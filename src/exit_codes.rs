@@ -277,6 +277,15 @@ pub static EXIT_CODE_DESCRIPTIONS: std::sync::LazyLock<HashMap<i32, ExitCodeInfo
             },
         );
 
+        map.insert(
+            65535,
+            ExitCodeInfo {
+                name: "InvalidMessage",
+                description: "Invalid message",
+                phase: "Compute phase",
+            },
+        );
+
         map
     });
 

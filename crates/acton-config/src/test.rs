@@ -1,7 +1,15 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::config::Network;
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
+/// Backtrace verbosity for failed tests
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum BacktraceMode {
+    /// Emit the full execution backtrace
     #[default]
     Full,
 }
@@ -14,20 +22,34 @@ impl std::fmt::Display for BacktraceMode {
     }
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq, Default)]
+/// Output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
 #[clap(rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum ReportFormat {
+    /// Human-readable console output
     #[default]
     Console,
+    /// TeamCity service messages
     TeamCity,
+    /// JUnit XML report
     JUnit,
+    /// Compact dot-progress output
     Dot,
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
+/// Coverage output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum CoverageFormat {
+    /// LCOV coverage report
     #[default]
     Lcov,
+    /// Plain-text coverage summary
     Text,
 }
 

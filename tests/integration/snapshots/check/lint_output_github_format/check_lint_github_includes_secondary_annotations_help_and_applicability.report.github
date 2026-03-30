@@ -1,1 +1,2 @@
 ::warning file=contracts/main.tolk,line=4,title=[E010]%3A used-ignored-identifier::`_value` is marked as unused but used here
+::warning file=contracts/main.tolk,line=4,title=[E032]%3A unused-expression::expression result is ignored

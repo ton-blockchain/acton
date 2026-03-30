@@ -43,9 +43,7 @@ fn write_bytes_impl(
         TupleItem::Slice(cell) | TupleItem::Cell(cell) => Tuple::parse_snake_bytes(&cell),
         _ => None,
     };
-    let success = data
-        .map(|bytes| std::fs::write(&path, bytes).is_ok())
-        .unwrap_or(false);
+    let success = data.is_some_and(|bytes| std::fs::write(&path, bytes).is_ok());
     stack.push_bool(success);
     Ok(())
 }

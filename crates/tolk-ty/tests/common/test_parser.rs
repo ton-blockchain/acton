@@ -23,6 +23,7 @@ pub enum ParserState {
 pub struct TestParser;
 
 impl TestParser {
+    #[must_use]
     pub fn parse_all(content: &str) -> Vec<TestCase> {
         let mut tests = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
@@ -192,7 +193,7 @@ impl TestParser {
 
         for test in tests {
             if !new_content.is_empty() {
-                new_content.push("".to_string());
+                new_content.push(String::new());
             }
 
             new_content.push(separator.to_string());
@@ -200,9 +201,9 @@ impl TestParser {
             for key in &test.properties_order {
                 if let Some(value) = test.properties.get(key) {
                     if value.is_empty() {
-                        new_content.push(format!("@{}", key));
+                        new_content.push(format!("@{key}"));
                     } else {
-                        new_content.push(format!("@{} {}", key, value));
+                        new_content.push(format!("@{key} {value}"));
                     }
                 }
             }
@@ -212,7 +213,7 @@ impl TestParser {
             new_content.push(test.input.clone());
 
             for (file_path, file_content) in &test.files {
-                new_content.push(format!("---FILE:{}", file_path));
+                new_content.push(format!("---FILE:{file_path}"));
                 new_content.push(file_content.clone());
             }
 

@@ -1,0 +1,237 @@
+'\" t
+.TH "ACTON\-BUILD" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-build \[em] Build all configured contracts or a selected contract
+.SH "SYNOPSIS"
+\fBacton build\fR [\fIoptions\fR] [\fIcontract\-id\fR]
+.SH "DESCRIPTION"
+Compile contracts declared in \fBActon.toml\fR, resolve their dependencies, and
+write build artifacts for the requested build set.
+.sp
+By default, \fBacton build\fR compiles every configured contract. If you pass a
+\fB_contract\-id_\fR, Acton builds only that contract and its transitive
+dependencies.
+.sp
+For each successful build, Acton writes a JSON artifact to the build output
+directory and, when the contract config has an \fBoutput\fR path, also writes the
+compiled \fB\&.boc\fR file there. Dependency helper files are emitted into the
+generated\-code directory, and optional Fift output can be written separately.
+.sp
+Contracts with \fB\&.boc\fR sources are treated as precompiled inputs: Acton loads
+their code, includes them in dependency resolution, and skips recompilation.
+.sp
+If the project has no \fB[contracts]\fR section or the section is empty, the
+command prints guidance and exits without compiling anything.
+.SH "OPTIONS"
+.SS "Build Options"
+.sp
+\fIcontract\-id\fR
+.RS 4
+Build only the specified contract and its transitive dependencies.
+.sp
+The value must match a \fB[contracts.<id>]\fR key in \fBActon.toml\fR\&.
+.RE
+.sp
+\fB\-\-clear\-cache\fR
+.RS 4
+Clear the project compilation cache before building.
+.RE
+.sp
+\fB\-\-graph\fR \fIpath\fR
+.RS 4
+Write the dependency graph for the requested build set as a DOT file.
+.RE
+.sp
+\fB\-\-out\-dir\fR \fIdir\fR
+.RS 4
+Directory for generated JSON build artifacts.
+.sp
+Defaults to \fB[build].out\-dir\fR when configured, otherwise \fBbuild/\fR\&.
+.RE
+.sp
+\fB\-\-gen\-dir\fR \fIdir\fR
+.RS 4
+Directory for generated dependency helper files such as
+\fBgen/<dependency>_code.tolk\fR\&.
+.sp
+Defaults to \fB[build].gen\-dir\fR when configured, otherwise \fBgen/\fR\&.
+.RE
+.sp
+\fB\-\-output\-fift\fR \fIdir\fR
+.RS 4
+Directory for compiled Fift output for \fB\&.tolk\fR contracts.
+.sp
+Defaults to \fB[build].output\-fift\fR when configured. If neither the flag nor the
+config value is set, Acton does not write \fB\&.fif\fR files.
+.RE
+.sp
+\fB\-\-info\fR
+.RS 4
+Print compiled code and hash information for each successfully built contract.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to load for this invocation.
+.sp
+Use this when running \fBacton build\fR outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery, cache storage, and
+default relative output paths.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "CONFIGURATION"
+\fBacton build\fR reads contracts from \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+[contracts.wallet]
+name = "Wallet Contract"
+src = "contracts/wallet.tolk"
+output = "wallet.boc"
+depends = ["child"]
+.fi
+.RE
+.sp
+Optional default output paths can be configured in \fB[build]\fR:
+.sp
+.RS 4
+.nf
+[build]
+out\-dir = "build"
+gen\-dir = "gen"
+output\-fift = "build/fift"
+.fi
+.RE
+.sp
+CLI flags override config values for the current invocation.
+.SH "OUTPUTS"
+Depending on command flags and project configuration, \fBacton build\fR may write:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<out\-dir>/<contract\-id>.json\fR with \fBcode_boc64\fR and \fBhash\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the configured contract \fBoutput\fR \fB\&.boc\fR file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<gen\-dir>/<dependency>_code.tolk\fR helper files for dependencies
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<output\-fift>/<contract\-id>.fif\fR for compiled \fB\&.tolk\fR contracts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'a DOT dependency graph file when \fB\-\-graph\fR is passed
+.RE
+.sp
+Existing output files at those paths are replaced with freshly generated
+artifacts.
+.SH "SIDE EFFECTS"
+\fBacton build\fR writes artifacts, cache entries, and optional graph output under
+the resolved project root. If one contract fails after earlier contracts were
+built successfully, the successful artifacts remain on disk.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The command completed without compilation failures.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The command failed because compilation, artifact writing, or dependency
+resolution failed for at least one requested contract.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Build every configured contract:
+.sp
+.RS 4
+.nf
+acton build
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Build one contract and its dependencies:
+.sp
+.RS 4
+.nf
+acton build wallet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Rebuild with a cleared cache:
+.sp
+.RS 4
+.nf
+acton build \-\-clear\-cache
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Write a dependency graph:
+.sp
+.RS 4
+.nf
+acton build \-\-graph deps.dot
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Override output locations for a single run:
+.sp
+.RS 4
+.nf
+acton build \-\-out\-dir artifacts \-\-gen\-dir artifacts/gen \-\-output\-fift artifacts/fift
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Print compiled code and hashes after the build:
+.sp
+.RS 4
+.nf
+acton build \-\-info
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help wrapper\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIBuild system configuration reference\fR <https://ton\-blockchain.github.io/acton/docs/build\-system/configuration\-reference>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIActon.toml reference\fR <https://ton\-blockchain.github.io/acton/docs/acton\-toml>
+.RE

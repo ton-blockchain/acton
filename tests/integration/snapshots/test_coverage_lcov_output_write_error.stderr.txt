@@ -1,0 +1,1 @@
+Error: Failed to generate LCOV file 'readonly/output.lcov': Permission denied ([OS_ERROR])

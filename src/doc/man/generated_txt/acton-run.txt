@@ -1,0 +1,101 @@
+ACTON-RUN(1)
+
+NAME
+       acton-run — Run a named script from Acton.toml
+
+SYNOPSIS
+       acton run [options] script [args…]
+
+DESCRIPTION
+       Run a command from the [scripts] section of Acton.toml.
+
+       This is similar to npm run: it lets you define short aliases for common
+       commands, multi-step workflows, or shell snippets and then execute them
+       through Acton.
+
+OPTIONS
+   Run Options
+       script
+           Name of the script entry in [scripts].
+
+       args…
+           Arguments appended to the configured script command.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+CONFIGURATION
+       Scripts are defined in Acton.toml:
+
+           [scripts]
+           deploy = "acton script scripts/deploy.tolk --broadcast"
+           test-unit = "acton test tests/unit"
+           custom-task = "echo 'Running custom task...'"
+
+BEHAVIOR
+       o  extra arguments passed after the script name are appended to the
+          configured command
+
+       o  if the script exits non-zero, acton run exits non-zero and includes
+          the nested exit code in the error message
+
+       o  on Unix-like systems scripts are executed via sh -c
+
+       o  on Windows scripts are executed via cmd /C
+
+       o  scripts run with the resolved project root as the working directory
+
+       o  stdin, stdout, stderr, and environment variables are inherited
+
+       o  arguments after _script_ are forwarded even when they start with -;
+          use -- only as an optional visual separator if you prefer
+
+       o  Acton does not guard against recursive script aliases; avoid scripts
+          that call themselves through acton run
+
+EXIT STATUS
+       o  0: The configured script finished successfully.
+
+       o  1: The script was missing, the shell could not start it, or the
+          nested command exited non-zero. The nested command’s exit code is
+          reported in the error message.
+
+EXAMPLES
+       1. Run a configured script:
+
+              acton run deploy
+
+       2. Append extra arguments:
+
+              acton run deploy --net mainnet
+
+       3. Run a custom shell task:
+
+              acton run custom-task
+
+       4. Use -- as an explicit separator if you prefer:
+
+              acton run deploy -- --net testnet
+
+SEE ALSO
+       o  acton help script
+
+       o  Run command guide
+          <https://ton-blockchain.github.io/acton/docs/commands/run>
+

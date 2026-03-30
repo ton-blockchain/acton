@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const CT_MESSAGES: &str = r#"
+const CT_MESSAGES: &str = r"
 struct (0xC7000001) CtTriggerExternal {
     queryId: uint64
 }
@@ -9,7 +9,7 @@ struct (0xC7000001) CtTriggerExternal {
 struct (0xC7000002) CtExternalNotice {
     count: uint32
 }
-"#;
+";
 
 const CT_EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -101,7 +101,7 @@ fn run_success(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn ext_out_list_at_or_null_out_of_range_returns_null_bug() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-out-of-range",
-        r#"
+        r"
 get fun `test-ct-ext-out-list-atornull-out-of-range`() {
     val externalAddress = deployCtExternalHarness();
 
@@ -116,7 +116,7 @@ get fun `test-ct-ext-out-list-atornull-out-of-range`() {
     val missing = externals.atOrNull<CtExternalNotice>(1);
     expect(missing == null).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_out_list_at_or_null_out_of_range_returns_null_bug/ext_out_list_at_or_null_out_of_range_returns_null_bug.stdout.txt",
     );
 }
@@ -125,7 +125,7 @@ get fun `test-ct-ext-out-list-atornull-out-of-range`() {
 fn ext_out_list_at_or_null_negative_index_returns_null() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-negative-index",
-        r#"
+        r"
 get fun `test-ct-ext-out-list-atornull-negative-index`() {
     val externalAddress = deployCtExternalHarness();
 
@@ -140,7 +140,7 @@ get fun `test-ct-ext-out-list-atornull-negative-index`() {
     val missing = externals.atOrNull<CtExternalNotice>(-1);
     expect(missing == null).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_out_list_at_or_null_out_of_range_returns_null_bug/ext_out_list_at_or_null_negative_index_returns_null.stdout.txt",
     );
 }
@@ -149,7 +149,7 @@ get fun `test-ct-ext-out-list-atornull-negative-index`() {
 fn ext_out_list_at_or_null_opcode_mismatch_returns_null() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-opcode-mismatch",
-        r#"
+        r"
 get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
     val externalAddress = deployCtExternalHarness();
 
@@ -164,7 +164,7 @@ get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
     val mismatched = externals.atOrNull<CtTriggerExternal>(0);
     expect(mismatched == null).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_out_list_at_or_null_out_of_range_returns_null_bug/ext_out_list_at_or_null_opcode_mismatch_returns_null.stdout.txt",
     );
 }
@@ -173,7 +173,7 @@ get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
 fn ext_out_list_at_or_null_valid_index_returns_message() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-valid-index",
-        r#"
+        r"
 get fun `test-ct-ext-out-list-atornull-valid-index`() {
     val externalAddress = deployCtExternalHarness();
 
@@ -189,7 +189,7 @@ get fun `test-ct-ext-out-list-atornull-valid-index`() {
     expect(first != null).toBeTrue();
     expect(first!.loadBody().count).toEqual(1);
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_out_list_at_or_null_out_of_range_returns_null_bug/ext_out_list_at_or_null_valid_index_returns_message.stdout.txt",
     );
 }

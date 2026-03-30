@@ -128,11 +128,11 @@ fn test_check_dangerous_send_mode_safety_comment_regular_mode_is_ignored() {
 fn test_check_dangerous_send_mode_safety_comment_send_raw_message_is_ignored() {
     run_simple_test(
         "dangerous_send_mode_safety_comment",
-        r#"
+        r"
             fun onInternalMessage(_: InMessage) {
                 sendRawMessage(beginCell().endCell(), SEND_MODE_CARRY_ALL_BALANCE);
             }
-        "#,
+        ",
         function_name!(),
     );
 }

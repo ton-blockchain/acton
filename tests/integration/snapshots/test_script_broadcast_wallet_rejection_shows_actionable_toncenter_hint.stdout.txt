@@ -1,0 +1,8 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 100
+Re-run with --backtrace full to get more information
+Failed to send message to real network: wallet deployer rejected the external message before contract execution; likely causes:
+- not enough balance to cover the transfer and fees
+- wallet is not deployed on mock-v2
+- seqno is stale (message used seqno 0)
+- message expired

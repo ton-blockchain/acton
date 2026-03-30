@@ -1,0 +1,4 @@
+Error: In simple:
+
+Failed to save Fift file readonly/simple.fif: Permission denied ([OS_ERROR])
+Build failed with 1 error

@@ -50,9 +50,8 @@ pub fn check_resolved_reference(
     }
 
     // Search for deprecated message is quite expensive but this is fine for this rule.
-    let message = find_deprecated_message(checker, symbol)
-        .map(|msg| format!(". {msg}"))
-        .unwrap_or_else(|| "".to_owned());
+    let message =
+        find_deprecated_message(checker, symbol).map_or_else(String::new, |msg| format!(". {msg}"));
 
     let diagnostic = Diagnostic::warning_for(file_id, DeprecatedSymbolUse)
         .with_annotations(vec![Annotation {

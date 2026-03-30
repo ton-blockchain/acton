@@ -528,9 +528,9 @@ fn test_include_patterns_via_config_with_explicit_directory_path() {
         .contract("simple", SIMPLE_CONTRACT)
         .raw_file(
             "tests/selected/path_case.test.tolk",
-            r#"
+            r"
             get fun `test-folder-path`() {}
-        "#,
+        ",
         )
         .with_test_config(TestConfig {
             include_patterns: Some(vec!["tests/selected/**".to_string()]),
@@ -756,7 +756,6 @@ fn test_fail_on_diff_via_config_without_baseline_snapshot_mode_succeeds() {
     let stderr = output.get_normalized_stderr();
     assert!(
         !stderr.contains("`--fail-on-diff` requires `--baseline-snapshot`"),
-        "snapshot mode with fail-on-diff from config must not require baseline, stderr:\n{}",
-        stderr
+        "snapshot mode with fail-on-diff from config must not require baseline, stderr:\n{stderr}"
     );
 }

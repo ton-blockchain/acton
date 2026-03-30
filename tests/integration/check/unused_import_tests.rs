@@ -13,41 +13,41 @@ fn run_fix_test_with_files(before: &str, after: &str, files: &[(&str, &str)], na
     run_rule_fix_test_with_files(RULE_CODE, before, after, files, name);
 }
 
-const FUNCTIONS_FILE: &str = r#"
+const FUNCTIONS_FILE: &str = r"
     fun fromFunction(): int {
         return 1;
     }
-"#;
+";
 
-const CONSTANTS_FILE: &str = r#"
+const CONSTANTS_FILE: &str = r"
     const FROM_CONST = 10
-"#;
+";
 
-const TYPES_FILE: &str = r#"
+const TYPES_FILE: &str = r"
     type FromAlias = int
-"#;
+";
 
-const STRUCTS_FILE: &str = r#"
+const STRUCTS_FILE: &str = r"
     struct FromStruct {
         value: int,
     }
-"#;
+";
 
-const METHODS_FILE: &str = r#"
+const METHODS_FILE: &str = r"
     fun int.bump(self): int {
         return self + 1;
     }
-"#;
+";
 
-const UNUSED_FILE: &str = r#"
+const UNUSED_FILE: &str = r"
     fun notUsed(): int {
         return 0;
     }
-"#;
+";
 
-const UNUSED_FILE_2: &str = r#"
+const UNUSED_FILE_2: &str = r"
     const NEVER_USED = 42
-"#;
+";
 
 #[test]
 #[named]

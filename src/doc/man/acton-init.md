@@ -1,0 +1,125 @@
+# acton-init(1)
+
+## NAME
+
+acton-init --- Initialize Acton support in the current directory
+
+## SYNOPSIS
+
+`acton init` [_options_]
+
+## DESCRIPTION
+
+Initialize Acton support in the current working directory.
+
+This command is intended for existing repositories or ad-hoc directories where
+you want to add `Acton.toml`, standard Acton ignore rules, the bundled
+standard library, and symlinks to global wallet and library overlays.
+
+If `Acton.toml` already exists, `acton init` does not replace it. Instead it
+patches in default mappings when they are missing.
+
+If `Acton.toml` does not exist, the command scans `.tolk` files in the current
+directory tree and auto-registers files that define `onInternalMessage` as
+contract entry files.
+
+## IDEMPOTENCY
+
+`acton init` is safe to run repeatedly.
+
+- it never replaces an existing `Acton.toml`
+- it backfills default `mappings` only when they are missing
+- it appends missing `.gitignore` patterns without deleting existing ones
+- it refreshes `.acton/tolk-stdlib`
+- it re-attempts global wallet and library symlinks on each run
+
+## DISPLAY OPTIONS
+
+{{> options-display }}
+
+## PROJECT OPTIONS
+
+{{> options-project-pass-through }}
+
+## GENERATED AND PATCHED FILES
+
+`acton init` can create or update:
+
+- `Acton.toml`
+- `.gitignore`
+- `.acton/`
+- local symlinks for `global.wallets.toml` and `global.libraries.toml`
+
+When `Acton.toml` is created from scratch, it starts from Acton's default
+project config and may include:
+
+- `[package]` metadata
+- `[fmt]` defaults
+- discovered `[contracts]`
+- default `[mappings]`
+
+When `Acton.toml` already exists, `acton init` only backfills missing default
+`[mappings]` entries.
+
+When patching `.gitignore`, Acton adds groups for:
+
+- Acton artifacts such as `.acton/`, `gen/`, `build/`, and `lcov.info`
+- local and global wallet/library overlay files
+- `.env` and mnemonic files
+
+## CONTRACT DISCOVERY
+
+When generating a new `Acton.toml`, contract discovery:
+
+- walks the current directory recursively
+- skips hidden directories and entries such as `node_modules`, `target`, `.git`,
+  and `.acton`
+- considers `.tolk` files only
+- treats files with an `onInternalMessage` function as contract entry files
+
+## STANDARD LIBRARY
+
+`acton init` ensures that the bundled Tolk standard library is installed into
+`.acton/tolk-stdlib`.
+
+If symlinks for global wallets or libraries cannot be created, Acton prints a
+warning and still completes initialization. This is relevant on systems where
+symlink creation is restricted.
+
+## SIDE EFFECTS
+
+`acton init` writes or patches local project files and may create local
+symlinks to global overlay files. It does not modify Git config and does not
+remove existing user content from `Acton.toml` or `.gitignore`.
+
+## EXIT STATUS
+
+- `0`: Initialization completed successfully, including no-op repeat runs.
+- `1`: Manifest parsing, contract discovery, stdlib installation, or filesystem
+  updates failed.
+
+## EXAMPLES
+
+1. Initialize Acton support in an existing repository:
+
+   ```bash
+   acton init
+   ```
+
+2. Regenerate default mappings in an existing `Acton.toml`:
+
+   ```bash
+   acton init
+   ```
+
+3. Re-run safely after adding more contracts:
+
+   ```bash
+   acton init
+   ```
+
+## SEE ALSO
+
+- `acton help new`
+- `acton help doctor`
+- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)

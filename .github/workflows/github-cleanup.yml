@@ -1,109 +1,76 @@
-name: Cleanup Unused GitHub Actions Cache
+name: Cleanup GitHub Actions Cache
 
 on:
   schedule:
-    # 00:00 Europe/Moscow (21:00 UTC)
-    - cron: "0 21 * * *"
+    # 00:00 Europe/Moscow every 3rd day of the month (21:00 UTC)
+    - cron: "0 21 */3 * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Preview stale caches without deleting them
+        description: Preview cache cleanup without deleting anything
         required: false
         type: boolean
         default: true
-      max_age_hours:
-        description: Delete caches older than this many hours
+      last_accessed_days:
+        description: Delete entries if last_accessed_at is older than this many days
         required: false
         type: number
-        default: 24
-      branch:
-        description: Branch to clean caches for; leave empty to include all branches
+        default: 1
+      created_days:
+        description: Delete entries if last_accessed_at is missing and created_at is older than this many days
         required: false
-        type: string
-        default: ""
+        type: number
+        default: 3
 
 concurrency:
-  group: cache-cleanup
+  group: github-cleanup
   cancel-in-progress: true
 
 permissions: { }
 
 jobs:
   cleanup-cache:
-    name: Delete unused caches
-    runs-on: ubicloud-standard-2
+    name: Delete caches
+    if: github.repository == 'ton-blockchain/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       actions: write
+      contents: read
+
+    env:
+      XTASK_DRY_RUN: ${{ inputs.dry_run }}
+      XTASK_LAST_ACCESSED_DAYS: ${{ inputs.last_accessed_days }}
+      XTASK_CREATED_DAYS: ${{ inputs.created_days }}
 
     steps:
-      - name: Delete unused caches
-        uses: actions/github-script@v8
-        env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
-          MAX_AGE_HOURS: ${{ github.event_name == 'workflow_dispatch' && inputs.max_age_hours || '24' }}
-          BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || '' }}
+      - name: Check out Acton repository
+        uses: actions/checkout@v6
         with:
-          # language=JavaScript
-          script: |
-            const { owner, repo } = context.repo;
-            const dryRun = process.env.DRY_RUN === 'true';
-            const maxAgeHours = Number.parseInt(process.env.MAX_AGE_HOURS ?? '24', 10);
-            const branchInput = (process.env.BRANCH ?? '').trim();
-            if (!Number.isFinite(maxAgeHours) || maxAgeHours < 0) {
-              throw new Error(`MAX_AGE_HOURS must be a non-negative integer, got "${process.env.MAX_AGE_HOURS}"`);
-            }
+          persist-credentials: false
 
-            const cutoffTimestamp = Date.now() - maxAgeHours * 60 * 60 * 1000;
-            const ref = branchInput
-              ? (branchInput.startsWith('refs/') ? branchInput : `refs/heads/${branchInput}`)
-              : undefined;
+      - name: Install Rust
+        run: rustup toolchain install
 
-            let checked = 0;
-            let deleted = 0;
+      - name: Run GitHub cache cleanup xtask
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # language=Bash
+        run: |
+          args=(
+            run -p xtask -- github-cleanup
+          )
 
-            core.info(`Dry run mode: ${dryRun ? 'enabled' : 'disabled'}`);
-            core.info(`Max cache age: ${maxAgeHours} hour(s)`);
-            core.info(`Branch filter: ${ref ?? 'all branches'}`);
+          if [[ -n "${XTASK_LAST_ACCESSED_DAYS}" ]]; then
+            args+=(--last-accessed-days "${XTASK_LAST_ACCESSED_DAYS}")
+          fi
 
-            const response = await github.rest.actions.getActionsCacheList({
-              owner: owner,
-              repo: repo,
-              sort: 'last_accessed_at',
-              direction: 'asc',
-              per_page: 100,
-              ref: ref,
-            });
+          if [[ -n "${XTASK_CREATED_DAYS}" ]]; then
+            args+=(--created-days "${XTASK_CREATED_DAYS}")
+          fi
 
-            const caches = response.data.actions_caches ?? [];
-            for (const cache of caches) {
-              checked += 1;
+          if [[ "${XTASK_DRY_RUN}" == 'true' ]]; then
+            args+=(--dry-run)
+          fi
 
-              const lastAccessedTimestamp = Date.parse(cache.last_accessed_at ?? '');
-              if (lastAccessedTimestamp >= cutoffTimestamp) {
-                break;
-              }
-
-              const details = `cache_id=${cache.id} key=${cache.key} ref=${cache.ref} last_accessed_at=${lastAccessedTimestamp}`;
-              if (dryRun) {
-                core.info(`Dry run: would delete ${details}`);
-                continue;
-              }
-
-              core.info(`Deleting ${details}`);
-              await github.rest.actions.deleteActionsCacheById({
-                owner: owner,
-                repo: repo,
-                cache_id: cache.id,
-              });
-
-              deleted += 1;
-            }
-
-            core.info(`Checked ${checked} caches.`);
-
-            if (dryRun) {
-              core.info(`Dry run complete. Deleted ${deleted} stale caches.`);
-            } else {
-              core.info(`Deleted ${deleted} stale caches.`);
-            }
+          cargo "${args[@]}"

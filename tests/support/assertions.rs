@@ -87,12 +87,19 @@ fn is_json_like_snapshot_file(path: &Path) -> bool {
 }
 
 #[allow(dead_code)]
+fn preserves_json_field_order(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| matches!(name, "package.json" | "package-lock.json"))
+}
+
+#[allow(dead_code)]
 fn normalize_file_snapshot_content(
     file_content: &str,
     file_path: &Path,
     project_path: &Path,
 ) -> String {
-    if is_json_like_snapshot_file(file_path) {
+    if is_json_like_snapshot_file(file_path) && !preserves_json_field_order(file_path) {
         normalize_output_preserve_escapes(file_content, project_path)
     } else {
         normalize_output(file_content, project_path)
@@ -101,7 +108,7 @@ fn normalize_file_snapshot_content(
 
 #[allow(dead_code)]
 fn snapshot_assert_for_file(file_path: &Path) -> snapbox::Assert {
-    if is_json_like_snapshot_file(file_path) {
+    if is_json_like_snapshot_file(file_path) && !preserves_json_field_order(file_path) {
         assertion().normalize_paths(false)
     } else {
         assertion()

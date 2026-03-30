@@ -1,4 +1,4 @@
-use crate::common::{acton_exe, assert_ui};
+use crate::common::{acton_exe, acton_path_env, assert_ui};
 use crate::support::assertions::TestOutput;
 use crate::support::tempdir::create_tmp_dir;
 use acton_config::color::ColorMode;
@@ -76,6 +76,14 @@ fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+}
+
+#[allow(dead_code)]
+#[cfg(unix)]
+fn preserves_json_field_order(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| matches!(name, "package.json" | "package-lock.json"))
 }
 
 #[allow(dead_code)]
@@ -223,6 +231,19 @@ impl PtySession {
         self
     }
 
+    /// Assert that a pattern does not appear before timeout or EOF.
+    pub(crate) fn expect_no_match<N>(&mut self, needle: N) -> &mut Self
+    where
+        N: expectrl::Needle + NeedleLabel,
+    {
+        let label = needle.needle_label();
+        match self.inner.expect(needle) {
+            Err(expectrl::Error::ExpectTimeout | expectrl::Error::Eof) => self,
+            Ok(_) => panic!("Expected PTY output to not match {label}"),
+            Err(err) => panic!("Expected PTY output to not match {label}, got error: {err}"),
+        }
+    }
+
     /// Expect a pattern and panic with a custom message on failure.
     #[allow(dead_code)]
     #[allow(non_snake_case)]
@@ -256,7 +277,9 @@ impl PtySession {
             panic!("Failed to read file '{}': {}", full_file_path.display(), e)
         });
 
-        let normalized = if is_json_like_snapshot_file(&full_file_path) {
+        let normalized = if is_json_like_snapshot_file(&full_file_path)
+            && !preserves_json_field_order(&full_file_path)
+        {
             crate::support::snapshots::normalize_output_preserve_escapes(
                 &file_content,
                 &self.project_path,
@@ -265,7 +288,9 @@ impl PtySession {
             crate::support::snapshots::normalize_output(&file_content, &self.project_path)
         };
 
-        let assertion = if is_json_like_snapshot_file(&full_file_path) {
+        let assertion = if is_json_like_snapshot_file(&full_file_path)
+            && !preserves_json_field_order(&full_file_path)
+        {
             crate::common::assertion().normalize_paths(false)
         } else {
             crate::common::assertion()
@@ -527,7 +552,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read test file from {}: {}", path, e));
+            .unwrap_or_else(|e| panic!("Failed to read test file from {path}: {e}"));
         self.tests.push((name.to_string(), code));
         self
     }
@@ -540,7 +565,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn contract_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read contract file from {}: {}", path, e));
+            .unwrap_or_else(|e| panic!("Failed to read contract file from {path}: {e}"));
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code),
@@ -559,7 +584,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn file_from_path(mut self, dest_path: &str, src_path: &str) -> Self {
         let code = fs::read_to_string(src_path)
-            .unwrap_or_else(|e| panic!("Failed to read file from {}: {}", src_path, e));
+            .unwrap_or_else(|e| panic!("Failed to read file from {src_path}: {e}"));
         self.files.push((dest_path.to_string(), code));
         self
     }
@@ -1002,7 +1027,7 @@ pub(crate) struct Project {
 impl Project {
     #[allow(dead_code)]
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = ProcessCommandBuilder::new(acton_exe());
+        let cmd = ProcessCommandBuilder::new(acton_exe()).env("PATH", acton_path_env());
         ActonCommand {
             cmd,
             project: Arc::new(ProjectRef {

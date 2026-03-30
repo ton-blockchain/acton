@@ -235,7 +235,7 @@ mod tests {
 
             if let Some(TupleItem::Slice(slice)) = tuple.0.first() {
                 let parsed = Tuple::parse_snake_string(slice);
-                assert_eq!(parsed, Some(test_string.to_string()));
+                assert_eq!(parsed, Some(test_string.clone()));
             } else {
                 panic!("Expected slice item for string of length {expected_len}");
             }

@@ -7,7 +7,7 @@ It combines project scaffolding, build, testing, scripting, wallet and network
 operations, verification, linting, formatting, and low-level VM tooling in one
 CLI.
 
-Documentation: https://i582.github.io/acton/docs/welcome
+Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 
 <br clear="right" />
 
@@ -21,15 +21,20 @@ Documentation: https://i582.github.io/acton/docs/welcome
 
 ## Install
 
-The recommended way to get Acton today is to download a prebuilt binary from
-the latest release:
+The recommended way to get Acton today is to run the latest public installer:
 
-| Platform | Architecture | Download                                                                                                        |
-|----------|--------------|-----------------------------------------------------------------------------------------------------------------|
-| macOS    | ARM64        | [acton-macos-aarch64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-macos-aarch64.tar.gz) |
-| macOS    | x86_64       | [acton-macos-x86_64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-macos-x86_64.tar.gz)   |
-| Linux    | x86_64       | [acton-linux-x86_64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-linux-x86_64.tar.gz)   |
-| Linux    | ARM64        | [acton-linux-aarch64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-linux-aarch64.tar.gz) |
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
+```
+
+If you prefer a manual download, use the latest public release:
+
+| Platform | Architecture | Download                                                                                                                                       |
+|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-apple-darwin.tar.gz)           |
+| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-apple-darwin.tar.gz)             |
+| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz)   |
+| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz) |
 
 After extracting the archive, make sure `acton` is on your `PATH` and verify
 the installation:
@@ -39,7 +44,16 @@ acton --version
 ```
 
 For more installation details, see the
-[installation guide](https://i582.github.io/acton/docs/installation).
+[installation guide](https://ton-blockchain.github.io/acton/docs/installation).
+
+## Support policy
+
+Acton is currently distributed as a public beta. The stable release channel is
+the latest numbered GitHub release, and the first-class platform matrix is
+macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). `trunk` builds installed
+via `acton up --trunk`, native Windows usage, and other source-built targets
+are beta / best-effort surfaces for now. The full policy is documented at
+[Support policy](https://ton-blockchain.github.io/acton/docs/miscellaneous/support-policy).
 
 ## From zero to testnet
 
@@ -53,14 +67,14 @@ acton build
 acton test
 
 # Create and fund a local testnet wallet
-acton wallet new --name deployer --local --airdrop
+acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
 acton script scripts/deploy.tolk --broadcast --net testnet
 ```
 
 For a step-by-step walkthrough, see the
-[quickstart guide](https://i582.github.io/acton/docs/quickstart).
+[quickstart guide](https://ton-blockchain.github.io/acton/docs/quickstart).
 
 ## Building from source
 

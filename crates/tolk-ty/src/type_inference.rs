@@ -148,7 +148,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         })
     }
 
-    pub(crate) fn infer_global_var<'t>(&mut self, v: &GlobalVar<'t>, symbol_id: SymbolId) {
+    pub(crate) fn infer_global_var(&mut self, v: &GlobalVar<'_>, symbol_id: SymbolId) {
         let declared_type = self.lower(v.typ());
         self.ctx.set_top_level_type(symbol_id, declared_type);
         self.ctx.set_node_type(v, declared_type);
@@ -157,7 +157,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         }
     }
 
-    pub(crate) fn infer_type_alias<'t>(&mut self, v: &TypeAlias<'t>, symbol_id: SymbolId) {
+    pub(crate) fn infer_type_alias(&mut self, v: &TypeAlias<'_>, symbol_id: SymbolId) {
         // type alias was already inferred during top levels type inference
         let Some(name_ident) = v.name() else { return };
         let ty = self
@@ -174,7 +174,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         }
     }
 
-    pub(crate) fn infer_constant<'t>(&mut self, v: &Constant<'t>, symbol_id: SymbolId) {
+    pub(crate) fn infer_constant(&mut self, v: &Constant<'_>, symbol_id: SymbolId) {
         let declared_type = self.lower_or_none(v.typ());
         let flow = FlowContext::new();
         if let Some(value) = v.value() {
@@ -195,7 +195,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         }
     }
 
-    pub(crate) fn infer_struct<'t>(&mut self, v: &Struct<'t>, symbol_id: SymbolId) {
+    pub(crate) fn infer_struct(&mut self, v: &Struct<'_>, symbol_id: SymbolId) {
         let Some(name_ident) = v.name() else { return };
         let Some(body) = v.body() else { return };
 
@@ -227,7 +227,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         }
     }
 
-    pub(crate) fn infer_enum<'t>(&mut self, v: &Enum<'t>, symbol_id: SymbolId) {
+    pub(crate) fn infer_enum(&mut self, v: &Enum<'_>, symbol_id: SymbolId) {
         let Some(name_ident) = v.name() else { return };
         let Some(body) = v.body() else { return };
         for member in body.members() {
@@ -309,7 +309,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         if let Some(return_type) = v.return_type()
             && let Some(declared_return_ty) = declared_return_ty
         {
-            self.ctx.set_node_type(&return_type, declared_return_ty)
+            self.ctx.set_node_type(&return_type, declared_return_ty);
         }
         self.ctx.declared_return_ty = declared_return_ty;
 
@@ -348,7 +348,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         Some(())
     }
 
-    pub(crate) fn infer_method<'t>(&mut self, v: &Method<'t>, symbol_id: SymbolId) -> Option<()> {
+    pub(crate) fn infer_method(&mut self, v: &Method<'_>, symbol_id: SymbolId) -> Option<()> {
         let mut body_start = FlowContext::new();
         let is_generic_declaration = v.type_parameters().is_some();
         let declared_return_ty = self.lower_or_none(v.return_type()).map(|ty| {

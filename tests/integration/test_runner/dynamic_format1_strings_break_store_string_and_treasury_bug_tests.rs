@@ -7,10 +7,10 @@ import "../../lib/fmt"
 import "../../lib/io"
 "#;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn run_dynamic_string_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{IMPORTS}\n{test_body}\n");

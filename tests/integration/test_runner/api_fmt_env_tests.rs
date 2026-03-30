@@ -179,7 +179,7 @@ fn env_rejects_unsupported_target_types_with_clear_error() {
         .failure()
         .assert_failed(1)
         .assert_contains(
-            "env() supports only int, bool, string, slice, address and cell types, but got Unsupported",
+            "env() supports only int, coins, bool, string, slice, address and cell types, but got Unsupported",
         )
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/api_fmt_env/env_rejects_unsupported_target_types_with_clear_error.stdout.txt",

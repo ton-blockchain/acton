@@ -5,17 +5,23 @@ use crate::context::{
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::DebugContext;
+use crate::exit_codes;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::retrace;
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
+use acton_config::test::BacktraceMode;
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
 use std::fs;
+use std::io::{Write, stderr, stdout};
+use std::net::TcpListener;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -27,9 +33,9 @@ use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
 };
 use ton_executor::get::step::StepGetExecutor;
-use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
+use ton_source_map::{SourceLocation, SourceMap};
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -37,11 +43,16 @@ use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
 use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
+const ASSERTION_FAILED_EXIT_CODE: i32 = 567;
+const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
+const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
+
 #[allow(clippy::too_many_arguments)]
 pub fn script_cmd(
     path: &String,
     args: Vec<String>,
     debug: bool,
+    backtrace: Option<BacktraceMode>,
     debug_port: u16,
     clear_cache: bool,
     fork_net: Option<String>,
@@ -86,6 +97,11 @@ pub fn script_cmd(
         Some(net) => Some(Network::from_str(net)?),
         None => None,
     };
+    let debug_listener = if debug {
+        Some(crate::debugger::dap::reserve_dap_listener(debug_port)?)
+    } else {
+        None
+    };
 
     run_script_file(
         path,
@@ -93,7 +109,8 @@ pub fn script_cmd(
         &mappings,
         stack,
         debug,
-        debug_port,
+        backtrace,
+        debug_listener,
         fork_net,
         api_key,
         fork_block_number,
@@ -116,7 +133,8 @@ fn run_script_file(
     mappings: &Option<BTreeMap<String, String>>,
     stack: Tuple,
     debug: bool,
-    debug_port: u16,
+    backtrace: Option<BacktraceMode>,
+    debug_listener: Option<TcpListener>,
     fork_net: Option<String>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
@@ -128,8 +146,9 @@ fn run_script_file(
     let abi = contract_abi(content.into(), file_path, mappings);
 
     let compiler = tolkc::Compiler::new(2).with_mappings(mappings);
+    let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
 
-    match compiler.compile(Path::new(file_path), debug) {
+    match compiler.compile(Path::new(file_path), need_debug_info) {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
@@ -141,7 +160,8 @@ fn run_script_file(
                 Arc::new(abi),
                 result.source_map.unwrap_or_default().into(),
                 debug,
-                debug_port,
+                backtrace,
+                debug_listener,
                 ExecutorVerbosity::FullLocationStackVerbose,
                 fork_net,
                 api_key,
@@ -161,6 +181,7 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
+    source_map: Arc<SourceMap>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -171,7 +192,8 @@ fn execute_script(
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
     debug: bool,
-    debug_port: u16,
+    backtrace: Option<BacktraceMode>,
+    debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     fork_net: Option<String>,
     api_key: Option<String>,
@@ -259,13 +281,14 @@ fn execute_script(
             emulator: &mut emulator,
             emulations: &mut emulations,
         },
+        message_iters: Default::default(),
         build: BuildContext {
             build_cache: &mut build_cache,
             file_build_cache: &mut file_build_cache,
             known_addresses: &mut known_addresses,
             known_code_cells: &mut known_code_cell,
-            need_debug_info: false,
-            backtrace: None,
+            need_debug_info: debug || backtrace == Some(BacktraceMode::Full),
+            backtrace,
         },
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
@@ -277,12 +300,14 @@ fn execute_script(
         let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
         ffi::register(&mut executor, &mut ctx);
 
-        let transport = crate::debugger::start_dap_server(debug_port);
+        let listener = debug_listener
+            .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
+        let transport = crate::debugger::dap::start_dap_server_with_listener(listener)?;
 
         let mut dbg_ctx = DebugContext::new(
             transport,
             AnyExecutor::Get(executor.clone()),
-            source_map,
+            source_map.clone(),
             "main".into(),
         );
 
@@ -293,7 +318,7 @@ fn execute_script(
         ctx.debug.ctx().process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
-        print_script_result(&ctx, ScriptResult { result });
+        print_script_result(&ctx, ScriptResult { result, source_map });
         return Ok(());
     }
 
@@ -302,7 +327,7 @@ fn execute_script(
 
     let stack = Boc::encode_base64(serialize_tuple(&stack)?);
     let result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
-    print_script_result(&ctx, ScriptResult { result });
+    print_script_result(&ctx, ScriptResult { result, source_map });
     Ok(())
 }
 
@@ -311,38 +336,140 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
         GetMethodResult::Success(success_result) => {
             let exit_code = success_result.vm_exit_code;
 
-            if exit_code != 0
-                && let Some(assert_failure) = ctx.asserts.assert_failure.as_ref()
-            {
-                let formatter = FormatterContext::from_context(ctx);
+            if exit_code != 0 {
+                print_nonzero_script_exit_code(ctx, success_result, &result.source_map, exit_code);
 
-                if let AssertFailure::WalletNotFound(failure) = assert_failure {
-                    let message = formatter.format_wallet_not_found_message(failure);
-                    let highlighted_message = FormatterContext::highlight_actual_expected(&message);
-                    eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
+                if let Some(assert_failure) = ctx.asserts.assert_failure.as_ref() {
+                    let formatter = FormatterContext::from_context(ctx);
 
-                    if let Some(location) = &failure.location {
-                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
-                    }
-                } else {
-                    let detailed_message = formatter
-                        .format_detailed_assert_failure(assert_failure, ctx.env.abi.clone());
+                    if let AssertFailure::WalletNotFound(failure) = assert_failure {
+                        let message = formatter.format_wallet_not_found_message(failure);
+                        let highlighted_message =
+                            FormatterContext::highlight_actual_expected(&message);
+                        eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
 
-                    if detailed_message.is_empty() {
-                        println!("{}", "└─".dimmed());
+                        if let Some(location) = &failure.location {
+                            println!("{} at {}", "└─".dimmed(), location.format().dimmed());
+                        }
                     } else {
-                        println!("{detailed_message}");
+                        let detailed_message = formatter
+                            .format_detailed_assert_failure(assert_failure, ctx.env.abi.clone());
+
+                        if detailed_message.is_empty() {
+                            println!("{}", "└─".dimmed());
+                        } else {
+                            println!("{detailed_message}");
+                        }
                     }
                 }
+
+                let _ = stdout().flush();
+                let _ = stderr().flush();
             }
 
-            std::process::exit(exit_code);
+            std::process::exit(if exit_code == 0 { 0 } else { 1 });
         }
         GetMethodResult::Error(error) => {
             println!("{} {}", "Execution error:".red(), error.error.red());
+            let _ = stdout().flush();
+            let _ = stderr().flush();
             std::process::exit(1);
         }
     }
+}
+
+fn print_nonzero_script_exit_code(
+    ctx: &Context<'_>,
+    result: &GetMethodResultSuccess,
+    source_map: &SourceMap,
+    exit_code: i32,
+) {
+    if exit_code == ASSERTION_FAILED_EXIT_CODE {
+        return;
+    }
+
+    println!(
+        "Script finished with exit code {}",
+        exit_code.to_string().yellow(),
+    );
+
+    let details = format_nonzero_script_exit_code_details(ctx, result, source_map, exit_code);
+    if !details.is_empty() {
+        println!("{details}");
+    }
+}
+
+fn format_nonzero_script_exit_code_details(
+    ctx: &Context<'_>,
+    result: &GetMethodResultSuccess,
+    source_map: &SourceMap,
+    exit_code: i32,
+) -> String {
+    let formatter = FormatterContext::from_context(ctx);
+    let mut details = String::new();
+    let exit_code_info = retrace::find_exception_info(&result.vm_log, source_map);
+
+    if let Some(info) = &exit_code_info {
+        if let Some(loc) = &info.loc {
+            writeln!(
+                details,
+                "at {}:{}:{}",
+                SourceLocation::normalize_path(&loc.file),
+                loc.line + 1,
+                loc.column + 2
+            )
+            .ok();
+
+            let backtrace_lines = FormatterContext::format_backtrace(&info.backtrace);
+            if !backtrace_lines.is_empty() {
+                writeln!(details, "Backtrace:").ok();
+                for line in backtrace_lines {
+                    writeln!(details, "  {line}").ok();
+                }
+            }
+        } else if formatter.backtrace.is_none() {
+            writeln!(
+                details,
+                "Re-run with {} to get more information",
+                "--backtrace full".yellow()
+            )
+            .ok();
+        }
+
+        if !info.description.is_empty() {
+            writeln!(details, "Description: {}", info.description.dimmed()).ok();
+        }
+    } else if formatter.backtrace.is_none() {
+        writeln!(
+            details,
+            "Re-run with {} to get more information",
+            "--backtrace full".yellow()
+        )
+        .ok();
+    }
+
+    if let Some(info) = exit_codes::find(exit_code) {
+        let should_show_fallback_description = exit_code_info
+            .as_ref()
+            .is_none_or(|exception| exception.description.is_empty());
+        if should_show_fallback_description {
+            writeln!(details, "Description: {}", info.description.dimmed()).ok();
+        }
+        writeln!(details, "Phase: {}", info.phase.dimmed()).ok();
+    }
+
+    if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
+        writeln!(
+            details,
+            "Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
+            "--fork-net".yellow(),
+        )
+        .ok();
+    } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
+        writeln!(details, "Cannot run method of contract without code").ok();
+    }
+
+    details.trim().to_string()
 }
 
 fn contract_address(code: &Cell) -> anyhow::Result<StdAddr> {

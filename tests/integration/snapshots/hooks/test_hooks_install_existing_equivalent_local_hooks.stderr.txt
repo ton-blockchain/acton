@@ -1,0 +1,1 @@
+Error: Git hooks are already installed. Run `acton hooks uninstall` first.

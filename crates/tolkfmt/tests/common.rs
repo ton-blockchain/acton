@@ -4,22 +4,22 @@ use tolkfmt::{FormatOptions, format_source};
 
 #[allow(dead_code)]
 pub(crate) fn check(code: &str, expect: Expect) {
-    check_with_width(code, expect, 80)
+    check_with_width(code, expect, 80);
 }
 
 #[allow(dead_code)]
 pub(crate) fn check_with_width(code: &str, expect: Expect, width: usize) {
-    check_code(code, expect, width, true, FormatOptions::default())
+    check_code(code, expect, width, true, FormatOptions::default());
 }
 
 #[allow(dead_code)]
 pub(crate) fn check_without_trees(code: &str, expect: Expect) {
-    check_with_width_without_trees(code, expect, 80)
+    check_with_width_without_trees(code, expect, 80);
 }
 
 #[allow(dead_code)]
 pub(crate) fn check_with_width_without_trees(code: &str, expect: Expect, width: usize) {
-    check_code(code, expect, width, false, FormatOptions::default())
+    check_code(code, expect, width, false, FormatOptions::default());
 }
 
 #[allow(dead_code)]

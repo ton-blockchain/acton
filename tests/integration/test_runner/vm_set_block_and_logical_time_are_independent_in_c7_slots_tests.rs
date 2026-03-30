@@ -3,10 +3,10 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const DJ_SIMPLE_CONTRACT: &str = r#"
+const DJ_SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const DJ_VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
@@ -31,7 +31,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn vm_set_block_and_logical_time_are_independent_in_c7_slots() {
     run_success_case(
         "dj-stdlib-vm-set-block-and-logical-time-independent-slots",
-        r#"
+        r"
 get fun `test-dj-vm-set-block-and-logical-time-independent-slots`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
@@ -53,7 +53,7 @@ get fun `test-dj-vm-set-block-and-logical-time-independent-slots`() {
     expect(paramsAfterLogical.get(4) as int).toEqual(blockLtBefore + 101);
     expect(paramsAfterLogical.get(5) as int).toEqual(logicalLtBefore + 202);
 }
-"#,
+",
         "integration/snapshots/test-runner/vm_set_block_and_logical_time_are_independent_in_c7_slots/vm_set_block_and_logical_time_are_independent_in_c7_slots.stdout.txt",
     );
 }
@@ -63,7 +63,7 @@ fn vm_set_logical_then_block_time_preserves_slot_isolation_in_fixture_project() 
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/dj_vm_set_logical_then_block_slot_isolation.test.tolk";
     let source = format!(
-        r#"
+        r"
 {DJ_VM_IMPORTS}
 get fun `test-dj-vm-set-logical-then-block-slot-isolation`() {{
     val c7Before = vm.getC7();
@@ -86,7 +86,7 @@ get fun `test-dj-vm-set-logical-then-block-slot-isolation`() {{
     expect(paramsAfterBlock.get(4) as int).toEqual(blockLtBefore + 404);
     expect(paramsAfterBlock.get(5) as int).toEqual(logicalLtBefore + 303);
 }}
-"#
+"
     );
 
     fs::write(fixture.path().join(test_path), source)

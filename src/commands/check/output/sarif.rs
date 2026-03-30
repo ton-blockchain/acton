@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, DiagnosticTag, Severity};
 use tolk_resolver::{FileDb, Span};
 
-const DOCS_BASE_URL: &str = "https://i582.github.io/acton/docs";
+const DOCS_BASE_URL: &str = "https://ton-blockchain.github.io/acton/docs";
 const SOURCE_ROOT_URI_BASE_ID: &str = "SRCROOT";
 
 pub(crate) fn write_report(
@@ -393,7 +393,7 @@ fn diagnostic_fixes(
             };
 
             artifact_changes_by_file
-                .entry(file_info.path().to_path_buf())
+                .entry(file_info.path().clone())
                 .and_modify(|change| change.replacements.push(replacement.clone()))
                 .or_insert_with(|| sarif::ArtifactChange {
                     artifact_location: artifact_location(file_info.path(), project_root),
@@ -549,18 +549,18 @@ fn span_to_region(source: &str, span: &Span) -> Option<sarif::Region> {
     let (end_line, end_col) = pos::byte_to_line_col(source, span.end as usize)?;
 
     Some(sarif::Region {
-        byte_length: Some((span.end.saturating_sub(span.start)) as i64),
-        byte_offset: Some(span.start as i64),
+        byte_length: Some(i64::from(span.end.saturating_sub(span.start))),
+        byte_offset: Some(i64::from(span.start)),
         char_length: None,
         char_offset: None,
-        end_column: Some((end_col + 1) as i64),
-        end_line: Some((end_line + 1) as i64),
+        end_column: Some(i64::from(end_col + 1)),
+        end_line: Some(i64::from(end_line + 1)),
         message: None,
         properties: None,
         snippet: None,
         source_language: None,
-        start_column: Some((start_col + 1) as i64),
-        start_line: Some((start_line + 1) as i64),
+        start_column: Some(i64::from(start_col + 1)),
+        start_line: Some(i64::from(start_line + 1)),
     })
 }
 

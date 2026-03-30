@@ -1,5 +1,7 @@
+use crate::commands::common::error_fmt;
 use crate::commands::test::reporting::{TestReport, TestReporter};
 use acton_config::color::OwoColorize;
+use anyhow::Context;
 use axum::{
     Router,
     extract::{Path as AxumPath, Query, State},
@@ -58,11 +60,17 @@ impl TestReporter for UiReporter {
     }
 }
 
+pub(crate) fn reserve_ui_listener(port: u16) -> anyhow::Result<std::net::TcpListener> {
+    let address = format!("127.0.0.1:{port}");
+    std::net::TcpListener::bind(&address)
+        .with_context(|| error_fmt::port_bind_failure("UI server", &address, "--ui-port"))
+}
+
 pub(crate) async fn start_ui_server(
     reports: Vec<TestReport>,
     trace_dir: Option<String>,
     project_root: String,
-    port: u16,
+    listener: std::net::TcpListener,
 ) -> anyhow::Result<()> {
     let project_root_path =
         dunce::canonicalize(&project_root).unwrap_or_else(|_| PathBuf::from(&project_root));
@@ -94,8 +102,15 @@ pub(crate) async fn start_ui_server(
     #[cfg(not(debug_assertions))]
     let app = app.fallback(handle_embedded_ui);
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
-    let url = format!("http://127.0.0.1:{port}");
+    let address = listener
+        .local_addr()
+        .context("Failed to inspect reserved UI server address")?;
+    listener
+        .set_nonblocking(true)
+        .with_context(|| format!("Failed to configure UI server socket on {address}"))?;
+    let listener = tokio::net::TcpListener::from_std(listener)
+        .with_context(|| format!("Failed to activate UI server on {address}"))?;
+    let url = format!("http://{address}");
     println!("     {} UI server at {}", "Starting".green().bold(), url);
 
     open_browser(&url);

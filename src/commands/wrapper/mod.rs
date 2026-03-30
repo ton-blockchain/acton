@@ -116,8 +116,7 @@ fn build_model(
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let storage_path = storage
         .iter()
-        .flat_map(|storage| find_type_path(&fallback_abi, &storage.name))
-        .next();
+        .find_map(|storage| find_type_path(&fallback_abi, &storage.name));
     let message_paths = incoming_messages
         .iter()
         .filter_map(|message| find_type_path(&fallback_abi, &message.name))
@@ -291,7 +290,7 @@ fn resolve_wrapper_path(
                 .join(&file_name);
         }
 
-        return project_root.join(&file_name);
+        return project_root.join("wrappers").join(&file_name);
     }
 
     if let Some(configured_tolk_output_dir) = non_empty_path(configured_tolk_output_dir) {
@@ -601,7 +600,7 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
         .map(|f| {
             let type_name = f.ty.render_param_type();
             let name = normalize_param_name(&f.name);
-            format!("{}: {}", name, type_name)
+            format!("{name}: {type_name}")
         })
         .collect::<Vec<_>>()
         .join(", ");
@@ -650,7 +649,7 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
 
 fn normalize_param_name(name: &str) -> String {
     if name == "from" || name == "config" {
-        format!("{}_", name)
+        format!("{name}_")
     } else {
         name.to_owned()
     }
@@ -685,7 +684,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .map(|p| {
             let type_name = p.ty.render_param_type();
             let param_name = normalize_get_param_name(&p.name);
-            format!("{}: {}", param_name, type_name)
+            format!("{param_name}: {type_name}")
         })
         .collect::<Vec<_>>()
         .join(", ");
@@ -696,7 +695,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .map(|p| {
             let param_name = normalize_get_param_name(&p.name);
             if p.ty.is_typed_cell() {
-                format!("{}.toCell()", param_name)
+                format!("{param_name}.toCell()")
             } else {
                 param_name
             }
@@ -748,7 +747,7 @@ fn normalize_get_method_name(name: &str) -> String {
 fn normalize_get_param_name(name: &str) -> String {
     let normalized = name.to_lower_camel_case();
     if normalized == "from" || normalized == "config" {
-        format!("{}_", normalized)
+        format!("{normalized}_")
     } else {
         normalized
     }
@@ -859,8 +858,7 @@ fn resolve_mapped_import(
         let score = mapping_abs.components().count();
         if best_match
             .as_ref()
-            .map(|(best_score, _)| score > *best_score)
-            .unwrap_or(true)
+            .is_none_or(|(best_score, _)| score > *best_score)
         {
             best_match = Some((score, import_path));
         }

@@ -261,7 +261,8 @@ fn has_on_internal_message_function(root_node: &Node<'_>, content: &str) -> bool
 
 fn format_contract_name(file_stem: &str) -> String {
     file_stem
-        .split('_')
+        .split(['_', '-'])
+        .filter(|word| !word.is_empty())
         .map(|word| {
             let mut chars = word.chars();
             match chars.next() {

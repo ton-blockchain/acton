@@ -3,6 +3,8 @@
 [WALLET_CREATED_ADDED]
 ✓ [WALLET_ADDRESS]
 
+To check wallet balances run acton wallet list --balance.
+
 SECURITY WARNING:
 [SECURITY_WARNING_MNEMONIC]
 - Do NOT commit this file to version control (already added to .gitignore)

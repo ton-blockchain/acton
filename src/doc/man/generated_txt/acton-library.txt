@@ -1,0 +1,260 @@
+ACTON-LIBRARY(1)
+
+NAME
+       acton-library — Manage on-chain TON libraries
+
+SYNOPSIS
+       acton library [options] command
+
+DESCRIPTION
+       Publish, fetch, inspect, and top up on-chain TON libraries.
+
+       Library metadata can also be stored locally in libraries.toml or
+       globally in global.libraries.toml for later inspection and maintenance.
+
+LIFECYCLE
+       A typical library workflow is:
+
+       1. publish a contract or code cell
+
+       2. save metadata locally or globally for later lookup
+
+       3. inspect runtime state with info
+
+       4. fetch the code again for inspection or backup
+
+       5. topup the library account when more storage time is needed
+
+SUBCOMMANDS
+   acton library publish
+       Publish a contract or arbitrary code as a library.
+
+      Synopsis
+          acton library publish [options] [contract-id]
+
+      Options
+          contract-id
+              Contract ID to publish.
+
+              Use --code to publish arbitrary code instead of compiling a
+              project contract.
+
+          --code code
+              Base64 or hex code to publish instead of compiling a contract.
+
+          --duration duration
+              Requested publication duration such as 100d or 1y.
+
+          --wallet wallet
+              Wallet to use for the publication transaction.
+
+          --net network
+              Network to use.
+
+              Defaults to testnet.
+
+          --api-key key
+              TonCenter API key for blockchain interactions.
+
+          --amount ton
+              Explicit TON amount to send.
+
+              Overrides duration-based estimation.
+
+          -y, --yes
+              Skip confirmation prompts.
+
+          --local
+              Save library metadata to local libraries.toml.
+
+          --global
+              Save library metadata to global global.libraries.toml.
+
+   acton library fetch
+       Fetch library code from the blockchain by hash.
+
+      Synopsis
+          acton library fetch [options] hash
+
+      Options
+          hash
+              Library code hash.
+
+          --disasm
+              Disassemble the fetched code and print TASM.
+
+          -o, --output path
+              Write fetched output to a file.
+
+              If --disasm is used, the output is text. Otherwise Acton writes
+              binary BoC for .boc paths and base64 text for other paths.
+
+          --net network
+              Network to use.
+
+              Defaults to testnet.
+
+          --api-key key
+              TonCenter API key for blockchain interactions.
+
+          --json
+              Emit JSON output for raw library fetches.
+
+              If --disasm is also passed, Acton prints disassembly text
+              instead.
+
+   acton library info
+       Show information about a deployed library.
+
+      Synopsis
+          acton library info [options] [name]
+
+      Options
+          name
+              Library name to inspect.
+
+              If omitted, Acton can prompt from the available library metadata.
+
+          --api-key key
+              TonCenter API key for balance checks.
+
+          The output includes publication time, last top-up time, current
+          balance, and estimated remaining storage runway.
+
+   acton library topup
+       Top up a library account for additional storage time.
+
+      Synopsis
+          acton library topup [options] [library-name]
+
+      Options
+          library-name
+              Library name to top up.
+
+          --duration duration
+              Requested additional storage duration such as 100d or 1y.
+
+          --amount ton
+              Explicit TON amount to send.
+
+              Overrides duration-based estimation.
+
+          --wallet wallet
+              Wallet to use for the top-up transaction.
+
+          --api-key key
+              TonCenter API key for blockchain interactions.
+
+          -y, --yes
+              Skip confirmation prompts.
+
+          After a successful top-up, Acton updates last_topup_timestamp in the
+          stored library metadata.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+RESOLUTION RULES
+       o  library metadata is merged from global.libraries.toml first and then
+          local libraries.toml
+
+       o  when both files define the same library name, the local entry wins on
+          lookup
+
+       o  when saving new metadata into a file that already contains the
+          requested library ID, Acton appends -1, -2, and so on to keep the
+          existing record
+
+       o  if neither --local nor --global is passed to publish, Acton prompts
+          for the destination file
+
+AMOUNT ESTIMATION
+       For publish and topup, --duration is used to estimate the required TON
+       amount from the library size and storage duration.
+
+       If --amount is passed, it overrides that estimate completely.
+
+METADATA FILES
+       Saved library metadata typically includes:
+
+       o  name
+
+       o  hash
+
+       o  code
+
+       o  account
+
+       o  duration
+
+       o  network
+
+       o  publication timestamp
+
+       o  last top-up timestamp
+
+       o  code size in bits and cells
+
+FETCH OUTPUT
+       o  without --output, fetched code is printed to stdout
+
+       o  with --output path.boc, Acton writes binary BoC
+
+       o  with --output to any other path, Acton writes base64 text
+
+       o  with --disasm, stdout and file output are always disassembly text
+
+       o  with --json, Acton prints JSON to stdout and does not also write
+          --output
+
+       o  if both --json and --disasm are passed, disassembly text takes
+          precedence over JSON on successful runs
+
+EXIT STATUS
+       o  0: The selected library subcommand completed successfully.
+
+       o  1: Contract or wallet resolution failed, chain access failed,
+          metadata could not be written, or publish/top-up transaction
+          preparation or submission failed.
+
+EXAMPLES
+       1. Publish a contract as a library:
+
+              acton library publish math --duration 365d --wallet deployer
+
+       2. Publish arbitrary code:
+
+              acton library publish --code "te6cckEBAQEAAgAAAEysuc0=" --duration 100d
+
+       3. Fetch and disassemble a library:
+
+              acton library fetch <HASH> --disasm
+
+       4. Top up a library for one year:
+
+              acton library topup math --duration 1y
+
+       5. Fetch raw code into a BoC file:
+
+              acton library fetch <HASH> --output build/math-lib.boc
+
+SEE ALSO
+       o  Libraries guide
+          <https://ton-blockchain.github.io/acton/docs/advanced/libraries>
+

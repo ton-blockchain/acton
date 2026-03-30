@@ -142,7 +142,7 @@ fn collect_message_opcodes(
             }
         }
         Type::TypeIdent(type_ident) => {
-            collect_type_ident_opcodes(checker, resolve_index, *type_ident, alias_stack, out)
+            collect_type_ident_opcodes(checker, resolve_index, *type_ident, alias_stack, out);
         }
         Type::TypeInstantiatedTs(type_with_args) => {
             if let Some(type_ident) = type_with_args.name() {

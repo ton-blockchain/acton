@@ -867,7 +867,7 @@ fn parse_std_addr(address: &str) -> anyhow::Result<Addr> {
     let (std_addr, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
         .map_err(|e| anyhow::anyhow!("Invalid address format `{address}`: {e}"))?;
     Ok(Addr {
-        workchain: std_addr.workchain as i32,
+        workchain: i32::from(std_addr.workchain),
         addr: std_addr.address.0,
     })
 }

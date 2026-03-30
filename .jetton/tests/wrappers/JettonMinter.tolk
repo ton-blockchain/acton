@@ -93,16 +93,13 @@ fun JettonMinter.fromStorage(storage: MinterStorage): JettonMinter {
     }
 }
 
-fun JettonMinter.sendDeploy(self, params: SendParams): SendResultList {
-    val msg = createMessage({
+fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResultList {
+    val deployMsg = createMessage({
         bounce: false,
         value: params.value,
-        dest: {
-            workchain: 0,
-            stateInit: self.init,
-        },
+        dest: { workchain: 0, stateInit: self.init },
     });
-    return net.send(net.treasury("treasury").address, msg);
+    return net.send(from, deployMsg);
 }
 
 fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount: int, forward_ton_amount: int, total_ton_amount: int): SendResultList {

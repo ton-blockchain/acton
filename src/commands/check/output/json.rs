@@ -5,11 +5,12 @@ use tolk_resolver::{FileDb, Span};
 
 pub(crate) fn write_report(
     writer: &mut dyn Write,
+    success: bool,
     all_diagnostics: &[Diagnostic],
     file_db: &FileDb,
 ) -> anyhow::Result<()> {
     let json_output = serde_json::json!({
-        "success": true,
+        "success": success,
         "diagnostics": all_diagnostics.iter().map(|d| diagnostic_to_json(d, file_db)).collect::<Vec<_>>()
     });
     let json = serde_json::to_string_pretty(&json_output)?;
@@ -51,16 +52,13 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
             let edit_file_id = edit.file_id;
             let edit_source = file_db
                 .get_by_id(edit_file_id)
-                .map(|info| info.source().source.clone())
-                .unwrap_or_else(|| source.into());
+                .map_or_else(|| source.into(), |info| info.source().source.clone());
             if let Some(range) = create_range_json(edit_source.as_ref(), &edit.span) {
                 edits_json.push(serde_json::json!({
                     "range": range,
                     "newText": &edit.replacement,
                     "file": file_db
-                        .get_by_id(edit_file_id)
-                        .map(|info| info.index().path.to_string_lossy().to_string())
-                        .unwrap_or_else(|| file_path.clone())
+                        .get_by_id(edit_file_id).map_or_else(|| file_path.clone(), |info| info.index().path.to_string_lossy().to_string())
                 }));
             }
         }

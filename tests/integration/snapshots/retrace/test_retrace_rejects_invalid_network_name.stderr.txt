@@ -1,0 +1,1 @@
+Error: Unknown network 'invalid-network', supported networks: 'mainnet', 'testnet', 'localnet' and 'custom:<network-name>'

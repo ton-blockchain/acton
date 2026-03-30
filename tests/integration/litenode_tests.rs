@@ -318,7 +318,7 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -468,7 +468,7 @@ fn litenode_script_println_net_send_in_broadcast_shows_synthetic_hint() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -504,7 +504,7 @@ fn litenode_supports_try_locate_transaction_endpoints() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -618,7 +618,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -830,7 +830,7 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -1355,7 +1355,7 @@ fn litenode_supports_v3_address_information_endpoint() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -1554,10 +1554,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let by_account = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?account={}&limit=50",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
-        ),
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=50"),
         Duration::from_secs(12),
     );
     for tx in v3_transactions_from_response(&by_account) {
@@ -1571,10 +1568,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let by_account_b = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?account={}&limit=100",
-            V3_TRANSACTIONS_TEST_ACCOUNT_B
-        ),
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_B}&limit=100"),
         Duration::from_secs(12),
     );
     assert!(
@@ -1587,10 +1581,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let excluded_account = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?exclude_account={}&limit=100",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
-        ),
+        &format!("/api/v3/transactions?exclude_account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=100"),
         Duration::from_secs(12),
     );
     assert!(
@@ -1843,8 +1834,7 @@ fn litenode_supports_v3_transactions_endpoints() {
     let pending_with_filters = wait_for_ok_response(
         &node,
         &format!(
-            "/api/v3/pendingTransactions?account={}&trace_id={tx_hash_query}",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
+            "/api/v3/pendingTransactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&trace_id={tx_hash_query}"
         ),
         Duration::from_secs(12),
     );
@@ -1901,7 +1891,7 @@ fn litenode_supports_v3_run_get_method() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -2202,7 +2192,7 @@ fn encode_query_component(value: &str) -> String {
     for byte in value.bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(char::from(byte))
+                encoded.push(char::from(byte));
             }
             _ => encoded.push_str(&format!("%{byte:02X}")),
         }

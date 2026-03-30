@@ -2,18 +2,18 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const UNUSED_VARIABLE_CONTRACT: &str = r#"
+const UNUSED_VARIABLE_CONTRACT: &str = r"
             fun main() {
                 val x = 1;
             }
-        "#;
+        ";
 
-const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r#"
+const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r"
             fun main() {
                 val _value = 1;
-                _value;
+                val _aa = _value;
             }
-        "#;
+        ";
 
 #[test]
 #[named]
@@ -190,6 +190,7 @@ fn check_lint_json_writes_report_to_output_file_even_when_exit_code_is_non_zero(
             "integration/snapshots/check/lint_output_json_format/{}.stderr.txt",
             function_name!()
         ))
+        .assert_file_contains(".acton/reports/non-zero.json", "\"success\": false")
         .assert_file_snapshot_matches(
             ".acton/reports/non-zero.json",
             &format!(

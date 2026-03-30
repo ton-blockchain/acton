@@ -11,12 +11,12 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 fn rewrite_contract(path: &Path, marker: &str) {
     let updated = format!(
-        r#"
+        r"
 fun onInternalMessage(_: InMessage) {{
     // {marker}
 }}
 fun onBouncedMessage(_: InMessageBounced) {{}}
-"#
+"
     );
 
     fs::write(path, updated)
@@ -332,11 +332,11 @@ fn build_import_change_recompiles_only_importing_contracts() {
     let project = ProjectBuilder::new("build-cache-reuse-import-change")
         .file(
             "shared/utils",
-            r#"
+            r"
 fun helperValue(): int {
     return 1;
 }
-"#,
+",
         )
         .contract(
             "uses_utils",
@@ -360,11 +360,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
     project.acton().build().run().success();
     fs::write(
         project.path().join("shared/utils.tolk"),
-        r#"
+        r"
 fun helperValue(): int {
     return 2;
 }
-"#,
+",
     )
     .expect("failed to update shared/utils.tolk");
 

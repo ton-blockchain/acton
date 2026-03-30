@@ -1,0 +1,161 @@
+'\" t
+.TH "ACTON\-RETRACE" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-retrace \[em] Replay an on\-chain transaction locally for inspection
+.SH "SYNOPSIS"
+\fBacton retrace\fR [\fIoptions\fR] \fIhash\fR
+.SH "DESCRIPTION"
+Download a transaction by hash and replay it locally in the TON sandbox.
+.sp
+\fBacton retrace\fR is useful for debugging failures, inspecting outgoing actions,
+reviewing VM and executor logs, and comparing local replay results with the
+original on\-chain execution.
+.SH "OPTIONS"
+.SS "Retrace Options"
+.sp
+\fIhash\fR
+.RS 4
+Transaction hash in hex format.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to retrace from.
+.sp
+Without this flag, Acton tries mainnet first and then falls back to testnet.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain queries.
+.RE
+.sp
+\fB\-v\fR, \fB\-\-verbose\fR
+.RS 4
+Show full cell hex in outgoing actions instead of only hashes.
+.RE
+.sp
+\fB\-\-logs\-dir\fR \fIdir\fR
+.RS 4
+Write VM and executor logs into the specified directory.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "NETWORK AND API BEHAVIOR"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Without \fB\-\-net\fR, Acton tries mainnet and then testnet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR and \fBcustom:<name>\fR are not supported by the retrace backend
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'If no \fB\-\-api\-key\fR is provided, Acton throttles requests to reduce rate\-limit
+failures
+.RE
+.sp
+For library fallback lookups, retrace also supports \fBDTON_API_KEY\fR from the
+environment.
+.SH "OUTPUT"
+The command prints:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'network selection and state\-hash check status
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'transaction metadata and fee summary
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compute and action phase summaries
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'decoded outgoing actions
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'additional full VM and executor logs when \fB\-\-logs\-dir\fR is used
+.RE
+.sp
+When \fB\-\-logs\-dir\fR is set, Acton creates the target directory and writes
+\fBvm.log\fR plus \fBexecutor.log\fR there.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The transaction was fetched and replayed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The transaction could not be found, network lookup failed, replay data
+was incomplete, or local log files could not be written.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Retrace with automatic network fallback:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Force mainnet and use an API key:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-net mainnet \-\-api\-key YOUR_API_KEY
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Save logs and show full outgoing cell bodies:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-verbose \-\-logs\-dir .acton/retrace
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help disasm\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIRetrace command guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/retrace>
+.RE

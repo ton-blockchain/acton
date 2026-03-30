@@ -1,0 +1,16 @@
+Deploying Jetton with JettonInfo {
+    name: "StarterJetton",
+    description: "A starter jetton template",
+    symbol: "SJTN",
+    image: "https://ton.org/download/ton_symbol.svg"
+}
+Deploying Jetton contract...
+Awaiting transaction... [Attempt 1/20]
+Transaction successfully applied!
+You can view it at [EXPLORER_TX_URL]
+Deployed Jetton minter to [WALLET_ADDRESS_BASE]
+Minting tokens: 1000000000
+Awaiting transaction... [Attempt 1/20]
+Transaction successfully applied!
+You can view it at [EXPLORER_TX_URL]
+Successfully minted and transferred 1000000000 tokens to [WALLET_ADDRESS_BASE]

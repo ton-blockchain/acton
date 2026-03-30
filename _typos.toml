@@ -1,5 +1,6 @@
 [files]
 extend-exclude = [
+  "dist-workspace.toml",
   "docs/**",
   "block.tlb",
   "crates/tasm/spec/**",

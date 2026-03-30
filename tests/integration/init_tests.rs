@@ -15,6 +15,16 @@ fun helper(): int {
 }
 ";
 
+const LOCAL_GLOBAL_WALLETS: &str = r#"[wallets.local]
+kind = "v5r1"
+keys = { mnemonic = "local-wallet-only" }
+"#;
+
+const LOCAL_GLOBAL_LIBRARIES: &str = r#"[libraries.local]
+hash = "beef"
+code = "te6ccgEBAQEAAgAAAA=="
+"#;
+
 // ========================================
 // Basic Init Tests
 // ========================================
@@ -100,6 +110,46 @@ tests = "custom-tests"
 }
 
 #[test]
+fn test_init_existing_complete_mappings_are_left_unchanged() {
+    let project = ProjectBuilder::new("init-complete-mappings")
+        .without_acton_toml()
+        .build();
+
+    fs::write(
+        project.path().join("Acton.toml"),
+        r#"[package]
+name = "my-acton-project"
+description = "A TON blockchain project"
+version = "0.1.0"
+license = "MIT"
+
+[fmt]
+width = 100
+ignore = []
+
+[mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "tests/wrappers"
+"#,
+    )
+    .unwrap();
+
+    let output = project.acton().init().run().success();
+
+    output
+        .assert_contains("Skipping Acton.toml project configuration")
+        .assert_contains("Updated Acton project")
+        .assert_not_contains("Patched Acton.toml with default mappings")
+        .assert_file_snapshot_matches(
+            "Acton.toml",
+            "integration/snapshots/test_init_existing_complete_mappings_are_left_unchanged.toml.gen",
+        );
+}
+
+#[test]
 fn test_init_updates_stdlib_if_already_initialized() {
     let project = ProjectBuilder::new("init-update-stdlib")
         .without_acton_toml()
@@ -180,6 +230,50 @@ fn test_init_symlinks_global_wallets_if_already_initialized() {
 
     output.assert_contains("Updated Acton project");
     assert!(project.path().join("global.wallets.toml").exists());
+}
+
+#[test]
+fn test_init_symlinks_global_libraries_if_already_initialized() {
+    let project = ProjectBuilder::new("init-update-libraries-symlink")
+        .without_acton_toml()
+        .build();
+
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+    let global_libraries_dir = home_path.join(".config").join("acton").join("libraries");
+    fs::create_dir_all(&global_libraries_dir).unwrap();
+    let global_config = global_libraries_dir.join("global.libraries.toml");
+    fs::write(
+        &global_config,
+        "[libraries.demo]\nhash = \"abcd\"\ncode = \"te6ccgEBAQEAAgAAAA==\"\n",
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    fs::remove_file(project.path().join("global.libraries.toml")).unwrap();
+
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    output.assert_contains("Updated Acton project");
+    let symlink = project.path().join("global.libraries.toml");
+    assert!(symlink.exists());
+    assert!(
+        fs::symlink_metadata(&symlink)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
 }
 
 #[test]
@@ -324,13 +418,10 @@ fn test_init_contract_name_formatting() {
     let output = project.acton().init().run().success();
 
     output.assert_contains("Discovered 2 contracts");
-
-    let acton_toml = fs::read_to_string(project.path().join("Acton.toml")).unwrap();
-
-    assert!(acton_toml.contains("[contracts.my_contract]"));
-    assert!(acton_toml.contains("name = \"My Contract\""));
-
-    assert!(acton_toml.contains("[contracts.my_contract_v2]"));
+    output.assert_file_snapshot_matches(
+        "Acton.toml",
+        "integration/snapshots/test_init_contract_name_formatting.toml.gen",
+    );
 }
 
 #[test]
@@ -438,6 +529,124 @@ fn test_init_project_symlinks_global_wallets() {
 
     let symlink = project.path().join("global.wallets.toml");
     assert!(symlink.exists());
+    assert!(
+        fs::symlink_metadata(&symlink)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
+#[test]
+fn test_init_project_symlinks_global_libraries() {
+    let project = ProjectBuilder::new("init-symlink-libraries")
+        .without_acton_toml()
+        .build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    let global_libraries_dir = home_path.join(".config").join("acton").join("libraries");
+    fs::create_dir_all(&global_libraries_dir).unwrap();
+    let global_config = global_libraries_dir.join("global.libraries.toml");
+    fs::write(
+        &global_config,
+        "[libraries.demo]\nhash = \"abcd\"\ncode = \"te6ccgEBAQEAAgAAAA==\"\n",
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    let symlink = project.path().join("global.libraries.toml");
+    assert!(symlink.exists());
+    assert!(
+        fs::symlink_metadata(&symlink)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
+#[test]
+fn test_init_preserves_existing_local_global_wallets_file() {
+    let project = ProjectBuilder::new("init-preserve-local-global-wallets")
+        .without_acton_toml()
+        .raw_file("global.wallets.toml", LOCAL_GLOBAL_WALLETS)
+        .build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
+    fs::create_dir_all(&global_wallets_dir).unwrap();
+    let global_config = global_wallets_dir.join("global.wallets.toml");
+    fs::write(
+        &global_config,
+        "[wallets.global]\nkind=\"v5r1\"\nkeys={mnemonic=\"word1\"}",
+    )
+    .unwrap();
+
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    let local_file = project.path().join("global.wallets.toml");
+    assert!(local_file.exists());
+    assert!(
+        !fs::symlink_metadata(&local_file)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    output.assert_file_snapshot_matches(
+        "global.wallets.toml",
+        "integration/snapshots/test_init_preserves_existing_local_global_wallets.toml.gen",
+    );
+}
+
+#[test]
+fn test_init_preserves_existing_local_global_libraries_file() {
+    let project = ProjectBuilder::new("init-preserve-local-global-libraries")
+        .without_acton_toml()
+        .raw_file("global.libraries.toml", LOCAL_GLOBAL_LIBRARIES)
+        .build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    let global_libraries_dir = home_path.join(".config").join("acton").join("libraries");
+    fs::create_dir_all(&global_libraries_dir).unwrap();
+    let global_config = global_libraries_dir.join("global.libraries.toml");
+    fs::write(
+        &global_config,
+        "[libraries.demo]\nhash = \"abcd\"\ncode = \"te6ccgEBAQEAAgAAAA==\"\n",
+    )
+    .unwrap();
+
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    let local_file = project.path().join("global.libraries.toml");
+    assert!(local_file.exists());
+    assert!(
+        !fs::symlink_metadata(&local_file)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    output.assert_file_snapshot_matches(
+        "global.libraries.toml",
+        "integration/snapshots/test_init_preserves_existing_local_global_libraries.toml.gen",
+    );
 }
 
 #[test]

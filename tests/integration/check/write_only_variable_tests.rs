@@ -14,14 +14,14 @@ fn run_simple_test(group: &str, content: &str, name: &str) {
 fn test_check_write_only_variable() {
     run_simple_test(
         "write_only_variable",
-        r#"
+        r"
             fun main() {
                 var counter = 0;
                 counter = 1;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -30,11 +30,11 @@ fn test_check_write_only_variable_ignores_mutable_parameters() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract(
             "main",
-            r#"
+            r"
             fun foo(mutate a: int) {
                 a = 100;
             }
-        "#,
+        ",
         )
         .build();
 

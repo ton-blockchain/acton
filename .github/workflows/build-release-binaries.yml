@@ -8,24 +8,30 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-release-binaries-${{ github.ref }}
   cancel-in-progress: true
+
+permissions: { }
 
 jobs:
   build-linux:
-    name: Build Linux (${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - runner: ubicloud-standard-4-ubuntu-2204
-            os: linux
+          - runner: ubicloud-standard-8-ubuntu-2204
             arch: x86_64
-          - runner: ubicloud-standard-4-arm-ubuntu-2204
-            os: linux
+            vendor: unknown
+            sys: linux
+            abi: gnu
+          - runner: ubicloud-standard-8-arm-ubuntu-2204
             arch: aarch64
+            vendor: unknown
+            sys: linux
+            abi: gnu
     env:
-      TARGET_NAME: ${{ matrix.os }}-${{ matrix.arch }}
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
     permissions:
       contents: read
@@ -39,12 +45,12 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: false
           lookup-only: true
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
@@ -81,13 +87,14 @@ jobs:
           CXX: clang++-16
         run: |
           just build-ui
-          cargo build --profile release-size --bin acton
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
-          ./target/release-size/acton --help
+          "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
+        shell: bash
         # language=Bash
         run: |
           set -euo pipefail
@@ -96,7 +103,7 @@ jobs:
           ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
 
           mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
           tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
@@ -111,20 +118,21 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    if: false # after moving to cargo-dist, we'll return
-    name: Build macOS (${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - runner: macos-15-intel
-            os: macos
             arch: x86_64
+            vendor: apple
+            sys: darwin
           - runner: macos-15
-            os: macos
             arch: aarch64
+            vendor: apple
+            sys: darwin
     env:
-      TARGET_NAME: ${{ matrix.os }}-${{ matrix.arch }}
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
     permissions:
       contents: read
@@ -138,12 +146,12 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: false
           lookup-only: true
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
@@ -170,13 +178,14 @@ jobs:
       - name: Build acton binary
         run: |
           just build-ui
-          cargo build --profile release-size --bin acton
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
-          ./target/release-size/acton --help
+          "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
+        shell: bash
         # language=Bash
         run: |
           set -euo pipefail
@@ -185,7 +194,7 @@ jobs:
           ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
 
           mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
           tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 

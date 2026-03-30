@@ -323,10 +323,7 @@ impl FileBuildCache {
                 .as_ref()
                 .is_some_and(|deps| !deps.is_empty());
             if !has_deps {
-                debug!(
-                    "Skipping deps processing for `{}` in `get_dependencies`",
-                    normalized_path
-                );
+                debug!("Skipping deps processing for `{normalized_path}` in `get_dependencies`");
                 debug!("Using file dependencies: {file_deps:?}");
                 if use_cache {
                     self.dependencies_cache.insert(

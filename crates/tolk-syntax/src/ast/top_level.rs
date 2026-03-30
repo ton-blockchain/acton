@@ -9,6 +9,15 @@ use crate::ast::{
 use crate::{AstNodeBytesKind, impl_ast_node};
 use tree_sitter::Node;
 
+pub const CONTRACT_ENTRYPOINTS: &[&str] = &[
+    "onInternalMessage",
+    "onExternalMessage",
+    "onRunTickTock",
+    "onSplitPrepare",
+    "onSplitInstall",
+    "onBouncedMessage",
+];
+
 #[derive(Clone, Copy, Debug)]
 pub enum TopLevel<'tree> {
     TolkRequiredVersion(TolkRequiredVersion<'tree>),
@@ -231,6 +240,7 @@ impl<'tree> AsmBody<'tree> {
             .unwrap_or_default()
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, ExprStringLiteral<'tree>> {
         AstChildren::new(self.0)
     }
@@ -291,6 +301,7 @@ pub struct ContractBody<'tree>(pub Node<'tree>);
 impl_ast_node!(ContractBody, "contract_body");
 
 impl<'tree> ContractBody<'tree> {
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, ContractField<'tree>> {
         AstChildren::new(self.0)
     }
@@ -499,6 +510,7 @@ pub struct StructBody<'tree>(pub Node<'tree>);
 impl_ast_node!(StructBody, "struct_body");
 
 impl<'tree> StructBody<'tree> {
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, StructField<'tree>> {
         AstChildren::new(self.0)
     }
@@ -631,6 +643,7 @@ pub struct EnumBody<'tree>(pub Node<'tree>);
 impl_ast_node!(EnumBody, "enum_body");
 
 impl<'tree> EnumBody<'tree> {
+    #[must_use]
     pub fn members(&self) -> AstChildren<'tree, EnumMember<'tree>> {
         AstChildren::new(self.0)
     }
@@ -778,10 +791,10 @@ impl<'tree> Method<'tree> {
         let skip = skip_self
             && params
                 .peek()
-                .and_then(|first| first.name())
+                .and_then(HasName::name)
                 .is_some_and(|name| name.text_matches(sources, "self"));
 
-        params.skip(if skip { 1 } else { 0 })
+        params.skip(usize::from(skip))
     }
 
     #[must_use]
@@ -917,6 +930,7 @@ pub struct AnnotationList<'tree>(pub Node<'tree>);
 impl_ast_node!(AnnotationList, "annotation_list");
 
 impl<'tree> AnnotationList<'tree> {
+    #[must_use]
     pub fn annotations(&self) -> AstChildren<'tree, Annotation<'tree>> {
         AstChildren::new(self.0)
     }
@@ -948,6 +962,7 @@ pub struct AnnotationArgs<'tree>(pub Node<'tree>);
 impl_ast_node!(AnnotationArgs, "annotation_arguments");
 
 impl<'tree> AnnotationArgs<'tree> {
+    #[must_use]
     pub fn args(&self) -> AstChildren<'tree, Expr<'tree>> {
         AstChildren::new(self.0)
     }
@@ -959,6 +974,7 @@ pub struct TypeParameters<'tree>(pub Node<'tree>);
 impl_ast_node!(TypeParameters, "type_parameters");
 
 impl<'tree> TypeParameters<'tree> {
+    #[must_use]
     pub fn parameters(&self) -> AstChildren<'tree, TypeParameter<'tree>> {
         AstChildren::new(self.0)
     }

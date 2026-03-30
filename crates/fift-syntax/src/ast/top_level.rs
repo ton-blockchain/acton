@@ -66,14 +66,17 @@ pub struct Program<'tree>(pub Node<'tree>);
 impl_ast_node!(Program, "program");
 
 impl<'tree> Program<'tree> {
+    #[must_use]
     pub fn items(&self) -> AstChildren<'tree, TopLevel<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn declarations(&self) -> AstChildren<'tree, Declaration<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn definitions(&self) -> AstChildren<'tree, Definition<'tree>> {
         AstChildren::new(self.0)
     }
@@ -277,6 +280,7 @@ impl<'tree> ProcDefinition<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -300,6 +304,7 @@ impl<'tree> ProcInlineDefinition<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -323,6 +328,7 @@ impl<'tree> ProcRefDefinition<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -346,6 +352,7 @@ impl<'tree> MethodDefinition<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }

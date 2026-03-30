@@ -1,0 +1,120 @@
+ACTON-DOC(1)
+
+NAME
+       acton-doc — Look up built-in reference documentation from the CLI
+
+SYNOPSIS
+       acton doc [options] command
+
+DESCRIPTION
+       Look up built-in reference documentation from the terminal.
+
+       At the moment, acton doc provides TVM instruction lookup through the tvm
+       subcommand.
+
+SUBCOMMANDS
+   acton doc tvm
+       Lookup TVM instructions by exact name or fuzzy search query.
+
+      Synopsis
+          acton doc tvm [options] instruction…
+
+      Options
+          instruction…
+              Instruction names or search queries.
+
+          -f, --find
+              Treat the input as a fuzzy search query instead of an exact
+              instruction name.
+
+          -d, --description
+              Include descriptions in fuzzy matching.
+
+              Requires --find.
+
+          --json
+              Emit JSON instead of formatted text.
+
+      Behavior
+          Without --find, each argument is treated as an instruction name.
+
+          o  name matching is case-insensitive
+
+          o  - and # are normalized for convenience
+
+          o  JSON mode always returns an array of instruction objects
+
+          o  at least one instruction name is required
+
+          With --find, each argument is treated as a search query.
+
+          o  fuzzy matching uses instruction names by default
+
+          o  --description also matches instruction descriptions, tags, and
+             operands
+
+          o  JSON mode returns query/matches objects
+
+          o  at least one query is required
+
+          o  queries with no matches return an error instead of an empty result
+             set
+
+TOPICS
+       Currently available documentation namespaces:
+
+       o  tvm
+
+       Additional namespaces may be added in future releases; acton doc tvm is
+       the current built-in reference surface.
+
+EXIT STATUS
+       o  0: The requested documentation was printed successfully.
+
+       o  1: The namespace was unknown, arguments were invalid, or rendering
+          failed.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project manifest for its
+           primary workflow. It remains mutually exclusive with --project-root.
+
+       --project-root path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project root for its
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
+
+EXAMPLES
+       1. Exact lookup:
+
+              acton doc tvm ADD
+              acton doc tvm ADD SUB
+
+       2. JSON output:
+
+              acton doc tvm SENDRAWMSG --json
+
+       3. Fuzzy search:
+
+              acton doc tvm SENRAWMSG --find
+              acton doc tvm outcomng --find --description
+
+       4. Compare exact lookup with fuzzy search:
+
+              acton doc tvm SENDRAWMSG
+              acton doc tvm SENRAWMSG --find
+
+SEE ALSO
+       o  CLI docs lookup guide
+          <https://ton-blockchain.github.io/acton/docs/commands/doc>
+

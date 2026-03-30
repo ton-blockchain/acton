@@ -196,19 +196,19 @@ mod tests {
     #[test]
     fn structural_eq_ignores_comments_and_semicolons() -> anyhow::Result<()> {
         let left = parse(
-            r#"
+            r"
             fun foo() {
                 1 + 1;
             }
-            "#,
+            ",
         )?;
         let right = parse(
-            r#"
+            r"
             fun foo() {
                 // formatting-only change
                 1 + 1;;
             }
-            "#,
+            ",
         )?;
 
         assert!(left.root_node().structurally_equivalent(

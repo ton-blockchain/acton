@@ -1,0 +1,4 @@
+Awaiting transaction... [Attempt 1/20]
+Transaction successfully applied!
+You can view it at [EXPLORER_TX_URL]
+Deployed starter contract to [WALLET_ADDRESS_BASE]

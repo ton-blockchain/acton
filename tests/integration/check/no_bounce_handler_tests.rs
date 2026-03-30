@@ -27,5 +27,5 @@ fn test_check_no_bounce_handler() {
             }
         "#,
         function_name!(),
-    )
+    );
 }

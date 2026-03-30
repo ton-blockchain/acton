@@ -1,16 +1,16 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
-const CHILD_CONTRACT: &str = r#"
+const CHILD_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 get fun childMarker(): int { return 1 }
-"#;
+";
 
 #[test]
 fn register_code_cell_labels_auto_deploy_transactions() {

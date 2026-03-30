@@ -59,7 +59,7 @@ pub async fn litenode_start_cmd(
     if let Some(path) = load_state.as_deref() {
         node.load_state(path.to_owned())
             .await
-            .with_context(|| format!("Failed to load state snapshot from {}", path))?;
+            .with_context(|| format!("Failed to load state snapshot from {path}"))?;
         println!(
             "      {} state from {}",
             "Loaded".green().bold(),
@@ -85,7 +85,7 @@ pub async fn litenode_start_cmd(
     {
         node.dump_state(path.to_owned())
             .await
-            .with_context(|| format!("Failed to dump state snapshot to {}", path))?;
+            .with_context(|| format!("Failed to dump state snapshot to {path}"))?;
         println!(
             "       {} state to {}",
             "Saved".green().bold(),
@@ -122,7 +122,14 @@ async fn setup_startup_accounts(node: &Arc<LiteNode>, accounts: &[String]) -> an
             .await
             .with_context(|| format!("Failed to fetch state for wallet '{wallet_name}'"))?;
 
-        if wallet_state != AccountStatus::Active {
+        if wallet_state == AccountStatus::Active {
+            println!(
+                "      {} wallet {} {}",
+                "Funded".green().bold(),
+                wallet_name.cyan(),
+                address.dimmed(),
+            );
+        } else {
             let deploy_boc = build_wallet_deploy_message(&wallet)?;
             node.send_boc(deploy_boc)
                 .await
@@ -130,13 +137,6 @@ async fn setup_startup_accounts(node: &Arc<LiteNode>, accounts: &[String]) -> an
             println!(
                 "       {} wallet {} {}",
                 "Ready".green().bold(),
-                wallet_name.cyan(),
-                address.dimmed(),
-            );
-        } else {
-            println!(
-                "      {} wallet {} {}",
-                "Funded".green().bold(),
                 wallet_name.cyan(),
                 address.dimmed(),
             );
@@ -197,7 +197,7 @@ pub async fn litenode_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
     let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;
 
     let res = client
-        .post(format!("http://localhost:{}/admin/faucet", port))
+        .post(format!("http://localhost:{port}/admin/faucet"))
         .json(&serde_json::json!({
             "address": address,
             "amount": amount_nanotons
@@ -207,10 +207,13 @@ pub async fn litenode_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
 
     if res.status().is_success() {
         let json: serde_json::Value = res.json().await?;
-        if json.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
+        if json
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
             || json
                 .get("success")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         {
             println!(
@@ -224,12 +227,12 @@ pub async fn litenode_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
                 .get("error")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown error");
-            anyhow::bail!("Airdrop failed: {}", error);
+            anyhow::bail!("Airdrop failed: {error}");
         }
     } else {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        anyhow::bail!("Airdrop failed with status {}: {}", status, body);
+        anyhow::bail!("Airdrop failed with status {status}: {body}");
     }
 
     Ok(())

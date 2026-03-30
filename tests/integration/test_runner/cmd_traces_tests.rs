@@ -2,11 +2,60 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 use std::path::PathBuf;
+use tycho_types::boc::Boc;
+use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+
+const STEP_TRACE_MESSAGES: &str = r#"
+struct (0x3101f001) TriggerForward {
+    queryId: uint64
+    target: address
+}
+
+struct (0x3101f002) Notify {
+    queryId: uint64
+}
+"#;
+
+const STEP_TRACE_FORWARDER_CONTRACT: &str = r#"
+import "messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy TriggerForward.fromSlice(in.body);
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: msg.target,
+        body: Notify {
+            queryId: msg.queryId,
+        },
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const STEP_TRACE_RECEIVER_CONTRACT: &str = r#"
+import "messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy Notify.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
 
 const TRACE_TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"
@@ -71,6 +120,31 @@ fn read_json_from_project(
         .unwrap_or_else(|e| panic!("Failed to read JSON file {}: {}", full_path.display(), e));
     serde_json::from_str(&content)
         .unwrap_or_else(|e| panic!("Failed to parse JSON file {}: {}", full_path.display(), e))
+}
+
+fn trace_root_wallet_name(
+    trace_json: &serde_json::Value,
+    trace_chain: &serde_json::Value,
+) -> Option<String> {
+    let raw_transaction =
+        trace_chain["transactions"].as_array()?.first()?["raw_transaction"].as_str()?;
+    let transaction = Boc::decode_base64(raw_transaction)
+        .ok()?
+        .parse::<Transaction>()
+        .ok()?;
+    let in_msg = transaction.load_in_msg().ok()??;
+    let MsgInfo::Int(info) = in_msg.info else {
+        return None;
+    };
+    let IntAddr::Std(src) = info.src else {
+        return None;
+    };
+    let src_key = src.display_base64_url(true).to_string();
+
+    trace_json["wallets"]
+        .get(&src_key)?
+        .as_str()
+        .map(ToString::to_string)
 }
 
 fn assert_trace_json_contract(
@@ -173,11 +247,11 @@ fn assert_trace_json_contract(
 fn save_test_trace_without_path_uses_default_directory() {
     let project = trace_project(
         "h-save-trace-default-dir",
-        r#"
+        r"
         get fun `test-default-trace`() {
             deployCounter();
         }
-        "#,
+        ",
     );
 
     let output = project
@@ -210,11 +284,11 @@ fn save_test_trace_without_path_uses_default_directory() {
 fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
     let project = trace_project(
         "h-save-trace-custom-dir",
-        r#"
+        r"
         get fun `test-custom-trace`() {
             deployCounter();
         }
-        "#,
+        ",
     );
 
     let output = project
@@ -252,7 +326,7 @@ fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
 fn save_test_trace_creates_trace_per_test_and_single_contract_file() {
     let project = trace_project(
         "h-save-trace-multi",
-        r#"
+        r"
         get fun `test-trace-first`() {
             deployCounter();
         }
@@ -260,7 +334,7 @@ fn save_test_trace_creates_trace_per_test_and_single_contract_file() {
         get fun `test-trace-second`() {
             deployCounter();
         }
-        "#,
+        ",
     );
 
     let output = project
@@ -379,13 +453,280 @@ fn save_test_trace_keeps_custom_trace_names() {
 
     assert!(
         trace_names.contains(&"deploy-counter"),
-        "Expected custom name `deploy-counter` in trace names: {:?}",
-        trace_names
+        "Expected custom name `deploy-counter` in trace names: {trace_names:?}"
     );
     assert!(
         trace_names.contains(&"ping-counter"),
-        "Expected custom name `ping-counter` in trace names: {:?}",
-        trace_names
+        "Expected custom name `ping-counter` in trace names: {trace_names:?}"
+    );
+
+    let deploy_trace = traces
+        .iter()
+        .find(|trace| trace["name"].as_str() == Some("deploy-counter"))
+        .unwrap_or_else(|| panic!("Missing deploy-counter trace in custom names trace json"));
+    assert_eq!(
+        trace_root_wallet_name(&trace, deploy_trace).as_deref(),
+        Some("deployer"),
+        "deploy-counter must stay attached to the deploy chain"
+    );
+
+    let ping_trace = traces
+        .iter()
+        .find(|trace| trace["name"].as_str() == Some("ping-counter"))
+        .unwrap_or_else(|| panic!("Missing ping-counter trace in custom names trace json"));
+    assert_eq!(
+        trace_root_wallet_name(&trace, ping_trace).as_deref(),
+        Some("sender"),
+        "ping-counter must stay attached to the ping chain"
+    );
+}
+
+#[test]
+fn save_test_trace_merges_step_execution_batches_into_single_named_trace() {
+    let project = ProjectBuilder::new("h-save-trace-step-iter-merge")
+        .file("contracts/messages", STEP_TRACE_MESSAGES)
+        .contract("forwarder", STEP_TRACE_FORWARDER_CONTRACT)
+        .contract("receiver", STEP_TRACE_RECEIVER_CONTRACT)
+        .test_file(
+            "trace",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/tracing"
+            import "../../lib/testing/transaction_expect"
+            import "../contracts/messages"
+
+            get fun `test-step-trace-merge`() {
+                val sender = net.treasury("sender");
+
+                val forwarderInit = ContractState {
+                    code: build("forwarder"),
+                    data: createEmptyCell(),
+                };
+                val forwarderAddress = AutoDeployAddress { stateInit: forwarderInit }.calculateAddress();
+
+                val receiverInit = ContractState {
+                    code: build("receiver"),
+                    data: createEmptyCell(),
+                };
+                val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: { stateInit: forwarderInit },
+                }))).toHaveSuccessfulDeploy({ to: forwarderAddress });
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: { stateInit: receiverInit },
+                }))).toHaveSuccessfulDeploy({ to: receiverAddress });
+
+                val iter = net.sendIter(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: forwarderAddress,
+                    body: TriggerForward {
+                        queryId: 33,
+                        target: receiverAddress,
+                    },
+                }));
+
+                val first = iter.executeN(1);
+                expect(first).toHaveLength(1);
+                expect(first).toHaveSuccessfulTx<TriggerForward>({
+                    from: sender.address,
+                    to: forwarderAddress,
+                });
+
+                val tail = iter.executeFrom();
+                expect(tail).toHaveLength(1);
+                expect(tail).toHaveSuccessfulTx<Notify>({
+                    from: forwarderAddress,
+                    to: receiverAddress,
+                });
+
+                tracing.save(tail, "step-forward-trace");
+            }
+            "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--save-test-trace")
+        .arg("trace-step-iter")
+        .run()
+        .success();
+
+    output
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_merges_step_execution_batches_into_single_named_trace.stdout.txt",
+        )
+        .assert_file_exists("trace-step-iter/test-step-trace-merge_trace.json")
+        .assert_file_exists("trace-step-iter/contracts/forwarder.json")
+        .assert_file_exists("trace-step-iter/contracts/receiver.json");
+
+    let trace =
+        read_json_from_project(&project, "trace-step-iter/test-step-trace-merge_trace.json");
+    let traces = trace["traces"]
+        .as_array()
+        .unwrap_or_else(|| panic!("Missing traces array in step-iter trace json"));
+
+    let merged_traces = traces
+        .iter()
+        .filter(|trace| trace["name"].as_str() == Some("step-forward-trace"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        merged_traces.len(),
+        1,
+        "step execution should keep a single named logical trace"
+    );
+    let merged_trace = merged_traces[0];
+
+    let transactions = merged_trace["transactions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("Missing transactions in step-iter trace json"));
+    assert_eq!(
+        transactions.len(),
+        2,
+        "merged step trace should include both batches"
+    );
+
+    let root_children = transactions[0]["child_transactions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("Missing root child_transactions in step-iter trace json"));
+    assert_eq!(
+        root_children.len(),
+        1,
+        "root tx should reference merged child tx"
+    );
+    assert_eq!(root_children[0].as_str(), transactions[1]["lt"].as_str());
+
+    let failed_messages = merged_trace["failed_messages"]
+        .as_array()
+        .map_or_else(Vec::new, |failed_messages| failed_messages.to_vec());
+    assert!(
+        failed_messages.is_empty(),
+        "step trace should not fragment failures into extra chains"
+    );
+}
+
+#[test]
+fn profiling_snapshot_merges_step_execution_batches_into_single_named_trace_chain() {
+    let project = ProjectBuilder::new("h-profile-step-iter")
+        .file("contracts/messages", STEP_TRACE_MESSAGES)
+        .contract("forwarder", STEP_TRACE_FORWARDER_CONTRACT)
+        .contract("receiver", STEP_TRACE_RECEIVER_CONTRACT)
+        .test_file(
+            "trace",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/tracing"
+            import "../../lib/testing/transaction_expect"
+            import "../contracts/messages"
+
+            get fun `test-step-profile-merge`() {
+                val sender = net.treasury("sender");
+
+                val forwarderInit = ContractState {
+                    code: build("forwarder"),
+                    data: createEmptyCell(),
+                };
+                val forwarderAddress = AutoDeployAddress { stateInit: forwarderInit }.calculateAddress();
+
+                val receiverInit = ContractState {
+                    code: build("receiver"),
+                    data: createEmptyCell(),
+                };
+                val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: { stateInit: forwarderInit },
+                }))).toHaveSuccessfulDeploy({ to: forwarderAddress });
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: { stateInit: receiverInit },
+                }))).toHaveSuccessfulDeploy({ to: receiverAddress });
+
+                val iter = net.sendIter(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: forwarderAddress,
+                    body: TriggerForward {
+                        queryId: 44,
+                        target: receiverAddress,
+                    },
+                }));
+
+                val first = iter.executeN(1);
+                expect(first).toHaveLength(1);
+                expect(first).toHaveSuccessfulTx<TriggerForward>({
+                    from: sender.address,
+                    to: forwarderAddress,
+                });
+
+                tracing.save(first, "step-forward-trace");
+
+                val tail = iter.executeFrom();
+                expect(tail).toHaveLength(1);
+                expect(tail).toHaveSuccessfulTx<Notify>({
+                    from: forwarderAddress,
+                    to: receiverAddress,
+                });
+            }
+            "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--snapshot")
+        .arg("step-profile.json")
+        .run()
+        .success();
+
+    output
+        .assert_passed(1)
+        .assert_contains("Gas snapshot saved to step-profile.json")
+        .assert_file_exists("step-profile.json");
+
+    let profile = read_json_from_project(&project, "step-profile.json");
+    let trace_chains = profile["trace_chains"]
+        .as_object()
+        .unwrap_or_else(|| panic!("Missing trace_chains object in step profile snapshot"));
+
+    let merged_traces = trace_chains
+        .values()
+        .filter(|trace| trace["trace_name"].as_str() == Some("step-forward-trace"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        merged_traces.len(),
+        1,
+        "profiling snapshot should keep a single named logical trace"
+    );
+
+    let merged_trace = merged_traces[0];
+    assert_eq!(
+        merged_trace["test_name"].as_str(),
+        Some("test-step-profile-merge"),
+        "profiling snapshot should keep the owning test name"
+    );
+    assert_eq!(
+        merged_trace["tx_count"].as_u64(),
+        Some(2),
+        "profiling snapshot should merge both step batches into one trace chain"
     );
 }
 
@@ -393,11 +734,11 @@ fn save_test_trace_keeps_custom_trace_names() {
 fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
     let project = trace_project(
         "h-regular-run-no-trace",
-        r#"
+        r"
         get fun `test-no-trace`() {
             deployCounter();
         }
-        "#,
+        ",
     );
 
     let output = project.acton().test().run().success();
@@ -420,11 +761,11 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
 fn save_test_trace_can_be_enabled_after_regular_run() {
     let project = trace_project(
         "h-trace-after-regular-run",
-        r#"
+        r"
         get fun `test-after-regular`() {
             deployCounter();
         }
-        "#,
+        ",
     );
 
     let regular_output = project.acton().test().run().success();

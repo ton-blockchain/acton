@@ -1,0 +1,1 @@
+Error: Failed to retrace transaction in any network: Network ci is not yet supported in retrace

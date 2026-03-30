@@ -60,7 +60,7 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
 
     let tmp_dir_raw = project_path.to_string_lossy().to_string();
     let tmp_dir_unix = if cfg!(windows) {
-        tmp_dir_raw.replace("\\", "/")
+        tmp_dir_raw.replace('\\', "/")
     } else {
         tmp_dir_raw.clone()
     };
@@ -137,13 +137,37 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
         .unwrap();
     redactions
+        .insert(
+            "[EXPLORER_TX_URL]",
+            regex!(r"http://(?:localhost|127\.0\.0\.1):\d+/explorer/tx/[0-9a-fA-F]+"),
+        )
+        .unwrap();
+    redactions
+        .insert(
+            "[LOCALHOST_URL]",
+            regex!(r"http://(?:localhost|127\.0\.0\.1):\d+"),
+        )
+        .unwrap();
+    redactions
+        .insert(
+            "[LOCALHOST_ADDR]",
+            regex!(r"(?:localhost|127\.0\.0\.1):\d+"),
+        )
+        .unwrap();
+    redactions
         .insert("[LAST_TOPUP_AT]", regex!(r"Last top-up: .*"))
         .unwrap();
     redactions
-        .insert("[ACTON_VERSION]", format!("v{}", current_version))
+        .insert("[ACTON_VERSION]", format!("v{current_version}"))
         .unwrap();
     redactions
-        .insert("[ACTON_DOCS_URL]", "https://i582.github.io/acton/docs")
+        .insert(
+            "[ACTON_DOCS_URL]",
+            "https://ton-blockchain.github.io/acton/docs",
+        )
+        .unwrap();
+    redactions
+        .insert("[OS_ERROR]", regex!(r"os error \d+"))
         .unwrap();
 
     redactions

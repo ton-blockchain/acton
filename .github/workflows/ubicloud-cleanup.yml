@@ -1,21 +1,26 @@
-name: Cleanup Ubicloud GitHub Cache
+name: Cleanup Ubicloud Actions Cache
 
 on:
   schedule:
-    # 00:00 Europe/Moscow (21:00 UTC)
-    - cron: "0 21 * * *"
+    # 00:00 Europe/Moscow every 3rd day of the month (21:00 UTC)
+    - cron: "0 21 */3 * *"
   workflow_dispatch:
     inputs:
       dry_run:
         description: Preview cache cleanup without deleting anything
         required: false
         type: boolean
-        default: false
-      keep:
-        description: Keep the last N Ubicloud cache entries; leave empty to keep 5 and auto-enable dry-run
+        default: true
+      last_accessed_days:
+        description: Delete entries if last_accessed_at is older than this many days
         required: false
         type: number
-        default: 5
+        default: 1
+      created_days:
+        description: Delete entries if last_accessed_at is missing and created_at is older than this many days
+        required: false
+        type: number
+        default: 3
 
 concurrency:
   group: ubicloud-cleanup
@@ -24,19 +29,18 @@ concurrency:
 permissions: { }
 
 jobs:
-  cleanup-cache-ubicloud:
-    name: Delete caches via Ubicloud xtask
-    if: github.repository == 'i582/acton'
+  cleanup-cache:
+    name: Delete caches
+    if: github.repository == 'ton-blockchain/acton'
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read
 
     env:
-      UBICLOUD_API_TOKEN: ${{ secrets.UBI_TOKEN }}
-      UBICLOUD_PROJECT_ID: pj3hr0c5d1ny7mx25m3tch57hn
-      XTASK_KEEP: ${{ inputs.keep }}
       XTASK_DRY_RUN: ${{ inputs.dry_run }}
+      XTASK_LAST_ACCESSED_DAYS: ${{ inputs.last_accessed_days }}
+      XTASK_CREATED_DAYS: ${{ inputs.created_days }}
 
     steps:
       - name: Check out Acton repository
@@ -49,6 +53,8 @@ jobs:
 
       - name: Run Ubicloud cache cleanup xtask
         env:
+          UBICLOUD_API_TOKEN: ${{ secrets.UBI_TOKEN }}
+          UBICLOUD_PROJECT_ID: pj3hr0c5d1ny7mx25m3tch57hn
           GITHUB_INSTALLATION: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
         # language=Bash
@@ -60,8 +66,12 @@ jobs:
             --repository "${GITHUB_REPOSITORY_NAME}"
           )
 
-          if [[ -n "${XTASK_KEEP}" ]]; then
-            args+=(--keep "${XTASK_KEEP}")
+          if [[ -n "${XTASK_LAST_ACCESSED_DAYS}" ]]; then
+            args+=(--last-accessed-days "${XTASK_LAST_ACCESSED_DAYS}")
+          fi
+
+          if [[ -n "${XTASK_CREATED_DAYS}" ]]; then
+            args+=(--created-days "${XTASK_CREATED_DAYS}")
           fi
 
           if [[ "${XTASK_DRY_RUN}" == 'true' ]]; then

@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const FORWARD_MESSAGES: &str = r#"
+const FORWARD_MESSAGES: &str = r"
 struct (0x1000f001) TriggerForward {
     queryId: uint64
     target: address
@@ -10,7 +10,7 @@ struct (0x1000f001) TriggerForward {
 struct (0x1000f002) Notify {
     queryId: uint64
 }
-"#;
+";
 
 const FORWARDER_CONTRACT: &str = r#"
 import "messages"
@@ -49,7 +49,7 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const ECHO_MESSAGES: &str = r#"
+const ECHO_MESSAGES: &str = r"
 struct (0x2000f001) TriggerEcho {
     queryId: uint64
 }
@@ -57,7 +57,7 @@ struct (0x2000f001) TriggerEcho {
 struct (0x2000f002) EchoNotice {
     queryId: uint64
 }
-"#;
+";
 
 const ECHO_CONTRACT: &str = r#"
 import "messages"

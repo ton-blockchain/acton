@@ -25,11 +25,11 @@ fn run_fix_test_with_mappings(
     run_rule_fix_test_with_mappings(RULE_CODE, before, after, files, mappings, name);
 }
 
-const LIB_MATH: &str = r#"
+const LIB_MATH: &str = r"
     fun plusOne(value: int): int {
         return value + 1;
     }
-"#;
+";
 
 #[test]
 #[named]
@@ -81,11 +81,11 @@ fn test_check_import_path_can_use_mappings_prefers_more_specific_mapping() {
         "#,
         &[(
             "libs/utils/math",
-            r#"
+            r"
                 fun plusTwo(value: int): int {
                     return value + 2;
                 }
-            "#,
+            ",
         )],
         &[("libs", "./libs"), ("utils", "./libs/utils")],
         function_name!(),

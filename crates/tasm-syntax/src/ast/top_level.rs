@@ -73,6 +73,7 @@ pub struct Instructions<'tree>(pub Node<'tree>);
 impl_ast_node!(Instructions, "instructions");
 
 impl<'tree> Instructions<'tree> {
+    #[must_use]
     pub fn items(&self) -> AstChildren<'tree, TopLevel<'tree>> {
         AstChildren::new(self.0)
     }
@@ -88,6 +89,7 @@ impl<'tree> Instruction<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn args(&self) -> AstChildren<'tree, Argument<'tree>> {
         AstChildren::new(self.0)
     }

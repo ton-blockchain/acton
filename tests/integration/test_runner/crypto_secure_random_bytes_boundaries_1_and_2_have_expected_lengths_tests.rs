@@ -3,10 +3,10 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const CRYPTO_IMPORTS: &str = r#"
 import "../../lib/crypto/crypto"
@@ -31,7 +31,7 @@ fn run_secure_random_case(project_name: &str, test_body: &str, snapshot_path: &s
 fn crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths() {
     run_secure_random_case(
         "dy-stdlib-secure-random-boundaries-1-and-2-lengths",
-        r#"
+        r"
 get fun `test-dy-stdlib-secure-random-boundaries-1-and-2-lengths`() {
     val bytes1 = crypto.getSecureRandomBytes(1);
     val bytes2 = crypto.getSecureRandomBytes(2);
@@ -41,7 +41,7 @@ get fun `test-dy-stdlib-secure-random-boundaries-1-and-2-lengths`() {
     expect(bytes2.remainingBitsCount()).toEqual(16);
     expect(bytes2.remainingRefsCount()).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths/crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths.stdout.txt",
     );
 }
@@ -50,7 +50,7 @@ get fun `test-dy-stdlib-secure-random-boundaries-1-and-2-lengths`() {
 fn crypto_secure_random_bytes_size_2_keeps_length_across_calls_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let source = format!(
-        r#"
+        r"
 {CRYPTO_IMPORTS}
 get fun `test-dy-stdlib-secure-random-size-2-keeps-length-across-calls`() {{
     val bytesA = crypto.getSecureRandomBytes(2);
@@ -61,7 +61,7 @@ get fun `test-dy-stdlib-secure-random-size-2-keeps-length-across-calls`() {{
     expect(bytesB.remainingBitsCount()).toEqual(16);
     expect(bytesB.remainingRefsCount()).toEqual(0);
 }}
-"#
+"
     );
 
     fs::write(

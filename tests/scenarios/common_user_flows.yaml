@@ -1,0 +1,57 @@
+version: 1
+suite: common_user_flows
+
+scenarios:
+  - id: create_project_and_run_tests
+    title: User creates a new project and verifies that the starter tests pass
+
+    environment: |
+      The user is in an empty directory and wants to start a new Acton project.
+      The command runs in interactive mode.
+      The local environment is healthy and all required tooling is available.
+
+    steps:
+      - The user runs `acton new`.
+      - The user provides a project name and a short project description.
+      - The user accepts the standard project layout.
+      - The user enters the newly created project directory.
+      - The user runs `acton test`.
+
+    expected:
+      - Project creation completes successfully.
+      - The CLI output is clear and suitable for a stdout snapshot.
+      - The generated project contains the expected starter structure.
+      - The test command completes successfully.
+      - The output shows that the starter tests passed.
+
+    generated_tests:
+      - id: create_project_and_run_tests
+        file: tests/integration/scenarios/common_user_flows.rs
+        snapshot: tests/integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt
+        status: active
+
+  - id: deploy_script_fails_when_toncenter_is_unavailable
+    title: User runs a deploy script but TonCenter is unavailable
+
+    environment: |
+      The user already has a normal project with a deploy script.
+      The user targets testnet and wants to broadcast a transaction.
+      TonCenter is unavailable in this scenario.
+      Requests may time out or return a temporary server error.
+
+    steps:
+      - The user runs `acton script scripts/deploy.tolk --broadcast --net testnet`.
+      - The CLI tries to contact TonCenter.
+      - The external service does not respond successfully.
+
+    expected:
+      - The command fails.
+      - The CLI shows a user-facing error that clearly points to the network or TonCenter.
+      - The failure does not look like a panic or an internal crash.
+      - The error output is stable enough for a stderr snapshot.
+
+    generated_tests:
+      - id: deploy_script_fails_when_toncenter_is_unavailable
+        file: tests/integration/scenarios/common_user_flows.rs
+        snapshot: tests/integration/snapshots/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt
+        status: active

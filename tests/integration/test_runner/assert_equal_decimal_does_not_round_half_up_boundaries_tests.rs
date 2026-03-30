@@ -12,11 +12,11 @@ fn wrap_assert_source(test_body: &str) -> String {
 #[test]
 fn assert_equal_decimal_does_not_round_half_up_boundaries() {
     let source = wrap_assert_source(
-        r#"
+        r"
 get fun `test-eg-assert-equal-decimal-no-round-half-up`() {
     Assert.equalDecimal(149, 150, 2);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("eg-stdlib-assert-equal-decimal-no-round-half-up")
@@ -37,11 +37,11 @@ get fun `test-eg-assert-equal-decimal-no-round-half-up`() {
 #[test]
 fn assert_equal_decimal_formats_negative_small_values_with_leading_zero() {
     let source = wrap_assert_source(
-        r#"
+        r"
 get fun `test-eg-assert-equal-decimal-negative-leading-zero`() {
     Assert.equalDecimal(-5, -6, 2);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("eg-stdlib-assert-equal-decimal-negative-leading-zero")

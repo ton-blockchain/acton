@@ -105,6 +105,7 @@ pub struct InstructionBlock<'tree>(pub Node<'tree>);
 impl_ast_node!(InstructionBlock, "instruction_block");
 
 impl<'tree> InstructionBlock<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -115,6 +116,7 @@ pub struct IfStatement<'tree>(pub Node<'tree>);
 impl_ast_node!(IfStatement, "if_statement");
 
 impl<'tree> IfStatement<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -125,6 +127,7 @@ pub struct IfJmpStatement<'tree>(pub Node<'tree>);
 impl_ast_node!(IfJmpStatement, "ifjmp_statement");
 
 impl<'tree> IfJmpStatement<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -135,6 +138,7 @@ pub struct WhileStatement<'tree>(pub Node<'tree>);
 impl_ast_node!(WhileStatement, "while_statement");
 
 impl<'tree> WhileStatement<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -145,6 +149,7 @@ pub struct RepeatStatement<'tree>(pub Node<'tree>);
 impl_ast_node!(RepeatStatement, "repeat_statement");
 
 impl<'tree> RepeatStatement<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -155,6 +160,7 @@ pub struct UntilStatement<'tree>(pub Node<'tree>);
 impl_ast_node!(UntilStatement, "until_statement");
 
 impl<'tree> UntilStatement<'tree> {
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, Instruction<'tree>> {
         AstChildren::new(self.0)
     }
@@ -187,10 +193,12 @@ pub struct StackOp<'tree>(pub Node<'tree>);
 impl_ast_node!(StackOp, "stack_op");
 
 impl<'tree> StackOp<'tree> {
+    #[must_use]
     pub fn stack_indices(&self) -> AstChildren<'tree, StackIndex<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn stack_refs(&self) -> AstChildren<'tree, StackRef<'tree>> {
         AstChildren::new(self.0)
     }

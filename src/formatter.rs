@@ -159,7 +159,7 @@ keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
 [wallets.deployer.expected]
 address-testnet = \"<<ADDRESS>>\"
 
-See https://i582.github.io/acton/docs/setup-wallets/ for more information
+See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),
@@ -485,7 +485,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     fn build_transaction_tree(&self, send_results: Vec<SendResult>) -> Vec<TransactionNode> {
         let mut lt_to_result: HashMap<i64, SendResult> = HashMap::new();
 
-        for result in send_results.into_iter() {
+        for result in send_results {
             lt_to_result.insert(result.tx.lt as i64, result);
         }
 
@@ -1432,7 +1432,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 "vm.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
             )));
-            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://i582.github.io/acton/docs/advanced/libraries/".to_owned()));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
@@ -1576,7 +1576,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                             Some(msg) => {
                                 self.format_single_message(&msg, contract_letters, false, None)
                             }
-                            None => hash.to_string(),
+                            None => hash.clone(),
                         };
 
                         (
@@ -2133,7 +2133,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
 
         let mut result = String::new();
         writeln!(result, "{type_name} {{").ok();
-        for (key, value) in entries.iter() {
+        for (key, value) in &entries {
             writeln!(result, "    {key}: {value},").ok();
         }
         result.push('}');
@@ -2435,7 +2435,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     #[must_use]
-    pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &String, indent: usize) -> String {
+    pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &str, indent: usize) -> String {
         fn add_indent_to_lines(text: &str, indent: usize) -> String {
             let indent_str = " ".repeat(indent);
             text.lines()
@@ -2444,7 +2444,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 .join("\n")
         }
 
-        let item = tuple.to_typed(&type_name.to_string());
+        let item = tuple.to_typed(type_name);
         let formatted = self.format(&item);
 
         if !formatted.contains('\n') {
@@ -2519,7 +2519,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 }
 
-impl<'a> FormatterContext<'a> {
+impl FormatterContext<'_> {
     #[must_use]
     pub fn format_tuple_diff(
         &self,
@@ -2595,7 +2595,7 @@ impl<'a> FormatterContext<'a> {
                 let has_diff = result.contains("\x1b[31m") || result.contains("\x1b[32m");
 
                 let field_name = if has_diff {
-                    field.name.to_string()
+                    field.name.clone()
                 } else {
                     field.name.dimmed().to_string()
                 };
@@ -3031,12 +3031,12 @@ impl<'a> FormatterContext<'a> {
         let send_results = self.parse_send_results(items);
         send_results
             .into_iter()
-            .flat_map(|res| {
+            .map(|res| {
                 let tx = res.tx;
                 let code = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
                 let build = self.build_cache.result_for_code(&code);
 
-                Some(TransactionInfo {
+                TransactionInfo {
                     lt: tx.lt.to_string(),
                     raw_transaction: Boc::encode_base64(to_cell(&tx)).into(),
                     parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
@@ -3060,7 +3060,7 @@ impl<'a> FormatterContext<'a> {
                         .map(crate::commands::test::trace::parse_executor_actions)
                         .unwrap_or_default(),
                     actions: Some(Boc::encode_base64(&res.actions).into()),
-                })
+                }
             })
             .collect()
     }
@@ -3078,7 +3078,7 @@ impl<'a> FormatterContext<'a> {
             && !message.is_empty()
         {
             let highlighted_message = Self::highlight_actual_expected(message);
-            writeln!(result, "{}", highlighted_message).ok();
+            writeln!(result, "{highlighted_message}").ok();
         }
 
         match failure {
@@ -3124,7 +3124,7 @@ impl<'a> FormatterContext<'a> {
                 writeln!(result, "{tx_tree}").ok();
                 let from_to = if tx_failure.params.from.is_none() && tx_failure.params.to.is_none()
                 {
-                    "".to_string()
+                    String::new()
                 } else {
                     format!(
                         " from {} to {}",

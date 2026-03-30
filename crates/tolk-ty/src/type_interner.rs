@@ -20,7 +20,7 @@ pub struct TyDisplay<'a> {
     interner: &'a TypeInterner,
 }
 
-impl<'a> std::fmt::Display for TyDisplay<'a> {
+impl std::fmt::Display for TyDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.interner.format(self.id))
     }
@@ -62,6 +62,7 @@ impl Default for TypeInterner {
 
 impl TypeInterner {
     /// Creates a new `TypeInterner` with all builtin types pre-interned.
+    #[must_use]
     pub fn new() -> Self {
         let mut this = Self {
             arena: Vec::new(),
@@ -120,17 +121,20 @@ impl TypeInterner {
     }
 
     /// Returns a string representation of the type.
+    #[must_use]
     pub fn format(&self, id: TyId) -> String {
         TypeFormatter::new(self).format(id)
     }
 
     /// Returns a helper object that implements `std::fmt::Display` for the given type ID.
+    #[must_use]
     pub const fn display(&self, id: TyId) -> TyDisplay<'_> {
         TyDisplay { id, interner: self }
     }
 
     /// Retrieves the type data for a given ID.
     #[inline]
+    #[must_use]
     pub fn data(&self, id: TyId) -> &TyData {
         &self.arena[id.0 as usize]
     }
@@ -313,6 +317,7 @@ impl TypeInterner {
     }
 
     /// Unwraps type aliases to get the underlying type.
+    #[must_use]
     pub fn unwrap_alias(&self, id: TyId) -> TyId {
         let mut current = id;
         while let TyData::TypeAlias { inner_ty, .. } = self.data(current) {
@@ -322,7 +327,7 @@ impl TypeInterner {
     }
 
     /// having `type UserId = int` and `type OwnerId = int` (when their underlying types are equal),
-    /// make `UserId` and `OwnerId` NOT equal and NOT assignable (although they'll have the same type_id);
+    /// make `UserId` and `OwnerId` NOT equal and NOT assignable (although they'll have the same `type_id`);
     /// it allows overloading methods for these types independently, e.g.
     /// > type BalanceList = dict
     /// > type AssetList = dict
@@ -385,6 +390,7 @@ impl TypeInterner {
     }
 
     /// Checks if a type contains any generic parameters.
+    #[must_use]
     pub fn has_generics(&self, id: TyId) -> bool {
         let data = self.data(id);
         match data {
@@ -416,7 +422,8 @@ impl TypeInterner {
     /// comparing types for equality (when implementation differs from a default "compare ids");
     /// two types are EQUAL is a much more strict property than "assignable";
     /// a union type can hold only non-equal types; for instance, having `type MyInt = int`, a union `int | MyInt` == `int`;
-    /// searching for a compatible method for a receiver is also based on equal_to() as first priority
+    /// searching for a compatible method for a receiver is also based on `equal_to()` as first priority
+    #[must_use]
     pub fn equals(&self, a: TyId, b: TyId) -> bool {
         if a == b {
             return true;
@@ -583,10 +590,11 @@ impl TypeInterner {
         }
     }
 
-    /// on `var lhs: <lhs_type> = rhs`, having inferred rhs_type, check that it can be assigned without any casts
+    /// on `var lhs: <lhs_type> = rhs`, having inferred `rhs_type`, check that it can be assigned without any casts
     /// the same goes for passing arguments, returning values, etc. — where the "receiver" (lhs) checks "applier" (rhs)
     /// note, that `int8 | int16` is not assignable to `int` (even though both are assignable),
     /// because the only way to work with union types is to use `match`/`is` operators
+    #[must_use]
     pub fn can_rhs_be_assigned(&self, lhs: TyId, rhs: TyId) -> bool {
         if self.equals(lhs, rhs) {
             return true;
@@ -676,9 +684,7 @@ impl TypeInterner {
             (TyData::Int(il), _) => match il {
                 IntTy::Int => matches!(
                     dr,
-                    TyData::Int(IntTy::IntN { .. })
-                        | TyData::Int(IntTy::VarIntN { .. })
-                        | TyData::Int(IntTy::Coins)
+                    TyData::Int(IntTy::IntN { .. } | IntTy::VarIntN { .. } | IntTy::Coins)
                 ),
                 IntTy::Coins => matches!(dr, TyData::Int(IntTy::Int)),
                 _ => false,
@@ -807,6 +813,7 @@ impl TypeInterner {
     }
 
     /// Checks if `from` can be cast to `to` using the `as` operator.
+    #[must_use]
     pub fn can_be_casted_with_as_operator(&self, from: TyId, to: TyId) -> bool {
         if self.can_rhs_be_assigned(to, from) {
             return true;
@@ -886,9 +893,10 @@ impl TypeInterner {
     }
 
     /// calculate, how many stack slots the type occupies, e.g. `int`=1, `(int,int)`=2, `(int,int)?`=3
-    /// it's calculated dynamically (not saved at TypeData*::create) to overcome problems with
-    /// - recursive struct mentions (to create TypeDataStruct without knowing width of children)
+    /// it's calculated dynamically (not saved at `TypeData`*`::create`) to overcome problems with
+    /// - recursive struct mentions (to create `TypeDataStruct` without knowing width of children)
     /// - uninitialized generics (that don't make any sense upon being instantiated)
+    #[must_use]
     pub fn get_width_on_stack(&self, id: TyId) -> usize {
         match self.data(id) {
             TyData::TypeAlias { inner_ty, .. } => self.get_width_on_stack(*inner_ty),
@@ -926,8 +934,9 @@ impl TypeInterner {
 
     /// assigning `null` to a primitive variable like `int?` / `cell?` can store TVM NULL inside the same slot
     /// (that's why the default implementation is just "return true", and most of types occupy 1 slot)
-    /// but for complex variables, like `(int, int)?`, "null presence" is kept in a separate slot (UTag for union types)
+    /// but for complex variables, like `(int, int)?`, "null presence" is kept in a separate slot (`UTag` for union types)
     /// though still, tricky situations like `(int, ())?` can still "embed" TVM NULL in parallel with original value
+    #[must_use]
     pub fn can_hold_tvm_null_instead(&self, id: TyId) -> bool {
         match self.data(id) {
             TyData::TypeAlias { inner_ty, .. } => self.can_hold_tvm_null_instead(*inner_ty),
@@ -970,7 +979,7 @@ impl TypeInterner {
         }
     }
 
-    /// "primitive nullable" is `T?` which holds TVM NULL in the same slot (it other words, has no UTag slot)
+    /// "primitive nullable" is `T?` which holds TVM NULL in the same slot (it other words, has no `UTag` slot)
     /// true : `int?`, `slice?`, `StructWith1IntField?`
     /// false: `(int, int)?`, `ComplexStruct?`, `()?`
     fn is_primitive_nullable(&self, id: TyId) -> bool {
@@ -987,13 +996,13 @@ impl TypeInterner {
             && variants.len() == 2
             && variants.contains(&self.ty_null)
         {
-            return variants.iter().find(|&&v| v != self.ty_null).cloned();
+            return variants.iter().find(|&&v| v != self.ty_null).copied();
         }
         None
     }
 
     //+ CHECKED
-    /// given this = `T1 | T2 | ...` and rhs_type, find the only (not ambiguous) T_i that can accept it
+    /// given this = `T1 | T2 | ...` and `rhs_type`, find the only (not ambiguous) `T_i` that can accept it
     pub(crate) fn calculate_exact_variant_to_fit_rhs(
         &self,
         union_id: TyId,
@@ -1034,6 +1043,7 @@ impl TypeInterner {
         first_covering
     }
 
+    #[must_use]
     pub fn has_all_variants_of(&self, union_a: TyId, union_b: TyId) -> bool {
         if let (TyData::Union(variants_a), TyData::Union(variants_b)) =
             (self.data(union_a), self.data(union_b))
@@ -1213,6 +1223,7 @@ impl TypeInterner {
         }
     }
 
+    #[must_use]
     pub fn as_nullable_union(&self, ty: TyId) -> Option<(TyId, TyId)> {
         let TyData::Union(elements) = self.data(ty) else {
             return None;

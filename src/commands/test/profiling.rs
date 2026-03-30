@@ -135,7 +135,7 @@ fn collect_trace_chain_stats(runner: &TestRunner) -> Vec<TraceChainStats> {
                 .map_or_else(|| format!("Trace {}", trace_index + 1), ToString::to_string);
             let mut stats = TraceChainStats::new(
                 format!("{test_name}::trace#{}", trace_index + 1),
-                test_name.to_string(),
+                test_name.clone(),
                 trace_name,
                 trace_index + 1,
                 trace_transactions.len(),

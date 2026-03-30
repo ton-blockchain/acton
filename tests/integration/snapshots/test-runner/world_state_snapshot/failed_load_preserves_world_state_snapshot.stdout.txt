@@ -1,0 +1,10 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/failed_load_preserves_world_state_snapshot.test.tolk (1 test)
+  ✓ load-world-state-snapshot-failure-keeps-current-state [TIME]
+
+ ✓ 1 passed in 1 file

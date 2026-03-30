@@ -1,5 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
+use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, global_libraries_path, project_root};
@@ -224,8 +225,12 @@ pub fn publish_cmd(
             .wallet
             .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
+    let boc = &external.to_boc_base64()?;
+    let network_name = network.to_string();
+    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
     api_client
-        .send_boc(&external.to_boc_base64()?)
+        .send_boc(boc)
+        .map_err(|error| format_send_boc_error(error, context))
         .context("Failed to send publication transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
@@ -550,6 +555,7 @@ pub fn topup_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
+    let network_name = network.to_string();
     let api_client = TonApiClient::new(network, custom_networks, api_key)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
@@ -589,8 +595,11 @@ pub fn topup_cmd(
             .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     println!("  {} Sending transaction...", "→".blue().bold());
+    let boc = &external.to_boc_base64()?;
+    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
     api_client
-        .send_boc(&external.to_boc_base64()?)
+        .send_boc(boc)
+        .map_err(|error| format_send_boc_error(error, context))
         .context("Failed to send top-up transaction")?;
 
     println!(

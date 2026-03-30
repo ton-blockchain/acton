@@ -5,6 +5,7 @@ pub struct PreorderTraverse<'tree> {
 }
 
 impl<'tree> PreorderTraverse<'tree> {
+    #[must_use]
     pub const fn new(c: TreeCursor<'tree>) -> Self {
         PreorderTraverse { cursor: Some(c) }
     }

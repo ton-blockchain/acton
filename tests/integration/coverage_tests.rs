@@ -444,3 +444,83 @@ fn test_coverage_text_custom_filename_from_config() {
         "Default coverage.txt should not exist when custom filename is specified"
     );
 }
+
+#[test]
+fn test_coverage_text_output_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("coverage-text-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-coverage-text-write-error`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("readonly/output.txt")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_coverage_text_output_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_coverage_lcov_output_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("coverage-lcov-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-coverage-lcov-write-error`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("lcov")
+        .with_coverage_file("readonly/output.lcov")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_coverage_lcov_output_write_error.stderr.txt",
+        );
+}

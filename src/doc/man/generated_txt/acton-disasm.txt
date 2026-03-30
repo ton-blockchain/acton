@@ -1,0 +1,134 @@
+ACTON-DISASM(1)
+
+NAME
+       acton-disasm — Disassemble TVM bytecode into human-readable TASM
+
+SYNOPSIS
+       acton disasm [options] [boc-file]
+
+DESCRIPTION
+       Disassemble compiled TVM bytecode from a file, a literal BoC string, or
+       a live contract address.
+
+       This command is useful for debugging compiler output, inspecting
+       deployed code, following library references, and correlating bytecode
+       with Tolk source via source maps.
+
+OPTIONS
+   Disassembly Options
+       boc-file
+           Binary, hex, or base64 BoC file to disassemble.
+
+           Use --string to pass the code directly instead of reading a file.
+
+       -s, --string string
+           BoC value in hex or base64 format.
+
+       -o, --output path
+           Write disassembled output to a file instead of standard output.
+
+       --show-hashes
+           Show cell hashes alongside code blocks.
+
+       --show-offsets
+           Show instruction bit offsets in the left column.
+
+       --source-map path
+           Use a source map to show original Tolk source locations together
+           with disassembly output.
+
+       --address address
+           Fetch contract code from the blockchain by address and disassemble
+           it.
+
+       --api-key key
+           TonCenter API key for blockchain queries.
+
+       --net network
+           Network to use for --address.
+
+           If omitted, Acton tries mainnet first and then falls back to
+           testnet.
+
+       --follow-libraries
+           If the code references a library, fetch and disassemble the actual
+           library code instead of showing only the library hash reference.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+BLOCKCHAIN LOOKUPS
+       When --address is used, Acton fetches code from the selected network.
+
+       o  Without --net, Acton tries mainnet first and then testnet
+
+       o  --api-key helps avoid TonCenter rate limits
+
+       o  --follow-libraries resolves library references when possible
+
+INPUT PRECEDENCE
+       o  BOC_FILE and --string are mutually exclusive
+
+       o  --address is used only when neither a file nor --string is provided
+
+       o  --follow-libraries only replaces the input when the fetched code is a
+          single library reference and the library lookup succeeds
+
+       o  if library lookup fails, Acton warns and disassembles the original
+          code
+
+SOURCE MAPS
+       If you compiled a contract with acton compile --source-map, you can pass
+       that source map here to annotate the disassembly with original Tolk
+       locations.
+
+EXIT STATUS
+       o  0: Disassembly completed successfully, including runs with unresolved
+          library references that were left as warnings.
+
+       o  1: BoC input was invalid, a blockchain fetch failed, source-map
+          loading failed, or the output file could not be written.
+
+EXAMPLES
+       1. Disassemble a local BoC file:
+
+              acton disasm contract.boc
+
+       2. Disassemble a literal BoC string:
+
+              acton disasm --string "b5ee9c72010104...0840f01c700f2f4"
+
+       3. Disassemble code from a blockchain address:
+
+              acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --net testnet
+
+       4. Show hashes, offsets, and source locations:
+
+              acton disasm contract.boc --show-hashes --show-offsets --source-map contract.json
+
+       5. Inspect deployed code together with hashes:
+
+              acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes --net testnet
+
+SEE ALSO
+       o  acton help compile
+
+       o  Disassembly command guide
+          <https://ton-blockchain.github.io/acton/docs/commands/disasm>
+

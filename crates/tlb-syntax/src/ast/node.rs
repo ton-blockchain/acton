@@ -17,11 +17,13 @@ ton_syntax::impl_source_file_basics!(SourceFile, ParseError, collect_errors, lan
 
 impl SourceFile {
     /// Returns the `program` node, if present.
+    #[must_use]
     pub fn program(&self) -> Option<Program<'_>> {
         Program::try_from_node(self.tree.root_node()).ok()
     }
 
     /// Returns an iterator over top-level declarations in the file.
+    #[must_use]
     pub fn top_levels(&self) -> AstChildren<'_, TopLevel<'_>> {
         self.program().map(|p| p.items()).unwrap_or_default()
     }

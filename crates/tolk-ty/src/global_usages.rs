@@ -18,6 +18,7 @@ pub struct GlobalUsages<'a> {
 }
 
 impl<'a> GlobalUsages<'a> {
+    #[must_use]
     pub const fn new(
         project_index: &'a ProjectIndex,
         body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,

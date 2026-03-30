@@ -1,0 +1,10 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/rich_load_world_state_snapshot.test.tolk (1 test)
+  ✓ load-world-state-snapshot-rich-state [TIME]
+
+ ✓ 1 passed in 1 file

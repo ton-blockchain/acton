@@ -1,0 +1,219 @@
+'\" t
+.TH "ACTON\-UP" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-up \[em] Update the Acton binary from published releases
+.SH "SYNOPSIS"
+\fBacton up\fR [\fIoptions\fR] [\fIversion\fR]
+.SH "DESCRIPTION"
+Download and install a published Acton release for the current target triple.
+.sp
+By default, stable builds update to the latest stable release. Trunk builds
+stay on the trunk channel unless \fB\-\-stable\fR is passed explicitly.
+.sp
+The updater fetches release metadata from GitHub, downloads the matching
+archive and SHA256 checksum, verifies the checksum, and replaces the current
+binary.
+.SH "OPTIONS"
+.SS "Update Options"
+.sp
+\fIversion\fR
+.RS 4
+Specific version tag to install.
+.RE
+.sp
+\fB\-\-trunk\fR
+.RS 4
+Install the most recent trunk release.
+.RE
+.sp
+\fB\-\-stable\fR
+.RS 4
+Install the latest stable release.
+.RE
+.sp
+\fB\-y\fR, \fB\-\-yes\fR
+.RS 4
+Skip confirmation prompts.
+.RE
+.sp
+\fB\-\-list\fR
+.RS 4
+List available release tags and exit.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "RELEASE SOURCES"
+Acton queries GitHub release metadata and assets from:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBton\-blockchain/acton\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBi582/acton\-public\fR
+.RE
+.sp
+If \fBGITHUB_TOKEN\fR is set, Acton uses it for authenticated GitHub API requests.
+.SH "INSTALLATION FLOW"
+When installing a release, Acton:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'selects the archive matching the current target triple
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'downloads the archive and its \fB\&.sha256\fR file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'verifies the SHA256 digest
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'unpacks the archive
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'replaces the current \fBacton\fR binary
+.RE
+.sp
+\fBacton up \-\-list\fR is read\-only and skips download or replacement.
+.SH "HOME BREW INSTALLATIONS"
+If the current binary path looks like a Homebrew installation, Acton warns and
+recommends using:
+.sp
+.RS 4
+.nf
+brew upgrade acton
+.fi
+.RE
+.sp
+Without \fB\-\-yes\fR, Acton asks whether to continue with the built\-in updater.
+.SH "INTERACTIVITY"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-yes\fR suppresses confirmation prompts for non\-interactive use
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Homebrew\-style installs prompt before replacement unless \fB\-\-yes\fR is passed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'up\-to\-date checks and \fB\-\-list\fR can succeed without making local changes
+.RE
+.SH "CHANNEL SELECTION"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton up\fR on a stable build updates to the latest stable release
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton up\fR on a trunk build stays on trunk
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton up \-\-stable\fR switches a trunk build back to stable
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton up \-\-trunk\fR switches to the trunk channel
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton up <version>\fR installs the explicit version even if it is older or
+newer than the current one
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The requested release information was listed, Acton was already up to
+date, or the selected version was installed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, archive replacement
+failed, or the update was cancelled or could not be confirmed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Update to the latest stable release:
+.sp
+.RS 4
+.nf
+acton up
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Switch to the trunk channel:
+.sp
+.RS 4
+.nf
+acton up \-\-trunk
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Install a specific version:
+.sp
+.RS 4
+.nf
+acton up 0.1.0
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'List available releases:
+.sp
+.RS 4
+.nf
+acton up \-\-list
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Update non\-interactively in CI or bootstrap scripts:
+.sp
+.RS 4
+.nf
+acton up \-\-stable \-y
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIInstallation guide\fR <https://ton\-blockchain.github.io/acton/docs/installation>
+.RE

@@ -1,0 +1,381 @@
+'\" t
+.TH "ACTON\-LIBRARY" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-library \[em] Manage on\-chain TON libraries
+.SH "SYNOPSIS"
+\fBacton library\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Publish, fetch, inspect, and top up on\-chain TON libraries.
+.sp
+Library metadata can also be stored locally in \fBlibraries.toml\fR or globally in
+\fBglobal.libraries.toml\fR for later inspection and maintenance.
+.SH "LIFECYCLE"
+A typical library workflow is:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'\fBpublish\fR a contract or code cell
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'save metadata locally or globally for later lookup
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'inspect runtime state with \fBinfo\fR
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'\fBfetch\fR the code again for inspection or backup
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'\fBtopup\fR the library account when more storage time is needed
+.RE
+.SH "SUBCOMMANDS"
+.SS "acton library publish"
+Publish a contract or arbitrary code as a library.
+.SS "Synopsis"
+\fBacton library publish\fR [\fIoptions\fR] [\fIcontract\-id\fR]
+.SS "Options"
+.sp
+\fIcontract\-id\fR
+.RS 4
+Contract ID to publish.
+.sp
+Use \fB\-\-code\fR to publish arbitrary code instead of compiling a project contract.
+.RE
+.sp
+\fB\-\-code\fR \fIcode\fR
+.RS 4
+Base64 or hex code to publish instead of compiling a contract.
+.RE
+.sp
+\fB\-\-duration\fR \fIduration\fR
+.RS 4
+Requested publication duration such as \fB100d\fR or \fB1y\fR\&.
+.RE
+.sp
+\fB\-\-wallet\fR \fIwallet\fR
+.RS 4
+Wallet to use for the publication transaction.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to use.
+.sp
+Defaults to \fBtestnet\fR\&.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain interactions.
+.RE
+.sp
+\fB\-\-amount\fR \fIton\fR
+.RS 4
+Explicit TON amount to send.
+.sp
+Overrides duration\-based estimation.
+.RE
+.sp
+\fB\-y\fR, \fB\-\-yes\fR
+.RS 4
+Skip confirmation prompts.
+.RE
+.sp
+\fB\-\-local\fR
+.RS 4
+Save library metadata to local \fBlibraries.toml\fR\&.
+.RE
+.sp
+\fB\-\-global\fR
+.RS 4
+Save library metadata to global \fBglobal.libraries.toml\fR\&.
+.RE
+.SS "acton library fetch"
+Fetch library code from the blockchain by hash.
+.SS "Synopsis"
+\fBacton library fetch\fR [\fIoptions\fR] \fIhash\fR
+.SS "Options"
+.sp
+\fIhash\fR
+.RS 4
+Library code hash.
+.RE
+.sp
+\fB\-\-disasm\fR
+.RS 4
+Disassemble the fetched code and print TASM.
+.RE
+.sp
+\fB\-o\fR, \fB\-\-output\fR \fIpath\fR
+.RS 4
+Write fetched output to a file.
+.sp
+If \fB\-\-disasm\fR is used, the output is text. Otherwise Acton writes binary BoC
+for \fB\&.boc\fR paths and base64 text for other paths.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to use.
+.sp
+Defaults to \fBtestnet\fR\&.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain interactions.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output for raw library fetches.
+.sp
+If \fB\-\-disasm\fR is also passed, Acton prints disassembly text instead.
+.RE
+.SS "acton library info"
+Show information about a deployed library.
+.SS "Synopsis"
+\fBacton library info\fR [\fIoptions\fR] [\fIname\fR]
+.SS "Options"
+.sp
+\fIname\fR
+.RS 4
+Library name to inspect.
+.sp
+If omitted, Acton can prompt from the available library metadata.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for balance checks.
+.RE
+.sp
+The output includes publication time, last top\-up time, current balance, and
+estimated remaining storage runway.
+.SS "acton library topup"
+Top up a library account for additional storage time.
+.SS "Synopsis"
+\fBacton library topup\fR [\fIoptions\fR] [\fIlibrary\-name\fR]
+.SS "Options"
+.sp
+\fIlibrary\-name\fR
+.RS 4
+Library name to top up.
+.RE
+.sp
+\fB\-\-duration\fR \fIduration\fR
+.RS 4
+Requested additional storage duration such as \fB100d\fR or \fB1y\fR\&.
+.RE
+.sp
+\fB\-\-amount\fR \fIton\fR
+.RS 4
+Explicit TON amount to send.
+.sp
+Overrides duration\-based estimation.
+.RE
+.sp
+\fB\-\-wallet\fR \fIwallet\fR
+.RS 4
+Wallet to use for the top\-up transaction.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain interactions.
+.RE
+.sp
+\fB\-y\fR, \fB\-\-yes\fR
+.RS 4
+Skip confirmation prompts.
+.RE
+.sp
+After a successful top\-up, Acton updates \fBlast_topup_timestamp\fR in the stored
+library metadata.
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "RESOLUTION RULES"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'library metadata is merged from \fBglobal.libraries.toml\fR first and then local
+\fBlibraries.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when both files define the same library name, the local entry wins on lookup
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when saving new metadata into a file that already contains the requested
+library ID, Acton appends \fB\-1\fR, \fB\-2\fR, and so on to keep the existing record
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if neither \fB\-\-local\fR nor \fB\-\-global\fR is passed to \fBpublish\fR, Acton prompts for
+the destination file
+.RE
+.SH "AMOUNT ESTIMATION"
+For \fBpublish\fR and \fBtopup\fR, \fB\-\-duration\fR is used to estimate the required TON
+amount from the library size and storage duration.
+.sp
+If \fB\-\-amount\fR is passed, it overrides that estimate completely.
+.SH "METADATA FILES"
+Saved library metadata typically includes:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'name
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'hash
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'code
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'account
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'duration
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'network
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'publication timestamp
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'last top\-up timestamp
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'code size in bits and cells
+.RE
+.SH "FETCH OUTPUT"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'without \fB\-\-output\fR, fetched code is printed to stdout
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-output path.boc\fR, Acton writes binary BoC
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-output\fR to any other path, Acton writes base64 text
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-disasm\fR, stdout and file output are always disassembly text
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-json\fR, Acton prints JSON to stdout and does not also write \fB\-\-output\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if both \fB\-\-json\fR and \fB\-\-disasm\fR are passed, disassembly text takes
+precedence over JSON on successful runs
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected library subcommand completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Contract or wallet resolution failed, chain access failed, metadata
+could not be written, or publish/top\-up transaction preparation or submission
+failed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Publish a contract as a library:
+.sp
+.RS 4
+.nf
+acton library publish math \-\-duration 365d \-\-wallet deployer
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Publish arbitrary code:
+.sp
+.RS 4
+.nf
+acton library publish \-\-code "te6cckEBAQEAAgAAAEysuc0=" \-\-duration 100d
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Fetch and disassemble a library:
+.sp
+.RS 4
+.nf
+acton library fetch <HASH> \-\-disasm
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Top up a library for one year:
+.sp
+.RS 4
+.nf
+acton library topup math \-\-duration 1y
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Fetch raw code into a BoC file:
+.sp
+.RS 4
+.nf
+acton library fetch <HASH> \-\-output build/math\-lib.boc
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fILibraries guide\fR <https://ton\-blockchain.github.io/acton/docs/advanced/libraries>
+.RE

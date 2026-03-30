@@ -10,6 +10,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.dist]
+dist = true
+
 [workspace]
 members = ["crates/*", "xtask"]
 
@@ -20,18 +23,19 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.0.16"
+version = "0.1.4"
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.93.0"
-homepage = "https://i582.github.io/acton"
-documentation = "https://i582.github.io/acton/docs/welcome"
-repository = "https://github.com/i582/acton"
+homepage = "https://ton-blockchain.github.io/acton"
+documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
+repository = "https://github.com/ton-blockchain/acton"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
+acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolkc = { path = "crates/tolkc" }
 ton-abi = { path = "crates/ton-abi" }
@@ -67,6 +71,9 @@ tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
 tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
 tree-sitter-toml-ng = "0.7.0"
+handlebars = { version = "6.4.0", features = ["dir_source"] }
+pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
+url = "2.5.7"
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -93,6 +100,7 @@ globset = "0.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 serde-sarif = "0.8.0"
+schemars = { version = "0.8.22", features = ["derive"] }
 toml = "0.9.8"
 jsonschema = { version = "0.45.0", default-features = false }
 referencing = "0.45.0"
@@ -184,6 +192,7 @@ cc = "1.2"
 [dependencies]
 # local crates
 acton-config = { workspace = true }
+acton-mdman = { workspace = true }
 tolkc = { workspace = true }
 ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
@@ -297,12 +306,18 @@ owo-colors = { workspace = true } # overall coloring
 
 [build-dependencies]
 chrono = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
 
 # save ~15% of size (29mb -> 23mb), but very slow to compile/link
 [profile.release-size]
 inherits = "release"
 lto = "fat"
 codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release-size"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -345,6 +360,9 @@ workspace = true
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
 profiling = ["ton-ls/profiling"]
 only_ci = []
+
+[lib]
+doctest = false
 
 #[profile.release]
 #debug = "full"

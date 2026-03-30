@@ -6,7 +6,7 @@ import "../../lib/io"
 import "../contracts/ar_shared_types"
 "#;
 
-const SHARED_TYPES: &str = r#"
+const SHARED_TYPES: &str = r"
 struct Point {
     x: int,
     y: int,
@@ -18,7 +18,7 @@ struct Frame {
     pair: (int, int),
     numbers: [int, int, int],
 }
-"#;
+";
 
 const FORMATTER_TYPES_CONTRACT: &str = r#"
 import "ar_shared_types"

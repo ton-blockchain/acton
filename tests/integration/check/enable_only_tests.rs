@@ -2,13 +2,13 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const MULTIPLE_RULES_SAMPLE: &str = r#"
+const MULTIPLE_RULES_SAMPLE: &str = r"
             global result: int; // E028
             fun onInternalMessage(in: InMessage) { // E002
                 var x = 1; // E003
                 _ = x;
             }
-        "#;
+        ";
 
 #[test]
 #[named]

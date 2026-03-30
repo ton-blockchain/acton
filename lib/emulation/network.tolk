@@ -182,6 +182,56 @@ fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
 }
 
+/// Opaque cursor for step-by-step transaction execution.
+///
+/// Use [net.sendIter] to create it, then drain it in parts with [TxCursor.executeN],
+/// [TxCursor.executeTill], or [TxCursor.executeFrom].
+struct TxCursor {
+    id: int
+}
+
+/// Returns `true` when the cursor has no more pending transactions to execute.
+fun TxCursor.isDone(self): bool {
+    return ffi.isMessageIterDone(self.id);
+}
+
+/// Discards any remaining pending transactions for this cursor.
+fun TxCursor.close(self): void {
+    ffi.closeMessageIter(self.id);
+}
+
+/// Executes up to [n] transactions from the cursor and returns only this executed segment.
+///
+/// This is useful when you need to inspect the first few hops of a long chain without
+/// draining the whole queue.
+fun TxCursor.executeN(self, n: int): SendResultList {
+    return ffi.executeMessageIterN(self.id, n);
+}
+
+/// Executes transactions until one of them matches [params], then returns the executed segment.
+///
+/// The matching transaction is included in the returned list. If no matching transaction is found
+/// before the queue is exhausted, this function fails the test.
+fun TxCursor.executeTill<Msg = unknown>(self, params: SearchParams = {}): SendResultList {
+    val declaredPrefix = Msg.getDeclaredPackPrefix2();
+    if (declaredPrefix != -1) {
+        params.opcode = declaredPrefix;
+    }
+
+    val txs = ffi.executeMessageIterTill(self.id, params.toTuple());
+    if (txs == null) {
+        Assert.fail("executeTill() did not find a matching transaction before queue exhaustion");
+        throw 567;
+    }
+
+    return txs;
+}
+
+/// Executes all remaining pending transactions and returns only this executed segment.
+fun TxCursor.executeFrom(self): SendResultList {
+    return ffi.executeMessageIterFrom(self.id);
+}
+
 /// Wait for the transaction to be applied on the blockchain.
 ///
 /// This method is useful when broadcasting transactions to the real network.
@@ -209,7 +259,7 @@ fun SendResultList.wait(
     self,
     quiet: bool = false,
     attempts: int = 20,
-    sleepDuration: int = 2000,
+    sleepDuration: int = 1000,
 ): bool {
     if (!net.isBroadcasting()) {
         // in emulation mode we don't need to wait for anything
@@ -470,6 +520,21 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     return rawRes;
 }
 
+/// Start step-by-step execution for a message sent from [from].
+///
+/// In contrast to [net.send], this method does not execute the whole transaction chain eagerly.
+/// Instead it returns a cursor that can be advanced in batches.
+///
+/// This API is emulation-only and is intended for programmable partial execution workflows
+/// such as large cascades and interleaving multiple message chains.
+///
+/// Step-by-step execution is not available in broadcast mode or test-runner debug mode.
+fun net.sendIter(from: address, message: OutMessage): TxCursor {
+    return TxCursor {
+        id: ffi.startMessageIter(message.messageCell, from.toCell()),
+    };
+}
+
 /// Send a single message from a specified address.
 ///
 /// In contrast to [net.send], this method doesn't process out messages, but returns
@@ -615,7 +680,13 @@ struct Treasury {
 ///     // ...
 /// }
 /// ```
+///
+/// Note: in scripts always use [net.wallet] instead.
 fun net.treasury(name: string): Treasury {
+    if (net.isBroadcasting()) {
+        Assert.fail("Cannot use treasury in broadcast mode, don't use `net.treasury()` in scripts, use `net.wallet()` instead")
+    }
+
     val stateInit: ContractState = {
         code: __treasuryCode(),
         data: beginCell().storeSlice(name.beginParse()).endCell(),
@@ -625,13 +696,13 @@ fun net.treasury(name: string): Treasury {
     val address = AutoDeployAddress { stateInit }.calculateAddress();
     net.registerAddress(address, name);
 
-    val msg = createMessage({
+    val deployMsg = createMessage({
         bounce: false,
         value: ton("10000"),
         dest: { workchain: 0, stateInit },
     });
     // Deploy treasury
-    net.send(deployer, msg);
+    net.send(deployer, deployMsg);
     return Treasury { address };
 }
 
@@ -646,7 +717,7 @@ struct Wallet {
 /// Without `--broadcast`, the wallet refers to an internal wallet, created in the
 /// same way as in `net.treasury`.
 ///
-/// Note: in tests, use `net.treasury`.
+/// Note: in tests, use [net.treasury].
 ///
 /// Example:
 /// ```tolk
@@ -859,7 +930,7 @@ fun net.getDeployedCode(addr: address): cell? {
 /// body.skipBits(1); // skip Either tag bit
 /// val bodyHashSlice = beginCell().storeUint(body.hash(), 256).toSlice();
 ///
-/// val ok = net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 20, 2000);
+/// val ok = net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 20, 1000);
 /// ```
 ///
 /// See [SendResultList.wait] for high-level API.
@@ -868,7 +939,7 @@ fun net.waitForTransaction(
     messageBodyHash: slice,
     quiet: bool = false,
     attempts: int = 20,
-    sleepDuration: int = 2000,
+    sleepDuration: int = 1000,
 ): bool {
     return ffi.waitForTransaction(
         addr.toCell(),
@@ -1042,6 +1113,9 @@ fun net.now(): uint32 {
 /// ```tolk
 /// net.topUp(address, ton("10"));
 /// ```
+///
+/// Note: This function for tests only!
+/// For testnet TON airdrop use `acton wallet airdrop command.
 fun net.topUp(to: address, amount: coins): void {
     val treasury = net.treasury("treasury");
     val topupMsg = createMessage({
@@ -1148,6 +1222,34 @@ fun net.setShardAccount(addr: address, account: ShardAccount?): void {
         return;
     }
     ffi.setShardAccount(addr, account.toCell());
+}
+
+/// Save the current emulation world state to a JSON snapshot file.
+///
+/// Returns `true` on successful write and `false` on serialization or host I/O failure.
+///
+/// Example:
+/// ```tolk
+/// net.topUp(addr, ton("3"));
+/// val saved = net.saveSnapshot("world-state.json");
+/// expect(saved).toBeTrue();
+/// ```
+fun net.saveSnapshot(path: string): bool {
+    return ffi.saveWorldStateSnapshot(path);
+}
+
+/// Load an emulation world state from a JSON snapshot file.
+///
+/// On success, replaces the current local emulation state with the snapshot contents.
+/// Returns `false` when the file is missing, malformed, or cannot be applied.
+///
+/// Example:
+/// ```tolk
+/// val loaded = net.loadSnapshot("world-state.json");
+/// expect(loaded).toBeTrue();
+/// ```
+fun net.loadSnapshot(path: string): bool {
+    return ffi.loadWorldStateSnapshot(path);
 }
 
 /// Sets the blockchain configuration.
@@ -1373,3 +1475,11 @@ fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
 fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL";
 fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";
 fun ffi.runTickTock(onAccount: address, isTock: bool): SendResultList asm "36 EXTCALL";
+fun ffi.saveWorldStateSnapshot(path: string): bool asm "37 EXTCALL";
+fun ffi.loadWorldStateSnapshot(path: string): bool asm "38 EXTCALL";
+fun ffi.startMessageIter(msg: cell, from: cell): int asm "39 EXTCALL";
+fun ffi.executeMessageIterN(cursorId: int, n: int): SendResultList asm "40 EXTCALL";
+fun ffi.executeMessageIterTill(cursorId: int, params: tuple): SendResultList? asm "41 EXTCALL";
+fun ffi.executeMessageIterFrom(cursorId: int): SendResultList asm "42 EXTCALL";
+fun ffi.isMessageIterDone(cursorId: int): bool asm "43 EXTCALL";
+fun ffi.closeMessageIter(cursorId: int): void asm "44 EXTCALL";

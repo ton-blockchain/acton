@@ -166,6 +166,7 @@ pub struct DottedKey<'tree>(pub Node<'tree>);
 impl_ast_node!(DottedKey, "dotted_key");
 
 impl<'tree> DottedKey<'tree> {
+    #[must_use]
     pub fn parts(&self) -> AstChildren<'tree, Key<'tree>> {
         AstChildren::new(self.0)
     }
@@ -216,6 +217,7 @@ pub struct Array<'tree>(pub Node<'tree>);
 impl_ast_node!(Array, "array");
 
 impl<'tree> Array<'tree> {
+    #[must_use]
     pub fn values(&self) -> AstChildren<'tree, Value<'tree>> {
         AstChildren::new(self.0)
     }
@@ -226,6 +228,7 @@ pub struct InlineTable<'tree>(pub Node<'tree>);
 impl_ast_node!(InlineTable, "inline_table");
 
 impl<'tree> InlineTable<'tree> {
+    #[must_use]
     pub fn pairs(&self) -> AstChildren<'tree, Pair<'tree>> {
         AstChildren::new(self.0)
     }

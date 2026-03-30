@@ -8,6 +8,12 @@ that are built and checked with Bun.
 This guide covers local setup, build steps, and contributor workflows used in
 this repository.
 
+## Useful references
+
+- Public project overview: [README.md](README.md)
+- Security reporting policy: [SECURITY.md](SECURITY.md)
+- Maintainer release process: [RELEASING.md](RELEASING.md)
+
 ## Command conventions
 
 - Unless stated otherwise, run commands from the repository root.
@@ -93,7 +99,7 @@ Example:
 ```bash
 mkdir -p dist objs
 ARCHIVE_NAME=ton-objs-linux-x86_64.tar.gz # change for your platform
-curl -fL "https://github.com/i582/acton/releases/latest/download/${ARCHIVE_NAME}" \
+curl -fL "https://github.com/ton-blockchain/acton/releases/latest/download/${ARCHIVE_NAME}" \
   -o "dist/${ARCHIVE_NAME}"
 tar -C objs -xzf "dist/${ARCHIVE_NAME}"
 
@@ -103,7 +109,11 @@ cargo build
 ```
 
 The extracted archive already contains `libemulator.a` and `libtolk.a` at the
-archive root, so unpacking it into `objs/` is enough.
+archive root, so unpacking it into `objs/` is enough. If you refresh these
+archives later, also bump `artifact_set_revision` and refresh the `sha256`
+entries in `crates/ton-objs/artifacts_manifest.toml` so Cargo invalidates
+`ton-objs`. Set `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY=1` during build only if
+you intentionally want to skip archive validation against that manifest.
 
 ### Option 2: build TON artifacts manually
 
@@ -137,6 +147,9 @@ Then copy the generated archives into Acton and build the project:
 mkdir -p objs
 cp ton-repo/artifacts/libemulator.a objs/
 cp ton-repo/artifacts/libtolk.a objs/
+# edit crates/ton-objs/artifacts_manifest.toml:
+# - increment `artifact_set_revision`
+# - update `sha256.libemulator` / `sha256.libtolk`
 
 just build-ui
 
@@ -218,6 +231,7 @@ just fmt-ui
 just check-ui
 ```
 
+`just check-ui-ci` matches the non-mutating UI check used in CI.
 `just check-ui` runs `lint:fix` and may modify files.
 Run it until no further changes are produced, then stage updated files.
 
@@ -248,17 +262,19 @@ just build-ui
 
 ## Documentation workflows
 
-Documentation site (Next.js in `docs/`, package manager: Yarn):
+Documentation site (Next.js in `docs/`, package manager: Yarn via Corepack):
 
 ```bash
+corepack enable
 cd docs
-yarn install --immutable
+yarn install --immutable --check-cache --check-resolutions
 yarn dev
 ```
 
 Build docs:
 
 ```bash
+corepack enable
 cd docs
 yarn build
 ```
@@ -290,13 +306,21 @@ generated documentation changes is required. This includes:
 After doc updates (manual or generated), validate docs build:
 
 ```bash
+corepack enable
 cd docs
+yarn install --immutable --check-cache --check-resolutions
 yarn build
 ```
 
 ## Tree-sitter workflows
 
-If your PR changes `crates/tree-sitter-tolk` grammar/parser artifacts:
+If your PR changes any `crates/tree-sitter-*` grammar/parser artifacts:
+
+```bash
+just test-tree-sitter-all
+```
+
+For quick Tolk-only iteration:
 
 ```bash
 just test-tree-sitter
@@ -317,9 +341,9 @@ Use this as a quick local matrix before pushing:
 | Rust-only code                                                                                     | `just check`                                                                                               |
 | UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui`                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata) | `just check` + `acton docgen` and commit generated docs                                                    |
-| Docs site content/config (`docs/`)                                                                 | `cd docs && yarn install --immutable && yarn build`                                                        |
-| Tree-sitter grammar (`crates/tree-sitter-tolk`)                                                    | `just check` + `just test-tree-sitter` (and `just update-test-tree-sitter` when needed)                    |
-| Release preparation                                                                                | Ensure versions are synced in `Acton.toml`, `Cargo.toml` (`workspace.package.version`), and `package.json` |
+| Docs site content/config (`docs/`)                                                                 | `corepack enable && cd docs && yarn install --immutable --check-cache --check-resolutions && yarn build`   |
+| Tree-sitter grammar (`crates/tree-sitter-*`)                                                       | `just check` + `just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
+| Release preparation (maintainers)                                                                  | Follow [RELEASING.md](RELEASING.md)                                                                        |
 
 ## PR requirements
 
@@ -329,8 +353,7 @@ Every pull request must pass all checks from:
 just check
 ```
 
-This command runs `fmt-check`, `clippy`, `typos`, and `test`.
-It also runs `check-deps` to detect unused Rust dependencies.
+This command runs Rust formatting, docgen, dependency, lint, schema, and test checks.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-litenode-ui`,
@@ -349,37 +372,6 @@ just precommit
 ```
 
 `just precommit` additionally runs UI formatting/lint and full build steps.
-
-## Release workflow (maintainers)
-
-Use the release `xtask` instead of manual version bump/tag/release steps:
-
-```bash
-cargo xtask release --version <major.minor.patch>
-```
-
-Example:
-
-```bash
-cargo xtask release --version 0.22.0
-```
-
-Prerequisites:
-
-- `gh` CLI installed and authenticated (`gh auth status`)
-- `yq` v4 installed (the `xtask` uses it to update `package.json`)
-- local `master` branch with no uncommitted changes
-
-What `cargo xtask release` does:
-
-- validates version format (`X.Y.Z`) and that `vX.Y.Z` does not exist on `origin`
-- fetches `origin/master` and checks local `master` is up to date
-- verifies GitHub Actions runs for current `master` `HEAD` are all successful
-- bumps versions in `Acton.toml`, `Cargo.toml`, and `package.json`
-- runs `cargo update --workspace` to refresh `Cargo.lock`
-- creates commit `chore(acton): bump to version \`X.Y.Z\`` and tag `vX.Y.Z`
-- asks for explicit confirmation (`yes`) before pushing `master` and the tag
-- pushes to `origin` and creates GitHub Release with generated notes
 
 ## Commit message style
 
@@ -419,8 +411,3 @@ Rules:
 ## AI Policy
 
 Do what you want and how it is convenient for you.
-
-## Additional references
-
-- Task catalog: [`justfile`](justfile)
-- Main user docs: https://i582.github.io/acton/docs/welcome

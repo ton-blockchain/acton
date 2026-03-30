@@ -12,16 +12,16 @@ fn run_simple_test(group: &str, content: &str, name: &str) {
 fn test_check_deprecated_function_use() {
     run_simple_test(
         "deprecated",
-        r#"
+        r"
             @deprecated
             fun foo() {}
 
             fun main() {
                 foo();
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn test_check_deprecated_function_use_with_message() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn test_check_deprecated_struct_use() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn test_check_deprecated_static_method_use() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn test_check_deprecated_instance_method_use() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -101,14 +101,14 @@ fn test_check_deprecated_instance_method_use() {
 fn test_check_deprecated_global_var_use() {
     run_simple_test(
         "deprecated",
-        r#"
+        r"
             @deprecated
             global foo: int
 
             fun main() {
                 foo;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

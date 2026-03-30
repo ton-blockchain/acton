@@ -1,0 +1,245 @@
+'\" t
+.TH "ACTON\-COMPLETIONS" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-completions \[em] Generate static shell completion scripts
+.SH "SYNOPSIS"
+\fBacton completions\fR [\fIoptions\fR] \fIshell\fR
+.SH "DESCRIPTION"
+Generate a static completion script for the selected shell.
+.sp
+Acton also supports dynamic completions through the \fBCOMPLETE=<shell> acton\fR
+mechanism. Dynamic completions are usually more powerful because they can use
+project context such as contract and script names.
+.SH "QUICK START"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'for dynamic completions, prefer \fBCOMPLETE=<shell> acton\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'for a static script without editing shell startup files yet, run
+\fBacton completions <shell>\fR and inspect the output first
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'regenerate static completion files after upgrading Acton
+.RE
+.SH "OPTIONS"
+.SS "Completion Options"
+.sp
+\fIshell\fR
+.RS 4
+Shell to generate completions for.
+.sp
+Possible values: \fBbash\fR, \fBelvish\fR, \fBfish\fR, \fBpowershell\fR, \fBzsh\fR
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "DYNAMIC COMPLETIONS"
+Dynamic completions are recommended when your shell supports them.
+.SS "Zsh"
+Add this to \fB~/.zshrc\fR:
+.sp
+.RS 4
+.nf
+source <(COMPLETE=zsh acton)
+.fi
+.RE
+.SS "Bash"
+Add this to \fB~/.bashrc\fR:
+.sp
+.RS 4
+.nf
+source <(COMPLETE=bash acton)
+.fi
+.RE
+.SS "Fish"
+Add this to \fB~/.config/fish/config.fish\fR:
+.sp
+.RS 4
+.nf
+COMPLETE=fish acton | source
+.fi
+.RE
+.SH "STATIC INSTALLATION"
+\fBacton completions\fR writes the completion script to standard output. Typical
+installation patterns include:
+.SS "Bash"
+For the current shell session:
+.sp
+.RS 4
+.nf
+source <(acton completions bash)
+.fi
+.RE
+.sp
+For a persistent setup, either append to \fB~/.bashrc\fR:
+.sp
+.RS 4
+.nf
+acton completions bash >> ~/.bashrc
+.fi
+.RE
+.sp
+or install into the system completion directory:
+.sp
+.RS 4
+.nf
+acton completions bash | sudo tee /usr/share/bash\-completion/completions/acton
+.fi
+.RE
+.SS "Zsh"
+Zsh usually expects the completion file in a directory listed in \fB$fpath\fR:
+.sp
+.RS 4
+.nf
+mkdir \-p ~/.zsh/completions
+acton completions zsh > ~/.zsh/completions/_acton
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload \-Uz compinit && compinit' >> ~/.zshrc
+.fi
+.RE
+.sp
+Reload the shell or run:
+.sp
+.RS 4
+.nf
+source ~/.zshrc
+.fi
+.RE
+.SS "Fish"
+.sp
+.RS 4
+.nf
+acton completions fish > ~/.config/fish/completions/acton.fish
+.fi
+.RE
+.SS "PowerShell"
+For the current session:
+.sp
+.RS 4
+.nf
+acton completions powershell | Out\-String | Invoke\-Expression
+.fi
+.RE
+.sp
+For a persistent setup, add the generated script to your PowerShell profile.
+.SS "Elvish"
+.sp
+.RS 4
+.nf
+acton completions elvish > ~/.elvish/completions/acton.elv
+.fi
+.RE
+.sp
+Then load it from \fB~/.elvish/rc.elv\fR:
+.sp
+.RS 4
+.nf
+use completions/acton
+.fi
+.RE
+.SH "VERIFYING INSTALLATION"
+After installation, try:
+.sp
+.RS 4
+.nf
+acton <TAB>
+acton test \-\-<TAB>
+.fi
+.RE
+.sp
+You should see command names and flag suggestions from the selected shell.
+.SH "TROUBLESHOOTING"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if static completions show old commands, regenerate them after updating Acton
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Zsh usually needs \fBcompinit\fR after changing completion locations
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if Zsh still does not complete, delete \fB~/.zcompdump\fR and rerun \fBcompinit\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Bash may require the shell\-specific completion package to be installed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if PowerShell completions do not persist, verify that the generated script is
+loaded from \fB$PROFILE\fR
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The completion script was generated successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The shell value was unsupported or output could not be written.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Generate a static Zsh script:
+.sp
+.RS 4
+.nf
+acton completions zsh
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Enable dynamic Bash completions:
+.sp
+.RS 4
+.nf
+source <(COMPLETE=bash acton)
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Inspect generated output without installing it:
+.sp
+.RS 4
+.nf
+acton completions zsh | head
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIShell completions guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/shell\-completions>
+.RE

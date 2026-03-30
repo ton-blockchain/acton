@@ -139,6 +139,7 @@ pub struct Dictionary<'tree>(pub Node<'tree>);
 impl_ast_node!(Dictionary, "dictionary");
 
 impl<'tree> Dictionary<'tree> {
+    #[must_use]
     pub fn entries(&self) -> AstChildren<'tree, DictionaryEntry<'tree>> {
         AstChildren::new(self.0)
     }

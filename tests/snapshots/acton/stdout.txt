@@ -13,6 +13,7 @@ Commands:
   fmt              [PATHS...]          Format Tolk source files
 
   wallet           <COMMAND>           Manage wallets
+  rpc              <COMMAND>           Inspect remote account and contract state
   verify           [CONTRACT_ID]       Verify contract source code on verifier.ton.org
   library          <COMMAND>           Manage TON libraries
   litenode         <COMMAND>           Manage lightweight TON node
@@ -26,7 +27,8 @@ Commands:
 
   ls                                   Run LSP server for the TON languages and technologies
   up                                   Manage Acton versions
-  help             [COMMAND]           Print this message or the help of the given subcommand(s)
+  help             [COMMAND]           Print this message or the help of a given top-level command
+  hooks            <COMMAND>           Manage git hooks for the current project
   doctor                               Inspect resolved project environment
   func2tolk        <PATH>              Convert FunC files to Tolk via @ton/convert-func-to-tolk
   completions      <SHELL>             Generate shell completions for selected shell
@@ -38,4 +40,6 @@ Global options:
   -h, --help                           Print help
   -V, --version                        Print version
 
-Learn more about Acton:                https://i582.github.io/acton/docs/welcome
+Use acton help <command> for detailed manuals with behavior, config, and examples.
+
+Learn more about Acton:                https://ton-blockchain.github.io/acton/docs/welcome

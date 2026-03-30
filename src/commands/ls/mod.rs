@@ -80,8 +80,8 @@ async fn ls_cmd_internal(
     });
 
     if let Some(port) = port {
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
-        println!("LSP server listening on port {}", port);
+        let listener = TcpListener::bind(format!("127.0.0.1:{port}")).await?;
+        println!("LSP server listening on port {port}");
         let (stream, _) = listener.accept().await?;
         let (reader, writer) = tokio::io::split(stream);
         Server::new(reader, writer, socket).serve(service).await;
@@ -111,7 +111,7 @@ fn setup_ls_logging(log_file: Option<String>) -> anyhow::Result<()> {
                 record.target(),
                 record.level(),
                 message
-            ))
+            ));
         })
         .level(log::LevelFilter::Debug)
         .chain(fern::log_file(log_path)?)

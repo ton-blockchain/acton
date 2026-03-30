@@ -299,10 +299,10 @@ fn test_teamcity_reporter_escapes_location_hint_special_chars() {
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
             "escape",
-            r#"
+            r"
             get fun `test teamcity '|[]`() {
             }
-        "#,
+        ",
         )
         .build();
 
@@ -395,17 +395,17 @@ fn test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs()
         .contract("simple", SIMPLE_CONTRACT)
         .raw_file(
             "tests/a/shared.test.tolk",
-            r#"
+            r"
             get fun `test-shared-a`() {
             }
-        "#,
+        ",
         )
         .raw_file(
             "tests/b/shared.test.tolk",
-            r#"
+            r"
             get fun `test-shared-b`() {
             }
-        "#,
+        ",
         )
         .build();
 

@@ -3,17 +3,13 @@ use crash_handler::{CrashHandler, Error};
 const ACTON_FATAL_CRASH_MESSAGE: &str = concat!(
     "\n",
     "Acton hit an internal crash and had to stop.\n",
-    "Please run the same command again. If it crashes again, report it at https://github.com/i582/acton/issues.\n",
+    "Please run the same command again. If it crashes again, report it at https://github.com/ton-blockchain/acton/issues.\n",
     "Include the command you ran, the files or project involved, what Acton printed before the crash, and the steps to reproduce it.\n",
     "Check the Acton log file for more details: ~/.acton/logs/debug.log.\n",
     "If ACTON_LOG_DIR is set, check that directory instead.\n",
-    "Version: v",
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("GIT_HASH"),
-    " ",
-    env!("BUILD_DATE"),
-    ")\n",
+    "Version: ",
+    env!("ACTON_LONG_VERSION"),
+    "\n",
 );
 
 pub fn install() -> Result<CrashHandler, Error> {

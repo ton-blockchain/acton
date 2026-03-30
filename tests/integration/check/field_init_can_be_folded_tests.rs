@@ -16,7 +16,7 @@ fn run_fix_test(before: &str, after: &str, name: &str) {
 fn test_check_field_init_can_be_folded() {
     run_simple_test(
         "field_init_can_be_folded",
-        r#"
+        r"
             struct Foo {
                 bar: int,
             }
@@ -26,16 +26,16 @@ fn test_check_field_init_can_be_folded() {
                     bar: bar,
                 };
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_field_init_can_be_folded() {
     run_fix_test(
-        r#"
+        r"
             struct Foo {
                 bar: int,
             }
@@ -45,8 +45,8 @@ fn test_fix_field_init_can_be_folded() {
                     bar: bar,
                 };
             }
-        "#,
-        r#"
+        ",
+        r"
             struct Foo {
                 bar: int,
             }
@@ -56,7 +56,7 @@ fn test_fix_field_init_can_be_folded() {
                     bar,
                 };
             }
-        "#,
+        ",
         function_name!(),
     );
 }

@@ -1,0 +1,112 @@
+ACTON-FUNC2TOLK(1)
+
+NAME
+       acton-func2tolk — Convert FunC sources to Tolk through the upstream
+       converter
+
+SYNOPSIS
+       acton func2tolk [options] path
+
+DESCRIPTION
+       Convert a FunC source file or a directory of FunC files into Tolk.
+
+       Acton shells out to npx and runs the upstream @ton/convert-func-to-tolk
+       package. Standard input, output, and error are forwarded directly to the
+       converter process.
+
+OPTIONS
+   Conversion Options
+       path
+           Path to a .fc or .func file, or to a directory containing such
+           files.
+
+       --output path
+           Write converted output to the specified path.
+
+       --warnings-as-comments
+           Insert warning comments into the generated output instead of
+           reporting warnings only on stderr.
+
+       --no-camel-case
+           Disable snake_case to camelCase renaming.
+
+       --version version
+           Version of @ton/convert-func-to-tolk to execute.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project manifest for its
+           primary workflow. It remains mutually exclusive with --project-root.
+
+       --project-root path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project root for its
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
+
+REQUIREMENTS
+       This command requires:
+
+       o  Node.js
+
+       o  npm
+
+       o  npx available in PATH
+
+       Acton uses a temporary npm cache directory for each invocation.
+
+       That means converter downloads are not reused across runs.
+
+PROCESS MODEL
+       Acton runs:
+
+           npx --yes @ton/convert-func-to-tolk@<version> ...
+
+       If the converter exits non-zero, acton func2tolk fails with the same
+       outcome reported as an Acton error.
+
+       If _path_ is a directory, file naming and directory traversal are
+       delegated to the upstream converter. --output is forwarded directly to
+       that tool.
+
+EXIT STATUS
+       o  0: Conversion completed successfully, including runs that produced
+          warnings.
+
+       o  1: npx or the converter could not be started, conversion failed, or
+          the requested output could not be written by the converter.
+
+EXAMPLES
+       1. Convert all FunC files in a directory:
+
+              acton func2tolk contracts
+
+       2. Convert a single file and keep warnings inline:
+
+              acton func2tolk jetton-minter.fc --warnings-as-comments
+
+       3. Disable camelCase renaming:
+
+              acton func2tolk jetton-minter.fc --no-camel-case
+
+       4. Use a specific converter version:
+
+              acton func2tolk jetton-minter.fc --version 1.0.0
+
+       5. Convert into an explicit output file:
+
+              acton func2tolk jetton-minter.fc --output jetton-minter.tolk
+
+SEE ALSO
+       o  convert-func-to-tolk
+          <https://github.com/ton-blockchain/convert-func-to-tolk>
+

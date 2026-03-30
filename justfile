@@ -28,6 +28,17 @@ test-integration:
 test-tree-sitter:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
 
+test-tree-sitter-fift:
+    cd crates/tree-sitter-fift && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+
+test-tree-sitter-tasm:
+    cd crates/tree-sitter-tasm && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+
+test-tree-sitter-tlb:
+    cd crates/tree-sitter-tlb && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+
+test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter
+
 update-test-tree-sitter:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
 
@@ -54,9 +65,15 @@ typos:
 check-docgen:
     cargo run -- docgen --check # always use latest acton
 
-check-ci: fmt-check check-docgen check-deps clippy typos
+check-schema:
+    cargo run -p xtask -- schema --check
 
-check: check-ci test
+check-deny:
+    cargo deny check
+
+check-ci: fmt-check check-docgen check-deps clippy typos check-schema
+
+check: check-ci check-deny check-schema test
 
 coverage-setup:
     cargo install cargo-llvm-cov
@@ -78,6 +95,9 @@ build-ui:
     bun install
     cd crates/acton-test-ui && bun i && bun run build
     cd crates/acton-litenode-ui && bun i && bun run build
+
+check-ui-ci:
+    bun run lint
 
 check-ui:
     bun run lint:fix

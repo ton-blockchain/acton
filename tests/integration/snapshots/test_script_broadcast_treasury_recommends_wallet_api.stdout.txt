@@ -1,0 +1,2 @@
+  Installing standard library [ACTON_VERSION]
+Cannot use treasury in broadcast mode, don't use `net.treasury()` in scripts, use `net.wallet()` instead

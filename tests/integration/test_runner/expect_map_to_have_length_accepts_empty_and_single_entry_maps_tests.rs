@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const LEDGER_CONTRACT: &str = r#"
+const LEDGER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 
@@ -14,7 +14,7 @@ get fun singleBalance(): map<int32, int32> {
     balances.set(7, 70);
     return balances;
 }
-"#;
+";
 
 const EE_MAP_TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"

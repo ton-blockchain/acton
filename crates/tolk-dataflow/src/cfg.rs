@@ -308,7 +308,7 @@ impl ControlFlowGraph {
             if options.include_reads_writes {
                 let reads = format_locals(&node.reads);
                 let writes = format_locals(&node.writes);
-                label.push_str(&format!("\nR:[{}]\nW:[{}]", reads, writes));
+                label.push_str(&format!("\nR:[{reads}]\nW:[{writes}]"));
             }
 
             let shape = match node.kind {

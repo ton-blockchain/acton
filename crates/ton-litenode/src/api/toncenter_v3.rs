@@ -37,6 +37,7 @@ fn map_jetton_master(m: &JettonMasterMeta) -> Value {
 }
 
 #[allow(clippy::ptr_arg)]
+#[must_use]
 pub fn map_jetton_wallets(wallets: &Vec<JettonWalletMeta>) -> Value {
     map_jetton_wallets_with_metadata(wallets, &HashMap::new())
 }
@@ -83,6 +84,7 @@ pub fn map_jetton_wallets_with_metadata(
 }
 
 #[allow(clippy::ptr_arg)]
+#[must_use]
 pub fn map_nft_items(items: &Vec<NftItemMeta>) -> Value {
     map_nft_items_with_metadata(items)
 }
@@ -125,23 +127,25 @@ pub fn map_nft_items_with_metadata(items: &Vec<NftItemMeta>) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_address_information(state: &LiteNodeAccountState) -> Value {
     serde_json::json!({
         "balance": state.balance.to_string(),
         "code": encode_optional_boc(state.code.as_ref()),
         "data": encode_optional_boc(state.data.as_ref()),
-        "frozen_hash": state.frozen_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default(),
+        "frozen_hash": state.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
         "last_transaction_hash": state.last_transaction_id.hash.to_base64(),
         "last_transaction_lt": state.last_transaction_id.lt.to_string(),
         "status": map_account_status(&state.state),
     })
 }
 
+#[must_use]
 pub fn map_send_message(bt: &LiteNodeBlockTransactions) -> Value {
     let message_hash = bt
         .msg_hash
         .as_ref()
-        .map(|h| h.to_base64())
+        .map(super::super::types::Hash256::to_base64)
         .unwrap_or_default();
     serde_json::json!({
         "message_hash": message_hash,
@@ -216,8 +220,8 @@ fn map_v3_message(
     let mut mapped = serde_json::json!({
         "hash": msg.hash.to_base64(),
         "hash_norm": msg.hash.to_base64(),
-        "source": msg.source.as_ref().map(|a| a.to_string()),
-        "destination": msg.destination.as_ref().map(|a| a.to_string()),
+        "source": msg.source.as_ref().map(ToString::to_string),
+        "destination": msg.destination.as_ref().map(ToString::to_string),
         "value": msg.value.to_string(),
         "value_extra_currencies": {},
         "fwd_fee": msg.fwd_fee.to_string(),
@@ -347,12 +351,11 @@ fn map_nft_item(item: &NftItemMeta) -> Value {
     let collection = item
         .collection_address
         .as_ref()
-        .map(|address| {
+        .map_or(Value::Null, |address| {
             serde_json::json!({
                 "address": address.to_string(),
             })
-        })
-        .unwrap_or(Value::Null);
+        });
 
     serde_json::json!({
         "address": item.address.to_string(),
@@ -425,6 +428,7 @@ fn content_string(content: &Value, key: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
+#[must_use]
 pub fn map_traces(tn: &TraceNode) -> Value {
     let mut transactions = HashMap::new();
     let mut transactions_order = Vec::new();
@@ -587,7 +591,7 @@ fn map_trace(
 ) -> Value {
     serde_json::json!({
         "trace_id": tn.transaction.meta.tx_hash.to_base64(),
-        "external_hash": tn.external_hash.as_ref().map(|h| h.to_base64()).unwrap_or_else(|| tn.transaction.meta.tx_hash.to_base64()),
+        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), super::super::types::Hash256::to_base64),
         "mc_seqno_start": "0",
         "mc_seqno_end": "0",
         "start_lt": tn.transaction.meta.lt.to_string(),
@@ -612,7 +616,7 @@ fn map_trace(
 fn map_trace_node(tn: &TraceNode) -> Value {
     serde_json::json!({
         "tx_hash": tn.transaction.meta.tx_hash.to_base64(),
-        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default(),
+        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
         "in_msg": tn.transaction.in_msg.as_ref().map(|m| map_message(&m.meta)),
         "transaction": map_transaction(&tn.transaction),
         "children": tn.children.iter().map(map_trace_node).collect::<Vec<_>>(),
@@ -662,8 +666,8 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
 fn map_message(msg: &MsgMeta) -> Value {
     serde_json::json!({
         "hash": msg.msg_hash.to_base64(),
-        "source": msg.src.as_ref().map(|a| a.to_string()),
-        "destination": msg.dst.as_ref().map(|a| a.to_string()),
+        "source": msg.src.as_ref().map(ToString::to_string),
+        "destination": msg.dst.as_ref().map(ToString::to_string),
         "value": msg.value.unwrap_or(0).to_string(),
         "fwd_fee": "0",
         "ihr_fee": "0",

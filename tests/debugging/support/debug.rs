@@ -138,10 +138,10 @@ impl DebugSession {
         let handle = thread::spawn(move || {
             let result = run_script_file(&code, &source_content, port, stack)
                 .expect("Failed to run debug script");
-            println!("Debug execution finished: {}", result);
+            println!("Debug execution finished: {result}");
         });
 
-        let address = format!("127.0.0.1:{}", port);
+        let address = format!("127.0.0.1:{port}");
         let client = DebuggerClient::connect_with_retry(&address, Duration::from_millis(2000))
             .expect("Failed to connect to debug server");
 
@@ -195,7 +195,7 @@ pub(crate) struct DebugActionExecutor<'a> {
     trace: &'a mut ExecutionTrace,
 }
 
-impl<'a> DebugActionExecutor<'a> {
+impl DebugActionExecutor<'_> {
     fn record_state_with_action(&mut self, action: String) -> anyhow::Result<()> {
         let thread_id = 1;
         let positions = self.client.stack_trace(thread_id)?;
@@ -309,7 +309,7 @@ impl ExecutionTrace {
 
                 for (i, line) in content.iter().enumerate().take(end_line).skip(start_line) {
                     let line_num = i + 1;
-                    context.push(format!("{:3}| {}", line_num, line));
+                    context.push(format!("{line_num:3}| {line}"));
                 }
 
                 if line_idx >= start_line && line_idx < end_line {
@@ -372,7 +372,7 @@ impl ExecutionTrace {
             if !step.code_context.is_empty() {
                 result.push_str("  Code:\n");
                 for line in &step.code_context {
-                    result.push_str(&format!("    {}\n", line));
+                    result.push_str(&format!("    {line}\n"));
                 }
             }
 

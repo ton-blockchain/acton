@@ -1,1 +1,1 @@
-Error: Permission denied (os error 13)
+Error: Permission denied ([OS_ERROR])

@@ -8,12 +8,11 @@ import "../../lib/testing/expect"
 
 fn run_account_state_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let test_code = format!(
-        r#"
-            {}
+        r"
+            {TEST_IMPORTS}
 
-            {}
-        "#,
-        TEST_IMPORTS, test_body
+            {test_body}
+        "
     );
 
     ProjectBuilder::new(project_name)

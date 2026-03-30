@@ -32,7 +32,7 @@ pub fn check_call_expr(
         .text_matches(file_id, &name_node, "createMessage")
     {
         return None;
-    };
+    }
     let arg = node.arguments().first()?;
     let Expr::ObjectLit(literal) = arg.expr()? else {
         return None;

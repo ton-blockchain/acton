@@ -8,10 +8,10 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 "#;
 
-const RECEIVER_CONTRACT: &str = r#"
+const RECEIVER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn run_deploy_expect_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{DEPLOY_EXPECT_IMPORTS}\n{test_body}\n");

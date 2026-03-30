@@ -524,8 +524,8 @@ impl Emulator {
         let config_boc = Boc::encode_base64(&config);
 
         match self.executor.set_config(&config_boc) {
-            Ok(res) => match res {
-                true => {
+            Ok(res) => {
+                if res {
                     let mut config_slice = config.as_slice_allow_exotic();
 
                     let config_dict = Dict::<u32, Cell>::load_from_root_ext(
@@ -536,9 +536,10 @@ impl Emulator {
 
                     state.set_config(config_dict);
                     Ok(true)
+                } else {
+                    Ok(false)
                 }
-                false => Ok(false),
-            },
+            }
             Err(e) => Err(e),
         }
     }

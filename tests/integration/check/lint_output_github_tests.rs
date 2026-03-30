@@ -2,18 +2,18 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const UNUSED_VARIABLE_CONTRACT: &str = r#"
+const UNUSED_VARIABLE_CONTRACT: &str = r"
             fun main() {
                 val x = 1;
             }
-        "#;
+        ";
 
-const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r#"
+const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r"
             fun main() {
                 val _value = 1;
                 _value;
             }
-        "#;
+        ";
 
 #[test]
 #[named]

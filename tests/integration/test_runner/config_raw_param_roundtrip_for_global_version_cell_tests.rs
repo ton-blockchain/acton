@@ -56,7 +56,7 @@ fn run_config_success_case_with_contract(project_name: &str, test_body: &str, sn
 fn config_raw_param_roundtrip_for_global_version_cell() {
     run_config_success_case(
         "ai-stdlib-config-raw-param-roundtrip",
-        r#"
+        r"
 get fun `test-ai-stdlib-config-raw-param-roundtrip`() {
     var config = net.getConfig();
     val overrideVersion = GlobalVersion {
@@ -72,7 +72,7 @@ get fun `test-ai-stdlib-config-raw-param-roundtrip`() {
     expect(decoded.version).toEqual(12345);
     expect(decoded.capabilities).toEqual(0xABCD);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_raw_param_roundtrip_for_global_version_cell/config_raw_param_roundtrip_for_global_version_cell.stdout.txt",
     );
 }
@@ -81,7 +81,7 @@ get fun `test-ai-stdlib-config-raw-param-roundtrip`() {
 fn config_set_config_rejects_invalid_global_version_cell() {
     run_config_success_case(
         "ai-stdlib-config-invalid-global-version",
-        r#"
+        r"
 get fun `test-ai-stdlib-config-invalid-global-version-cell`() {
     var config = net.getConfig();
     config.setParamRaw(GLOBAL_VERSION_INDEX, beginCell().endCell());
@@ -89,7 +89,7 @@ get fun `test-ai-stdlib-config-invalid-global-version-cell`() {
     val result = net.setConfig(config);
     expect(result).toBeFalse();
 }
-"#,
+",
         "integration/snapshots/test-runner/config_raw_param_roundtrip_for_global_version_cell/config_set_config_rejects_invalid_global_version_cell.stdout.txt",
     );
 }
@@ -98,7 +98,7 @@ get fun `test-ai-stdlib-config-invalid-global-version-cell`() {
 fn config_storage_prices_roundtrip_updates_initial_entry() {
     run_config_success_case(
         "ai-stdlib-config-storage-prices-roundtrip",
-        r#"
+        r"
 get fun `test-ai-stdlib-config-storage-prices-roundtrip`() {
     var config = net.getConfig();
     var prices = config.getStoragePrices();
@@ -117,7 +117,7 @@ get fun `test-ai-stdlib-config-storage-prices-roundtrip`() {
     expect(updated.bitPrice).toEqual(expectedBitPrice);
     expect(updated.cellPrice).toEqual(expectedCellPrice);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_raw_param_roundtrip_for_global_version_cell/config_storage_prices_roundtrip_updates_initial_entry.stdout.txt",
     );
 }
@@ -126,7 +126,7 @@ get fun `test-ai-stdlib-config-storage-prices-roundtrip`() {
 fn config_gas_prices_update_basechain_and_masterchain_independently() {
     run_config_success_case(
         "ai-stdlib-config-gas-prices-roundtrip",
-        r#"
+        r"
 get fun `test-ai-stdlib-config-gas-prices-roundtrip`() {
     var config = net.getConfig();
 
@@ -155,7 +155,7 @@ get fun `test-ai-stdlib-config-gas-prices-roundtrip`() {
     expect(actualBase.flatGasPrice).toNotEqual(baseBefore);
     expect(actualMaster.flatGasPrice).toNotEqual(masterBefore);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_raw_param_roundtrip_for_global_version_cell/config_gas_prices_update_basechain_and_masterchain_independently.stdout.txt",
     );
 }
@@ -194,7 +194,7 @@ get fun `test-ai-stdlib-config-msg-forward-prices`() {
 fn config_precompiled_contracts_roundtrip_and_duplicate_insert_guard() {
     run_config_success_case(
         "ai-stdlib-config-precompiled-contracts",
-        r#"
+        r"
 get fun `test-ai-stdlib-config-precompiled-contracts`() {
     var precompiled = PrecompiledContractsConfig {
         list: createEmptyMap<uint256, PrecompiledSmartContract>(),
@@ -220,7 +220,7 @@ get fun `test-ai-stdlib-config-precompiled-contracts`() {
     expect(first.gasUsage).toEqual(777);
     expect(second.gasUsage).toEqual(555);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_raw_param_roundtrip_for_global_version_cell/config_precompiled_contracts_roundtrip_and_duplicate_insert_guard.stdout.txt",
     );
 }

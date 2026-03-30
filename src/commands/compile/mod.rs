@@ -77,7 +77,7 @@ pub fn compile_cmd(
     let mut compiler = tolkc::Compiler::new(2);
     if let Some(acton_config) = &acton_config {
         let mappings = acton_config.mappings();
-        compiler = compiler.with_mappings(&mappings)
+        compiler = compiler.with_mappings(&mappings);
     }
 
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
@@ -153,30 +153,7 @@ fn handle_compilation_result(
     let code_hex = Boc::encode_hex(&code);
 
     if let Some(source_map_path) = &source_map_path {
-        if let Some(parent_dir) = Path::new(&source_map_path).parent()
-            && let Err(err) = fs::create_dir_all(parent_dir)
-        {
-            anyhow::bail!(
-                "Failed to create directory for source map file {}: {}",
-                parent_dir.display(),
-                err
-            );
-        }
-
-        if let Some(source_map_data) = &source_map {
-            if let Ok(json_string) = serde_json::to_string_pretty(source_map_data) {
-                fs::write(source_map_path, json_string).map_err(|err| {
-                    anyhow!(
-                        "Failed to save source map {}: {err}",
-                        source_map_path.yellow()
-                    )
-                })?;
-            } else {
-                eprintln!("Warning: Failed to serialize source map");
-            }
-        } else if !json && !base64_only {
-            eprintln!("Warning: No source map data available");
-        }
+        write_source_map(source_map.as_ref(), source_map_path)?;
     }
 
     if let Some(fift_path) = &fift {
@@ -256,4 +233,56 @@ fn handle_compilation_result(
         println!("Code hash hex: {}", format!("0x{code_hash_hex}").dimmed());
     }
     Ok(())
+}
+
+fn write_source_map(source_map: Option<&SourceMap>, source_map_path: &str) -> anyhow::Result<()> {
+    if let Some(parent_dir) = Path::new(source_map_path).parent()
+        && let Err(err) = fs::create_dir_all(parent_dir)
+    {
+        anyhow::bail!(
+            "Failed to create directory for source map file {}: {}",
+            parent_dir.display(),
+            err
+        );
+    }
+
+    let source_map = source_map.ok_or_else(|| {
+        anyhow!(
+            "No source map data available for {}",
+            source_map_path.yellow()
+        )
+    })?;
+    let json_string = serde_json::to_string_pretty(source_map).map_err(|err| {
+        anyhow!(
+            "Failed to serialize source map {}: {err}",
+            source_map_path.yellow()
+        )
+    })?;
+    fs::write(source_map_path, json_string).map_err(|err| {
+        anyhow!(
+            "Failed to save source map {}: {err}",
+            source_map_path.yellow()
+        )
+    })?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_source_map;
+
+    #[test]
+    fn write_source_map_requires_source_map_data() {
+        let error = write_source_map(None, "source-map.json").expect_err("must fail");
+        let rendered = error.to_string();
+
+        assert!(
+            rendered.contains("No source map data available for"),
+            "unexpected error: {rendered}"
+        );
+        assert!(
+            rendered.contains("source-map.json"),
+            "unexpected error: {rendered}"
+        );
+    }
 }

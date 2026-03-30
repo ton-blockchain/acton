@@ -3,6 +3,7 @@ import "@acton/build/build"
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
+import "@acton/types/message"
 // Jetton contract imports
 import "@contracts/errors"
 import "@contracts/messages"

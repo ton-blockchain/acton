@@ -703,10 +703,10 @@ impl<'tree> AstNode<'tree> for BuiltinExpr<'tree> {
 impl<'t> From<Node<'t>> for BuiltinExpr<'t> {
     fn from(node: Node<'t>) -> Self {
         match node.kind_bytes() {
-            b"builtin_expr" => node
-                .named_child(0)
-                .map(BuiltinExpr::from)
-                .unwrap_or_else(|| BuiltinExpr::Unmapped(RawNode::new(node))),
+            b"builtin_expr" => node.named_child(0).map_or_else(
+                || BuiltinExpr::Unmapped(RawNode::new(node)),
+                BuiltinExpr::from,
+            ),
             b"builtin_one_arg" => BuiltinExpr::BuiltinOneArg(BuiltinOneArg(node)),
             b"builtin_zero_args" => BuiltinExpr::BuiltinZeroArgs(BuiltinZeroArgs(node)),
             _ => BuiltinExpr::Unmapped(RawNode::new(node)),
@@ -739,6 +739,7 @@ impl<'tree> CombinatorExpr<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn params(&self) -> AstChildren<'tree, TypeExpr<'tree>> {
         AstChildren::new(self.0)
     }
@@ -933,10 +934,10 @@ impl<'tree> AstNode<'tree> for CompareExpr<'tree> {
 impl<'t> From<Node<'t>> for CompareExpr<'t> {
     fn from(node: Node<'t>) -> Self {
         match node.kind_bytes() {
-            b"compare_expr" => node
-                .named_child(0)
-                .map(CompareExpr::from)
-                .unwrap_or_else(|| CompareExpr::Unmapped(RawNode::new(node))),
+            b"compare_expr" => node.named_child(0).map_or_else(
+                || CompareExpr::Unmapped(RawNode::new(node)),
+                CompareExpr::from,
+            ),
             b"binary_expression" => CompareExpr::BinaryExpression(BinaryExpression(node)),
             b"parens_compare_expr" => CompareExpr::ParensCompareExpr(ParensCompareExpr(node)),
             _ => CompareExpr::Unmapped(RawNode::new(node)),
@@ -1000,10 +1001,10 @@ impl<'tree> AstNode<'tree> for CurlyExpression<'tree> {
 impl<'t> From<Node<'t>> for CurlyExpression<'t> {
     fn from(node: Node<'t>) -> Self {
         match node.kind_bytes() {
-            b"curly_expression" => node
-                .named_child(0)
-                .map(CurlyExpression::from)
-                .unwrap_or_else(|| CurlyExpression::Unmapped(RawNode::new(node))),
+            b"curly_expression" => node.named_child(0).map_or_else(
+                || CurlyExpression::Unmapped(RawNode::new(node)),
+                CurlyExpression::from,
+            ),
             b"compare_expr" | b"binary_expression" | b"parens_compare_expr" => {
                 CurlyExpression::CompareExpr(CompareExpr::from(node))
             }

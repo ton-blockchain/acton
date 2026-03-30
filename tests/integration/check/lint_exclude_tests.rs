@@ -2,23 +2,23 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const UNUSED_VARIABLE_CONTRACT: &str = r#"
+const UNUSED_VARIABLE_CONTRACT: &str = r"
             fun main() {
                 val x = 1;
             }
-        "#;
+        ";
 
-const HELPER_WITH_UNUSED_VARIABLE: &str = r#"
+const HELPER_WITH_UNUSED_VARIABLE: &str = r"
             fun dangerous() {
                 val helper_unused = 1;
             }
-        "#;
+        ";
 
-const BROKEN_HELPER: &str = r#"
+const BROKEN_HELPER: &str = r"
             fun broken(value: int): int {
                 return value +
             }
-        "#;
+        ";
 
 #[test]
 #[named]
@@ -142,6 +142,7 @@ fn check_lint_exclude_does_not_hide_compiler_errors_from_excluded_files() {
             "#,
         )
         .file("contracts/broken_helper", BROKEN_HELPER)
+        .with_lint_level("missing-contract-header", "allow")
         .with_lint_level("explicit-return-type", "allow")
         .with_lint_exclude("contracts/broken_helper.tolk")
         .build();

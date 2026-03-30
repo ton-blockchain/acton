@@ -1,0 +1,106 @@
+ACTON-RETRACE(1)
+
+NAME
+       acton-retrace — Replay an on-chain transaction locally for inspection
+
+SYNOPSIS
+       acton retrace [options] hash
+
+DESCRIPTION
+       Download a transaction by hash and replay it locally in the TON sandbox.
+
+       acton retrace is useful for debugging failures, inspecting outgoing
+       actions, reviewing VM and executor logs, and comparing local replay
+       results with the original on-chain execution.
+
+OPTIONS
+   Retrace Options
+       hash
+           Transaction hash in hex format.
+
+       --net network
+           Network to retrace from.
+
+           Without this flag, Acton tries mainnet first and then falls back to
+           testnet.
+
+       --api-key key
+           TonCenter API key for blockchain queries.
+
+       -v, --verbose
+           Show full cell hex in outgoing actions instead of only hashes.
+
+       --logs-dir dir
+           Write VM and executor logs into the specified directory.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+NETWORK AND API BEHAVIOR
+       o  Without --net, Acton tries mainnet and then testnet
+
+       o  localnet and custom:<name> are not supported by the retrace backend
+
+       o  If no --api-key is provided, Acton throttles requests to reduce
+          rate-limit failures
+
+       For library fallback lookups, retrace also supports DTON_API_KEY from
+       the environment.
+
+OUTPUT
+       The command prints:
+
+       o  network selection and state-hash check status
+
+       o  transaction metadata and fee summary
+
+       o  compute and action phase summaries
+
+       o  decoded outgoing actions
+
+       o  additional full VM and executor logs when --logs-dir is used
+
+       When --logs-dir is set, Acton creates the target directory and writes
+       vm.log plus executor.log there.
+
+EXIT STATUS
+       o  0: The transaction was fetched and replayed successfully.
+
+       o  1: The transaction could not be found, network lookup failed, replay
+          data was incomplete, or local log files could not be written.
+
+EXAMPLES
+       1. Retrace with automatic network fallback:
+
+              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41
+
+       2. Force mainnet and use an API key:
+
+              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --net mainnet --api-key YOUR_API_KEY
+
+       3. Save logs and show full outgoing cell bodies:
+
+              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --verbose --logs-dir .acton/retrace
+
+SEE ALSO
+       o  acton help disasm
+
+       o  Retrace command guide
+          <https://ton-blockchain.github.io/acton/docs/commands/retrace>
+

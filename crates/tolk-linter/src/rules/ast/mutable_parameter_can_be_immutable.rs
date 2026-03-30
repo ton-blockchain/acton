@@ -88,7 +88,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
                 message: "remove `mutate`".to_string(),
                 edits: vec![Edit {
                     span,
-                    replacement: "".to_string(),
+                    replacement: String::new(),
                     file_id,
                 }],
                 applicability: Applicability::Auto,

@@ -16,6 +16,7 @@ pub struct NftItemData {
     pub individual_content: Cell,
 }
 
+#[must_use]
 pub fn get_nft_item_data(address: String, code: Cell, data: Cell) -> Option<NftItemData> {
     let Ok(result) = crate::jettons::run_get_method(address, code, data, "get_nft_data") else {
         return None;
@@ -65,6 +66,7 @@ fn parse_optional_address(item: &TupleItem) -> Option<String> {
     }
 }
 
+#[must_use]
 pub fn parse_nft_content(content_cell: Cell) -> Value {
     let mut parser = match content_cell.as_slice() {
         Ok(p) => p,

@@ -1,0 +1,4 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 678
+Re-run with --backtrace full to get more information
+Cannot run method of not deployed contract, make sure you're deployed contract first or passed --fork-net

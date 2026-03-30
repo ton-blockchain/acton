@@ -8,12 +8,11 @@ import "../../lib/testing/expect"
 
 fn run_either_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!(
-        r#"
-            {}
+        r"
+            {EITHER_TEST_IMPORTS}
 
-            {}
-        "#,
-        EITHER_TEST_IMPORTS, test_body
+            {test_body}
+        "
     );
 
     ProjectBuilder::new(project_name)
@@ -31,7 +30,7 @@ fn run_either_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn either_left_and_right_encode_expected_tag_bits() {
     run_either_case(
         "ab-stdlib-either-tags",
-        r#"
+        r"
         get fun `test-ab-stdlib-either-tags`() {
             val left = Either<uint32, uint32>.left(17);
             val right = Either<uint32, uint32>.right(99);
@@ -44,7 +43,7 @@ fn either_left_and_right_encode_expected_tag_bits() {
             expect(rightSlice.loadUint(1)).toEqual(1);
             expect(rightSlice.loadUint(32)).toEqual(99);
         }
-        "#,
+        ",
         "integration/snapshots/test-runner/either_left_and_right_encode_expected_tag_bits/either_left_and_right_encode_expected_tag_bits.stdout.txt",
     );
 }
@@ -53,7 +52,7 @@ fn either_left_and_right_encode_expected_tag_bits() {
 fn either_match_routes_left_and_right_variants() {
     run_either_case(
         "ab-stdlib-either-match",
-        r#"
+        r"
         fun branchScore(choice: Either<uint32, uint32>): int {
             return match (choice) {
                 EitherLeft => 1000 + choice.value,
@@ -68,7 +67,7 @@ fn either_match_routes_left_and_right_variants() {
             expect(branchScore(left)).toEqual(1011);
             expect(branchScore(right)).toEqual(2011);
         }
-        "#,
+        ",
         "integration/snapshots/test-runner/either_left_and_right_encode_expected_tag_bits/either_match_routes_left_and_right_variants.stdout.txt",
     );
 }

@@ -1,3 +1,4 @@
+use crate::build_info;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, LibrariesFile, WalletsFile, global_libraries_path, global_wallets_path,
@@ -6,10 +7,20 @@ use acton_config::config::{
 use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::OpenOptions;
+use std::io::Write as _;
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use std::{env, fs};
+
+const DOCTOR_API_CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
+const DOCTOR_API_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
+const DOCTOR_TONCENTER_REQUEST_STAGGER: Duration = Duration::from_secs(1);
+const DOCTOR_API_TARGETS_JSON_ENV: &str = "ACTON_DOCTOR_API_TARGETS_JSON";
+const DEFAULT_DTON_API_KEY: &str = "fpYxhGTWfIe3ZEf2s6vvgAGmps_qnNmD";
 
 #[derive(Debug, Serialize)]
 struct DoctorPath {
@@ -24,6 +35,7 @@ struct DoctorPath {
 #[derive(Debug, Serialize)]
 struct DoctorVersions {
     acton: String,
+    release_channel: String,
     git_sha: String,
     build_date: String,
     target_triple: String,
@@ -98,6 +110,25 @@ struct DoctorLogging {
 }
 
 #[derive(Debug, Serialize)]
+struct DoctorNativeLibrary {
+    load_ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ton_commit_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ton_commit_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorNativeLibraries {
+    emulator: DoctorNativeLibrary,
+    tolk: DoctorNativeLibrary,
+}
+
+#[derive(Debug, Serialize)]
 struct DoctorEnvironmentVars {
     home: Option<String>,
     userprofile: Option<String>,
@@ -122,8 +153,73 @@ struct DoctorReport {
     config_overlays: DoctorConfigOverlays,
     manifest: DoctorManifest,
     stdlib: DoctorStdlib,
+    native_libraries: DoctorNativeLibraries,
     logging: DoctorLogging,
     environment: DoctorEnvironment,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum DoctorApiMethod {
+    Get,
+    PostJson,
+}
+
+impl DoctorApiMethod {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Get => "GET",
+            Self::PostJson => "POST",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DoctorApiTarget {
+    name: String,
+    method: DoctorApiMethod,
+    url: String,
+    display_url: String,
+    body: Option<serde_json::Value>,
+    sequence_group: Option<String>,
+    sequence_delay_after: Duration,
+    retry_on_429_after: Option<Duration>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct DoctorApiTargetOverride {
+    name: String,
+    method: DoctorApiMethod,
+    url: String,
+    #[serde(default)]
+    display_url: Option<String>,
+    #[serde(default)]
+    body: Option<serde_json::Value>,
+    #[serde(default)]
+    sequence_group: Option<String>,
+    #[serde(default)]
+    sequence_delay_after_ms: Option<u64>,
+    #[serde(default)]
+    retry_on_429_after_ms: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorApiCheck {
+    name: String,
+    method: String,
+    url: String,
+    ok: bool,
+    status_code: Option<u16>,
+    duration_ms: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorApiChecks {
+    healthy: usize,
+    total: usize,
+    checks: Vec<DoctorApiCheck>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -374,7 +470,7 @@ fn inspect_stdlib(acton_dir: &Path, stdlib_path: &Path) -> DoctorStdlib {
         &stdlib_path.join("VERSION"),
     ]);
     let common_tolk = stdlib_path.join("common.tolk");
-    let expected_version = env!("CARGO_PKG_VERSION").to_string();
+    let expected_version = build_info::PACKAGE_VERSION.to_string();
     let status = if !stdlib_path.exists() {
         "missing"
     } else if !common_tolk.exists() {
@@ -396,6 +492,44 @@ fn inspect_stdlib(acton_dir: &Path, stdlib_path: &Path) -> DoctorStdlib {
         revision,
         source: "embedded-bundle".to_string(),
     }
+}
+
+fn inspect_native_libraries() -> DoctorNativeLibraries {
+    let emulator = match ton_executor::native_emulator_version() {
+        Ok(version) => DoctorNativeLibrary {
+            load_ok: true,
+            version: None,
+            ton_commit_hash: Some(version.ton_commit_hash),
+            ton_commit_date: Some(version.ton_commit_date),
+            error: None,
+        },
+        Err(err) => DoctorNativeLibrary {
+            load_ok: false,
+            version: None,
+            ton_commit_hash: None,
+            ton_commit_date: None,
+            error: Some(err.to_string()),
+        },
+    };
+
+    let tolk = match tolkc::native_tolk_version() {
+        Ok(version) => DoctorNativeLibrary {
+            load_ok: true,
+            version: Some(version.version),
+            ton_commit_hash: Some(version.ton_commit_hash),
+            ton_commit_date: Some(version.ton_commit_date),
+            error: None,
+        },
+        Err(err) => DoctorNativeLibrary {
+            load_ok: false,
+            version: None,
+            ton_commit_hash: None,
+            ton_commit_date: None,
+            error: Some(err.to_string()),
+        },
+    };
+
+    DoctorNativeLibraries { emulator, tolk }
 }
 
 fn non_empty_env_string(var: &str) -> Option<String> {
@@ -459,6 +593,7 @@ fn collect_doctor_report() -> Result<DoctorReport> {
 
     let stdlib_path = acton_dir.join("tolk-stdlib");
     let stdlib = inspect_stdlib(&acton_dir, &stdlib_path);
+    let native_libraries = inspect_native_libraries();
     let wallets_overlay = inspect_wallet_overlays(&local_wallets, global_wallets.as_deref());
     let libraries_overlay = inspect_library_overlays(&local_libraries, global_libraries.as_deref());
     let (resolved_log_dir, log_dir_source) = resolve_acton_log_dir(&project_root);
@@ -469,11 +604,12 @@ fn collect_doctor_report() -> Result<DoctorReport> {
 
     Ok(DoctorReport {
         versions: DoctorVersions {
-            acton: env!("CARGO_PKG_VERSION").to_string(),
-            git_sha: env!("GIT_HASH").to_string(),
-            build_date: env!("BUILD_DATE").to_string(),
-            target_triple: env!("TARGET_TRIPLE").to_string(),
-            profile: env!("BUILD_PROFILE").to_string(),
+            acton: build_info::PACKAGE_VERSION.to_string(),
+            release_channel: build_info::RELEASE_CHANNEL.to_string(),
+            git_sha: build_info::GIT_HASH.to_string(),
+            build_date: build_info::BUILD_DATE.to_string(),
+            target_triple: build_info::TARGET_TRIPLE.to_string(),
+            profile: build_info::BUILD_PROFILE.to_string(),
             os: env::consts::OS.to_string(),
             arch: env::consts::ARCH.to_string(),
         },
@@ -497,6 +633,7 @@ fn collect_doctor_report() -> Result<DoctorReport> {
         },
         manifest: manifest_status,
         stdlib,
+        native_libraries,
         logging: DoctorLogging {
             acton_log_dir_env: non_empty_env_string("ACTON_LOG_DIR"),
             resolved_dir: describe_path(&resolved_log_dir, Some(log_dir_source)),
@@ -532,6 +669,334 @@ fn read_first_existing(paths: &[&Path]) -> Option<String> {
     None
 }
 
+fn build_doctor_api_targets() -> Result<Vec<DoctorApiTarget>> {
+    if let Ok(raw) = env::var(DOCTOR_API_TARGETS_JSON_ENV) {
+        let overrides: Vec<DoctorApiTargetOverride> = serde_json::from_str(&raw)?;
+        let targets = overrides
+            .into_iter()
+            .map(|item| DoctorApiTarget {
+                display_url: item.display_url.unwrap_or_else(|| item.url.clone()),
+                name: item.name,
+                method: item.method,
+                url: item.url,
+                body: item.body,
+                sequence_group: item.sequence_group,
+                sequence_delay_after: Duration::from_millis(
+                    item.sequence_delay_after_ms.unwrap_or_default(),
+                ),
+                retry_on_429_after: item.retry_on_429_after_ms.map(Duration::from_millis),
+            })
+            .collect();
+        return Ok(targets);
+    }
+
+    let dton_api_key = env::var("DTON_API_KEY").unwrap_or_else(|_| DEFAULT_DTON_API_KEY.to_owned());
+
+    Ok(build_default_doctor_api_targets(&dton_api_key))
+}
+
+fn build_default_doctor_api_targets(dton_api_key: &str) -> Vec<DoctorApiTarget> {
+    let graphql_probe = Some(serde_json::json!({
+        "query": "query { __typename }",
+        "variables": {}
+    }));
+
+    vec![
+        DoctorApiTarget {
+            name: "toncenter_v2_mainnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://toncenter.com/api/v2/getMasterchainInfo".to_string(),
+            display_url: "https://toncenter.com/api/v2/getMasterchainInfo".to_string(),
+            body: None,
+            sequence_group: Some("toncenter".to_string()),
+            sequence_delay_after: DOCTOR_TONCENTER_REQUEST_STAGGER,
+            retry_on_429_after: Some(DOCTOR_TONCENTER_REQUEST_STAGGER),
+        },
+        DoctorApiTarget {
+            name: "toncenter_v2_testnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://testnet.toncenter.com/api/v2/getMasterchainInfo".to_string(),
+            display_url: "https://testnet.toncenter.com/api/v2/getMasterchainInfo".to_string(),
+            body: None,
+            sequence_group: Some("toncenter".to_string()),
+            sequence_delay_after: DOCTOR_TONCENTER_REQUEST_STAGGER,
+            retry_on_429_after: Some(DOCTOR_TONCENTER_REQUEST_STAGGER),
+        },
+        DoctorApiTarget {
+            name: "toncenter_v3_mainnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://toncenter.com/api/v3/masterchainInfo".to_string(),
+            display_url: "https://toncenter.com/api/v3/masterchainInfo".to_string(),
+            body: None,
+            sequence_group: Some("toncenter".to_string()),
+            sequence_delay_after: DOCTOR_TONCENTER_REQUEST_STAGGER,
+            retry_on_429_after: Some(DOCTOR_TONCENTER_REQUEST_STAGGER),
+        },
+        DoctorApiTarget {
+            name: "toncenter_v3_testnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://testnet.toncenter.com/api/v3/masterchainInfo".to_string(),
+            display_url: "https://testnet.toncenter.com/api/v3/masterchainInfo".to_string(),
+            body: None,
+            sequence_group: Some("toncenter".to_string()),
+            sequence_delay_after: DOCTOR_TONCENTER_REQUEST_STAGGER,
+            retry_on_429_after: Some(DOCTOR_TONCENTER_REQUEST_STAGGER),
+        },
+        DoctorApiTarget {
+            name: "tonhub_v4_mainnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://mainnet-v4.tonhubapi.com/block/latest".to_string(),
+            display_url: "https://mainnet-v4.tonhubapi.com/block/latest".to_string(),
+            body: None,
+            sequence_group: None,
+            sequence_delay_after: Duration::ZERO,
+            retry_on_429_after: None,
+        },
+        DoctorApiTarget {
+            name: "tonhub_v4_testnet".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://testnet-v4.tonhubapi.com/block/latest".to_string(),
+            display_url: "https://testnet-v4.tonhubapi.com/block/latest".to_string(),
+            body: None,
+            sequence_group: None,
+            sequence_delay_after: Duration::ZERO,
+            retry_on_429_after: None,
+        },
+        DoctorApiTarget {
+            name: "dton_graphql_mainnet".to_string(),
+            method: DoctorApiMethod::PostJson,
+            url: format!("https://dton.io/{dton_api_key}/graphql"),
+            display_url: "https://dton.io/[DTON_API_KEY]/graphql".to_string(),
+            body: graphql_probe,
+            sequence_group: None,
+            sequence_delay_after: Duration::ZERO,
+            retry_on_429_after: None,
+        },
+        DoctorApiTarget {
+            name: "verifier_backends_config".to_string(),
+            method: DoctorApiMethod::Get,
+            url: "https://raw.githubusercontent.com/ton-community/contract-verifier-config/main/config.json".to_string(),
+            display_url: "https://raw.githubusercontent.com/ton-community/contract-verifier-config/main/config.json".to_string(),
+            body: None,
+            sequence_group: None,
+            sequence_delay_after: Duration::ZERO,
+            retry_on_429_after: None,
+        },
+    ]
+}
+
+fn send_doctor_api_request(
+    client: &reqwest::blocking::Client,
+    target: &DoctorApiTarget,
+) -> Result<reqwest::blocking::Response, reqwest::Error> {
+    match (&target.method, &target.body) {
+        (DoctorApiMethod::Get, _) => client.get(&target.url),
+        (DoctorApiMethod::PostJson, Some(body)) => client.post(&target.url).json(body),
+        (DoctorApiMethod::PostJson, None) => client.post(&target.url),
+    }
+    .header("User-Agent", "acton-doctor")
+    .send()
+}
+
+fn build_doctor_api_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+    // `doctor` is best-effort diagnostics: prefer direct requests over
+    // reqwest system-proxy autodiscovery, which can panic in restricted
+    // macOS environments instead of returning a recoverable transport error.
+    reqwest::blocking::Client::builder()
+        .no_proxy()
+        .connect_timeout(DOCTOR_API_CONNECT_TIMEOUT)
+        .timeout(DOCTOR_API_REQUEST_TIMEOUT)
+        .build()
+}
+
+fn doctor_api_panic_message(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
+fn doctor_api_transport_error(error: impl std::fmt::Display) -> String {
+    format!("request failed before receiving an HTTP response from this environment: {error}")
+}
+
+fn panic_doctor_api_check(
+    target: DoctorApiTarget,
+    started: Instant,
+    payload: Box<dyn Any + Send>,
+) -> DoctorApiCheck {
+    DoctorApiCheck {
+        name: target.name,
+        method: target.method.as_str().to_string(),
+        url: target.display_url,
+        ok: false,
+        status_code: None,
+        duration_ms: started.elapsed().as_millis(),
+        error: Some(format!(
+            "API check panicked before receiving an HTTP response from this environment: {}",
+            doctor_api_panic_message(payload.as_ref())
+        )),
+    }
+}
+
+fn run_doctor_api_check_with<F>(target: DoctorApiTarget, execute: F) -> DoctorApiCheck
+where
+    F: FnOnce(&DoctorApiTarget, Instant) -> DoctorApiCheck,
+{
+    let started = Instant::now();
+    match std::panic::catch_unwind(AssertUnwindSafe(|| execute(&target, started))) {
+        Ok(check) => check,
+        Err(payload) => panic_doctor_api_check(target, started, payload),
+    }
+}
+
+fn run_doctor_api_check_inner(target: &DoctorApiTarget, started: Instant) -> DoctorApiCheck {
+    let client = build_doctor_api_client();
+
+    let (ok, status_code, error) = match client {
+        Ok(client) => match send_doctor_api_request(&client, target) {
+            Ok(response) => {
+                let mut status = response.status().as_u16();
+                if status == 429
+                    && let Some(retry_delay) = target.retry_on_429_after
+                {
+                    std::thread::sleep(retry_delay);
+                    match send_doctor_api_request(&client, target) {
+                        Ok(retry_response) => {
+                            status = retry_response.status().as_u16();
+                            (
+                                status == 200,
+                                Some(status),
+                                (status != 200).then(|| format!("HTTP {status}")),
+                            )
+                        }
+                        Err(err) => (false, None, Some(doctor_api_transport_error(err))),
+                    }
+                } else {
+                    (
+                        status == 200,
+                        Some(status),
+                        (status != 200).then(|| format!("HTTP {status}")),
+                    )
+                }
+            }
+            Err(err) => (false, None, Some(doctor_api_transport_error(err))),
+        },
+        Err(err) => (false, None, Some(doctor_api_transport_error(err))),
+    };
+
+    let duration_ms = started.elapsed().as_millis();
+
+    DoctorApiCheck {
+        name: target.name.clone(),
+        method: target.method.as_str().to_string(),
+        url: target.display_url.clone(),
+        ok,
+        status_code,
+        duration_ms,
+        error,
+    }
+}
+
+fn run_doctor_api_check(target: DoctorApiTarget) -> DoctorApiCheck {
+    run_doctor_api_check_with(target, run_doctor_api_check_inner)
+}
+
+fn run_doctor_api_group(group: Vec<(usize, DoctorApiTarget)>) -> Vec<(usize, DoctorApiCheck)> {
+    let group_len = group.len();
+    let mut results = Vec::with_capacity(group_len);
+
+    for (position, (index, target)) in group.into_iter().enumerate() {
+        let sequence_delay_after = target.sequence_delay_after;
+        results.push((index, run_doctor_api_check(target)));
+
+        if position + 1 < group_len && !sequence_delay_after.is_zero() {
+            std::thread::sleep(sequence_delay_after);
+        }
+    }
+
+    results
+}
+
+fn collect_doctor_api_checks() -> DoctorApiChecks {
+    let targets = match build_doctor_api_targets() {
+        Ok(targets) => targets,
+        Err(err) => {
+            return DoctorApiChecks {
+                healthy: 0,
+                total: 1,
+                checks: vec![DoctorApiCheck {
+                    name: "api_targets".to_string(),
+                    method: "<config>".to_string(),
+                    url: format!("env:{DOCTOR_API_TARGETS_JSON_ENV}"),
+                    ok: false,
+                    status_code: None,
+                    duration_ms: 0,
+                    error: Some(err.to_string()),
+                }],
+            };
+        }
+    };
+
+    let total = targets.len();
+    let mut groups = Vec::<Vec<(usize, DoctorApiTarget)>>::new();
+    let mut grouped_indexes = BTreeMap::<String, usize>::new();
+
+    for (index, target) in targets.into_iter().enumerate() {
+        if let Some(group_name) = target.sequence_group.clone() {
+            let group_index = match grouped_indexes.get(&group_name) {
+                Some(index) => *index,
+                None => {
+                    let next_index = groups.len();
+                    grouped_indexes.insert(group_name, next_index);
+                    groups.push(Vec::new());
+                    next_index
+                }
+            };
+            groups[group_index].push((index, target));
+        } else {
+            groups.push(vec![(index, target)]);
+        }
+    }
+
+    let mut handles = Vec::with_capacity(groups.len());
+    for group in groups {
+        handles.push(std::thread::spawn(move || run_doctor_api_group(group)));
+    }
+
+    let mut indexed = Vec::with_capacity(total);
+    for handle in handles {
+        match handle.join() {
+            Ok(results) => indexed.extend(results),
+            Err(_) => indexed.push((
+                usize::MAX,
+                DoctorApiCheck {
+                    name: "api_check".to_string(),
+                    method: "<thread>".to_string(),
+                    url: "<unknown>".to_string(),
+                    ok: false,
+                    status_code: None,
+                    duration_ms: 0,
+                    error: Some("API check thread panicked".to_string()),
+                },
+            )),
+        }
+    }
+
+    indexed.sort_by_key(|(index, _)| *index);
+    let checks: Vec<_> = indexed.into_iter().map(|(_, check)| check).collect();
+    let healthy = checks.iter().filter(|check| check.ok).count();
+
+    DoctorApiChecks {
+        healthy,
+        total: checks.len(),
+        checks,
+    }
+}
+
 fn print_section(title: &str) {
     println!("{}", title.bold().cyan());
 }
@@ -539,6 +1004,26 @@ fn print_section(title: &str) {
 fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!("{} {}", format!("{key:<17}").bold(), value.as_ref());
+}
+
+fn doctor_api_environment_note(report: &DoctorApiChecks) -> Option<String> {
+    let transport_failures = report
+        .checks
+        .iter()
+        .filter(|check| !check.ok && check.status_code.is_none())
+        .count();
+
+    if transport_failures == 0 {
+        None
+    } else if transport_failures == report.total && report.total > 0 {
+        Some(
+            "API health could not be verified from this environment; all outbound checks failed before any HTTP response. This does not prove the APIs are down.".to_string(),
+        )
+    } else {
+        Some(format!(
+            "{transport_failures} endpoint(s) could not be verified from this environment because the request failed before any HTTP response."
+        ))
+    }
 }
 
 fn print_path(label: &str, value: &DoctorPath) {
@@ -592,6 +1077,7 @@ fn print_report(report: &DoctorReport) {
 
     print_section("Versions");
     print_kv("acton", &report.versions.acton);
+    print_kv("channel", &report.versions.release_channel);
     print_kv("git_sha", &report.versions.git_sha);
     print_kv("build_date", &report.versions.build_date);
     print_kv("target", &report.versions.target_triple);
@@ -709,6 +1195,89 @@ fn print_report(report: &DoctorReport) {
     print_kv("source", &report.stdlib.source);
     println!();
 
+    print_section("Native Libraries");
+    print_kv(
+        "emulator.load_ok",
+        report.native_libraries.emulator.load_ok.to_string(),
+    );
+    print_kv(
+        "emulator.version",
+        report
+            .native_libraries
+            .emulator
+            .version
+            .as_deref()
+            .unwrap_or("<n/a>"),
+    );
+    print_kv(
+        "emulator.ton_commit_hash",
+        report
+            .native_libraries
+            .emulator
+            .ton_commit_hash
+            .as_deref()
+            .unwrap_or("<unknown>"),
+    );
+    print_kv(
+        "emulator.ton_commit_date",
+        report
+            .native_libraries
+            .emulator
+            .ton_commit_date
+            .as_deref()
+            .unwrap_or("<unknown>"),
+    );
+    print_kv(
+        "emulator.error",
+        report
+            .native_libraries
+            .emulator
+            .error
+            .as_deref()
+            .unwrap_or("<none>"),
+    );
+    print_kv(
+        "tolk.load_ok",
+        report.native_libraries.tolk.load_ok.to_string(),
+    );
+    print_kv(
+        "tolk.version",
+        report
+            .native_libraries
+            .tolk
+            .version
+            .as_deref()
+            .unwrap_or("<unknown>"),
+    );
+    print_kv(
+        "tolk.ton_commit_hash",
+        report
+            .native_libraries
+            .tolk
+            .ton_commit_hash
+            .as_deref()
+            .unwrap_or("<unknown>"),
+    );
+    print_kv(
+        "tolk.ton_commit_date",
+        report
+            .native_libraries
+            .tolk
+            .ton_commit_date
+            .as_deref()
+            .unwrap_or("<unknown>"),
+    );
+    print_kv(
+        "tolk.error",
+        report
+            .native_libraries
+            .tolk
+            .error
+            .as_deref()
+            .unwrap_or("<none>"),
+    );
+    println!();
+
     print_section("Logging");
     print_kv(
         "ACTON_LOG_DIR",
@@ -770,8 +1339,43 @@ fn print_report(report: &DoctorReport) {
     );
 }
 
+fn print_api_checks(report: &DoctorApiChecks) {
+    print_kv("healthy", format!("{}/{}", report.healthy, report.total));
+    if let Some(note) = doctor_api_environment_note(report) {
+        print_kv("note", note);
+    }
+
+    for check in &report.checks {
+        let status = if check.ok {
+            format!("{} [200, {} ms]", "ok".green(), check.duration_ms)
+        } else if let Some(code) = check.status_code {
+            format!(
+                "{} [{code}, {} ms]",
+                "failed".bright_red(),
+                check.duration_ms
+            )
+        } else {
+            format!("{} [{} ms]", "unverified".yellow(), check.duration_ms)
+        };
+
+        print_kv(
+            &check.name,
+            format!("{status} {} {}", check.method.dimmed(), check.url),
+        );
+
+        if let Some(error) = &check.error {
+            print_kv(&format!("{}.error", check.name), error);
+        }
+    }
+}
+
 pub fn doctor_cmd() -> Result<()> {
     let report = collect_doctor_report()?;
     print_report(&report);
+    println!();
+    print_section("API Reachability");
+    let _ = std::io::stdout().flush();
+    let api_checks = collect_doctor_api_checks();
+    print_api_checks(&api_checks);
     Ok(())
 }

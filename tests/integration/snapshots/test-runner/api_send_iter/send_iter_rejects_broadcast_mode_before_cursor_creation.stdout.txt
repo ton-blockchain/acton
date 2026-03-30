@@ -1,0 +1,28 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external_forwarder
+    Finished in [TIME]
+   Compiling forwarder
+    Finished in [TIME]
+   Compiling race
+    Finished in [TIME]
+   Compiling receiver
+    Finished in [TIME]
+   Compiling relay
+    Finished in [TIME]
+   Compiling router
+    Finished in [TIME]
+   Compiling sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ send-iter-rejects-broadcast-mode [TIME]
+    └─ Error: net.sendIter() is available only in emulation mode
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

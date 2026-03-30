@@ -253,13 +253,11 @@ fn relative_to_project_root(path: &Path, project_root: &Path) -> PathBuf {
 fn path_for_display(path: &Path, current_dir: &Path) -> PathBuf {
     let normalized_current_dir = current_dir
         .absolutize()
-        .map(|p| p.into_owned())
-        .unwrap_or_else(|_| current_dir.to_path_buf());
+        .map_or_else(|_| current_dir.to_path_buf(), std::borrow::Cow::into_owned);
 
     let normalized_path = path
         .absolutize_from(&normalized_current_dir)
-        .map(|p| p.into_owned())
-        .unwrap_or_else(|_| path.to_path_buf());
+        .map_or_else(|_| path.to_path_buf(), std::borrow::Cow::into_owned);
 
     pathdiff::diff_paths(&normalized_path, &normalized_current_dir).unwrap_or(normalized_path)
 }

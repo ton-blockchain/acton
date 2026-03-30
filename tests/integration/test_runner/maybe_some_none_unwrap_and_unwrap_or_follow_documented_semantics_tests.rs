@@ -37,7 +37,7 @@ fn run_maybe_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics() {
     run_maybe_success(
         "aa-stdlib-maybe-some-none-unwrap-semantics",
-        r#"
+        r"
 get fun `test-maybe-some-none-unwrap-semantics`() {
     val empty = Maybe<int>.none();
     val present = Maybe<int>.some(17);
@@ -54,7 +54,7 @@ get fun `test-maybe-some-none-unwrap-semantics`() {
     expect(nestedValue).toBeNone();
     expect(nestedValue.unwrapOr(123)).toEqual(123);
 }
-"#,
+",
         "integration/snapshots/test-runner/maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics/maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics.stdout.txt",
     );
 }
@@ -63,12 +63,12 @@ get fun `test-maybe-some-none-unwrap-semantics`() {
 fn maybe_unwrap_on_none_throws_exit_code_7() {
     run_maybe_failure(
         "aa-stdlib-maybe-unwrap-none-exit7",
-        r#"
+        r"
 get fun `test-maybe-unwrap-on-none-throws-exit-code-7`() {
     val empty = Maybe<int>.none();
     empty.unwrap();
 }
-"#,
+",
         "integration/snapshots/test-runner/maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics/maybe_unwrap_on_none_throws_exit_code_7.stdout.txt",
     );
 }

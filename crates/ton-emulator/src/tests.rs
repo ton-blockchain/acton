@@ -1,12 +1,14 @@
 #![cfg(test)]
 use crate::emulator::Emulator;
-use crate::{AccountsState, LocalAccountsState, WorldState};
+use crate::{AccountsState, LocalAccountsState, WorldState, WorldStateSnapshot};
 use anyhow::Context;
+use tycho_types::cell::Lazy;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::config::{BlockchainConfigParams, MsgForwardPrices};
 use tycho_types::models::{
-    CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMessage,
-    RelaxedMsgInfo,
+    Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, OwnedRelaxedMessage,
+    RelaxedIntMsgInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, StateInit, StdAddr,
+    StorageInfo,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -29,6 +31,35 @@ fn body_with_u32(value: u32) -> anyhow::Result<Cell> {
     let mut builder = CellBuilder::new();
     builder.store_u32(value)?;
     Ok(builder.build()?)
+}
+
+fn std_addr(workchain: i8, byte: u8) -> StdAddr {
+    StdAddr::new(workchain, HashBytes([byte; 32]))
+}
+
+fn shard_account(
+    address: StdAddr,
+    balance: u128,
+    code: Option<Cell>,
+) -> anyhow::Result<ShardAccount> {
+    Ok(ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(Account {
+            address: IntAddr::Std(address),
+            balance: CurrencyCollection::new(balance),
+            last_trans_lt: 777,
+            storage_stat: StorageInfo::default(),
+            state: match code {
+                Some(code) => AccountState::Active(StateInit {
+                    code: Some(code),
+                    data: Some(body_with_u32(0xfeed_beef)?),
+                    ..Default::default()
+                }),
+                None => AccountState::Uninit,
+            },
+        })))?,
+        last_trans_hash: HashBytes([0x42; 32]),
+        last_trans_lt: 1_234_567,
+    })
 }
 
 fn make_internal_relaxed_message(
@@ -169,5 +200,53 @@ fn compute_in_msg_fwd_fee_uses_workchain_specific_prices() -> anyhow::Result<()>
         assert_ne!(sc_fee, mc_fee);
     }
 
+    Ok(())
+}
+
+#[test]
+fn world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()> {
+    let mut state = new_world_state()?;
+    state.set_now(1_717_171_717);
+    let lt = state.get_lt();
+    assert_eq!(lt, 1_000_000);
+
+    let library = body_with_u32(0xcafe_babe)?;
+    state.register_lib(library);
+
+    let account_addr = std_addr(0, 0x55);
+    let code = body_with_u32(0x1234_5678)?;
+    let account = shard_account(account_addr.clone(), 123_456_789, Some(code))?;
+    state.update_account(&account_addr, &account);
+
+    let snapshot = state.snapshot()?;
+    let json = serde_json::to_string(&snapshot)?;
+    let decoded_snapshot: WorldStateSnapshot = serde_json::from_str(&json)?;
+
+    let restored = WorldState::from_snapshot(decoded_snapshot)?;
+    let restored_snapshot = restored.snapshot()?;
+
+    assert_eq!(restored_snapshot, snapshot);
+    Ok(())
+}
+
+#[test]
+fn world_state_load_snapshot_replaces_existing_state() -> anyhow::Result<()> {
+    let mut source = new_world_state()?;
+    source.set_now(77);
+    source.get_lt();
+
+    let source_addr = std_addr(0, 0x21);
+    let source_account = shard_account(source_addr.clone(), 900, None)?;
+    source.update_account(&source_addr, &source_account);
+    let snapshot = source.snapshot()?;
+
+    let mut target = new_world_state()?;
+    let target_addr = std_addr(0, 0x99);
+    let target_account = shard_account(target_addr.clone(), 100, Some(body_with_u32(1)?))?;
+    target.update_account(&target_addr, &target_account);
+
+    target.load_snapshot(snapshot.clone())?;
+
+    assert_eq!(target.snapshot()?, snapshot);
     Ok(())
 }

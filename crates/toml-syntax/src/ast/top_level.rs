@@ -65,18 +65,22 @@ pub struct Document<'tree>(pub Node<'tree>);
 impl_ast_node!(Document, "document");
 
 impl<'tree> Document<'tree> {
+    #[must_use]
     pub fn items(&self) -> AstChildren<'tree, TopLevel<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn pairs(&self) -> AstChildren<'tree, Pair<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn tables(&self) -> AstChildren<'tree, Table<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn table_arrays(&self) -> AstChildren<'tree, TableArrayElement<'tree>> {
         AstChildren::new(self.0)
     }
@@ -95,6 +99,7 @@ impl<'tree> Table<'tree> {
             .find_map(|child| Key::try_from_node(child).ok())
     }
 
+    #[must_use]
     pub fn pairs(&self) -> AstChildren<'tree, Pair<'tree>> {
         AstChildren::new(self.0)
     }
@@ -113,6 +118,7 @@ impl<'tree> TableArrayElement<'tree> {
             .find_map(|child| Key::try_from_node(child).ok())
     }
 
+    #[must_use]
     pub fn pairs(&self) -> AstChildren<'tree, Pair<'tree>> {
         AstChildren::new(self.0)
     }

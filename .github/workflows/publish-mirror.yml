@@ -1,0 +1,54 @@
+name: publish-mirror
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+env:
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+
+permissions: { }
+
+jobs:
+  publish-mirror:
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    steps:
+      - name: "Download GitHub Artifacts"
+        uses: actions/download-artifact@v7
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+      - name: Cleanup
+        run: |
+          rm -f artifacts/*-dist-manifest.json
+      - id: release-metadata
+        name: Read release metadata from dist-manifest.json
+        # language=Bash
+        run: |
+          manifest_path=artifacts/dist-manifest.json
+          echo "artifacts uploaded and released successfully"
+          cat "$manifest_path"
+          echo "manifest=$(jq -c "." "$manifest_path")" >> "$GITHUB_OUTPUT"
+
+      - name: Create mirror release
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_tag }}"
+          PRERELEASE_FLAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_title }}"
+          ANNOUNCEMENT_BODY: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_github_body }}"
+        # language=Bash
+        run: |
+          # Write and read notes from a file to avoid quoting breaking things
+          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
+
+          gh release create "$RELEASE_TAG" \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            $PRERELEASE_FLAG \
+            --title "$ANNOUNCEMENT_TITLE" \
+            --notes-file "$RUNNER_TEMP/notes.txt" \
+            artifacts/*

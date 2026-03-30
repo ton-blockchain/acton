@@ -1,21 +1,18 @@
-use std::fs;
-use std::io::{self, Write};
-use std::process::Command;
-
-use crate::modules::git::Git;
-use crate::modules::github::Github;
+use crate::modules::release::{
+    ACTON_TOML_PATH, CARGO_LOCK_PATH, CARGO_TOML_PATH, DEFAULT_BRANCH_NAME, GITHUB_REPOSITORY_URL,
+    PACKAGE_JSON_PATH, ReleaseContext, check_current_branch_is_master,
+    check_local_master_matches_remote, check_master_github_build_succeeded,
+    check_no_uncommitted_changes, check_release_tag_does_not_exist, check_release_version_format,
+    confirm_expected_yes, create_release_tag, push_release_commit_and_tag,
+    refresh_remote_master_ref,
+};
 use crate::modules::workflow::{Workflow, WorkflowStep};
 use anyhow::{Context, Result, bail};
 use clap::Args;
+use std::fs;
+use std::process::Command;
 
-const DEFAULT_BRANCH_NAME: &str = "master";
-const ORIGIN_REMOTE_NAME: &str = "origin";
-const GITHUB_REPOSITORY_URL: &str = "https://github.com/i582/acton";
-
-const ACTON_TOML_PATH: &str = "Acton.toml";
-const CARGO_TOML_PATH: &str = "Cargo.toml";
-const CARGO_LOCK_PATH: &str = "Cargo.lock";
-const PACKAGE_JSON_PATH: &str = "package.json";
+const CHANGELOG_PATH: &str = "CHANGELOG.md";
 
 #[derive(Args)]
 pub(crate) struct ReleaseArgs {
@@ -24,7 +21,7 @@ pub(crate) struct ReleaseArgs {
 }
 
 pub(crate) fn run(args: ReleaseArgs) -> Result<()> {
-    let context = ReleaseContext::new(args);
+    let context = ReleaseContext::new(args.version);
 
     println!(
         "Creating release `{}` from tag `{}`",
@@ -40,27 +37,6 @@ pub(crate) fn run(args: ReleaseArgs) -> Result<()> {
     Ok(())
 }
 
-struct ReleaseContext {
-    github: Github,
-    git: Git,
-    version: String,
-    tag: String,
-}
-
-impl ReleaseContext {
-    fn new(args: ReleaseArgs) -> Self {
-        let version = args.version;
-        let tag = format!("v{version}");
-
-        Self {
-            github: Github::new(),
-            git: Git::new(),
-            version,
-            tag,
-        }
-    }
-}
-
 fn release_workflow() -> Workflow<'static, ReleaseContext> {
     Workflow {
         name: "release",
@@ -68,6 +44,10 @@ fn release_workflow() -> Workflow<'static, ReleaseContext> {
             WorkflowStep {
                 name: "check release version format",
                 run: check_release_version_format,
+            },
+            WorkflowStep {
+                name: "check changelog has release entry",
+                run: check_changelog_has_release_entry,
             },
             WorkflowStep {
                 name: "current branch is master",
@@ -86,8 +66,8 @@ fn release_workflow() -> Workflow<'static, ReleaseContext> {
                 run: refresh_remote_master_ref,
             },
             WorkflowStep {
-                name: "check local master is up to date",
-                run: check_local_master_is_up_to_date,
+                name: "check local master matches remote",
+                run: check_local_master_matches_remote,
             },
             WorkflowStep {
                 name: "check master GitHub build succeeded",
@@ -121,90 +101,23 @@ fn release_workflow() -> Workflow<'static, ReleaseContext> {
     }
 }
 
-fn check_release_version_format(context: &ReleaseContext) -> Result<()> {
-    let parts: Vec<&str> = context.version.split('.').collect();
-    if parts.len() != 3 {
-        bail!(
-            "release version `{}` must have three dot-separated parts",
-            context.version
-        );
-    }
+fn check_changelog_has_release_entry(context: &ReleaseContext) -> Result<()> {
+    let changelog_contents = fs::read_to_string(CHANGELOG_PATH)
+        .with_context(|| format!("failed to read {CHANGELOG_PATH}"))?;
 
-    let has_no_empty_parts = parts.iter().all(|part| !part.is_empty());
-    if !has_no_empty_parts {
-        bail!(
-            "release version `{}` must not contain empty version parts",
-            context.version
-        );
-    }
+    ensure_changelog_has_release_entry(&changelog_contents, &context.version)
+        .with_context(|| format!("failed to validate {CHANGELOG_PATH}"))
+}
 
-    let has_only_numeric_parts = parts
-        .iter()
-        .all(|part| part.chars().all(|char| char.is_ascii_digit()));
-    if !has_only_numeric_parts {
-        bail!(
-            "release version `{}` must contain only numeric version parts",
-            context.version
-        );
+fn ensure_changelog_has_release_entry(changelog_contents: &str, version: &str) -> Result<()> {
+    let changelog =
+        parse_changelog::parse(changelog_contents).context("failed to parse changelog")?;
+
+    if changelog.get(version).is_none() {
+        bail!("CHANGELOG.md does not contain a release entry for version `{version}`");
     }
 
     Ok(())
-}
-
-fn check_current_branch_is_master(context: &ReleaseContext) -> Result<()> {
-    let current_branch = context.git.current_branch()?;
-
-    if current_branch != DEFAULT_BRANCH_NAME {
-        bail!("release must be run from the `master` branch, current branch: `{current_branch}`");
-    }
-
-    Ok(())
-}
-
-fn check_no_uncommitted_changes(context: &ReleaseContext) -> Result<()> {
-    if context.git.has_uncommitted_changes()? {
-        bail!("`{DEFAULT_BRANCH_NAME}` branch has uncommitted changes");
-    }
-
-    Ok(())
-}
-
-fn refresh_remote_master_ref(context: &ReleaseContext) -> Result<()> {
-    context
-        .git
-        .fetch_branch(ORIGIN_REMOTE_NAME, DEFAULT_BRANCH_NAME)
-}
-
-fn check_local_master_is_up_to_date(context: &ReleaseContext) -> Result<()> {
-    let remote_branch = format!("{ORIGIN_REMOTE_NAME}/{DEFAULT_BRANCH_NAME}");
-    let behind = context.git.commit_count_between("HEAD", &remote_branch)?;
-
-    if behind != 0 {
-        let message = format!("local `master` is behind `{remote_branch}` by {behind} commit(s)");
-        bail!(message);
-    }
-
-    Ok(())
-}
-
-fn check_release_tag_does_not_exist(context: &ReleaseContext) -> Result<()> {
-    if context
-        .git
-        .remote_tag_exists(ORIGIN_REMOTE_NAME, &context.tag)?
-    {
-        bail!("release tag `{}` already exists on remote", context.tag);
-    }
-
-    Ok(())
-}
-
-fn check_master_github_build_succeeded(context: &ReleaseContext) -> Result<()> {
-    let branch = context.git.current_branch()?;
-    let head_sha = context.git.head_commit()?;
-
-    context
-        .github
-        .ensure_branch_builds_succeeded(&branch, &head_sha)
 }
 
 fn bump_versions_from_tag(context: &ReleaseContext) -> Result<()> {
@@ -229,50 +142,29 @@ fn create_version_bump_commit(context: &ReleaseContext) -> Result<()> {
     ];
 
     context.git.add_files(&bump_files)?;
-    context.git.commit(&format!(
-        "chore(acton): bump to version `{}`",
-        context.version
-    ))
-}
-
-fn create_release_tag(context: &ReleaseContext) -> Result<()> {
-    context.git.tag(&context.tag)
+    context.git.commit(
+        &format!("chore(acton): bump to version `{}`", context.version),
+        &[],
+    )
 }
 
 fn show_created_commit_numstat(context: &ReleaseContext) -> Result<()> {
     let commit_numstat = context.git.show_commit_numstat("HEAD")?;
 
     println!("Created commit numstat:\n");
-    println!("{}", commit_numstat);
+    println!("{commit_numstat}");
 
     Ok(())
 }
 
 fn confirm_release_push(context: &ReleaseContext) -> Result<()> {
-    print!(
-        "Type `yes` to push branch `{}` and tag `{}`: ",
-        DEFAULT_BRANCH_NAME, context.tag
-    );
-    io::stdout()
-        .flush()
-        .context("failed to flush confirmation prompt")?;
-
-    let mut confirmation = String::new();
-    io::stdin()
-        .read_line(&mut confirmation)
-        .context("failed to read push confirmation")?;
-
-    if confirmation.trim() != "yes" {
-        bail!("push aborted: expected `yes` confirmation");
-    }
-
-    Ok(())
-}
-
-fn push_release_commit_and_tag(context: &ReleaseContext) -> Result<()> {
-    context
-        .git
-        .push_refs(ORIGIN_REMOTE_NAME, &[DEFAULT_BRANCH_NAME, &context.tag])
+    confirm_expected_yes(
+        &format!(
+            "Type `yes` to push branch `{}` and tag `{}`: ",
+            DEFAULT_BRANCH_NAME, context.tag
+        ),
+        "push aborted: expected `yes` confirmation",
+    )
 }
 
 fn update_toml_file(path: &str, update: impl FnOnce(&mut toml_edit::DocumentMut)) -> Result<()> {

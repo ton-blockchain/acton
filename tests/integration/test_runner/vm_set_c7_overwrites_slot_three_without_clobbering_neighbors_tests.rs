@@ -3,10 +3,10 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
@@ -32,7 +32,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn vm_set_c7_overwrites_slot_three_without_clobbering_neighbors() {
     run_success_case(
         "cm-stdlib-vm-set-c7-overwrite-slot-three",
-        r#"
+        r"
 get fun `test-cm-stdlib-vm-set-c7-overwrite-slot-three`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
@@ -53,7 +53,7 @@ get fun `test-cm-stdlib-vm-set-c7-overwrite-slot-three`() {
     expect(paramsAfter.get(5) as int).toEqual(beforeLogicalTime);
     expect(blockchain.now()).toEqual(1700003000);
 }
-"#,
+",
         "integration/snapshots/test-runner/vm_set_c7_overwrites_slot_three_without_clobbering_neighbors/vm_set_c7_overwrites_slot_three_without_clobbering_neighbors.stdout.txt",
     );
 }
@@ -63,7 +63,7 @@ fn vm_set_c7_repeated_reads_and_writes_preserve_unmodified_slots() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/cm_vm_set_c7_repeated_reads_writes.test.tolk";
     let source = format!(
-        r#"
+        r"
 {VM_IMPORTS}
 get fun `test-cm-stdlib-vm-set-c7-repeated-reads-writes`() {{
     val c7Initial = vm.getC7();
@@ -92,7 +92,7 @@ get fun `test-cm-stdlib-vm-set-c7-repeated-reads-writes`() {{
     expect(paramsFinal.get(5) as int).toEqual(initialLogicalTime);
     expect(blockchain.now()).toEqual(initialNow + 1111);
 }}
-"#
+"
     );
 
     fs::write(fixture.path().join(test_path), source)

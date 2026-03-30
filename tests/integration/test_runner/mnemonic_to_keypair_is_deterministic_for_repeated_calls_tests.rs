@@ -23,7 +23,7 @@ fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn mnemonic_to_keypair_is_deterministic_for_repeated_calls() {
     run_crypto_case(
         "dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls",
-        r#"
+        r"
 get fun `test-dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls`() {
     val words = crypto.createMnemonic();
     val kpFirst = words.toKeyPair();
@@ -34,7 +34,7 @@ get fun `test-dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls`() {
     expect(kpFirst.privateKey).toNotEqual(0);
     expect(kpFirst.publicKey).toNotEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/mnemonic_to_keypair_is_deterministic_for_repeated_calls/mnemonic_to_keypair_is_deterministic_for_repeated_calls.stdout.txt",
     );
 }

@@ -12,6 +12,7 @@ pub enum ContractType {
     WalletV5R1,
 }
 
+#[must_use]
 pub fn categorize_contract(hash: HashBytes) -> ContractType {
     let hash_str = base64::engine::general_purpose::STANDARD.encode(hash);
 

@@ -30,6 +30,7 @@ pub struct JettonWalletData {
     pub jetton_wallet_code: Cell,
 }
 
+#[must_use]
 pub fn get_jetton_wallet_data(address: String, code: Cell, data: Cell) -> Option<JettonWalletData> {
     let Ok(result) = run_get_method(address, code, data, "get_wallet_data") else {
         return None;
@@ -73,6 +74,7 @@ pub fn get_jetton_wallet_data(address: String, code: Cell, data: Cell) -> Option
     })
 }
 
+#[must_use]
 pub fn parse_jetton_content(content_cell: Cell) -> Value {
     let mut parser = match content_cell.as_slice() {
         Ok(p) => p,
@@ -138,6 +140,7 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
     json!({})
 }
 
+#[must_use]
 pub fn get_jetton_data(address: String, code: Cell, data: Cell) -> Option<JettonData> {
     let Ok(result) = run_get_method(address, code, data, "get_jetton_data") else {
         return None;
@@ -202,7 +205,7 @@ pub fn run_get_method(
         code: Boc::encode_base64(code),
         data: Boc::encode_base64(data),
         verbosity: ExecutorVerbosity::Short,
-        libs: "".to_owned(),
+        libs: String::new(),
         address,
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),

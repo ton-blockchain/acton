@@ -94,6 +94,7 @@ impl Compiler {
     /// - `@root`: `foo/bar/`
     ///
     /// `import "@root/baz"` will be resolved to `foo/bar/baz`
+    #[must_use]
     pub fn with_mappings(mut self, mappings: &Option<BTreeMap<String, String>>) -> Self {
         if let Some(mappings) = mappings {
             self.mappings = mappings.clone().into_iter().collect();
@@ -114,6 +115,7 @@ impl Compiler {
     /// Compiles passed file with Tolk compiler.
     ///
     /// Returns successful result with `code_boc64` or error with `message`.
+    #[must_use]
     pub fn compile(&self, path: &Path, with_debug_info: bool) -> CompilerResult {
         let result = self.run_internal::<CompilerInternalResult>(path, with_debug_info, false);
 
@@ -203,7 +205,7 @@ impl Compiler {
                             if let Some(target) = mappings.get(prefix) {
                                 let cur_mapped_path = Path::new(target).join(suffix);
 
-                                resolved = Some(fail_if_symlink(&cur_mapped_path).and_then(|_| {
+                                resolved = Some(fail_if_symlink(&cur_mapped_path).and_then(|()| {
                                     dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string())
                                 }));
                             }

@@ -59,7 +59,7 @@ enum CaseRules {
 }
 
 fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId, case: CaseRules) {
-    if symbol.name.starts_with("_") {
+    if symbol.name.starts_with('_') {
         // internal names
         return;
     }
@@ -115,7 +115,7 @@ fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId
             tags: vec![DiagnosticTag::Unnecessary],
         }])
         .with_fixes(vec![Fix {
-            message: format!("rename to {case_name}: {}", correct_case),
+            message: format!("rename to {case_name}: {correct_case}"),
             edits,
             applicability: Applicability::Auto,
         }]);
@@ -130,27 +130,25 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
         };
 
         // First check local declarations
-        for local_def in resolve_index.locals.iter() {
+        for local_def in &resolve_index.locals {
             let name = local_def.name.clone();
-            if name.starts_with("_") {
+            if name.starts_with('_') {
                 // don't check explicitly unused symbols
                 // we also skip something like `_foo_bar` but I think it's ok
                 continue;
             }
 
-            let (correct_case, case_name) = match local_def.kind {
-                LocalDefKind::TypeParameter => {
-                    if utils::cases::is_pascal_ascii(name.as_ref()) {
-                        continue;
-                    }
-                    (name.to_upper_camel_case(), "PascalCase")
+            let (correct_case, case_name) = if matches!(local_def.kind, LocalDefKind::TypeParameter)
+            {
+                if utils::cases::is_pascal_ascii(name.as_ref()) {
+                    continue;
                 }
-                _ => {
-                    if utils::cases::is_camel_ascii(name.as_ref()) {
-                        continue;
-                    }
-                    (name.to_lower_camel_case(), "camelCase")
+                (name.to_upper_camel_case(), "PascalCase")
+            } else {
+                if utils::cases::is_camel_ascii(name.as_ref()) {
+                    continue;
                 }
+                (name.to_lower_camel_case(), "camelCase")
             };
 
             if correct_case.as_bytes() == name.as_bytes() {
@@ -201,25 +199,25 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
                 tolk_resolver::SymbolKind::GlobalVariable
                 | tolk_resolver::SymbolKind::Function { .. }
                 | tolk_resolver::SymbolKind::Method { .. } => {
-                    check_case(symbol, checker, file_id, CaseRules::Camel)
+                    check_case(symbol, checker, file_id, CaseRules::Camel);
                 }
                 tolk_resolver::SymbolKind::Struct { fields, .. } => {
                     check_case(symbol, checker, file_id, CaseRules::Pascal);
                     for field in fields {
-                        check_case(field, checker, file_id, CaseRules::Camel)
+                        check_case(field, checker, file_id, CaseRules::Camel);
                     }
                 }
                 tolk_resolver::SymbolKind::Enum { members } => {
                     check_case(symbol, checker, file_id, CaseRules::Pascal);
                     for member in members {
-                        check_case(member, checker, file_id, CaseRules::Pascal)
+                        check_case(member, checker, file_id, CaseRules::Pascal);
                     }
                 }
                 tolk_resolver::SymbolKind::TypeAlias { .. } => {
-                    check_case(symbol, checker, file_id, CaseRules::Pascal)
+                    check_case(symbol, checker, file_id, CaseRules::Pascal);
                 }
                 tolk_resolver::SymbolKind::Constant => {
-                    check_case(symbol, checker, file_id, CaseRules::ScreamingSnake)
+                    check_case(symbol, checker, file_id, CaseRules::ScreamingSnake);
                 }
                 tolk_resolver::SymbolKind::StructField | tolk_resolver::SymbolKind::EnumMember => {
                     // checked in struct and enum arms

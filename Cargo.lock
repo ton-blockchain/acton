@@ -14,9 +14,10 @@ dependencies = [
 
 [[package]]
 name = "acton"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "acton-config",
+ "acton-mdman",
  "anyhow",
  "axum",
  "base64",
@@ -104,15 +105,28 @@ dependencies = [
 
 [[package]]
 name = "acton-config"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "clap",
  "owo-colors",
  "path-absolutize",
+ "schemars 0.8.22",
  "serde",
+ "serde_json",
  "toml",
  "ton-networks",
+]
+
+[[package]]
+name = "acton-mdman"
+version = "0.1.4"
+dependencies = [
+ "anyhow",
+ "handlebars",
+ "pulldown-cmark",
+ "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -1100,13 +1114,23 @@ dependencies = [
 
 [[package]]
 name = "dap-client"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
  "dap",
  "log",
  "serde_json",
+]
+
+[[package]]
+name = "darling"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7f46116c46ff9ab3eb1597a45688b6715c6e628b5c133e288e709a29bcb4ee"
+dependencies = [
+ "darling_core 0.20.11",
+ "darling_macro 0.20.11",
 ]
 
 [[package]]
@@ -1127,6 +1151,20 @@ checksum = "25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d"
 dependencies = [
  "darling_core 0.23.0",
  "darling_macro 0.23.0",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d00b9596d185e565c2207a0b01f8bd1a135483d02d9b7b0a54b11da8d53412e"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim 0.11.1",
+ "syn 2.0.114",
 ]
 
 [[package]]
@@ -1153,6 +1191,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim 0.11.1",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
+dependencies = [
+ "darling_core 0.20.11",
+ "quote",
  "syn 2.0.114",
 ]
 
@@ -1295,6 +1344,37 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "derive_builder"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "507dfb09ea8b7fa618fcf76e953f4f5e192547945816d5358edffe39f6f94947"
+dependencies = [
+ "derive_builder_macro",
+]
+
+[[package]]
+name = "derive_builder_core"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5bcf7b024d6835cfb3d473887cd966994907effbe9227e8c8219824d06c4e8"
+dependencies = [
+ "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "derive_builder_macro"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
+dependencies = [
+ "derive_builder_core",
+ "syn 2.0.114",
 ]
 
 [[package]]
@@ -1575,7 +1655,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "fift-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -1938,6 +2018,23 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "handlebars"
+version = "6.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b3f9296c208515b87bd915a2f5d1163d4b3f863ba83337d7713cf478055948e"
+dependencies = [
+ "derive_builder",
+ "log",
+ "num-order",
+ "pest",
+ "pest_derive",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "walkdir",
 ]
 
 [[package]]
@@ -2865,6 +2962,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-modular"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17bb261bf36fa7d83f4c294f834e91256769097b3cb505d44831e0a179ac647f"
+
+[[package]]
+name = "num-order"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537b596b97c40fcf8056d153049eb22f481c17ebce72a513ec9286e4986d1bb6"
+dependencies = [
+ "num-modular",
+]
+
+[[package]]
 name = "num-rational"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3031,6 +3143,17 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
+]
+
+[[package]]
+name = "parse-changelog"
+version = "0.6.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6245ae3ccab647e14c9b3894b8d18e4ddeea5365a6d5dad774ba89ba2021a1d"
+dependencies = [
+ "indexmap 2.12.0",
+ "memchr",
+ "regex",
 ]
 
 [[package]]
@@ -3280,6 +3403,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c3a14896dfa883796f1cb410461aef38810ea05f2b2c33c5aded3649095fdad"
+dependencies = [
+ "bitflags 2.9.4",
+ "memchr",
+ "pulldown-cmark-escape",
+ "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-escape"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
+
+[[package]]
 name = "quanta"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3525,7 +3666,7 @@ dependencies = [
 
 [[package]]
 name = "retrace"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -3710,6 +3851,18 @@ dependencies = [
 
 [[package]]
 name = "schemars"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
+dependencies = [
+ "dyn-clone",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd191f9397d57d581cddd31014772520aa448f65ef991055d7f61582c65165f"
@@ -3730,6 +3883,18 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.114",
 ]
 
 [[package]]
@@ -3852,6 +4017,17 @@ name = "serde_derive"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4249,9 +4425,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tar"
-version = "0.4.44"
+version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
 dependencies = [
  "filetime",
  "libc",
@@ -4260,7 +4436,7 @@ dependencies = [
 
 [[package]]
 name = "tasm"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -4274,7 +4450,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4476,7 +4652,7 @@ dependencies = [
 
 [[package]]
 name = "tlb-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4586,7 +4762,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-analysis"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "bitflags 2.9.4",
  "rustc-hash 2.1.1",
@@ -4598,7 +4774,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-dataflow"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "rustc-hash 2.1.1",
  "tolk-resolver",
@@ -4607,7 +4783,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-linter"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "acton-config",
  "dunce",
@@ -4627,7 +4803,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-macros"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "heck 0.5.0",
  "itertools",
@@ -4638,7 +4814,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-resolver"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -4654,7 +4830,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4664,7 +4840,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-ty"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "dunce",
  "log",
@@ -4677,7 +4853,7 @@ dependencies = [
 
 [[package]]
 name = "tolkc"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "dunce",
@@ -4691,7 +4867,7 @@ dependencies = [
 
 [[package]]
 name = "tolkfmt"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4719,7 +4895,7 @@ dependencies = [
 
 [[package]]
 name = "toml-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4848,7 +5024,7 @@ dependencies = [
 
 [[package]]
 name = "ton-abi"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "crc",
@@ -4865,7 +5041,7 @@ dependencies = [
 
 [[package]]
 name = "ton-api"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "log",
@@ -4880,12 +5056,14 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "acton-config",
  "anyhow",
  "num-traits",
  "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
  "ton-api",
  "ton-executor",
  "ton-networks",
@@ -4895,7 +5073,7 @@ dependencies = [
 
 [[package]]
 name = "ton-executor"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "hex",
@@ -4911,7 +5089,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -4926,7 +5104,7 @@ dependencies = [
 
 [[package]]
 name = "ton-json-schema"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "jsonptr",
@@ -4938,7 +5116,7 @@ dependencies = [
 
 [[package]]
 name = "ton-litenode"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -4963,7 +5141,7 @@ dependencies = [
 
 [[package]]
 name = "ton-ls"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -4991,22 +5169,25 @@ dependencies = [
 
 [[package]]
 name = "ton-networks"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
+ "schemars 0.8.22",
  "serde",
 ]
 
 [[package]]
 name = "ton-objs"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "pkg-config",
+ "sha2",
+ "toml",
 ]
 
 [[package]]
 name = "ton-source-map"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "pathdiff",
@@ -5016,7 +5197,7 @@ dependencies = [
 
 [[package]]
 name = "ton-syntax"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "memchr",
@@ -5345,7 +5526,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvmffi"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -5583,7 +5764,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vmlogs"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
  "thiserror 2.0.18",
  "winnow 0.7.13",
@@ -6138,12 +6319,16 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.0.16"
+version = "0.1.4"
 dependencies = [
+ "acton-config",
  "anyhow",
+ "chrono",
  "clap",
  "owo-colors",
+ "parse-changelog",
  "reqwest",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "toml_edit 0.24.0+spec-1.1.0",

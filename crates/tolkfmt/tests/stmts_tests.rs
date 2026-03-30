@@ -9,14 +9,14 @@ use expect_test::expect;
 fn test_if_statement() {
     check(
         "fun test() { if (true) { return 1; } else { return 0; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (true) {
                         return 1;
                     } else {
                         return 0;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -24,12 +24,12 @@ fn test_if_statement() {
 fn test_if_without_else() {
     check(
         "fun test() { if (true) { return 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (true) {
                         return 1;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -37,14 +37,14 @@ fn test_if_without_else() {
 fn test_if_else() {
     check(
         "fun test() { if (true) { return 1; } else { return 0; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (true) {
                         return 1;
                     } else {
                         return 0;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -52,14 +52,14 @@ fn test_if_else() {
 fn test_if_else_if() {
     check(
         "fun test() { if (x > 10) { return 1; } else if (x > 5) { return 2; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (x > 10) {
                         return 1;
                     } else if (x > 5) {
                         return 2;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -80,7 +80,7 @@ fn test_destructuring_comments() {
                     // trailing tensor
                 ) = y;
             }",
-        expect![[r#"
+        expect![[r"
                 fun main() {
                     val [
                         // leading
@@ -94,7 +94,7 @@ fn test_destructuring_comments() {
                         d,
                         // trailing tensor
                     ) = y;
-                }"#]],
+                }"]],
     );
 }
 
@@ -102,7 +102,7 @@ fn test_destructuring_comments() {
 fn test_if_else_if_else() {
     check(
         "fun test() { if (x > 10) { return 1; } else if (x > 5) { return 2; } else { return 0; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (x > 10) {
                         return 1;
@@ -111,7 +111,7 @@ fn test_if_else_if_else() {
                     } else {
                         return 0;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -119,7 +119,7 @@ fn test_if_else_if_else() {
 fn test_nested_if() {
     check(
         "fun test() { if (x > 0) { if (y > 0) { return 1; } else { return 2; } } else { return 0; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (x > 0) {
                         if (y > 0) {
@@ -130,7 +130,7 @@ fn test_nested_if() {
                     } else {
                         return 0;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -138,12 +138,12 @@ fn test_nested_if() {
 fn test_while_statement() {
     check(
         "fun test() { while (x < 10) { x = x + 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     while (x < 10) {
                         x = x + 1;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -151,12 +151,12 @@ fn test_while_statement() {
 fn test_repeat_statement() {
     check(
         "fun test() { repeat (10) { x = x + 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     repeat (10) {
                         x = x + 1;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -164,12 +164,12 @@ fn test_repeat_statement() {
 fn test_do_while_statement() {
     check(
         "fun test() { do { x = x + 1; } while (x < 10); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     do {
                         x = x + 1;
                     } while (x < 10);
-                }"#]],
+                }"]],
     );
 }
 
@@ -177,12 +177,12 @@ fn test_do_while_statement() {
 fn test_local_vars() {
     check(
         "fun test() { var x = 10; val y: int = 20; val [a, b] = [1, 2]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x = 10;
                     val y: int = 20;
                     val [a, b] = [1, 2];
-                }"#]],
+                }"]],
     );
 }
 
@@ -190,10 +190,10 @@ fn test_local_vars() {
 fn test_var_without_type_without_init() {
     check(
         "fun test() { var x; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x;
-                }"#]],
+                }"]],
     );
 }
 
@@ -201,10 +201,10 @@ fn test_var_without_type_without_init() {
 fn test_val_without_type_without_init() {
     check(
         "fun test() { val y; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     val y;
-                }"#]],
+                }"]],
     );
 }
 
@@ -212,10 +212,10 @@ fn test_val_without_type_without_init() {
 fn test_var_with_type_without_init() {
     check(
         "fun test() { var x: int; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x: int;
-                }"#]],
+                }"]],
     );
 }
 
@@ -223,10 +223,10 @@ fn test_var_with_type_without_init() {
 fn test_val_with_type_without_init() {
     check(
         "fun test() { val y: slice; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     val y: slice;
-                }"#]],
+                }"]],
     );
 }
 
@@ -234,10 +234,10 @@ fn test_val_with_type_without_init() {
 fn test_var_without_type_with_init() {
     check(
         "fun test() { var x = 42; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x = 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -256,10 +256,10 @@ fn test_val_without_type_with_init() {
 fn test_var_with_type_with_init() {
     check(
         "fun test() { var x: int = 42; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x: int = 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -278,10 +278,10 @@ fn test_val_with_type_with_init() {
 fn test_var_redef() {
     check(
         "fun test() { var x redef; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var x redef;
-                }"#]],
+                }"]],
     );
 }
 
@@ -289,10 +289,10 @@ fn test_var_redef() {
 fn test_val_redef() {
     check(
         "fun test() { val y redef; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     val y redef;
-                }"#]],
+                }"]],
     );
 }
 
@@ -300,10 +300,10 @@ fn test_val_redef() {
 fn test_single_tuple_destructuring() {
     check(
         "fun test() { var [a] = [1]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [a] = [1];
-                }"#]],
+                }"]],
     );
 }
 
@@ -311,10 +311,10 @@ fn test_single_tuple_destructuring() {
 fn test_tuple_destructuring() {
     check(
         "fun test() { var [a, b] = [1, 2]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [a, b] = [1, 2];
-                }"#]],
+                }"]],
     );
 }
 
@@ -322,10 +322,10 @@ fn test_tuple_destructuring() {
 fn test_tuple_destructuring_with_types() {
     check(
         "fun test() { var [a: int, b: slice] = [1, 2]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [a: int, b: slice] = [1, 2];
-                }"#]],
+                }"]],
     );
 }
 
@@ -333,10 +333,10 @@ fn test_tuple_destructuring_with_types() {
 fn test_single_tensor_destructuring() {
     check(
         "fun test() { var (a) = (1); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var (a) = (1);
-                }"#]],
+                }"]],
     );
 }
 
@@ -344,10 +344,10 @@ fn test_single_tensor_destructuring() {
 fn test_tensor_destructuring() {
     check(
         "fun test() { var (a, b) = (1, 2); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var (a, b) = (1, 2);
-                }"#]],
+                }"]],
     );
 }
 
@@ -355,10 +355,10 @@ fn test_tensor_destructuring() {
 fn test_tensor_destructuring_with_types() {
     check(
         "fun test() { var (a: int, b: slice) = (1, 2); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var (a: int, b: slice) = (1, 2);
-                }"#]],
+                }"]],
     );
 }
 
@@ -366,10 +366,10 @@ fn test_tensor_destructuring_with_types() {
 fn test_nested_destructuring() {
     check(
         "fun test() { var [[a, b], (c, d)] = [[1, 2], (3, 4)]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [[a, b], (c, d)] = [[1, 2], (3, 4)];
-                }"#]],
+                }"]],
     );
 }
 
@@ -377,10 +377,10 @@ fn test_nested_destructuring() {
 fn test_complex_destructuring() {
     check(
         "fun test() { var  [a: int, b, c redef] = [1, 2, 3]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [a: int, b, c redef] = [1, 2, 3];
-                }"#]],
+                }"]],
     );
 }
 
@@ -388,10 +388,10 @@ fn test_complex_destructuring() {
 fn test_return_without_expression() {
     check(
         "fun test() { return; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     return;
-                }"#]],
+                }"]],
     );
 }
 
@@ -399,10 +399,10 @@ fn test_return_without_expression() {
 fn test_return_with_expression() {
     check(
         "fun test() { return 42; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     return 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -410,10 +410,10 @@ fn test_return_with_expression() {
 fn test_throw_with_expression() {
     check(
         "fun test() { throw 100; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     throw 100;
-                }"#]],
+                }"]],
     );
 }
 
@@ -421,13 +421,13 @@ fn test_throw_with_expression() {
 fn test_return_in_match_arm() {
     check(
         "fun test() { match (x) { 1 => return 10, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => return 10,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -435,13 +435,13 @@ fn test_return_in_match_arm() {
 fn test_throw_in_match_arm() {
     check(
         "fun test() { match (x) { 1 => throw 100, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => throw 100,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -449,10 +449,10 @@ fn test_throw_in_match_arm() {
 fn test_assert_comma_syntax() {
     check(
         "fun test() { assert(x > 0, 100); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     assert(x > 0, 100);
-                }"#]],
+                }"]],
     );
 }
 
@@ -460,10 +460,10 @@ fn test_assert_comma_syntax() {
 fn test_assert_throw_syntax() {
     check(
         "fun test() { assert (x > 0) throw 100; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     assert (x > 0) throw 100;
-                }"#]],
+                }"]],
     );
 }
 
@@ -471,14 +471,14 @@ fn test_assert_throw_syntax() {
 fn test_try_catch_no_vars() {
     check(
         "fun test() { try { risky(); } catch { return 0; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     try {
                         risky();
                     } catch {
                         return 0;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -486,14 +486,14 @@ fn test_try_catch_no_vars() {
 fn test_try_catch_one_var() {
     check(
         "fun test() { try { risky(); } catch (e) { return e; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     try {
                         risky();
                     } catch (e) {
                         return e;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -501,14 +501,14 @@ fn test_try_catch_one_var() {
 fn test_try_catch_two_vars() {
     check(
         "fun test() { try { risky(); } catch (e, arg) { return e + arg; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     try {
                         risky();
                     } catch (e, arg) {
                         return e + arg;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -516,14 +516,14 @@ fn test_try_catch_two_vars() {
 fn test_match_type_pattern() {
     check(
         "fun test() { match (x) { int => return 1, string => return 2, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         int => return 1,
                         string => return 2,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -546,7 +546,7 @@ fn test_match_expression_pattern() {
 fn test_match_block_body() {
     check(
         "fun test() { match (x) { 1 => { var y = 10; return y; } else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => {
@@ -555,7 +555,7 @@ fn test_match_block_body() {
                         }
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -563,13 +563,13 @@ fn test_match_block_body() {
 fn test_match_expression_body() {
     check(
         "fun test() { match (x) { 1 => x * 2, else => 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => x * 2,
                         else => 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -577,13 +577,13 @@ fn test_match_expression_body() {
 fn test_match_with_var_declaration() {
     check(
         "fun test() { match (var x = getValue()) { 1 => return 10, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (var x = getValue()) {
                         1 => return 10,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -591,12 +591,12 @@ fn test_match_with_var_declaration() {
 fn test_break_statement() {
     check(
         "fun test() { while (true) { break; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     while (true) {
                         break;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -604,12 +604,12 @@ fn test_break_statement() {
 fn test_continue_statement() {
     check(
         "fun test() { while (true) { continue; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     while (true) {
                         continue;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -627,10 +627,10 @@ fn test_empty_statements() {
 fn test_empty_statements_after_stmt() {
     check(
         "fun test() { val a = 100;;;;;; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     val a = 100;
-                }"#]],
+                }"]],
     );
 }
 
@@ -638,10 +638,10 @@ fn test_empty_statements_after_stmt() {
 fn test_expression_statement() {
     check(
         "fun test() { x = 42; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     x = 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -649,10 +649,10 @@ fn test_expression_statement() {
 fn test_function_call_expression() {
     check(
         "fun test() { doSomething(); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     doSomething();
-                }"#]],
+                }"]],
     );
 }
 
@@ -660,13 +660,13 @@ fn test_function_call_expression() {
 fn test_while_with_complex_condition() {
     check(
         "fun test() { while (x > 0 && y < 10) { x = x - 1; y = y + 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     while (x > 0 && y < 10) {
                         x = x - 1;
                         y = y + 1;
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -674,10 +674,10 @@ fn test_while_with_complex_condition() {
 fn test_empty_block() {
     check(
         "fun test() { {} }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     {}
-                }"#]],
+                }"]],
     );
 }
 
@@ -685,7 +685,7 @@ fn test_empty_block() {
 fn test_match() {
     check(
         "fun test() { match (x) { 1 => { return 10; } else => return 0, } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => {
@@ -693,7 +693,7 @@ fn test_match() {
                         }
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -701,14 +701,14 @@ fn test_match() {
 fn test_match_arm_return_statement() {
     check(
         "fun test() { match (x) { 1 => return 10, 2 => return 20, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => return 10,
                         2 => return 20,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -716,21 +716,21 @@ fn test_match_arm_return_statement() {
 fn test_match_arm_throw_statement() {
     check(
         "fun test() { match (x) { 1 => throw 100, 2 => throw 200, else => return 0 } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => throw 100,
                         2 => throw 200,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_match_mixed_arm_bodies() {
     check(
-        r#"fun test() {
+        r"fun test() {
                 match (x) {
                     1 => return 10,
                     2 => { var y = 20; return y; },
@@ -738,8 +738,8 @@ fn test_match_mixed_arm_bodies() {
                     4 => x * 2,
                     else => 0
                 }
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     match (x) {
                         1 => return 10,
@@ -751,14 +751,14 @@ fn test_match_mixed_arm_bodies() {
                         4 => x * 2,
                         else => 0,
                     }
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_deeply_nested_blocks() {
     check(
-        r#"fun test() {
+        r"fun test() {
                 {
                     {
                         {
@@ -770,8 +770,8 @@ fn test_deeply_nested_blocks() {
                         }
                     }
                 }
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     {
                         {
@@ -784,41 +784,41 @@ fn test_deeply_nested_blocks() {
                             }
                         }
                     }
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_multiple_assert_statements() {
     check(
-        r#"fun test() {
+        r"fun test() {
                 assert(x > 0, 100);
                 assert (y != null) throw 101;
                 assert(z >= 0, 102);
                 return x + y + z;
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     assert(x > 0, 100);
                     assert (y != null) throw 101;
                     assert(z >= 0, 102);
                     return x + y + z;
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_match_with_type_patterns() {
     check(
-        r#"fun test() {
+        r"fun test() {
                 match (getValue()) {
                     int => return 1,
                     string => return 2,
                     bool => return 3,
                     else => throw 200
                 }
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     match (getValue()) {
                         int => return 1,
@@ -826,7 +826,7 @@ fn test_match_with_type_patterns() {
                         bool => return 3,
                         else => throw 200,
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -836,14 +836,14 @@ fn test_match_with_type_patterns() {
 fn test_line_breaking_if_statement_small_width() {
     check_with_width(
         "fun test() { if (very_long_condition_that_should_break) { return 42; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     if (
                         very_long_condition_that_should_break
                     ) {
                         return 42;
                     }
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -852,14 +852,14 @@ fn test_line_breaking_if_statement_small_width() {
 fn test_line_breaking_while_statement_small_width() {
     check_with_width(
         "fun test() { while (very_long_condition_that_should_break) { x = x + 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     while (
                         very_long_condition_that_should_break
                     ) {
                         x = x + 1;
                     }
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -868,14 +868,14 @@ fn test_line_breaking_while_statement_small_width() {
 fn test_line_breaking_repeat_statement_small_width() {
     check_with_width(
         "fun test() { repeat (very_long_expression_that_should_break) { x = x + 1; } }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     repeat (
                         very_long_expression_that_should_break
                     ) {
                         x = x + 1;
                     }
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -884,14 +884,14 @@ fn test_line_breaking_repeat_statement_small_width() {
 fn test_line_breaking_do_while_statement_small_width() {
     check_with_width(
         "fun test() { do { x = x + 1; } while (very_long_condition_that_should_break); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     do {
                         x = x + 1;
                     } while (
                         very_long_condition_that_should_break
                     );
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -900,12 +900,12 @@ fn test_line_breaking_do_while_statement_small_width() {
 fn test_line_breaking_assert_statement_small_width() {
     check_with_width(
         "fun test() { assert (very_long_condition_that_should_break) throw error_code; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     assert (
                         very_long_condition_that_should_break
                     ) throw error_code;
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -914,14 +914,14 @@ fn test_line_breaking_assert_statement_small_width() {
 fn test_line_breaking_function_call_small_width() {
     check_with_width(
         "fun test() { very_long_function_name_that_should_break(arg1, arg2, arg3); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     very_long_function_name_that_should_break(
                         arg1,
                         arg2,
                         arg3,
                     );
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -929,14 +929,14 @@ fn test_line_breaking_function_call_small_width() {
 #[test]
 fn test_line_breaking_match_expression_small_width() {
     check_with_width(
-        r#"fun test() {
+        r"fun test() {
                 match (very_long_expression_that_should_break) {
                     1 => return 10,
                     2 => return 20,
                     else => return 0
                 }
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     match (
                         very_long_expression_that_should_break
@@ -945,7 +945,7 @@ fn test_line_breaking_match_expression_small_width() {
                         2 => return 20,
                         else => return 0,
                     }
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -954,14 +954,14 @@ fn test_line_breaking_match_expression_small_width() {
 fn test_line_breaking_complex_expression_small_width() {
     check_with_width(
         "fun test() { x = a + b + c + d + e + f + g; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     x = a + b + c +
                     d +
                     e +
                     f +
                     g;
-                }"#]],
+                }"]],
         20,
     );
 }
@@ -970,7 +970,7 @@ fn test_line_breaking_complex_expression_small_width() {
 fn test_line_breaking_nested_calls_small_width() {
     check_with_width(
         "fun test() { result = outer_function(inner_function(arg1, arg2), another_arg); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     result = outer_function(
                         inner_function(
@@ -979,7 +979,7 @@ fn test_line_breaking_nested_calls_small_width() {
                         ),
                         another_arg,
                     );
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -988,14 +988,14 @@ fn test_line_breaking_nested_calls_small_width() {
 fn test_line_breaking_tuple_small_width() {
     check_with_width(
         "fun test() { var [a, b, c] = [value1, value2, value3]; }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var [a, b, c] = [
                         value1,
                         value2,
                         value3,
                     ];
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -1004,14 +1004,14 @@ fn test_line_breaking_tuple_small_width() {
 fn test_line_breaking_tensor_small_width() {
     check_with_width(
         "fun test() { var (a, b, c) = (value1, value2, value3); }",
-        expect![[r#"
+        expect![[r"
                 fun test() {
                     var (a, b, c) = (
                         value1,
                         value2,
                         value3,
                     );
-                }"#]],
+                }"]],
         30,
     );
 }
@@ -1019,14 +1019,14 @@ fn test_line_breaking_tensor_small_width() {
 #[test]
 fn test_line_breaking_try_catch_small_width() {
     check_with_width(
-        r#"fun test() {
+        r"fun test() {
                 try {
                     very_long_function_call_that_should_break();
                 } catch (exception, code) {
                     handle_error(exception, code);
                 }
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 fun test() {
                     try {
                         very_long_function_call_that_should_break();
@@ -1036,7 +1036,7 @@ fn test_line_breaking_try_catch_small_width() {
                             code,
                         );
                     }
-                }"#]],
+                }"]],
         20,
     );
 }
@@ -1051,12 +1051,12 @@ fn test_empty_block_with_comment() {
                     // comment
                 }
             }",
-        expect![[r#"
+        expect![[r"
                 fun main() {
                     {
                         // comment
                     }
-                }"#]],
+                }"]],
     );
 }
 
@@ -1067,11 +1067,11 @@ fn test_inline_comments_for_statements() {
                  val a = 100; // comment
                  val bbb = 20000; // comment 2
             }",
-        expect![[r#"
+        expect![[r"
                 fun main() {
                     val a = 100;     // comment
                     val bbb = 20000; // comment 2
-                }"#]],
+                }"]],
     );
 }
 
@@ -1083,12 +1083,12 @@ fn test_inline_comments_grouping_for_statements() {
 
                  val bbb = 20000; // comment 2
             }",
-        expect![[r#"
+        expect![[r"
                 fun main() {
                     val a = 100; // comment
 
                     val bbb = 20000; // comment 2
-                }"#]],
+                }"]],
     );
 }
 
@@ -1102,21 +1102,21 @@ fn test_inline_comments_grouping_for_statements_2() {
                  val c = 20000; // comment 3
                  val ddddd = 20000; // comment 4
             }",
-        expect![[r#"
+        expect![[r"
                 fun main() {
                     val a = 100;  // comment
                     val bb = 100; // comment 2
 
                     val c = 20000;     // comment 3
                     val ddddd = 20000; // comment 4
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_comments_for_statements() {
     check_with_width(
-        r#"
+        r"
                 fun main() {
                     // comment 1
                     val a = 100; // comment 2
@@ -1126,8 +1126,8 @@ fn test_comments_for_statements() {
                     val b = 100;
 
                     // comment 4
-                }"#,
-        expect![[r#"
+                }",
+        expect![[r"
                 fun main() {
                     // comment 1
                     val a = 100; // comment 2
@@ -1136,7 +1136,7 @@ fn test_comments_for_statements() {
 
                     val b = 100;
                     // comment 4
-                }"#]],
+                }"]],
         30,
     );
 }

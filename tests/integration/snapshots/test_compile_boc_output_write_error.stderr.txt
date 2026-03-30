@@ -1,1 +1,1 @@
-Error: Failed to save BoC file readonly/output.boc: Permission denied (os error 13)
+Error: Failed to save BoC file readonly/output.boc: Permission denied ([OS_ERROR])

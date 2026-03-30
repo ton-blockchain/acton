@@ -23,12 +23,12 @@ fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn crypto_create_mnemonic_returns_24_words() {
     run_crypto_case(
         "an-stdlib-create-mnemonic-returns-24-words",
-        r#"
+        r"
 get fun `test-an-stdlib-create-mnemonic-returns-24-words`() {
     val words = crypto.createMnemonic();
     expect(words.size()).toEqual(24);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_create_mnemonic_returns_24_words.stdout.txt",
     );
 }
@@ -37,7 +37,7 @@ get fun `test-an-stdlib-create-mnemonic-returns-24-words`() {
 fn crypto_to_keypair_is_deterministic_for_same_mnemonic() {
     run_crypto_case(
         "an-stdlib-to-keypair-deterministic",
-        r#"
+        r"
 get fun `test-an-stdlib-to-keypair-deterministic`() {
     val words = crypto.createMnemonic();
     val kp1 = words.toKeyPair();
@@ -48,7 +48,7 @@ get fun `test-an-stdlib-to-keypair-deterministic`() {
     expect(kp1.privateKey).toNotEqual(0);
     expect(kp1.publicKey).toNotEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_to_keypair_is_deterministic_for_same_mnemonic.stdout.txt",
     );
 }
@@ -57,7 +57,7 @@ get fun `test-an-stdlib-to-keypair-deterministic`() {
 fn crypto_sign_matches_raw_sign_and_verifies() {
     run_crypto_case(
         "an-stdlib-sign-matches-raw-sign",
-        r#"
+        r"
 get fun `test-an-stdlib-sign-matches-raw-sign`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
@@ -71,7 +71,7 @@ get fun `test-an-stdlib-sign-matches-raw-sign`() {
     expect(signSig.remainingRefsCount()).toEqual(0);
     expect(isSignatureValid(data.hash(), signSig, kp.publicKey)).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_sign_matches_raw_sign_and_verifies.stdout.txt",
     );
 }
@@ -80,7 +80,7 @@ get fun `test-an-stdlib-sign-matches-raw-sign`() {
 fn crypto_raw_sign_is_deterministic_and_hash_sensitive() {
     run_crypto_case(
         "an-stdlib-raw-sign-deterministic-hash-sensitive",
-        r#"
+        r"
 get fun `test-an-stdlib-raw-sign-deterministic-hash-sensitive`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
@@ -95,7 +95,7 @@ get fun `test-an-stdlib-raw-sign-deterministic-hash-sensitive`() {
     expect(isSignatureValid(hashA, sigA1, kp.publicKey)).toBeTrue();
     expect(isSignatureValid(hashB, sigA1, kp.publicKey)).toBeFalse();
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_raw_sign_is_deterministic_and_hash_sensitive.stdout.txt",
     );
 }
@@ -104,14 +104,14 @@ get fun `test-an-stdlib-raw-sign-deterministic-hash-sensitive`() {
 fn crypto_fast_random_bytes_seeded_are_deterministic() {
     run_crypto_case(
         "an-stdlib-fast-random-seeded-deterministic",
-        r#"
+        r"
 get fun `test-an-stdlib-fast-random-seeded-deterministic`() {
     val seeded127a = crypto.getFastRandomBytes(127, 42);
     val seeded127b = crypto.getFastRandomBytes(127, 42);
     // BUG: getFastRandomBytes should be deterministic for the same seed; expected equal slices, got different values.
     expect(seeded127a).toEqual(seeded127b);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_seeded_are_deterministic.stdout.txt",
     );
 }
@@ -120,12 +120,12 @@ get fun `test-an-stdlib-fast-random-seeded-deterministic`() {
 fn crypto_fast_random_bytes_rejects_128_bytes() {
     run_crypto_case(
         "an-stdlib-fast-random-rejects-128-bytes",
-        r#"
+        r"
 get fun `test-an-stdlib-fast-random-rejects-128-bytes`() {
     expectToEndWithExitCode(567);
     crypto.getFastRandomBytes(128, 1);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_rejects_128_bytes.stdout.txt",
     );
 }
@@ -134,7 +134,7 @@ get fun `test-an-stdlib-fast-random-rejects-128-bytes`() {
 fn crypto_fast_random_bytes_supports_zero_bytes() {
     run_crypto_case(
         "an-stdlib-fast-random-supports-zero-bytes",
-        r#"
+        r"
 get fun `test-an-stdlib-fast-random-supports-zero-bytes`() {
     val seeded = crypto.getFastRandomBytes(0, 42);
     val noSeed = crypto.getFastRandomBytes(0);
@@ -144,7 +144,7 @@ get fun `test-an-stdlib-fast-random-supports-zero-bytes`() {
     expect(noSeed.remainingBitsCount()).toEqual(0);
     expect(noSeed.remainingRefsCount()).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_supports_zero_bytes.stdout.txt",
     );
 }
@@ -153,7 +153,7 @@ get fun `test-an-stdlib-fast-random-supports-zero-bytes`() {
 fn crypto_secure_random_bytes_supports_1_and_127() {
     run_crypto_case(
         "an-stdlib-secure-random-supports-1-and-127",
-        r#"
+        r"
 get fun `test-an-stdlib-secure-random-supports-1-and-127`() {
     val b1 = crypto.getSecureRandomBytes(1);
     val b127 = crypto.getSecureRandomBytes(127);
@@ -163,7 +163,7 @@ get fun `test-an-stdlib-secure-random-supports-1-and-127`() {
     expect(b127.remainingBitsCount()).toEqual(127 * 8);
     expect(b127.remainingRefsCount()).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_secure_random_bytes_supports_1_and_127.stdout.txt",
     );
 }
@@ -172,12 +172,12 @@ get fun `test-an-stdlib-secure-random-supports-1-and-127`() {
 fn crypto_secure_random_bytes_rejects_128_bytes() {
     run_crypto_case(
         "an-stdlib-secure-random-rejects-128-bytes",
-        r#"
+        r"
 get fun `test-an-stdlib-secure-random-rejects-128-bytes`() {
     expectToEndWithExitCode(567);
     crypto.getSecureRandomBytes(128);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_secure_random_bytes_rejects_128_bytes.stdout.txt",
     );
 }

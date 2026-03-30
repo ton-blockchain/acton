@@ -17,3 +17,6 @@ jsonschema = { workspace = true }
 referencing = { workspace = true }
 jsonptr = { workspace = true }
 regex = { workspace = true }
+
+[lib]
+doctest = false

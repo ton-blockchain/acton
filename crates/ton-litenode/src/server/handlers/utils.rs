@@ -5,7 +5,7 @@ use std::future::Future;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow::Result<T> {
-    serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {}", method))
+    serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {method}"))
 }
 
 pub fn parse_method_name(method: &Value) -> anyhow::Result<String> {
@@ -38,9 +38,9 @@ where
     }
 }
 
+#[must_use]
 pub fn get_extra() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis().to_string())
-        .unwrap_or_else(|_| "0".to_string())
+        .map_or_else(|_| "0".to_string(), |d| d.as_millis().to_string())
 }

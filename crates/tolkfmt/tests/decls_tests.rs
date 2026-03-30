@@ -15,13 +15,13 @@ fn test_function_parameters_comments() {
                 // trailing
                 b: slice
             ) {}",
-        expect![[r#"
+        expect![[r"
                 fun test(
                     // leading
                     a: int, // inline
                     // trailing
                     b: slice,
-                ) {}"#]],
+                ) {}"]],
     );
 }
 
@@ -35,14 +35,14 @@ fn test_annotation_arguments_comments() {
                 // trailing
             )
             fun main() {}",
-        expect![[r#"
+        expect![[r"
                 @test(
                     // leading
                     1, // inline
                     2,
                     // trailing
                 )
-                fun main() {}"#]],
+                fun main() {}"]],
     );
 }
 
@@ -55,13 +55,13 @@ fn test_type_parameters_comments() {
                 U
                 // trailing
             > {}",
-        expect![[r#"
+        expect![[r"
                 struct Test<
                     // leading
                     T, // inline
                     U,
                     // trailing
-                > {}"#]],
+                > {}"]],
     );
 }
 
@@ -91,12 +91,12 @@ fn test_annotation_comments() {
             // trailing list
             @deprecated
             fun main() {}",
-        expect![[r#"
+        expect![[r"
                 // leading list
                 @test // inline list
                 // trailing list
                 @deprecated
-                fun main() {}"#]],
+                fun main() {}"]],
     );
 }
 
@@ -108,15 +108,15 @@ fn test_tolk_required_version() {
 #[test]
 fn test_tolk_required_version_with_comments() {
     check(
-        r#"
+        r"
         // comment 1
         // comment 2
         tolk 0.6.0
-        "#,
-        expect![[r#"
+        ",
+        expect![[r"
             // comment 1
             // comment 2
-            tolk 0.6.0"#]],
+            tolk 0.6.0"]],
     );
 }
 
@@ -132,12 +132,12 @@ fn test_import() {
 fn test_contract_declaration() {
     check(
         "contract Wallet { state: int, init: 1 + 2, storage: map<int, slice> }",
-        expect![[r#"
+        expect![[r"
                 contract Wallet {
                     state: int
                     init: 1 + 2
                     storage: map<int, slice>
-                }"#]],
+                }"]],
     );
 }
 
@@ -145,11 +145,11 @@ fn test_contract_declaration() {
 fn test_empty_contract_declaration_with_comments() {
     check(
         "contract Contract {\n// storage: Storage\n// incomingMessages: AllowedMessages\n}",
-        expect![[r#"
+        expect![[r"
                 contract Contract {
                     // storage: Storage
                     // incomingMessages: AllowedMessages
-                }"#]],
+                }"]],
     );
 }
 
@@ -157,11 +157,11 @@ fn test_empty_contract_declaration_with_comments() {
 fn test_empty_struct_declaration_with_comments() {
     check(
         "struct Storage {\n// counter: int\n// owner: address\n}",
-        expect![[r#"
+        expect![[r"
                 struct Storage {
                     // counter: int
                     // owner: address
-                }"#]],
+                }"]],
     );
 }
 
@@ -169,11 +169,11 @@ fn test_empty_struct_declaration_with_comments() {
 fn test_empty_enum_declaration_with_comments() {
     check(
         "enum Mode {\n// User\n// Admin\n}",
-        expect![[r#"
+        expect![[r"
                 enum Mode {
                     // User
                     // Admin
-                }"#]],
+                }"]],
     );
 }
 
@@ -186,10 +186,10 @@ fn test_global_var() {
 fn test_global_var_with_annotations() {
     check(
         "@deprecated\n@test(42)\nglobal x: int;",
-        expect![[r#"
+        expect![[r"
                 @deprecated
                 @test(42)
-                global x: int"#]],
+                global x: int"]],
     );
 }
 
@@ -203,9 +203,9 @@ fn test_constant_declaration() {
 fn test_constant_with_annotations() {
     check(
         "@deprecated\nconst MAX_SIZE = 100;",
-        expect![[r#"
+        expect![[r"
                 @deprecated
-                const MAX_SIZE = 100"#]],
+                const MAX_SIZE = 100"]],
     );
 }
 
@@ -232,9 +232,9 @@ fn test_type_alias() {
 fn test_type_alias_with_annotations() {
     check(
         "@deprecated\ntype OldType = int;",
-        expect![[r#"
+        expect![[r"
                 @deprecated
-                type OldType = int"#]],
+                type OldType = int"]],
     );
 }
 
@@ -250,12 +250,12 @@ fn test_type_alias_union_type() {
     );
     check_with_width(
         "type ComplexUnion = int | slice | bool | address;",
-        expect![[r#"
+        expect![[r"
                 type ComplexUnion =
                     | int
                     | slice
                     | bool
-                    | address"#]],
+                    | address"]],
         20,
     );
 }
@@ -288,47 +288,47 @@ fn test_type_alias_complex_types() {
 fn test_struct_declaration() {
     check(
         "struct Point { x: int, y: int }",
-        expect![[r#"
+        expect![[r"
                 struct Point {
                     x: int
                     y: int
-                }"#]],
+                }"]],
     );
     check(
         "struct Point<T> { x: T, y: T }",
-        expect![[r#"
+        expect![[r"
                 struct Point<T> {
                     x: T
                     y: T
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_struct_declaration_with_new_lines() {
     check(
-        r#"struct Point {
+        r"struct Point {
                 x: int
 
                 y: int
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 struct Point {
                     x: int
 
                     y: int
-                }"#]],
+                }"]],
     );
     check(
-        r#"struct Point {
+        r"struct Point {
                 x: int
 
                 y: int
 
                 z: int
                 z1: int
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 struct Point {
                     x: int
 
@@ -336,28 +336,28 @@ fn test_struct_declaration_with_new_lines() {
 
                     z: int
                     z1: int
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_struct_declaration_with_comments() {
     check(
-        r#"struct Point {
+        r"struct Point {
                 // leadding comment
                 x: int // inline comment 1
                 y: int, // inline comment 2
                 z: int
                 // trailing comment
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 struct Point {
                     // leadding comment
                     x: int // inline comment 1
                     y: int // inline comment 2
                     z: int
                     // trailing comment
-                }"#]],
+                }"]],
     );
 }
 
@@ -365,10 +365,10 @@ fn test_struct_declaration_with_comments() {
 fn test_struct_with_pack_prefix() {
     check(
         "struct (1) PackedStruct { x: int }",
-        expect![[r#"
+        expect![[r"
                 struct (1) PackedStruct {
                     x: int
-                }"#]],
+                }"]],
     );
 }
 
@@ -376,11 +376,11 @@ fn test_struct_with_pack_prefix() {
 fn test_struct_with_annotations() {
     check(
         "@deprecated\nstruct OldStruct { x: int }",
-        expect![[r#"
+        expect![[r"
                 @deprecated
                 struct OldStruct {
                     x: int
-                }"#]],
+                }"]],
     );
 }
 
@@ -388,12 +388,12 @@ fn test_struct_with_annotations() {
 fn test_struct_field_modifiers() {
     check(
         "struct Test { readonly x: int, private y: slice, private readonly z: slice }",
-        expect![[r#"
+        expect![[r"
                 struct Test {
                     readonly x: int
                     private y: slice
                     private readonly z: slice
-                }"#]],
+                }"]],
     );
 }
 
@@ -401,11 +401,11 @@ fn test_struct_field_modifiers() {
 fn test_struct_field_defaults() {
     check(
         "struct Config { timeout: int = 30, enabled: bool = true }",
-        expect![[r#"
+        expect![[r"
                 struct Config {
                     timeout: int = 30
                     enabled: bool = true
-                }"#]],
+                }"]],
     );
 }
 
@@ -414,8 +414,8 @@ fn test_struct_empty() {
     // TODO
     check(
         "struct Empty {}",
-        expect![[r#"
-                struct Empty {}"#]],
+        expect![[r"
+                struct Empty {}"]],
     );
 }
 
@@ -423,8 +423,8 @@ fn test_struct_empty() {
 fn test_struct_without_body() {
     check(
         "struct Empty",
-        expect![[r#"
-                struct Empty"#]],
+        expect![[r"
+                struct Empty"]],
     );
 }
 
@@ -432,12 +432,12 @@ fn test_struct_without_body() {
 fn test_struct_complex() {
     check(
         "@custom\nstruct (0x2) Complex<T, U> { readonly x: T = 42, private y: U }",
-        expect![[r#"
+        expect![[r"
                 @custom
                 struct (0x2) Complex<T, U> {
                     readonly x: T = 42
                     private y: U
-                }"#]],
+                }"]],
     );
 }
 
@@ -445,52 +445,52 @@ fn test_struct_complex() {
 fn test_enum_declaration() {
     check(
         "enum Color { RED, GREEN, BLUE }",
-        expect![[r#"
+        expect![[r"
                 enum Color {
                     RED
                     GREEN
                     BLUE
-                }"#]],
+                }"]],
     );
     check(
         "enum Status: int { OK = 0, ERROR = 1 }",
-        expect![[r#"
+        expect![[r"
                 enum Status: int {
                     OK = 0
                     ERROR = 1
-                }"#]],
+                }"]],
     );
 }
 
 #[test]
 fn test_enum_declaration_with_new_lines() {
     check(
-        r#"enum Color {
+        r"enum Color {
                 RED,
 
                 GREEN,
 
                 BLUE
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 enum Color {
                     RED
 
                     GREEN
 
                     BLUE
-                }"#]],
+                }"]],
     );
     check(
-        r#"enum Color {
+        r"enum Color {
                 RED,
 
                 GREEN,
 
                 BLUE,
                 BLUE2,
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 enum Color {
                     RED
 
@@ -498,7 +498,7 @@ fn test_enum_declaration_with_new_lines() {
 
                     BLUE
                     BLUE2
-                }"#]],
+                }"]],
     );
 }
 
@@ -506,12 +506,12 @@ fn test_enum_declaration_with_new_lines() {
 fn test_enum_with_annotations() {
     check(
         "@deprecated\nenum OldEnum { A, B }",
-        expect![[r#"
+        expect![[r"
                 @deprecated
                 enum OldEnum {
                     A
                     B
-                }"#]],
+                }"]],
     );
 }
 
@@ -519,11 +519,11 @@ fn test_enum_with_annotations() {
 fn test_enum_backed_types() {
     check(
         "enum Status: uint8 { OK = 0, ERROR = 1 }",
-        expect![[r#"
+        expect![[r"
                 enum Status: uint8 {
                     OK = 0
                     ERROR = 1
-                }"#]],
+                }"]],
     );
 }
 
@@ -531,13 +531,13 @@ fn test_enum_backed_types() {
 fn test_enum_mixed_values() {
     check(
         "enum Mixed { A, B = 1, C, D = 10 }",
-        expect![[r#"
+        expect![[r"
                 enum Mixed {
                     A
                     B = 1
                     C
                     D = 10
-                }"#]],
+                }"]],
     );
 }
 
@@ -545,10 +545,10 @@ fn test_enum_mixed_values() {
 fn test_enum_single_member() {
     check(
         "enum Single { ONLY }",
-        expect![[r#"
+        expect![[r"
                 enum Single {
                     ONLY
-                }"#]],
+                }"]],
     );
 }
 
@@ -556,8 +556,8 @@ fn test_enum_single_member() {
 fn test_enum_empty() {
     check(
         "enum Empty {}",
-        expect![[r#"
-                enum Empty {}"#]],
+        expect![[r"
+                enum Empty {}"]],
     );
 }
 
@@ -604,19 +604,19 @@ fn test_enum_comments_alignment_with_new_lines() {
 #[test]
 fn test_struct_comments_alignment() {
     check(
-        r#"struct Config {
+        r"struct Config {
                 enabled: bool        // enable feature
                 timeout: int         // timeout in seconds
                 host: slice          // server host
                 port: int            // server port number
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 struct Config {
                     enabled: bool // enable feature
                     timeout: int  // timeout in seconds
                     host: slice   // server host
                     port: int     // server port number
-                }"#]],
+                }"]],
     );
 }
 
@@ -624,9 +624,9 @@ fn test_struct_comments_alignment() {
 fn test_function_with_annotations() {
     check(
         "@pure\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 @pure
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -634,10 +634,10 @@ fn test_function_with_annotations() {
 fn test_function_doc_comment_with_annotation() {
     check(
         "/// Returns value\n@pure\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 /// Returns value
                 @pure
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -645,20 +645,20 @@ fn test_function_doc_comment_with_annotation() {
 fn test_function_generics() {
     check(
         "fun identity<T>(x: T): T { return x; }",
-        expect![[r#"
+        expect![[r"
                 fun identity<T>(x: T): T {
                     return x;
-                }"#]],
+                }"]],
     );
 }
 #[test]
 fn test_function_generics_with_default_type() {
     check(
         "fun identity<T = int>(x: T): T { return x; }",
-        expect![[r#"
+        expect![[r"
                 fun identity<T = int>(x: T): T {
                     return x;
-                }"#]],
+                }"]],
     );
 }
 
@@ -672,10 +672,10 @@ fn test_function_no_generics() {
 fn test_function_parameters() {
     check(
         "fun add(a: int, b: int): int { return a + b; }",
-        expect![[r#"
+        expect![[r"
                 fun add(a: int, b: int): int {
                     return a + b;
-                }"#]],
+                }"]],
     );
 }
 
@@ -683,10 +683,10 @@ fn test_function_parameters() {
 fn test_function_parameter_with_default() {
     check(
         "fun add(a: int = 10, b: int = 20 + 10): int { return a + b; }",
-        expect![[r#"
+        expect![[r"
                 fun add(a: int = 10, b: int = 20 + 10): int {
                     return a + b;
-                }"#]],
+                }"]],
     );
 }
 
@@ -694,10 +694,10 @@ fn test_function_parameter_with_default() {
 fn test_function_optional_return() {
     check(
         "fun optional(): int? { return null; }",
-        expect![[r#"
+        expect![[r"
                 fun optional(): int? {
                     return null;
-                }"#]],
+                }"]],
     );
 }
 
@@ -716,10 +716,10 @@ fn test_function_complex_return() {
 fn test_function_no_return_type() {
     check(
         "fun noReturn() { return; }",
-        expect![[r#"
+        expect![[r"
                 fun noReturn() {
                     return;
-                }"#]],
+                }"]],
     );
 }
 
@@ -727,10 +727,10 @@ fn test_function_no_return_type() {
 fn test_function_no_parameters() {
     check(
         "fun empty(): int { return 42; }",
-        expect![[r#"
+        expect![[r"
                 fun empty(): int {
                     return 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -738,10 +738,10 @@ fn test_function_no_parameters() {
 fn test_multiple_annotations() {
     check(
         "@pure\n@deprecated\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 @pure
                 @deprecated
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -769,9 +769,9 @@ fn test_annotation_with_multiple_arguments() {
 fn test_annotation_empty_args() {
     check(
         "@deprecated()\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 @deprecated()
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -779,9 +779,9 @@ fn test_annotation_empty_args() {
 fn test_annotation_empty_args_inline_comment() {
     check(
         "@foo() // comment\nfun main() {}",
-        expect![[r#"
+        expect![[r"
                 @foo() // comment
-                fun main() {}"#]],
+                fun main() {}"]],
     );
 }
 
@@ -799,10 +799,10 @@ fn test_annotation_with_arguments_inline_comment() {
 fn test_multiple_annotations_with_inline_comments() {
     check(
         "@pure // first\n@test() // second\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 @pure // first
                 @test() // second
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -810,10 +810,10 @@ fn test_multiple_annotations_with_inline_comments() {
 fn test_annotation_list_last_annotation_inline_comment() {
     check(
         "@pure\n@test() // trailing list\nfun foo() {}",
-        expect![[r#"
+        expect![[r"
                 @pure
                 @test() // trailing list
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -821,11 +821,11 @@ fn test_annotation_list_last_annotation_inline_comment() {
 fn test_method_annotation_inline_comment() {
     check(
         "@pure() // comment\nfun int.abs(): int { return self; }",
-        expect![[r#"
+        expect![[r"
                 @pure() // comment
                 fun int.abs(): int {
                     return self;
-                }"#]],
+                }"]],
     );
 }
 
@@ -833,11 +833,11 @@ fn test_method_annotation_inline_comment() {
 fn test_get_method_annotation_inline_comment() {
     check(
         "@pure() // comment\nget fun value(): int { return 42; }",
-        expect![[r#"
+        expect![[r"
                 @pure() // comment
                 get fun value(): int {
                     return 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -845,10 +845,10 @@ fn test_get_method_annotation_inline_comment() {
 fn test_method_declaration() {
     check(
         "fun int.add(other: int): int { return self + other; }",
-        expect![[r#"
+        expect![[r"
                 fun int.add(other: int): int {
                     return self + other;
-                }"#]],
+                }"]],
     );
 }
 
@@ -856,10 +856,10 @@ fn test_method_declaration() {
 fn test_method_declaration_with_type_parameters() {
     check(
         "fun int.add<T>(other: T): int | T { return self + other; }",
-        expect![[r#"
+        expect![[r"
                 fun int.add<T>(other: T): int | T {
                     return self + other;
-                }"#]],
+                }"]],
     );
 }
 
@@ -867,11 +867,11 @@ fn test_method_declaration_with_type_parameters() {
 fn test_method_with_annotations() {
     check(
         "@pure\nfun int.abs(): int { return self; }",
-        expect![[r#"
+        expect![[r"
                 @pure
                 fun int.abs(): int {
                     return self;
-                }"#]],
+                }"]],
     );
 }
 
@@ -879,10 +879,10 @@ fn test_method_with_annotations() {
 fn test_method_complex_receiver() {
     check(
         "fun [int, slice].first(): int { return self.0; }",
-        expect![[r#"
+        expect![[r"
                 fun [int, slice].first(): int {
                     return self.0;
-                }"#]],
+                }"]],
     );
 }
 
@@ -890,10 +890,10 @@ fn test_method_complex_receiver() {
 fn test_method_generics() {
     check(
         "fun map<K, V>.get(key: K): V? { return null; }",
-        expect![[r#"
+        expect![[r"
                 fun map<K, V>.get(key: K): V? {
                     return null;
-                }"#]],
+                }"]],
     );
 }
 
@@ -901,10 +901,10 @@ fn test_method_generics() {
 fn test_method_multiple_parameters() {
     check(
         "fun slice.concat(other: slice, separator: slice): slice { return self; }",
-        expect![[r#"
+        expect![[r"
                 fun slice.concat(other: slice, separator: slice): slice {
                     return self;
-                }"#]],
+                }"]],
     );
 }
 
@@ -912,10 +912,10 @@ fn test_method_multiple_parameters() {
 fn test_method_no_parameters() {
     check(
         "fun int.double(): int { return self * 2; }",
-        expect![[r#"
+        expect![[r"
                 fun int.double(): int {
                     return self * 2;
-                }"#]],
+                }"]],
     );
 }
 
@@ -923,10 +923,10 @@ fn test_method_no_parameters() {
 fn test_get_method_declaration() {
     check(
         "get fun balance(): int { return 0; }",
-        expect![[r#"
+        expect![[r"
                 get fun balance(): int {
                     return 0;
-                }"#]],
+                }"]],
     );
 }
 
@@ -934,10 +934,10 @@ fn test_get_method_declaration() {
 fn test_get_method_without_fun() {
     check(
         "get balance(): int { return 0; }",
-        expect![[r#"
+        expect![[r"
                 get fun balance(): int {
                     return 0;
-                }"#]],
+                }"]],
     );
 }
 
@@ -945,11 +945,11 @@ fn test_get_method_without_fun() {
 fn test_get_method_with_annotations() {
     check(
         "@pure\nget fun value(): int { return 42; }",
-        expect![[r#"
+        expect![[r"
                 @pure
                 get fun value(): int {
                     return 42;
-                }"#]],
+                }"]],
     );
 }
 
@@ -957,10 +957,10 @@ fn test_get_method_with_annotations() {
 fn test_get_method_with_parameters() {
     check(
         "get fun item(index: int): slice? { return null; }",
-        expect![[r#"
+        expect![[r"
                 get fun item(index: int): slice? {
                     return null;
-                }"#]],
+                }"]],
     );
 }
 
@@ -968,9 +968,9 @@ fn test_get_method_with_parameters() {
 fn test_get_method_declaration_with_builtin() {
     check(
         "get fun balance(): int builtin",
-        expect![[r#"
+        expect![[r"
                 get fun balance(): int
-                    builtin"#]],
+                    builtin"]],
     );
 }
 
@@ -1034,9 +1034,9 @@ fn test_multiple_string_literals_after_asm_break_after_keyword() {
 fn test_builtin_function() {
     check(
         "fun hash(): int builtin",
-        expect![[r#"
+        expect![[r"
                 fun hash(): int
-                    builtin"#]],
+                    builtin"]],
     );
 }
 
@@ -1069,8 +1069,8 @@ fn test_empty_statement() {
 fn test_empty_function_body() {
     check(
         "fun empty() {}",
-        expect![[r#"
-                fun empty() {}"#]],
+        expect![[r"
+                fun empty() {}"]],
     );
 }
 
@@ -1090,11 +1090,11 @@ fn test_semicolon_optional() {
 fn test_complex_nesting() {
     check(
         "struct Outer { inner: map<int, slice>, data: [int, slice] }",
-        expect![[r#"
+        expect![[r"
                 struct Outer {
                     inner: map<int, slice>
                     data: [int, slice]
-                }"#]],
+                }"]],
     );
 }
 
@@ -1132,9 +1132,9 @@ fn test_mixed_declarations() {
 #[test]
 fn test_several_tolk_required_versions() {
     check_without_trees(
-        r#"
+        r"
                 tolk 1.0.1
-                tolk 1.0.0"#,
+                tolk 1.0.0",
         expect!["tolk 1.0.1"],
     );
 }
@@ -1155,13 +1155,13 @@ fn test_tolk_required_version_after_imports() {
 #[test]
 fn test_tolk_required_version_after_decl() {
     check_without_trees(
-        r#"
+        r"
                 fun foo() {}
-                tolk 1.0.0"#,
-        expect![[r#"
+                tolk 1.0.0",
+        expect![[r"
                 tolk 1.0.0
 
-                fun foo() {}"#]],
+                fun foo() {}"]],
     );
 }
 
@@ -1389,28 +1389,28 @@ fn test_plain_import_path_is_separate_group_before_relative_imports() {
 #[test]
 fn test_constants_without_newlines() {
     check(
-        r#"
+        r"
                 const foo = 1
                 const bar = 2
-                "#,
-        expect![[r#"
+                ",
+        expect![[r"
                 const foo = 1
-                const bar = 2"#]],
+                const bar = 2"]],
     );
 }
 
 #[test]
 fn test_constants_with_newlines() {
     check(
-        r#"
+        r"
                 const foo = 1
 
                 const bar = 2
-                "#,
-        expect![[r#"
+                ",
+        expect![[r"
                 const foo = 1
 
-                const bar = 2"#]],
+                const bar = 2"]],
     );
 }
 // }

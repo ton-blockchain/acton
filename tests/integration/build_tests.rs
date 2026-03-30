@@ -1139,7 +1139,7 @@ fn test_build_output_boc_write_error() {
         .acton()
         .build()
         .run()
-        .success()
+        .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_build_output_boc_write_error.stderr.txt",
         );
@@ -1683,6 +1683,62 @@ fn test_build_with_output_fift_for_multiple_contracts() {
         second_fift_file.exists(),
         "build/fift/second.fif should be created"
     );
+}
+
+#[test]
+fn test_build_with_output_fift_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("build-output-fift-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("readonly")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_output_fift_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_with_out_dir_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("build-out-dir-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("readonly")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_out_dir_write_error.stderr.txt",
+        );
 }
 
 #[test]

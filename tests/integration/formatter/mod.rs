@@ -3,7 +3,7 @@ use crate::support::project::ProjectBuilder;
 use acton::formatter::FormatterContext;
 use tycho_types::models::{ReserveCurrencyFlags, SendMsgFlags};
 
-const LINEAR_MESSAGES: &str = r#"
+const LINEAR_MESSAGES: &str = r"
 struct (0xF1000001) FmRoute {
     queryId: uint64
     mid: address
@@ -19,7 +19,7 @@ struct (0xF1000003) FmDelivered {
     queryId: uint64
     hop: uint8
 }
-"#;
+";
 
 const LINEAR_ROOT_CONTRACT: &str = r#"
 import "fm_linear_messages"
@@ -193,14 +193,14 @@ fun sendFmLinear(sender: Treasury, rootAddress: address, midAddress: address, si
 }
 "#;
 
-const KNOWN_ADDRESS_MESSAGES: &str = r#"
+const KNOWN_ADDRESS_MESSAGES: &str = r"
 struct (0xF1800001) FmKnownAddressBody {
     queryId: uint64
     newAdminAddress: address
 }
-"#;
+";
 
-const WRAPPED_KNOWN_ADDRESS_MESSAGES: &str = r#"
+const WRAPPED_KNOWN_ADDRESS_MESSAGES: &str = r"
 struct FmWrappedKnownAddress {
     queryId: uint64
     newAdminAddress: address
@@ -210,7 +210,7 @@ struct FmWrappedKnownAddress {
 struct (0xF1800002) FmWrappedKnownAddressBody {
     internalTransferMsg: Cell<FmWrappedKnownAddress>
 }
-"#;
+";
 
 const ABI_MEGA_MESSAGES: &str = r#"
 enum FmAbiMegaMode {
@@ -491,7 +491,7 @@ fun deployFmAbiMegaHarness() {
 }
 "#;
 
-const FANOUT_MESSAGES: &str = r#"
+const FANOUT_MESSAGES: &str = r"
 struct (0xF2000001) FmFanKick {
     queryId: uint64
     left: address
@@ -505,7 +505,7 @@ struct (0xF2000002) FmLeftNotice {
 struct (0xF2000003) FmRightNotice {
     queryId: uint64
 }
-"#;
+";
 
 const FANOUT_ROOT_CONTRACT: &str = r#"
 import "fm_fanout_messages"
@@ -655,7 +655,7 @@ fun sendFmFanout(sender: Treasury, rootAddress: address, leftAddress: address, r
 }
 "#;
 
-const EXTERNAL_MESSAGES: &str = r#"
+const EXTERNAL_MESSAGES: &str = r"
 struct (0xF3000001) FmExternalTrigger {
     queryId: uint64
 }
@@ -667,7 +667,7 @@ struct (0xF3000002) FmExternalNoneDest {
 struct (0xF3000003) FmExternalAddressDest {
     queryId: uint64
 }
-"#;
+";
 
 const EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -804,7 +804,7 @@ fun deployFmExternalThrowHarness() {
 }
 "#;
 
-const BOUNCE_MESSAGES: &str = r#"
+const BOUNCE_MESSAGES: &str = r"
 struct (0xF4000001) FmBouncePing {
     queryId: uint64
 }
@@ -812,7 +812,7 @@ struct (0xF4000001) FmBouncePing {
 struct (0xF4000002) FmBounceAck {
     queryId: uint64
 }
-"#;
+";
 
 const BOUNCE_CONTRACT: &str = r#"
 import "fm_bounce_messages"
@@ -868,10 +868,10 @@ fun deployFmBounceHarness() {
 }
 "#;
 
-const ACTION_CHILD_CONTRACT: &str = r#"
+const ACTION_CHILD_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const ACTION_FAIL_CONTRACT: &str = r#"
 import "../gen/fm_action_child_code.tolk"
@@ -914,7 +914,7 @@ fun fmActionInit() {
 }
 "#;
 
-const FLAGS_MESSAGES: &str = r#"
+const FLAGS_MESSAGES: &str = r"
 struct (0xF5000001) FmFlagsOk {
     queryId: uint64
 }
@@ -926,7 +926,7 @@ struct (0xF5000002) FmFlagsThrow {
 struct (0xF5000003) FmFlagsActionFail {
     queryId: uint64
 }
-"#;
+";
 
 const FLAGS_CONTRACT: &str = r#"
 import "fm_flags_messages"
@@ -993,11 +993,11 @@ fun unknownFmFlagsAddress() {
 }
 "#;
 
-const DEBUG_MESSAGES: &str = r#"
+const DEBUG_MESSAGES: &str = r"
 struct (0xF6000001) FmDebugPing {
     queryId: uint64
 }
-"#;
+";
 
 const DEBUG_CONTRACT: &str = r#"
 import "fm_debug_messages"
@@ -1047,11 +1047,11 @@ fun deployFmDebugHarness() {
 }
 "#;
 
-const DESTROY_MESSAGES: &str = r#"
+const DESTROY_MESSAGES: &str = r"
 struct (0xF7000001) FmDestroyNow {
     queryId: uint64
 }
-"#;
+";
 
 const DESTROY_CONTRACT: &str = r#"
 import "fm_destroy_messages"
@@ -1272,7 +1272,7 @@ fn formatter_linear_chain_println_renders_nested_tree() {
     run_success_case(
         linear_formatter_project(
             "formatter-linear-chain-println",
-            r#"
+            r"
 get fun `test-formatter-linear-chain-println`() {
     val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 101);
@@ -1280,7 +1280,7 @@ get fun `test-formatter-linear-chain-println`() {
     expect(txs).toHaveLength(3);
     println(txs);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_linear_chain_println_nested_tree.stdout.txt",
     );
@@ -1290,7 +1290,7 @@ get fun `test-formatter-linear-chain-println`() {
 fn formatter_hides_bodies_without_show_bodies_flag() {
     linear_formatter_project(
         "formatter-hides-bodies-without-show-bodies-flag",
-        r#"
+        r"
 get fun `test-formatter-hides-bodies-without-show-bodies-flag`() {
     val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 707);
@@ -1298,7 +1298,7 @@ get fun `test-formatter-hides-bodies-without-show-bodies-flag`() {
     expect(txs).toHaveLength(3);
     println(txs);
 }
-"#,
+",
     )
     .build()
     .acton()
@@ -1316,7 +1316,7 @@ fn formatter_linear_chain_println_renders_exit_code63_for_opcode_mismatch() {
     run_success_case(
         linear_mismatch_formatter_project(
             "formatter-linear-chain-println-exit-code63-opcode-mismatch",
-            r#"
+            r"
 get fun `test-formatter-linear-chain-println-exit-code63-opcode-mismatch`() {
     val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 102);
@@ -1324,7 +1324,7 @@ get fun `test-formatter-linear-chain-println-exit-code63-opcode-mismatch`() {
     expect(txs).toHaveLength(2);
     println(txs);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_linear_chain_println_exit_code63_opcode_mismatch.stdout.txt",
     );
@@ -1727,7 +1727,7 @@ fn formatter_fanout_chain_println_renders_sibling_branches() {
     run_success_case(
         fanout_formatter_project(
             "formatter-fanout-println",
-            r#"
+            r"
 get fun `test-formatter-fanout-chain-println`() {
     val (sender, rootAddress, leftAddress, rightAddress) = deployFmFanoutHarness();
     val txs = sendFmFanout(sender, rootAddress, leftAddress, rightAddress, 202);
@@ -1735,7 +1735,7 @@ get fun `test-formatter-fanout-chain-println`() {
     expect(txs).toHaveLength(3);
     println(txs);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_fanout_chain_println_sibling_branches.stdout.txt",
     );
@@ -1746,7 +1746,7 @@ fn formatter_external_out_println_renders_none_and_external_destinations() {
     run_success_case(
         external_formatter_project(
             "formatter-external-out-println-destinations",
-            r#"
+            r"
 get fun `test-formatter-external-out-println-destinations`() {
     val extAddress = deployFmExternalHarness();
     val txs = net.sendExternal(
@@ -1761,7 +1761,7 @@ get fun `test-formatter-external-out-println-destinations`() {
     expect(txs!).toHaveLength(1);
     println(txs);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_external_out_println_destinations.stdout.txt",
     );
@@ -1771,7 +1771,7 @@ get fun `test-formatter-external-out-println-destinations`() {
 fn formatter_ext_in_exit_code_with_backtrace_full_println_renders_backtrace() {
     external_throw_formatter_project(
         "formatter-ext-in-exit-code-with-backtrace-full",
-        r#"
+        r"
 get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
     val extAddress = deployFmExternalThrowHarness();
     val txs = net.sendExternal(
@@ -1786,7 +1786,7 @@ get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
     expect(txs!).toHaveLength(1);
     println(txs);
 }
-"#,
+",
     )
     .build()
     .acton()
@@ -1850,7 +1850,7 @@ fn formatter_multi_root_println_renders_independent_internal_chains() {
     run_success_case(
         linear_formatter_project(
             "formatter-multi-root-println-independent-internal-chains",
-            r#"
+            r"
 get fun `test-formatter-multi-root-println-independent-internal-chains`() {
     val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
     val first = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 505);
@@ -1871,7 +1871,7 @@ get fun `test-formatter-multi-root-println-independent-internal-chains`() {
     expect(merged.size()).toEqual(first.size() + second.size());
     println(merged);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_multi_root_println_independent_internal_chains.stdout.txt",
     );
@@ -2142,7 +2142,7 @@ fn formatter_orphan_chain_println_treats_missing_parent_as_root() {
     run_success_case(
         linear_formatter_project(
             "formatter-orphan-chain-println-missing-parent",
-            r#"
+            r"
 get fun `test-formatter-orphan-chain-println-missing-parent`() {
     val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 909);
@@ -2153,7 +2153,7 @@ get fun `test-formatter-orphan-chain-println-missing-parent`() {
     orphaned.push(txs.get(2));
     println(orphaned);
 }
-"#,
+",
         ),
         "integration/snapshots/formatter/formatter_orphan_chain_println_missing_parent.stdout.txt",
     );

@@ -5,9 +5,10 @@ import {Copy, Check} from 'lucide-react';
 
 const TABS = ['macOS / Linux', 'Windows'];
 const COMMANDS: Record<string, string> = {
-  'macOS / Linux': 'curl -fsSL https://acton.sh/install | bash',
-  'Windows': 'powershell -c "irm acton.sh/install.ps1 | iex"',
-};
+  "macOS / Linux":
+    "curl -fsSL https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh",
+  Windows: 'powershell -c "irm acton.sh/install.ps1 | iex"',
+}
 
 const highlightCommand = (command: string) => {
   if (command.includes('curl')) {
@@ -41,7 +42,7 @@ export const InstallationCodeBlock: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className="relative max-w-xl mx-auto mt-16">
+    <div className="relative max-w-4xl mx-auto mt-16">
       <div
         className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
       <div className="relative bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl shadow-lg">

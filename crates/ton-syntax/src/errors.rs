@@ -41,11 +41,7 @@ pub fn collect_errors(source: &Arc<str>, tree: &Tree, language: &Language) -> Ve
 
         if node.is_error() {
             let expected = expected_symbols(language, node.parse_state());
-            let text = node
-                .utf8_text(source.as_bytes())
-                .ok()
-                .map(str::trim)
-                .unwrap_or("");
+            let text = node.utf8_text(source.as_bytes()).ok().map_or("", str::trim);
             let mut message = if text.is_empty() {
                 "syntax error: unexpected fragment.".to_string()
             } else {
@@ -72,7 +68,7 @@ pub fn collect_errors(source: &Arc<str>, tree: &Tree, language: &Language) -> Ve
         if node.is_missing() {
             let expected = expected_symbols(language, node.parse_state());
             let missing_kind = node.kind().to_string();
-            let mut message = format!("syntax error: missing `{}`.", missing_kind);
+            let mut message = format!("syntax error: missing `{missing_kind}`.");
             if !expected.is_empty() {
                 message.push_str(" Valid here: ");
                 message.push_str(&expected.join(", "));

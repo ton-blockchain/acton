@@ -40,9 +40,9 @@ impl TonCenterClient {
         })
     }
 
-    /// Applies a simple global rate limit for unauthenticated TonCenter requests.
+    /// Applies a simple global rate limit for unauthenticated `TonCenter` requests.
     ///
-    /// TonCenter has stricter limits without an API key, so we serialize
+    /// `TonCenter` has stricter limits without an API key, so we serialize
     /// requests and keep at least 1 second between request starts.
     async fn maybe_wait_for_rate_limit(&self) {
         if self.api_key.is_some() {
@@ -54,7 +54,7 @@ impl TonCenterClient {
             let elapsed = last.elapsed();
             if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
                 let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
-                log::debug!("throttle for {:?}", wait_for);
+                log::debug!("throttle for {wait_for:?}");
                 tokio::time::sleep(wait_for).await;
             }
         }

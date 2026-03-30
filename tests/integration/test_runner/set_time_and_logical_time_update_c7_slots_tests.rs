@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const VM_IMPORTS: &str = r#"
 import "../../lib/build/build"
@@ -55,7 +55,7 @@ fn run_failure_case(
 fn set_time_and_logical_time_update_c7_slots() {
     run_success_case(
         "aj-stdlib-vm-set-time-and-logical-slots-3-4-5",
-        r#"
+        r"
 get fun `test-aj-stdlib-vm-set-time-and-logical-slots-3-4-5`() {
     vm.setTime(1700001234);
     vm.setBlockLogicalTime(123456789);
@@ -69,7 +69,7 @@ get fun `test-aj-stdlib-vm-set-time-and-logical-slots-3-4-5`() {
     expect(params.get(5) as int).toEqual(223456789);
     expect(blockchain.now()).toEqual(1700001234);
 }
-"#,
+",
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/set_time_and_logical_time_update_c7_slots.stdout.txt",
     );
 }
@@ -104,7 +104,7 @@ get fun `test-aj-stdlib-vm-set-original-balance-slot-7`() {
 fn set_config_root_dict_replaces_c7_root_config_slot() {
     run_success_case(
         "aj-stdlib-vm-set-config-root-slot-9",
-        r#"
+        r"
 get fun `test-aj-stdlib-vm-set-config-root-slot-9`() {
     var config = net.getConfig();
     var version = config.getGlobalVersion();
@@ -122,7 +122,7 @@ get fun `test-aj-stdlib-vm-set-config-root-slot-9`() {
     expect(c7Version.version).toEqual(version.version);
     expect(c7Version.capabilities).toEqual(version.capabilities);
 }
-"#,
+",
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/set_config_root_dict_replaces_c7_root_config_slot.stdout.txt",
     );
 }
@@ -210,13 +210,13 @@ get fun `test-aj-stdlib-vm-convert-address-invalid`() {
 fn get_config_param_generic_is_not_usable_bug() {
     run_success_case(
         "aj-stdlib-vm-get-config-param-generic-bug",
-        r#"
+        r"
 get fun `test-aj-stdlib-vm-get-config-param-generic-bug`() {
     vm.setTime(1700001000);
     val now = vm.getConfigParam<int>(3);
     expect(now).toEqual(1700001000);
 }
-"#,
+",
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/get_config_param_generic_is_not_usable_bug.stdout.txt",
     );
 }

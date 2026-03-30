@@ -126,8 +126,7 @@ fn is_loopback_origin(origin: &HeaderValue) -> bool {
     let Ok(uri) = origin.parse::<axum::http::Uri>() else {
         return false;
     };
-    matches!(uri.scheme_str(), Some("http") | Some("https"))
-        && uri.host().is_some_and(is_loopback_host)
+    matches!(uri.scheme_str(), Some("http" | "https")) && uri.host().is_some_and(is_loopback_host)
 }
 
 fn is_loopback_host(host: &str) -> bool {

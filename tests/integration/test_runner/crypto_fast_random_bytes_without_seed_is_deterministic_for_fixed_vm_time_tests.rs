@@ -24,7 +24,7 @@ fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time() {
     run_crypto_case(
         "az-stdlib-fast-random-without-seed-fixed-time",
-        r#"
+        r"
 get fun `test-az-stdlib-fast-random-without-seed-fixed-time`() {
     vm.setTime(1700004321);
 
@@ -37,7 +37,7 @@ get fun `test-az-stdlib-fast-random-without-seed-fixed-time`() {
     // BUG: getFastRandomBytes without seed should be deterministic for fixed vm time; expected equal slices, got different values.
     expect(randomA).toEqual(randomB);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time/crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time.stdout.txt",
     );
 }

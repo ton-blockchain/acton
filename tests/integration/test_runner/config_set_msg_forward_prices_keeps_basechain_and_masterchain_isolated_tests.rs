@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated() {
     run_config_success_case(
         "be-stdlib-config-msg-forward-prices-branch-isolation",
-        r#"
+        r"
 get fun `test-be-stdlib-config-msg-forward-prices-branch-isolation`() {
     var config = net.getConfig();
 
@@ -92,7 +92,7 @@ get fun `test-be-stdlib-config-msg-forward-prices-branch-isolation`() {
     expect(masterFinal.bitPrice).toNotEqual(masterBeforeBit);
     expect(masterFinal.cellPrice).toNotEqual(masterBeforeCell);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated/config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated.stdout.txt",
     );
 }

@@ -25,7 +25,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_global_version_roundtrip_supports_zero_values() {
     run_config_success_case(
         "do-stdlib-config-global-version-zero-roundtrip",
-        r#"
+        r"
 get fun `test-do-stdlib-config-global-version-zero-roundtrip`() {
     var config = net.getConfig();
 
@@ -41,7 +41,7 @@ get fun `test-do-stdlib-config-global-version-zero-roundtrip`() {
     expect(updated.version).toEqual(0);
     expect(updated.capabilities).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/config_global_version_roundtrip_supports_zero_values.stdout.txt",
     );
 }
@@ -50,7 +50,7 @@ get fun `test-do-stdlib-config-global-version-zero-roundtrip`() {
 fn config_global_version_roundtrip_supports_non_zero_values() {
     run_config_success_case(
         "do-stdlib-config-global-version-non-zero-roundtrip",
-        r#"
+        r"
 get fun `test-do-stdlib-config-global-version-non-zero-roundtrip`() {
     var config = net.getConfig();
 
@@ -68,7 +68,7 @@ get fun `test-do-stdlib-config-global-version-non-zero-roundtrip`() {
     expect(updated.version).toNotEqual(0);
     expect(updated.capabilities).toNotEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/config_global_version_roundtrip_supports_non_zero_values.stdout.txt",
     );
 }

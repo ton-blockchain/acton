@@ -1,1 +1,1 @@
-Error: Failed to save source map readonly/sourcemap.json: Permission denied (os error 13)
+Error: Failed to save source map readonly/sourcemap.json: Permission denied ([OS_ERROR])

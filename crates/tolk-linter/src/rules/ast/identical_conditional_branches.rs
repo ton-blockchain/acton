@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn detects_identical_branches_ignoring_comments_and_semicolons() {
         assert!(has_identical_branches_for_first_if(
-            r#"
+            r"
             fun f(flag: bool) {
                 if (flag) {
                     // comment
@@ -157,14 +157,14 @@ mod tests {
                     do_work();
                 }
             }
-            "#,
+            ",
         ));
     }
 
     #[test]
     fn ignores_non_identical_or_missing_else() {
         assert!(!has_identical_branches_for_first_if(
-            r#"
+            r"
             fun f(flag: bool) {
                 if (flag) {
                     do_work();
@@ -172,39 +172,39 @@ mod tests {
                     other_work();
                 }
             }
-            "#,
+            ",
         ));
 
         assert!(!has_identical_branches_for_first_if(
-            r#"
+            r"
             fun f(flag: bool) {
                 if (flag) {
                     do_work();
                 }
             }
-            "#,
+            ",
         ));
     }
 
     #[test]
     fn detects_identical_ternary_branches() {
         assert!(has_identical_branches_for_first_ternary(
-            r#"
+            r"
             fun f(flag: bool, value: int): int {
                 return flag ? (value + 1 /* comment */) : (value + 1);
             }
-            "#,
+            ",
         ));
     }
 
     #[test]
     fn ignores_non_identical_ternary_branches() {
         assert!(!has_identical_branches_for_first_ternary(
-            r#"
+            r"
             fun f(flag: bool, left: int, right: int): int {
                 return flag ? left : right;
             }
-            "#,
+            ",
         ));
     }
 }

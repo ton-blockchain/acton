@@ -56,6 +56,7 @@ pub struct LocalDefId {
 
 impl LocalDefId {
     /// Creates a new `LocalDefId`.
+    #[must_use]
     pub const fn new(file_id: FileId, local: u32) -> Self {
         Self { file_id, local }
     }
@@ -110,6 +111,7 @@ pub struct FileResolveIndex {
 
 impl FileResolveIndex {
     /// Finds the name usage at the given byte offset using binary search.
+    #[must_use]
     pub fn find_use(&self, pos: usize) -> Option<&NameUse> {
         let pos = pos as u32;
         self.uses
@@ -140,10 +142,12 @@ impl FileResolveIndex {
             .filter(move |u| matches!(u.resolved, Resolved::Global(id) if id == symbol_id))
     }
 
+    #[must_use]
     pub fn find_local(&self, id: LocalDefId) -> Option<&LocalDef> {
         self.locals.iter().find(|local| local.id == id)
     }
 
+    #[must_use]
     pub fn find_local_at(&self, offset: usize) -> Option<&LocalDef> {
         self.locals
             .iter()

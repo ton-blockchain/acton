@@ -1,0 +1,173 @@
+# acton-wrapper(1)
+
+## NAME
+
+acton-wrapper --- Generate Tolk or TypeScript wrappers for a contract
+
+## SYNOPSIS
+
+`acton wrapper` [_options_] _contract-id_
+
+## DESCRIPTION
+
+Generate a wrapper for the contract identified by `_contract-id_` from
+`Acton.toml`.
+
+Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
+contract header is the source of truth for typed storage accessors, incoming
+message helpers, and generated get-method bindings.
+
+The command can also generate a stub test file or emit a TypeScript wrapper for
+frontend and tooling integrations.
+
+`acton wrapper` compiles the selected contract directly. A prior `acton build`
+run is not required.
+
+## OPTIONS
+
+### Wrapper Options
+
+{{#options}}
+
+{{#option "_contract-id_" }}
+Contract ID from `Acton.toml` to generate the wrapper for.
+{{/option}}
+
+{{#option "`-o`, `--output` _path_" }}
+Write the generated wrapper to an exact path.
+
+Conflicts with `--output-dir`.
+{{/option}}
+
+{{#option "`--output-dir` _dir_" }}
+Write the generated wrapper to a directory and let Acton choose the file name.
+
+Conflicts with `--output`.
+{{/option}}
+
+{{/options}}
+
+### Test Stub Options
+
+{{#options}}
+
+{{#option "`-t`, `--test`" }}
+Generate a stub test file together with the wrapper.
+{{/option}}
+
+{{#option "`--test-output` _path_" }}
+Write the generated test file to an exact path.
+
+Requires `--test`.
+{{/option}}
+
+{{#option "`--test-output-dir` _dir_" }}
+Write the generated test file to a directory and let Acton choose the file
+name.
+
+Requires `--test` and conflicts with `--test-output`.
+{{/option}}
+
+{{/options}}
+
+### TypeScript Options
+
+{{#options}}
+
+{{#option "`--ts`" }}
+Generate a TypeScript wrapper through `gen-typescript-from-tolk`.
+
+Conflicts with test stub generation.
+{{/option}}
+
+{{/options}}
+
+### Display Options
+
+{{> options-display }}
+
+### Project Options
+
+{{> options-project-resolved }}
+
+## ABI REQUIREMENTS
+
+Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
+
+- `storage: ...` enables typed storage helpers such as `fromStorage`
+- `incomingMessages: ...` enables `send{Message}` helpers
+- declared get methods are emitted as wrapper methods
+
+If `incomingMessages` is missing, message-sending helpers are not generated. If
+`storage` is missing, storage helpers fall back to an untyped initializer.
+
+## TYPESCRIPT GENERATION
+
+`acton wrapper --ts` shells out to `npx gen-typescript-from-tolk-dev`.
+
+- Node.js, npm, and `npx` must be available in `PATH`
+- existing wrapper files at the target path are overwritten
+- `--ts` cannot be combined with `--test`, `--test-output`, or
+  `--test-output-dir`
+
+## CONFIGURATION
+
+Project-wide defaults can be configured in `Acton.toml`:
+
+```toml
+[wrappers.tolk]
+output-dir = "tests/wrappers"
+generate-test = true
+test-output-dir = "tests"
+
+[wrappers.typescript]
+output-dir = "wrappers"
+```
+
+CLI flags override config values for the current invocation.
+
+## EXIT STATUS
+
+- `0`: Wrapper generation completed successfully.
+- `1`: The contract could not be found or compiled, ABI data was missing, the
+  TypeScript generator could not run, or an output file could not be written.
+
+## EXAMPLES
+
+1. Generate the default Tolk wrapper:
+
+   ```bash
+   acton wrapper counter
+   ```
+
+2. Generate a wrapper and stub test:
+
+   ```bash
+   acton wrapper counter --test
+   ```
+
+3. Generate a TypeScript wrapper:
+
+   ```bash
+   acton wrapper counter --ts
+   ```
+
+4. Generate into custom locations:
+
+   ```bash
+   acton wrapper counter --output-dir tests/generated
+   acton wrapper counter --test --test-output-dir tests/generated
+   acton wrapper counter --ts --output-dir wrappers
+   ```
+
+5. Generate a frontend-oriented TypeScript wrapper layout:
+
+   ```bash
+   acton wrapper counter --ts --output-dir app/src/wrappers
+   ```
+
+## SEE ALSO
+
+- `acton help build`
+- `acton help test`
+- [Generating wrappers guide](https://ton-blockchain.github.io/acton/docs/test-runner/generating-wrappers)

@@ -72,10 +72,12 @@ pub struct Program<'tree>(pub Node<'tree>);
 impl_ast_node!(Program, "program");
 
 impl<'tree> Program<'tree> {
+    #[must_use]
     pub fn items(&self) -> AstChildren<'tree, TopLevel<'tree>> {
         AstChildren::new(self.0)
     }
 
+    #[must_use]
     pub fn declarations(&self) -> AstChildren<'tree, Declaration<'tree>> {
         AstChildren::new(self.0)
     }
@@ -96,6 +98,7 @@ impl<'tree> Declaration<'tree> {
         self.0.field("combinator")
     }
 
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, Field<'tree>> {
         AstChildren::new(self.0)
     }
@@ -177,6 +180,7 @@ impl<'tree> Combinator<'tree> {
         self.0.field("name")
     }
 
+    #[must_use]
     pub fn params(&self) -> AstChildren<'tree, TypeParameter<'tree>> {
         AstChildren::new(self.0)
     }
@@ -354,6 +358,7 @@ pub struct FieldAnonRef<'tree>(pub Node<'tree>);
 impl_ast_node!(FieldAnonRef, "field_anon_ref");
 
 impl<'tree> FieldAnonRef<'tree> {
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, Field<'tree>> {
         AstChildren::new(self.0)
     }

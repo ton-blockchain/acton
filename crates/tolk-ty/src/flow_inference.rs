@@ -44,7 +44,7 @@ impl ExprFlow {
     }
 }
 
-/// UnreachableKind is a reason of why control flow is unreachable or interrupted
+/// `UnreachableKind` is a reason of why control flow is unreachable or interrupted
 /// example: `return;` interrupts control flow
 /// example: `if (true) ... else ...` inside "else" flow is unreachable because it can't happen
 pub(crate) enum UnreachableKind {
@@ -58,7 +58,7 @@ pub(crate) enum UnreachableKind {
     Continue,
 }
 
-/// FactsAboutExpr represents "everything known about SinkExpression at a given execution point"
+/// `FactsAboutExpr` represents "everything known about `SinkExpression` at a given execution point"
 /// remember, that indices/fields are also expressions, `t.1 = 2` or `u.id = 2` also store such facts
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FactsAboutExpr {
@@ -72,9 +72,9 @@ impl FactsAboutExpr {
     }
 }
 
-/// FlowContext represents "everything known about control flow at a given execution point"
-/// while traversing AST, each statement node gets "in" FlowContext (prior knowledge)
-/// and returns "output" FlowContext (representing a state AFTER execution of a statement)
+/// `FlowContext` represents "everything known about control flow at a given execution point"
+/// while traversing AST, each statement node gets "in" `FlowContext` (prior knowledge)
+/// and returns "output" `FlowContext` (representing a state AFTER execution of a statement)
 /// on branching, like if/else, input context is cloned, two contexts for each branch calculated, and merged to a result
 #[derive(Debug, Default)]
 pub(crate) struct FlowContext {
@@ -153,7 +153,7 @@ impl FlowContext {
     /// update current type of `local_var` / `tensorVar.0` / `obj.field`
     /// example: `local_var = rhs`
     /// example: `f(mutate obj.field)`
-    /// example: `if (t.0 != null)`, in true_flow `t.0` assigned to "not-null of current", in false_flow to null
+    /// example: `if (t.0 != null)`, in `true_flow` `t.0` assigned to "not-null of current", in `false_flow` to null
     pub(crate) fn register_known_type(&mut self, expr: SinkExpr, ty: TyId) {
         // having index_path = (some bytes filled in the end),
         // calc index_mask: replace every filled byte with 0xFF
@@ -215,7 +215,7 @@ impl FlowContext {
                     }
                 }
             }
-        };
+        }
 
         FlowContext {
             known_facts: unified,
@@ -225,7 +225,7 @@ impl FlowContext {
     }
 }
 
-/// SinkExpression is an expression that can be smart cast like `if (x != null)` (x is int inside)
+/// `SinkExpression` is an expression that can be smart cast like `if (x != null)` (x is int inside)
 /// or analyzed by data flow is some other way like `if (x > 0) ... else ...` (x <= 0 inside else).
 /// In other words, it "absorbs" data flow facts.
 /// Examples: `localVar`, `localTensor.1`, `localTuple.1.2.3`, `localObj.field`
@@ -257,7 +257,7 @@ impl Display for SinkExpr {
         while cur_path != 0 {
             write!(f, ".")?;
             let index = ((cur_path & 0xff) as i32 - 1).to_string();
-            write!(f, "{}", index)?;
+            write!(f, "{index}")?;
             cur_path >>= 8;
         }
 
@@ -269,8 +269,8 @@ impl SinkExpr {
     pub(crate) const fn from_def(name: SmolStr, def: LocalDefId, index_path: u64) -> Self {
         Self {
             def,
-            name,
             index_path,
+            name,
         }
     }
 }
@@ -317,7 +317,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn set_resolved(&mut self, use_: NameUse) {
-        self.resolved_refs.push(use_)
+        self.resolved_refs.push(use_);
     }
 
     pub fn get_resolved_node<'node, Node: AstNode<'node>>(&self, node: &Node) -> Option<&NameUse> {
@@ -388,7 +388,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn set_node_type<'node, Node: AstNode<'node>>(&mut self, node: &Node, ty: TyId) {
-        self.set_type(node.syntax().span(), ty)
+        self.set_type(node.syntax().span(), ty);
     }
 
     pub fn get_node_type<'node, Node: AstNode<'node>>(&self, node: &Node) -> Option<TyId> {
@@ -406,7 +406,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn get_type(&self, span: Span) -> Option<TyId> {
-        self.expression_types.get(&span).cloned()
+        self.expression_types.get(&span).copied()
     }
 }
 
@@ -425,6 +425,7 @@ pub struct InferenceResult {
 }
 
 impl InferenceResult {
+    #[must_use]
     pub fn new(ctx: InferenceContext) -> Self {
         Self {
             expression_types: ctx.expression_types,
@@ -434,11 +435,13 @@ impl InferenceResult {
     }
 
     /// Retrieves the type of expression at the given span.
+    #[must_use]
     pub fn type_of(&self, span: Span) -> Option<TyId> {
-        self.expression_types.get(&span).cloned()
+        self.expression_types.get(&span).copied()
     }
 
     /// Resolves a reference at the given span.
+    #[must_use]
     pub fn resolve(&self, span: Span) -> Option<&NameUse> {
         let pos = span.start;
         self.resolved_refs

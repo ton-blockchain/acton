@@ -168,6 +168,7 @@ impl std::fmt::Debug for ReporterManager {
 }
 
 impl ReporterManager {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             reporters: Vec::new(),

@@ -12,8 +12,8 @@ permissions: { }
 
 jobs:
   label:
-    runs-on: ubicloud-standard-2
-    if: github.repository == 'i582/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    if: github.repository == 'ton-blockchain/acton'
 
     permissions:
       contents: read

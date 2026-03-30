@@ -15,7 +15,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
 
  > tests/env_unsupported_generic.test.tolk (1 test)
   ✗ bq-stdlib-env-unsupported-generic [TIME]
-    └─ Error: env() supports only int, bool, string, slice, address and cell types, but got Unsupported
+    └─ Error: env() supports only int, coins, bool, string, slice, address and cell types, but got Unsupported
 
  ✗ 1 failed in 1 file
 

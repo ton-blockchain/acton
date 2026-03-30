@@ -173,17 +173,12 @@ fn parse_placeholder_kind(
             "x" => Ok(PlaceholderKind::Hex),
             "ton" => Ok(PlaceholderKind::Ton),
             _ => bail!(
-                "Invalid format string at byte {}: unknown format modifier '{}' in {} (supported: :x, :ton)",
-                byte_pos,
-                modifier,
-                placeholder
+                "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :ton)"
             ),
         };
     }
     bail!(
-        "Invalid format string at byte {}: unsupported placeholder {} (supported: {{}}, {{:x}}, {{:ton}})",
-        byte_pos,
-        placeholder
+        "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:ton}})"
     )
 }
 
@@ -208,10 +203,7 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
 
         if let Some(stripped) = rem.strip_prefix('{') {
             let Some(close_rel) = stripped.find('}') else {
-                bail!(
-                    "Invalid format string at byte {}: unclosed '{{' placeholder",
-                    i
-                );
+                bail!("Invalid format string at byte {i}: unclosed '{{' placeholder");
             };
 
             let close_pos = i + 1 + close_rel;
@@ -229,7 +221,7 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
         }
 
         if rem.starts_with('}') {
-            bail!("Invalid format string at byte {}: unmatched '}}'", i);
+            bail!("Invalid format string at byte {i}: unmatched '}}'");
         }
 
         let ch = rem

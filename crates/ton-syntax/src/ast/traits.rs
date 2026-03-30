@@ -156,7 +156,7 @@ pub trait AstNodeBytesKind {
     fn kind_bytes(&self) -> &[u8];
 }
 
-impl<'tree> AstNodeBytesKind for tree_sitter::Node<'tree> {
+impl AstNodeBytesKind for tree_sitter::Node<'_> {
     fn kind_bytes(&self) -> &[u8] {
         // SAFETY: we know that `ts_node_type` returns a valid C-string.
         #[allow(unsafe_code)]

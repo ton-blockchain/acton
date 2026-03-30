@@ -1,0 +1,1 @@
+Error: Git hooks require the `git` command to be available in PATH

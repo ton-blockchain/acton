@@ -100,6 +100,7 @@ pub struct Block<'tree>(pub Node<'tree>);
 impl_ast_node!(Block, "block_statement");
 
 impl<'tree> Block<'tree> {
+    #[must_use]
     pub fn stmts(&self) -> AstChildren<'tree, Stmt<'tree>> {
         AstChildren::new(self.0)
     }

@@ -72,7 +72,7 @@ where
         return None;
     }
 
-    let name_span = name.map(|name| name.span()).unwrap_or_else(|| node.span());
+    let name_span = name.map_or_else(|| node.span(), |name| name.span());
     let insert_offset = node.syntax().child_by_field_name("parameters")?.end_byte() as u32;
 
     fire_diagnostic(checker, file_id, name_span, insert_offset, inference)

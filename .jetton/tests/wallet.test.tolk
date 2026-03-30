@@ -28,7 +28,7 @@ fun setup_test(): (JettonMinter, Treasury, Treasury) {
         jettonWalletCode: build("jetton-wallet"),
     });
 
-    val transactions = minter.sendDeploy({ value: ton("10") });
+    val transactions = minter.sendDeploy(deployer.address, { value: ton("10") });
     expect(transactions).toHaveSuccessfulDeploy({ to: minter.address });
 
     return (minter, deployer, notDeployer);

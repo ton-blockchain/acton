@@ -57,7 +57,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let use_facts = checker.use_facts(file_id)?;
 
     for local in &resolved_index.locals {
-        if local.name.starts_with("_") {
+        if local.name.starts_with('_') {
             // fast path, no need to find usages
             continue;
         }
@@ -120,10 +120,10 @@ fn fire_diagnostic(
 
         if let Some(ident) = ident {
             fixes.push(Fix {
-                message: format!("prefix with underscore: `_{}`", name),
+                message: format!("prefix with underscore: `_{name}`"),
                 edits: vec![Edit {
                     span: Span::from_syntax(&ident.0),
-                    replacement: format!("_{}", name),
+                    replacement: format!("_{name}"),
                     file_id,
                 }],
                 applicability: Applicability::Auto,

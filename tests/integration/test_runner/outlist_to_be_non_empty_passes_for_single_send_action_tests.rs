@@ -74,13 +74,13 @@ get fun `test-af-outlist-to-be-non-empty`() {
 fn outlist_to_be_empty_passes_without_actions() {
     run_outlist_success(
         "af-stdlib-outlist-to-be-empty",
-        r#"
+        r"
 get fun `test-af-outlist-to-be-empty`() {
     val out_actions = [];
     expect(out_actions).toBeEmpty();
     expect(out_actions.size()).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/outlist_to_be_non_empty_passes_for_single_send_action/outlist_to_be_empty_passes_without_actions.stdout.txt",
     );
 }

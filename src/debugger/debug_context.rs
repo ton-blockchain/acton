@@ -684,9 +684,8 @@ impl DebugContext {
         self.stepper.thread_id
     }
 
-    fn normalize_path(file: &String) -> String {
-        file.to_string()
-            .replace(".test.tolk.test.tolk", ".test.tolk")
+    fn normalize_path(file: &str) -> String {
+        file.replace(".test.tolk.test.tolk", ".test.tolk")
     }
 
     fn get_root_function_name(&self, thread_id: i64) -> Arc<str> {
@@ -703,7 +702,7 @@ impl DebugContext {
         function_name: Arc<str>,
         pos: &BytecodeLocation,
     ) -> StackFrame {
-        let file_path = Self::normalize_path(&loc.loc.file.to_string());
+        let file_path = Self::normalize_path(&loc.loc.file.clone());
         let file_name = std::path::Path::new(&file_path)
             .file_name()
             .and_then(|n| n.to_str())

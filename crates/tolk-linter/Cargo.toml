@@ -31,3 +31,6 @@ profile_rules = []
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

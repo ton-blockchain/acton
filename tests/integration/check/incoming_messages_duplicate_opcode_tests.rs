@@ -12,7 +12,7 @@ fn run_simple_test(group: &str, content: &str, name: &str) {
 fn test_check_incoming_messages_duplicate_opcode_reports_inline_union() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x1001) IncreaseCounter {
                 value: int
             }
@@ -24,9 +24,9 @@ fn test_check_incoming_messages_duplicate_opcode_reports_inline_union() {
             contract Counter {
                 incomingMessages: IncreaseCounter | DecreaseCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_inline_union() {
 fn test_check_incoming_messages_duplicate_opcode_reports_alias_union() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x1001) IncreaseCounter {
                 value: int
             }
@@ -48,9 +48,9 @@ fn test_check_incoming_messages_duplicate_opcode_reports_alias_union() {
             contract Counter {
                 incomingMessages: Incoming,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_alias_union() {
 fn test_check_incoming_messages_duplicate_opcode_skips_unique_opcodes() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x1001) IncreaseCounter {
                 value: int
             }
@@ -70,9 +70,9 @@ fn test_check_incoming_messages_duplicate_opcode_skips_unique_opcodes() {
             contract Counter {
                 incomingMessages: IncreaseCounter | DecreaseCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_check_incoming_messages_duplicate_opcode_skips_unique_opcodes() {
 fn test_check_incoming_messages_duplicate_opcode_skips_same_value_with_different_width() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x001) IncreaseCounter {
                 value: int
             }
@@ -92,9 +92,9 @@ fn test_check_incoming_messages_duplicate_opcode_skips_same_value_with_different
             contract Counter {
                 incomingMessages: IncreaseCounter | DecreaseCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn test_check_incoming_messages_duplicate_opcode_skips_same_value_with_different
 fn test_check_incoming_messages_duplicate_opcode_reports_hex_and_binary_same_width() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x01) IncreaseCounter {
                 value: int
             }
@@ -114,9 +114,9 @@ fn test_check_incoming_messages_duplicate_opcode_reports_hex_and_binary_same_wid
             contract Counter {
                 incomingMessages: IncreaseCounter | DecreaseCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_hex_and_binary_same_wid
 fn test_check_incoming_messages_duplicate_opcode_skips_hex_and_binary_different_width() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x01) IncreaseCounter {
                 value: int
             }
@@ -136,9 +136,9 @@ fn test_check_incoming_messages_duplicate_opcode_skips_hex_and_binary_different_
             contract Counter {
                 incomingMessages: IncreaseCounter | DecreaseCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -147,7 +147,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_multiline_inline_union_
 {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x1001) IncreaseCounter {
                 value: int
             }
@@ -171,9 +171,9 @@ fn test_check_incoming_messages_duplicate_opcode_reports_multiline_inline_union_
                     | NotifyCounter
                     | ResetCounter,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_multiline_inline_union_
 fn test_check_incoming_messages_duplicate_opcode_reports_alias_union_with_many_messages() {
     run_simple_test(
         "incoming_messages_duplicate_opcode",
-        r#"
+        r"
             struct (0x2001) IncreaseCounter {
                 value: int
             }
@@ -207,7 +207,7 @@ fn test_check_incoming_messages_duplicate_opcode_reports_alias_union_with_many_m
             contract Counter {
                 incomingMessages: Incoming,
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

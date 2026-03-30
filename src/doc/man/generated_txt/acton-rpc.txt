@@ -1,0 +1,148 @@
+ACTON-RPC(1)
+
+NAME
+       acton-rpc — Inspect remote account state and decode contract storage
+
+SYNOPSIS
+       acton rpc [options] command
+
+DESCRIPTION
+       Query blockchain account state through a configured network endpoint.
+
+       acton rpc is intended for fast inspection workflows when you want to:
+
+       o  check whether an account is active, frozen, or uninitialized
+
+       o  inspect balance, last transaction metadata, and state hashes
+
+       o  match deployed code against a local Acton project by code_hash
+
+       o  decode account storage through local ABI metadata when a match is
+          found
+
+       The command works without a project manifest for raw remote inspection.
+
+       When Acton can resolve a local project and finds a contract with the
+       same compiled code_hash, it also prints the matched contract ID and
+       decodes the account storage using the local compiler ABI.
+
+SUBCOMMANDS
+   acton rpc info
+       Show information about a single account.
+
+      Synopsis
+          acton rpc info [options] address
+
+      Options
+          address
+              Contract address in friendly or raw format.
+
+          --net network
+              Network to query.
+
+              Defaults to testnet.
+
+              Supported values include mainnet, testnet, localnet, and
+              custom:<name>.
+
+          --api-key key
+              TonCenter API key for blockchain queries.
+
+      Output
+          acton rpc info prints:
+
+          o  remote account metadata such as status, balance, last transaction
+             LT and hashes
+
+          o  code and data hashes when the account has deployed state
+
+          o  local contract match information when a project contract has the
+             same code_hash
+
+          o  decoded storage in a YAML-like view when compiler ABI metadata is
+             available
+
+          If no local ABI match is found, Acton still prints the raw remote
+          account information and reports that decoded storage is unavailable.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project manifest for its
+           primary workflow. It remains mutually exclusive with --project-root.
+
+       --project-root path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project root for its
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
+
+NETWORK RESOLUTION
+       o  mainnet and testnet use the built-in TonCenter endpoints
+
+       o  localnet uses the configured local LiteNode or its default URL
+
+       o  custom:<name> resolves through [networks.<name>] in Acton.toml
+
+       For custom:<name>, Acton needs access to the selected project or
+       manifest so it can read the custom network configuration.
+
+ABI MATCHING
+       Storage decoding is best-effort and depends on local project context.
+
+       Acton attempts to:
+
+       1. fetch the remote account code cell
+
+       2. compute its code_hash
+
+       3. compare that hash with locally configured contracts
+
+       4. decode storage with the matched contract’s compiler ABI
+
+       This means decoding is robust for contracts you control in the current
+       Acton project, but not guaranteed for arbitrary third-party deployments.
+
+EXIT STATUS
+       o  0: The selected RPC query completed successfully.
+
+       o  1: The address was invalid, the network could not be resolved, the
+          remote request failed, or local ABI decoding encountered an
+          unrecoverable error.
+
+EXAMPLES
+       1. Inspect a testnet account quickly:
+
+              acton rpc info EQC...
+
+       2. Inspect a mainnet account with an API key:
+
+              acton rpc info EQC... --net mainnet --api-key $TONCENTER_API_KEY
+
+       3. Inspect a localnet deployment and decode storage with the current
+          project:
+
+              acton rpc info EQC... --net localnet
+
+       4. Use a custom network defined in another manifest:
+
+              acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
+
+SEE ALSO
+       o  acton help disasm
+
+       o  acton help retrace
+
+       o  acton help script
+
+       o  Command reference
+          <https://ton-blockchain.github.io/acton/docs/commands>
+

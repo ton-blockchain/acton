@@ -5,7 +5,7 @@ use crate::type_interner::TyId;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_syntax::*;
 
-impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
+impl<'t> TypeInferenceWalker<'_, '_> {
     pub(crate) fn process_stmt(&mut self, v: Stmt<'t>, flow: FlowContext) -> FlowContext {
         match v {
             Stmt::ExprStmt(expr_stmt) => self.process_expr_stmt(expr_stmt, flow),

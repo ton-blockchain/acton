@@ -3,7 +3,9 @@
 
 NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
 
-To get testnet coins run `acton wallet airdrop` or check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+To get testnet coins run acton wallet airdrop or check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+
+To check wallet balances run acton wallet list --balance.
 
 SECURITY WARNING:
 [SECURITY_WARNING_MNEMONIC]

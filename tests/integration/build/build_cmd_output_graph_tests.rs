@@ -413,8 +413,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
         assert_eq!(
             baseline_dot, variant_dot,
-            "graph content changed for --graph path variant '{}'",
-            path
+            "graph content changed for --graph path variant '{path}'"
         );
     }
 

@@ -15,7 +15,7 @@ struct tracing
 
 Utilities for naming and organizing traces produced in tests.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/tracing.tolk#L5" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/tracing.tolk#L5" />
 
 ## `tracing.save`
 
@@ -23,7 +23,7 @@ Utilities for naming and organizing traces produced in tests.
 fun tracing.save(txs: SendResultList, name: string): void
 ```
 
-Save a custom name for a trace chain produced by [net.send](../network/#netsend).
+Save a custom name for a trace chain produced by [net.send](../network/#netsend) or [net.sendIter](../network/#netsenditer).
 
 The custom name is used in the Test UI and gas/fee profiling reports.
 
@@ -34,5 +34,5 @@ tracing.save(txs, "deploy-counter");
 expect(txs).toHaveAllSuccessfulTxs();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/tracing.tolk#L17" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/tracing.tolk#L17" />
 

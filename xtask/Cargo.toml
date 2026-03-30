@@ -14,11 +14,15 @@ license = { workspace = true }
 workspace = true
 
 [dependencies]
+acton-config = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml_edit = { workspace = true }
 owo-colors = { workspace = true }
 reqwest = { workspace = true }
 urlencoding = { workspace = true }
+parse-changelog = { version = "0.6.15", default-features = false }

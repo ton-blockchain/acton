@@ -60,7 +60,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
         ) {
             continue;
         }
-        if local.name.starts_with("_") {
+        if local.name.starts_with('_') {
             continue;
         }
 

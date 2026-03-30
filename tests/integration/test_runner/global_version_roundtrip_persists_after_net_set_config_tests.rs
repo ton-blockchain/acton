@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn global_version_roundtrip_persists_after_net_set_config() {
     run_config_success_case(
         "bb-stdlib-config-global-version-roundtrip",
-        r#"
+        r"
 get fun `test-bb-stdlib-config-global-version-roundtrip`() {
     var config = net.getConfig();
     val before = config.getGlobalVersion();
@@ -43,7 +43,7 @@ get fun `test-bb-stdlib-config-global-version-roundtrip`() {
     expect(updated.version).toNotEqual(before.version);
     expect(updated.capabilities).toNotEqual(before.capabilities);
 }
-"#,
+",
         "integration/snapshots/test-runner/global_version_roundtrip_persists_after_net_set_config/global_version_roundtrip_persists_after_net_set_config.stdout.txt",
     );
 }
@@ -52,7 +52,7 @@ get fun `test-bb-stdlib-config-global-version-roundtrip`() {
 fn global_version_typed_and_raw_reads_match_after_roundtrip() {
     run_config_success_case(
         "bb-stdlib-config-global-version-raw-typed-consistency",
-        r#"
+        r"
 get fun `test-bb-stdlib-config-global-version-raw-typed-consistency`() {
     var config = net.getConfig();
     val target = GlobalVersion {
@@ -75,7 +75,7 @@ get fun `test-bb-stdlib-config-global-version-raw-typed-consistency`() {
     expect(secondRead.version).toEqual(target.version);
     expect(secondRead.capabilities).toEqual(target.capabilities);
 }
-"#,
+",
         "integration/snapshots/test-runner/global_version_roundtrip_persists_after_net_set_config/global_version_typed_and_raw_reads_match_after_roundtrip.stdout.txt",
     );
 }

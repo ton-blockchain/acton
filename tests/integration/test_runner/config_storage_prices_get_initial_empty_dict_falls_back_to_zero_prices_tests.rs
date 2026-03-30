@@ -23,7 +23,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_storage_prices_get_initial_prefers_zero_key_when_present() {
     run_config_success_case(
         "dp-stdlib-config-storage-prices-get-initial-prefers-zero-key",
-        r#"
+        r"
 get fun `test-dp-stdlib-config-storage-prices-get-initial-prefers-zero-key`() {
     var prices = createEmptyMap<uint32, StoragePrices>();
     prices.set(0, StoragePrices {
@@ -48,7 +48,7 @@ get fun `test-dp-stdlib-config-storage-prices-get-initial-prefers-zero-key`() {
     expect(initial.masterchainBitPrice).toEqual(303);
     expect(initial.masterchainCellPrice).toEqual(404);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_get_initial_empty_dict_falls_back_to_zero_prices/config_storage_prices_get_initial_prefers_zero_key_when_present.stdout.txt",
     );
 }

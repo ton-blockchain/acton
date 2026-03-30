@@ -40,7 +40,7 @@ fn run_message_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn ext_message_load_opcode_returns_null_for_either_right_without_ref() {
     run_message_case(
         "ci-stdlib-ext-message-load-opcode-right-without-ref",
-        r#"
+        r"
 get fun `test-ci-stdlib-ext-message-load-opcode-right-without-ref`() {
     val body = beginCell().storeBool(true).endCell().beginParse();
 
@@ -52,7 +52,7 @@ get fun `test-ci-stdlib-ext-message-load-opcode-right-without-ref`() {
 
     expect(msg.loadOpcode()).toBeNull();
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_message_load_opcode_returns_null_for_either_right_without_ref/ext_message_load_opcode_returns_null_for_either_right_without_ref.stdout.txt",
     );
 }

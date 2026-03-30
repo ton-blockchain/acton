@@ -16,11 +16,11 @@ fn run_fix_test(before: &str, after: &str, name: &str) {
 fn test_check_explicit_return_type_with_explicit_type() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             fun function(): slice {
                 return beginCell().toSlice();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -30,7 +30,7 @@ fn test_check_explicit_return_type_with_explicit_type() {
 fn test_check_explicit_return_type_skips_contract_entrypoints() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             fun main() {}
             fun onInternalMessage() {}
             fun onExternalMessage() {}
@@ -38,7 +38,7 @@ fn test_check_explicit_return_type_skips_contract_entrypoints() {
             fun onSplitPrepare() {}
             fun onSplitInstall() {}
             fun onBouncedMessage(_: InMessageBounced) {}
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -47,16 +47,16 @@ fn test_check_explicit_return_type_skips_contract_entrypoints() {
 #[named]
 fn test_fix_explicit_return_type() {
     run_fix_test(
-        r#"
+        r"
             fun function() {
                 return beginCell().toSlice();
             }
-        "#,
-        r#"
+        ",
+        r"
             fun function(): slice {
                 return beginCell().toSlice();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -66,11 +66,11 @@ fn test_fix_explicit_return_type() {
 fn test_check_explicit_return_type() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             fun function() {
                 return beginCell().toSlice();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -79,7 +79,7 @@ fn test_check_explicit_return_type() {
 #[named]
 fn test_fix_explicit_return_type_for_method() {
     run_fix_test(
-        r#"
+        r"
             struct Counter {
                 value: int,
             }
@@ -87,8 +87,8 @@ fn test_fix_explicit_return_type_for_method() {
             fun Counter.getValue(self) {
                 return self.value;
             }
-        "#,
-        r#"
+        ",
+        r"
             struct Counter {
                 value: int,
             }
@@ -96,7 +96,7 @@ fn test_fix_explicit_return_type_for_method() {
             fun Counter.getValue(self): int {
                 return self.value;
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -106,7 +106,7 @@ fn test_fix_explicit_return_type_for_method() {
 fn test_check_explicit_return_type_for_method() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             struct Counter {
                 value: int,
             }
@@ -114,7 +114,7 @@ fn test_check_explicit_return_type_for_method() {
             fun Counter.getValue(self) {
                 return self.value;
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -123,16 +123,16 @@ fn test_check_explicit_return_type_for_method() {
 #[named]
 fn test_fix_explicit_return_type_for_get_method() {
     run_fix_test(
-        r#"
+        r"
             get fun getCounter() {
                 return 42;
             }
-        "#,
-        r#"
+        ",
+        r"
             get fun getCounter(): int {
                 return 42;
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -142,11 +142,11 @@ fn test_fix_explicit_return_type_for_get_method() {
 fn test_check_explicit_return_type_for_get_method() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             get fun getCounter() {
                 return 42;
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -155,14 +155,14 @@ fn test_check_explicit_return_type_for_get_method() {
 #[named]
 fn test_fix_explicit_return_type_for_void() {
     run_fix_test(
-        r#"
+        r"
             fun doNothing() {
             }
-        "#,
-        r#"
+        ",
+        r"
             fun doNothing() {
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -172,10 +172,10 @@ fn test_fix_explicit_return_type_for_void() {
 fn test_check_explicit_return_type_for_void() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             fun doNothing() {
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -184,7 +184,7 @@ fn test_check_explicit_return_type_for_void() {
 #[named]
 fn test_fix_explicit_return_type_for_struct() {
     run_fix_test(
-        r#"
+        r"
             struct Payload {
                 value: int,
             }
@@ -192,8 +192,8 @@ fn test_fix_explicit_return_type_for_struct() {
             fun buildPayload() {
                 return Payload { value: 10 };
             }
-        "#,
-        r#"
+        ",
+        r"
             struct Payload {
                 value: int,
             }
@@ -201,7 +201,7 @@ fn test_fix_explicit_return_type_for_struct() {
             fun buildPayload(): Payload {
                 return Payload { value: 10 };
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -211,7 +211,7 @@ fn test_fix_explicit_return_type_for_struct() {
 fn test_check_explicit_return_type_for_struct() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             struct Payload {
                 value: int,
             }
@@ -219,7 +219,7 @@ fn test_check_explicit_return_type_for_struct() {
             fun buildPayload() {
                 return Payload { value: 10 };
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -228,16 +228,16 @@ fn test_check_explicit_return_type_for_struct() {
 #[named]
 fn test_fix_explicit_return_type_for_generic() {
     run_fix_test(
-        r#"
+        r"
             fun identity<T>(value: T) {
                 return value;
             }
-        "#,
-        r#"
+        ",
+        r"
             fun identity<T>(value: T): T {
                 return value;
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -247,11 +247,11 @@ fn test_fix_explicit_return_type_for_generic() {
 fn test_check_explicit_return_type_for_generic() {
     run_simple_test(
         "explicit_return_type",
-        r#"
+        r"
             fun identity<T>(value: T) {
                 return value;
             }
-        "#,
+        ",
         function_name!(),
     );
 }

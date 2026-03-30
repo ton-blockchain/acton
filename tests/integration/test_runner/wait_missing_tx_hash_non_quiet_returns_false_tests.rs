@@ -6,10 +6,10 @@ import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 "#;
 
-const NOOP_CONTRACT: &str = r#"
+const NOOP_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const WAITING_LOG: &str = "Awaiting transaction... [Attempt 1/1]";
 

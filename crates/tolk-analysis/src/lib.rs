@@ -36,6 +36,7 @@ impl Default for AnalysisDb {
 }
 
 impl AnalysisDb {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             use_facts: FxHashMap::default(),

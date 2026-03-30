@@ -16,29 +16,29 @@ fn run_fix_test(before: &str, after: &str, name: &str) {
 fn test_check_unused_variable() {
     run_simple_test(
         "unused_variable",
-        r#"
+        r"
             fun main() {
                 val unused = 1;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_unused_variable() {
     run_fix_test(
-        r#"
+        r"
             fun main() {
                 val unused = 1;
             }
-        "#,
-        r#"
+        ",
+        r"
             fun main() {
                 val _unused = 1;
             }
-        "#,
+        ",
         function_name!(),
     );
 }

@@ -47,7 +47,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let resolve_index = checker.resolve_index_for(file_id)?;
 
     for local in &resolve_index.locals {
-        if !local.name.starts_with("_") || local.name.starts_with("__") {
+        if !local.name.starts_with('_') || local.name.starts_with("__") {
             continue;
         }
         let Some(renamed) = local.name.strip_prefix('_') else {

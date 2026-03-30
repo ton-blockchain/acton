@@ -24,7 +24,7 @@ fn test_check_message_should_be_named() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn test_check_message_should_be_named_skips_proper_name() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -59,20 +59,20 @@ fn test_check_create_message_inline_send() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_check_create_message_inline_send_skips_other_factories() {
     run_create_message_inline_send_test(
-        r#"
+        r"
             fun onInternalMessage(_: InMessage) {
                 createExternalLogMessage({
                     dest: createAddressNone(),
                 }).send(SEND_MODE_REGULAR);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

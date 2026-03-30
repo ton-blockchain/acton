@@ -9,39 +9,39 @@ mod tests {
     #[test]
     fn test_local_var() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_tuple_local_var() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val [x, y] = [1, 2];
                     <caret>x;
                     <caret>y;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 55-56)
                 y -> Local(y at 58-59)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_nested_tuple_local_var() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val [x, [[y, z], w]] = [];
                     <caret>x;
@@ -49,37 +49,37 @@ mod tests {
                     <caret>z;
                     <caret>w;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 55-56)
                 y -> Local(y at 60-61)
                 z -> Local(z at 63-64)
                 w -> Local(w at 67-68)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_tensor_local_var() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val (x, y) = (1, 2);
                     <caret>x;
                     <caret>y;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 55-56)
                 y -> Local(y at 58-59)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_nested_tensor_local_var() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val ((x, ((y, z), w)) = [];
                     <caret>x;
@@ -87,50 +87,50 @@ mod tests {
                     <caret>z;
                     <caret>w;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 56-57)
                 y -> Local(y at 61-62)
                 z -> Local(z at 64-65)
                 w -> Local(w at 68-69)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_function_param() {
         check_definition(
-            r#"
+            r"
                 fun foo(a: int) {
                     <caret>a;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 a -> Local(a at 25-26)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_global_function() {
         check_definition(
-            r#"
+            r"
                 fun foo() {}
 
                 fun main() {
                     <caret>foo();
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 foo -> Global(foo at test.tolk:21-24)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_function_and_type_with_same_name() {
         check_definition(
-            r#"
+            r"
                 type foo = int;
 
                 fun foo() {}
@@ -140,19 +140,19 @@ mod tests {
                     val a: <caret>foo;
                     <caret>foo.bar();
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 foo -> Global(foo at test.tolk:54-57)
                 foo -> Global(foo at test.tolk:22-25)
                 foo -> Global(foo at test.tolk:22-25)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_nested_scopes() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     {
@@ -161,32 +161,32 @@ mod tests {
                     }
                     <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 111-112)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_unresolved() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     <caret>unknown_symbol;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 unknown_symbol -> Unresolved
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_global_var_and_const() {
         check_definition(
-            r#"
+            r"
                 global g: int;
 
                 const C: int = 42;
@@ -195,31 +195,31 @@ mod tests {
                     <caret>g;
                     <caret>C;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 g -> Global(g at test.tolk:24-25)
                 C -> Global(C at test.tolk:55-56)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_type_alias() {
         check_definition(
-            r#"
+            r"
                 type MyInt = int;
                 fun foo(x: <caret>MyInt) {}
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 MyInt -> Global(MyInt at test.tolk:22-27)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_struct_and_enum() {
         check_definition(
-            r#"
+            r"
                 struct S { x: int }
 
                 enum E { A, B }
@@ -228,19 +228,19 @@ mod tests {
                     val s: <caret>S;
                     val e: <caret>E = <caret>E.A;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 S -> Global(S at test.tolk:24-25)
                 E -> Global(E at test.tolk:59-60)
                 E -> Global(E at test.tolk:59-60)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_lambda() {
         check_definition(
-            r#"
+            r"
                 const FOO = 100;
 
                 fun main() {
@@ -248,35 +248,35 @@ mod tests {
                         <caret>x;
                     };
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 FOO -> Global(FOO at test.tolk:23-26)
                 x -> Local(x at 97-98)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_lambda_return_type() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val f = fun (x: int): <caret>int {
                         <caret>x;
                     };
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 int -> Global(int at common.tolk:350-353)
                 x -> Local(x at 63-64)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_catch() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     try {
                     } catch (x, y) {
@@ -284,70 +284,70 @@ mod tests {
                         <caret>y;
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 85-86)
                 y -> Local(y at 88-89)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_method() {
         check_definition(
-            r#"
+            r"
                 struct S {}
 
                 fun S.foo(self, x: int) {
                     <caret>self;
                     <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 self -> Local(self at 56-60)
                 x -> Local(x at 62-63)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_get_method() {
         check_definition(
-            r#"
+            r"
                 type MyInt = builtin;
 
                 get fun foo(x: int): <caret>MyInt {
                     <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 MyInt -> Global(MyInt at test.tolk:22-27)
                 x -> Local(x at 68-69)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_match() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     match (val x = 1) {
                         int => { <caret>x; }
                         else => {}
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 61-62)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_match_with_return_and_throw() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     match (val x = 1) {
                         1 => return <caret>x
@@ -355,19 +355,19 @@ mod tests {
                         else => <caret>x
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 61-62)
                 x -> Local(x at 61-62)
                 x -> Local(x at 61-62)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_match_arm() {
         check_definition(
-            r#"
+            r"
                 type ctring = slice;
 
                 fun main() {
@@ -376,10 +376,10 @@ mod tests {
                         _ => {}
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 ctring -> Global(ctring at test.tolk:22-28)
-            "#]],
+            "]],
         );
     }
 
@@ -397,16 +397,16 @@ mod tests {
                     }
                 }
             "#,
-            expect![[r#"
+            expect![[r"
                 ctring -> Local(ctring at 92-98)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_get_method_call() {
         check_definition(
-            r#"
+            r"
                 get fun balance() {
                     return 100;
                 }
@@ -414,17 +414,17 @@ mod tests {
                 fun main() {
                     val b = <caret>balance();
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 balance -> Global(balance at test.tolk:25-32)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_struct_field_access() {
         check_definition(
-            r#"
+            r"
                 struct Person {
                     name: string;
                     age: int;
@@ -435,18 +435,18 @@ mod tests {
                     <caret>p.name;
                     <caret>p.age;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 p -> Local(p at 169-170)
                 p -> Local(p at 169-170)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_struct_field_access_without_struct() {
         check_definition(
-            r#"
+            r"
                 struct Person {
                     name: string;
                     age: int;
@@ -457,18 +457,18 @@ mod tests {
                     <caret>name;
                     <caret>age;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 name -> Unresolved
                 age -> Unresolved
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_enum_member_access() {
         check_definition(
-            r#"
+            r"
                 enum Color {
                     Red,
                     Green,
@@ -479,18 +479,18 @@ mod tests {
                     val c = <caret>Color.Red;
                     <caret>Color.Green;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 Color -> Global(Color at test.tolk:22-27)
                 Color -> Global(Color at test.tolk:22-27)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_function_call() {
         check_definition(
-            r#"
+            r"
                 fun add(a: int, b: int): int {
                     return a + b;
                 }
@@ -500,19 +500,19 @@ mod tests {
                     val y = 2;
                     val result = <caret>add(<caret>x, <caret>y);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 add -> Global(add at test.tolk:21-24)
                 x -> Local(x at 154-155)
                 y -> Local(y at 185-186)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_function_call_with_static_method() {
         check_definition(
-            r#"
+            r"
                 struct bar;
 
                 fun bar.add(a: int, b: int): int {
@@ -524,17 +524,17 @@ mod tests {
                     val y = 2;
                     val result = <caret>add(x, y);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 add -> Unresolved
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_object_literal() {
         check_definition(
-            r#"
+            r"
                 struct Point {
                     x: int;
                     y: int;
@@ -543,17 +543,17 @@ mod tests {
                 fun main() {
                     val origin = <caret>Point { <caret>x: 0, <caret>y: 0 };
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 Point -> Global(Point at test.tolk:24-29)
-                UnresolvedUnresolved"#]],
+                UnresolvedUnresolved"]],
         );
     }
 
     #[test]
     fn test_method_call() {
         check_definition(
-            r#"
+            r"
                 struct Calculator {
                     value: int;
                 }
@@ -566,97 +566,97 @@ mod tests {
                     val calc: Calculator;
                     <caret>calc.add(5);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 calc -> Local(calc at 248-252)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_cast_as_operator() {
         check_definition(
-            r#"
+            r"
                 type string2 = slice;
                 fun main() {
                     val x: int = 42;
                     val y = <caret>x as <caret>string2;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 92-93)
                 string2 -> Global(string2 at test.tolk:22-29)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_is_type_operator() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x: int = 42;
                     val result = <caret>x is int;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_not_null_operator() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x: int? = 42;
                     val result = <caret>x!;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_set_assignment() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     var x = 1;
                     <caret>x += 5;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_ternary_operator() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     val y = 2;
                     val result = <caret>x > 0 ? <caret>x : <caret>y;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
                 y -> Local(y at 85-86)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_lazy_expression() {
         check_definition(
-            r#"
+            r"
                 fun expensive(): int {
                     return 42;
                 }
@@ -665,11 +665,11 @@ mod tests {
                     val x = true;
                     val result = <caret>x && lazy <caret>expensive();
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 143-144)
                 expensive -> Global(expensive at test.tolk:21-30)
-            "#]],
+            "]],
         );
     }
 
@@ -685,51 +685,51 @@ mod tests {
                     val result = <caret>identity<int>(<caret>identity<string>("hello"));
                 }
             "#,
-            expect![[r#"
+            expect![[r"
                 identity -> Global(identity at test.tolk:21-29)
                 identity -> Global(identity at test.tolk:21-29)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_tensor_expression() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     val y = 2;
                     val tuple = (<caret>x, <caret>y);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 y -> Local(y at 85-86)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_typed_tuple() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     val y = 2;
                     val tuple = [<caret>x, <caret>y];
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 y -> Local(y at 85-86)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_contract_field_values_resolve() {
         check_definition(
-            r#"
+            r"
                 type Token = int;
                 const BASE = 10;
 
@@ -742,33 +742,33 @@ mod tests {
                     startBalance: <caret>BASE + 1,
                     generator: <caret>makeToken(),
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 Token -> Global(Token at test.tolk:22-27)
                 BASE -> Global(BASE at test.tolk:57-61)
                 makeToken -> Global(makeToken at test.tolk:89-98)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_contract_field_unresolved_value() {
         check_definition(
-            r#"
+            r"
                 contract Wallet {
                     startBalance: <caret>missingValue + 1,
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 missingValue -> Unresolved
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_contract_field_references() {
         check_references(
-            r#"
+            r"
                 const BASE = 10;
 
                 fun f(): int {
@@ -782,19 +782,19 @@ mod tests {
                 fun main(): int {
                     return BASE;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 BASE at 93-97
                 BASE at 186-190
                 BASE at 276-280
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_contract_type_field_references() {
         check_references(
-            r#"
+            r"
                 type Token = int;
 
                 contract Wallet {
@@ -805,26 +805,26 @@ mod tests {
                     val x: Token = 10;
                     return x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 Token at 101-106
                 Token at 155-160
                 Token at 190-195
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_underscore() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     match (val x = 1) {
                         int => { <caret>_ = 2; }
                         _ => {}
                     }
                 }
-            "#,
+            ",
             expect!["Unresolved"],
         );
     }
@@ -832,22 +832,22 @@ mod tests {
     #[test]
     fn test_parenthesized_expression() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     val result = (<caret>x + 1) * 2;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_if_else() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     val y = 2;
@@ -857,55 +857,55 @@ mod tests {
                         <caret>x;
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 y -> Local(y at 85-86)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_while_loop() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     var x = 0;
                     while (<caret>x < 10) {
                         <caret>x += 1;
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_do_while_loop() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     var x = 0;
                     do {
                         <caret>x += 1;
                     } while (<caret>x < 10);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_repeat_loop() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val n = 5;
                     repeat (<caret>n) {
@@ -913,18 +913,18 @@ mod tests {
                         <caret>x;
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 n -> Local(n at 54-55)
                 x -> Local(x at 122-123)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_try_catch() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     try {
                         val x = 1;
@@ -934,64 +934,64 @@ mod tests {
                         <caret>arg;
                     }
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 84-85)
                 e -> Local(e at 147-148)
                 arg -> Local(arg at 150-153)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_assert_statement() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     assert(<caret>x > 0, 100);
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_throw_statement() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     throw <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_return_statement() {
         check_definition(
-            r#"
+            r"
                 fun test() {
                     val x = 1;
                     return <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_binary_operators() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val a = 1;
                     val b = 2;
@@ -999,70 +999,70 @@ mod tests {
                     val d = <caret>a && <caret>b;
                     val e = <caret>a == <caret>b;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 a -> Local(a at 54-55)
                 b -> Local(b at 85-86)
                 a -> Local(a at 54-55)
                 b -> Local(b at 85-86)
                 a -> Local(a at 54-55)
                 b -> Local(b at 85-86)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_unary_operators() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = true;
                     val y = -<caret>x;
                     val z = !<caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_type_parameters() {
         check_definition(
-            r#"
+            r"
                 type MyType<T> = <caret>T;
 
                 fun main() {
                     val result: <caret>MyType<int>;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 T -> Local(T at 29-30)
                 MyType -> Global(MyType at test.tolk:22-28)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_type_parameters_in_method_receiver() {
         check_definition(
-            r#"
+            r"
                 struct Generic<T> {}
 
                 fun Generic<T>.foo(): <caret>T {}
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 T -> Local(T at 67-68)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_enum_with_backed_type() {
         check_definition(
-            r#"
+            r"
                 type int = builtin;
 
                 enum Status: <caret>int {
@@ -1073,51 +1073,51 @@ mod tests {
                 fun main() {
                     val s: <caret>Status = <caret>Status.Active;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 int -> Global(int at common.tolk:350-353)
                 Status -> Global(Status at test.tolk:59-65)
                 Status -> Global(Status at test.tolk:59-65)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_multiple_carets_same_symbol() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     <caret>x;
                     <caret>x;
                     <caret>x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
                 x -> Local(x at 54-55)
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_uint_like_type_resolves_to_builtin_templates() {
         check_definition(
-            r#"
+            r"
                 fun main() {
                     val a: <caret>uint128? = 0;
                     val b: <caret>int32? = 0;
                     val c: <caret>bits256? = null;
                     val d: <caret>bytes32? = null;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 uint128 -> Global(uintN at common.tolk:3633-3638)
                 int32 -> Global(intN at common.tolk:3357-3361)
                 bits256 -> Global(bitsN at common.tolk:5235-5240)
                 bytes32 -> Global(bytesN at common.tolk:5325-5331)
-            "#]],
+            "]],
         );
     }
 
@@ -1137,85 +1137,85 @@ mod tests {
                     unknown_symbol;
                 }
             "#,
-            expect![[r#"
+            expect![[r"
                 unknown_symbol at 240-254
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_local_var_references() {
         check_references(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     <def>x;
                     x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x at 81-82
                 x at 104-105
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_function_param_references() {
         check_references(
-            r#"
+            r"
                 fun foo(a: int) {
                     <def>a;
                     a;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 a at 55-56
                 a at 78-79
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_global_function_references() {
         check_references(
-            r#"
+            r"
                 fun foo() {}
 
                 fun main() {
                     <def>foo();
                     foo();
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 foo at 80-83
                 foo at 107-110
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_struct_references() {
         check_references(
-            r#"
+            r"
                 struct S { x: int }
 
                 fun main() {
                     val s: <def>S;
                     val t: S;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 S at 94-95
                 S at 124-125
-            "#]],
+            "]],
         );
     }
 
     #[test]
     fn test_nested_scopes_references() {
         check_references(
-            r#"
+            r"
                 fun main() {
                     val x = 1;
                     {
@@ -1224,10 +1224,10 @@ mod tests {
                     }
                     x;
                 }
-            "#,
-            expect![[r#"
+            ",
+            expect![[r"
                 x at 142-143
-            "#]],
+            "]],
         );
     }
 
@@ -1246,10 +1246,10 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_references(expect![[r#"
+            .check_references(expect![[r"
                 other_fun at 86-95
                 other_fun at 119-128
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1266,10 +1266,10 @@ mod tests {
                 }
                 "#,
             )
-            .check_references(expect![[r#"
+            .check_references(expect![[r"
                 getGasConsumedAtTheMoment at 97-122
                 getGasConsumedAtTheMoment at 146-171
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1296,10 +1296,10 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_references(expect![[r#"
+            .check_references(expect![[r"
                 b_fun at 83-88
                 b_fun at 112-117
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1308,17 +1308,17 @@ mod tests {
             .file("other.tolk", "fun other_fun() {}")
             .file(
                 "main.tolk",
-                r#"
+                r"
                 fun main() {
                     <def>other_fun();
                     other_fun();
                 }
-                "#,
+                ",
             )
             .target("main.tolk")
-            .check_references(expect![[r#"
+            .check_references(expect![[r"
                 Unresolved
-            "#]]);
+            "]]);
     }
 
     fn check_definition(input: &str, expect: Expect) {
@@ -1353,9 +1353,9 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_definition(expect![[r#"
+            .check_definition(expect![[r"
                 other_fun -> Global(other_fun at other.tolk:4-13)
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1373,9 +1373,9 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_definition(expect![[r#"
+            .check_definition(expect![[r"
                 mapped_fun -> Global(mapped_fun at math.tolk:4-14)
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1393,9 +1393,9 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_definition(expect![[r#"
+            .check_definition(expect![[r"
                 mapped_fun -> Global(mapped_fun at math.tolk:4-14)
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1411,9 +1411,9 @@ mod tests {
                 }
                 "#,
             )
-            .check_definition(expect![[r#"
+            .check_definition(expect![[r"
                 getGasConsumedAtTheMoment -> Global(getGasConsumedAtTheMoment at gas-payments.tolk:180-205)
-            "#]]);
+            "]]);
     }
 
     #[test]
@@ -1440,10 +1440,10 @@ mod tests {
                 "#,
             )
             .target("main.tolk")
-            .check_definition(expect![[r#"
+            .check_definition(expect![[r"
                 b_fun -> Global(b_fun at b.tolk:54-59)
                 a_fun -> Unresolved
-            "#]]);
+            "]]);
     }
 
     #[derive(Clone, Copy)]

@@ -14,5 +14,4 @@ fun main() {
     }
 
     println1("Deployed starter contract to {}", contract.address);
-    println1("Owner is {}", contract.owner());
 }

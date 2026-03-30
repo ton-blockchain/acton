@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const EP_NOOP_CONTRACT: &str = r#"
+const EP_NOOP_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const EP_IMPORTS: &str = r#"
 import "../../lib/build/build"
@@ -64,13 +64,13 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn declared_pack_prefix_helpers_direct_calls_return_expected_values() {
     run_success_case(
         "ep-stdlib-declared-pack-prefix-helpers-direct-calls",
-        r#"
+        r"
 get fun `test-ep-declared-pack-prefix-helpers-direct-calls`() {
     expect(EpDeclaredPrefixBody.getDeclaredPackPrefix()).toEqual(0xE5000001);
     expect(unknown.getDeclaredPackPrefix()).toEqual(-1);
     expect(unknown.getDeclaredPackPrefixLen()).toEqual(-1);
 }
-"#,
+",
         "integration/snapshots/test-runner/declared_pack_prefix_helpers_direct_calls_return_expected_values/declared_pack_prefix_helpers_direct_calls_return_expected_values.stdout.txt",
     );
 }

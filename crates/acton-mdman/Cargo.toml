@@ -1,0 +1,16 @@
+[package]
+name = "acton-mdman"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+handlebars = { workspace = true }
+pulldown-cmark = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+
+[lints]
+workspace = true

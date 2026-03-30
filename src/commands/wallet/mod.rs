@@ -13,10 +13,11 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::io::{IsTerminal, stdin, stdout};
+use std::io::{IsTerminal, Read, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::mpsc;
 use std::time::Duration;
 use toml_edit::{DocumentMut, Item, Table, value};
 use ton::ton_core::cell::TonCell;
@@ -99,7 +100,8 @@ const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const DEFAULT_FAUCET_URL: &str = "https://acton.monster/faucet/";
 const DEFAULT_LITENODE_PORT: u16 = 5411;
 const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
-const NEW_WALLET_AIRDROP_FAUCET_URL_ENV: &str = "ACTON_FAUCET_URL"; // for testing purpose
+const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
+const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL"; // integration tests only
 
@@ -159,6 +161,14 @@ pub enum WalletCommand {
             default_value_t = false
         )]
         airdrop: bool,
+        #[arg(long, help = "Faucet URL for automatic testnet airdrop")]
+        faucet_url: Option<String>,
+        #[arg(
+            long,
+            help = "Do not wait for testnet funds to appear after a successful automatic airdrop",
+            default_value_t = false
+        )]
+        no_wait_airdrop: bool,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -205,7 +215,7 @@ pub enum WalletCommand {
         #[arg(
             long,
             alias = "message",
-            help = "External body BoC to sign in hex or base64. If omitted, reads from stdin or prompts interactively"
+            help = "External body BoC to sign in hex or base64. If omitted, reads from stdin when piped or prompts interactively"
         )]
         body: Option<String>,
         #[arg(long, help = "Output result as JSON")]
@@ -233,6 +243,12 @@ pub enum WalletCommand {
         net: WalletAirdropNetworkArg,
         #[arg(long, help = "Faucet URL for testnet airdrop backend")]
         faucet_url: Option<String>,
+        #[arg(
+            long,
+            help = "Do not wait for testnet funds to appear after a successful testnet airdrop",
+            default_value_t = false
+        )]
+        no_wait_airdrop: bool,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -247,8 +263,20 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             local,
             secure,
             airdrop,
+            faucet_url,
+            no_wait_airdrop,
             json,
-        } => new_wallet(name, version, global, local, secure, airdrop, json),
+        } => new_wallet(
+            name,
+            version,
+            global,
+            local,
+            secure,
+            airdrop,
+            faucet_url,
+            no_wait_airdrop,
+            json,
+        ),
         WalletCommand::Import {
             name,
             mnemonics,
@@ -270,8 +298,9 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             name,
             net,
             faucet_url,
+            no_wait_airdrop,
             json,
-        } => airdrop_wallet(name, net, faucet_url, json),
+        } => airdrop_wallet(name, net, faucet_url, no_wait_airdrop, json),
     }
 }
 
@@ -279,9 +308,12 @@ fn airdrop_wallet(
     name: Option<String>,
     net: WalletAirdropNetworkArg,
     faucet_url: Option<String>,
+    no_wait_airdrop: bool,
     json: bool,
 ) -> anyhow::Result<()> {
-    let run_result = perform_airdrop(name, resolve_airdrop_target(net, faucet_url)?, json);
+    let target = resolve_airdrop_target(net, faucet_url)?;
+    let wait_for_balance = matches!(&target, AirdropTarget::Testnet { .. });
+    let run_result = perform_airdrop(name, target, json);
 
     match run_result {
         Ok(result) => {
@@ -304,6 +336,9 @@ fn airdrop_wallet(
                 println!("{}", serde_json::to_string(&payload)?);
             } else {
                 println!("{} {}", "✓".green(), message);
+                if wait_for_balance {
+                    maybe_wait_for_testnet_airdrop_balance(&result.address, no_wait_airdrop);
+                }
             }
             Ok(())
         }
@@ -335,7 +370,7 @@ fn perform_airdrop(
         .get_wallet(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let address = get_wallet_address(wallet, target.network())?;
+    let address = get_wallet_address(&name, wallet, target.network())?;
 
     if !json {
         println!(
@@ -387,17 +422,11 @@ fn perform_testnet_airdrop(
 ) -> anyhow::Result<AirdropResult> {
     let faucet_base = parse_faucet_base_url(&faucet_url)?;
     let challenge_url = faucet_base.join("challenge").with_context(|| {
-        format!(
-            "Failed to build challenge URL from faucet base URL {}",
-            faucet_base
-        )
+        format!("Failed to build challenge URL from faucet base URL {faucet_base}")
     })?;
-    let claim_url = faucet_base.join("claim").with_context(|| {
-        format!(
-            "Failed to build claim URL from faucet base URL {}",
-            faucet_base
-        )
-    })?;
+    let claim_url = faucet_base
+        .join("claim")
+        .with_context(|| format!("Failed to build claim URL from faucet base URL {faucet_base}"))?;
 
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(10))
@@ -521,10 +550,13 @@ fn perform_localnet_airdrop(
         let json: serde_json::Value = response
             .json()
             .context("Failed to parse localnet faucet response")?;
-        if json.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
+        if json
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
             || json
                 .get("success")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         {
             let message = format!("Successfully airdropped {amount_ton} TON on localnet");
@@ -598,6 +630,34 @@ where
     }
 
     unreachable!("retry loop must return on success or final failure")
+}
+
+fn create_testnet_ton_api_client(api_key: Option<String>) -> anyhow::Result<TonApiClient> {
+    let config = ActonConfig::load().unwrap_or_default();
+    let mut custom_networks = config.custom_networks();
+    let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
+    let toncenter_v3_override = env::var(TEST_TONCENTER_V3_URL_ENV).ok();
+
+    if let Some(url) = toncenter_v3_override {
+        // test only code
+        let network_name = "__wallet_list_testnet_override".to_string();
+        let normalized = Arc::<str>::from(url.trim_end_matches('/').to_owned());
+        custom_networks.insert(
+            network_name.clone(),
+            CustomNetworkUrls {
+                v2_url: Arc::clone(&normalized),
+                v3_url: Some(normalized),
+                explorer_url: None,
+            },
+        );
+        TonApiClient::new(
+            Network::Custom(Arc::from(network_name)),
+            custom_networks,
+            api_key,
+        )
+    } else {
+        TonApiClient::new(Network::Testnet, custom_networks, api_key)
+    }
 }
 
 fn http_retry_backoff(attempt: usize) -> Duration {
@@ -704,7 +764,7 @@ fn export_mnemonic(name: Option<String>) -> anyhow::Result<()> {
         .get_wallet(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let mnemonic = wallets::load_mnemonic(wallet)?;
+    let mnemonic = wallets::load_mnemonic(&name, wallet)?;
 
     println!("{mnemonic}");
 
@@ -727,7 +787,7 @@ fn sign_wallet_external_body(
     let body = read_sign_body(body)?;
     let (external_body, input) = decode_sign_input(&body)?;
 
-    let mnemonic_str = wallets::load_mnemonic(wallet)?;
+    let mnemonic_str = wallets::load_mnemonic(&name, wallet)?;
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
     let version = parse_wallet_version(&wallet.kind)?;
@@ -765,9 +825,20 @@ fn read_sign_body(body: Option<String>) -> anyhow::Result<String> {
         return Ok(body);
     }
 
+    if !stdin().is_terminal() {
+        let mut input = stdin();
+        return read_sign_body_from_reader(&mut input).context("Failed to read body from stdin");
+    }
+
     Text::new("External body BoC (hex/base64) to sign:")
         .prompt()
         .context("Failed to read body")
+}
+
+fn read_sign_body_from_reader(reader: &mut impl Read) -> anyhow::Result<String> {
+    let mut body = String::new();
+    reader.read_to_string(&mut body)?;
+    Ok(body)
 }
 
 fn decode_sign_input(body: &str) -> anyhow::Result<(TonCell, SignMessageFormat)> {
@@ -815,7 +886,7 @@ fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<
 
     let keyring_mnemonic_removed = if let Some(keyring_id) = wallet.keys.mnemonic_keyring.as_deref()
     {
-        wallets::delete_mnemonic_from_keyring(keyring_id)?;
+        wallets::delete_mnemonic_from_keyring(keyring_id, &name)?;
         true
     } else {
         false
@@ -867,8 +938,7 @@ fn confirm_wallet_removal(name: &str, yes: bool, json: bool) -> anyhow::Result<b
     }
 
     let confirmed = Confirm::new(&format!(
-        "Remove wallet '{}'? This action cannot be undone.",
-        name
+        "Remove wallet '{name}'? This action cannot be undone."
     ))
     .with_default(false)
     .prompt()?;
@@ -947,30 +1017,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
     }
 
     let client = if balance {
-        let config = ActonConfig::load().unwrap_or_default();
-        let mut custom_networks = config.custom_networks();
-        let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-        let toncenter_v3_override = env::var(TEST_TONCENTER_V3_URL_ENV).ok();
-        Some(if let Some(url) = toncenter_v3_override {
-            // test only code
-            let network_name = "__wallet_list_testnet_override".to_string();
-            let normalized = Arc::<str>::from(url.trim_end_matches('/').to_owned());
-            custom_networks.insert(
-                network_name.clone(),
-                CustomNetworkUrls {
-                    v2_url: Arc::clone(&normalized),
-                    v3_url: Some(normalized),
-                    explorer_url: None,
-                },
-            );
-            TonApiClient::new(
-                Network::Custom(Arc::from(network_name)),
-                custom_networks,
-                api_key,
-            )?
-        } else {
-            TonApiClient::new(Network::Testnet, custom_networks, api_key)?
-        })
+        Some(create_testnet_ton_api_client(api_key)?)
     } else {
         None
     };
@@ -981,7 +1028,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
 
     let mut wallets_data = Vec::new();
     for (name, wallet_config) in wallets {
-        let Ok(address) = get_wallet_address(wallet_config, Network::Testnet) else {
+        let Ok(address) = get_wallet_address(name, wallet_config, Network::Testnet) else {
             error!("cannot get wallet address for {name}"); // very unlikely
             continue;
         };
@@ -1066,7 +1113,11 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
     Ok(())
 }
 
-fn get_wallet_address(wallet: &config::WalletConfig, network: Network) -> anyhow::Result<String> {
+fn get_wallet_address(
+    wallet_name: &str,
+    wallet: &config::WalletConfig,
+    network: Network,
+) -> anyhow::Result<String> {
     if let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
@@ -1074,7 +1125,7 @@ fn get_wallet_address(wallet: &config::WalletConfig, network: Network) -> anyhow
         return Ok(format_testnet_wallet_address(&addr));
     }
 
-    let mnemonic_str = wallets::load_mnemonic(wallet)?;
+    let mnemonic_str = wallets::load_mnemonic(wallet_name, wallet)?;
 
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let version = parse_wallet_version(&wallet.kind)?;
@@ -1214,6 +1265,130 @@ fn resolve_auto_airdrop(airdrop_flag: bool, json: bool) -> anyhow::Result<bool> 
         .with_default(false)
         .prompt()
         .context("Failed to read auto-airdrop confirmation")
+}
+
+const fn should_wait_for_testnet_airdrop_balance(
+    no_wait_airdrop: bool,
+    stdin_is_tty: bool,
+    stdout_is_tty: bool,
+) -> bool {
+    !no_wait_airdrop && stdin_is_tty && stdout_is_tty
+}
+
+fn spawn_wait_skip_listener() -> mpsc::Receiver<()> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let _ = stdin().read_line(&mut line);
+        let _ = tx.send(());
+    });
+    rx
+}
+
+fn fetch_testnet_account_balance(
+    client: &TonApiClient,
+    address: &str,
+) -> anyhow::Result<Option<i128>> {
+    let Some(state) = client.get_account_states(&[address])?.into_iter().next() else {
+        return Ok(None);
+    };
+
+    let Some(balance) = state.balance else {
+        return Ok(Some(0));
+    };
+
+    let balance = balance
+        .parse::<i128>()
+        .with_context(|| format!("Failed to parse testnet balance `{balance}`"))?;
+    Ok(Some(balance))
+}
+
+fn maybe_wait_for_testnet_airdrop_balance(address: &str, no_wait_airdrop: bool) {
+    if !should_wait_for_testnet_airdrop_balance(
+        no_wait_airdrop,
+        stdin().is_terminal(),
+        stdout().is_terminal(),
+    ) {
+        return;
+    }
+
+    let client = match create_testnet_ton_api_client(None) {
+        Ok(client) => client,
+        Err(err) => {
+            println!(
+                "{} Faucet accepted the request, but balance confirmation could not start: {}",
+                "Warning:".yellow().bold(),
+                err
+            );
+            println!(
+                "  Check later with {}.",
+                "acton wallet list --balance".yellow()
+            );
+            return;
+        }
+    };
+
+    println!(
+        "{} Waiting for testnet funds to appear... Press Enter to skip waiting.",
+        "→".blue().bold()
+    );
+    let _ = stdout().flush();
+
+    let skip_rx = spawn_wait_skip_listener();
+    let mut last_error = None::<String>;
+
+    for attempt in 0..AIRDROP_BALANCE_WAIT_ATTEMPTS {
+        if matches!(skip_rx.try_recv(), Ok(())) {
+            println!(
+                "{} Skipping wait. You can check later with {}.",
+                "→".blue().bold(),
+                "acton wallet list --balance".yellow()
+            );
+            return;
+        }
+
+        match fetch_testnet_account_balance(&client, address) {
+            Ok(Some(balance)) if balance > 0 => {
+                let balance_ton = balance as f64 / 1_000_000_000.0;
+                println!(
+                    "{} Testnet funds are available: {}",
+                    "✓".green(),
+                    format!("{balance_ton:.4} TON").green()
+                );
+                return;
+            }
+            Ok(_) => {}
+            Err(err) => last_error = Some(err.to_string()),
+        }
+
+        if attempt + 1 < AIRDROP_BALANCE_WAIT_ATTEMPTS
+            && matches!(skip_rx.recv_timeout(AIRDROP_BALANCE_WAIT_INTERVAL), Ok(()))
+        {
+            println!(
+                "{} Skipping wait. You can check later with {}.",
+                "→".blue().bold(),
+                "acton wallet list --balance".yellow()
+            );
+            return;
+        }
+    }
+
+    if let Some(err) = last_error {
+        println!(
+            "{} Faucet accepted the request, but balance confirmation failed: {}",
+            "Warning:".yellow().bold(),
+            err
+        );
+    } else {
+        println!(
+            "{} Faucet accepted the request, but funds are not visible yet.",
+            "Warning:".yellow().bold()
+        );
+    }
+    println!(
+        "  Check later with {}.",
+        "acton wallet list --balance".yellow()
+    );
 }
 
 fn get_config_path(name: &str, is_global: bool) -> anyhow::Result<PathBuf> {
@@ -1364,6 +1539,7 @@ fn save_wallet_to_config(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn new_wallet(
     name: Option<String>,
     version: Option<WalletVersionArg>,
@@ -1371,9 +1547,10 @@ fn new_wallet(
     local_flag: bool,
     secure: Option<bool>,
     airdrop: bool,
+    faucet_url: Option<String>,
+    no_wait_airdrop: bool,
     json: bool,
 ) -> anyhow::Result<()> {
-    let config = ActonConfig::load().ok();
     let name = get_or_prompt_name(name)?;
     let is_global = get_is_global(global_flag, local_flag)?;
     let config_path = get_config_path(&name, is_global)?;
@@ -1392,14 +1569,13 @@ fn new_wallet(
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
-    let project_name = if is_global {
-        None
-    } else {
-        config.map(|c| c.package.name)
-    };
-
-    let (mnemonic_str_opt, mnemonic_keyring_opt) =
-        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store, project_name)?;
+    let (mnemonic_str_opt, mnemonic_keyring_opt) = maybe_store_mnemonic_in_keystore(
+        &config_path,
+        &name,
+        &mnemonic_str,
+        use_secure_store,
+        is_global,
+    )?;
 
     save_wallet_to_config(
         &config_path,
@@ -1411,7 +1587,7 @@ fn new_wallet(
         is_global,
     )?;
     let auto_airdrop = resolve_auto_airdrop(airdrop, json)?;
-    let airdrop_faucet_url = auto_airdrop.then(new_wallet_airdrop_faucet_url);
+    let airdrop_faucet_url = auto_airdrop.then(|| new_wallet_airdrop_faucet_url(faucet_url));
 
     if json {
         let mut output = serde_json::json!({
@@ -1491,6 +1667,7 @@ fn new_wallet(
                         "✓".green(),
                         result.message.as_deref().unwrap_or("Success")
                     );
+                    maybe_wait_for_testnet_airdrop_balance(&result.address, no_wait_airdrop);
                 }
                 Err(err) => {
                     println!(
@@ -1511,11 +1688,14 @@ fn new_wallet(
             );
 
             println!(
-                "\nTo get testnet coins run `acton wallet airdrop` or check official documentation: {}",
+                "\nTo get testnet coins run {} or check official documentation: {}",
+                "acton wallet airdrop".yellow(),
                 "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
                     .underline(),
             );
         }
+
+        print_wallet_balance_hint();
 
         if !use_secure_store {
             show_security_warning(config_path);
@@ -1525,19 +1705,20 @@ fn new_wallet(
     Ok(())
 }
 
-fn new_wallet_airdrop_faucet_url() -> String {
-    env::var(NEW_WALLET_AIRDROP_FAUCET_URL_ENV).unwrap_or_else(|_| DEFAULT_FAUCET_URL.to_owned())
+fn new_wallet_airdrop_faucet_url(faucet_url: Option<String>) -> String {
+    faucet_url.unwrap_or_else(|| DEFAULT_FAUCET_URL.to_owned())
 }
 
 fn maybe_store_mnemonic_in_keystore(
+    config_path: &Path,
     name: &str,
     mnemonic_str: &str,
     use_secure_store: bool,
-    project_name: Option<String>,
+    is_global: bool,
 ) -> anyhow::Result<(Option<String>, Option<String>)> {
     let (mnemonic_str_opt, mnemonic_keyring_opt) = if use_secure_store {
-        let keyring_id = keyring_id_for_wallet(name, project_name);
-        wallets::store_mnemonic_in_keyring(&keyring_id, mnemonic_str)?;
+        let keyring_id = keyring_id_for_scope(config_path, is_global)?;
+        wallets::store_mnemonic_in_keyring(&keyring_id, name, mnemonic_str)?;
         (None, Some(keyring_id))
     } else {
         (Some(mnemonic_str.to_owned()), None)
@@ -1545,12 +1726,37 @@ fn maybe_store_mnemonic_in_keystore(
     Ok((mnemonic_str_opt, mnemonic_keyring_opt))
 }
 
-fn keyring_id_for_wallet(name: &str, project_name: Option<String>) -> String {
-    if let Some(project) = project_name {
-        format!("{project}:{name}")
-    } else {
-        name.to_string()
+fn keyring_id_for_scope(config_path: &Path, is_global: bool) -> anyhow::Result<String> {
+    if let Some(existing) = existing_keyring_id(config_path)? {
+        return Ok(existing);
     }
+
+    if is_global {
+        return Ok("global".to_string());
+    }
+
+    let project_root = dunce::canonicalize(configured_project_root())
+        .unwrap_or_else(|_| configured_project_root().to_path_buf());
+    let digest = Sha256::digest(project_root.as_os_str().to_string_lossy().as_bytes());
+    Ok(format!("local:{}", hex::encode(&digest[..8])))
+}
+
+fn existing_keyring_id(config_path: &Path) -> anyhow::Result<Option<String>> {
+    if !config_path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read {}", config_path.display()))?;
+    let wallets: WalletsFile = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse {} as TOML", config_path.display()))?;
+
+    Ok(wallets.wallets.and_then(|wallets| {
+        wallets
+            .wallets
+            .into_values()
+            .find_map(|wallet| wallet.keys.mnemonic_keyring)
+    }))
 }
 
 fn import_wallet(
@@ -1562,7 +1768,6 @@ fn import_wallet(
     secure: Option<bool>,
     json: bool,
 ) -> anyhow::Result<()> {
-    let config = ActonConfig::load().ok();
     let name = get_or_prompt_name(name)?;
     let is_global = get_is_global(global_flag, local_flag)?;
     let config_path = get_config_path(&name, is_global)?;
@@ -1586,14 +1791,13 @@ fn import_wallet(
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
-    let project_name = if is_global {
-        None
-    } else {
-        config.map(|c| c.package.name)
-    };
-
-    let (mnemonic_str_opt, mnemonic_keyring_opt) =
-        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store, project_name)?;
+    let (mnemonic_str_opt, mnemonic_keyring_opt) = maybe_store_mnemonic_in_keystore(
+        &config_path,
+        &name,
+        &mnemonic_str,
+        use_secure_store,
+        is_global,
+    )?;
 
     save_wallet_to_config(
         &config_path,
@@ -1635,11 +1839,20 @@ fn import_wallet(
             );
         }
 
+        print_wallet_balance_hint();
+
         if !use_secure_store {
             show_security_warning(config_path);
         }
     }
     Ok(())
+}
+
+fn print_wallet_balance_hint() {
+    println!(
+        "\nTo check wallet balances run {}.",
+        "acton wallet list --balance".yellow()
+    );
 }
 
 fn show_security_warning(config_path: PathBuf) {
@@ -1765,6 +1978,16 @@ mod wallet_name_tests {
     }
 
     #[test]
+    fn test_decode_sign_input_trims_surrounding_whitespace() {
+        let cell = TonCell::empty().clone();
+        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
+        let padded = format!(" \n{body_b64}\t");
+        let (decoded, format) = decode_sign_input(&padded).expect("must decode trimmed input");
+        assert_eq!(decoded, cell);
+        assert_eq!(format, SignMessageFormat::Base64);
+    }
+
+    #[test]
     fn test_decode_sign_input_empty() {
         let err = decode_sign_input("").expect_err("must fail for empty payload");
         assert!(
@@ -1781,6 +2004,14 @@ mod wallet_name_tests {
                 .contains("Body must be a valid BoC encoded as hex or base64"),
             "unexpected error: {err}"
         );
+    }
+
+    #[allow(clippy::string_lit_as_bytes)]
+    #[test]
+    fn test_read_sign_body_from_reader() {
+        let mut reader = "te6ccgEBAQEAAgAAAA==\n".as_bytes();
+        let body = read_sign_body_from_reader(&mut reader).expect("must read piped body");
+        assert_eq!(body, "te6ccgEBAQEAAgAAAA==\n");
     }
 
     #[test]
@@ -1803,7 +2034,7 @@ mod wallet_name_tests {
             }),
         };
 
-        let actual = get_wallet_address(&wallet, Network::Testnet)
+        let actual = get_wallet_address("wallet", &wallet, Network::Testnet)
             .expect("must derive testnet address from mnemonic");
 
         let mnemonic = Mnemonic::from_str(mnemonic_str, None).expect("valid mnemonic");
@@ -1859,6 +2090,25 @@ mod wallet_name_tests {
     }
 
     #[test]
+    fn test_resolve_airdrop_target_uses_default_testnet_faucet_url() {
+        let target = resolve_airdrop_target(WalletAirdropNetworkArg::Testnet, None)
+            .expect("testnet target must resolve");
+        match target {
+            AirdropTarget::Testnet { faucet_url } => assert_eq!(faucet_url, DEFAULT_FAUCET_URL),
+            AirdropTarget::Localnet { .. } => panic!("expected testnet target"),
+        }
+    }
+
+    #[test]
+    fn test_new_wallet_airdrop_faucet_url_uses_explicit_flag_or_default() {
+        let explicit = new_wallet_airdrop_faucet_url(Some("https://example.com/faucet".to_owned()));
+        assert_eq!(explicit, "https://example.com/faucet");
+
+        let fallback = new_wallet_airdrop_faucet_url(None);
+        assert_eq!(fallback, DEFAULT_FAUCET_URL);
+    }
+
+    #[test]
     fn test_solve_challenge_rejects_too_high_difficulty() {
         let err = solve_challenge("abc", 257).expect_err("difficulty > 256 must fail");
         assert!(
@@ -1903,6 +2153,18 @@ mod wallet_name_tests {
     #[test]
     fn test_should_prompt_auto_airdrop_disabled_when_flag_is_set() {
         assert!(!should_prompt_auto_airdrop(true, false, true, true));
+    }
+
+    #[test]
+    fn test_should_wait_for_testnet_airdrop_balance_interactive_by_default() {
+        assert!(should_wait_for_testnet_airdrop_balance(false, true, true));
+    }
+
+    #[test]
+    fn test_should_wait_for_testnet_airdrop_balance_disabled_by_flag_or_non_tty() {
+        assert!(!should_wait_for_testnet_airdrop_balance(true, true, true));
+        assert!(!should_wait_for_testnet_airdrop_balance(false, false, true));
+        assert!(!should_wait_for_testnet_airdrop_balance(false, true, false));
     }
 
     #[test]

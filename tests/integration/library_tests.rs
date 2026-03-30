@@ -2999,9 +2999,9 @@ fn write_library_metadata_file(path: &Path, library_id: &str, network: &str, las
         format!(
             r#"[libraries.{library_id}]
 name = "MyLib"
-hash = "{lib_hash}"
+hash = "{LIB_HASH}"
 code = "te6cckEBAQEAAgAAAEysuc0="
-account = "{account}"
+account = "{TEST_LIBRARY_ACCOUNT}"
 duration = 31536000
 network = "{network}"
 timestamp = "2026-01-05T12:00:00Z"
@@ -3009,8 +3009,6 @@ last_topup_timestamp = "{last_topup}"
 bits = 1024
 cells = 4
 "#,
-            lib_hash = LIB_HASH,
-            account = TEST_LIBRARY_ACCOUNT,
         ),
     )
     .expect("failed to write library metadata");
@@ -3034,7 +3032,7 @@ api = {{ v2 = "{v2_url}" }}
 fn start_litenode_with_localnet(project: &Project) -> crate::support::litenode::LiteNodeHandle {
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -3093,7 +3091,7 @@ fn read_first_library_entry(path: &Path) -> (String, StoredLibraryEntry) {
             .to_string(),
     };
 
-    (library_id.to_string(), library)
+    (library_id.clone(), library)
 }
 
 fn mark_library_runway_exhausted(path: &Path, library_id: &str) {

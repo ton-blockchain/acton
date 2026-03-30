@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry() {
     run_config_success_case(
         "du-stdlib-precompiled-duplicate-hash-no-overwrite",
-        r#"
+        r"
 get fun `test-du-stdlib-precompiled-duplicate-hash-no-overwrite`() {
     var precompiled = PrecompiledContractsConfig {
         list: createEmptyMap<uint256, PrecompiledSmartContract>(),
@@ -56,7 +56,7 @@ get fun `test-du-stdlib-precompiled-duplicate-hash-no-overwrite`() {
     expect(persistedDuplicate.gasUsage).toNotEqual(999);
     expect(persistedOther.gasUsage).toEqual(333);
 }
-"#,
+",
         "integration/snapshots/test-runner/precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry/precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry.stdout.txt",
     );
 }

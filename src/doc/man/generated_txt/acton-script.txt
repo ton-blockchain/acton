@@ -1,0 +1,160 @@
+ACTON-SCRIPT(1)
+
+NAME
+       acton-script — Execute a standalone Tolk script file
+
+SYNOPSIS
+       acton script [options] path [args…]
+
+DESCRIPTION
+       Execute a standalone Tolk script.
+
+       Scripts are useful for experimentation, deployment flows, blockchain
+       queries, and one-off operational tasks. Unlike tests, scripts use a
+       main() entry point and can send real transactions when --broadcast is
+       enabled.
+
+OPTIONS
+   Script Options
+       path
+           Path to the script file to execute.
+
+       args…
+           Arguments passed through to the script.
+
+   Debugging Options
+       --debug
+           Enable debug mode.
+
+       --backtrace level
+           Enable execution backtraces.
+
+           Currently supported value: full.
+
+       --debug-port port
+           Debug server port.
+
+   Cache Options
+       --clear-cache
+           Clear the compilation cache before running.
+
+   Remote Options
+       --fork-net network
+           Fork blockchain state from a remote network for local execution.
+
+       --fork-block-number seqno
+           Historical block sequence number to fork from.
+
+       --api-key key
+           TonCenter API key for blockchain queries.
+
+   Broadcasting Options
+       --broadcast
+           Send transactions to the selected blockchain network instead of
+           emulating them.
+
+       --net network
+           Network to use for broadcasting.
+
+       --explorer name
+           Explorer to use for transaction links.
+
+           Possible values: tonscan, toncx, dton, tonviewer
+
+   Output Options
+       --show-bodies
+           Show decoded message bodies in printed transaction trees when ABI is
+           known.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+SCRIPT MODEL
+       A Tolk script defines a main() function and runs as an isolated
+       execution.
+
+       o  state is not preserved between runs
+
+       o  local execution uses emulator wallets and balances
+
+       o  --fork-net keeps execution local but resolves remote state
+
+       o  --broadcast sends real transactions using configured wallets
+
+       Wallet names referenced by the script are resolved from the merged
+       wallet configuration, with local wallets.toml entries overriding
+       global.wallets.toml on name conflicts.
+
+ARGUMENT FORWARDING
+       Arguments after _path_ are passed through to the script runtime.
+
+       If a forwarded argument could be mistaken for an Acton flag, insert --
+       before the script arguments:
+
+           acton script scripts/query.tolk -- --net-like-value
+
+SIDE EFFECTS
+       acton script always compiles and executes the selected script. With
+       --broadcast, it can send real blockchain transactions; without
+       --broadcast, execution stays local even when --fork-net is used.
+
+EXIT STATUS
+       o  0: The script completed successfully, including successful broadcast
+          flows.
+
+       o  1: Script execution failed, broadcast submission failed, or remote
+          network access such as fork-state resolution failed.
+
+SAFE EXECUTION ORDER
+       When a script can affect on-chain state, the usual safe sequence is:
+
+       1. acton build
+
+       2. acton test
+
+       3. acton script <path> without --broadcast
+
+       4. only then acton script <path> --broadcast
+
+EXAMPLES
+       1. Execute locally in the emulator:
+
+              acton script scripts/deploy.tolk
+
+       2. Broadcast to testnet:
+
+              acton script scripts/deploy.tolk --broadcast --net testnet
+
+       3. Query mainnet state without broadcasting:
+
+              acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+
+       4. Broadcast a deploy flow and print explorer links:
+
+              acton script scripts/deploy.tolk --broadcast --net testnet --explorer tonviewer
+
+SEE ALSO
+       o  acton help run
+
+       o  Scripting guide
+          <https://ton-blockchain.github.io/acton/docs/scripting>
+
+       o  Wallet setup
+          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+

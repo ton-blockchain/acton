@@ -10,7 +10,7 @@ pub enum OneOrMany<T> {
 }
 
 /// =======================
-/// Types: TypePtr::as_abi_json()
+/// Types: `TypePtr::as_abi_json()`
 /// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -202,7 +202,7 @@ pub struct ABIUnionVariant {
 }
 
 /// =======================
-/// Const values: ConstValExpression -> constants[].value
+/// Const values: `ConstValExpression` -> constants[].value
 /// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -243,7 +243,7 @@ pub enum ABIConstValue {
 }
 
 /// =======================
-/// Declarations (used_symbols -> declarations[])
+/// Declarations (`used_symbols` -> declarations[])
 /// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIOpcode {
@@ -428,7 +428,7 @@ pub struct ABIConstant {
 }
 
 /// =======================
-/// Root: ContractABI (то, что лежит в abiJson)
+/// Root: `ContractABI` (то, что лежит в abiJson)
 /// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractABI {
@@ -547,6 +547,7 @@ impl ContractABI {
 }
 
 impl ABIType {
+    #[must_use]
     pub fn render_param_type(&self) -> String {
         if let ABIType::CellOf { inner } = self {
             render_one_or_many_type(inner)
@@ -616,10 +617,12 @@ impl ABIType {
         }
     }
 
+    #[must_use]
     pub const fn is_typed_cell(&self) -> bool {
         matches!(self, ABIType::CellOf { .. })
     }
 
+    #[must_use]
     pub fn typed_cell_payload_default_value(&self, abi: &ContractABI) -> Option<String> {
         match self {
             ABIType::CellOf { inner } => Some(default_value_for_one_or_many(
@@ -632,6 +635,7 @@ impl ABIType {
         }
     }
 
+    #[must_use]
     pub fn default_value(&self, abi: &ContractABI) -> String {
         default_value_impl(abi, self, &BTreeMap::new(), &mut HashSet::new())
     }
@@ -647,7 +651,7 @@ fn collect_structs_from_type(
     match ty {
         ABIType::StructRef { struct_name, .. } => {
             let fields = find_struct_decl(abi, struct_name)
-                .ok_or_else(|| anyhow!("Struct {} referenced by ABI was not found", struct_name))?;
+                .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
             if seen_structs.insert(struct_name.clone()) {
                 resolved.push(to_resolved_struct(struct_name, fields));
             }
@@ -655,11 +659,11 @@ fn collect_structs_from_type(
         }
         ABIType::AliasRef { alias_name, .. } => {
             if !visited_aliases.insert(alias_name.clone()) {
-                anyhow::bail!("Cyclic ABI alias reference detected for {}", alias_name);
+                anyhow::bail!("Cyclic ABI alias reference detected for {alias_name}");
             }
 
             let result = find_alias_decl(abi, alias_name)
-                .ok_or_else(|| anyhow!("Alias {} referenced by ABI was not found", alias_name))
+                .ok_or_else(|| anyhow!("Alias {alias_name} referenced by ABI was not found"))
                 .and_then(|target_ty| {
                     collect_structs_from_type(
                         abi,
@@ -926,11 +930,7 @@ fn default_struct_value(
 
     let result = find_struct_decl_full(abi, struct_name)
         .map(|(type_params, fields)| {
-            if !type_args.is_empty()
-                || type_params
-                    .map(|params| !params.is_empty())
-                    .unwrap_or(false)
-            {
+            if !type_args.is_empty() || type_params.is_some_and(|params| !params.is_empty()) {
                 return "{}".to_owned();
             }
 
@@ -971,11 +971,7 @@ fn default_alias_value(
 
     let result = find_alias_decl_full(abi, alias_name)
         .map(|(type_params, target_ty)| {
-            if !type_args.is_empty()
-                || type_params
-                    .map(|params| !params.is_empty())
-                    .unwrap_or(false)
-            {
+            if !type_args.is_empty() || type_params.is_some_and(|params| !params.is_empty()) {
                 return "{}".to_owned();
             }
 
@@ -995,8 +991,10 @@ fn default_alias_value(
 fn default_enum_value(abi: &ContractABI, enum_name: &str) -> String {
     find_enum_decl(abi, enum_name)
         .and_then(|(_, members)| members.first())
-        .map(|member| format!("{enum_name}.{}", member.name))
-        .unwrap_or_else(|| "null".to_owned())
+        .map_or_else(
+            || "null".to_owned(),
+            |member| format!("{enum_name}.{}", member.name),
+        )
 }
 
 fn default_union_value(
@@ -1045,15 +1043,15 @@ fn render_const_value(value: &ABIConstValue) -> String {
     match value {
         ABIConstValue::Int { v } => v.clone(),
         ABIConstValue::Bool { v } => v.to_string(),
-        ABIConstValue::Slice { hex } => serde_json::to_string(hex)
-            .map(|hex| format!("stringHexToSlice({hex})"))
-            .unwrap_or_else(|_| "null".to_owned()),
+        ABIConstValue::Slice { hex } => serde_json::to_string(hex).map_or_else(
+            |_| "null".to_owned(),
+            |hex| format!("stringHexToSlice({hex})"),
+        ),
         ABIConstValue::String { str } => {
             serde_json::to_string(str).unwrap_or_else(|_| "\"\"".to_owned())
         }
         ABIConstValue::Address { addr } => serde_json::to_string(addr)
-            .map(|addr| format!("address({addr})"))
-            .unwrap_or_else(|_| "null".to_owned()),
+            .map_or_else(|_| "null".to_owned(), |addr| format!("address({addr})")),
         ABIConstValue::Tensor { items } => format!(
             "({})",
             items

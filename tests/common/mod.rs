@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 #[macro_export]
@@ -52,6 +53,17 @@ pub(crate) fn acton_exe() -> PathBuf {
     } else {
         snapbox::cmd::cargo_bin!("acton").to_path_buf()
     }
+}
+
+pub(crate) fn acton_path_env() -> OsString {
+    let mut paths = Vec::new();
+    if let Some(bin_dir) = acton_exe().parent() {
+        paths.push(bin_dir.to_path_buf());
+    }
+    if let Some(existing_path) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing_path));
+    }
+    std::env::join_paths(paths).expect("Failed to construct PATH with Acton binary")
 }
 
 #[allow(dead_code)]

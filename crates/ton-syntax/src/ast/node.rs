@@ -48,7 +48,7 @@ pub struct AstChildren<'tree, N> {
     ph: PhantomData<N>,
 }
 
-impl<'tree, N> Default for AstChildren<'tree, N> {
+impl<N> Default for AstChildren<'_, N> {
     fn default() -> Self {
         Self {
             inner: SyntaxNodeChildren::empty(),
@@ -59,6 +59,7 @@ impl<'tree, N> Default for AstChildren<'tree, N> {
 
 impl<'tree, N> AstChildren<'tree, N> {
     /// Creates a new `AstChildren` iterator for the children of the given node.
+    #[must_use]
     pub fn new(parent: Node<'tree>) -> Self {
         AstChildren {
             inner: SyntaxNodeChildren::new(parent),
@@ -77,12 +78,14 @@ impl<'tree, N: AstNode<'tree>> Iterator for AstChildren<'tree, N> {
 
 impl<'tree, N: AstNode<'tree>> AstChildren<'tree, N> {
     /// Returns `true` if there are no children of type `N`.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         let mut clone = self.clone();
         clone.next().is_none()
     }
 
     /// Returns the first child of type `N`, if any.
+    #[must_use]
     pub fn first(&self) -> Option<N> {
         let mut clone = self.clone();
         clone.next()

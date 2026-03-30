@@ -8,6 +8,7 @@ body:
     attributes:
       value: |
         Use this template for incorrect behavior, unexpected errors, failed commands, or regressions.
+        Do not use public issues for security vulnerabilities; see `SECURITY.md` and use the private advisory flow instead.
 
   - type: input
     id: version

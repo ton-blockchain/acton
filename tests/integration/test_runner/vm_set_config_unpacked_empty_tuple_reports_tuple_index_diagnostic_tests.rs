@@ -3,10 +3,10 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const DL_SIMPLE_CONTRACT: &str = r#"
+const DL_SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const DL_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
@@ -34,7 +34,7 @@ fn run_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic() {
     run_failure_case(
         "dl-stdlib-vm-set-config-unpacked-empty-tuple-diagnostic",
-        r#"
+        r"
 get fun `test-dl-vm-set-config-unpacked-empty-tuple-diagnostic`() {
     vm.setConfigUnpacked([]);
 
@@ -42,7 +42,7 @@ get fun `test-dl-vm-set-config-unpacked-empty-tuple-diagnostic`() {
     val applied = net.setConfig(config);
     expect(applied).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic/vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic.stdout.txt",
     );
 }
@@ -52,7 +52,7 @@ fn vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fi
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/dl_vm_set_config_unpacked_single_item_malformed.test.tolk";
     let source = format!(
-        r#"{DL_VM_IMPORTS}
+        r"{DL_VM_IMPORTS}
 get fun `test-dl-vm-set-config-unpacked-single-item-tuple-diagnostic`() {{
     var malformed = [];
     malformed.push(1);
@@ -62,7 +62,7 @@ get fun `test-dl-vm-set-config-unpacked-single-item-tuple-diagnostic`() {{
     val applied = net.setConfig(config);
     expect(applied).toBeTrue();
 }}
-"#
+"
     );
 
     fs::write(fixture.path().join(test_path), source)

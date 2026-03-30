@@ -60,6 +60,7 @@ pub struct GetTransactionsRequest {
     pub to_lt: Option<u64>,
 }
 
+#[must_use]
 pub const fn default_limit() -> usize {
     10
 }

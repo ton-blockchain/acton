@@ -106,6 +106,28 @@ fn diagnostics_summary(diagnostics: &[Diagnostic]) -> (usize, usize) {
     (error_count, warning_count)
 }
 
+struct DiagnosticsStatus {
+    error_count: usize,
+    warning_count: usize,
+    warning_limit_exceeded: bool,
+}
+
+impl DiagnosticsStatus {
+    const fn is_success(&self) -> bool {
+        self.error_count == 0 && !self.warning_limit_exceeded
+    }
+}
+
+fn diagnostics_status(diagnostics: &[Diagnostic], max_warnings: usize) -> DiagnosticsStatus {
+    let (error_count, warning_count) = diagnostics_summary(diagnostics);
+
+    DiagnosticsStatus {
+        error_count,
+        warning_count,
+        warning_limit_exceeded: warning_count > max_warnings,
+    }
+}
+
 pub fn check_cmd(
     fix: bool,
     cli_output_format: Option<CheckOutputFormat>,
@@ -209,6 +231,7 @@ pub fn check_cmd(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
+    let status = diagnostics_status(&all_diagnostics, max_warnings);
 
     let mut writer: Box<dyn Write> = match output_file {
         Some(path) => {
@@ -227,7 +250,12 @@ pub fn check_cmd(
             show_plain_report(fix, max_warnings, &all_diagnostics, &file_db)?;
         }
         CheckOutputFormat::Json => {
-            output::json::write_report(&mut writer, &all_diagnostics, &file_db)?;
+            output::json::write_report(
+                &mut writer,
+                status.is_success(),
+                &all_diagnostics,
+                &file_db,
+            )?;
         }
         CheckOutputFormat::Sarif => {
             output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
@@ -243,11 +271,7 @@ pub fn check_cmd(
     if output_format != CheckOutputFormat::Plain {
         writer.flush()?;
 
-        let (error_count, warning_count) = diagnostics_summary(&all_diagnostics);
-        let warning_limit_exceeded = warning_count > max_warnings;
-        let is_success = error_count == 0 && !warning_limit_exceeded;
-
-        if !is_success {
+        if !status.is_success() {
             std::process::exit(1);
         }
     }
@@ -332,8 +356,7 @@ fn show_plain_report(
     } else {
         Vec::from(all_diagnostics)
     };
-    let (error_count, warning_count) = diagnostics_summary(&shown_diagnostics);
-    let warning_limit_exceeded = warning_count > max_warnings;
+    let status = diagnostics_status(&shown_diagnostics, max_warnings);
 
     if !shown_diagnostics.is_empty() {
         shown_diagnostics.sort();
@@ -369,14 +392,14 @@ fn show_plain_report(
             }
         }
 
-        if warning_limit_exceeded {
+        if status.warning_limit_exceeded {
             if !printed_autofix_notice {
                 eprintln!();
             }
             eprintln!(
                 "Warning limit exceeded: {} {} (max-warnings = {}).",
-                warning_count,
-                if warning_count == 1 {
+                status.warning_count,
+                if status.warning_count == 1 {
                     "warning"
                 } else {
                     "warnings"
@@ -391,11 +414,11 @@ fn show_plain_report(
                 "Use {} to get detailed explanation of a rule.",
                 "acton check --explain <CODE>".yellow()
             );
-            eprintln!("For example: acton check --explain {}", code);
+            eprintln!("For example: acton check --explain {code}");
         }
     }
 
-    if error_count > 0 || warning_limit_exceeded {
+    if !status.is_success() {
         std::process::exit(1);
     }
     Ok(())

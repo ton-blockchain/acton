@@ -12,7 +12,7 @@ fn run_simple_test(group: &str, content: &str, name: &str) {
 fn test_check_pure_function_call_unused() {
     run_simple_test(
         "pure_function_call_unused",
-        r#"
+        r"
             @pure
             fun add(a: int, b: int): int {
                 return a + b;
@@ -21,7 +21,7 @@ fn test_check_pure_function_call_unused() {
             fun main() {
                 add(1, 2);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

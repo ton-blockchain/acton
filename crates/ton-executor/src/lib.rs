@@ -33,9 +33,11 @@ use ton_objs as _;
 
 mod common;
 mod config;
+mod version;
 
 pub mod get;
 pub mod message;
 
 pub use common::*;
 pub use config::*;
+pub use version::{NativeEmulatorVersion, native_emulator_version};

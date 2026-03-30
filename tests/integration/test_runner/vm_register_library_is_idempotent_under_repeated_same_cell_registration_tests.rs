@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const DV_SIMPLE_CONTRACT: &str = r#"
+const DV_SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const DV_IMPORTS: &str = r#"
 import "../../lib/build/build"

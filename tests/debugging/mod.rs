@@ -158,7 +158,7 @@ pub(crate) fn run_script_file(
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &config {
         let mappings = config.mappings();
-        compiler = compiler.with_mappings(&mappings)
+        compiler = compiler.with_mappings(&mappings);
     }
 
     match compiler.compile(Path::new(file_path), true) {
@@ -278,6 +278,7 @@ fn execute_script<'a>(
             emulator: &mut emulator,
             emulations: &mut emulations,
         },
+        message_iters: Default::default(),
         build: BuildContext {
             build_cache: &mut build_cache,
             file_build_cache: &mut file_build_cache,
@@ -296,7 +297,7 @@ fn execute_script<'a>(
     let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
 
-    let transport = debugger::start_dap_server(debug_port);
+    let transport = debugger::start_dap_server(debug_port)?;
 
     let mut dbg_ctx = DebugContext::new(
         transport,

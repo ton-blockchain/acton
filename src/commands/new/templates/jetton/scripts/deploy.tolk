@@ -48,7 +48,7 @@ fun main() {
 
     val deployer = net.wallet("deployer");
     val minter = JettonMinter.fromStorage({
-        totalSupply: supply,
+        totalSupply: 0,
         adminAddress: deployer.address,
         content,
         jettonWalletCode: build("jetton_wallet"),

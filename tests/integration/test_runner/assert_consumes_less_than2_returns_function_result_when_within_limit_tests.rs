@@ -13,7 +13,7 @@ fn wrap_assert_source(test_body: &str) -> String {
 #[test]
 fn assert_consumes_less_than2_returns_function_result_when_within_limit() {
     let source = wrap_assert_source(
-        r#"
+        r"
 get fun `test-ac-consumes-less-than2-returns-result`() {
     val sum = Assert.consumesLessThan2(
         fun(a: int, b: int): int {
@@ -25,7 +25,7 @@ get fun `test-ac-consumes-less-than2-returns-result`() {
     );
     expect(sum).toEqual(42);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("ac-stdlib-assert-consumes-less-than2-pass")
@@ -44,7 +44,7 @@ get fun `test-ac-consumes-less-than2-returns-result`() {
 #[test]
 fn assert_consumes_less_than_reports_human_readable_gas_failure() {
     let source = wrap_assert_source(
-        r#"
+        r"
 get fun `test-ac-consumes-less-than-failure`() {
     Assert.consumesLessThan(
         fun() {
@@ -56,7 +56,7 @@ get fun `test-ac-consumes-less-than-failure`() {
         0
     );
 }
-"#,
+",
     );
 
     ProjectBuilder::new("ac-stdlib-assert-consumes-less-than-fail")
@@ -76,11 +76,11 @@ get fun `test-ac-consumes-less-than-failure`() {
 #[test]
 fn expect_to_equal_decimal_formats_negative_fraction_values_in_failure() {
     let source = wrap_assert_source(
-        r#"
+        r"
 get fun `test-ac-decimal-default-message-formatting`() {
     expect(-15).toEqualDecimal(-10, 2);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("ac-stdlib-decimal-default-formatting")

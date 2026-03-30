@@ -20,6 +20,7 @@ ton_syntax::impl_source_file_basics!(SourceFile, ParseError, collect_errors, lan
 
 impl SourceFile {
     /// Returns an iterator over all top-level declarations in the file.
+    #[must_use]
     pub fn top_levels(&self) -> AstChildren<'_, TopLevel<'_>> {
         AstChildren::new(self.tree.root_node())
     }
@@ -58,6 +59,7 @@ impl SourceFile {
     /// # Returns
     ///
     /// The top-level declaration that covers the given range of bytes, if any.
+    #[must_use]
     pub fn find_top_levels_at(&self, start: usize, end: usize) -> Option<TopLevel<'_>> {
         self.top_levels().find(|decl| {
             let decl_start = decl.syntax().start_byte();

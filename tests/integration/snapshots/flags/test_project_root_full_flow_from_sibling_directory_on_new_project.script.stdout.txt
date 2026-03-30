@@ -1,2 +1,1 @@
 Deployed starter contract to [WALLET_ADDRESS_BASE] (Empty)
-Owner is [WALLET_ADDRESS_BASE] (deployer)

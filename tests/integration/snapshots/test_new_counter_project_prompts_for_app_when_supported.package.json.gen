@@ -1,0 +1,36 @@
+{
+  "name": "interactive-counter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:contracts && vite build",
+    "build:contracts": "acton build",
+    "dev": "vite",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
+    "preview": "vite preview",
+    "test": "acton test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
+    "@ton/appkit-react": "^0.0.4",
+    "@ton/core": "^0.63.1",
+    "@ton/ton": "^16.2.2",
+    "@tonconnect/ui-react": "^2.4.2",
+    "buffer": "^6.0.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}

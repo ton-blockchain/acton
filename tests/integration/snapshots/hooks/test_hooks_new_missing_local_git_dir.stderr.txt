@@ -1,0 +1,1 @@
+Error: Hooks scaffold can only be created in a project root containing .git. Run `git init` first.

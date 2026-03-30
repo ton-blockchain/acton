@@ -21,5 +21,7 @@ use ton_objs as _;
 
 pub mod abi;
 pub mod compiler;
+mod version;
 
 pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};
+pub use version::{NativeTolkVersion, native_tolk_version};

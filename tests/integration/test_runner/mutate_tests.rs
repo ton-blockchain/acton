@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 
-const MUTATION_CONTRACT: &str = r#"
+const MUTATION_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {
     assert (in.valueCoins > 0) throw 5;
 }
@@ -11,7 +11,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 get fun addOne(x: int): int {
     return x + 1;
 }
-"#;
+";
 
 const PASSING_TEST: &str = r#"
 import "../../lib/testing/expect"
@@ -32,15 +32,15 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const BROKEN_DEPENDENCY_MUTATION_CONTRACT: &str = r#"
+const BROKEN_DEPENDENCY_MUTATION_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {
     THIS IS A SYNTAX ERROR
 }
 
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
-const COMPILE_ERROR_MUTATION_CONTRACT: &str = r#"
+const COMPILE_ERROR_MUTATION_CONTRACT: &str = r"
 get fun mustFail(): int {
     throw 5;
 }
@@ -51,12 +51,12 @@ get fun addOne(x: int): int {
 
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
-const NO_MUTATION_POINTS_CONTRACT: &str = r#"
+const NO_MUTATION_POINTS_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn mutation_project(name: &str) -> Project {
     ProjectBuilder::new(name)
@@ -291,13 +291,13 @@ fn mutate_benchmark_large_mutant_set() {
     }
 
     let contract = format!(
-        r#"
+        r"
 fun onInternalMessage(in: InMessage) {{
 {asserts}
 }}
 
 fun onBouncedMessage(_: InMessageBounced) {{}}
-"#
+"
     );
 
     let start = Instant::now();
@@ -338,8 +338,5 @@ fun onBouncedMessage(_: InMessageBounced) {{}}
         );
     }
 
-    eprintln!(
-        "mutation benchmark: {} mutants processed in {:?}",
-        mutant_count, elapsed
-    );
+    eprintln!("mutation benchmark: {mutant_count} mutants processed in {elapsed:?}");
 }

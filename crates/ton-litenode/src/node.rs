@@ -219,7 +219,7 @@ impl Node {
         let mut globals = Globals::new(config_hash);
         globals.head_seqno = head_seqno;
         // Approximation of global LT
-        globals.global_lt = history.blocks.last().map(|b| b.end_lt).unwrap_or(0);
+        globals.global_lt = history.blocks.last().map_or(0, |b| b.end_lt);
 
         let mut node = Self {
             cas,
@@ -408,8 +408,7 @@ impl Node {
             if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
                 let storage: u128 = ord
                     .storage_phase
-                    .map(|p| p.storage_fees_collected.into())
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.storage_fees_collected.into());
                 let total: u128 = exec_result.tx.total_fees.tokens.into();
                 (storage, total.saturating_sub(storage))
             } else {
@@ -774,11 +773,12 @@ impl Node {
     fn parse_addr_internal(&self, s: &str) -> Option<Addr> {
         let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).ok()?;
         Some(Addr {
-            workchain: int_addr.workchain as i32,
+            workchain: i32::from(int_addr.workchain),
             addr: int_addr.address.0,
         })
     }
 
+    #[must_use]
     pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryLookup> {
         hashes
             .iter()
@@ -1149,10 +1149,12 @@ impl Node {
         None
     }
 
+    #[must_use]
     pub fn get_cell(&self, hash: &Hash256) -> Option<BocBytes> {
         self.cas.get(hash)
     }
 
+    #[must_use]
     pub fn get_transactions(
         &self,
         addr: &Addr,
@@ -1196,6 +1198,7 @@ impl Node {
             .collect()
     }
 
+    #[must_use]
     pub fn get_block_header(&self, seqno: Seqno) -> Option<BlockMeta> {
         if seqno == 0 || seqno as usize > self.history.blocks.len() {
             None
@@ -1204,6 +1207,7 @@ impl Node {
         }
     }
 
+    #[must_use]
     pub fn find_block_by_lt(&self, lt: Lt) -> Option<BlockMeta> {
         self.history
             .blocks
@@ -1212,6 +1216,7 @@ impl Node {
             .cloned()
     }
 
+    #[must_use]
     pub fn find_block_by_unixtime(&self, utime: u32) -> Option<BlockMeta> {
         // Find block with gen_utime closest but not greater than utime
         self.history
@@ -1221,18 +1226,21 @@ impl Node {
             .cloned()
     }
 
+    #[must_use]
     pub fn get_block_transactions(&self, block_meta: &BlockMeta) -> Option<Vec<TxMeta>> {
         let tx_hash = self.indexes.tx_by_block.get(&block_meta.seqno)?;
         let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
         Some(vec![tx])
     }
 
+    #[must_use]
     pub fn get_message_info(&self, hash: &Hash256) -> Option<MessageInfo> {
         let meta = self.history.msg_by_hash.get(hash).cloned()?;
         let boc = self.cas.get(&meta.msg_boc_hash)?;
         Some(MessageInfo { meta, boc })
     }
 
+    #[must_use]
     pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
         let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
@@ -1411,8 +1419,7 @@ impl Node {
             if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
                 let storage: u128 = ord
                     .storage_phase
-                    .map(|p| p.storage_fees_collected.into())
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.storage_fees_collected.into());
                 let total: u128 = exec_result.tx.total_fees.tokens.into();
                 (storage, total.saturating_sub(storage))
             } else {
@@ -1539,6 +1546,7 @@ impl Node {
         Ok(Some(boc))
     }
 
+    #[must_use]
     pub fn has_pending_messages(&self) -> bool {
         !self.pool.external.is_empty() || !self.pool.internal.is_empty()
     }

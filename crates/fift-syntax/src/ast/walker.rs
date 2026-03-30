@@ -280,6 +280,7 @@ pub trait Walker<'tree> {
 }
 
 /// Finds the nearest parent node matching the provided tree-sitter kind.
+#[must_use]
 pub fn find_parent_by_kind<'a>(
     node: &'a tree_sitter::Node<'a>,
     target_kind: &str,

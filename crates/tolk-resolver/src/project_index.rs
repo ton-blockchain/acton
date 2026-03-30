@@ -22,11 +22,13 @@ pub struct ResolvedImport {
 
 impl ResolvedImport {
     /// Returns AST node of this import.
+    #[must_use]
     pub const fn import(&self) -> &Import {
         &self.import
     }
 
     /// Return `FileId` which is imported.
+    #[must_use]
     pub const fn target(&self) -> Option<FileId> {
         self.target
     }
@@ -61,10 +63,12 @@ impl ProjectIndex {
         ProjectIndexBuilder::new(file_db, root_path)
     }
 
+    #[must_use]
     pub const fn files(&self) -> &FxHashMap<FileId, Arc<FileIndex>> {
         &self.files
     }
 
+    #[must_use]
     pub fn workspace_files(&self) -> Vec<Arc<FileIndex>> {
         let mut files = self
             .files
@@ -76,27 +80,33 @@ impl ProjectIndex {
         files
     }
 
+    #[must_use]
     pub const fn imports(&self) -> &FxHashMap<FileId, Vec<ResolvedImport>> {
         &self.imports
     }
 
+    #[must_use]
     pub fn imports_of(&self, file_id: FileId) -> Option<Vec<ResolvedImport>> {
         self.imports.get(&file_id).cloned()
     }
 
+    #[must_use]
     pub const fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
         &self.path_to_file_id
     }
 
+    #[must_use]
     pub const fn resolved_uses(&self) -> &FxHashMap<FileId, Arc<FileResolveIndex>> {
         &self.resolved_uses
     }
 
+    #[must_use]
     pub const fn dependents(&self) -> &FxHashMap<FileId, Vec<FileId>> {
         &self.dependents
     }
 
     /// Returns a list of all file IDs that directly import the given file.
+    #[must_use]
     pub fn direct_dependents(&self, file_id: FileId) -> Vec<FileId> {
         let Some(file) = self.files.get(&file_id) else {
             // very unlikely and likely a bug
@@ -107,7 +117,7 @@ impl ProjectIndex {
 
         if is_common {
             // all files depend on common.tolk
-            return self.files.keys().cloned().collect();
+            return self.files.keys().copied().collect();
         }
 
         let mut result = vec![file_id]; // include the file itself
@@ -118,31 +128,38 @@ impl ProjectIndex {
         result
     }
 
+    #[must_use]
     pub fn stdlib_path(&self) -> Option<&Path> {
         self.stdlib_path.as_deref()
     }
 
+    #[must_use]
     pub const fn mappings(&self) -> &FxHashMap<String, String> {
         &self.mappings
     }
 
+    #[must_use]
     pub fn errors(&self) -> &[String] {
         &self.errors
     }
 
+    #[must_use]
     pub fn get_file_index(&self, file_id: FileId) -> Option<&Arc<FileIndex>> {
         self.files.get(&file_id)
     }
 
+    #[must_use]
     pub fn get_resolved_uses(&self, file_id: FileId) -> Option<&Arc<FileResolveIndex>> {
         self.resolved_uses.get(&file_id)
     }
 
+    #[must_use]
     pub const fn global_symbols(&self) -> &HashMap<Arc<str>, Vec<SymbolId>> {
         &self.global_symbols
     }
 
     /// Returns a list of all file IDs that are recursively reachable from the given file.
+    #[must_use]
     pub fn reachable_files(&self, file_id: FileId) -> Vec<FileId> {
         // TODO: add common.tolk
         let mut queue = VecDeque::new();
@@ -154,7 +171,7 @@ impl ProjectIndex {
                 continue;
             };
 
-            let imported_files = imports.iter().flat_map(|import| import.target);
+            let imported_files = imports.iter().filter_map(|import| import.target);
             result.extend(imported_files.clone());
             queue.extend(imported_files);
         }
@@ -163,6 +180,7 @@ impl ProjectIndex {
     }
 
     /// Resolves a `SymbolId` to its corresponding `Symbol` declaration.
+    #[must_use]
     pub fn resolve_symbol(&self, symbol_id: SymbolId) -> Option<&Symbol> {
         let file_index = self.files.get(&symbol_id.file_id)?;
         file_index.decls.iter().find_map(|d| {
@@ -178,6 +196,7 @@ impl ProjectIndex {
         })
     }
 
+    #[must_use]
     pub fn find_symbol_at(&self, file_id: FileId, offset: usize) -> Option<&Symbol> {
         let file = self.files().get(&file_id)?;
         file.decls.iter().find_map(|d| {
@@ -198,12 +217,14 @@ impl ProjectIndex {
     }
 
     /// Finds a name usage at the specified byte offset in a file.
+    #[must_use]
     pub fn find_use(&self, file_id: FileId, pos: usize) -> Option<&NameUse> {
         self.resolved_uses.get(&file_id)?.find_use(pos)
     }
 
+    #[must_use]
     pub fn get_file_by_path(&self, path: &Path) -> Option<FileId> {
-        self.path_to_file_id.get(path).cloned()
+        self.path_to_file_id.get(path).copied()
     }
 
     fn resolve_imports(
@@ -221,14 +242,14 @@ impl ProjectIndex {
                 {
                     Ok(resolved) => resolved,
                     Err(err) => {
-                        errors.push(format!("{:#?}", err));
+                        errors.push(format!("{err:#?}"));
                         continue;
                     }
                 };
             let file_id = path_to_id.get(&resolved);
             file_imports.push(ResolvedImport {
                 import: import.clone(),
-                target: file_id.cloned(),
+                target: file_id.copied(),
             });
         }
         (file_imports, errors)
@@ -243,7 +264,7 @@ impl ProjectIndex {
     ) -> anyhow::Result<PathBuf> {
         if let Some(relative_path) = import.strip_prefix("@stdlib/") {
             let Some(stdlib) = stdlib_path else {
-                anyhow::bail!("Stdlib path not provided for @stdlib import: {}", import);
+                anyhow::bail!("Stdlib path not provided for @stdlib import: {import}");
             };
             let abs_path = stdlib.join(relative_path);
             let abs_path = Self::append_tolk_extension_if_needed(abs_path);
@@ -303,6 +324,7 @@ impl<'a> ProjectIndexBuilder<'a> {
         }
     }
 
+    #[must_use]
     pub fn with_stdlib(mut self, path: PathBuf) -> Self {
         self.stdlib_path = Some(path);
         self
@@ -311,6 +333,7 @@ impl<'a> ProjectIndexBuilder<'a> {
     /// Sets path mappings used to resolve `@alias/...` imports.
     ///
     /// Keys are normalized to include `@` prefix, matching compiler behavior.
+    #[must_use]
     pub fn with_mappings(mut self, mappings: &Option<BTreeMap<String, String>>) -> Self {
         if let Some(mappings) = mappings {
             self.mappings = mappings
@@ -365,7 +388,7 @@ impl<'a> ProjectIndexBuilder<'a> {
                 Err(err) => {
                     errors.push(format!("Cannot process common.tolk file: {err}"));
                 }
-            };
+            }
         }
 
         while let Some((root_file_id, import)) = queue.pop_front() {
@@ -381,7 +404,7 @@ impl<'a> ProjectIndexBuilder<'a> {
             ) {
                 Ok(resolved) => resolved,
                 Err(err) => {
-                    errors.push(format!("{:#?}", err));
+                    errors.push(format!("{err:#?}"));
                     continue;
                 }
             };
@@ -393,7 +416,7 @@ impl<'a> ProjectIndexBuilder<'a> {
             let index = match self.file_db.process(&resolved) {
                 Ok(info) => info.index().clone(),
                 Err(err) => {
-                    errors.push(format!("{:#?}", err));
+                    errors.push(format!("{err:#?}"));
                     continue;
                 }
             };

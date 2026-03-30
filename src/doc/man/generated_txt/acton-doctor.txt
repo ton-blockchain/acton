@@ -1,0 +1,109 @@
+ACTON-DOCTOR(1)
+
+NAME
+       acton-doctor — Inspect the resolved Acton project environment
+
+SYNOPSIS
+       acton doctor [options]
+
+DESCRIPTION
+       Print a diagnostic report for the current Acton environment.
+
+       The report is intended to help debug project resolution, manifest
+       parsing, wallet and library overlays, bundled standard-library state,
+       native emulator and Tolk library metadata, logging paths, and relevant
+       environment variables.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+REPORT SECTIONS
+       acton doctor prints:
+
+       o  version and build metadata
+
+       o  resolved paths for the project, manifest, .acton, cache, wallets, and
+          libraries
+
+       o  Acton.toml existence and parse status
+
+       o  wallet and library overlay load status
+
+       o  bundled stdlib health and version
+
+       o  native emulator/Tolk version metadata, including the TON commit hash
+          and date embedded in the linked libraries
+
+       o  resolved logging directory and debug log path
+
+       o  selected environment variables such as HOME, SHELL, and NO_COLOR
+
+PATH AND OVERLAY CHECKS
+       For each reported path, Acton shows whether it exists, whether it
+       appears writable, and when relevant which resolution source selected it.
+
+       Overlay inspection includes:
+
+       o  whether local and global overlay files parse correctly
+
+       o  how many entries they contain
+
+       o  a merged entry count when both layers load successfully
+
+STDLIB HEALTH
+       The stdlib section reports whether .acton/tolk-stdlib is:
+
+       o  missing
+
+       o  incomplete
+
+       o  healthy
+
+       o  outdated
+
+       o  unknown-version
+
+EXIT STATUS
+       o  0: The diagnostic report was produced successfully.
+
+       o  1: Environment inspection failed before the report could be
+          completed, for example because path resolution or manifest loading
+          failed unexpectedly.
+
+EXAMPLES
+       1. Show diagnostics for the current project:
+
+              acton doctor
+
+       2. Inspect another project root explicitly:
+
+              acton --project-root ../my-project doctor
+
+       3. Capture environment details before filing a bug:
+
+              acton doctor
+
+SEE ALSO
+       o  acton help init
+
+       o  acton help ls
+
+       o  Acton documentation
+          <https://ton-blockchain.github.io/acton/docs/welcome>
+

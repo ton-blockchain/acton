@@ -44,7 +44,7 @@ fn run_ext_message_case(project_name: &str, test_body: &str, snapshot_path: &str
 fn ext_message_relaxed_load_body_returns_left_value() {
     run_ext_message_case(
         "ch-stdlib-ext-message-load-body-left",
-        r#"
+        r"
 get fun `test-ch-stdlib-ext-message-load-body-left`() {
     val payload = ChExternalPayload {
         queryId: 41,
@@ -59,7 +59,7 @@ get fun `test-ch-stdlib-ext-message-load-body-left`() {
 
     expect(msg.loadBody()).toEqual(payload);
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_message_relaxed_load_body_returns_left_value/ext_message_relaxed_load_body_returns_left_value.stdout.txt",
     );
 }
@@ -68,7 +68,7 @@ get fun `test-ch-stdlib-ext-message-load-body-left`() {
 fn ext_message_relaxed_load_body_loads_right_cell_value() {
     run_ext_message_case(
         "ch-stdlib-ext-message-load-body-right",
-        r#"
+        r"
 get fun `test-ch-stdlib-ext-message-load-body-right`() {
     val payload = ChExternalPayload {
         queryId: 77,
@@ -84,7 +84,7 @@ get fun `test-ch-stdlib-ext-message-load-body-right`() {
 
     expect(msg.loadBody()).toEqual(payload);
 }
-"#,
+",
         "integration/snapshots/test-runner/ext_message_relaxed_load_body_returns_left_value/ext_message_relaxed_load_body_loads_right_cell_value.stdout.txt",
     );
 }

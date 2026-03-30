@@ -1,0 +1,173 @@
+'\" t
+.TH "ACTON\-HELP" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-help \[em] Show root help or detailed help for a specific top\-level command
+.SH "SYNOPSIS"
+\fBacton help\fR [\fIoptions\fR] [\fIcommand\fR]
+.SH "DESCRIPTION"
+Show help for the Acton CLI.
+.sp
+Without an argument, \fBacton help\fR prints the root command overview.
+.sp
+For detailed manuals, prefer \fBacton help <command>\fR for top\-level commands.
+Generated manuals document behavior, configuration, side effects, and examples
+in more detail than short flag help.
+.sp
+With a command name, Acton first tries to render a generated command manual
+from the bundled \fBtxt\fR and \fBman\fR artifacts. If no generated manual exists,
+Acton falls back to clap long help for that subcommand.
+.sp
+Nested command paths such as \fBwallet list\fR are not currently accepted by
+\fBacton help\fR\&. In practice, top\-level manuals such as \fBacton help wallet\fR and
+\fBacton help library\fR already include the nested subcommands under that command.
+Use clap help directly only when you need the exact nested help view, for
+example \fBacton wallet list \-\-help\fR\&.
+.sp
+If the command name is unknown, Acton reports an error and may suggest a
+similar command name.
+.SH "OPTIONS"
+.SS "Help Options"
+.sp
+\fIcommand\fR
+.RS 4
+Top\-level command to show help for.
+.sp
+Top\-level manuals usually include summaries of nested subcommands.
+.sp
+Nested command paths are not currently supported.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "PAGER AND FALLBACK"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when output is a terminal, \fBacton help <command>\fR prefers rendering through
+\fBman\fR, then \fBless\fR, then \fBmore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when output is not a terminal, Acton writes the generated plain\-text manual
+directly to standard output
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'piping or redirecting output disables pager rendering automatically
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when no generated manual exists for a top\-level command, Acton falls back to
+clap long help, which is typically shorter and flag\-focused
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help\fR itself does not require a project to exist
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Help was printed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The requested command was unknown or help rendering failed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Show the root command overview:
+.sp
+.RS 4
+.nf
+acton help
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Show the generated manual for \fBbuild\fR:
+.sp
+.RS 4
+.nf
+acton help build
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Inspect nested wallet subcommands through the top\-level manual:
+.sp
+.RS 4
+.nf
+acton help wallet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Show the exact clap help for a nested subcommand:
+.sp
+.RS 4
+.nf
+acton wallet list \-\-help
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Show help for an unknown command:
+.sp
+.RS 4
+.nf
+acton help not\-a\-command
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Search within a manual without invoking the pager:
+.sp
+.RS 4
+.nf
+acton help build | rg "EXIT STATUS|EXAMPLES"
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton \-\-help\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help new\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fICommands overview\fR <https://ton\-blockchain.github.io/acton/docs/commands>
+.RE

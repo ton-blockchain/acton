@@ -2388,7 +2388,7 @@ impl<'idx> UseDefCollector<'idx> {
             match arm.pattern() {
                 MatchPattern::Type(_) => {}
                 MatchPattern::Expr(expr) => {
-                    self.collect_expr(expr, AccessMode::Read, reads, writes)
+                    self.collect_expr(expr, AccessMode::Read, reads, writes);
                 }
                 MatchPattern::Else => {}
             }
@@ -2449,7 +2449,7 @@ impl<'idx> UseDefCollector<'idx> {
                 if let Some(alt) = if_stmt.alternative() {
                     match alt {
                         IfAlt::If(else_if) => {
-                            self.collect_stmt_inline(Stmt::If(else_if), reads, writes)
+                            self.collect_stmt_inline(Stmt::If(else_if), reads, writes);
                         }
                         IfAlt::Block(else_block) => {
                             for nested in else_block.stmts() {

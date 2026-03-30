@@ -76,7 +76,7 @@ Acton's test runner can export coverage data to LCOV format, which is compatible
 To generate an LCOV file:
 
 ```bash
-acton test --coverage --format lcov
+acton test --coverage --coverage-format lcov
 ```
 
 This creates a `lcov.info` file in your project root.
@@ -114,7 +114,7 @@ genhtml lcov.info -o coverage-report/
 
 - Coverage collection adds overhead to test execution
 - For large test suites, consider running coverage less frequently
-- Use `--format lcov` to collect data once and analyze offline
+- Use `--coverage-format lcov` to collect data once and analyze offline
 
 ## Summary
 
