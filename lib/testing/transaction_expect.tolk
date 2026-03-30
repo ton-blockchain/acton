@@ -60,7 +60,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(
     params.success = true;
     params.deploy = true;
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
@@ -102,7 +102,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(
         params.exitCode = 0;
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
@@ -134,7 +134,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchPara
         params.opcode = declaredPrefix;
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
@@ -161,7 +161,7 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchP
         params.opcode = declaredPrefix;
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx != null) {
         ffi.failToNotFindTransactionByParams(
             self.location,
@@ -192,7 +192,7 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
     }
     params.bounced = true;
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
@@ -235,13 +235,13 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
             "expect(<actual>).toHaveFailedTx(params) must have not null exitCode parameter in params",
         );
     }
-    if (params.exitCode == 0) {
+    if (params.exitCode is int32 && params.exitCode as int32 == 0) {
         Assert.fail(
             "expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params",
         );
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
@@ -263,7 +263,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
 fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
     val params = SearchParams { success: false };
     // trying to find some transaction with success=false
-    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toInternal().toTuple());
     if (tx != null) {
         // we found one, so matcher fail
         ffi.failToNotFindTransactionByParams(

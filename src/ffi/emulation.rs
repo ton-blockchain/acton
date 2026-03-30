@@ -1,10 +1,11 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, Wallet, to_cell,
+    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, PredicateSearchParams, Wallet,
+    to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
-use crate::ffi::assert::parse_search_params;
+
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
@@ -33,7 +34,7 @@ use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
 use ton_executor::message::{EmulationResult, RunTransactionArgs};
 use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvmffi::stack::{ContData, Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict::Dict;
@@ -699,9 +700,100 @@ fn save_trace_name_impl(
     Ok(())
 }
 
+/// Call a TVM predicate continuation with a single argument. Returns the bool result.
+fn call_predicate(
+    executor: &GetExecutor,
+    cont: &ContData,
+    arg: TupleItem,
+) -> anyhow::Result<bool> {
+    let mut cont_builder = CellBuilder::new();
+    tvmffi::serde::serialize_vm_cont(&mut cont_builder, cont)?;
+    let cont_cell = cont_builder.build()?;
+    let cont_boc = Boc::encode_base64(cont_cell);
+
+    let args = Tuple(vec![arg]);
+    let stack_boc = serialize_tuple(&args)
+        .map(|t| Boc::encode_base64(&t))
+        .context("Cannot serialize predicate arg")?;
+
+    let result = executor
+        .run_continuation(&cont_boc, &stack_boc)
+        .context("Cannot run predicate")?;
+
+    match result {
+        GetMethodResult::Success(r) if r.vm_exit_code == 0 || r.vm_exit_code == 1 => {
+            let cell = Boc::decode_base64(r.stack.as_ref()).context("Failed to decode result stack")?;
+            let tuple = Tuple::deserialize(&cell).context("Failed to deserialize result")?;
+            match tuple.first() {
+                Some(TupleItem::Int(n)) => Ok(*n != BigInt::from(0)),
+                _ => Ok(false),
+            }
+        }
+        _ => Ok(false),
+    }
+}
+
+/// Parse SearchParamsInternal tuple into PredicateSearchParams (continuations).
+fn parse_predicate_search_params(params: &Tuple) -> PredicateSearchParams {
+    let item_from_end = |idx_from_end: usize| -> Option<&TupleItem> {
+        params.0.len().checked_sub(idx_from_end + 1).and_then(|idx| params.0.get(idx))
+    };
+
+    let extract_cont = |idx_from_end: usize| -> Option<ContData> {
+        match item_from_end(idx_from_end) {
+            Some(TupleItem::Cont(cont)) => Some(cont.clone()),
+            _ => None,
+        }
+    };
+
+    PredicateSearchParams {
+        body: extract_cont(0),
+        compute_phase_skipped: extract_cont(1),
+        action_exit_code: extract_cont(2),
+        opcode: extract_cont(3),
+        bounced: extract_cont(4),
+        bounce: extract_cont(5),
+        deploy: extract_cont(6),
+        aborted: extract_cont(7),
+        success: extract_cont(8),
+        exit_code: extract_cont(9),
+        value: extract_cont(10),
+        from: extract_cont(11),
+        to: extract_cont(12),
+    }
+}
+
+/// Create a GetExecutor suitable for running predicate continuations.
+fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
+    let code = ctx.env.test_code.as_ref()
+        .map(Boc::encode_base64)
+        .unwrap_or_else(|| Boc::encode_base64(Cell::default()));
+
+    let now = std::time::SystemTime::now();
+    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+    let params = RunGetMethodArgs {
+        code,
+        data: Boc::encode_base64(Cell::default()),
+        verbosity: ctx.env.default_log_level,
+        libs: Default::default(),
+        address: "0:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        unixtime: duration_since_epoch.as_secs().try_into()?,
+        balance: "10".to_string(),
+        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        gas_limit: "0".to_string(),
+        method_id: 0,
+        debug_enabled: false,
+        extra_currencies: HashMap::new(),
+        prev_blocks_info: None,
+    };
+
+    GetExecutor::new(&params).context("Cannot create predicate executor")
+}
+
 extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>) using find_transaction_by_params_impl);
 fn find_transaction_by_params_impl(
-    _ctx: &mut Context,
+    ctx: &mut Context,
     stack: &mut Tuple,
     params: Tuple,
     txs: Vec<TupleItem>,
@@ -711,21 +803,35 @@ fn find_transaction_by_params_impl(
         return Ok(());
     }
 
-    let params = if let Some(value) = parse_search_params(&params) {
-        value
-    } else {
-        stack.push(TupleItem::Null);
-        return Ok(());
-    };
-    let requires_internal_in_msg = params.opcode.is_some()
-        || params.bounced.is_some()
-        || params.bounce.is_some()
-        || params.value.is_some()
-        || params.from.is_some()
-        || params.to.is_some();
-    let expected_body_hash = params.body.as_ref().map(|body| body.repr_hash());
+    let predicates = parse_predicate_search_params(&params);
+    let has_any = predicates.to.is_some()
+        || predicates.from.is_some()
+        || predicates.value.is_some()
+        || predicates.exit_code.is_some()
+        || predicates.success.is_some()
+        || predicates.aborted.is_some()
+        || predicates.deploy.is_some()
+        || predicates.bounce.is_some()
+        || predicates.bounced.is_some()
+        || predicates.opcode.is_some()
+        || predicates.action_exit_code.is_some()
+        || predicates.compute_phase_skipped.is_some()
+        || predicates.body.is_some();
 
-    let mut found = txs
+    let executor = if has_any {
+        Some(make_predicate_executor(ctx)?)
+    } else {
+        None
+    };
+
+    let requires_internal_in_msg = predicates.opcode.is_some()
+        || predicates.bounced.is_some()
+        || predicates.bounce.is_some()
+        || predicates.value.is_some()
+        || predicates.from.is_some()
+        || predicates.to.is_some();
+
+    let tx_cells: Vec<_> = txs
         .iter()
         .filter_map(|el| match el {
             TupleItem::Tuple(tuple) => match tuple.first() {
@@ -734,156 +840,133 @@ fn find_transaction_by_params_impl(
             },
             _ => None,
         })
-        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
-        .filter(|(tx, _)| {
-            if let Some(expected_deploy) = params.deploy {
-                let is_deploy = tx.orig_status == AccountStatus::NotExists
-                    && tx.end_status == AccountStatus::Active;
-                if expected_deploy != is_deploy {
-                    // Deploy flag mismatch
-                    return false;
+        .collect();
+
+    for cell in tx_cells {
+        let Ok(tx) = cell.parse::<Transaction>() else { continue };
+        let executor = executor.as_ref().unwrap();
+
+        // Deploy predicate
+        if let Some(ref pred) = predicates.deploy {
+            let is_deploy = tx.orig_status == AccountStatus::NotExists
+                && tx.end_status == AccountStatus::Active;
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_deploy { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        let in_msg = tx.load_in_msg();
+        if let Ok(Some(in_msg)) = &in_msg
+            && let MsgInfo::Int(info) = &in_msg.info
+        {
+            // Opcode predicate
+            if let Some(ref pred) = predicates.opcode {
+                let mut slice = in_msg.body;
+                let Ok(opcode) = slice.load_u32() else { continue };
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(opcode)))? {
+                    continue;
                 }
             }
 
-            let in_msg = tx.load_in_msg();
-            if let Ok(Some(in_msg)) = &in_msg
-                && let MsgInfo::Int(info) = &in_msg.info
-            {
-                if let Some(expected_opcode) = &params.opcode {
-                    let mut slice = in_msg.body;
-                    let Ok(opcode) = slice.load_u32() else {
-                        // No opcode at all
-                        return false;
-                    };
-                    if *expected_opcode != opcode {
-                        if params.bounced == Some(true) {
-                            // if bounced, try to match opcode after 0xFFFFFFFF
-                            let Ok(bounced_opcode) = slice.load_u32() else {
-                                // No bounced opcode at all
-                                return false;
-                            };
-                            if *expected_opcode != bounced_opcode {
-                                // Bounced opcode mismatch
-                                return false;
-                            }
-                        } else {
-                            // Opcode mismatch
-                            return false;
-                        }
-                    }
-                }
-
-                if let Some(expected_bounced) = &params.bounced
-                    && *expected_bounced != info.bounced
-                {
-                    // Bounced value mismatch
-                    return false;
-                }
-
-                if let Some(expected_bounce) = &params.bounce
-                    && *expected_bounce != info.bounce
-                {
-                    // Bounce value mismatch
-                    return false;
-                }
-
-                if let Some(expected_value) = &params.value
-                    && (*expected_value) != info.value.tokens.into()
-                {
-                    // Message value mismatch
-                    return false;
-                }
-
-                if let Some(expected_from_addr) = &params.from
-                    && (*expected_from_addr) != info.src
-                {
-                    // Source address mismatch
-                    return false;
-                }
-
-                if let Some(expected_to_addr) = &params.to
-                    && (*expected_to_addr) != info.dst
-                {
-                    // Destination address mismatch
-                    return false;
-                }
-
-                if let Some(expected_hash) = expected_body_hash.as_ref() {
-                    let body_cell = to_cell(&in_msg.body);
-                    let actual_hash = body_cell.repr_hash();
-                    if expected_hash != &actual_hash {
-                        // Message body hash mismatch
-                        return false;
-                    }
-                }
-            } else if requires_internal_in_msg {
-                return false;
-            }
-
-            let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
-                return false;
-            };
-
-            if let Some(expected_compute_skipped) = params.compute_phase_skipped {
-                let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
-                if expected_compute_skipped != is_skipped {
-                    // Compute phase skipped mismatch
-                    return false;
+            // Bounced predicate
+            if let Some(ref pred) = predicates.bounced {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounced { -1 } else { 0 })))? {
+                    continue;
                 }
             }
 
-            if let Some(expected_aborted) = params.aborted
-                && expected_aborted != info.aborted
-            {
-                // Aborted mismatch
-                return false;
-            }
-
-            if let Some(expected_action_exit_code) = params.action_exit_code {
-                if let Some(action_phase) = &info.action_phase {
-                    if action_phase.result_code != expected_action_exit_code {
-                        // Action exit code mismatch
-                        return false;
-                    }
-                } else {
-                    // Action phase is missing but expected
-                    return false;
+            // Bounce predicate
+            if let Some(ref pred) = predicates.bounce {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounce { -1 } else { 0 })))? {
+                    continue;
                 }
             }
 
-            if let ComputePhase::Executed(compute) = &info.compute_phase
-                && let Some(expected_exit_code) = params.exit_code
-                && compute.exit_code != expected_exit_code as i32
-            {
-                // Exit code mismatch
-                return false;
-            }
-
-            if let Some(expected_success) = params.success {
-                let action_phase_success = if let Some(action_phase) = &info.action_phase {
-                    action_phase.success
-                } else {
-                    false // np action phase, no success
-                };
-
-                if let ComputePhase::Executed(compute) = &info.compute_phase
-                    && (action_phase_success && compute.success) != expected_success
-                {
-                    // Success mismatch
-                    return false;
+            // Value predicate
+            if let Some(ref pred) = predicates.value {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(info.value.tokens.into_inner())))? {
+                    continue;
                 }
             }
 
-            true
-        });
+            // From predicate
+            if let Some(ref pred) = predicates.from {
+                let addr_cell = to_cell(&info.src);
+                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
+                    continue;
+                }
+            }
 
-    let Some((_, first)) = found.next() else {
-        // No transaction found
-        stack.push(TupleItem::Null);
+            // To predicate
+            if let Some(ref pred) = predicates.to {
+                let addr_cell = to_cell(&info.dst);
+                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
+                    continue;
+                }
+            }
+
+            // Body predicate
+            if let Some(ref pred) = predicates.body {
+                let body_cell = to_cell(&in_msg.body);
+                if !call_predicate(executor, pred, TupleItem::Cell(body_cell))? {
+                    continue;
+                }
+            }
+        } else if requires_internal_in_msg {
+            continue;
+        }
+
+        let Ok(TxInfo::Ordinary(ord_info)) = tx.load_info() else { continue };
+
+        // Compute phase skipped predicate
+        if let Some(ref pred) = predicates.compute_phase_skipped {
+            let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_skipped { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        // Aborted predicate
+        if let Some(ref pred) = predicates.aborted {
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if ord_info.aborted { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        // Action exit code predicate
+        if let Some(ref pred) = predicates.action_exit_code {
+            let code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(code)))? {
+                continue;
+            }
+        }
+
+        // Exit code predicate (only check if compute phase was executed)
+        if let Some(ref pred) = predicates.exit_code {
+            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(compute.exit_code)))? {
+                    continue;
+                }
+            }
+        }
+
+        // Success predicate (only check if compute phase was executed)
+        if let Some(ref pred) = predicates.success {
+            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+                let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
+                let is_success = action_success && compute.success;
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_success { -1 } else { 0 })))? {
+                    continue;
+                }
+            }
+        }
+
+        // All predicates matched
+        stack.push(TupleItem::Cell((*cell).clone()));
         return Ok(());
-    };
+    }
 
-    stack.push(TupleItem::Cell(first.clone()));
+    stack.push(TupleItem::Null);
     Ok(())
 }
 
@@ -953,14 +1036,11 @@ fn run_get_method_impl(
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize tuple")?;
 
-    eprintln!("[DBG] run_get_method_impl: debug_enabled={}", ctx.debug.is_enabled());
     let result = if ctx.debug.is_enabled() {
-        eprintln!("[DBG] using step executor (debug mode)");
         let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
 
         let dbg_ctx = ctx.debug.ctx();
-        eprintln!("[DBG] begin_thread...");
         dbg_ctx
             .begin_thread(
                 2,
@@ -971,47 +1051,37 @@ fn run_get_method_impl(
             )
             .context("Cannot send response")?;
 
-        eprintln!("[DBG] prepare...");
         step_executor
             .prepare(method_id, &args_b64)
             .context("Cannot prepare get method")?;
 
         // Step to update internal state
-        eprintln!("[DBG] stepping (need_to_stop={})...", dbg_ctx.need_to_stop_child_thread_on_start());
         if dbg_ctx.need_to_stop_child_thread_on_start() {
             dbg_ctx.step(StepMode::StepIn);
         } else {
             dbg_ctx.step(StepMode::Continue);
         }
 
-        eprintln!("[DBG] stepper terminated={}", dbg_ctx.stepper.is_terminated());
         if !dbg_ctx.stepper.is_terminated() {
-            eprintln!("[DBG] process_incoming_requests...");
             dbg_ctx
                 .process_incoming_requests(false)
                 .context("Cannot send response")?;
         }
 
-        eprintln!("[DBG] finish_thread...");
         dbg_ctx.finish_thread(2).context("Cannot send response")?;
 
         if dbg_ctx.performing_step != Some(StepMode::Continue) {
             dbg_ctx.step(StepMode::StepIn);
         }
 
-        eprintln!("[DBG] finish...");
         step_executor
             .finish(&params.code)
             .context("Cannot run get method")?
     } else {
-        eprintln!("[DBG] using normal executor");
         let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
-        eprintln!("[DBG] run_get_method...");
-        let r = executor
+        executor
             .run_get_method(&args_b64, &params, Some(&config_b64))
-            .context("Cannot run get method")?;
-        eprintln!("[DBG] run_get_method done");
-        r
+            .context("Cannot run get method")?
     };
 
     match result {
@@ -1625,16 +1695,8 @@ fn call_tolk_function_impl(
 
     let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
     let result = executor
-        .run_continuation(&cont_boc, &stack_boc);
-    if let Ok(GetMethodResult::Success(ref r)) = result {
-        eprintln!("[DBG] exit_code={}, gas_used={}", r.vm_exit_code, r.gas_used);
-        let log: String = r.vm_log.chars().take(2000).collect();
-        eprintln!("[DBG] vm_log:\n{}", log);
-    }
-    if let Err(ref e) = result {
-        eprintln!("[DBG] error: {}", e);
-    }
-    let result = result.context("Cannot run continuation")?;
+        .run_continuation(&cont_boc, &stack_boc)
+        .context("Cannot run continuation")?;
 
     match result {
         GetMethodResult::Success(result) => {

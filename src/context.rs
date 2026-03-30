@@ -17,7 +17,7 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::{SourceLocation, SourceMap};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvmffi::stack::{ContData, Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
@@ -74,6 +74,25 @@ pub struct TransactionNotFoundParams {
     pub action_exit_code: Option<i32>,
     pub compute_phase_skipped: Option<bool>,
     pub body: Option<Cell>,
+}
+
+/// Search params with predicate continuations (from SearchParamsInternal).
+/// Each field is an optional TVM continuation that takes a value and returns bool.
+#[derive(Debug, Clone, Default)]
+pub struct PredicateSearchParams {
+    pub to: Option<ContData>,
+    pub from: Option<ContData>,
+    pub value: Option<ContData>,
+    pub exit_code: Option<ContData>,
+    pub success: Option<ContData>,
+    pub aborted: Option<ContData>,
+    pub deploy: Option<ContData>,
+    pub bounce: Option<ContData>,
+    pub bounced: Option<ContData>,
+    pub opcode: Option<ContData>,
+    pub action_exit_code: Option<ContData>,
+    pub compute_phase_skipped: Option<ContData>,
+    pub body: Option<ContData>,
 }
 
 #[derive(Debug, Clone)]
