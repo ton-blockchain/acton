@@ -12,5 +12,4 @@ pub mod replayer;
 pub mod retrace;
 pub mod stdlib;
 pub mod types_render;
-pub mod vmtrace;
 pub mod wallets;
