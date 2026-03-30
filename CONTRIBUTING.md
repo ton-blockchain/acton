@@ -46,7 +46,16 @@ To build and test Acton locally, install:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
-7. `cargo-llvm-cov` (optional, for coverage)
+7. GitHub CLI (`gh`) (used by `cargo xtask sync-artifacts`)
+   - macOS:
+     ```bash
+     brew install gh
+     ```
+   - Linux (Debian/Ubuntu):
+     ```bash
+     sudo apt install gh
+     ```
+8. `cargo-llvm-cov` (optional, for coverage)
    ```bash
    cargo install cargo-llvm-cov
    rustup component add llvm-tools-preview
@@ -75,45 +84,56 @@ sudo apt-get install -y \
   clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
 ```
 
-## Building from source
+## Start working locally
 
-Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
-`i582/ton` fork branch `pmakhnev/acton`.
-
-### Option 1: download prebuilt `objs` from releases
-
-Stable Acton releases also ship prebuilt TON artifact archives. If you do not
-want to build `objs` manually, download the asset matching your platform from a
-stable release, extract it into `objs/`, and then continue with `just build-ui`
-and `cargo build`.
-
-Available asset names:
-
-- `ton-objs-linux-x86_64.tar.gz`
-- `ton-objs-linux-aarch64.tar.gz`
-- `ton-objs-macos-x86_64.tar.gz`
-- `ton-objs-macos-aarch64.tar.gz`
-
-Example:
+For a fresh checkout, the shortest path to a working contributor setup is:
 
 ```bash
-mkdir -p dist objs
-ARCHIVE_NAME=ton-objs-linux-x86_64.tar.gz # change for your platform
-curl -fL "https://github.com/ton-blockchain/acton/releases/latest/download/${ARCHIVE_NAME}" \
-  -o "dist/${ARCHIVE_NAME}"
-tar -C objs -xzf "dist/${ARCHIVE_NAME}"
-
+cargo xtask sync-artifacts
 just build-ui
 cargo build
 ./target/debug/acton --help
 ```
 
-The extracted archive already contains `libemulator.a` and `libtolk.a` at the
-archive root, so unpacking it into `objs/` is enough. If you refresh these
-archives later, also bump `artifact_set_revision` and refresh the `sha256`
-entries in `crates/ton-objs/artifacts_manifest.toml` so Cargo invalidates
-`ton-objs`. Set `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY=1` during build only if
-you intentionally want to skip archive validation against that manifest.
+What this does:
+
+1. `cargo xtask sync-artifacts` syncs `crates/ton-objs/artifacts_manifest.toml`
+   from the `trunk-objs` release and, on a fresh checkout, downloads the
+   matching prebuilt `objs/` archive for your current platform.
+2. `just build-ui` installs UI dependencies and builds the bundled UI assets.
+3. `cargo build` builds the CLI against the synced TON archives.
+4. `./target/debug/acton --help` confirms that the binary starts.
+
+If `objs/` already exists and the tracked manifest changed, `cargo xtask
+sync-artifacts` may ask whether local `objs/` should be refreshed. Use
+`cargo xtask sync-artifacts --force` to refresh without a prompt.
+
+## Building from source
+
+Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
+`i582/ton` fork branch `pmakhnev/acton`.
+
+### Option 1: sync prebuilt `objs` with xtask
+
+Use the built-in sync task instead of downloading release assets manually:
+
+```bash
+cargo xtask sync-artifacts
+just build-ui
+cargo build
+./target/debug/acton --help
+```
+
+This command:
+
+- downloads the current `artifacts_manifest.toml` from the `trunk-objs` release;
+- updates `crates/ton-objs/artifacts_manifest.toml` when needed;
+- downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
+  `objs/` on a fresh checkout;
+- can also refresh local `objs/` later when the tracked manifest changes.
+
+Use `cargo xtask sync-artifacts --force` if you want to overwrite the local
+manifest and refresh `objs/` without confirmation.
 
 ### Option 2: build TON artifacts manually
 

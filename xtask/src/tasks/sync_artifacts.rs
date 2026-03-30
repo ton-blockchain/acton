@@ -32,6 +32,8 @@ pub(crate) fn run(args: SyncArtifactsArgs) -> Result<()> {
         "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from GitHub release `{TRUNK_OBJS_RELEASE_TAG}`"
     );
 
+    let objs_dir = Path::new(TON_OBJS_DIR);
+    let should_refresh_objs = args.force || !objs_dir.is_dir();
     let github = Github::new();
     let downloaded_asset =
         github.download_release_asset(TRUNK_OBJS_RELEASE_TAG, ARTIFACTS_MANIFEST_ASSET_NAME)?;
@@ -45,11 +47,14 @@ pub(crate) fn run(args: SyncArtifactsArgs) -> Result<()> {
         args.force,
     )?;
 
-    if args.force || sync_status == SyncStatus::Updated {
+    if sync_status == SyncStatus::Updated {
         println!("Synchronized `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`");
-        maybe_offer_local_objs_refresh(&github, args.force)?;
     } else {
         println!("`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` is already up to date");
+    }
+
+    if should_refresh_objs || sync_status == SyncStatus::Updated {
+        maybe_offer_local_objs_refresh(&github, objs_dir, args.force)?;
     }
 
     Ok(())
@@ -91,11 +96,11 @@ fn release_archive_name(rust_target: &str) -> String {
     format!("ton-objs-{rust_target}.tar.gz")
 }
 
-fn maybe_offer_local_objs_refresh(github: &Github, force: bool) -> Result<()> {
+fn maybe_offer_local_objs_refresh(github: &Github, objs_dir: &Path, force: bool) -> Result<()> {
     let rust_target = current_release_target()?;
     let archive_name = release_archive_name(&rust_target);
 
-    if !force {
+    if !force && objs_dir.is_dir() {
         print!(
             "`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` changed. Update local `objs/` from release `{TRUNK_OBJS_RELEASE_TAG}` asset `{archive_name}`? Type `yes` to continue: "
         );
@@ -115,7 +120,7 @@ fn maybe_offer_local_objs_refresh(github: &Github, force: bool) -> Result<()> {
         }
     }
 
-    refresh_local_objs_from_release(github, &archive_name, Path::new(TON_OBJS_DIR))?;
+    refresh_local_objs_from_release(github, &archive_name, objs_dir)?;
     println!(
         "Updated local `objs/` from release `{TRUNK_OBJS_RELEASE_TAG}` asset `{archive_name}`"
     );
