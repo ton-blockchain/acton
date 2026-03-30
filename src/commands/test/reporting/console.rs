@@ -439,7 +439,7 @@ fn process_nonzero_exit_code(
         exit_code.to_string().yellow()
     );
 
-    let exit_code_info = retrace::find_tolk_exception_info(
+    let exit_code_info = retrace::find_exception_info(
         &result.vm_log,
         Some(&test.new_source_map),
         test.code_boc.as_ref(),
@@ -452,19 +452,19 @@ fn process_nonzero_exit_code(
     if let Some(info) = &get_method_info {
         let mut nested = vec![format!(
             "at {}",
-            FormatterContext::format_tolk_location(&info.loc).dimmed()
+            FormatterContext::format_location(&info.loc).dimmed()
         )];
-        nested.extend(FormatterContext::format_tolk_backtrace(&info.backtrace));
+        nested.extend(FormatterContext::format_backtrace(&info.backtrace));
         groups.push(("Get method:".to_string(), nested));
     }
 
     if let Some(info) = &exit_code_info {
         if get_method_info.is_some() {
-            let mut nested = FormatterContext::format_tolk_backtrace(&info.backtrace);
+            let mut nested = FormatterContext::format_backtrace(&info.backtrace);
             if nested.is_empty() {
                 nested.push(format!(
                     "at {}",
-                    FormatterContext::format_tolk_location(&info.loc).dimmed()
+                    FormatterContext::format_location(&info.loc).dimmed()
                 ));
             }
             groups.push(("Called from:".to_string(), nested));
@@ -472,9 +472,9 @@ fn process_nonzero_exit_code(
             groups.push((
                 format!(
                     "at {}",
-                    FormatterContext::format_tolk_location(&info.loc).dimmed()
+                    FormatterContext::format_location(&info.loc).dimmed()
                 ),
-                FormatterContext::format_tolk_backtrace(&info.backtrace),
+                FormatterContext::format_backtrace(&info.backtrace),
             ));
         }
     } else if test.backtrace.is_none() {

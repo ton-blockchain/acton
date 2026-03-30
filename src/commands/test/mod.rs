@@ -1,3 +1,4 @@
+use crate::boc_utils::{boc_bytes, decode_optional_boc_base64_bytes};
 use crate::commands::build::build_cmd;
 use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
@@ -782,24 +783,6 @@ struct TestStats {
     todo: usize,
 }
 
-fn boc_bytes(cell: &Cell) -> Arc<[u8]> {
-    Arc::from(Boc::encode(cell.clone()))
-}
-
-fn decode_optional_boc_base64_bytes(
-    boc_b64: Option<&str>,
-    label: &str,
-) -> anyhow::Result<Option<Arc<[u8]>>> {
-    match boc_b64.filter(|boc| !boc.is_empty()) {
-        Some(boc_b64) => {
-            let cell = Boc::decode_base64(boc_b64)
-                .map_err(|e| anyhow!("{label} is not valid BoC: {e}"))?;
-            Ok(Some(boc_bytes(&cell)))
-        }
-        None => Ok(None),
-    }
-}
-
 fn compile_test_file(
     file_cache: &mut FileBuildCache,
     file: &str,
@@ -1040,7 +1023,7 @@ fn run_file_tests(
         if let (Some(AssertFailure::GetMethod(failure)), GetMethodResult::Success(result)) =
             (&mut assert_failure, &get_result)
         {
-            failure.caller_trace = crate::retrace::find_tolk_execution_trace(
+            failure.caller_trace = crate::retrace::find_execution_trace(
                 &result.vm_log,
                 Some(&new_source_map),
                 code_boc.as_ref(),

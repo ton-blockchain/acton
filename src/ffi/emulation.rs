@@ -1,3 +1,4 @@
+use crate::boc_utils::{boc_bytes, decode_optional_boc_base64_bytes};
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, Context, GetMethodAssertFailure, KnownAddress, MessageIterState,
@@ -44,26 +45,6 @@ use tycho_types::models::{
     LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
-
-fn boc_bytes(cell: &Cell) -> Arc<[u8]> {
-    Arc::from(Boc::encode(cell.clone()))
-}
-
-fn decode_boc_base64_bytes(boc_b64: &str, label: &str) -> anyhow::Result<Arc<[u8]>> {
-    let cell =
-        Boc::decode_base64(boc_b64).with_context(|| format!("Failed to decode {label} BoC"))?;
-    Ok(boc_bytes(&cell))
-}
-
-fn decode_optional_boc_base64_bytes(
-    boc_b64: Option<&str>,
-    label: &str,
-) -> anyhow::Result<Option<Arc<[u8]>>> {
-    match boc_b64.filter(|boc| !boc.is_empty()) {
-        Some(boc_b64) => decode_boc_base64_bytes(boc_b64, label).map(Some),
-        None => Ok(None),
-    }
-}
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(
@@ -1460,7 +1441,7 @@ fn run_get_method_impl(
                     None
                 };
 
-                let location = retrace::find_tolk_exception_info(
+                let location = retrace::find_exception_info(
                     &result.vm_log,
                     new_source_map.as_deref(),
                     code_boc.as_ref(),
