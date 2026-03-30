@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, Context, GetMethodAssertFailure, KnownAddress, MessageIterState,
-    PendingMessageStep, TransactionNotFoundParams, Wallet, to_cell, PredicateSearchParams, Wallet
+    PendingMessageStep, PredicateSearchParams, TransactionNotFoundParams, Wallet, to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
@@ -1318,9 +1318,25 @@ fn find_transaction_by_params_impl(
         return Ok(());
     }
 
-    let Some(matcher) = build_search_matcher(&params) else {
-        stack.push(TupleItem::Null);
-        return Ok(());
+    let predicates = parse_predicate_search_params(&params);
+    let has_any = predicates.to.is_some()
+        || predicates.from.is_some()
+        || predicates.value.is_some()
+        || predicates.exit_code.is_some()
+        || predicates.success.is_some()
+        || predicates.aborted.is_some()
+        || predicates.deploy.is_some()
+        || predicates.bounce.is_some()
+        || predicates.bounced.is_some()
+        || predicates.opcode.is_some()
+        || predicates.action_exit_code.is_some()
+        || predicates.compute_phase_skipped.is_some()
+        || predicates.body.is_some();
+
+    let executor = if has_any {
+        Some(make_predicate_executor(ctx)?)
+    } else {
+        None
     };
 
     let requires_internal_in_msg = predicates.opcode.is_some()
@@ -1339,25 +1355,129 @@ fn find_transaction_by_params_impl(
             },
             _ => None,
         })
-    let found = txs
-        .iter()
-        .filter_map(|el| match el {
-            TupleItem::Tuple(tuple) => match tuple.first() {
-                Some(TupleItem::Cell(cell)) => Some(cell),
-                _ => None,
-            },
-            _ => None,
-        })
-        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
-        .filter(|(tx, _)| transaction_matches_search(tx, &matcher));
+        .collect();
 
-    let Some((_, first)) = found.next() else {
-        stack.push(TupleItem::Null);
-        return Ok(());
-    };
+    for cell in tx_cells {
+        let Ok(tx) = cell.parse::<Transaction>() else { continue };
+        let executor = executor.as_ref().unwrap();
 
-    stack.push(TupleItem::Cell(first.clone()));
-    Ok(())
+        // Deploy predicate
+        if let Some(ref pred) = predicates.deploy {
+            let is_deploy = tx.orig_status == AccountStatus::NotExists
+                && tx.end_status == AccountStatus::Active;
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_deploy { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        let in_msg = tx.load_in_msg();
+        if let Ok(Some(in_msg)) = &in_msg
+            && let MsgInfo::Int(info) = &in_msg.info
+        {
+            // Opcode predicate
+            if let Some(ref pred) = predicates.opcode {
+                let mut slice = in_msg.body;
+                let Ok(opcode) = slice.load_u32() else { continue };
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(opcode)))? {
+                    continue;
+                }
+            }
+
+            // Bounced predicate
+            if let Some(ref pred) = predicates.bounced {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounced { -1 } else { 0 })))? {
+                    continue;
+                }
+            }
+
+            // Bounce predicate
+            if let Some(ref pred) = predicates.bounce {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounce { -1 } else { 0 })))? {
+                    continue;
+                }
+            }
+
+            // Value predicate
+            if let Some(ref pred) = predicates.value {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(info.value.tokens.into_inner())))? {
+                    continue;
+                }
+            }
+
+            // From predicate
+            if let Some(ref pred) = predicates.from {
+                let addr_cell = to_cell(&info.src);
+                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
+                    continue;
+                }
+            }
+
+            // To predicate
+            if let Some(ref pred) = predicates.to {
+                let addr_cell = to_cell(&info.dst);
+                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
+                    continue;
+                }
+            }
+
+            // Body predicate
+            if let Some(ref pred) = predicates.body {
+                let body_cell = to_cell(&in_msg.body);
+                if !call_predicate(executor, pred, TupleItem::Cell(body_cell))? {
+                    continue;
+                }
+            }
+        } else if requires_internal_in_msg {
+            continue;
+        }
+
+        let Ok(TxInfo::Ordinary(ord_info)) = tx.load_info() else { continue };
+
+        // Compute phase skipped predicate
+        if let Some(ref pred) = predicates.compute_phase_skipped {
+            let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_skipped { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        // Aborted predicate
+        if let Some(ref pred) = predicates.aborted {
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if ord_info.aborted { -1 } else { 0 })))? {
+                continue;
+            }
+        }
+
+        // Action exit code predicate
+        if let Some(ref pred) = predicates.action_exit_code {
+            let code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(code)))? {
+                continue;
+            }
+        }
+
+        // Exit code predicate (only check if compute phase was executed)
+        if let Some(ref pred) = predicates.exit_code {
+            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(compute.exit_code)))? {
+                    continue;
+                }
+            }
+        }
+
+        // Success predicate (only check if compute phase was executed)
+        if let Some(ref pred) = predicates.success {
+            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+                let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
+                let is_success = action_success && compute.success;
+                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_success { -1 } else { 0 })))? {
+                    continue;
+                }
+            }
+        }
+
+        // All predicates matched
+        stack.push(TupleItem::Cell((*cell).clone()));
         return Ok(());
     }
 
@@ -2193,6 +2313,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         42 => execute_message_iter_from : 1,
         43 => is_message_iter_done : 1,
         44 => close_message_iter : 1,
+        501 => call_tolk_function : 3,
     });
 }
 

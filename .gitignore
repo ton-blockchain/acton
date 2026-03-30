@@ -34,9 +34,3 @@ gen/
 wallets.toml
 global.wallets.toml
 toncenter-*.json
-
-# Acton related files
-build/
-lcov.info
-libraries.toml
-global.libraries.toml
