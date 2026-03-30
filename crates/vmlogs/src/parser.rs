@@ -304,6 +304,12 @@ fn cell_slice<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     .parse_next(i)
 }
 
+fn string_literal<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+    delimited("\"", take_while(0.., |c: char| c != '"'), "\"")
+        .map(|s: &str| VmStackValue::String(s.to_string()))
+        .parse_next(i)
+}
+
 fn unknown_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     "???".value(VmStackValue::Unknown).parse_next(i)
 }
@@ -323,6 +329,7 @@ pub fn vm_stack_value<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
                 CellLike::Cell(_) => unreachable!(),
             }),
             cell_slice,
+            string_literal,
             unknown_val,
         )),
     )
@@ -437,4 +444,39 @@ pub fn parse_lines(input: &str) -> Vec<Result<VmLine<'_>, String>> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{VmStack, VmStackValue};
+
+    #[test]
+    fn parses_quoted_string_in_stack() {
+        let parsed = VmStack::new("[ \"hello world\" ]").parsed();
+        assert_eq!(parsed.len(), 1);
+        match &parsed[0] {
+            VmStackValue::String(value) => assert_eq!(value, "hello world"),
+            other => panic!("expected string, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_quoted_string_inside_tuple() {
+        let parsed = VmStack::new("[ ( \"hello\" 1 ) ]").parsed();
+        assert_eq!(parsed.len(), 1);
+        match &parsed[0] {
+            VmStackValue::Tuple(items) => {
+                assert_eq!(items.len(), 2);
+                match &items[0] {
+                    VmStackValue::String(value) => assert_eq!(value, "hello"),
+                    other => panic!("expected tuple string, got {other:?}"),
+                }
+                match &items[1] {
+                    VmStackValue::Integer(value) => assert_eq!(value, "1"),
+                    other => panic!("expected tuple integer, got {other:?}"),
+                }
+            }
+            other => panic!("expected tuple, got {other:?}"),
+        }
+    }
 }

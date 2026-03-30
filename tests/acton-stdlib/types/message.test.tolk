@@ -119,7 +119,7 @@ get fun `test-load-body-from-inline-and-ref`() {
 }
 
 get fun `test-load-opcode-from-inline-and-ref-body`() {
-    val opcode = reflect.serializationPrefixOf<IncreaseCounter>().1;
+    val opcode = reflect.serializationPrefixOf<IncreaseCounter>().0;
 
     val inlineMessage = MessageRelaxedGeneric {
         info: internalInfo(),
