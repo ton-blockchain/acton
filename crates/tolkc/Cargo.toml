@@ -20,7 +20,7 @@ include_dir = { workspace = true }
 rustc-hash = { workspace = true }
 dunce = { workspace = true }
 anyhow = { workspace = true }
-tycho-types = "0.3.1"
+tycho-types = { workspace = true }
 
 [lints]
 workspace = true
