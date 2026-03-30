@@ -10,6 +10,7 @@ rules:
         actions/github-script: ref-pin
         actions/labeler: ref-pin
         actions/setup-node: ref-pin
+        actions/setup-python: ref-pin
         actions/upload-artifact: ref-pin
         ton-blockchain/setup-acton: ref-pin
         zizmorcore/zizmor-action: ref-pin

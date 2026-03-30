@@ -1,0 +1,25 @@
+name: Check Release Daily
+
+on:
+  schedule:
+    # 00:00 Europe/Moscow every day (21:00 UTC)
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: check-release-daily
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build-release-binaries:
+    if: github.repository == 'ton-blockchain/acton'
+    uses: ./.github/workflows/build-release-binaries.yml
+    secrets: inherit
+
+  check-release:
+    if: github.repository == 'ton-blockchain/acton'
+    needs: [ build-release-binaries ]
+    uses: ./.github/workflows/check-release.yml
+    secrets: inherit
