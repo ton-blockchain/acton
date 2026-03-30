@@ -227,3 +227,79 @@ fn parse_diff_line(content: &str) -> Vec<StackDiff> {
 
     diffs
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_compute_stack_diff_all_same() {
+        let input = "stack: [ 0 ]\nstack: [ 0 ]";
+        let output = convert_to_diff_logs(input);
+        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ =1 ]");
+    }
+
+    #[test]
+    fn test_compute_stack_diff_add() {
+        let input = "stack: [ 0 ]\nstack: [ 0 1 ]";
+        let output = convert_to_diff_logs(input);
+        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ =1 +1 ]");
+    }
+
+    #[test]
+    fn test_compute_stack_diff_remove() {
+        let input = "stack: [ 0 1 ]\nstack: [ 0 ]";
+        let output = convert_to_diff_logs(input);
+        assert_eq!(output, "stack: [ 0 1 ]\nrel stack: [ =1 -1 ]");
+    }
+
+    #[test]
+    fn test_compute_stack_diff_change() {
+        let input = "stack: [ 0 ]\nstack: [ 1 ]";
+        let output = convert_to_diff_logs(input);
+        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ ~0:1 ]");
+    }
+
+    #[test]
+    fn test_convert_from_diff_logs() {
+        let diff_logs = "stack: [ 0 ]\nrel stack: [ =1 +1 ]";
+        let output = convert_from_diff_logs(diff_logs);
+        assert_eq!(output, "stack: [ 0 ]\nstack: [ 0 1 ]");
+    }
+
+    #[test]
+    fn test_full_conversion_cycle() {
+        let input = "stack: [ 0 ]\nstack: [ 0 1 ]\nstack: [ 0 1 2 ]";
+        let diff_logs = convert_to_diff_logs(input);
+        let restored = convert_from_diff_logs(&diff_logs);
+
+        let original_lines = input.lines();
+        let restored_lines = restored.lines();
+
+        assert_eq!(original_lines.count(), restored_lines.count());
+    }
+
+    #[test]
+    fn test_real_logs() {
+        let logs = [
+            "testdata/test-can-mint3000000.logs",
+            "testdata/test-can-mint5000000.logs",
+            "testdata/test-can-mint6000000.logs",
+            "testdata/test-can-mint7000000.logs",
+            "testdata/test-can-mint8000000.logs",
+            "testdata/test-no-forward-ton-amount-no-forward10000000.logs",
+            "testdata/test-not-wallet-owner-should-not-be-able-to-burn-jettons6000000.logs",
+        ];
+        for path in logs {
+            let input = fs::read_to_string(path).unwrap();
+            let diff_logs = convert_to_diff_logs(&input);
+            let restored = convert_from_diff_logs(&diff_logs);
+
+            let original_lines = input.lines();
+            let restored_lines = restored.lines();
+
+            assert_eq!(original_lines.count(), restored_lines.count());
+        }
+    }
+}
