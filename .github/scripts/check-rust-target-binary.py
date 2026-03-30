@@ -6,6 +6,12 @@ from typing import NamedTuple
 
 _TARGET_PATTERN: re.Pattern[str] = re.compile(r"^(?P<arch>[^-]+)-(?P<vendor>[^-]+)-(?P<sys>[^-]+)(?:-(?P<abi>[^-]+))?$")
 
+_VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
+    "GLIBC": re.compile(r"\bGLIBC_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
+    "GLIBCXX": re.compile(r"\bGLIBCXX_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
+    "OPENSSL": re.compile(r"\bOPENSSL_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
+}
+
 _TARGET_MAP: dict[str, dict[str, str]] = {
     "x86_64-unknown-linux-gnu": {
         "GLIBC": "2.34",
@@ -27,12 +33,6 @@ _TARGET_MAP: dict[str, dict[str, str]] = {
 
 _OTOOL_PATH = "/usr/bin/otool"
 _STRINGS_PATH = "/usr/bin/strings"
-
-_VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
-    "GLIBC": re.compile(r"\bGLIBC_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
-    "GLIBCXX": re.compile(r"\bGLIBCXX_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
-    "OPENSSL": re.compile(r"\bOPENSSL_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
-}
 
 
 class RustTarget(NamedTuple):
