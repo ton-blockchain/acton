@@ -80,6 +80,8 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/tlb/maybe"
+import "../../lib/types/message"
 import "../contracts/dd_messages"
 
 fun deployDdHarness() {

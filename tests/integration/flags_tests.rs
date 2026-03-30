@@ -27,6 +27,7 @@ const PROFILED_TEST: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
+import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
     val init = ContractState {
@@ -60,6 +61,7 @@ const PROFILED_TEST_WITH_DRIFT: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
+import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
     val init = ContractState {

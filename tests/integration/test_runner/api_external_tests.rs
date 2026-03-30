@@ -49,6 +49,7 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
+import "../../lib/types/message"
 import "../../lib/types/transaction"
 
 struct (0x70000001) TriggerExternal {
