@@ -4,6 +4,18 @@ on:
   schedule:
     # 00:00 Europe/Moscow every day (21:00 UTC)
     - cron: "0 21 * * *"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".cargo/**"
+      - "crates/ton-objs/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".cargo/**"
+      - "crates/ton-objs/**"
   workflow_dispatch:
 
 concurrency:
@@ -14,12 +26,22 @@ permissions: { }
 
 jobs:
   build-release-binaries:
+    name: Build release binaries
     if: github.repository == 'ton-blockchain/acton'
+
+    permissions:
+      contents: read
+
     uses: ./.github/workflows/build-release-binaries.yml
     secrets: inherit
 
   check-release:
+    name: Check release
     if: github.repository == 'ton-blockchain/acton'
     needs: [ build-release-binaries ]
+
+    permissions:
+      contents: read
+
     uses: ./.github/workflows/check-release.yml
     secrets: inherit
