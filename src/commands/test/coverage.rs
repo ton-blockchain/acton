@@ -1,14 +1,13 @@
 use crate::context::{BuildCache, EmulationsState};
-use crate::vmtrace::{HighLevelTrace, HighLevelTraceStep, HighLevelTraceStepMapped};
 use acton_config::color::OwoColorize;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use retrace::trace::{Trace, TraceStep};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use ton_source_map::{EntryContextDescription, SourceMap};
+use tolkc::{TolkSourceMap, source_map::DebugMark};
 use tycho_types::boc::Boc;
 use vmlogs::parser::{VmStack, VmStackValue};
 
@@ -39,17 +38,14 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
     // instruction with the source code that generated it. And since the instruction appeared in the
     // execution trace, we can say that those source code lines were executed and thus covered by tests.
     let data = collect_source_data(emulations, build_cache);
-    // When we have the necessary components, we can build a high-level execution trace
-    // that contains all execution steps reflected on the source code.
-    let traces = build_high_level_traces(&data);
     // Not all lines of code in source code can be executed, for example, struct definitions
     // or comments. We collect executable file lines using the fact that the source map
     // contains a mapping of each executable line to bytecode instructions, which means we
     // can build a per-file mapping that indicates whether a specific line is executable.
     let executable_lines_per_file = build_executable_lines_per_files(&data);
-    // Having high-level traces, we can traverse them and collect which specific source code
-    // lines were executed. This will give us information about covered lines.
-    let result = collect_executed_lines_per_files(&traces);
+    // Having VM traces and the new Tolk source map, we can correlate executed bytecode
+    // back to source lines and collect covered lines.
+    let result = collect_executed_lines_per_files(&data);
     let (line_hits_per_file, branch_hits_per_file) = (result.lines, result.branches);
 
     // Now having all this information, we can trivially determine how many executable
@@ -86,7 +82,8 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
 }
 
 struct SourceMapAndLogs {
-    source_map: Arc<SourceMap>,
+    build_path: PathBuf,
+    tolk_source_map: Arc<TolkSourceMap>,
     logs: Arc<str>,
 }
 
@@ -101,10 +98,15 @@ fn collect_source_data(
             continue;
         };
 
-        let source_map = build_result.1.source_map;
+        let build_path = build_result.0;
+        let tolk_source_map = build_result.1.tolk_source_map;
         let logs = message.vm_log.clone();
 
-        data.push(SourceMapAndLogs { source_map, logs });
+        data.push(SourceMapAndLogs {
+            build_path,
+            tolk_source_map,
+            logs,
+        });
     }
 
     for get_result in emulations.get_methods() {
@@ -115,22 +117,17 @@ fn collect_source_data(
             continue;
         };
 
-        let source_map = build_result.1.source_map;
+        let build_path = build_result.0;
+        let tolk_source_map = build_result.1.tolk_source_map;
         let logs = get_result.vm_log.clone();
 
-        data.push(SourceMapAndLogs { source_map, logs });
+        data.push(SourceMapAndLogs {
+            build_path,
+            tolk_source_map,
+            logs,
+        });
     }
     data
-}
-
-/// Builds execution traces by source code.
-fn build_high_level_traces(data: &[SourceMapAndLogs]) -> Vec<HighLevelTrace> {
-    data.iter()
-        .map(|SourceMapAndLogs { source_map, logs }| {
-            let trace = Trace::new(logs, Some(1_000_000));
-            HighLevelTrace::new(trace, source_map)
-        })
-        .collect::<Vec<_>>()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -146,39 +143,47 @@ pub(super) struct ExecutedLinesForFile {
 
 /// Collects all source code lines and branches that were executed in all execution traces
 /// that was collected in [`collect_source_data`].
-fn collect_executed_lines_per_files(traces: &Vec<HighLevelTrace>) -> ExecutedLinesForFile {
+fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesForFile {
     let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
     let mut branch_hits_per_file: HashMap<String, HashMap<i64, BranchHits>> = HashMap::new();
 
-    for trace in traces {
+    for SourceMapAndLogs {
+        tolk_source_map,
+        logs,
+        ..
+    } in data
+    {
+        let trace = Trace::new(logs, Some(1_000_000));
+
         for step in &trace.steps {
-            match step {
-                HighLevelTraceStep::Mapped(step) => {
-                    #[allow(clippy::collapsible_if)]
-                    if let TraceStep::Execute { instr, stack, .. } = &step.inner {
-                        // `assert (foo) throw 10` generates `THROW*` instruction, and we want to
-                        // collect which branches are covered.
-                        // TODO: for now we don't have precise mapping for any branch instructions
-                        //       like IF, IFJMP, IFNOT and other, for them we need to wait new source maps
-                        //       in Tolk compiler.
-                        if instr.contains("THROWANYIFNOT")
-                            || instr.contains("THROWIFNOT")
-                            || instr.contains("THROWIFNOT_SHORT")
-                        {
-                            process_throw_instruction(&mut branch_hits_per_file, step, stack);
-                        }
-                    }
+            let TraceStep::Execute {
+                instr,
+                stack,
+                hash,
+                offset,
+                ..
+            } = step
+            else {
+                continue;
+            };
 
-                    for loc in &step.locs {
-                        let file = &loc.loc.file;
-                        let line = loc.loc.line;
-                        let entry = line_hits_per_file.entry(file.clone()).or_default();
+            let Some((file, line)) = find_coverage_loc(tolk_source_map, hash, *offset) else {
+                continue;
+            };
 
-                        *entry.entry(line).or_insert(0) += 1;
-                    }
-                }
-                HighLevelTraceStep::Unmapped(_) => {}
+            if is_ignored_coverage_file(&file) {
+                continue;
             }
+
+            if instr.contains("THROWANYIFNOT")
+                || instr.contains("THROWIFNOT")
+                || instr.contains("THROWIFNOT_SHORT")
+            {
+                process_throw_instruction(&mut branch_hits_per_file, &file, line, stack);
+            }
+
+            let entry = line_hits_per_file.entry(file).or_default();
+            *entry.entry(line).or_insert(0) += 1;
         }
     }
 
@@ -188,44 +193,84 @@ fn collect_executed_lines_per_files(traces: &Vec<HighLevelTrace>) -> ExecutedLin
     }
 }
 
+fn find_coverage_loc(
+    tolk_source_map: &TolkSourceMap,
+    hash: &str,
+    offset: u16,
+) -> Option<(String, i64)> {
+    let marks = tolk_source_map.marks_dict.as_ref()?.get(hash)?;
+    let target_offset = i32::from(offset);
+    let mut loc = None;
+
+    for &(mark_offset, mark_id) in marks {
+        if mark_offset > target_offset {
+            break;
+        }
+
+        let Some((file, line)) =
+            coverage_location_for_mark(&tolk_source_map.source_map, mark_id as usize)
+        else {
+            continue;
+        };
+
+        loc = Some((file, line));
+    }
+
+    loc
+}
+
+fn coverage_location_for_mark(
+    source_map: &tolkc::SourceMap,
+    mark_id: usize,
+) -> Option<(String, i64)> {
+    let DebugMark::Loc { range, .. } = source_map.get_debug_mark(mark_id) else {
+        return None;
+    };
+
+    let file = source_map
+        .resolve_file_full_path(range.file_id())
+        .unwrap_or_else(|| source_map.resolve_file_name(range.file_id()))
+        .to_owned();
+
+    Some((file, zero_based_line(range.start_line())))
+}
+
 fn process_throw_instruction(
     branch_hits_per_file: &mut HashMap<String, HashMap<i64, BranchHits>>,
-    step: &HighLevelTraceStepMapped,
+    file: &str,
+    line: i64,
     stack: &str,
 ) {
     let elements = VmStack::new(stack).parsed();
 
     if let [.., VmStackValue::Integer(value)] = &elements[..] {
         let taken = value == "0";
+        let entry = branch_hits_per_file.entry(file.to_owned()).or_default();
+        let entry = entry.entry(line).or_default();
 
-        for loc in &step.locs {
-            let file = &loc.loc.file;
-            let line = loc.loc.line;
-            let entry = branch_hits_per_file.entry(file.clone()).or_default();
-
-            let entry = entry.entry(line).or_default();
-
-            if taken {
-                entry.if_true += 1;
-            } else {
-                entry.if_false += 1;
-            }
+        if taken {
+            entry.if_true += 1;
+        } else {
+            entry.if_false += 1;
         }
     }
 }
 
-fn build_executable_lines_per_files(
-    data: &Vec<SourceMapAndLogs>,
-) -> HashMap<String, BTreeSet<i64>> {
+fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String, BTreeSet<i64>> {
     let mut seen_source_maps = HashSet::new();
     let mut executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
 
-    for SourceMapAndLogs { source_map, .. } in data {
-        if !seen_source_maps.insert(source_map.hash()) {
+    for SourceMapAndLogs {
+        build_path,
+        tolk_source_map,
+        ..
+    } in data
+    {
+        if !seen_source_maps.insert(build_path.clone()) {
             continue;
         }
 
-        build_executable_lines_per_file(&mut executable_lines_per_file, source_map);
+        build_executable_lines_per_file(&mut executable_lines_per_file, tolk_source_map);
     }
 
     executable_lines_per_file
@@ -233,50 +278,41 @@ fn build_executable_lines_per_files(
 
 fn build_executable_lines_per_file(
     executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
-    source_map: &SourceMap,
+    tolk_source_map: &TolkSourceMap,
 ) {
-    let mut local_executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
-    let source_maps_locations = &source_map.high_level.locations;
-    let executable_locations = source_maps_locations;
+    let source_map = &tolk_source_map.source_map;
 
-    for loc in executable_locations {
-        let file = &loc.loc.file;
+    for mark_id in 0..source_map.debug_marks_count() {
+        let DebugMark::Loc { range, .. } = source_map.get_debug_mark(mark_id) else {
+            continue;
+        };
 
-        // ignore stdlib and test files completely
-        // we also don't need to collect executable lines for Acton stdlib
-        if file.contains("@stdlib/")
-            || file.is_empty()
-            || file.contains("/lib/")
-            || file.contains("/.acton/")
-            || file.contains(".test.tolk")
-        {
+        let file_id = range.file_id();
+        let file = source_map
+            .resolve_file_full_path(file_id)
+            .unwrap_or_else(|| source_map.resolve_file_name(file_id));
+
+        if is_ignored_coverage_file(file) {
             continue;
         }
 
-        let file = file.clone();
-        if executable_lines_per_file.contains_key(&file) {
-            // we already have executable lines for this file
-            continue;
-        }
-
-        if let EntryContextDescription::Basic { ast_kind } = &loc.context.description
-            && ast_kind == "ast_block_statement"
-        {
-            // skip block statements
-            continue;
-        }
-
-        let entry = local_executable_lines_per_file.entry(file).or_default();
-        entry.insert(loc.loc.line);
+        executable_lines_per_file
+            .entry(file.to_owned())
+            .or_default()
+            .insert(zero_based_line(range.start_line()));
     }
+}
 
-    for (path, locs) in &local_executable_lines_per_file {
-        if executable_lines_per_file.contains_key(path) {
-            // we already have executable lines for this file
-            continue;
-        }
-        executable_lines_per_file.insert(path.clone(), locs.clone());
-    }
+fn is_ignored_coverage_file(file: &str) -> bool {
+    file.is_empty()
+        || file.contains("@stdlib/")
+        || file.contains("/lib/")
+        || file.contains("/.acton/")
+        || file.contains(".test.tolk")
+}
+
+const fn zero_based_line(line: usize) -> i64 {
+    line.saturating_sub(1) as i64
 }
 
 #[allow(dead_code)] // maybe for command like coverage merge

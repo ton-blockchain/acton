@@ -1,12 +1,12 @@
 Coverage Summary:
 Lines: 2/3 (66.67%)
-Total Hits: 14
+Total Hits: 10
 
 File: [ROOT]/code/validator.tolk
 Annotated Code:
 1   |                                                       |
 2   |             fun validate(value: int): bool {          |
-3 ✓ |                 if (value > 0) {                      | hits:8
+3 ✓ |                 if (value > 0) {                      | hits:4
 4 ✓ |                     return true;                      | hits:6
 5   |                 }                                     |
 6 ✗ |                 return false;                         | hits:0
