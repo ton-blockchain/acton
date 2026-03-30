@@ -26,7 +26,7 @@ fn run_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("tuple index out of range")
+        .assert_contains("Range check error")
         .assert_snapshot_matches(snapshot_path);
 }
 
@@ -75,7 +75,7 @@ get fun `test-dl-vm-set-config-unpacked-single-item-tuple-diagnostic`() {{
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("tuple index out of range")
+        .assert_contains("Range check error")
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic/vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fixture_project.stdout.txt",
         );

@@ -80,7 +80,7 @@ const CONFIG_UNPACKED_INDEX = 14
 ///
 /// Use [vm.getConfigUnpacked] as a template for expected tuple layout.
 /// If this tuple is malformed (for example, too short), later operations that assume
-/// specific indices can fail with runtime errors such as `tuple index out of range`.
+/// specific indices can fail with runtime errors such as `Range check error`.
 fun vm.setConfigUnpacked(values: tuple): void {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;

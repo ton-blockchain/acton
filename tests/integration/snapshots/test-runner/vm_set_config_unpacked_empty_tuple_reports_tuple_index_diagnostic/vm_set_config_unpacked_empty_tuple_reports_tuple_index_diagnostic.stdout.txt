@@ -11,7 +11,7 @@
   ✗ dl-vm-set-config-unpacked-empty-tuple-diagnostic [TIME]
     └─ exit_code=5
       ├─ Re-run with --backtrace full to get more information
-      ├─ tuple index out of range
+      ├─ Range check error — an integer is out of its expected range
       └─ Phase: Compute phase
 
  ✗ 1 failed in 1 file
