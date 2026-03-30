@@ -11,12 +11,10 @@
   ✗ foo [TIME]
     └─ exit_code=679
       ├─ at ../lib/emulation/network[LINE]
-      │     __throw                            at ../lib/emulation/network[LINE]
-      │     __throw                            at ../lib/emulation/network[LINE]
       │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
-      │     net.runGetMethod<int,tuple>        at tests/test.test[LINE]
-      │     net.send                           at ../lib/emulation/network[LINE]
-      │     net.treasury                       at tests/test.test[LINE]
+      │     net.runGetMethod<int,tuple>        at ../lib/emulation/network[LINE]
+      │     test-foo                           at tests/test.test[LINE]
+      ├─ custom THROW
       └─ Cannot run method of contract without code
 
  ✗ 1 failed in 1 file

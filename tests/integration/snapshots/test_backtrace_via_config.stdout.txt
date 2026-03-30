@@ -11,7 +11,7 @@
   ✗ with-error [TIME]
     └─ exit_code=42
       ├─ at tests/test.test[LINE]
-      │     __throw   at tests/test.test[LINE]
+      │     test-with-error   at tests/test.test[LINE]
       ├─ Library change action error
       └─ Phase: Action phase
 

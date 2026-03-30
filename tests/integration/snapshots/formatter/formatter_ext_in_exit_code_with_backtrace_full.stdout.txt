@@ -15,6 +15,6 @@
            queryId: 404
            ├── Compute phase failed: Dictionary error
            └── at contracts/fm_external_throw[LINE]
-                  __throw   at contracts/fm_external_throw[LINE]
+                  onExternalMessage   at contracts/fm_external_throw[LINE]
 
  ✓ 1 passed in 1 file

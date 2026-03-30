@@ -12,7 +12,7 @@
   ✗ should-reset-counter [TIME]
     └─ exit_code=9
       ├─ at tests/counter.test[LINE]
-      │     __throw   at tests/counter.test[LINE]
+      │     test-should-reset-counter   at tests/counter.test[LINE]
       ├─ Cell underflow
       └─ Phase: Compute phase
 
