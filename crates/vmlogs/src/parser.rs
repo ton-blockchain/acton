@@ -206,8 +206,9 @@ fn tag(i: &mut I, mut s: &'static str) -> PResult<()> {
 // Null / NaN / Integer
 fn null_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     alt((
-        delimited("(", ws0, delimited("", ws0, ")")).value(VmStackValue::Null), // "()" с пробелами
+        delimited("(", ws0, delimited("", ws0, ")")).value(VmStackValue::Null), // "()" with spaces
         "(null)".value(VmStackValue::Null),
+        "null".value(VmStackValue::Null),
     ))
     .parse_next(i)
     .or_else(|_| "NaN".value(VmStackValue::NaN).parse_next(i))

@@ -8,8 +8,8 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
+use tolkc::SourceMap as TolkSourceMap;
 use tolkc::abi::ContractABI;
-use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
@@ -57,7 +57,7 @@ pub fn compile_cmd(
             cached_entry.code_boc64,
             cached_entry.code_hash_hex,
             cached_entry.fift_code,
-            cached_entry.source_map,
+            cached_entry.new_source_map,
             cached_entry.abi,
             abi,
             source_map,
@@ -100,7 +100,7 @@ pub fn compile_cmd(
                 result.code_boc64,
                 result.code_hash_hex,
                 result.fift_code,
-                result.source_map,
+                result.new_source_map,
                 result.abi,
                 abi,
                 source_map,
@@ -138,7 +138,7 @@ fn handle_compilation_result(
     code_boc64: String,
     code_hash_hex: String,
     fift_code: String,
-    source_map: Option<SourceMap>,
+    new_source_map: Option<TolkSourceMap>,
     abi: Option<ContractABI>,
     abi_path: Option<String>,
     source_map_path: Option<String>,
@@ -153,7 +153,7 @@ fn handle_compilation_result(
     let code_hex = Boc::encode_hex(&code);
 
     if let Some(source_map_path) = &source_map_path {
-        write_source_map(source_map.as_ref(), source_map_path)?;
+        write_source_map(new_source_map.as_ref(), source_map_path)?;
     }
 
     if let Some(fift_path) = &fift {
@@ -235,7 +235,10 @@ fn handle_compilation_result(
     Ok(())
 }
 
-fn write_source_map(source_map: Option<&SourceMap>, source_map_path: &str) -> anyhow::Result<()> {
+fn write_source_map(
+    new_source_map: Option<&TolkSourceMap>,
+    source_map_path: &str,
+) -> anyhow::Result<()> {
     if let Some(parent_dir) = Path::new(source_map_path).parent()
         && let Err(err) = fs::create_dir_all(parent_dir)
     {
@@ -246,12 +249,13 @@ fn write_source_map(source_map: Option<&SourceMap>, source_map_path: &str) -> an
         );
     }
 
-    let source_map = source_map.ok_or_else(|| {
+    let source_map = new_source_map.ok_or_else(|| {
         anyhow!(
             "No source map data available for {}",
             source_map_path.yellow()
         )
     })?;
+
     let json_string = serde_json::to_string_pretty(source_map).map_err(|err| {
         anyhow!(
             "Failed to serialize source map {}: {err}",

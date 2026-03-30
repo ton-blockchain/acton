@@ -64,7 +64,7 @@ get fun `test-cv-out-action-inline-parity`() {
     val genericMsg = action!.loadGenericMessage();
     val typedBody = typedMsg.loadBody();
 
-    expect(genericMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<InlineParityPayload>());
+    expect(genericMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<InlineParityPayload>().0);
     expect(typedMsg.info.dest).toEqual(dest);
     expect(typedMsg.info.value.grams).toEqual(ton("1.5"));
     expect(genericMsg.info.dest).toEqual(dest);
@@ -76,7 +76,7 @@ get fun `test-cv-out-action-inline-parity`() {
     val queryId = genericBody.loadUint(64);
     val amount = genericBody.loadUint(32);
 
-    expect(opcode).toEqual(reflect.serializationPrefixOf<InlineParityPayload>());
+    expect(opcode).toEqual(reflect.serializationPrefixOf<InlineParityPayload>().0);
     expect(queryId).toEqual(typedBody.queryId);
     expect(amount).toEqual(typedBody.amount);
 }
@@ -115,7 +115,7 @@ get fun `test-cv-out-action-ref-parity`() {{
     val genericMsg = action!.loadGenericMessage();
     val typedBody = typedMsg.loadBody();
 
-    expect(genericMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<RefParityPayload>());
+    expect(genericMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<RefParityPayload>().0);
     expect(typedMsg.info.dest).toEqual(dest);
     expect(typedMsg.info.value.grams).toEqual(ton("2.25"));
     expect(genericMsg.info.dest).toEqual(dest);
@@ -130,7 +130,7 @@ get fun `test-cv-out-action-ref-parity`() {{
     val part2 = bodyRef.loadUint(256);
     val part3 = bodyRef.loadUint(256);
 
-    expect(opcode).toEqual(reflect.serializationPrefixOf<RefParityPayload>());
+    expect(opcode).toEqual(reflect.serializationPrefixOf<RefParityPayload>().0);
     expect(queryId).toEqual(typedBody.queryId);
     expect(part1).toEqual(typedBody.part1);
     expect(part2).toEqual(typedBody.part2);
