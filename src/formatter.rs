@@ -1775,7 +1775,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             let result = self.build_cache.result_for_code(&code);
 
             if let Some(result) = result {
-                return retrace::find_source_loc(&result.1.source_map, loc_hash, loc_offset);
+                return retrace::find_source_loc(&result.1.tolk_source_map, loc_hash, loc_offset);
             }
         }
 

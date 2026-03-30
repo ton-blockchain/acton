@@ -158,6 +158,10 @@ impl SourceMap {
     pub fn get_debug_mark(&self, mark_id: usize) -> &DebugMark {
         &self.debug_marks[mark_id]
     }
+
+    pub const fn is_empty(&self) -> bool {
+        self.debug_marks.is_empty()
+    }
 }
 
 // ---------------------------------------------------------------------------

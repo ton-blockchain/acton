@@ -1,11 +1,9 @@
 use crate::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
-use crate::vmtrace;
-use crate::vmtrace::SkipBlocksMode;
 pub use retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
 use tolkc::TolkSourceMap;
-use ton_source_map::{DebugLocation, SourceLocation, SourceMap};
+use ton_source_map::{DebugLocation, SourceLocation};
 use vmlogs::parser::VmLine;
 
 #[derive(Debug)]
@@ -175,20 +173,17 @@ fn to_source_location(
 }
 
 #[must_use]
-pub fn find_source_loc(source_map: &SourceMap, hash: &str, offset: u16) -> Option<SourceLocation> {
-    if source_map.high_level.locations.is_empty() {
+pub fn find_source_loc(
+    tolk_source_map: &TolkSourceMap,
+    hash: &str,
+    offset: u16,
+) -> Option<SourceLocation> {
+    if tolk_source_map.source_map.is_empty() {
         // `--backtrace full` is not enabled
         return None;
     }
 
-    let locs = vmtrace::low_level_loc_to_debug_locations(
-        source_map,
-        hash,
-        offset,
-        SkipBlocksMode::None,
-        true,
-    )?;
-    locs.last().map(|l| l.loc.clone())
+    tolk_source_map.find_source_loc(hash, offset)
 }
 
 #[must_use]

@@ -1,7 +1,6 @@
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::dap::{DapMessage, DapTransport};
 use crate::formatter::FormatterContext;
-use crate::vmtrace::SkipBlocksMode;
 use anyhow::anyhow;
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
 use dap::prelude::{Command, Request, Response, ResponseBody};
@@ -1081,15 +1080,20 @@ fn skip_function(stepper: &mut Stepper, func_name: &Arc<str>) -> bool {
     }
 }
 
-fn get_locations(executor: &AnyExecutor, source_map: &SourceMap) -> Option<Vec<DebugLocation>> {
-    let (hash, offset) = get_code_pos(executor)?;
-    crate::vmtrace::low_level_loc_to_debug_locations(
-        source_map,
-        hash.as_str(),
-        offset,
-        SkipBlocksMode::None,
-        false,
-    )
+const fn get_locations(
+    _executor: &AnyExecutor,
+    _source_map: &SourceMap,
+) -> Option<Vec<DebugLocation>> {
+    // let (hash, offset) = get_code_pos(executor)?;
+    // crate::vmtrace::low_level_loc_to_debug_locations(
+    //     source_map,
+    //     hash.as_str(),
+    //     offset,
+    //     SkipBlocksMode::None,
+    //     false,
+    // )
+    // will be done in the next commits
+    None
 }
 
 fn get_code_pos(executor: &AnyExecutor) -> Option<(String, u16)> {
