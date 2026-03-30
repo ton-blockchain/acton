@@ -1,12 +1,12 @@
 import "@stdlib/reflection"
-import "@local-acton/types/message"
-import "@local-acton/types/out_actions"
 import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/outlist_expect"
 import "@local-acton/tlb/either"
 import "@local-acton/tlb/maybe"
 import "@local-acton/types/message"
+import "@local-acton/types/message"
+import "@local-acton/types/out_actions"
 import "@local-acton/types/out_actions"
 import "@local-acton/vm/vm"
 
@@ -99,35 +99,23 @@ get fun `test-load-body-from-inline-and-ref`() {
     val inlineMessage = MessageRelaxed<DemoPayload> {
         info: internalInfo(),
         init: Maybe<Either<StateInit, Cell<StateInit>>>.none(),
-        body: Either<DemoPayload, Cell<DemoPayload>>.left(DemoPayload {
-            value: 1
-        }),
+        body: Either<DemoPayload, Cell<DemoPayload>>.left(DemoPayload { value: 1 }),
     };
-    expect(inlineMessage.loadBody()).toEqual(DemoPayload {
-        value: 1
-    });
+    expect(inlineMessage.loadBody()).toEqual(DemoPayload { value: 1 });
 
     val refMessage = MessageRelaxed<DemoPayload> {
         info: internalInfo(),
         init: Maybe<Either<StateInit, Cell<StateInit>>>.none(),
-        body: Either<DemoPayload, Cell<DemoPayload>>.right(DemoPayload {
-            value: 2
-        }.toCell()),
+        body: Either<DemoPayload, Cell<DemoPayload>>.right(DemoPayload { value: 2 }.toCell()),
     };
-    expect(refMessage.loadBody()).toEqual(DemoPayload {
-        value: 2
-    });
+    expect(refMessage.loadBody()).toEqual(DemoPayload { value: 2 });
 
     val extRefMessage = ExtMessageRelaxed<DemoPayload> {
         info: externalInfo(),
         init: Maybe<Either<StateInit, Cell<StateInit>>>.none(),
-        body: Either<DemoPayload, Cell<DemoPayload>>.right(DemoPayload {
-            value: 3
-        }.toCell()),
+        body: Either<DemoPayload, Cell<DemoPayload>>.right(DemoPayload { value: 3 }.toCell()),
     };
-    expect(extRefMessage.loadBody()).toEqual(DemoPayload {
-        value: 3
-    });
+    expect(extRefMessage.loadBody()).toEqual(DemoPayload { value: 3 });
 }
 
 get fun `test-load-opcode-from-inline-and-ref-body`() {
