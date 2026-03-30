@@ -21,7 +21,7 @@ println(point); // Output: Point { x: 10, y: 20 }
 
 // Formatted output
 println1("Iteration: {}", 5);
-println1("Address: {}", myAddress);
+println2("Transfer {} to {}", amount, myAddress);
 
 // Error logging
 eprintln("Critical failure in setup!");
@@ -80,6 +80,81 @@ Notes:
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L64" />
 
+## `println2`
+
+```tolk
+fun println2<T1, T2>(fmt: string, value1: T1, value2: T2): void
+```
+
+Prints the given values to the standard output formatted according to format string.
+
+Uses the same placeholder rules and edge-case behavior as [println1](#println1).
+
+Example:
+```tolk
+println2("{} -> {}", "from", "to");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L76" />
+
+## `println3`
+
+```tolk
+fun println3<T1, T2, T3>(fmt: string, value1: T1, value2: T2, value3: T3): void
+```
+
+Prints the given values to the standard output formatted according to format string.
+
+Uses the same placeholder rules and edge-case behavior as [println1](#println1).
+
+Example:
+```tolk
+println3("{} + {} = {}", 2, 3, 5);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L88" />
+
+## `println4`
+
+```tolk
+fun println4<T1, T2, T3, T4>(fmt: string, value1: T1, value2: T2, value3: T3, value4: T4): void
+```
+
+Prints the given values to the standard output formatted according to format string.
+
+Uses the same placeholder rules and edge-case behavior as [println1](#println1).
+
+Example:
+```tolk
+println4("{} {} {} {}", "a", "b", "c", "d");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L100" />
+
+## `println5`
+
+```tolk
+fun println5<T1, T2, T3, T4, T5>(
+    fmt: string,
+    value1: T1,
+    value2: T2,
+    value3: T3,
+    value4: T4,
+    value5: T5,
+): void
+```
+
+Prints the given values to the standard output formatted according to format string.
+
+Uses the same placeholder rules and edge-case behavior as [println1](#println1).
+
+Example:
+```tolk
+println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L112" />
+
 ## `eprintln`
 
 ```tolk
@@ -93,5 +168,5 @@ Example:
 eprintln("Something went wrong");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L129" />
 

@@ -1066,6 +1066,34 @@ fn test_script_output_snapshot() {
         .assert_snapshot_matches("integration/snapshots/test_script_output_snapshot.stdout.txt");
 }
 
+#[test]
+fn test_script_multi_arg_println_helpers_snapshot() {
+    let project = ProjectBuilder::new("script-println-multiarg-snapshot")
+        .script_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println2("{} + {}", "left", "right");
+                println3("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+                println4("{} {} {} {}", "a", "b", "c", "d");
+                println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/output.tolk")
+        .run()
+        .code(0)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
+        );
+}
+
 // ========================================
 // Additional Error Handling Tests
 // ========================================
