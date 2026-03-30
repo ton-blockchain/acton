@@ -92,7 +92,9 @@ pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
             }
             Ok(serde_json::json!(["num", format!("0x{i:x}")]))
         }
-        TupleItem::Cont(cont) => Ok(serde_json::json!(["cont", { "bytes": Boc::encode_base64(&cont.code) }])),
+        TupleItem::Cont(cont) => {
+            Ok(serde_json::json!(["cont", { "bytes": Boc::encode_base64(&cont.code) }]))
+        }
         TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Builder(c) => {

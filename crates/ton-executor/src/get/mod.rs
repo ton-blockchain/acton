@@ -234,20 +234,18 @@ impl GetExecutor {
 
         let inner = self.inner.lock();
 
+        // SAFETY: `tvm_emulator_set_gas_limit` and `tvm_emulator_run_continuation` are safe C API functions.
         let result_ptr = unsafe {
-            tvm_emulator_set_gas_limit(inner.0.as_ptr(), 10000);
+            tvm_emulator_set_gas_limit(inner.0.as_ptr(), i64::MAX - 1000);
 
-            tvm_emulator_run_continuation(
-                inner.0.as_ptr(),
-                cont_cstr.as_ptr(),
-                stack_cstr.as_ptr(),
-            )
+            tvm_emulator_run_continuation(inner.0.as_ptr(), cont_cstr.as_ptr(), stack_cstr.as_ptr())
         };
 
         if result_ptr.is_null() {
             anyhow::bail!("tvm_emulator_run_continuation returned null pointer");
         }
 
+        // SAFETY: The C++ side is expected to return a valid null-terminated C string.
         let output_str = unsafe { CStr::from_ptr(result_ptr).to_string_lossy() };
         let result: GetMethodResult = serde_json::from_str(&output_str)
             .with_context(|| format!("Failed to parse emulator output JSON: {output_str}"))?;

@@ -1,16 +1,16 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, Context, GetMethodAssertFailure, KnownAddress, MessageIterState,
-    PendingMessageStep, PredicateSearchParams, TransactionNotFoundParams, Wallet, to_cell,
+    PendingMessageStep, PredicateSearchParams, Wallet, to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::external_send::{SendBocContext, format_send_boc_error};
-use crate::ffi::assert::parse_search_params;
+
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
-use anyhow::{Context as AnyhowContext};
+use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
@@ -419,16 +419,10 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
     ])))
 }
 
-struct SearchMatcher {
-    params: TransactionNotFoundParams,
-    requires_internal_in_msg: bool,
-    expected_body_hash: Option<HashBytes>,
-}
-
 #[allow(clippy::large_enum_variant)]
 enum IterationStop {
     Steps(usize),
-    UntilMatch(SearchMatcher),
+    UntilMatch(PredicateSearchParams, GetExecutor),
     Exhausted,
 }
 
@@ -504,149 +498,6 @@ fn push_successful_send_results(stack: &mut Tuple, emulations: &[SendMessageResu
     ));
 }
 
-fn build_search_matcher(params: &Tuple) -> Option<SearchMatcher> {
-    let params = parse_search_params(params)?;
-    let requires_internal_in_msg = params.opcode.is_some()
-        || params.bounced.is_some()
-        || params.bounce.is_some()
-        || params.value.is_some()
-        || params.from.is_some()
-        || params.to.is_some();
-    let expected_body_hash = params.body.as_ref().map(|body| body.repr_hash()).copied();
-
-    Some(SearchMatcher {
-        params,
-        requires_internal_in_msg,
-        expected_body_hash,
-    })
-}
-
-fn transaction_matches_search(tx: &Transaction, matcher: &SearchMatcher) -> bool {
-    let params = &matcher.params;
-
-    if let Some(expected_deploy) = params.deploy {
-        let is_deploy =
-            tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
-        if expected_deploy != is_deploy {
-            return false;
-        }
-    }
-
-    let in_msg = tx.load_in_msg();
-    if let Ok(Some(in_msg)) = &in_msg
-        && let MsgInfo::Int(info) = &in_msg.info
-    {
-        if let Some(expected_opcode) = &params.opcode {
-            let mut slice = in_msg.body;
-            let Ok(opcode) = slice.load_u32() else {
-                return false;
-            };
-            if *expected_opcode != opcode {
-                if params.bounced == Some(true) {
-                    let Ok(bounced_opcode) = slice.load_u32() else {
-                        return false;
-                    };
-                    if *expected_opcode != bounced_opcode {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            }
-        }
-
-        if let Some(expected_bounced) = &params.bounced
-            && *expected_bounced != info.bounced
-        {
-            return false;
-        }
-
-        if let Some(expected_bounce) = &params.bounce
-            && *expected_bounce != info.bounce
-        {
-            return false;
-        }
-
-        if let Some(expected_value) = &params.value
-            && (*expected_value) != info.value.tokens.into()
-        {
-            return false;
-        }
-
-        if let Some(expected_from_addr) = &params.from
-            && (*expected_from_addr) != info.src
-        {
-            return false;
-        }
-
-        if let Some(expected_to_addr) = &params.to
-            && (*expected_to_addr) != info.dst
-        {
-            return false;
-        }
-
-        if let Some(expected_hash) = matcher.expected_body_hash.as_ref() {
-            let body_cell = to_cell(&in_msg.body);
-            let actual_hash = body_cell.repr_hash();
-            if expected_hash != actual_hash {
-                return false;
-            }
-        }
-    } else if matcher.requires_internal_in_msg {
-        return false;
-    }
-
-    let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
-        return false;
-    };
-
-    if let Some(expected_compute_skipped) = params.compute_phase_skipped {
-        let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
-        if expected_compute_skipped != is_skipped {
-            return false;
-        }
-    }
-
-    if let Some(expected_aborted) = params.aborted
-        && expected_aborted != info.aborted
-    {
-        return false;
-    }
-
-    if let Some(expected_action_exit_code) = params.action_exit_code {
-        if let Some(action_phase) = &info.action_phase {
-            if action_phase.result_code != expected_action_exit_code {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    if let ComputePhase::Executed(compute) = &info.compute_phase
-        && let Some(expected_exit_code) = params.exit_code
-        && compute.exit_code != expected_exit_code as i32
-    {
-        return false;
-    }
-
-    if let Some(expected_success) = params.success {
-        let action_phase_success = if let Some(action_phase) = &info.action_phase {
-            action_phase.success
-        } else {
-            false
-        };
-
-        if let ComputePhase::Executed(compute) = &info.compute_phase
-            && (action_phase_success && compute.success) != expected_success
-        {
-            return false;
-        }
-    }
-
-    true
-}
-
 fn backfill_batch_child_transactions(results: &mut [SendMessageResult]) {
     let mut children_by_parent = HashMap::<u64, Vec<u64>>::new();
 
@@ -698,7 +549,7 @@ where
     loop {
         match &stop {
             IterationStop::Steps(limit) if executed >= *limit => break,
-            IterationStop::Steps(_) | IterationStop::UntilMatch(_) | IterationStop::Exhausted => {}
+            IterationStop::Steps(_) | IterationStop::UntilMatch(..) | IterationStop::Exhausted => {}
         }
 
         let Some((pending, libs_owner)) = message_iters.peek_next(cursor_id) else {
@@ -741,10 +592,12 @@ where
 
             step.externals = externals;
 
-            if let IterationStop::UntilMatch(matcher) = &stop
-                && transaction_matches_search(&step.transaction, matcher)
-            {
-                matched = true;
+            if let IterationStop::UntilMatch(predicates, executor) = &stop {
+                if transaction_matches_predicates(&step.transaction, predicates, executor)
+                    .unwrap_or(false)
+                {
+                    matched = true;
+                }
             }
         }
 
@@ -1111,12 +964,14 @@ fn execute_message_iter_till_impl(
     let cursor_id = cursor_id
         .to_u64()
         .context("Transaction iterator id does not fit into u64")?;
-    let Some(matcher) = build_search_matcher(&params) else {
-        stack.push(TupleItem::Null);
-        return Ok(());
-    };
+    let predicates = parse_predicate_search_params(&params);
+    let executor = make_predicate_executor(ctx)?;
 
-    let batch = execute_message_iter_batch(ctx, cursor_id, IterationStop::UntilMatch(matcher))?;
+    let batch = execute_message_iter_batch(
+        ctx,
+        cursor_id,
+        IterationStop::UntilMatch(predicates, executor),
+    )?;
 
     finish_message_iter_results(ctx, cursor_id, &batch.results);
     if let Some(error) = batch.hard_error {
@@ -1216,11 +1071,7 @@ fn save_trace_name_impl(
 }
 
 /// Call a TVM predicate continuation with a single argument. Returns the bool result.
-fn call_predicate(
-    executor: &GetExecutor,
-    cont: &ContData,
-    arg: TupleItem,
-) -> anyhow::Result<bool> {
+fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> anyhow::Result<bool> {
     let mut cont_builder = CellBuilder::new();
     tvmffi::serde::serialize_vm_cont(&mut cont_builder, cont)?;
     let cont_cell = cont_builder.build()?;
@@ -1237,7 +1088,8 @@ fn call_predicate(
 
     match result {
         GetMethodResult::Success(r) if r.vm_exit_code == 0 || r.vm_exit_code == 1 => {
-            let cell = Boc::decode_base64(r.stack.as_ref()).context("Failed to decode result stack")?;
+            let cell =
+                Boc::decode_base64(r.stack.as_ref()).context("Failed to decode result stack")?;
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize result")?;
             match tuple.first() {
                 Some(TupleItem::Int(n)) => Ok(*n != BigInt::from(0)),
@@ -1251,7 +1103,11 @@ fn call_predicate(
 /// Parse SearchParamsInternal tuple into PredicateSearchParams (continuations).
 fn parse_predicate_search_params(params: &Tuple) -> PredicateSearchParams {
     let item_from_end = |idx_from_end: usize| -> Option<&TupleItem> {
-        params.0.len().checked_sub(idx_from_end + 1).and_then(|idx| params.0.get(idx))
+        params
+            .0
+            .len()
+            .checked_sub(idx_from_end + 1)
+            .and_then(|idx| params.0.get(idx))
     };
 
     let extract_cont = |idx_from_end: usize| -> Option<ContData> {
@@ -1278,9 +1134,154 @@ fn parse_predicate_search_params(params: &Tuple) -> PredicateSearchParams {
     }
 }
 
+/// Check if a transaction matches all predicate search params by calling each predicate via run_continuation.
+fn transaction_matches_predicates(
+    tx: &Transaction,
+    predicates: &PredicateSearchParams,
+    executor: &GetExecutor,
+) -> anyhow::Result<bool> {
+    let requires_internal_in_msg = predicates.opcode.is_some()
+        || predicates.bounced.is_some()
+        || predicates.bounce.is_some()
+        || predicates.value.is_some()
+        || predicates.from.is_some()
+        || predicates.to.is_some();
+
+    // Deploy predicate
+    if let Some(ref pred) = predicates.deploy {
+        let is_deploy =
+            tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
+        if !call_predicate(
+            executor,
+            pred,
+            TupleItem::Int(BigInt::from(if is_deploy { -1 } else { 0 })),
+        )? {
+            return Ok(false);
+        }
+    }
+
+    let in_msg = tx.load_in_msg();
+    if let Ok(Some(in_msg)) = &in_msg
+        && let MsgInfo::Int(info) = &in_msg.info
+    {
+        if let Some(ref pred) = predicates.opcode {
+            let mut slice = in_msg.body;
+            let Ok(opcode) = slice.load_u32() else {
+                return Ok(false);
+            };
+            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(opcode)))? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.bounced {
+            if !call_predicate(
+                executor,
+                pred,
+                TupleItem::Int(BigInt::from(if info.bounced { -1 } else { 0 })),
+            )? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.bounce {
+            if !call_predicate(
+                executor,
+                pred,
+                TupleItem::Int(BigInt::from(if info.bounce { -1 } else { 0 })),
+            )? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.value {
+            if !call_predicate(
+                executor,
+                pred,
+                TupleItem::Int(BigInt::from(info.value.tokens.into_inner())),
+            )? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.from {
+            if !call_predicate(executor, pred, TupleItem::Slice(to_cell(&info.src)))? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.to {
+            if !call_predicate(executor, pred, TupleItem::Slice(to_cell(&info.dst)))? {
+                return Ok(false);
+            }
+        }
+        if let Some(ref pred) = predicates.body {
+            if !call_predicate(executor, pred, TupleItem::Cell(to_cell(&in_msg.body)))? {
+                return Ok(false);
+            }
+        }
+    } else if requires_internal_in_msg {
+        return Ok(false);
+    }
+
+    let Ok(TxInfo::Ordinary(ord_info)) = tx.load_info() else {
+        return Ok(false);
+    };
+
+    if let Some(ref pred) = predicates.compute_phase_skipped {
+        let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
+        if !call_predicate(
+            executor,
+            pred,
+            TupleItem::Int(BigInt::from(if is_skipped { -1 } else { 0 })),
+        )? {
+            return Ok(false);
+        }
+    }
+    if let Some(ref pred) = predicates.aborted {
+        if !call_predicate(
+            executor,
+            pred,
+            TupleItem::Int(BigInt::from(if ord_info.aborted { -1 } else { 0 })),
+        )? {
+            return Ok(false);
+        }
+    }
+    if let Some(ref pred) = predicates.action_exit_code {
+        let code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
+        if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(code)))? {
+            return Ok(false);
+        }
+    }
+    if let Some(ref pred) = predicates.exit_code {
+        if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+            if !call_predicate(
+                executor,
+                pred,
+                TupleItem::Int(BigInt::from(compute.exit_code)),
+            )? {
+                return Ok(false);
+            }
+        }
+    }
+    if let Some(ref pred) = predicates.success {
+        if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+            let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
+            let is_success = action_success && compute.success;
+            if !call_predicate(
+                executor,
+                pred,
+                TupleItem::Int(BigInt::from(if is_success { -1 } else { 0 })),
+            )? {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
+}
+
 /// Create a GetExecutor suitable for running predicate continuations.
 fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
-    let code = ctx.env.test_code.as_ref()
+    let code = ctx
+        .env
+        .test_code
+        .as_ref()
         .map(Boc::encode_base64)
         .unwrap_or_else(|| Boc::encode_base64(Cell::default()));
 
@@ -1319,34 +1320,9 @@ fn find_transaction_by_params_impl(
     }
 
     let predicates = parse_predicate_search_params(&params);
-    let has_any = predicates.to.is_some()
-        || predicates.from.is_some()
-        || predicates.value.is_some()
-        || predicates.exit_code.is_some()
-        || predicates.success.is_some()
-        || predicates.aborted.is_some()
-        || predicates.deploy.is_some()
-        || predicates.bounce.is_some()
-        || predicates.bounced.is_some()
-        || predicates.opcode.is_some()
-        || predicates.action_exit_code.is_some()
-        || predicates.compute_phase_skipped.is_some()
-        || predicates.body.is_some();
+    let executor = make_predicate_executor(ctx)?;
 
-    let executor = if has_any {
-        Some(make_predicate_executor(ctx)?)
-    } else {
-        None
-    };
-
-    let requires_internal_in_msg = predicates.opcode.is_some()
-        || predicates.bounced.is_some()
-        || predicates.bounce.is_some()
-        || predicates.value.is_some()
-        || predicates.from.is_some()
-        || predicates.to.is_some();
-
-    let tx_cells: Vec<_> = txs
+    let found = txs
         .iter()
         .filter_map(|el| match el {
             TupleItem::Tuple(tuple) => match tuple.first() {
@@ -1355,133 +1331,15 @@ fn find_transaction_by_params_impl(
             },
             _ => None,
         })
-        .collect();
+        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
+        .find(|(tx, _)| {
+            transaction_matches_predicates(tx, &predicates, &executor).unwrap_or(false)
+        });
 
-    for cell in tx_cells {
-        let Ok(tx) = cell.parse::<Transaction>() else { continue };
-        let executor = executor.as_ref().unwrap();
-
-        // Deploy predicate
-        if let Some(ref pred) = predicates.deploy {
-            let is_deploy = tx.orig_status == AccountStatus::NotExists
-                && tx.end_status == AccountStatus::Active;
-            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_deploy { -1 } else { 0 })))? {
-                continue;
-            }
-        }
-
-        let in_msg = tx.load_in_msg();
-        if let Ok(Some(in_msg)) = &in_msg
-            && let MsgInfo::Int(info) = &in_msg.info
-        {
-            // Opcode predicate
-            if let Some(ref pred) = predicates.opcode {
-                let mut slice = in_msg.body;
-                let Ok(opcode) = slice.load_u32() else { continue };
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(opcode)))? {
-                    continue;
-                }
-            }
-
-            // Bounced predicate
-            if let Some(ref pred) = predicates.bounced {
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounced { -1 } else { 0 })))? {
-                    continue;
-                }
-            }
-
-            // Bounce predicate
-            if let Some(ref pred) = predicates.bounce {
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if info.bounce { -1 } else { 0 })))? {
-                    continue;
-                }
-            }
-
-            // Value predicate
-            if let Some(ref pred) = predicates.value {
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(info.value.tokens.into_inner())))? {
-                    continue;
-                }
-            }
-
-            // From predicate
-            if let Some(ref pred) = predicates.from {
-                let addr_cell = to_cell(&info.src);
-                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
-                    continue;
-                }
-            }
-
-            // To predicate
-            if let Some(ref pred) = predicates.to {
-                let addr_cell = to_cell(&info.dst);
-                if !call_predicate(executor, pred, TupleItem::Slice(addr_cell))? {
-                    continue;
-                }
-            }
-
-            // Body predicate
-            if let Some(ref pred) = predicates.body {
-                let body_cell = to_cell(&in_msg.body);
-                if !call_predicate(executor, pred, TupleItem::Cell(body_cell))? {
-                    continue;
-                }
-            }
-        } else if requires_internal_in_msg {
-            continue;
-        }
-
-        let Ok(TxInfo::Ordinary(ord_info)) = tx.load_info() else { continue };
-
-        // Compute phase skipped predicate
-        if let Some(ref pred) = predicates.compute_phase_skipped {
-            let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
-            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_skipped { -1 } else { 0 })))? {
-                continue;
-            }
-        }
-
-        // Aborted predicate
-        if let Some(ref pred) = predicates.aborted {
-            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if ord_info.aborted { -1 } else { 0 })))? {
-                continue;
-            }
-        }
-
-        // Action exit code predicate
-        if let Some(ref pred) = predicates.action_exit_code {
-            let code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
-            if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(code)))? {
-                continue;
-            }
-        }
-
-        // Exit code predicate (only check if compute phase was executed)
-        if let Some(ref pred) = predicates.exit_code {
-            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(compute.exit_code)))? {
-                    continue;
-                }
-            }
-        }
-
-        // Success predicate (only check if compute phase was executed)
-        if let Some(ref pred) = predicates.success {
-            if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
-                let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
-                let is_success = action_success && compute.success;
-                if !call_predicate(executor, pred, TupleItem::Int(BigInt::from(if is_success { -1 } else { 0 })))? {
-                    continue;
-                }
-            }
-        }
-
-        // All predicates matched
-        stack.push(TupleItem::Cell((*cell).clone()));
-        return Ok(());
+    match found {
+        Some((_, cell)) => stack.push(TupleItem::Cell(cell.clone())),
+        None => stack.push(TupleItem::Null),
     }
-
-    stack.push(TupleItem::Null);
     Ok(())
 }
 
@@ -2185,9 +2043,15 @@ fn call_tolk_function_impl(
         )
     } else if let Some(test_code) = &ctx.env.test_code {
         // Use the test contract's compiled code (needed for c3 / CALLDICT)
-        (Boc::encode_base64(test_code), Boc::encode_base64(Cell::default()))
+        (
+            Boc::encode_base64(test_code),
+            Boc::encode_base64(Cell::default()),
+        )
     } else {
-        (Boc::encode_base64(Cell::default()), Boc::encode_base64(Cell::default()))
+        (
+            Boc::encode_base64(Cell::default()),
+            Boc::encode_base64(Cell::default()),
+        )
     };
 
     let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
