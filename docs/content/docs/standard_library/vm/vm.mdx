@@ -141,7 +141,7 @@ It writes C7 slot 14 directly and does not validate tuple shape.
 
 Use [vm.getConfigUnpacked](#vmgetconfigunpacked) as a template for expected tuple layout.
 If this tuple is malformed (for example, too short), later operations that assume
-specific indices can fail with runtime errors such as `tuple index out of range`.
+specific indices can fail with runtime errors such as `Range check error`.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L84" />
 
