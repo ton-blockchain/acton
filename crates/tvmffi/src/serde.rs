@@ -363,7 +363,7 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
 /// Serialize a VmCont as vmc_std into a cell builder.
 ///
 /// Always serializes as `vmc_std$00` with VmControlData and VmCellSlice.
-fn serialize_vm_cont(builder: &mut CellBuilder, cont: &ContData) -> anyhow::Result<()> {
+pub fn serialize_vm_cont(builder: &mut CellBuilder, cont: &ContData) -> anyhow::Result<()> {
     // vmc_std$00
     builder.store_uint(0b00, 2)?;
 
@@ -387,8 +387,9 @@ fn serialize_vm_cont(builder: &mut CellBuilder, cont: &ContData) -> anyhow::Resu
         builder.store_bit(false)?;
     }
 
-    // cp:(Maybe int16) — absent
-    builder.store_bit(false)?;
+    // cp:(Maybe int16) — always serialize as codepage 0
+    builder.store_bit(true)?;
+    builder.store_uint(0, 16)?;
 
     // code:VmCellSlice
     let code = &cont.code;

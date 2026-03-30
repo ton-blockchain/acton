@@ -1556,38 +1556,110 @@ fn call_tolk_function_impl(
     args: TupleItem,
     function: TupleItem,
 ) -> anyhow::Result<()> {
-    eprintln!("[DBG] call_tolk_function_impl entered");
-    eprintln!("[DBG] function type: {:?}", std::mem::discriminant(&function));
-    eprintln!("[DBG] args type: {:?}", std::mem::discriminant(&args));
-
     let cont = match function {
         TupleItem::Cont(cont) => cont,
         _ => anyhow::bail!("Expected Cont, got {:?}", function),
     };
-    eprintln!("[DBG] cont.code bit_len={}, has captured_stack={}", cont.code.bit_len(), cont.stack.is_some());
-    if let Some(ref s) = cont.stack {
-        eprintln!("[DBG] captured_stack len={}, items: {:?}", s.len(), s.0.iter().map(|i| std::mem::discriminant(i)).collect::<Vec<_>>());
-    }
 
-    let mut args_stack = match args {
+    let args_stack = match args {
         TupleItem::Tuple(args_stack) => args_stack,
         _ => anyhow::bail!("Expected Tuple, got {:?}", args),
     };
-    eprintln!("[DBG] args_stack len={}", args_stack.len());
 
-    // Prepend the continuation's captured stack (from SETCONTARGS) to the args.
-    // When TVM executes a continuation, captured values are placed below the current stack.
-    if let Some(captured) = &cont.stack {
-        let mut combined = captured.0.clone();
-        combined.append(&mut args_stack.0);
-        args_stack = Tuple(combined);
+    // Serialize the VmCont (with savelist, captured stack, code)
+    let mut cont_builder = CellBuilder::new();
+    tvmffi::serde::serialize_vm_cont(&mut cont_builder, &cont)?;
+    let cont_cell = cont_builder.build()?;
+    let cont_boc = Boc::encode_base64(cont_cell);
+
+    // Serialize args as VmStack
+    let args = args_stack.unwrap_empty().unwrap_tuple();
+    let stack_boc = serialize_tuple(&args)
+        .map(|t| Boc::encode_base64(&t))
+        .context("Cannot serialize args stack")?;
+
+    // Get account state for emulator initialization
+    let world_state = &mut ctx.chain.world_state;
+    let addr_str = addr.to_string();
+    let shard_account = world_state.get_account(&addr);
+    let account_state = shard_account
+        .account
+        .load()
+        .context("Failed to load account")?
+        .0
+        .map(|s| s.state);
+
+    let (code, data) = if let Some(AccountState::Active(state)) = account_state {
+        (
+            Boc::encode_base64(state.code.unwrap_or_default()),
+            Boc::encode_base64(state.data.unwrap_or_default()),
+        )
+    } else if let Some(test_code) = &ctx.env.test_code {
+        // Use the test contract's compiled code (needed for c3 / CALLDICT)
+        (Boc::encode_base64(test_code), Boc::encode_base64(Cell::default()))
+    } else {
+        (Boc::encode_base64(Cell::default()), Boc::encode_base64(Cell::default()))
+    };
+
+    let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
+    let libs_root = libs.into_root();
+
+    let now = std::time::SystemTime::now();
+    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+    let params = RunGetMethodArgs {
+        code,
+        data,
+        verbosity: ctx.env.default_log_level,
+        libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
+        address: addr_str,
+        unixtime: duration_since_epoch.as_secs().try_into()?,
+        balance: "10".to_string(),
+        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        gas_limit: "0".to_string(),
+        method_id: 0,
+        debug_enabled: true,
+        extra_currencies: HashMap::new(),
+        prev_blocks_info: None,
+    };
+
+    let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
+    let result = executor
+        .run_continuation(&cont_boc, &stack_boc);
+    if let Ok(GetMethodResult::Success(ref r)) = result {
+        eprintln!("[DBG] exit_code={}, gas_used={}", r.vm_exit_code, r.gas_used);
+        let log: String = r.vm_log.chars().take(2000).collect();
+        eprintln!("[DBG] vm_log:\n{}", log);
     }
-    eprintln!("[DBG] final args_stack len={}", args_stack.len());
-    eprintln!("[DBG] calling run_get_method_impl...");
+    if let Err(ref e) = result {
+        eprintln!("[DBG] error: {}", e);
+    }
+    let result = result.context("Cannot run continuation")?;
 
-    let result = run_get_method_impl(ctx, stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont.code, addr);
-    eprintln!("[DBG] run_get_method_impl returned: {:?}", result.as_ref().map(|_| "ok"));
-    result
+    match result {
+        GetMethodResult::Success(result) => {
+            ctx.chain
+                .emulations
+                .save_get_method(&ctx.env.running_id, result.clone());
+
+            let cell =
+                Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
+            let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
+
+            if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
+                anyhow::bail!(
+                    "Continuation execution failed with exit code {}",
+                    result.vm_exit_code
+                );
+            }
+
+            stack.push(TupleItem::Tuple(tuple));
+            Ok(())
+        }
+        GetMethodResult::Error(err) => {
+            anyhow::bail!("Continuation execution error: {}", err.error);
+        }
+    }
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {

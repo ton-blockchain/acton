@@ -285,6 +285,7 @@ impl<'a> TestRunner<'a> {
                 api_key: self.config.api_key.clone(),
                 fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
+                test_code: Some(code_cell.clone()),
             },
             io: IoContext {
                 stdout_buffer: String::new(),
