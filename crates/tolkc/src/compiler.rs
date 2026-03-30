@@ -5,7 +5,6 @@ use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::any::type_name;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -333,91 +332,10 @@ impl Compiler {
                 .to_string()
         };
 
-        let result = parse_compilation_result::<TBody>(&compilation_result_str)?;
+        let result = serde_json::from_str::<TBody>(&compilation_result_str)
+            .map_err(|error| anyhow::anyhow!("cannot parse JSON result from compiler: {error}"))?;
         Ok(result)
     }
-}
-
-fn parse_compilation_result<TBody: DeserializeOwned>(
-    compilation_result_str: &str,
-) -> anyhow::Result<TBody> {
-    let mut deserializer = serde_json::Deserializer::from_str(compilation_result_str);
-
-    match serde_path_to_error::deserialize(&mut deserializer) {
-        Ok(result) => Ok(result),
-        Err(error) => {
-            if let Some(diagnostic) =
-                diagnose_untagged_compiler_result::<TBody>(compilation_result_str, &error)
-            {
-                anyhow::bail!("{diagnostic}");
-            }
-            Err(anyhow::anyhow!(format_parse_error(error)))
-        }
-    }
-}
-
-fn diagnose_untagged_compiler_result<TBody>(
-    compilation_result_str: &str,
-    error: &serde_path_to_error::Error<serde_json::Error>,
-) -> Option<String> {
-    let path = error.path().to_string();
-    let inner = error.inner().to_string();
-    if !matches!(path.as_str(), "" | ".")
-        || !inner.contains("data did not match any variant of untagged enum")
-    {
-        return None;
-    }
-
-    let json: serde_json::Value = serde_json::from_str(compilation_result_str).ok()?;
-    let object = json.as_object()?;
-    let type_name = type_name::<TBody>();
-
-    if type_name.ends_with("CompilerInternalResult") {
-        if matches!(
-            object.get("status").and_then(serde_json::Value::as_str),
-            Some("error")
-        ) || object.contains_key("message")
-        {
-            return try_parse_subbody::<CompilerResultError>(compilation_result_str);
-        }
-        return try_parse_subbody::<CompilerInternalResultSuccess>(compilation_result_str);
-    }
-
-    if type_name.ends_with("CompilerCheckResult") {
-        if matches!(
-            object.get("status").and_then(serde_json::Value::as_str),
-            Some("error")
-        ) || object.contains_key("errors")
-        {
-            return try_parse_subbody::<CompilerCheckError>(compilation_result_str);
-        }
-        return try_parse_subbody::<CompilerCheckResultSuccess>(compilation_result_str);
-    }
-
-    None
-}
-
-fn try_parse_subbody<TBody: DeserializeOwned>(compilation_result_str: &str) -> Option<String> {
-    let mut deserializer = serde_json::Deserializer::from_str(compilation_result_str);
-    match serde_path_to_error::deserialize::<_, TBody>(&mut deserializer) {
-        Ok(_) => None,
-        Err(error) => Some(format_parse_error(error)),
-    }
-}
-
-fn format_parse_error(error: serde_path_to_error::Error<serde_json::Error>) -> String {
-    let path = error.path().to_string();
-    let inner = error.into_inner();
-    let line = inner.line();
-    let column = inner.column();
-    let path = match path.as_str() {
-        "" | "." => "<root>",
-        _ => path.as_str(),
-    };
-
-    format!(
-        "cannot parse JSON result from compiler at {path} (line {line}, column {column}): {inner}"
-    )
 }
 
 #[derive(Serialize)]
@@ -561,7 +479,7 @@ type WasmFsReadCallback = Option<
 
 #[cfg(test)]
 mod tests {
-    use super::{CompilerError, CompilerInternalResultSuccess, parse_compilation_result};
+    use super::CompilerError;
 
     #[test]
     fn compiler_error_deserializes_warning_flag() {
@@ -602,30 +520,5 @@ mod tests {
         .expect("failed to deserialize compiler error");
 
         assert!(!error.is_warning);
-    }
-
-    #[test]
-    fn compiler_parse_error_reports_json_path() {
-        let error = parse_compilation_result::<CompilerInternalResultSuccess>(
-            r#"{
-                "fiftCode":"PROGRAM",
-                "codeBoc64":"Ym9j",
-                "codeHashHex":"DEADBEEF",
-                "sourceMapsJson":{
-                    "files":"not-an-array",
-                    "declarations":[],
-                    "unique_ty":[],
-                    "functions":[],
-                    "debug_marks":[]
-                },
-                "abiJson":null,
-                "stderr":""
-            }"#,
-        )
-        .expect_err("expected compiler payload to fail deserialization");
-
-        let error = error.to_string();
-        assert!(error.contains("sourceMapsJson.files"));
-        assert!(error.contains("cannot parse JSON result from compiler"));
     }
 }
