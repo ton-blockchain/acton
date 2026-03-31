@@ -1218,7 +1218,7 @@ fn transaction_matches_predicates(
         check!(predicates.bounce, bool_item(info.bounce));
         check!(
             predicates.value,
-            int_item(info.value.tokens.into_inner() as i64)
+            TupleItem::Int(BigInt::from(info.value.tokens.into_inner()))
         );
         check!(predicates.from, TupleItem::Slice(to_cell(&info.src)));
         check!(predicates.to, TupleItem::Slice(to_cell(&info.dst)));
@@ -1235,8 +1235,19 @@ fn transaction_matches_predicates(
     check!(predicates.compute_phase_skipped, bool_item(is_skipped));
     check!(predicates.aborted, bool_item(ord_info.aborted));
 
-    let action_code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
-    check!(predicates.action_exit_code, int_item(action_code as i64));
+    if let Some(ref field) = predicates.action_exit_code {
+        if let Some(action_phase) = &ord_info.action_phase {
+            if !call_predicate(
+                executor,
+                &field.predicate,
+                int_item(action_phase.result_code as i64),
+            )? {
+                return Ok(false);
+            }
+        } else {
+            return Ok(false);
+        }
+    }
 
     // Exit code and success: only check if compute phase was executed
     if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
