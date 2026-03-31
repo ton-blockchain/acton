@@ -282,9 +282,15 @@ pub fn process_txs_and_search_params(
     Some((params, parsed_txs))
 }
 
-/// Extract tag and value from a sub-tuple [tag, value].
-/// Returns None for tag 0 (absent), Some((tag, &value)) for tag 1 or 2.
-fn read_subtuple(item: Option<&TupleItem>) -> Option<(u8, &TupleItem)> {
+/// Extract tag, predicate, and optional original value from a sub-tuple.
+/// Format: [0, null] = absent, [1, cont] = user predicate, [2, cont, original_value].
+/// Returns None for tag 0. For tag 2, `original` holds the display value.
+struct SubtupleData<'a> {
+    tag: u8,
+    original: Option<&'a TupleItem>,
+}
+
+fn read_subtuple(item: Option<&TupleItem>) -> Option<SubtupleData<'_>> {
     let TupleItem::Tuple(sub) = item? else {
         return None;
     };
@@ -298,7 +304,8 @@ fn read_subtuple(item: Option<&TupleItem>) -> Option<(u8, &TupleItem)> {
     if tag == 0 {
         return None;
     }
-    Some((tag, &sub[1]))
+    let original = if tag == 2 { sub.get(2) } else { None };
+    Some(SubtupleData { tag, original })
 }
 
 use crate::context::DisplayParam;
@@ -329,78 +336,76 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
         body: None,
     };
 
-    // Helper: parse a sub-tuple field as DisplayParam
+    // Helper: parse a sub-tuple field as DisplayParam.
+    // For tag=1 (user predicate) → Function.
+    // For tag=2 (value-as-predicate) → extract original value from sub[2] for display.
     macro_rules! parse_field {
-        // For address fields
         (addr $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let Some(addr) = read_optional_address_value(value) {
-                    result.$field = Some(DisplayParam::Value(addr));
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
+                } else if let Some(orig) = data.original.and_then(read_optional_address_value) {
+                    Some(DisplayParam::Value(orig))
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    Some(DisplayParam::Function)
+                };
             }
         };
-        // For BigInt fields
         (bigint $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let Some(num) = read_int_like_param(value) {
-                    result.$field = Some(DisplayParam::Value(num.clone()));
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
+                } else if let Some(num) = data.original.and_then(read_int_like_param) {
+                    Some(DisplayParam::Value(num.clone()))
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    Some(DisplayParam::Function)
+                };
             }
         };
-        // For u32 fields
         (u32 $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let Some(num) = read_int_like_param(value) {
-                    result.$field = num.to_u32().map(DisplayParam::Value);
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    data.original
+                        .and_then(read_int_like_param)
+                        .and_then(|n| n.to_u32())
+                        .map(DisplayParam::Value)
+                        .or(Some(DisplayParam::Function))
+                };
             }
         };
-        // For i32 fields
         (i32 $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let Some(num) = read_int_like_param(value) {
-                    result.$field = Some(DisplayParam::Value(num.to_i32().unwrap_or(0)));
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
+                } else if let Some(num) = data.original.and_then(read_int_like_param) {
+                    Some(DisplayParam::Value(num.to_i32().unwrap_or(0)))
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    Some(DisplayParam::Function)
+                };
             }
         };
-        // For bool fields
         (bool $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let Some(b) = read_bool_like_param(value) {
-                    result.$field = Some(DisplayParam::Value(b));
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
+                } else if let Some(b) = data.original.and_then(read_bool_like_param) {
+                    Some(DisplayParam::Value(b))
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    Some(DisplayParam::Function)
+                };
             }
         };
-        // For cell fields
         (cell $field:ident, $idx:expr) => {
-            if let Some((tag, value)) = read_subtuple(item_from_end($idx)) {
-                if tag == 1 {
-                    result.$field = Some(DisplayParam::Function);
-                } else if let TupleItem::Cell(cell) = value {
-                    result.$field = Some(DisplayParam::Value(cell.clone()));
+            if let Some(data) = read_subtuple(item_from_end($idx)) {
+                result.$field = if data.tag == 1 {
+                    Some(DisplayParam::Function)
+                } else if let Some(TupleItem::Cell(cell)) = data.original {
+                    Some(DisplayParam::Value(cell.clone()))
                 } else {
-                    result.$field = Some(DisplayParam::Function);
-                }
+                    Some(DisplayParam::Function)
+                };
             }
         };
     }

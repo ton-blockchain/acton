@@ -325,15 +325,17 @@ fun T.__eq(self, other: T): bool {
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
 fun __bind1<T1, T2, R>(f: (T1, T2) -> R, arg: T1): (T2 -> R) asm "SWAP 1 -1 SETCONTARGS";
 
-/// Convert a union field to [tag, predicate/null]:
-///   [0, null] = absent, [1, cont] = user predicate, [2, cont] = value-as-predicate.
+/// Convert a union field to a tagged tuple for FFI:
+///   [0, null] = absent
+///   [1, cont] = user predicate
+///   [2, cont, original_value] = value converted to predicate (original kept for display)
 fun toPredicate<T>(field: (T -> bool) | T | null): tuple {
     match (field) {
         (T -> bool) => {
             return [1, field];
         }
         T => {
-            return [2, __bind1(field.__eq, field)];
+            return [2, __bind1(field.__eq, field), field];
         }
         null => {
             return [0, null];

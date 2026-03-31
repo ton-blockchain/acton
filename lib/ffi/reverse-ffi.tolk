@@ -11,7 +11,7 @@ fun ffi.__executeInSeparateLibemulatorInternal(functionToCall: continuation, arg
 fun ffi.__executeInSeparateLibemulator<Ret, Args = array<unknown>>(functionToCall: (Args) -> Ret, args: Args? = null): Ret {
     val res = ffi.__executeInSeparateLibemulatorInternal(functionToCall as unknown as continuation, args.toTuple(), contract.getAddress());
     if(res == null) {
-        Assert.fail("__executeInRust unexpectidly returned null");
+        Assert.fail("__executeInRust unexpectedly returned null");
     }
     else {
         try {
