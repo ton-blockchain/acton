@@ -86,10 +86,8 @@ fun reflect.serializationPrefixOf<T>(): (int, int)
 ```
 
 Returns serialization prefix of a struct.
-Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`,
-where `.0` is the prefix/opcode value and `.1` is its bit length.
+Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`.
 ```
-reflect.serializationPrefixOf<AssetRegular>().0   // 240
 reflect.serializationPrefixOf<AssetRegular>().1   // 8
 ```
 
@@ -166,3 +164,4 @@ Behaves like [reflect.sourceLocation](#reflectsourcelocation), but returns a str
 Being used as a default parameter value, captures the caller's location.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L101" />
+
