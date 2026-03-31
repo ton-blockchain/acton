@@ -11,6 +11,10 @@ build:
 build-dev:
     cargo build
 
+[arg("force", long, value="--force")]
+sync-artifacts force="":
+    cargo xtask sync-artifacts {{force}}
+
 test-unit:
     {{ CARGO_TEST }} --workspace --lib --bins \
         --exclude retrace

@@ -46,7 +46,7 @@ To build and test Acton locally, install:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
-7. GitHub CLI (`gh`) (used by `cargo xtask sync-artifacts`)
+7. GitHub CLI (`gh`) (used by `just sync-artifacts`)
    - macOS:
      ```bash
      brew install gh
@@ -89,7 +89,7 @@ sudo apt-get install -y \
 For a fresh checkout, the shortest path to a working contributor setup is:
 
 ```bash
-cargo xtask sync-artifacts
+just sync-artifacts
 just build-ui
 cargo build
 ./target/debug/acton --help
@@ -97,16 +97,16 @@ cargo build
 
 What this does:
 
-1. `cargo xtask sync-artifacts` syncs `crates/ton-objs/artifacts_manifest.toml`
+1. `just sync-artifacts` syncs `crates/ton-objs/artifacts_manifest.toml`
    from the `trunk-objs` release and, on a fresh checkout, downloads the
    matching prebuilt `objs/` archive for your current platform.
 2. `just build-ui` installs UI dependencies and builds the bundled UI assets.
 3. `cargo build` builds the CLI against the synced TON archives.
 4. `./target/debug/acton --help` confirms that the binary starts.
 
-If `objs/` already exists and the tracked manifest changed, `cargo xtask
+If `objs/` already exists and the tracked manifest changed, `just
 sync-artifacts` may ask whether local `objs/` should be refreshed. Use
-`cargo xtask sync-artifacts --force` to refresh without a prompt.
+`just sync-artifacts --force` to refresh without a prompt.
 
 ## Building from source
 
@@ -118,7 +118,7 @@ Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
 Use the built-in sync task instead of downloading release assets manually:
 
 ```bash
-cargo xtask sync-artifacts
+just sync-artifacts
 just build-ui
 cargo build
 ./target/debug/acton --help
@@ -132,7 +132,7 @@ This command:
   `objs/` on a fresh checkout;
 - can also refresh local `objs/` later when the tracked manifest changes.
 
-Use `cargo xtask sync-artifacts --force` if you want to overwrite the local
+Use `just sync-artifacts --force` if you want to overwrite the local
 manifest and refresh `objs/` without confirmation.
 
 ### Option 2: build TON artifacts manually
