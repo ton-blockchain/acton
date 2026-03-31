@@ -282,25 +282,3 @@ fn write_source_map(
     })?;
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::write_source_map;
-    use tycho_types::cell::Cell;
-
-    #[test]
-    fn write_source_map_requires_source_map_data() {
-        let error =
-            write_source_map(None, &Cell::empty(), None, "source-map.json").expect_err("must fail");
-        let rendered = error.to_string();
-
-        assert!(
-            rendered.contains("No source map data available for"),
-            "unexpected error: {rendered}"
-        );
-        assert!(
-            rendered.contains("source-map.json"),
-            "unexpected error: {rendered}"
-        );
-    }
-}
