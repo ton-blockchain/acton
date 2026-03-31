@@ -310,7 +310,6 @@ fn execute_script(
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
-        executor.prepare(0, &stack_b64)?;
         let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
             anyhow!("Compiler did not return debug info for script debug session")
         })?;

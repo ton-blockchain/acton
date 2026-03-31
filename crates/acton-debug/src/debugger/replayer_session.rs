@@ -222,6 +222,22 @@ impl ReplayerDebugSession {
         ctx.resolved_breakpoints.get(&(file_id, line)).cloned()
     }
 
+    fn resolve_breakpoint_lines_for_path(
+        &self,
+        path: &PathBuf,
+        requested_lines: &[usize],
+    ) -> Option<Vec<usize>> {
+        self.contexts.iter().rev().find_map(|ctx| {
+            let ctx = ctx.try_borrow().ok()?;
+            let path_str = path.to_string_lossy();
+            let file_id = ctx.replayer.file_id_by_path(path_str.as_ref())?;
+            Some(
+                ctx.replayer
+                    .resolve_breakpoint_lines(file_id, requested_lines),
+            )
+        })
+    }
+
     fn step_active_context(&self, mode: StepMode) -> bool {
         let Some(ctx) = self.active_context() else {
             return true;
@@ -274,6 +290,14 @@ impl ReplayerDebugSession {
         self.breakpoints
             .values()
             .any(|breakpoints| !breakpoints.is_empty())
+    }
+
+    fn active_context_uses_live_backend(&self) -> bool {
+        self.active_context().and_then(|ctx| {
+            ctx.try_borrow()
+                .ok()
+                .map(|ctx| ctx.replayer.runtime_backend_kind())
+        }) == Some(replayer::RuntimeBackendKind::LiveVm)
     }
 
     fn reapply_pending_debug_state(&mut self) {
@@ -578,6 +602,8 @@ impl ReplayerDebugSession {
 
         let step_mode = if self.has_breakpoints() {
             StepMode::RunUntilBreakpoint
+        } else if self.active_context_uses_live_backend() {
+            StepMode::StepInto
         } else {
             StepMode::StepOver
         };
@@ -611,10 +637,24 @@ impl ReplayerDebugSession {
             .or_else(|| args.source.name.clone())
             .unwrap_or_default();
         let path_buf = PathBuf::from(&path);
+        let requested_lines = args
+            .breakpoints
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|bp| bp.line.max(1) as usize)
+            .collect::<Vec<_>>();
+        let resolved_lines = self.resolve_breakpoint_lines_for_path(&path_buf, &requested_lines);
 
         let mut breakpoints = Vec::new();
         let mut file_breakpoints = Vec::new();
-        for bp in args.breakpoints.as_deref().unwrap_or_default() {
+        for (idx, bp) in args
+            .breakpoints
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+        {
             let id = self.next_breakpoint_id;
             self.next_breakpoint_id += 1;
 
@@ -622,7 +662,12 @@ impl ReplayerDebugSession {
             breakpoints.push(Breakpoint {
                 id: Some(id),
                 verified: true,
-                line: Some(bp.line),
+                line: Some(
+                    resolved_lines
+                        .as_ref()
+                        .and_then(|lines| lines.get(idx).copied())
+                        .map_or(bp.line, |line| line as i64),
+                ),
                 column: bp.column,
                 ..Default::default()
             });

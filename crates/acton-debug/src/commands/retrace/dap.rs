@@ -230,6 +230,16 @@ impl DapState {
         let line = r.current_line();
         self.resolved_breakpoints.get(&(file_id, line)).cloned()
     }
+
+    fn resolve_breakpoint_lines_for_path(
+        &self,
+        path: &str,
+        requested_lines: &[usize],
+    ) -> Option<Vec<usize>> {
+        let r = self.replayer.as_ref()?;
+        let file_id = r.file_id_by_path(path)?;
+        Some(r.resolve_breakpoint_lines(file_id, requested_lines))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -473,9 +483,23 @@ fn handle_set_breakpoints(
         .clone()
         .or_else(|| args.source.name.clone())
         .unwrap_or_default();
+    let requested_lines = args
+        .breakpoints
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|bp| bp.line.max(1) as usize)
+        .collect::<Vec<_>>();
+    let resolved_lines = state.resolve_breakpoint_lines_for_path(&path, &requested_lines);
     let mut source_breakpoints = Vec::new();
     let mut breakpoints = Vec::new();
-    for bp in args.breakpoints.as_deref().unwrap_or_default() {
+    for (idx, bp) in args
+        .breakpoints
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+    {
         let id = state.next_breakpoint_id;
         state.next_breakpoint_id += 1;
 
@@ -484,7 +508,12 @@ fn handle_set_breakpoints(
             id: Some(id),
             verified: true,
             source: Some(args.source.clone()),
-            line: Some(bp.line),
+            line: Some(
+                resolved_lines
+                    .as_ref()
+                    .and_then(|lines| lines.get(idx).copied())
+                    .map_or(bp.line, |line| line as i64),
+            ),
             column: bp.column,
             ..Default::default()
         });
