@@ -14,8 +14,8 @@ use dap::responses::{
     SetExceptionBreakpointsResponse, StackTraceResponse, ThreadsResponse, VariablesResponse,
 };
 use dap::types::{
-    ExceptionBreakMode, ExceptionBreakpointsFilter, Scope, ScopePresentationhint, Source,
-    StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
+    Breakpoint, ExceptionBreakMode, ExceptionBreakpointsFilter, Scope, ScopePresentationhint,
+    Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
 use serde_json::Value;
 
@@ -125,13 +125,21 @@ impl<R: BufRead, W: Write> Server<R, W> {
 // State
 // ---------------------------------------------------------------------------
 
-type PendingBreakpoints = HashMap<String, Vec<i64>>;
+type PendingBreakpoints = HashMap<String, Vec<SourceBreakpointInfo>>;
+
+#[derive(Debug, Clone)]
+struct SourceBreakpointInfo {
+    id: i64,
+    line: i64,
+}
 
 struct DapState {
     replayer: Option<TolkReplayer>,
     pending_breakpoints: PendingBreakpoints,
     pending_exception_mode: replayer::ExceptionBreakMode,
     config_done: bool,
+    next_breakpoint_id: i64,
+    resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
 
     next_req_id: i64,
     /// Maps frame ref_id (returned in StackTrace) → depth_from_top (0 = innermost).
@@ -149,6 +157,8 @@ impl DapState {
             pending_breakpoints: HashMap::new(),
             pending_exception_mode: replayer::ExceptionBreakMode::Never,
             config_done: false,
+            next_breakpoint_id: 1,
+            resolved_breakpoints: HashMap::new(),
             // Keep structured variable refs in a separate numeric range so they
             // never collide with stable frame ids derived from stack depth.
             next_req_id: 1_000_000,
@@ -159,10 +169,24 @@ impl DapState {
 
     fn apply_pending_breakpoints(&mut self) {
         if let Some(ref mut r) = self.replayer {
-            for (path, lines) in &self.pending_breakpoints {
+            r.clear_all_breakpoints();
+            self.resolved_breakpoints.clear();
+
+            for (path, breakpoints) in &self.pending_breakpoints {
                 if let Some(file_id) = r.file_id_by_path(path) {
-                    let line_ints: Vec<usize> = lines.iter().map(|&l| l as usize).collect();
-                    r.set_breakpoints(file_id, &line_ints);
+                    let requested_lines = breakpoints
+                        .iter()
+                        .map(|bp| bp.line.max(1) as usize)
+                        .collect::<Vec<_>>();
+                    let resolved_lines = r.resolve_breakpoint_lines(file_id, &requested_lines);
+                    r.set_breakpoints(file_id, &requested_lines);
+
+                    for (bp, resolved_line) in breakpoints.iter().zip(resolved_lines) {
+                        self.resolved_breakpoints
+                            .entry((file_id, resolved_line))
+                            .or_default()
+                            .push(bp.id);
+                    }
                 }
             }
         }
@@ -198,6 +222,13 @@ impl DapState {
             true
         }
     }
+
+    fn current_breakpoint_ids(&self) -> Option<Vec<i64>> {
+        let r = self.replayer.as_ref()?;
+        let file_id = r.current_file_id();
+        let line = r.current_line();
+        self.resolved_breakpoints.get(&(file_id, line)).cloned()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -222,15 +253,17 @@ fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
 fn send_stopped(
     server: &mut Server<impl BufRead, impl Write>,
     reason: StoppedEventReason,
+    description: Option<String>,
+    hit_breakpoint_ids: Option<Vec<i64>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     server.send_event(Event::Stopped(events::StoppedEventBody {
         reason,
-        description: None,
+        description,
         thread_id: Some(THREAD_ID),
         preserve_focus_hint: None,
         text: None,
         all_threads_stopped: Some(true),
-        hit_breakpoint_ids: None,
+        hit_breakpoint_ids,
     }))?;
     Ok(())
 }
@@ -256,8 +289,15 @@ fn step_and_notify(
     } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
         let text = format!("Exit code {}", exc.errno);
         send_stopped_exception(server, &text)?;
+    } else if let Some(ids) = state.current_breakpoint_ids() {
+        send_stopped(
+            server,
+            StoppedEventReason::Breakpoint,
+            Some("Breakpoint hit".to_string()),
+            Some(ids),
+        )?;
     } else {
-        send_stopped(server, StoppedEventReason::Step)?;
+        send_stopped(server, StoppedEventReason::Step, None, None)?;
     }
     Ok(())
 }
@@ -423,40 +463,30 @@ fn handle_set_breakpoints(
         .clone()
         .or_else(|| args.source.name.clone())
         .unwrap_or_default();
-    let lines: Vec<i64> = args
-        .breakpoints
-        .as_deref()
-        .unwrap_or_default()
-        .iter()
-        .map(|bp| bp.line)
-        .collect();
-    state
-        .pending_breakpoints
-        .insert(path.clone(), lines.clone());
+    let mut source_breakpoints = Vec::new();
+    let mut breakpoints = Vec::new();
+    for bp in args.breakpoints.as_deref().unwrap_or_default() {
+        let id = state.next_breakpoint_id;
+        state.next_breakpoint_id += 1;
 
-    if let Some(ref mut r) = state.replayer
-        && let Some(file_id) = r.file_id_by_path(&path)
-    {
-        let line_ints: Vec<usize> = lines.iter().map(|&l| l as usize).collect();
-        r.set_breakpoints(file_id, &line_ints);
+        source_breakpoints.push(SourceBreakpointInfo { id, line: bp.line });
+        breakpoints.push(Breakpoint {
+            id: Some(id),
+            verified: true,
+            source: Some(args.source.clone()),
+            line: Some(bp.line),
+            column: bp.column,
+            ..Default::default()
+        });
     }
 
-    let source = args.source.clone();
-    let breakpoints = lines
-        .iter()
-        .map(|&line| types::Breakpoint {
-            id: None,
-            verified: true,
-            message: None,
-            source: Some(source.clone()),
-            line: Some(line),
-            column: None,
-            end_line: None,
-            end_column: None,
-            instruction_reference: None,
-            offset: None,
-        })
-        .collect();
+    if source_breakpoints.is_empty() {
+        state.pending_breakpoints.remove(&path);
+    } else {
+        state.pending_breakpoints.insert(path, source_breakpoints);
+    }
+    state.apply_pending_breakpoints();
+
     req.success(ResponseBody::SetBreakpoints(SetBreakpointsResponse {
         breakpoints,
     }))
@@ -512,7 +542,7 @@ fn handle_configuration_done(
     let has_breakpoints = state
         .pending_breakpoints
         .values()
-        .any(|lines| !lines.is_empty());
+        .any(|breakpoints| !breakpoints.is_empty());
     let step_mode = if has_breakpoints {
         StepMode::RunUntilBreakpoint
     } else {
@@ -522,8 +552,15 @@ fn handle_configuration_done(
 
     if finished {
         send_terminated(server)?;
+    } else if let Some(ids) = state.current_breakpoint_ids() {
+        send_stopped(
+            server,
+            StoppedEventReason::Breakpoint,
+            Some("Breakpoint hit".to_string()),
+            Some(ids),
+        )?;
     } else {
-        send_stopped(server, StoppedEventReason::Entry)?;
+        send_stopped(server, StoppedEventReason::Entry, None, None)?;
     }
     Ok(req.success(ResponseBody::ConfigurationDone))
 }
