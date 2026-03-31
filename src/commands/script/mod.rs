@@ -310,15 +310,10 @@ fn execute_script(
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
-        let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
-            anyhow!("Compiler did not return debug info for script debug session")
-        })?;
-
         let replayer = TolkReplayer::new_live_vm(
-            tolk_source_map.source_map.clone(),
-            marks_dict,
+            tolk_source_map.as_ref(),
             AnyExecutor::Get(executor.clone()),
-        );
+        )?;
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);

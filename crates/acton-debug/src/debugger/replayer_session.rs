@@ -22,7 +22,7 @@ use dap::types::{
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -224,7 +224,7 @@ impl ReplayerDebugSession {
 
     fn resolve_breakpoint_lines_for_path(
         &self,
-        path: &PathBuf,
+        path: &Path,
         requested_lines: &[usize],
     ) -> Option<Vec<usize>> {
         self.contexts.iter().rev().find_map(|ctx| {
@@ -790,14 +790,10 @@ impl DebugSession for ReplayerDebugSession {
         let Some(tolk_source_map) = spec.tolk_source_map else {
             return Ok(false);
         };
-        let Some(marks_dict) = tolk_source_map.marks_dict.as_ref() else {
+        let Ok(mut replayer) = TolkReplayer::new_live_vm(tolk_source_map.as_ref(), spec.executor)
+        else {
             return Ok(false);
         };
-        let mut replayer = TolkReplayer::new_live_vm(
-            tolk_source_map.source_map.clone(),
-            marks_dict,
-            spec.executor,
-        );
         replayer.set_exception_breakpoints(self.exception_mode);
 
         let label: Arc<str> = spec.name.into();

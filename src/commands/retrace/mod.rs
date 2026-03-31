@@ -5,7 +5,6 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use acton_debug::commands::retrace::dap::serve_retrace_dap;
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::retrace as debug_retrace;
 use anyhow::{Context, anyhow};
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
@@ -87,16 +86,15 @@ pub fn retrace_cmd(
                     ensure_contract_matches_transaction(contract_name, &result, artifacts)?;
 
                     if let Some(port) = dap_port {
-                        let replayer = debug_retrace::build_tolk_replayer(
-                            &result.emulated_tx.vm_logs,
-                            &artifacts.tolk_source_map,
-                        )
-                        .ok_or_else(|| {
-                            anyhow!(
-                                "Cannot build replayer for contract {}",
-                                contract_name.yellow()
-                            )
-                        })?;
+                        let vm_logs = &result.emulated_tx.vm_logs;
+                        let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+                        let replayer = TolkReplayer::new(&artifacts.tolk_source_map, &vm_lines)
+                            .with_context(|| {
+                                format!(
+                                    "Cannot build replayer for contract {}",
+                                    contract_name.yellow()
+                                )
+                            })?;
 
                         serve_retrace_dap(replayer, port)
                             .map_err(|err| anyhow!(err.to_string()))?;

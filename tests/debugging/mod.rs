@@ -305,15 +305,8 @@ fn execute_script<'a>(
 
     let transport = debugger::start_dap_server(debug_port)?;
     executor.prepare(0, &stack)?;
-    let marks_dict = tolk_source_map
-        .marks_dict
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Compiler did not return debug info for debug test"))?;
-    let replayer = TolkReplayer::new_live_vm(
-        tolk_source_map.source_map.clone(),
-        marks_dict,
-        AnyExecutor::Get(executor.clone()),
-    );
+    let replayer =
+        TolkReplayer::new_live_vm(tolk_source_map.as_ref(), AnyExecutor::Get(executor.clone()))?;
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 

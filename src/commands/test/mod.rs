@@ -326,14 +326,10 @@ impl<'a> TestRunner<'a> {
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
-                let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
-                    anyhow!("Compiler did not return debug info for unit test debug session")
-                })?;
                 let replayer = TolkReplayer::new_live_vm(
-                    tolk_source_map.source_map.clone(),
-                    marks_dict,
+                    tolk_source_map.as_ref(),
                     AnyExecutor::Get(executor.clone()),
-                );
+                )?;
                 let mut dbg_session =
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);

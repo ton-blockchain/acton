@@ -7,7 +7,9 @@
 
 use crate::debugger::any_executor::AnyExecutor;
 use crate::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
+use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
+use tolkc::TolkSourceMap;
 use tolkc::debug_marks_dict::DebugMarksDict;
 use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
 use tolkc::types_kernel::Ty;
@@ -559,35 +561,30 @@ pub struct TolkReplayer {
 
 impl TolkReplayer {
     pub fn new(
-        source_map: SourceMap,
-        marks_dict: &DebugMarksDict,
+        tolk_source_map: &TolkSourceMap,
         vm_lines: &[Result<VmLine<'_>, String>],
-    ) -> Self {
-        Self::new_with_runtime_source(
-            source_map,
+    ) -> Result<Self> {
+        let marks_dict = tolk_source_map
+            .marks_dict
+            .as_deref()
+            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+        Ok(Self::new_with_boxed_runtime_source(
+            tolk_source_map.source_map.clone(),
             marks_dict,
-            VmLogRuntimeEventSource::new(vm_lines),
-        )
+            Box::new(VmLogRuntimeEventSource::new(vm_lines)),
+        ))
     }
 
-    pub fn new_live_vm(
-        source_map: SourceMap,
-        marks_dict: &DebugMarksDict,
-        executor: AnyExecutor,
-    ) -> Self {
-        Self::new_with_runtime_source(
-            source_map,
+    pub fn new_live_vm(tolk_source_map: &TolkSourceMap, executor: AnyExecutor) -> Result<Self> {
+        let marks_dict = tolk_source_map
+            .marks_dict
+            .as_deref()
+            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+        Ok(Self::new_with_boxed_runtime_source(
+            tolk_source_map.source_map.clone(),
             marks_dict,
-            LiveVmRuntimeEventSource::new(executor),
-        )
-    }
-
-    pub fn new_with_runtime_source(
-        source_map: SourceMap,
-        marks_dict: &DebugMarksDict,
-        runtime_source: impl RuntimeEventSource + 'static,
-    ) -> Self {
-        Self::new_with_boxed_runtime_source(source_map, marks_dict, Box::new(runtime_source))
+            Box::new(LiveVmRuntimeEventSource::new(executor)),
+        ))
     }
 
     fn new_with_boxed_runtime_source(
