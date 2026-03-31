@@ -11,8 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-tycho-types = { workspace = true }
-serde = { workspace = true, features = ["rc"] }
+serde = { workspace = true }
 anyhow = { workspace = true }
 pathdiff = { workspace = true }
 

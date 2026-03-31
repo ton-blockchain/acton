@@ -5194,7 +5194,6 @@ dependencies = [
  "anyhow",
  "pathdiff",
  "serde",
- "tycho-types",
 ]
 
 [[package]]

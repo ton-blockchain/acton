@@ -18,7 +18,7 @@ use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSucce
 use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
-use ton_source_map::{SourceLocation, SourceMap};
+use ton_source_map::SourceLocation;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
@@ -156,7 +156,6 @@ impl BuildCache {
         path: &Path,
         code: &str,
         code_hash: HashBytes,
-        source_map: Arc<SourceMap>,
         tolk_source_map: Arc<TolkSourceMap>,
         abi: Option<Arc<ContractAbi>>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
@@ -167,7 +166,6 @@ impl BuildCache {
                 name: name.to_owned(),
                 code_boc64: code.to_owned(),
                 code_hash,
-                source_map,
                 tolk_source_map,
                 abi,
                 compiler_abi,
@@ -191,7 +189,6 @@ pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: HashBytes,
-    pub source_map: Arc<SourceMap>,
     pub tolk_source_map: Arc<TolkSourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,

@@ -3,15 +3,8 @@ pub use retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
 use tolkc::TolkSourceMap;
-use ton_source_map::{DebugLocation, SourceLocation};
+use ton_source_map::SourceLocation;
 use vmlogs::parser::VmLine;
-
-#[derive(Debug)]
-pub struct ExceptionInfo {
-    pub description: String,
-    pub loc: Option<SourceLocation>,
-    pub backtrace: Vec<DebugLocation>,
-}
 
 #[derive(Debug, Clone)]
 pub struct TolkBacktraceFrame {
