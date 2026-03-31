@@ -157,6 +157,16 @@ jobs:
           path: |
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
+
+  custom-build-docker-image:
+    needs:
+      - plan
+      - custom-build-release-binaries
+      - custom-attach-objs-to-releases
+    uses: ./.github/workflows/build-docker-image.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
   # Determines if we should publish/announce
   host:
     needs:
@@ -164,8 +174,9 @@ jobs:
       - custom-build-release-binaries
       - custom-attach-objs-to-releases
       - build-global-artifacts
+      - custom-build-docker-image
     # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
-    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-release-binaries.result == 'skipped' || needs.custom-build-release-binaries.result == 'success') && (needs.custom-attach-objs-to-releases.result == 'skipped' || needs.custom-attach-objs-to-releases.result == 'success') }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-docker-image.result == 'skipped' || needs.custom-build-docker-image.result == 'success') && (needs.custom-build-release-binaries.result == 'skipped' || needs.custom-build-release-binaries.result == 'success') && (needs.custom-attach-objs-to-releases.result == 'skipped' || needs.custom-attach-objs-to-releases.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
@@ -208,21 +219,38 @@ jobs:
     needs:
       - plan
       - build-global-artifacts
+      - custom-build-docker-image
     uses: ./.github/workflows/check-release.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
+
+  custom-publish-docker-image:
+    needs:
+      - plan
+      - host
+      - custom-check-release
+    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+    uses: ./.github/workflows/publish-docker-image.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+    # publish jobs get escalated permissions
+    permissions:
+      "id-token": "write"
+      "packages": "write"
 
   # Create a GitHub Release while uploading all files to it
   announce:
     needs:
       - plan
       - host
+      - custom-publish-docker-image
       - custom-check-release
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.custom-publish-docker-image.result == 'skipped' || needs.custom-publish-docker-image.result == 'success') }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
