@@ -1,8 +1,8 @@
 use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
 use crate::context::{
-    AssertFailure, BuildCache, EmulationsState, GetMethodAssertFailure, KnownAddresses,
-    TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
+    KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledAction, InstalledActions, InvalidAction};
 use crate::{context, exit_codes, retrace};
@@ -2740,107 +2740,89 @@ impl FormatterContext<'_> {
         abi: Arc<ContractAbi>,
     ) -> Vec<String> {
         let mut params = vec![];
-        if let Some(opcode) = assert_failure.params.opcode {
-            let opcode_type = abi.find_type_by_opcode(opcode);
-            params.push(format!(
-                "  opcode={} {}",
-                format!("0x{opcode:x}").green(),
-                opcode_type
-                    .map(|typ| typ.name)
-                    .unwrap_or_else(|| if opcode == 0 {
-                        "empty".to_owned()
-                    } else {
-                        "unknown".to_owned()
-                    })
-                    .purple()
-                    .bold()
-            ));
-        }
-        if let Some(bounced) = assert_failure.params.bounced {
-            params.push(format!(
-                "  bounced={}",
-                if bounced {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+        use crate::context::DisplayParam;
+
+        let fmt_bool = |v: bool| {
+            if v {
+                "true".green().to_string()
+            } else {
+                "false".red().to_string()
+            }
+        };
+        let fmt_int = |v: &dyn std::fmt::Display, zero_ok: bool| {
+            let s = v.to_string();
+            if zero_ok && s == "0" {
+                "0".green().to_string()
+            } else {
+                s.red().to_string()
+            }
+        };
+
+        macro_rules! push_param {
+            (bool $name:literal, $field:expr) => {
+                match &$field {
+                    Some(DisplayParam::Value(v)) => {
+                        params.push(format!("  {}={}", $name, fmt_bool(*v)))
+                    }
+                    Some(DisplayParam::Function) => {
+                        params.push(format!("  {}={}", $name, "<function>".cyan()))
+                    }
+                    None => {}
                 }
-            ));
-        }
-        if let Some(bounce) = assert_failure.params.bounce {
-            params.push(format!(
-                "  bounce={}",
-                if bounce {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+            };
+            (int $name:literal, $field:expr) => {
+                match &$field {
+                    Some(DisplayParam::Value(v)) => {
+                        params.push(format!("  {}={}", $name, fmt_int(v, true)))
+                    }
+                    Some(DisplayParam::Function) => {
+                        params.push(format!("  {}={}", $name, "<function>".cyan()))
+                    }
+                    None => {}
                 }
-            ));
+            };
         }
-        if let Some(value) = &assert_failure.params.value {
-            params.push(format!("  value={value}",));
-        }
-        if let Some(deploy) = assert_failure.params.deploy {
-            params.push(format!(
-                "  deploy={}",
-                if deploy {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+
+        if let Some(ref dp) = assert_failure.params.opcode {
+            match dp {
+                DisplayParam::Value(opcode) => {
+                    let opcode_type = abi.find_type_by_opcode(*opcode);
+                    params.push(format!(
+                        "  opcode={} {}",
+                        format!("0x{opcode:x}").green(),
+                        opcode_type
+                            .map(|typ| typ.name)
+                            .unwrap_or_else(|| if *opcode == 0 {
+                                "empty".to_owned()
+                            } else {
+                                "unknown".to_owned()
+                            })
+                            .purple()
+                            .bold()
+                    ));
                 }
-            ));
+                DisplayParam::Function => params.push(format!("  opcode={}", "<function>".cyan())),
+            }
         }
-        if let Some(success) = assert_failure.params.success {
-            params.push(format!(
-                "  success={}",
-                if success {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
+        push_param!(bool "bounced", assert_failure.params.bounced);
+        push_param!(bool "bounce", assert_failure.params.bounce);
+        match &assert_failure.params.value {
+            Some(DisplayParam::Value(v)) => params.push(format!("  value={v}")),
+            Some(DisplayParam::Function) => params.push(format!("  value={}", "<function>".cyan())),
+            None => {}
         }
-        if let Some(aborted) = assert_failure.params.aborted {
-            params.push(format!(
-                "  aborted={}",
-                if aborted {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
-        }
-        if let Some(exit_code) = assert_failure.params.exit_code {
-            params.push(format!(
-                "  exit_code={}",
-                if exit_code == 0 {
-                    "0".green().to_string()
-                } else {
-                    exit_code.to_string().red().to_string()
-                }
-            ));
-        }
-        if let Some(action_exit_code) = assert_failure.params.action_exit_code {
-            params.push(format!(
-                "  action_exit_code={}",
-                if action_exit_code == 0 {
-                    "0".green().to_string()
-                } else {
-                    action_exit_code.to_string().red().to_string()
-                }
-            ));
-        }
-        if let Some(compute_phase_skipped) = assert_failure.params.compute_phase_skipped {
-            params.push(format!(
-                "  compute_phase_skipped={}",
-                if compute_phase_skipped {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
-        }
-        if let Some(body) = &assert_failure.params.body {
-            params.push(format!("  body={}", Boc::encode_hex(body)));
+        push_param!(bool "deploy", assert_failure.params.deploy);
+        push_param!(bool "success", assert_failure.params.success);
+        push_param!(bool "aborted", assert_failure.params.aborted);
+        push_param!(int "exit_code", assert_failure.params.exit_code);
+        push_param!(int "action_exit_code", assert_failure.params.action_exit_code);
+        push_param!(bool "compute_phase_skipped", assert_failure.params.compute_phase_skipped);
+        match &assert_failure.params.body {
+            Some(DisplayParam::Value(body)) => {
+                params.push(format!("  body={}", Boc::encode_hex(body)))
+            }
+            Some(DisplayParam::Function) => params.push(format!("  body={}", "<function>".cyan())),
+            None => {}
         }
         params
     }
@@ -2991,16 +2973,14 @@ impl FormatterContext<'_> {
         failure: &TransactionGenericAssertFailure,
         abi: Arc<ContractAbi>,
     ) -> FailedTransactionContext {
-        let from_address = failure
-            .params
-            .from
-            .as_ref()
-            .map(|addr| self.address_to_string(addr));
-        let to_address = failure
-            .params
-            .to
-            .as_ref()
-            .map(|addr| self.address_to_string(addr));
+        let from_address = failure.params.from.as_ref().map(|dp| match dp {
+            DisplayParam::Value(addr) => self.address_to_string(addr),
+            DisplayParam::Function => "<function>".to_string(),
+        });
+        let to_address = failure.params.to.as_ref().map(|dp| match dp {
+            DisplayParam::Value(addr) => self.address_to_string(addr),
+            DisplayParam::Function => "<function>".to_string(),
+        });
         let params = self
             .format_search_transaction_parameters(failure, abi)
             .into_iter()
@@ -3106,11 +3086,38 @@ impl FormatterContext<'_> {
                 let params = self.format_search_transaction_parameters(tx_failure, abi);
                 let tx_tree = self.format(&tx_failure.txs);
                 writeln!(result, "{tx_tree}").ok();
+                let from_addr = tx_failure.params.from.as_ref().and_then(|dp| match dp {
+                    DisplayParam::Value(a) => Some(a.clone()),
+                    DisplayParam::Function => None,
+                });
+                let to_addr = tx_failure.params.to.as_ref().and_then(|dp| match dp {
+                    DisplayParam::Value(a) => Some(a.clone()),
+                    DisplayParam::Function => None,
+                });
+                let from_str = if tx_failure
+                    .params
+                    .from
+                    .as_ref()
+                    .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                {
+                    "<function>".cyan().to_string()
+                } else {
+                    self.format_address(&tx_failure.txs, &from_addr)
+                };
+                let to_str = if tx_failure
+                    .params
+                    .to
+                    .as_ref()
+                    .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                {
+                    "<function>".cyan().to_string()
+                } else {
+                    self.format_address(&tx_failure.txs, &to_addr)
+                };
                 writeln!(
                     result,
                     "Cannot find transaction from {} to {}",
-                    self.format_address(&tx_failure.txs, &tx_failure.params.from),
-                    self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                    from_str, to_str
                 )
                 .ok();
                 writeln!(result, "with:").ok();
@@ -3126,11 +3133,35 @@ impl FormatterContext<'_> {
                 {
                     String::new()
                 } else {
-                    format!(
-                        " from {} to {}",
-                        self.format_address(&tx_failure.txs, &tx_failure.params.from),
-                        self.format_address(&tx_failure.txs, &tx_failure.params.to)
-                    )
+                    let from_addr = tx_failure.params.from.as_ref().and_then(|dp| match dp {
+                        DisplayParam::Value(a) => Some(a.clone()),
+                        DisplayParam::Function => None,
+                    });
+                    let to_addr = tx_failure.params.to.as_ref().and_then(|dp| match dp {
+                        DisplayParam::Value(a) => Some(a.clone()),
+                        DisplayParam::Function => None,
+                    });
+                    let from_s = if tx_failure
+                        .params
+                        .from
+                        .as_ref()
+                        .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                    {
+                        "<function>".cyan().to_string()
+                    } else {
+                        self.format_address(&tx_failure.txs, &from_addr)
+                    };
+                    let to_s = if tx_failure
+                        .params
+                        .to
+                        .as_ref()
+                        .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                    {
+                        "<function>".cyan().to_string()
+                    } else {
+                        self.format_address(&tx_failure.txs, &to_addr)
+                    };
+                    format!(" from {} to {}", from_s, to_s)
                 };
                 writeln!(result, "Unexpected transaction{from_to}").ok();
                 if !params.is_empty() {

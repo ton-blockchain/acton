@@ -5,6 +5,7 @@ import "@local-acton/ffi/reverse-ffi"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
 import "contracts/types"
+import "../projects/basic/.acton/tolk-stdlib/reflection"
 
 fun x2(x: int): int {
     return x * 2;

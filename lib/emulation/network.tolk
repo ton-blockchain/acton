@@ -218,7 +218,7 @@ fun TxCursor.executeTill<Msg = unknown>(self, params: SearchParams = {}): SendRe
         params.opcode = declaredPrefix;
     }
 
-    val txs = ffi.executeMessageIterTill(self.id, params.toInternal().toTuple());
+    val txs = ffi.executeMessageIterTill(self.id, params.toFFI().toTuple());
     if (txs == null) {
         Assert.fail("executeTill() did not find a matching transaction before queue exhaustion");
         throw 567;
@@ -314,24 +314,6 @@ struct SearchParams {
     body: (cell -> bool) | cell | null = null
 }
 
-/// Internal representation of SearchParams where all fields are predicate functions.
-/// Used for FFI communication — plain values are converted to equality predicates.
-struct SearchParamsInternal {
-    to: (address -> bool)?  = null
-    from: (address -> bool)?  = null
-    value: (coins -> bool)?  = null
-    exitCode: (int32 -> bool)?  = null
-    success: (bool -> bool)?  = null
-    aborted: (bool -> bool)?  = null
-    deploy: (bool -> bool)?  = null
-    bounce: (bool -> bool)?  = null
-    bounced: (bool -> bool)?  = null
-    opcode: (uint32 -> bool)?  = null
-    actionExitCode: (int32 -> bool)?  = null
-    computePhaseSkipped: (bool -> bool)?  = null
-    body: (cell -> bool)?  = null
-}
-
 fun cell.__eq(self, other: cell): bool {
     return self.hash() == other.hash();
 }
@@ -343,22 +325,42 @@ fun T.__eq(self, other: T): bool {
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
 fun __bind1<T1, T2, R>(f: (T1, T2) -> R, arg: T1): (T2 -> R) asm "SWAP 1 -1 SETCONTARGS";
 
-fun toPredicate<T>(field: (T -> bool) | T | null): (T -> bool)? {
+/// Convert a union field to [tag, predicate/null]:
+///   [0, null] = absent, [1, cont] = user predicate, [2, cont] = value-as-predicate.
+fun toPredicate<T>(field: (T -> bool) | T | null): tuple {
     match (field) {
         (T -> bool) => {
-            return field;
+            return [1, field];
         }
         T => {
-            return __bind1(field.__eq, field);
+            return [2, __bind1(field.__eq, field)];
         }
         null => {
-            return null;
+            return [0, null];
         }
     }
 }
 
-fun SearchParams.toInternal(self): SearchParamsInternal {
-    return SearchParamsInternal {
+/// Wrapper struct for FFI — all fields are [tag, predicate] tuples.
+struct SearchParamsForFFI {
+    to: tuple
+    from: tuple
+    value: tuple
+    exitCode: tuple
+    success: tuple
+    aborted: tuple
+    deploy: tuple
+    bounce: tuple
+    bounced: tuple
+    opcode: tuple
+    actionExitCode: tuple
+    computePhaseSkipped: tuple
+    body: tuple
+}
+
+/// Convert SearchParams to a tuple of [tag, predicate] pairs for FFI.
+fun SearchParams.toFFI(self): SearchParamsForFFI {
+    return SearchParamsForFFI {
         to: toPredicate(self.to),
         from: toPredicate(self.from),
         value: toPredicate(self.value),
@@ -480,7 +482,7 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
     }
-    val tx = ffi.findTransactionByParams(self, params.toInternal().toTuple());
+    val tx = ffi.findTransactionByParams(self, params.toFFI().toTuple());
     if (tx == null) {
         return Maybe<Transaction>.none();
     }

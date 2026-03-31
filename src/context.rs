@@ -60,40 +60,56 @@ pub struct GetMethodAssertFailure {
     pub location: Option<SourceLocation>,
 }
 
+/// A display-only search param: either a concrete value or a `<function>` marker.
 #[derive(Debug, Clone)]
-pub struct TransactionNotFoundParams {
-    pub to: Option<IntAddr>,
-    pub from: Option<IntAddr>,
-    pub value: Option<BigInt>,
-    pub exit_code: Option<u32>,
-    pub success: Option<bool>,
-    pub aborted: Option<bool>,
-    pub deploy: Option<bool>,
-    pub bounce: Option<bool>,
-    pub bounced: Option<bool>,
-    pub opcode: Option<u32>,
-    pub action_exit_code: Option<i32>,
-    pub compute_phase_skipped: Option<bool>,
-    pub body: Option<Cell>,
+pub enum DisplayParam<T> {
+    Value(T),
+    Function,
 }
 
-/// Search params with predicate continuations (from SearchParamsInternal).
-/// Each field is an optional TVM continuation that takes a value and returns bool.
+#[derive(Debug, Clone)]
+pub struct TransactionNotFoundParams {
+    pub to: Option<DisplayParam<IntAddr>>,
+    pub from: Option<DisplayParam<IntAddr>>,
+    pub value: Option<DisplayParam<BigInt>>,
+    pub exit_code: Option<DisplayParam<u32>>,
+    pub success: Option<DisplayParam<bool>>,
+    pub aborted: Option<DisplayParam<bool>>,
+    pub deploy: Option<DisplayParam<bool>>,
+    pub bounce: Option<DisplayParam<bool>>,
+    pub bounced: Option<DisplayParam<bool>>,
+    pub opcode: Option<DisplayParam<u32>>,
+    pub action_exit_code: Option<DisplayParam<i32>>,
+    pub compute_phase_skipped: Option<DisplayParam<bool>>,
+    pub body: Option<DisplayParam<Cell>>,
+}
+
+/// A search field parsed from SearchParams.
+/// Tag 0 = absent, tag 1 = user-provided predicate, tag 2 = plain value converted to predicate.
+#[derive(Debug, Clone)]
+pub struct SearchField {
+    /// 1 = user predicate (display as `<predicate>`), 2 = value-based (display as `<value>`)
+    pub tag: u8,
+    pub predicate: ContData,
+}
+
+/// Parsed search params from SearchParams union fields.
+/// Each field is either a predicate (with tag for display) or absent (None).
 #[derive(Debug, Clone, Default)]
-pub struct PredicateSearchParams {
-    pub to: Option<ContData>,
-    pub from: Option<ContData>,
-    pub value: Option<ContData>,
-    pub exit_code: Option<ContData>,
-    pub success: Option<ContData>,
-    pub aborted: Option<ContData>,
-    pub deploy: Option<ContData>,
-    pub bounce: Option<ContData>,
-    pub bounced: Option<ContData>,
-    pub opcode: Option<ContData>,
-    pub action_exit_code: Option<ContData>,
-    pub compute_phase_skipped: Option<ContData>,
-    pub body: Option<ContData>,
+pub struct ParsedSearchParams {
+    pub to: Option<SearchField>,
+    pub from: Option<SearchField>,
+    pub value: Option<SearchField>,
+    pub exit_code: Option<SearchField>,
+    pub success: Option<SearchField>,
+    pub aborted: Option<SearchField>,
+    pub deploy: Option<SearchField>,
+    pub bounce: Option<SearchField>,
+    pub bounced: Option<SearchField>,
+    pub opcode: Option<SearchField>,
+    pub action_exit_code: Option<SearchField>,
+    pub compute_phase_skipped: Option<SearchField>,
+    pub body: Option<SearchField>,
 }
 
 #[derive(Debug, Clone)]
