@@ -18,8 +18,6 @@ log = { workspace = true }
 serde_json = { workspace = true }
 tolkc = { workspace = true }
 ton-executor = { workspace = true }
-ton-source-map = { workspace = true }
-retrace = { workspace = true }
 tvmffi = { workspace = true }
 tycho-types = { workspace = true }
 vmlogs = { workspace = true }

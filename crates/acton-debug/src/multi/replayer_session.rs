@@ -779,7 +779,7 @@ impl ReplayerDebugSession {
         Ok(())
     }
 
-    pub fn need_to_stop_child_thread_on_start(&self) -> bool {
+    pub const fn need_to_stop_child_thread_on_start(&self) -> bool {
         matches!(
             self.performing_step,
             Some(StepMode::StepInto | StepMode::EachAsmInstruction)
@@ -844,7 +844,7 @@ impl ReplayerDebugSession {
         self.performing_step
     }
 
-    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
+    pub const fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
 }
