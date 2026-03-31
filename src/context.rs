@@ -4,7 +4,7 @@ use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
 use acton_debug::replayer::StepMode;
-use acton_debug::{ChildDebugContextSpec, DebugSession};
+use acton_debug::{ChildDebugContextSpec, ReplayerDebugSession};
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
@@ -637,7 +637,7 @@ pub struct BuildContext<'a> {
 
 pub enum DebugCtx<'a> {
     Disabled,
-    Enabled { inner: &'a mut dyn DebugSession },
+    Enabled { inner: &'a mut ReplayerDebugSession },
 }
 
 impl Context<'_> {
@@ -712,7 +712,7 @@ impl ChainContext<'_> {
 }
 
 impl<'a> DebugCtx<'a> {
-    pub const fn new(inner: &'a mut dyn DebugSession) -> DebugCtx<'a> {
+    pub const fn new(inner: &'a mut ReplayerDebugSession) -> DebugCtx<'a> {
         DebugCtx::Enabled { inner }
     }
 
@@ -721,7 +721,7 @@ impl<'a> DebugCtx<'a> {
         matches!(self, DebugCtx::Enabled { .. })
     }
 
-    fn session(&mut self) -> &mut dyn DebugSession {
+    fn session(&mut self) -> &mut ReplayerDebugSession {
         match self {
             DebugCtx::Enabled { inner: ctx, .. } => *ctx,
             DebugCtx::Disabled => {

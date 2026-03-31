@@ -1,5 +1,5 @@
 use crate::multi::dap_transport::{DapMessage, DapTransport};
-use crate::multi::session::{ChildDebugContextSpec, DebugSession};
+use crate::multi::session::ChildDebugContextSpec;
 use crate::replayer::{
     self, CallFrameInfo, ExceptionInfo, LocalVarRendered, StepMode, TolkReplayer,
 };
@@ -769,8 +769,8 @@ impl ReplayerDebugSession {
     }
 }
 
-impl DebugSession for ReplayerDebugSession {
-    fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
+impl ReplayerDebugSession {
+    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
         for req in &self.transport.req_receiver.clone() {
             if self.handle_request(req.clone(), terminate_at_end)? {
                 break;
@@ -779,14 +779,14 @@ impl DebugSession for ReplayerDebugSession {
         Ok(())
     }
 
-    fn need_to_stop_child_thread_on_start(&self) -> bool {
+    pub fn need_to_stop_child_thread_on_start(&self) -> bool {
         matches!(
             self.performing_step,
             Some(StepMode::StepInto | StepMode::EachAsmInstruction)
         )
     }
 
-    fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
+    pub fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
         let Some(tolk_source_map) = spec.tolk_source_map else {
             return Ok(false);
         };
@@ -813,14 +813,14 @@ impl DebugSession for ReplayerDebugSession {
         Ok(true)
     }
 
-    fn finish_child_context(&mut self, _thread_id: i64) -> anyhow::Result<()> {
+    pub fn finish_child_context(&mut self, _thread_id: i64) -> anyhow::Result<()> {
         if self.contexts.len() > 1 {
             self.contexts.pop();
         }
         Ok(())
     }
 
-    fn step(&mut self, mode: StepMode) -> bool {
+    pub fn step(&mut self, mode: StepMode) -> bool {
         self.performing_step = Some(mode);
         let is_end = self.step_active_context(mode);
 
@@ -834,17 +834,17 @@ impl DebugSession for ReplayerDebugSession {
         is_end
     }
 
-    fn active_context_is_terminated(&self) -> bool {
+    pub fn active_context_is_terminated(&self) -> bool {
         self.active_context()
             .and_then(|ctx| ctx.try_borrow().ok().map(|ctx| ctx.replayer.is_finished()))
             .unwrap_or(true)
     }
 
-    fn performing_step(&self) -> Option<StepMode> {
+    pub const fn performing_step(&self) -> Option<StepMode> {
         self.performing_step
     }
 
-    fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
+    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
 }

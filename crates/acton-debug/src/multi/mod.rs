@@ -10,4 +10,4 @@ pub use dap_transport::{
     start_dap_server_with_listener,
 };
 pub use replayer_session::ReplayerDebugSession;
-pub use session::{ChildDebugContextSpec, DebugSession};
+pub use session::ChildDebugContextSpec;
