@@ -157,6 +157,12 @@ impl ReplayerDebugSession {
         id
     }
 
+    fn alloc_frame_id(&mut self, locator: FrameLocator) -> i64 {
+        let id = self.frame_to_depth.len() as i64 + 1;
+        self.frame_to_depth.insert(id, locator);
+        id
+    }
+
     fn apply_breakpoints_to_context(&self, ctx_index: usize) {
         let stored = self.breakpoints.clone();
         let Some(ctx) = self.contexts.get(ctx_index) else {
@@ -681,14 +687,10 @@ impl ReplayerDebugSession {
 
         let mut stack_frames = Vec::new();
         for frame in collected {
-            let id = encode_frame_id(frame.context_idx, frame.depth_from_top);
-            self.frame_to_depth.insert(
-                id,
-                FrameLocator {
-                    context_idx: frame.context_idx,
-                    depth_from_top: frame.depth_from_top,
-                },
-            );
+            let id = self.alloc_frame_id(FrameLocator {
+                context_idx: frame.context_idx,
+                depth_from_top: frame.depth_from_top,
+            });
 
             stack_frames.push(StackFrame {
                 id,
@@ -822,10 +824,6 @@ enum StopReason {
     Step,
     Breakpoint(Vec<i64>),
     Exception(ExceptionInfo),
-}
-
-const fn encode_frame_id(context_idx: usize, depth_from_top: usize) -> i64 {
-    (((context_idx as i64) + 1) << 32) | ((depth_from_top as i64) + 1)
 }
 
 fn make_capabilities() -> dap::types::Capabilities {
