@@ -74,7 +74,7 @@ pub fn retrace_cmd(
                 }
 
                 if let Some(contract_name) = &contract {
-                    let artifacts = load_contract_trace_artifacts(contract_name)?;
+                    let artifacts = build_contract_trace_artifacts(contract_name)?;
                     ensure_contract_matches_transaction(contract_name, &result, &artifacts)?;
 
                     if let Some(port) = dap_port {
@@ -428,7 +428,7 @@ fn print_retrace_result(
     }
 }
 
-fn load_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<ContractTraceArtifacts> {
+fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<ContractTraceArtifacts> {
     let acton_config = ActonConfig::load()?;
     let contract = acton_config
         .get_contract(contract_name)

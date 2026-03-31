@@ -105,51 +105,6 @@ pub fn find_execution_trace(
 }
 
 #[must_use]
-pub fn collect_tolk_line_trace(
-    vm_logs: &str,
-    tolk_source_map: &TolkSourceMap,
-) -> Option<Vec<TolkTraceLine>> {
-    let source_map = &tolk_source_map.source_map;
-    let (mut replayer, _) = create_tolk_replayer(vm_logs, tolk_source_map)?;
-    let mut trace = Vec::new();
-    let mut last_key = None;
-
-    while !replayer.is_finished() {
-        replayer.step(StepMode::StepInto);
-
-        let loc = to_source_location(
-            source_map,
-            replayer.current_file_id(),
-            replayer.current_line(),
-            replayer.current_column(),
-        );
-        if loc.line == 0 && loc.column == 0 {
-            continue;
-        }
-
-        let function_name = replayer
-            .call_stack()
-            .last()
-            .map(|frame| frame.f_name.clone())
-            .unwrap_or_default();
-        let key = (
-            loc.file.clone(),
-            loc.line,
-            loc.column,
-            function_name.clone(),
-        );
-        if last_key.as_ref() == Some(&key) {
-            continue;
-        }
-
-        trace.push(TolkTraceLine { function_name, loc });
-        last_key = Some(key);
-    }
-
-    if trace.is_empty() { None } else { Some(trace) }
-}
-
-#[must_use]
 pub fn build_tolk_replayer(vm_logs: &str, tolk_source_map: &TolkSourceMap) -> Option<TolkReplayer> {
     create_tolk_replayer(vm_logs, tolk_source_map).map(|(replayer, _)| replayer)
 }
