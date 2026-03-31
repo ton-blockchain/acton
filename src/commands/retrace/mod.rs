@@ -2,6 +2,7 @@ mod dap;
 
 use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
+use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
@@ -429,6 +430,8 @@ fn print_retrace_result(
 }
 
 fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<ContractTraceArtifacts> {
+    stdlib::ensure_latest(configured_project_root())?;
+
     let acton_config = ActonConfig::load()?;
     let contract = acton_config
         .get_contract(contract_name)
