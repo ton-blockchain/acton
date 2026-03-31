@@ -2,7 +2,6 @@
 
 mod dap_transport;
 mod replayer_session;
-pub(crate) mod request_parser;
 mod session;
 
 pub use dap_transport::{

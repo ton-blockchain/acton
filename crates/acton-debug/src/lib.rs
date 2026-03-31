@@ -9,6 +9,7 @@
 mod core;
 pub mod multi;
 pub mod single;
+mod transport;
 
 pub mod replayer {
     pub use crate::core::replayer::*;

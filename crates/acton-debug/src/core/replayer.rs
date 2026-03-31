@@ -7,7 +7,7 @@
 
 use super::any_executor::AnyExecutor;
 use super::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tolkc::TolkSourceMap;
 use tolkc::debug_marks_dict::DebugMarksDict;
@@ -563,7 +563,7 @@ impl TolkReplayer {
     pub fn new(
         tolk_source_map: &TolkSourceMap,
         vm_lines: &[Result<VmLine<'_>, String>],
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let marks_dict = tolk_source_map
             .marks_dict
             .as_deref()
@@ -575,7 +575,10 @@ impl TolkReplayer {
         ))
     }
 
-    pub fn new_live_vm(tolk_source_map: &TolkSourceMap, executor: AnyExecutor) -> Result<Self> {
+    pub fn new_live_vm(
+        tolk_source_map: &TolkSourceMap,
+        executor: AnyExecutor,
+    ) -> anyhow::Result<Self> {
         let marks_dict = tolk_source_map
             .marks_dict
             .as_deref()

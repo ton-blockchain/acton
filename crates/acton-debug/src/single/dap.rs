@@ -4,10 +4,9 @@
 //! 2. attaches to an already prepared `TolkReplayer`
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
-use dap::base_message::{BaseMessage, Sendable};
 use dap::prelude::*;
 use dap::responses::{
     ContinueResponse, EvaluateResponse, ExceptionInfoResponse, ScopesResponse,
@@ -18,10 +17,9 @@ use dap::types::{
     Breakpoint, ExceptionBreakMode, ExceptionBreakpointsFilter, Scope, ScopePresentationhint,
     Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
-use serde_json::Value;
 
-use crate::multi::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
 use crate::replayer::{self, StepMode, TolkReplayer};
+use crate::transport::{DapConnection, IncomingRequest};
 use crate::types_render::RenderedValue;
 
 const THREAD_ID: i64 = 1;
@@ -52,72 +50,6 @@ fn make_capabilities() -> types::Capabilities {
             },
         ]),
         ..Default::default()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Transport
-// ---------------------------------------------------------------------------
-
-/// Local transport with the same API surface we use from `dap::Server`,
-/// but with tolerant parsing of unknown custom requests.
-struct Server<R: BufRead, W: Write> {
-    input_buffer: R,
-    output_buffer: BufWriter<W>,
-    sequence_number: i64,
-}
-
-impl<R: BufRead, W: Write> Server<R, W> {
-    fn new(input: R, output: W) -> Self {
-        Self {
-            input_buffer: input,
-            output_buffer: BufWriter::new(output),
-            sequence_number: 0,
-        }
-    }
-
-    fn poll_request(&mut self) -> Result<Option<IncomingRequest>, Box<dyn std::error::Error>> {
-        poll_incoming_request(&mut self.input_buffer).map_err(Into::into)
-    }
-
-    fn send(&mut self, body: Sendable) -> Result<(), Box<dyn std::error::Error>> {
-        self.sequence_number += 1;
-        let message = BaseMessage {
-            seq: self.sequence_number,
-            message: body,
-        };
-        self.send_json_value(&serde_json::to_value(message)?)
-    }
-
-    fn respond(&mut self, response: Response) -> Result<(), Box<dyn std::error::Error>> {
-        self.send(Sendable::Response(response))
-    }
-
-    fn send_event(&mut self, event: Event) -> Result<(), Box<dyn std::error::Error>> {
-        self.send(Sendable::Event(event))
-    }
-
-    fn respond_custom_success(
-        &mut self,
-        request_seq: i64,
-        command: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        self.sequence_number += 1;
-        self.send_json_value(&serde_json::json!({
-            "seq": self.sequence_number,
-            "type": "response",
-            "request_seq": request_seq,
-            "success": true,
-            "command": command,
-        }))
-    }
-
-    fn send_json_value(&mut self, value: &Value) -> Result<(), Box<dyn std::error::Error>> {
-        let json = serde_json::to_string(value)?;
-        write!(self.output_buffer, "Content-Length: {}\r\n\r\n", json.len())?;
-        write!(self.output_buffer, "{json}")?;
-        self.output_buffer.flush()?;
-        Ok(())
     }
 }
 
@@ -261,11 +193,11 @@ fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
 }
 
 fn send_stopped(
-    server: &mut Server<impl BufRead, impl Write>,
+    server: &mut DapConnection<impl BufRead, impl Write>,
     reason: StoppedEventReason,
     description: Option<String>,
     hit_breakpoint_ids: Option<Vec<i64>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<()> {
     server.send_event(Event::Stopped(events::StoppedEventBody {
         reason,
         description,
@@ -278,9 +210,7 @@ fn send_stopped(
     Ok(())
 }
 
-fn send_terminated(
-    server: &mut Server<impl BufRead, impl Write>,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn send_terminated(server: &mut DapConnection<impl BufRead, impl Write>) -> anyhow::Result<()> {
     server.send_event(Event::Exited(events::ExitedEventBody { exit_code: 0 }))?;
     server.send_event(Event::Terminated(Some(
         events::TerminatedEventBody::default(),
@@ -291,8 +221,8 @@ fn send_terminated(
 fn step_and_notify(
     state: &mut DapState,
     step_mode: StepMode,
-    server: &mut Server<impl BufRead, impl Write>,
-) -> Result<(), Box<dyn std::error::Error>> {
+    server: &mut DapConnection<impl BufRead, impl Write>,
+) -> anyhow::Result<()> {
     let finished = state.do_step(step_mode);
     if finished {
         send_terminated(server)?;
@@ -313,9 +243,9 @@ fn step_and_notify(
 }
 
 fn send_stopped_exception(
-    server: &mut Server<impl BufRead, impl Write>,
+    server: &mut DapConnection<impl BufRead, impl Write>,
     text: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<()> {
     server.send_event(Event::Stopped(events::StoppedEventBody {
         reason: StoppedEventReason::Exception,
         description: Some("Paused on exception".to_string()),
@@ -374,8 +304,8 @@ fn debug_value_to_variable(state: &mut DapState, name: String, dv: &RenderedValu
 fn handle_request(
     state: &mut DapState,
     req: Request,
-    server: &mut Server<impl BufRead, impl Write>,
-) -> Result<(), Box<dyn std::error::Error>> {
+    server: &mut DapConnection<impl BufRead, impl Write>,
+) -> anyhow::Result<()> {
     let response = match req.command.clone() {
         Command::Initialize(_) => {
             let resp = req.success(ResponseBody::Initialize(make_capabilities()));
@@ -445,7 +375,7 @@ fn handle_launch(
     state: &mut DapState,
     _args: &requests::LaunchRequestArguments,
     req: Request,
-) -> Result<Response, Box<dyn std::error::Error>> {
+) -> anyhow::Result<Response> {
     if let Some(ref mut r) = state.replayer {
         r.set_exception_breakpoints(state.pending_exception_mode);
         state.apply_pending_breakpoints();
@@ -460,7 +390,7 @@ fn handle_attach(
     state: &mut DapState,
     _args: &requests::AttachRequestArguments,
     req: Request,
-) -> Result<Response, Box<dyn std::error::Error>> {
+) -> anyhow::Result<Response> {
     if let Some(ref mut r) = state.replayer {
         r.set_exception_breakpoints(state.pending_exception_mode);
         state.apply_pending_breakpoints();
@@ -573,9 +503,9 @@ fn handle_exception_info(state: &DapState, req: Request) -> Response {
 
 fn handle_configuration_done(
     state: &mut DapState,
-    server: &mut Server<impl BufRead, impl Write>,
+    server: &mut DapConnection<impl BufRead, impl Write>,
     req: Request,
-) -> Result<Response, Box<dyn std::error::Error>> {
+) -> anyhow::Result<Response> {
     state.config_done = true;
     let has_breakpoints = state
         .pending_breakpoints
@@ -793,10 +723,7 @@ fn expand_debug_value(state: &mut DapState, dv: &RenderedValue) -> Vec<Variable>
 // Entry point
 // ---------------------------------------------------------------------------
 
-pub fn serve_single_replayer_dap(
-    replayer: TolkReplayer,
-    port: u16,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn serve_single_replayer_dap(replayer: TolkReplayer, port: u16) -> anyhow::Result<()> {
     let address = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&address)?;
 
@@ -807,7 +734,7 @@ pub fn serve_single_replayer_dap(
 
     let input = BufReader::new(stream.try_clone()?);
     let output = stream;
-    let mut server = Server::new(input, output);
+    let mut server = DapConnection::new(input, output);
     let mut state = DapState::new();
     state.replayer = Some(replayer);
 

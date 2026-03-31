@@ -1,10 +1,10 @@
-use crate::multi::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
+use crate::transport::{DapConnection, IncomingRequest};
 use anyhow::Context;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::Event;
-use dap::prelude::{Request, Response, Server};
+use dap::prelude::{Request, Response};
 use log::{debug, error, info, warn};
-use std::io::{BufReader, BufWriter, Cursor};
+use std::io::{BufReader, Cursor};
 use std::net::TcpListener;
 use std::thread;
 use std::time::Duration;
@@ -62,14 +62,14 @@ pub fn start_dap_server_with_listener(listener: TcpListener) -> anyhow::Result<D
             println!("New connection established");
 
             let input_stream = stream.try_clone()?;
-            let mut input = BufReader::new(input_stream);
+            let mut reader = DapConnection::new(BufReader::new(input_stream), std::io::sink());
 
             let req_sender_for_reader = req_sender.clone();
 
             // Since `poll_request` is blocking, run it in the separate thread
             let reader_thread = thread::spawn(move || -> anyhow::Result<()> {
                 loop {
-                    let req = poll_incoming_request(&mut input);
+                    let req = reader.poll_request();
                     match req {
                         Ok(Some(IncomingRequest::Known(req))) => {
                             debug!("Processing DAP request: {:?}", req.command);
@@ -96,8 +96,7 @@ pub fn start_dap_server_with_listener(listener: TcpListener) -> anyhow::Result<D
             // on server, since we use thread above.
             let dummy_input = BufReader::new(Cursor::new(b""));
             let output_stream = stream;
-            let output = BufWriter::new(output_stream);
-            let mut server = Server::new(dummy_input, output);
+            let mut connection = DapConnection::new(dummy_input, output_stream);
 
             loop {
                 crossbeam_channel::select! {
@@ -105,10 +104,10 @@ pub fn start_dap_server_with_listener(listener: TcpListener) -> anyhow::Result<D
                         let Ok(dap_msg) = msg else { break };
                         match dap_msg {
                             DapMessage::Response(rsp) => {
-                                server.respond(rsp)?;
+                                connection.respond(rsp)?;
                             }
                             DapMessage::Event(event) => {
-                                server.send_event(event)?;
+                                connection.send_event(event)?;
                             }
                         }
                     }
