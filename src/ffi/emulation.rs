@@ -8,7 +8,8 @@ use crate::ffi::assert::parse_search_params;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use acton_debug::debugger::any_executor::AnyExecutor;
-use acton_debug::debugger::session::{ChildDebugContextSpec, StepMode};
+use acton_debug::debugger::session::ChildDebugContextSpec;
+use acton_debug::replayer::StepMode;
 use acton_debug::retrace;
 use anyhow::Context as AnyhowContext;
 use base64::Engine;
@@ -932,11 +933,9 @@ fn send_message_debug(
         .context("Cannot start nested debug context")?;
 
     let child_step_mode = if need_to_stop_on_entry {
-        StepMode::StepIn
-    } else if ctx.debug.performing_step() == Some(StepMode::ContinueWithoutBreakpoints) {
-        StepMode::ContinueWithoutBreakpoints
+        StepMode::StepInto
     } else {
-        StepMode::Continue
+        StepMode::RunUntilBreakpoint
     };
     run_nested_executor_until_finished(ctx, child_debug_started, child_step_mode, || {
         step_executor.step()
@@ -954,7 +953,7 @@ fn send_message_debug(
 
         if !matches!(
             ctx.debug.performing_step(),
-            Some(StepMode::Continue | StepMode::ContinueWithoutBreakpoints)
+            Some(StepMode::RunUntilBreakpoint)
         ) {
             // When we step out from nested message/get method, stop on a line after send/call.
             ctx.debug
@@ -1379,11 +1378,9 @@ fn run_get_method_impl(
             .context("Cannot send response")?;
 
         let child_step_mode = if need_to_stop_on_entry {
-            StepMode::StepIn
-        } else if ctx.debug.performing_step() == Some(StepMode::ContinueWithoutBreakpoints) {
-            StepMode::ContinueWithoutBreakpoints
+            StepMode::StepInto
         } else {
-            StepMode::Continue
+            StepMode::RunUntilBreakpoint
         };
         run_nested_executor_until_finished(ctx, child_debug_started, child_step_mode, || {
             step_executor.step()
@@ -1401,7 +1398,7 @@ fn run_get_method_impl(
 
             if !matches!(
                 ctx.debug.performing_step(),
-                Some(StepMode::Continue | StepMode::ContinueWithoutBreakpoints)
+                Some(StepMode::RunUntilBreakpoint)
             ) {
                 // When we step out from nested message/get method, stop on a line after call.
                 ctx.debug

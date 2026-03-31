@@ -1,6 +1,8 @@
 use crate::debugger::dap::{DapMessage, DapTransport};
-use crate::debugger::session::{ChildDebugContextSpec, DebugSession, StepMode};
-use crate::replayer::{self, CallFrameInfo, ExceptionInfo, LocalVarRendered, TolkReplayer};
+use crate::debugger::session::{ChildDebugContextSpec, DebugSession};
+use crate::replayer::{
+    self, CallFrameInfo, ExceptionInfo, LocalVarRendered, StepMode, TolkReplayer,
+};
 use crate::types_render::RenderedValue;
 use anyhow::anyhow;
 use dap::events::{Event, ExitedEventBody, StoppedEventBody, TerminatedEventBody};
@@ -204,30 +206,24 @@ impl ReplayerDebugSession {
         ctx.resolved_breakpoints.get(&(file_id, line)).cloned()
     }
 
-    const fn replayer_step_mode(mode: StepMode) -> replayer::StepMode {
-        match mode {
-            StepMode::StepIn => replayer::StepMode::StepInto,
-            StepMode::StepOver => replayer::StepMode::StepOver,
-            StepMode::StepOut => replayer::StepMode::StepOut,
-            StepMode::Continue | StepMode::ContinueWithoutBreakpoints => {
-                replayer::StepMode::RunUntilBreakpoint
-            }
-        }
-    }
-
     fn step_active_context(&self, mode: StepMode) -> bool {
         let Some(ctx) = self.active_context() else {
             return true;
         };
         let mut ctx = ctx.borrow_mut();
+        ctx.replayer.step(mode);
+        ctx.replayer.is_finished()
+    }
 
-        if mode == StepMode::ContinueWithoutBreakpoints {
-            ctx.replayer.clear_all_breakpoints();
-            ctx.replayer
-                .set_exception_breakpoints(replayer::ExceptionBreakMode::Never);
-        }
-
-        ctx.replayer.step(Self::replayer_step_mode(mode));
+    fn step_active_context_without_breakpoints(&self, mode: StepMode) -> bool {
+        let Some(ctx) = self.active_context() else {
+            return true;
+        };
+        let mut ctx = ctx.borrow_mut();
+        ctx.replayer.clear_all_breakpoints();
+        ctx.replayer
+            .set_exception_breakpoints(replayer::ExceptionBreakMode::Never);
+        ctx.replayer.step(mode);
         ctx.replayer.is_finished()
     }
 
@@ -429,7 +425,7 @@ impl ReplayerDebugSession {
             Command::ConfigurationDone => {
                 self.send_response(req.success(ResponseBody::ConfigurationDone))?;
 
-                let is_end = self.step(StepMode::StepIn);
+                let is_end = self.step(StepMode::StepInto);
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -474,7 +470,7 @@ impl ReplayerDebugSession {
                     all_threads_continued: Some(true),
                 })))?;
 
-                let is_end = self.step(StepMode::Continue);
+                let is_end = self.step(StepMode::RunUntilBreakpoint);
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -485,7 +481,7 @@ impl ReplayerDebugSession {
             Command::StepIn(_) => {
                 self.send_response(req.success(ResponseBody::StepIn))?;
 
-                let is_end = self.step(StepMode::StepIn);
+                let is_end = self.step(StepMode::StepInto);
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -523,12 +519,14 @@ impl ReplayerDebugSession {
             }
             Command::Disconnect(_) => {
                 self.send_response(req.success(ResponseBody::Disconnect))?;
-                self.step(StepMode::ContinueWithoutBreakpoints);
+                self.performing_step = Some(StepMode::RunUntilBreakpoint);
+                self.step_active_context_without_breakpoints(StepMode::RunUntilBreakpoint);
                 return Ok(true);
             }
             Command::Terminate(_) => {
                 self.send_response(req.success(ResponseBody::Terminate))?;
-                self.step(StepMode::ContinueWithoutBreakpoints);
+                self.performing_step = Some(StepMode::RunUntilBreakpoint);
+                self.step_active_context_without_breakpoints(StepMode::RunUntilBreakpoint);
                 return Ok(true);
             }
             Command::Evaluate(args) => {
@@ -686,7 +684,7 @@ impl DebugSession for ReplayerDebugSession {
     }
 
     fn need_to_stop_child_thread_on_start(&self) -> bool {
-        self.performing_step == Some(StepMode::StepIn)
+        self.performing_step == Some(StepMode::StepInto)
     }
 
     fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
@@ -731,7 +729,7 @@ impl DebugSession for ReplayerDebugSession {
         self.performing_step = Some(mode);
         let is_end = self.step_active_context(mode);
 
-        if !is_end && mode == StepMode::Continue {
+        if !is_end && mode == StepMode::RunUntilBreakpoint {
             let reason = self.stop_reason_for_active_context();
             if !matches!(reason, StopReason::Step) {
                 let _ = self.send_stop_reason(reason);

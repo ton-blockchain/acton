@@ -1,15 +1,7 @@
 use crate::debugger::any_executor::AnyExecutor;
+use crate::replayer::StepMode;
 use std::sync::Arc;
 use tolkc::TolkSourceMap;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StepMode {
-    StepIn,
-    StepOver,
-    StepOut,
-    Continue,
-    ContinueWithoutBreakpoints,
-}
 
 #[derive(Clone)]
 pub struct ChildDebugContextSpec {
