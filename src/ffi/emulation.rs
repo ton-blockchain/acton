@@ -8,8 +8,8 @@ use crate::ffi::assert::parse_search_params;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
+use acton_debug::ChildDebugContextSpec;
 use acton_debug::replayer::StepMode;
-use acton_debug::{AnyExecutor, ChildDebugContextSpec};
 use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -925,7 +925,7 @@ fn send_message_debug(
         .begin_child_context(ChildDebugContextSpec {
             thread_id: 2,
             name: "Send internal message".to_string(),
-            executor: AnyExecutor::Message(step_executor.clone()),
+            executor: step_executor.clone().into(),
             tolk_source_map,
             stop_on_entry: need_to_stop_on_entry,
         })
@@ -1373,7 +1373,7 @@ fn run_get_method_impl(
             .begin_child_context(ChildDebugContextSpec {
                 thread_id: 2,
                 name: "Run get method".to_string(),
-                executor: AnyExecutor::Get(step_executor.clone()),
+                executor: step_executor.clone().into(),
                 tolk_source_map: Some(tolk_source_map.clone()),
                 stop_on_entry: need_to_stop_on_entry,
             })

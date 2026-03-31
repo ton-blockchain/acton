@@ -13,9 +13,7 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
 use acton_config::test::BacktraceMode;
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::{
-    AnyExecutor, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
-};
+use acton_debug::{ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener};
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;
@@ -310,10 +308,8 @@ fn execute_script(
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
-        let replayer = TolkReplayer::new_live_vm(
-            tolk_source_map.as_ref(),
-            AnyExecutor::Get(executor.clone()),
-        )?;
+        let replayer =
+            TolkReplayer::new_live_vm(tolk_source_map.as_ref(), executor.clone().into())?;
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);

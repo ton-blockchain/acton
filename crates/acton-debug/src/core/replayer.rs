@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use super::any_executor::AnyExecutor;
+use super::debug_executor_handle::DebugExecutorHandle;
 use super::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -13,9 +13,7 @@ use tolkc::TolkSourceMap;
 use tolkc::debug_marks_dict::DebugMarksDict;
 use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
 use tolkc::types_kernel::Ty;
-use tvmffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use vmlogs::parser::{CellLike, CellSlice, VmLine, VmStackValue};
+use vmlogs::parser::{VmLine, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -334,13 +332,13 @@ const LIVE_VM_CAPABILITY_GAPS: &[RuntimeCapabilityGap] = &[
 ];
 
 pub struct LiveVmRuntimeEventSource {
-    executor: AnyExecutor,
+    executor: DebugExecutorHandle,
     terminated: bool,
     pending_events: VecDeque<RuntimeEvent>,
 }
 
 impl LiveVmRuntimeEventSource {
-    pub const fn new(executor: AnyExecutor) -> Self {
+    pub const fn new(executor: DebugExecutorHandle) -> Self {
         Self {
             executor,
             terminated: false,
@@ -365,14 +363,17 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
         // - no exception callbacks/status;
         // - stack snapshot is tuple-shaped, not VM-log compatible.
         let is_end = self.executor.step();
+        let snapshot = self.executor.snapshot();
 
-        if let Some(values) = live_vm_stack_values(&self.executor) {
+        if let Some(values) = snapshot.stack_values {
             self.pending_events
                 .push_back(RuntimeEvent::Stack { values });
         }
-        if let Some((cell_hash, offset)) = live_vm_code_pos(&self.executor) {
-            self.pending_events
-                .push_back(RuntimeEvent::Position { cell_hash, offset });
+        if let Some(position) = snapshot.code_position {
+            self.pending_events.push_back(RuntimeEvent::Position {
+                cell_hash: position.cell_hash,
+                offset: position.offset,
+            });
         }
 
         self.terminated = is_end;
@@ -389,48 +390,6 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
 
     fn capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
         LIVE_VM_CAPABILITY_GAPS
-    }
-}
-
-fn live_vm_code_pos(executor: &AnyExecutor) -> Option<(String, i32)> {
-    let pos = executor.get_code_pos();
-    let (hash, offset): (&str, &str) = pos.split_once(':')?;
-    let offset = offset.parse::<i32>().ok()?;
-    Some((hash.to_string(), offset))
-}
-
-fn live_vm_stack_values(executor: &AnyExecutor) -> Option<Vec<VmStackValue>> {
-    let stack = executor.get_stack();
-    let stack_cell = Boc::decode_base64(&stack).ok()?;
-    let stack_tuple = Tuple::deserialize(&stack_cell).ok()?;
-    Some(
-        stack_tuple
-            .iter()
-            .map(tuple_item_to_vm_stack_value)
-            .collect(),
-    )
-}
-
-fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
-    match item {
-        TupleItem::Null => VmStackValue::Null,
-        TupleItem::Int(v) => VmStackValue::Integer(v.to_string()),
-        TupleItem::Nan => VmStackValue::NaN,
-        TupleItem::Cell(cell) => VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(cell))),
-        // `get_stack()` exposes a whole cell for slice values, but not the exact viewed
-        // bit/ref window from VM logs, so range information is intentionally left absent.
-        TupleItem::Slice(cell) => VmStackValue::CellSlice(CellSlice {
-            value: Boc::encode_hex(cell),
-            bits: None,
-            refs: None,
-        }),
-        TupleItem::Builder(cell) => VmStackValue::Builder(Boc::encode_hex(cell)),
-        TupleItem::Tuple(items) => {
-            VmStackValue::Tuple(items.iter().map(tuple_item_to_vm_stack_value).collect())
-        }
-        TupleItem::TypedTuple { inner, .. } => {
-            VmStackValue::Tuple(inner.iter().map(tuple_item_to_vm_stack_value).collect())
-        }
     }
 }
 
@@ -577,7 +536,7 @@ impl TolkReplayer {
 
     pub fn new_live_vm(
         tolk_source_map: &TolkSourceMap,
-        executor: AnyExecutor,
+        executor: DebugExecutorHandle,
     ) -> anyhow::Result<Self> {
         let marks_dict = tolk_source_map
             .marks_dict

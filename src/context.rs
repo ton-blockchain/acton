@@ -723,7 +723,7 @@ impl<'a> DebugCtx<'a> {
 
     fn session(&mut self) -> &mut ReplayerDebugSession {
         match self {
-            DebugCtx::Enabled { inner: ctx, .. } => *ctx,
+            DebugCtx::Enabled { inner: ctx, .. } => ctx,
             DebugCtx::Disabled => {
                 panic!("Debug context accessed from non debug context");
             }

@@ -1,5 +1,5 @@
-pub(crate) mod any_executor;
+pub(crate) mod debug_executor_handle;
 pub(crate) mod replayer;
 pub(crate) mod types_render;
 
-pub use any_executor::AnyExecutor;
+pub use debug_executor_handle::DebugExecutorHandle;

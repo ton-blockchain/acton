@@ -6,9 +6,9 @@ use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_debug::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::start_dap_server;
-use acton_debug::{AnyExecutor, ReplayerDebugSession};
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -304,8 +304,7 @@ fn execute_script<'a>(
 
     let transport = start_dap_server(debug_port)?;
     executor.prepare(0, &stack)?;
-    let replayer =
-        TolkReplayer::new_live_vm(tolk_source_map.as_ref(), AnyExecutor::Get(executor.clone()))?;
+    let replayer = TolkReplayer::new_live_vm(tolk_source_map.as_ref(), executor.clone().into())?;
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 

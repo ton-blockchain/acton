@@ -15,7 +15,7 @@ pub mod replayer {
     pub use crate::core::replayer::*;
 }
 
-pub use core::AnyExecutor;
+pub use core::DebugExecutorHandle;
 pub use multi::{ChildDebugContextSpec, ReplayerDebugSession};
 pub use multi::{
     DapMessage, DapTransport, reserve_dap_listener, start_dap_server,

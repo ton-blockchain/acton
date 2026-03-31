@@ -27,8 +27,7 @@ use acton_config::config::{
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::{
-    AnyExecutor, DapTransport, ReplayerDebugSession, reserve_dap_listener,
-    start_dap_server_with_listener,
+    DapTransport, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
 };
 use anyhow::anyhow;
 use dunce;
@@ -325,10 +324,8 @@ impl<'a> TestRunner<'a> {
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
-                let replayer = TolkReplayer::new_live_vm(
-                    tolk_source_map.as_ref(),
-                    AnyExecutor::Get(executor.clone()),
-                )?;
+                let replayer =
+                    TolkReplayer::new_live_vm(tolk_source_map.as_ref(), executor.clone().into())?;
                 let mut dbg_session =
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);
