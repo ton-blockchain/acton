@@ -1,8 +1,8 @@
-import "@local-acton/types/message"
-import "@local-acton/types/out_actions"
 import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/outlist_expect"
+import "@local-acton/types/message"
+import "@local-acton/types/out_actions"
 import "@local-acton/vm/vm"
 
 struct (0x7e8764ef) IncreaseCounter {
@@ -10,7 +10,8 @@ struct (0x7e8764ef) IncreaseCounter {
     increaseBy: uint32
 }
 
-fun changeLib(code: cell, mode: int): void asm "SETLIBCODE"
+fun changeLib(code: cell, mode: int): void
+    asm "SETLIBCODE"
 
 /// Tests that we can actually retrieve out actions and parse it correctly
 get fun `test-out-actions`() {
@@ -19,14 +20,20 @@ get fun `test-out-actions`() {
         bounce: false,
         value: ton("1.9999"),
         dest,
-        body: IncreaseCounter { queryId: 0, increaseBy: 1 },
+        body: IncreaseCounter {
+            queryId: 0,
+            increaseBy: 1,
+        },
     });
 
     // Setup actions to test
     val new_code = beginCell().storeUint(0xFF, 8).endCell();
     contract.setCodePostponed(new_code);
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(ton("0.005"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveToncoinsOnBalance(
+        ton("0.005"),
+        RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
+    );
     changeLib(createEmptyCell(), 2);
 
     val out_actions = vm.outActions();
@@ -40,7 +47,9 @@ get fun `test-out-actions`() {
     val second_action = out_actions.at(1);
     expect(second_action.kind()).toEqual("reserve-currency");
     if (second_action is OutActionReserveCurrency) {
-        expect(second_action.mode).toEqual(RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        expect(second_action.mode).toEqual(
+            RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
+        );
         expect(second_action.currency.grams).toEqual(ton("0.005"));
     }
 
@@ -70,7 +79,10 @@ get fun `test-out-message-out-actions-helper`() {
         bounce: false,
         value: ton("0.5"),
         dest,
-        body: IncreaseCounter { queryId: 0, increaseBy: 7 },
+        body: IncreaseCounter {
+            queryId: 0,
+            increaseBy: 7,
+        },
     });
 
     val actions = msg.outActions(SEND_MODE_REGULAR);
@@ -102,12 +114,18 @@ get fun `test-get-send-message-helpers-return-null-for-non-send-action`() {
         bounce: false,
         value: ton("1"),
         dest,
-        body: IncreaseCounter { queryId: 0, increaseBy: 1 },
+        body: IncreaseCounter {
+            queryId: 0,
+            increaseBy: 1,
+        },
     });
 
     contract.setCodePostponed(beginCell().storeUint(0xEE, 8).endCell());
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(ton("0.005"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveToncoinsOnBalance(
+        ton("0.005"),
+        RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
+    );
     changeLib(createEmptyCell(), 2);
 
     val actions = vm.outActions();

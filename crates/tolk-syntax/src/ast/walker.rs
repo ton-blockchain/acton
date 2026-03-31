@@ -12,9 +12,9 @@ use crate::ast::statements::{
     Return, Stmt, Throw, TryCatch, While,
 };
 use crate::ast::top_level::{
-    Annotation, AnnotationArgs, AnnotationList, AsmBody, Constant, Contract, ContractBody,
-    ContractField, ContractFieldValue, EmptyStmt, Enum, EnumBody, EnumMember, Func, FuncBody,
-    GetMethod, GlobalVar, Import, Method, MethodReceiver, Parameter, Struct, StructBody,
+    Annotation, AnnotationArgs, AnnotationList, AnnotationName, AsmBody, Constant, Contract,
+    ContractBody, ContractField, ContractFieldValue, EmptyStmt, Enum, EnumBody, EnumMember, Func,
+    FuncBody, GetMethod, GlobalVar, Import, Method, MethodReceiver, Parameter, Struct, StructBody,
     StructField, TolkRequiredVersion, TopLevel, TypeAlias, TypeAliasUnderlyingType, TypeParameter,
     TypeParameters,
 };
@@ -638,6 +638,10 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
+    fn walk_annotation_name(&mut self, _node: &AnnotationName<'tree>) -> Self::Result {
+        self.default_result()
+    }
+
     fn walk_numeric_index(&mut self, _node: &NumericIndex<'tree>) -> Self::Result {
         self.default_result()
     }
@@ -717,7 +721,7 @@ pub trait Walker<'tree> {
 
     fn walk_annotation(&mut self, node: &Annotation<'tree>) -> Self::Result {
         if let Some(name) = node.name() {
-            self.walk_ident(&name);
+            self.walk_annotation_name(&name);
         }
         if let Some(args) = node.args() {
             self.walk_annotation_args(&args);

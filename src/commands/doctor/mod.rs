@@ -1,4 +1,5 @@
 use crate::build_info;
+use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, LibrariesFile, WalletsFile, global_libraries_path, global_wallets_path,
@@ -470,7 +471,7 @@ fn inspect_stdlib(acton_dir: &Path, stdlib_path: &Path) -> DoctorStdlib {
         &stdlib_path.join("VERSION"),
     ]);
     let common_tolk = stdlib_path.join("common.tolk");
-    let expected_version = build_info::PACKAGE_VERSION.to_string();
+    let expected_version = stdlib::current_stdlib_version();
     let status = if !stdlib_path.exists() {
         "missing"
     } else if !common_tolk.exists() {

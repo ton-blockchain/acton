@@ -1,4 +1,5 @@
 struct (0x00000001) Msg
+
 struct (0x00000002) Msg2
 
 struct Storage

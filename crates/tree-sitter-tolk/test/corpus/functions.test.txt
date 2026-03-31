@@ -198,7 +198,7 @@ fun Message?.output(self): self {}
   (method_declaration
     annotations: (annotation_list
       (annotation
-        name: (identifier)))
+        name: (annotation_name)))
     receiver: (method_receiver
       receiver_type: (nullable_type
         inner: (type_identifier)))
@@ -207,6 +207,29 @@ fun Message?.output(self): self {}
       (parameter_declaration
         name: (identifier)))
     return_type: (type_identifier)
+    body: (block_statement)))
+
+========================================================================
+Function with dotted annotation
+========================================================================
+
+@abi.minimalMsgValue(1)
+@custom.flag
+fun foo() {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    annotations: (annotation_list
+      (annotation
+        name: (annotation_name)
+        arguments: (annotation_arguments
+          (number_literal)))
+      (annotation
+        name: (annotation_name)))
+    name: (identifier)
+    parameters: (parameter_list)
     body: (block_statement)))
 
 ========================================================================

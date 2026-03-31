@@ -1,8 +1,9 @@
-import "@local-acton/types/message"
 import "@local-acton/build/build"
 import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
+import "@local-acton/tlb/maybe"
+import "@local-acton/types/message"
 import "contracts/types"
 
 struct Counter {
@@ -16,7 +17,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 
 fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
@@ -36,14 +37,12 @@ fun setupTest(): (Counter, Treasury) {
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
-        dest: {
-            stateInit: counter.init,
-        },
+        dest: { stateInit: counter.init },
     });
     val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
-    return (counter, deployer)
+    return (counter, deployer);
 }
 
 get fun `test-externals`() {
@@ -62,7 +61,9 @@ get fun `test-externals`() {
     val second = tx.externals.at<ResetCounter>(1);
     expect(second.loadBody()).toEqual(ResetCounter {});
 
-    val addr = address.fromValidBuilder(beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16));
+    val addr = address.fromValidBuilder(
+        beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16),
+    );
     expect(second.info.dest).toEqual(addr);
 }
 
@@ -94,11 +95,10 @@ get fun `test-find-external-out-message`() {
     expect(first).toBeDefined();
     expect(first.unwrap().loadBody()).toEqual(IncreaseCounter { increaseBy: 100 });
 
-    val addr = any_address.fromCell(beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16).endCell());
-    val second = res.findExternalOutMessage<ResetCounter>({
-        from: counter.address,
-        to: addr,
-    });
+    val addr = any_address.fromCell(
+        beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16).endCell(),
+    );
+    val second = res.findExternalOutMessage<ResetCounter>({ from: counter.address, to: addr });
     expect(second).toBeDefined();
     expect(second.unwrap().loadBody()).toEqual(ResetCounter {});
 }

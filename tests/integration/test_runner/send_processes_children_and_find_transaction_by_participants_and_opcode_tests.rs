@@ -159,6 +159,8 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/big_array"
+import "../../lib/types/message"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
 

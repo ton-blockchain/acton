@@ -1,0 +1,382 @@
+off │ instruction
+────┼───────────────────────────────────────
+0   │ SETCP 0
+16  │ DICTPUSHCONST 19 [
+    │     0 => { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF
+    │         // contracts/counter[LINE]
+    │         // 5 | fun onInternalMessage(in: InMessage) {
+    │         //   |     ^^^^^^^^^^^^^^^^^
+8   │         INMSG_BOUNCED
+24  │         PUSHCONT_SHORT { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF offset 28
+    │             // contracts/counter[LINE]
+    │             // 25 | fun onBouncedMessage(in: InMessageBounced) {}
+    │             //    |                                             ^
+32  │             DROP
+    │         }
+    │         // contracts/counter[LINE]
+    │         // 23 | }
+    │         //    | ^
+40  │         IFJMP
+48  │         DUP
+    │         // contracts/counter[LINE]
+    │         //  8 |     match (msg) {
+    │         //    |     ^^^^^^^^^^^^^
+    │         // .. | ... 13 lines omitted ...
+    │         // 22 |     }
+    │         //    |     ^
+56  │         SDBEGINSQ x{7e8764efa_}
+112 │         PUSHCONT { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF offset 119
+    │             // contracts/counter[LINE]
+    │             //  9 |         IncreaseCounter => {
+    │             //    |                            ^
+    │             // .. | ... 3 lines omitted ...
+    │             // 13 |         }
+    │             //    |         ^
+128 │             NIP
+    │             // contracts/types[LINE]
+    │             // 7 |     return Storage.fromCell(contract.getData());
+    │             //   |                             ^^^^^^^^^^^^^^^^^^
+136 │             PUSHCTR c4
+    │             // contracts/counter[LINE]
+    │             // 10 |             var storage = lazy Storage.load();
+    │             //    |                           ^^^^^^^^^^^^^^^^^^^
+152 │             CTOS
+    │             // contracts/counter[LINE]
+    │             // 10 |             var storage = lazy Storage.load();
+    │             //    |                 ^^^^^^^
+160 │             SWAP
+    │             // contracts/counter[LINE]
+    │             // 11 |             storage.counter += msg.increaseBy;
+    │             //    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+168 │             PLDU 32
+192 │             SWAP
+200 │             LDSLICE 32
+216 │             PLDU 32
+240 │             ROT
+248 │             ADD
+    │             // contracts/counter[LINE]
+    │             // 12 |             storage.save();
+    │             //    |                     ^^^^
+256 │             SWAP
+    │             // contracts/types[LINE]
+    │             // 11 |     contract.setData(self.toCell());
+    │             //    |                      ^^^^^^^^^^^^^
+264 │             NEWC
+272 │             STSLICE
+280 │             STU 32
+296 │             ENDC
+    │             // contracts/types[LINE]
+    │             // 11 |     contract.setData(self.toCell());
+    │             //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+304 │             POPCTR c4
+    │         }
+    │         // contracts/counter[LINE]
+    │         // 23 | }
+    │         //    | ^
+320 │         IFJMP
+    │         // contracts/counter[LINE]
+    │         //  8 |     match (msg) {
+    │         //    |     ^^^^^^^^^^^^^
+    │         // .. | ... 13 lines omitted ...
+    │         // 22 |     }
+    │         //    |     ^
+328 │         SDBEGINSQ x{3a752f06a_}
+384 │         NIP
+392 │         PUSHCONT { // 6F7AF2ED8B0B84F321FC02C7729BE99A9DB9D94DF3940C9C80E274319E5C9FEF offset 399
+    │             // contracts/counter[LINE]
+    │             // 14 |         ResetCounter => {
+    │             //    |                         ^
+    │             // .. | ... 3 lines omitted ...
+    │             // 18 |         }
+    │             //    |         ^
+408 │             DROP
+    │             // contracts/types[LINE]
+    │             // 7 |     return Storage.fromCell(contract.getData());
+    │             //   |                             ^^^^^^^^^^^^^^^^^^
+416 │             PUSHCTR c4
+    │             // contracts/counter[LINE]
+    │             // 15 |             var storage = lazy Storage.load();
+    │             //    |                           ^^^^^^^^^^^^^^^^^^^
+432 │             CTOS
+    │             // contracts/counter[LINE]
+    │             // 16 |             storage.counter = 0;
+    │             //    |             ^^^^^^^^^^^^^^^^^^^
+440 │             LDSLICE 32
+456 │             DROP
+    │             // contracts/types[LINE]
+    │             // 11 |     contract.setData(self.toCell());
+    │             //    |                      ^^^^^^^^^^^^^
+464 │             NEWC
+472 │             STSLICE
+480 │             STSLICECONST x{}
+528 │             ENDC
+    │             // contracts/types[LINE]
+    │             // 11 |     contract.setData(self.toCell());
+    │             //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+536 │             POPCTR c4
+    │         }
+    │         // contracts/counter[LINE]
+    │         // 23 | }
+    │         //    | ^
+552 │         IFJMP
+    │         // contracts/counter[LINE]
+    │         // 20 |             assert (in.body.isEmpty()) throw 0xFFFF;
+    │         //    |                                              ^^^^^^
+560 │         PUSHPOW2DEC 16
+576 │         SWAP
+    │         // contracts/counter[LINE]
+    │         // 20 |             assert (in.body.isEmpty()) throw 0xFFFF;
+    │         //    |                             ^^^^^^^
+584 │         SEMPTY
+    │         // contracts/counter[LINE]
+    │         // 20 |             assert (in.body.isEmpty()) throw 0xFFFF;
+    │         //    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+600 │         THROWANYIFNOT
+    │     }
+    │     72514 => { // 45C2D1B52FD2D9BD143A5683C2AE4B543E3A15449276A9E6D0191D09DA003FAF
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+20  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 33 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+36  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 34 |     return (storage.counter, storage.counter * 2);
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44  │         LDU 32
+60  │         NIP
+68  │         PLDU 32
+92  │         DUP
+    │         // contracts/counter[LINE]
+    │         // 34 |     return (storage.counter, storage.counter * 2);
+    │         //    |                              ^^^^^^^^^^^^^^^^^^^
+100 │         LSHIFT 1
+    │     }
+    │     89315 => { // DF57950F6429AFDFBA686017A0A71838A2703943684B64254C35154A31B21E2C
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 59 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+35  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 60 |     return storage.counter + x * 2;
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+43  │         LDU 32
+59  │         NIP
+67  │         PLDU 32
+91  │         SWAP
+    │         // contracts/counter[LINE]
+    │         // 60 |     return storage.counter + x * 2;
+    │         //    |                              ^^^^^
+99  │         LSHIFT 1
+    │         // contracts/counter[LINE]
+    │         // 60 |     return storage.counter + x * 2;
+    │         //    |            ^^^^^^^^^^^^^^^^^^^^^^^
+115 │         ADD
+    │     }
+    │     97029 => { // 73BDB9549D7C2BE9AC8593F83F7D6951C43DFD2BD0583EA25F00AB912BA8AEA3
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+16  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 51 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+32  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 52 |     if (storage.counter > 100) {
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 53 |         return storage;
+    │         //    |         ^^^^^^^^^^^^^^^
+    │         // 54 |     }
+    │         //    |     ^
+40  │         LDU 32
+56  │         PLDU 32
+    │         // contracts/counter[LINE]
+    │         // 52 |     if (storage.counter > 100) {
+    │         //    |     ^^
+80  │         DUP
+    │         // contracts/counter[LINE]
+    │         // 52 |     if (storage.counter > 100) {
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^
+88  │         GTINT 100
+    │         // contracts/counter[LINE]
+    │         // 52 |     if (storage.counter > 100) {
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 53 |         return storage;
+    │         //    |         ^^^^^^^^^^^^^^^
+    │         // 54 |     }
+    │         //    |     ^
+104 │         PUSHCONT_SHORT { // 73BDB9549D7C2BE9AC8593F83F7D6951C43DFD2BD0583EA25F00AB912BA8AEA3 offset 108
+    │             // contracts/counter[LINE]
+    │             // 53 |         return storage;
+    │             //    |                ^^^^^^^
+112 │             PUSHINT_16 129
+    │         }
+    │         // contracts/counter[LINE]
+    │         // 53 |         return storage;
+    │         //    |         ^^^^^^^^^^^^^^
+136 │         IFJMP
+144 │         DROP2
+    │         // contracts/counter[LINE]
+    │         // 55 |     return null;
+    │         //    |            ^^^^
+152 │         PUSHNULL
+160 │         PUSHNULL
+168 │         PUSHINT_4 0
+    │     }
+    │     97645 => { // 089A658DE8B3ED7048F3351DA2FB36BBDBE678E8738044DED83EC4F43612CC4B
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+16  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 69 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+32  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 70 |     return Pair {
+    │         //    |     ^^^^^^^^^^^^^
+    │         // 71 |         x: p.x + storage.counter,
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 72 |         y: p.y * 2,
+    │         //    |         ^^^^^^^^^^^
+    │         // 73 |     };
+    │         //    |     ^
+40  │         LDU 32
+56  │         NIP
+64  │         PLDU 32
+88  │         XCHG_1I s1 s2
+    │         // contracts/counter[LINE]
+    │         // 71 |         x: p.x + storage.counter,
+    │         //    |            ^^^^^^^^^^^^^^^^^^^^^
+96  │         ADD
+    │         // contracts/counter[LINE]
+    │         // 71 |         x: p.x + storage.counter,
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+104 │         SWAP
+    │         // contracts/counter[LINE]
+    │         // 72 |         y: p.y * 2,
+    │         //    |            ^^^^^^^
+112 │         LSHIFT 1
+    │     }
+    │     106187 => { // 1196A6AA07CC7C7606F6B64AC0976E03DAF2C24E2F96D728FB747F71DD0A7303
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 46 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+35  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 47 |     return storage;
+    │         //    |     ^^^^^^^^^^^^^^
+43  │         LDU 32
+59  │         PLDU 32
+    │     }
+    │     108248 => { // 798D8699FB2F0B045C0CB808E4646C18F4CD7DBAC358F63C3BC239DE3075478E
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 38 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+35  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 39 |     if (storage.counter > 100) {
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 40 |         return storage.counter * 100;
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 41 |     }
+    │         //    |     ^
+43  │         LDU 32
+59  │         NIP
+67  │         PLDU 32
+    │         // contracts/counter[LINE]
+    │         // 39 |     if (storage.counter > 100) {
+    │         //    |     ^^
+91  │         DUP
+    │         // contracts/counter[LINE]
+    │         // 39 |     if (storage.counter > 100) {
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^
+99  │         GTINT 100
+    │         // contracts/counter[LINE]
+    │         // 39 |     if (storage.counter > 100) {
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 40 |         return storage.counter * 100;
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         // 41 |     }
+    │         //    |     ^
+115 │         PUSHCONT_SHORT { // 798D8699FB2F0B045C0CB808E4646C18F4CD7DBAC358F63C3BC239DE3075478E offset 119
+    │             // contracts/counter[LINE]
+    │             // 40 |         return storage.counter * 100;
+    │             //    |                ^^^^^^^^^^^^^^^^^^^^^
+123 │             MULINT 100
+    │         }
+    │         // contracts/counter[LINE]
+    │         // 40 |         return storage.counter * 100;
+    │         //    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+139 │         IFJMP
+147 │         DROP
+    │         // contracts/counter[LINE]
+    │         // 42 |     return null;
+    │         //    |            ^^^^
+155 │         PUSHNULL
+    │     }
+    │     117456 => { // 0AD36D005938FC59C8931709F3BD93CA7CA1BD168CA695440889C5F66F7E2344
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+18  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 28 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+34  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 29 |     return storage.counter;
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^
+42  │         LDU 32
+58  │         NIP
+66  │         PLDU 32
+    │     }
+    │     122613 => { // C319500CBF7A4877BA389ABDDE1C6A0FFF91EFB738AF26D07E26E8B2E78F58A1
+    │         // contracts/types[LINE]
+    │         // 7 |     return Storage.fromCell(contract.getData());
+    │         //   |                             ^^^^^^^^^^^^^^^^^^
+18  │         PUSHCTR c4
+    │         // contracts/counter[LINE]
+    │         // 64 |     val storage = lazy Storage.load();
+    │         //    |                   ^^^^^^^^^^^^^^^^^^^
+34  │         CTOS
+    │         // contracts/counter[LINE]
+    │         // 65 |     return storage.counter + x * 2 + y;
+    │         //    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+42  │         LDU 32
+58  │         NIP
+66  │         PLDU 32
+90  │         XCHG_0I s2
+    │         // contracts/counter[LINE]
+    │         // 65 |     return storage.counter + x * 2 + y;
+    │         //    |                              ^^^^^
+98  │         LSHIFT 1
+114 │         XCHG_1I s1 s2
+    │         // contracts/counter[LINE]
+    │         // 65 |     return storage.counter + x * 2 + y;
+    │         //    |            ^^^^^^^^^^^^^^^^^^^^^^^
+122 │         ADD
+    │         // contracts/counter[LINE]
+    │         // 65 |     return storage.counter + x * 2 + y;
+    │         //    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+130 │         ADD
+    │     }
+    │ ]
+40  │ DICTIGETJMPZ
+56  │ THROWARG 11
+

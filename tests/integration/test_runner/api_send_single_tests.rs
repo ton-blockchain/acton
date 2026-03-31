@@ -124,6 +124,7 @@ fn send_single_keeps_out_messages_without_executing_children() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-single-keeps-out-messages`() {
@@ -206,6 +207,7 @@ fn send_executes_child_transactions_and_matches_notify_expectation() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-processes-child-transactions`() {
@@ -290,6 +292,7 @@ fn send_single_bounce_roundtrip_matches_bounced_notify_opcode() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-single-bounce-roundtrip-bounced-opcode`() {
@@ -375,6 +378,7 @@ fn send_single_bounce_roundtrip_matches_failed_tx_exit_code() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             const ERR_REJECT_BOUNCE = 777;

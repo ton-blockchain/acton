@@ -1,42 +1,73 @@
-use crate::types::{ArgValue, Instruction};
+use crate::types::{ArgValue, Code, Instruction};
 use std::fs;
-use ton_source_map::{OffsetAndId, SourceLocation, SourceMap};
+use tolkc::TolkSourceMap;
+use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
-const OFFSET_PADDING: &str = "    │ ";
+const MIN_OFFSET_WIDTH: usize = 4;
+const MAX_RENDERED_SOURCE_RANGE_LINES: usize = 4;
 
 #[derive(Clone, Default)]
 pub struct FormatOptions {
     pub show_hashes: bool,
     pub show_offsets: bool,
-    pub source_map: Option<Box<SourceMap>>,
+    pub source_map: Option<Box<TolkSourceMap>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SourceLocationKey {
+    file: String,
+    line: i64,
+    column: i64,
+    end_line: i64,
+    end_column: i64,
+}
+
+impl From<&SourceLocation> for SourceLocationKey {
+    fn from(value: &SourceLocation) -> Self {
+        Self {
+            file: value.file.clone(),
+            line: value.line,
+            column: value.column,
+            end_line: value.end_line,
+            end_column: value.end_column,
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct PrintState {
+    last_source_location: Option<SourceLocationKey>,
 }
 
 impl Instruction {
     #[must_use]
-    pub fn print(&self, depth: usize, opts: &FormatOptions, offset: Option<u16>) -> String {
-        use std::fmt::Write as _;
-
+    pub(crate) fn print(
+        &self,
+        depth: usize,
+        opts: &FormatOptions,
+        offset: Option<u16>,
+        offset_width: usize,
+        state: &mut PrintState,
+    ) -> String {
         let indent = "    ".repeat(depth);
         let mut builder = String::new();
 
         if opts.show_offsets {
-            if let Some(off) = offset {
-                write!(builder, "{off:<4}│ ").ok();
-            } else {
-                builder.push_str("     │");
-            }
+            push_offset_prefix(&mut builder, offset, offset_width);
         }
 
         if let Instruction::Ref(instr) = self {
+            state.last_source_location = None;
             builder.push_str(&indent);
             builder.push_str("ref ");
-            builder.push_str(&format_arg(&instr.code, depth, opts));
+            builder.push_str(&format_arg(&instr.code, depth, opts, offset_width));
             return builder.trim_end().to_string();
         }
 
         if let Instruction::ExoticCell(instr) = self {
+            state.last_source_location = None;
             builder.push_str(&indent);
             builder.push_str("exotic ");
 
@@ -60,127 +91,251 @@ impl Instruction {
         builder.push(' ');
 
         for (i, arg) in instr.args.iter().enumerate() {
-            builder.push_str(&format_arg(arg, depth, opts));
+            builder.push_str(&format_arg(arg, depth, opts, offset_width));
             if i < instr.args.len() - 1 {
                 builder.push(' ');
             }
         }
 
         let result = builder.trim_end().to_string();
-        let padding = 100_usize.saturating_sub(builder.len());
 
-        if let Some(source_map) = &opts.source_map
-            && let Some(off) = offset
-            && let Some(locations) =
-                get_source_locations(source_map, instr.source_cell.as_ref(), off)
-            && !locations.is_empty()
-        {
-            let source_contexts: Vec<String> = locations
-                .iter()
-                .filter_map(|location| format_source_context(location))
-                .collect();
-
-            if !source_contexts.is_empty() {
-                let before = format!("    └{}┐\n", "─".repeat(56));
-                let after = format!("    ┌{}┘", "─".repeat(56));
-                let source_output = source_contexts.join("");
-                return format!(
-                    "{}{:>padding$}\n{before}{}{after}",
-                    result, "", source_output
-                );
-            }
+        if let Some(source_context) = next_source_context(
+            opts,
+            instr.source_cell.as_ref(),
+            offset,
+            offset_width,
+            depth,
+            state,
+        ) {
+            return format!("{source_context}\n{result}");
         }
 
         result
     }
 }
 
-fn get_source_locations<'a>(
-    source_map: &'a SourceMap,
+fn get_source_location(
+    source_map: &TolkSourceMap,
     cell: Option<&Cell>,
     offset: u16,
-) -> Option<Vec<&'a SourceLocation>> {
-    if let Some(cell) = cell {
-        let hash = cell.repr_hash().to_string().to_uppercase();
-        if let Some(marks) = source_map.debug_marks.get(&hash) {
-            let debug_ids: Vec<i32> = marks
-                .iter()
-                .filter_map(|OffsetAndId(mark_offset, debug_id)| {
-                    if mark_offset == &offset {
-                        Some(*debug_id)
-                    } else {
-                        None
+) -> Option<SourceLocation> {
+    let cell = cell?;
+    let hash = cell.repr_hash().to_string().to_uppercase();
+    source_map.find_source_loc(&hash, offset)
+}
+
+fn next_source_context(
+    opts: &FormatOptions,
+    cell: Option<&Cell>,
+    offset: Option<u16>,
+    offset_width: usize,
+    depth: usize,
+    state: &mut PrintState,
+) -> Option<String> {
+    let Some(source_map) = &opts.source_map else {
+        state.last_source_location = None;
+        return None;
+    };
+    let Some(offset) = offset else {
+        state.last_source_location = None;
+        return None;
+    };
+    let Some(location) = get_source_location(source_map, cell, offset) else {
+        state.last_source_location = None;
+        return None;
+    };
+
+    let key = SourceLocationKey::from(&location);
+    let should_render = state.last_source_location.as_ref() != Some(&key);
+    state.last_source_location = Some(key);
+
+    should_render.then(|| {
+        format_source_context(&location, &source_context_prefix(depth, opts, offset_width))
+    })
+}
+
+fn source_context_prefix(depth: usize, opts: &FormatOptions, offset_width: usize) -> String {
+    let mut prefix = String::new();
+    if opts.show_offsets {
+        prefix.push_str(&offset_padding(offset_width));
+    }
+    prefix.push_str(&"    ".repeat(depth));
+    prefix.push_str("// ");
+    prefix
+}
+
+fn format_source_context(location: &SourceLocation, prefix: &str) -> String {
+    use std::fmt::Write as _;
+
+    let mut result = String::new();
+    write!(result, "{prefix}{}", location.format()).ok();
+
+    if let Ok(content) = fs::read_to_string(&location.file) {
+        let lines: Vec<&str> = content.lines().collect();
+        if let Some((start_line_idx, end_line_idx)) = source_line_range(location, lines.len()) {
+            let line_number_width = (end_line_idx + 1).to_string().len();
+
+            for excerpt in source_excerpt_lines(start_line_idx, end_line_idx) {
+                match excerpt {
+                    SourceExcerptLine::Code(line_idx) => {
+                        let line_content = lines[line_idx];
+                        let pointer = format_range_pointer(
+                            location,
+                            line_idx,
+                            line_content,
+                            start_line_idx,
+                            end_line_idx,
+                        );
+                        let line_no = line_idx + 1;
+
+                        write!(
+                            result,
+                            "\n{prefix}{line_no:>line_number_width$} | {line_content}"
+                        )
+                        .ok();
+                        write!(result, "\n{prefix}{:>line_number_width$} | {pointer}", "").ok();
                     }
-                })
-                .collect();
-
-            if !debug_ids.is_empty() {
-                let locations: Vec<&SourceLocation> = debug_ids
-                    .iter()
-                    .filter_map(|debug_id| {
-                        source_map
-                            .high_level
-                            .locations
-                            .iter()
-                            .find(|loc| loc.idx == *debug_id)
-                            .map(|loc| &loc.loc)
-                    })
-                    .collect();
-
-                if !locations.is_empty() {
-                    return Some(locations);
+                    SourceExcerptLine::Ellipsis { omitted_lines } => {
+                        write!(
+                            result,
+                            "\n{prefix}{:>line_number_width$} | ... {omitted_lines} lines omitted ...",
+                            ".."
+                        )
+                        .ok();
+                    }
                 }
             }
         }
     }
-    None
+
+    result
 }
 
-fn format_source_context(location: &SourceLocation) -> Option<String> {
-    use std::fmt::Write as _;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SourceExcerptLine {
+    Code(usize),
+    Ellipsis { omitted_lines: usize },
+}
 
-    let content = fs::read_to_string(&location.file).ok()?;
-    let lines: Vec<&str> = content.lines().collect();
-
-    let line_idx = (location.line as usize).saturating_sub(1); // Convert to 0-based index
-    if line_idx >= lines.len() {
+fn source_line_range(location: &SourceLocation, total_lines: usize) -> Option<(usize, usize)> {
+    if total_lines == 0 {
         return None;
     }
 
-    let start_line = line_idx.saturating_sub(1);
-    let end_line = (line_idx + 2).min(lines.len());
-
-    let mut result = String::new();
-    write!(
-        result,
-        "{:<60} │  {}:{}:{}",
-        " ",
-        SourceLocation::normalize_path(&location.file),
-        location.line + 1,
-        location.column + 2
-    )
-    .ok();
-
-    for (i, line_content) in lines.iter().enumerate().take(end_line).skip(start_line) {
-        let line_num = i + 1;
-        write!(result, "\n{:>60} │  {:>3}: {}", "", line_num, line_content).ok();
-
-        if i == line_idx + 1 {
-            let cursor_pos = location.column as usize + 1;
-            write!(
-                result,
-                "\n{:>60} │  {:>3}  {}^",
-                "",
-                "",
-                " ".repeat(cursor_pos)
-            )
-            .ok();
-        }
+    let start_line_idx = location.line.saturating_sub(1) as usize;
+    if start_line_idx >= total_lines {
+        return None;
     }
 
-    result.push('\n');
+    let mut end_line_idx = if location.end_line > 0 {
+        location.end_line.saturating_sub(1) as usize
+    } else {
+        start_line_idx
+    };
+    end_line_idx = end_line_idx.clamp(start_line_idx, total_lines - 1);
 
-    Some(result)
+    Some((start_line_idx, end_line_idx))
+}
+
+fn source_excerpt_lines(start_line_idx: usize, end_line_idx: usize) -> Vec<SourceExcerptLine> {
+    let line_count = end_line_idx - start_line_idx + 1;
+    if line_count <= MAX_RENDERED_SOURCE_RANGE_LINES {
+        return (start_line_idx..=end_line_idx)
+            .map(SourceExcerptLine::Code)
+            .collect();
+    }
+
+    vec![
+        SourceExcerptLine::Code(start_line_idx),
+        SourceExcerptLine::Ellipsis {
+            omitted_lines: line_count - 2,
+        },
+        SourceExcerptLine::Code(end_line_idx),
+    ]
+}
+
+fn format_range_pointer(
+    location: &SourceLocation,
+    line_idx: usize,
+    line_content: &str,
+    start_line_idx: usize,
+    end_line_idx: usize,
+) -> String {
+    let line_len = line_content.len();
+    let start_col = if line_idx == start_line_idx {
+        normalize_column(location.column, line_len)
+    } else {
+        0
+    };
+    let end_col = if line_idx == end_line_idx {
+        normalize_column(location.end_column, line_len).max(start_col)
+    } else {
+        line_len
+    };
+    let start_col =
+        trim_leading_whitespace_within_range(line_content, start_col, end_col).unwrap_or(start_col);
+    let underline_len = end_col.saturating_sub(start_col).max(1);
+
+    format!("{}{}", " ".repeat(start_col), "^".repeat(underline_len))
+}
+
+pub(crate) fn offset_width_for(code: &Code) -> usize {
+    offset_width_from_slice(code.offsets.as_deref())
+}
+
+pub(crate) fn offset_padding(offset_width: usize) -> String {
+    format!("{}│ ", " ".repeat(offset_width))
+}
+
+fn push_offset_prefix(builder: &mut String, offset: Option<u16>, offset_width: usize) {
+    use std::fmt::Write as _;
+
+    if let Some(off) = offset {
+        write!(builder, "{off:<offset_width$}│ ").ok();
+    } else {
+        builder.push_str(&offset_padding(offset_width));
+    }
+}
+
+fn offset_width_from_slice(offsets: Option<&[u16]>) -> usize {
+    offsets
+        .and_then(|offsets| offsets.iter().max().copied())
+        .map_or(MIN_OFFSET_WIDTH, |offset| {
+            offset.to_string().len().max(MIN_OFFSET_WIDTH)
+        })
+}
+
+fn normalize_column(column: i64, line_len: usize) -> usize {
+    column.saturating_sub(1).clamp(0, line_len as i64) as usize
+}
+
+fn trim_leading_whitespace_within_range(
+    line_content: &str,
+    start_col: usize,
+    end_col: usize,
+) -> Option<usize> {
+    let safe_end = end_col.min(line_content.len());
+    if start_col >= line_content.len() {
+        return None;
+    }
+
+    if start_col < safe_end
+        && let Some(pos) = line_content[start_col..safe_end]
+            .char_indices()
+            .find_map(|(offset, ch)| (!ch.is_whitespace()).then_some(start_col + offset))
+    {
+        return Some(pos);
+    }
+
+    let safe_end = safe_end.min(line_content.len());
+    let is_leading_whitespace_range = line_content[..safe_end].chars().all(char::is_whitespace);
+    if !is_leading_whitespace_range {
+        return None;
+    }
+
+    line_content[safe_end..]
+        .char_indices()
+        .find_map(|(offset, ch)| (!ch.is_whitespace()).then_some(safe_end + offset))
 }
 
 impl ArgValue {
@@ -203,7 +358,7 @@ fn normalize_name(name: &str) -> String {
     }
 }
 
-fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
+fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions, offset_width: usize) -> String {
     let indent = "    ".repeat(depth);
     match arg {
         ArgValue::Control(c) => format!("{c}"),
@@ -217,6 +372,7 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
         } => {
             use std::fmt::Write as _;
 
+            let nested_offset_width = offset_width_for(code);
             let mut builder = String::new();
             builder.push('{');
             if opts.show_hashes {
@@ -229,14 +385,21 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
                 .ok();
             }
             builder.push('\n');
+            let mut nested_state = PrintState::default();
             for (i, instruction) in code.instructions.iter().enumerate() {
                 let instr_offset = code.offsets.as_ref().and_then(|offs| offs.get(i).copied());
-                builder.push_str(&instruction.print(depth + 1, opts, instr_offset));
+                builder.push_str(&instruction.print(
+                    depth + 1,
+                    opts,
+                    instr_offset,
+                    nested_offset_width,
+                    &mut nested_state,
+                ));
                 builder.push('\n');
             }
 
             if opts.show_offsets {
-                builder.push_str("    │ ");
+                builder.push_str(&offset_padding(nested_offset_width));
             }
 
             builder.push_str(&indent);
@@ -249,8 +412,9 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
             let mut builder = String::new();
             builder.push_str("[\n");
             for method in &dict.methods {
+                let method_offset_width = offset_width_from_slice(method.offsets.as_deref());
                 if opts.show_offsets {
-                    builder.push_str(OFFSET_PADDING);
+                    builder.push_str(&offset_padding(method_offset_width));
                 }
 
                 builder.push_str(&indent);
@@ -265,17 +429,24 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
                     .ok();
                 }
                 builder.push('\n');
+                let mut method_state = PrintState::default();
                 for (i, instruction) in method.instructions.iter().enumerate() {
                     let instr_offset = method
                         .offsets
                         .as_ref()
                         .and_then(|offs| offs.get(i).copied());
-                    builder.push_str(&instruction.print(depth + 2, opts, instr_offset));
+                    builder.push_str(&instruction.print(
+                        depth + 2,
+                        opts,
+                        instr_offset,
+                        method_offset_width,
+                        &mut method_state,
+                    ));
                     builder.push('\n');
                 }
 
                 if opts.show_offsets {
-                    builder.push_str(OFFSET_PADDING);
+                    builder.push_str(&offset_padding(method_offset_width));
                 }
 
                 builder.push_str("    ");
@@ -284,7 +455,7 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
             }
 
             if opts.show_offsets {
-                builder.push_str(OFFSET_PADDING);
+                builder.push_str(&offset_padding(offset_width));
             }
 
             builder.push_str(&indent);
@@ -310,5 +481,27 @@ fn format_slice(slice: &CellSlice<'_>) -> String {
             return String::new();
         };
         format!("boc{{{}}}", Boc::encode_hex(cell))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_context_prefix_uses_five_digit_offset_width() {
+        let code = Code {
+            instructions: Vec::new(),
+            offsets: Some(vec![0, 10_000]),
+        };
+        let opts = FormatOptions {
+            show_offsets: true,
+            ..FormatOptions::default()
+        };
+
+        let offset_width = offset_width_for(&code);
+
+        assert_eq!(offset_width, 5);
+        assert_eq!(source_context_prefix(0, &opts, offset_width), "     │ // ");
     }
 }

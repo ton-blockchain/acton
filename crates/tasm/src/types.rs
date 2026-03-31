@@ -1,4 +1,4 @@
-use crate::printer::FormatOptions;
+use crate::printer::{FormatOptions, PrintState, offset_width_for};
 use crate::spec::SpecInstruction;
 use num_bigint::{BigInt, BigUint};
 use std::fmt::Write;
@@ -63,17 +63,27 @@ impl Code {
     #[must_use]
     pub fn print(&self, options: &FormatOptions) -> String {
         let mut s = String::new();
+        let mut state = PrintState::default();
+        let offset_width = offset_width_for(self);
 
         if options.show_offsets {
-            s.write_str("off │ instruction\n").ok();
-            s.write_str("────┼───────────────────────────────────────\n")
-                .ok();
+            writeln!(s, "{:<offset_width$}│ instruction", "off").ok();
+            writeln!(
+                s,
+                "{}┼───────────────────────────────────────",
+                "─".repeat(offset_width)
+            )
+            .ok();
         }
 
         for (i, instruction) in self.instructions.iter().enumerate() {
             let offset = self.offsets.as_ref().and_then(|offs| offs.get(i).copied());
-            s.write_str(instruction.print(0, options, offset).as_str())
-                .ok();
+            s.write_str(
+                instruction
+                    .print(0, options, offset, offset_width, &mut state)
+                    .as_str(),
+            )
+            .ok();
             s.write_str("\n").ok();
         }
         s

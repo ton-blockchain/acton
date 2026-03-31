@@ -45,13 +45,33 @@ impl Network {
         })
     }
 
+    fn mainnet_toncenter_v2_url() -> String {
+        env_value("ACTON_TEST_TONCENTER_MAINNET_V2_URL")
+            .unwrap_or_else(|| "https://toncenter.com/api/v2".to_owned())
+    }
+
+    fn mainnet_toncenter_v3_url() -> String {
+        env_value("ACTON_TEST_TONCENTER_MAINNET_V3_URL")
+            .unwrap_or_else(|| "https://toncenter.com/api/v3".to_owned())
+    }
+
+    fn testnet_toncenter_v2_url() -> String {
+        env_value("ACTON_TEST_TONCENTER_TESTNET_V2_URL")
+            .unwrap_or_else(|| "https://testnet.toncenter.com/api/v2".to_owned())
+    }
+
+    fn testnet_toncenter_v3_url() -> String {
+        env_value("ACTON_TEST_TONCENTER_TESTNET_V3_URL")
+            .unwrap_or_else(|| "https://testnet.toncenter.com/api/v3".to_owned())
+    }
+
     pub fn toncenter_v3_url(
         &self,
         custom_networks: &HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<String> {
         match self {
-            Network::Mainnet => Ok("https://toncenter.com/api/v3".to_owned()),
-            Network::Testnet => Ok("https://testnet.toncenter.com/api/v3".to_owned()),
+            Network::Mainnet => Ok(Self::mainnet_toncenter_v3_url()),
+            Network::Testnet => Ok(Self::testnet_toncenter_v3_url()),
             Network::Localnet => Network::localnet_urls(custom_networks)?
                 .v3_url
                 .as_ref()
@@ -76,8 +96,8 @@ impl Network {
         custom_networks: &HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<String> {
         match self {
-            Network::Mainnet => Ok("https://toncenter.com/api/v2".to_owned()),
-            Network::Testnet => Ok("https://testnet.toncenter.com/api/v2".to_owned()),
+            Network::Mainnet => Ok(Self::mainnet_toncenter_v2_url()),
+            Network::Testnet => Ok(Self::testnet_toncenter_v2_url()),
             Network::Localnet => Ok(Network::localnet_urls(custom_networks)?.v2_url.to_string()),
             Network::Custom(name) => {
                 let Some(urls) = custom_networks.get(name.as_ref()) else {
@@ -87,6 +107,13 @@ impl Network {
             }
         }
     }
+}
+
+fn env_value(env_name: &str) -> Option<String> {
+    std::env::var(env_name)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 impl FromStr for Network {

@@ -56,7 +56,10 @@ get fun `test get executor config`() {
     val deployer = net.treasury("deployer");
     val res = net.send(deployer.address, deployMsg);
 
-    expect(res).toHaveSuccessfulDeploy({ from: deployer.address, to: getAddress.calculateAddress() });
+    expect(res).toHaveSuccessfulDeploy({
+        from: deployer.address,
+        to: getAddress.calculateAddress(),
+    });
 
     val firstRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
 
@@ -80,7 +83,8 @@ get fun `test current config`() {
     val gas = 100;
     val before = calculateForwardFeeLocal(BASECHAIN, gas, gas);
 
-    val priceBefore = ((vm.getC7().get(0) as tuple).get(9) as Config).getMsgForwardPrices(BASECHAIN)
+    val priceBefore = ((vm.getC7().get(0) as tuple).get(9) as Config)
+        .getMsgForwardPrices(BASECHAIN)
         .lumpPrice;
     var config = net.getConfig();
 
@@ -92,7 +96,8 @@ get fun `test current config`() {
     val result = net.setConfig(config);
     expect(result).toBeTrue();
 
-    val priceAfter = ((vm.getC7().get(0) as tuple).get(9) as Config).getMsgForwardPrices(BASECHAIN)
+    val priceAfter = ((vm.getC7().get(0) as tuple).get(9) as Config)
+        .getMsgForwardPrices(BASECHAIN)
         .lumpPrice;
     expect(priceBefore).toNotEqual(priceAfter);
 

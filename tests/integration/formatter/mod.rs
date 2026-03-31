@@ -126,6 +126,7 @@ import "../../lib/emulation/network"
 import "../../lib/io"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/big_array"
 import "../contracts/fm_linear_messages"
 
 fun deployFmLinearHarness() {
@@ -467,6 +468,7 @@ import "../../lib/emulation/network"
 import "../../lib/io"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/transaction"
 import "../contracts/fm_abi_mega_messages"
 
 fun deployFmAbiMegaHarness() {
@@ -1108,6 +1110,7 @@ const LETTER_ROLLOVER_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/io"
 import "../../lib/testing/expect"
+import "../../lib/types/big_array"
 "#;
 
 fn run_success_case(project: ProjectBuilder, snapshot_path: &str) {

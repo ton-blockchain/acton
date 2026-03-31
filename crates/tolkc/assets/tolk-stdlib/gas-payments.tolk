@@ -1,5 +1,5 @@
 // A part of standard library for Tolk
-tolk 1.2
+tolk 1.3
 
 /**
   Gas and payment related primitives.
@@ -68,7 +68,7 @@ fun contract.getStorageDuePayment(): coins
     asm "DUEPAYMENT"
 
 /// Returns the amount of nanotoncoins charged for storage.
-/// (during the storage phase preceding the current computation phase)
+/// (during storage phase preceeding to current computation phase)
 @pure
 fun contract.getStoragePaidPayment(): coins
     asm "STORAGEFEES"

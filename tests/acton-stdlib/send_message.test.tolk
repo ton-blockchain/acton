@@ -1,5 +1,5 @@
-import "@local-acton/emulation/network"
 import "@local-acton/build/build"
+import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
 import "contracts/types"
@@ -17,7 +17,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 
 fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
@@ -37,18 +37,16 @@ fun setupTest(): (Counter, Treasury) {
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
-        dest: {
-            stateInit: counter.init,
-        },
+        dest: { stateInit: counter.init },
     });
     val _res = net.send(deployer.address, msg);
     // expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
-    return (counter, deployer)
+    return (counter, deployer);
 }
 
 fun Counter.getCounter(self): int {
-    return net.runGetMethod(self.address, "currentCounter")
+    return net.runGetMethod(self.address, "currentCounter");
 }
 
 get fun `test-send-message`() {
@@ -133,7 +131,11 @@ get fun `test-failed-transaction`() {
         body: UnknownMessage {},
     });
     val res = net.send(deployer.address, msg);
-    expect(res).toHaveFailedTx({ from: deployer.address, to: counter.address, exitCode: 0xFFFF });
+    expect(res).toHaveFailedTx({
+        from: deployer.address,
+        to: counter.address,
+        exitCode: 0xFFFF,
+    });
     expect(counter.getCounter()).toEqual(0);
 }
 

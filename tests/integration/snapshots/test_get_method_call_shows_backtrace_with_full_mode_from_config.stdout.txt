@@ -13,7 +13,11 @@
       ├─ exit_code=10
       ├─ at contracts/simple[LINE]
       ├─ Backtrace:
-      │     __throw   at contracts/simple[LINE]
+      │     currentCounterFail   at contracts/simple[LINE]
+      ├─ Called from:
+      │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
+      │     net.runGetMethod<int,tuple>        at ../lib/emulation/network[LINE]
+      │     test-foo                           at tests/test.test[LINE]
       ├─ Description: Dictionary error
       └─ Phase: Compute phase
 

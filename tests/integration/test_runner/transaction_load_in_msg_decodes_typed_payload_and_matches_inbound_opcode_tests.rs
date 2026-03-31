@@ -7,6 +7,7 @@ const DA_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
+import "../../lib/tlb/maybe"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
 
@@ -63,13 +64,13 @@ get fun `test-da-stdlib-transaction-load-in-msg-inline-opcode`() {
     expect(inMsg.info.dest).toEqual(destination);
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
-    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>());
+    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);
     expect(genericInMsg.info.src).toEqual(sender.address as any_address);
     expect(genericInMsg.info.dest).toEqual(destination);
 
     var rawBody = genericInMsg.body;
     expect(rawBody.loadBool()).toBeFalse();
-    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DaInlinePayload>());
+    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);
 }
 "#,
         "integration/snapshots/test-runner/transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode/transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode.stdout.txt",
@@ -108,13 +109,13 @@ get fun `test-da-stdlib-transaction-load-in-msg-fixture-opcode`() {
     expect(inMsg.info.dest).toEqual(destination);
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
-    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>());
+    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);
     expect(genericInMsg.info.src).toEqual(sender.address as any_address);
     expect(genericInMsg.info.dest).toEqual(destination);
 
     var rawBody = genericInMsg.body;
     expect(rawBody.loadBool()).toBeFalse();
-    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DaInlinePayload>());
+    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);
 }
 "#
     );

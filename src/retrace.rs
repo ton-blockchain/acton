@@ -1,9 +1,9 @@
-use crate::vmtrace;
-use crate::vmtrace::SkipBlocksMode;
+use crate::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
 pub use retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
-use ton_source_map::{DebugLocation, SourceLocation, SourceMap};
+use tolkc::TolkSourceMap;
+use ton_source_map::{DebugLocation, SourceLocation};
 use vmlogs::parser::VmLine;
 
 #[derive(Debug)]
@@ -13,91 +13,177 @@ pub struct ExceptionInfo {
     pub backtrace: Vec<DebugLocation>,
 }
 
+#[derive(Debug, Clone)]
+pub struct TolkBacktraceFrame {
+    pub function_name: String,
+    pub loc: SourceLocation,
+}
+
+#[derive(Debug, Clone)]
+pub struct TolkTraceInfo {
+    pub loc: SourceLocation,
+    pub backtrace: Vec<TolkBacktraceFrame>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TolkExceptionInfo {
+    pub errno: String,
+    pub description: String,
+    pub loc: SourceLocation,
+    pub backtrace: Vec<TolkBacktraceFrame>,
+}
+
 #[must_use]
-pub fn find_exception_info(vm_logs: &str, source_map: &SourceMap) -> Option<ExceptionInfo> {
-    let lines = vmlogs::parser::parse_lines(vm_logs);
-
-    let exception = lines
+pub fn find_exception_info(
+    vm_logs: &str,
+    tolk_source_map: &TolkSourceMap,
+) -> Option<TolkExceptionInfo> {
+    let source_map = &tolk_source_map.source_map;
+    let marks_dict = tolk_source_map.marks_dict.as_deref()?;
+    let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+    let description = vm_lines
         .iter()
-        .rfind(|line| matches!(line, Ok(VmLine::VmException { .. })));
-    let description = match exception {
-        Some(Ok(VmLine::VmException { message, .. })) => (*message).to_string(),
-        _ => String::new(),
-    };
+        .rfind(|line| matches!(line, Ok(VmLine::VmException { .. })))
+        .and_then(|line| match line {
+            Ok(VmLine::VmException { message, .. }) => Some((*message).to_string()),
+            _ => None,
+        })
+        .unwrap_or_default();
+    let mut replayer = TolkReplayer::new(source_map.clone(), marks_dict, &vm_lines);
+    replayer.set_exception_breakpoints(ExceptionBreakMode::Uncaught);
 
-    let location = lines
-        .iter()
-        .rfind(|line| matches!(line, Ok(VmLine::VmLoc { .. })));
+    while !replayer.is_finished() {
+        replayer.step(StepMode::StepInto);
 
-    let (hash, offset) = match location {
-        Some(Ok(VmLine::VmLoc { hash, offset })) => {
-            ((*hash).to_string(), offset.parse().unwrap_or(0))
+        let Some(exception) = replayer.last_exception() else {
+            continue;
+        };
+        if !exception.is_uncaught {
+            continue;
         }
-        _ => (String::new(), 0),
-    };
 
-    let loc = find_source_loc(source_map, &hash, offset);
+        let loc = to_source_location(
+            source_map,
+            replayer.current_file_id(),
+            replayer.current_line(),
+            replayer.current_column(),
+        );
 
-    let backtrace = find_backtrace(source_map, lines);
+        return Some(TolkExceptionInfo {
+            errno: exception.errno.clone(),
+            description,
+            backtrace: find_backtrace(source_map, &replayer.call_stack(), &loc),
+            loc,
+        });
+    }
 
-    Some(ExceptionInfo {
-        description,
+    None
+}
+
+#[must_use]
+pub fn find_execution_trace(
+    vm_logs: &str,
+    tolk_source_map: &TolkSourceMap,
+) -> Option<TolkTraceInfo> {
+    let source_map = &tolk_source_map.source_map;
+    let marks_dict = tolk_source_map.marks_dict.as_deref()?;
+    let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+    let mut replayer = TolkReplayer::new(source_map.clone(), marks_dict, &vm_lines);
+
+    while !replayer.is_finished() {
+        replayer.step(StepMode::StepInto);
+    }
+
+    let loc = to_source_location(
+        source_map,
+        replayer.current_file_id(),
+        replayer.current_line(),
+        replayer.current_column(),
+    );
+    if loc.line == 0 && loc.column == 0 && replayer.call_stack().is_empty() {
+        return None;
+    }
+
+    Some(TolkTraceInfo {
+        backtrace: find_backtrace(source_map, &replayer.call_stack(), &loc),
         loc,
-        backtrace,
     })
 }
 
 fn find_backtrace(
-    source_map: &SourceMap,
-    lines: Vec<Result<VmLine, String>>,
-) -> Vec<DebugLocation> {
-    let execution_path =
-        vmtrace::build_vm_trace_from_lines(lines, source_map, SkipBlocksMode::None);
+    source_map: &tolkc::SourceMap,
+    call_stack: &[CallFrameInfo],
+    current_loc: &SourceLocation,
+) -> Vec<TolkBacktraceFrame> {
+    let mut frames = Vec::new();
 
-    let mut stack = vec![];
+    for idx in (0..call_stack.len()).rev() {
+        let frame = &call_stack[idx];
+        let loc = if idx + 1 == call_stack.len() {
+            Some(current_loc.clone())
+        } else {
+            call_stack[idx + 1]
+                .call_site_loc
+                .as_ref()
+                .map(|range| src_range_to_source_location(source_map, range))
+        };
 
-    for step in &execution_path {
-        if step.context.event == Some("EnterFunction".to_string())
-            || step.context.event == Some("EnterInlinedFunction".to_string())
-        {
-            if step.context.event_function.is_none() {
-                continue;
-            }
-
-            stack.push(step);
-        }
-        if step.context.event == Some("AfterFunctionCall".to_string())
-            || step.context.event == Some("LeaveInlinedFunction".to_string())
-        {
-            let event_function = &step.context.event_function;
-
-            let Some(last) = stack.last() else {
-                continue;
-            };
-
-            if last.context.event_function == *event_function {
-                stack.pop();
-            }
+        if let Some(loc) = loc {
+            frames.push(TolkBacktraceFrame {
+                function_name: frame.f_name.clone(),
+                loc,
+            });
         }
     }
-    stack.iter().map(|loc| (**loc).clone()).collect::<Vec<_>>()
+
+    frames
+}
+
+fn src_range_to_source_location(
+    source_map: &tolkc::SourceMap,
+    range: &tolkc::source_map::SrcRange,
+) -> SourceLocation {
+    to_source_location(
+        source_map,
+        range.file_id(),
+        range.start_line(),
+        range.start_col(),
+    )
+}
+
+fn to_source_location(
+    source_map: &tolkc::SourceMap,
+    file_id: usize,
+    line: usize,
+    column: usize,
+) -> SourceLocation {
+    let file = source_map
+        .resolve_file_full_path(file_id)
+        .unwrap_or_else(|| source_map.resolve_file_name(file_id))
+        .to_owned();
+
+    SourceLocation {
+        file,
+        line: line as i64,
+        column: column as i64,
+        end_line: line as i64,
+        end_column: column as i64,
+        length: 0,
+    }
 }
 
 #[must_use]
-pub fn find_source_loc(source_map: &SourceMap, hash: &str, offset: u16) -> Option<SourceLocation> {
-    if source_map.high_level.locations.is_empty() {
+pub fn find_source_loc(
+    tolk_source_map: &TolkSourceMap,
+    hash: &str,
+    offset: u16,
+) -> Option<SourceLocation> {
+    if tolk_source_map.source_map.is_empty() {
         // `--backtrace full` is not enabled
         return None;
     }
 
-    let locs = vmtrace::low_level_loc_to_debug_locations(
-        source_map,
-        hash,
-        offset,
-        SkipBlocksMode::None,
-        true,
-    )?;
-    locs.last().map(|l| l.loc.clone())
+    tolk_source_map.find_source_loc(hash, offset)
 }
 
 #[must_use]

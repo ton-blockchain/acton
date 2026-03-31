@@ -107,55 +107,21 @@ Given `[a b]` and `[c d]`, returns `[a b c d]`.
 
 ```tolk
 @pure
-fun createEmptyList(): tuple
+@deprecated("use `[]` instead of `createEmptyList`")
+fun createEmptyList<T>(): lisp_list<T>
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L107" />
+Creates a lisp_list\<T> with zero elements.
+Deprecated. Use `[]` syntax instead:
+```
+// old way, deprecated:
+var list = createEmptyList<int>();
 
-## `listPrepend`
-
-```tolk
-@pure
-fun listPrepend<X>(head: X, tail: tuple?): tuple
+// new way, preferred:
+var t = lisp_list<int> [];
 ```
 
-Adds an element to the beginning of lisp-style list.
-Note, that it does not mutate the list: instead, it returns a new one (it's a lisp pattern).
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L113" />
-
-## `listSplit`
-
-```tolk
-@pure
-fun listSplit<X>(list: tuple): (X, tuple?)
-```
-
-Extracts the head and the tail of lisp-style list.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L118" />
-
-## `listGetHead`
-
-```tolk
-@pure
-fun listGetHead<X>(list: tuple): X
-```
-
-Returns the head of lisp-style list.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L123" />
-
-## `listGetTail`
-
-```tolk
-@pure
-fun listGetTail(list: tuple): tuple?
-```
-
-Returns the tail of lisp-style list.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L128" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L112" />
 
 ## `lisp_list<T>.packToBuilder`
 
@@ -167,7 +133,7 @@ fun lisp_list<T>.packToBuilder(self, mutate b: builder): void
 A list `[1 2 3]` (on a stack: `[1 [2 [3 null]]]`) is "3.ref(2.ref(1.ref(empty cell)))".
 An empty list `[]` (on a stack: `null`) is "empty cell"
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L136" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L121" />
 
 ## `lisp_list<T>.unpackFromSlice`
 
@@ -178,5 +144,5 @@ fun lisp_list<T>.unpackFromSlice(mutate s: slice): lisp_list<T>
 Unserialize `lisp_list<T>` from snake refs:
 From "3.ref(2.ref(1.ref(empty cell)))" get a list `[1 2 3]` (on a stack: `[1 [2 [3 null]]]`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L147" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/lisp-lists.tolk#L132" />
 

@@ -47,5 +47,5 @@ get fun currentCounter(): int {
 }
 
 get fun currentCounter2(arg: int): int {
-    return arg
+    return arg;
 }

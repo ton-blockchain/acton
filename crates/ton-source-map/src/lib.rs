@@ -90,17 +90,13 @@ impl SourceLocation {
 
     #[must_use]
     pub fn format_full(&self) -> String {
-        format!(
-            "{}:{}:{}",
-            Self::normalize_temp_name(&self.file),
-            self.line,
-            self.column
-        )
+        let file = &self.file;
+        format!("{}:{}:{}", file, self.line, self.column)
     }
 
     #[must_use]
     pub fn normalize_path(file: &str) -> String {
-        let normalized = Self::normalize_temp_name(file);
+        let normalized = file.to_owned();
 
         if let Ok(cwd) = std::env::current_dir()
             && let Some(relative) = pathdiff::diff_paths(&normalized, cwd)
@@ -109,10 +105,6 @@ impl SourceLocation {
         }
 
         normalized
-    }
-
-    fn normalize_temp_name(file: &str) -> String {
-        file.replace(".test.tolk.test.tolk", ".test.tolk")
     }
 
     pub fn parse(s: &str) -> anyhow::Result<Option<Self>> {

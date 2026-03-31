@@ -1,11 +1,11 @@
-tolk 1.2.0
+tolk 1.3.0
 
 import "@stdlib/gas-payments"
 
 const DEFAULT_DURATION = 3600 * 24 * 365 * 1 // 1 year, can top-up in any time
 
 fun contract.setLibraryCode(code: cell, mode: int): void
-    asm "SETLIBCODE";
+    asm "SETLIBCODE"
 
 fun onInternalMessage(in: InMessage) {
     val libraryCode = contract.getData();
@@ -14,8 +14,8 @@ fun onInternalMessage(in: InMessage) {
     val (libraryRefs, libraryBits, _) = libraryCode.calculateSizeStrict(2048);
     val gasConsumedForCalculation = getGasConsumedAtTheMoment() - gasConsumedBeforeCalculation;
 
-    val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation)
-    + calculateStorageFee(MASTERCHAIN, DEFAULT_DURATION, libraryBits, libraryRefs);
+    val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation) +
+    calculateStorageFee(MASTERCHAIN, DEFAULT_DURATION, libraryBits, libraryRefs);
 
     reserveToncoinsOnBalance(toReserve, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 

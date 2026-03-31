@@ -2,6 +2,18 @@ use acton::stdlib::ensure_latest;
 use std::fs;
 use tempfile::TempDir;
 
+fn expected_stdlib_version() -> String {
+    if acton::build_info::RELEASE_CHANNEL == "trunk" {
+        format!(
+            "{}-trunk+{}",
+            acton::build_info::PACKAGE_VERSION,
+            acton::build_info::GIT_HASH
+        )
+    } else {
+        acton::build_info::PACKAGE_VERSION.to_owned()
+    }
+}
+
 #[test]
 fn test_stdlib_ensure_latest_creates_dir() {
     let temp_dir = TempDir::new().unwrap();
@@ -22,7 +34,7 @@ fn test_stdlib_ensure_latest_creates_dir() {
     assert!(acton_dir.join(".version").exists());
 
     let version = fs::read_to_string(acton_dir.join(".version")).unwrap();
-    assert_eq!(version.trim(), env!("CARGO_PKG_VERSION"));
+    assert_eq!(version.trim(), expected_stdlib_version());
 
     // check if some standard files exist
     assert!(acton_dir.join("testing/assert.tolk").exists());
@@ -52,7 +64,7 @@ fn test_stdlib_ensure_latest_updates_on_version_mismatch() {
     ensure_latest(project_root).expect("Failed to ensure latest stdlib");
 
     let version = fs::read_to_string(acton_dir.join(".version")).unwrap();
-    assert_eq!(version.trim(), env!("CARGO_PKG_VERSION"));
+    assert_eq!(version.trim(), expected_stdlib_version());
 
     let content = fs::read_to_string(&test_file).unwrap();
     assert_ne!(content, "old content"); // should be overwritten by extract
@@ -81,8 +93,8 @@ fn test_stdlib_ensure_latest_no_update_if_version_matches() {
     .unwrap();
     fs::create_dir_all(&acton_dir).unwrap();
 
-    let current_version = env!("CARGO_PKG_VERSION");
-    fs::write(acton_dir.join(".version"), current_version).unwrap();
+    let current_version = expected_stdlib_version();
+    fs::write(acton_dir.join(".version"), &current_version).unwrap();
 
     // create a "canary" file that is NOT in the real stdlib
     let canary_path = acton_dir.join("canary.txt");
@@ -105,4 +117,34 @@ fn test_stdlib_ensure_latest_no_update_if_version_matches() {
 
     // canary should still be there
     assert!(canary_path.exists());
+}
+
+#[test]
+fn test_stdlib_ensure_latest_updates_legacy_trunk_marker_without_git_hash() {
+    let temp_dir = TempDir::new().unwrap();
+    let project_root = temp_dir.path();
+    let acton_dir = project_root.join(".acton");
+
+    fs::write(
+        project_root.join("Acton.toml"),
+        "[package]\nname = \"test\"",
+    )
+    .unwrap();
+    fs::create_dir_all(&acton_dir).unwrap();
+
+    let current_version = expected_stdlib_version();
+    let legacy_trunk_version = format!("{}-trunk", env!("CARGO_PKG_VERSION"));
+    fs::write(acton_dir.join(".version"), legacy_trunk_version).unwrap();
+
+    let test_file = acton_dir.join("testing/assert.tolk");
+    fs::create_dir_all(test_file.parent().unwrap()).unwrap();
+    fs::write(&test_file, "old content").unwrap();
+
+    ensure_latest(project_root).expect("Failed to ensure latest stdlib");
+
+    let version = fs::read_to_string(acton_dir.join(".version")).unwrap();
+    assert_eq!(version.trim(), current_version);
+
+    let content = fs::read_to_string(&test_file).unwrap();
+    assert_ne!(content, "old content");
 }

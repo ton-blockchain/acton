@@ -26,6 +26,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
+use tolkc::TolkSourceMap;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -35,7 +36,7 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::{SourceLocation, SourceMap};
+use ton_source_map::SourceMap;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -152,13 +153,20 @@ fn run_script_file(
         tolkc::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
+            let source_map = Arc::new(result.source_map.unwrap_or_default());
+            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                result.new_source_map.unwrap_or_default(),
+                &code_cell,
+                result.debug_mark_base64.as_deref(),
+            )?);
 
             execute_script(
                 &code_cell,
                 &data_cell,
                 stack,
                 Arc::new(abi),
-                result.source_map.unwrap_or_default().into(),
+                source_map,
+                tolk_source_map,
                 debug,
                 backtrace,
                 debug_listener,
@@ -181,7 +189,7 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    source_map: Arc<SourceMap>,
+    tolk_source_map: Arc<TolkSourceMap>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -191,6 +199,7 @@ fn execute_script(
     stack: Tuple,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
+    tolk_source_map: Arc<TolkSourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -307,7 +316,7 @@ fn execute_script(
         let mut dbg_ctx = DebugContext::new(
             transport,
             AnyExecutor::Get(executor.clone()),
-            source_map.clone(),
+            source_map,
             "main".into(),
         );
 
@@ -318,7 +327,13 @@ fn execute_script(
         ctx.debug.ctx().process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
-        print_script_result(&ctx, ScriptResult { result, source_map });
+        print_script_result(
+            &ctx,
+            ScriptResult {
+                result,
+                tolk_source_map,
+            },
+        );
         return Ok(());
     }
 
@@ -327,7 +342,13 @@ fn execute_script(
 
     let stack = Boc::encode_base64(serialize_tuple(&stack)?);
     let result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
-    print_script_result(&ctx, ScriptResult { result, source_map });
+    print_script_result(
+        &ctx,
+        ScriptResult {
+            result,
+            tolk_source_map,
+        },
+    );
     Ok(())
 }
 
@@ -337,7 +358,7 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
             let exit_code = success_result.vm_exit_code;
 
             if exit_code != 0 {
-                print_nonzero_script_exit_code(ctx, success_result, &result.source_map, exit_code);
+                print_nonzero_script_exit_code(ctx, success_result, &result, exit_code);
 
                 if let Some(assert_failure) = ctx.asserts.assert_failure.as_ref() {
                     let formatter = FormatterContext::from_context(ctx);
@@ -381,7 +402,7 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
 fn print_nonzero_script_exit_code(
     ctx: &Context<'_>,
     result: &GetMethodResultSuccess,
-    source_map: &SourceMap,
+    script_result: &ScriptResult,
     exit_code: i32,
 ) {
     if exit_code == ASSERTION_FAILED_EXIT_CODE {
@@ -393,7 +414,7 @@ fn print_nonzero_script_exit_code(
         exit_code.to_string().yellow(),
     );
 
-    let details = format_nonzero_script_exit_code_details(ctx, result, source_map, exit_code);
+    let details = format_nonzero_script_exit_code_details(ctx, result, script_result, exit_code);
     if !details.is_empty() {
         println!("{details}");
     }
@@ -402,38 +423,28 @@ fn print_nonzero_script_exit_code(
 fn format_nonzero_script_exit_code_details(
     ctx: &Context<'_>,
     result: &GetMethodResultSuccess,
-    source_map: &SourceMap,
+    script_result: &ScriptResult,
     exit_code: i32,
 ) -> String {
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
-    let exit_code_info = retrace::find_exception_info(&result.vm_log, source_map);
+    let exit_code_info =
+        retrace::find_exception_info(&result.vm_log, &script_result.tolk_source_map);
 
     if let Some(info) = &exit_code_info {
-        if let Some(loc) = &info.loc {
-            writeln!(
-                details,
-                "at {}:{}:{}",
-                SourceLocation::normalize_path(&loc.file),
-                loc.line + 1,
-                loc.column + 2
-            )
-            .ok();
+        writeln!(
+            details,
+            "at {}",
+            FormatterContext::format_location(&info.loc)
+        )
+        .ok();
 
-            let backtrace_lines = FormatterContext::format_backtrace(&info.backtrace);
-            if !backtrace_lines.is_empty() {
-                writeln!(details, "Backtrace:").ok();
-                for line in backtrace_lines {
-                    writeln!(details, "  {line}").ok();
-                }
+        let backtrace_lines = FormatterContext::format_backtrace(&info.backtrace);
+        if !backtrace_lines.is_empty() {
+            writeln!(details, "Backtrace:").ok();
+            for line in backtrace_lines {
+                writeln!(details, "  {line}").ok();
             }
-        } else if formatter.backtrace.is_none() {
-            writeln!(
-                details,
-                "Re-run with {} to get more information",
-                "--backtrace full".yellow()
-            )
-            .ok();
         }
 
         if !info.description.is_empty() {
@@ -522,7 +533,7 @@ fn parse_stack_args(args: Vec<String>) -> anyhow::Result<Tuple> {
     Ok(Tuple(items).unwrap_tuple())
 }
 
-fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<TupleItem> {
+fn convert_vm_value_to_tuple_item(value: VmStackValue) -> anyhow::Result<TupleItem> {
     match value {
         VmStackValue::Null => Ok(TupleItem::Null),
         VmStackValue::NaN => Ok(TupleItem::Nan),
@@ -549,12 +560,12 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
         VmStackValue::Continuation(_) => {
             Err(anyhow!("Continuation not supported in script arguments"))
         }
-        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(s)?)),
+        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(&s)?)),
         VmStackValue::Unknown => Err(anyhow!("Unknown stack value type")),
     }
 }
 
-fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<Cell> {
+fn convert_cell_like(cell_like: CellLike) -> anyhow::Result<Cell> {
     match cell_like {
         CellLike::Cell(hex) => Ok(Boc::decode_hex(hex)?),
         CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),

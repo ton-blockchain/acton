@@ -15,7 +15,6 @@
            queryId: 88
            ├── Compute phase failed: Dictionary error
            ├── at contracts/fm_flags[LINE]
-           │      __throw             at contracts/fm_flags[LINE]
            │      onInternalMessage   at contracts/fm_flags[LINE]
            └── account created
 

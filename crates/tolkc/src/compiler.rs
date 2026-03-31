@@ -1,18 +1,18 @@
 #![allow(unsafe_code)]
 use crate::abi::ContractABI;
-use anyhow::Context;
 use dunce;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
-use std::ffi::{CStr, CString, c_char, c_int};
+use std::collections::BTreeMap;
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::fs;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
-use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
+use std::ptr::null_mut;
+use ton_source_map::SourceMap;
 
 thread_local! {
     static CURRENT_MAPPINGS: RefCell<FxHashMap<String, String>> = RefCell::new(FxHashMap::default());
@@ -72,6 +72,8 @@ pub struct Compiler {
     pub with_stack_comments: bool,
     /// Show comments with Tolk source file references in Fift code.
     pub with_src_line_comments: bool,
+    /// Allow compilation without a contract entrypoint.
+    pub allow_no_entrypoint: bool,
     /// Mappings for paths (e.g. "@core" -> "/path/to/core")
     pub mappings: FxHashMap<String, String>,
 }
@@ -83,8 +85,15 @@ impl Compiler {
             opt_level,
             with_stack_comments: true,
             with_src_line_comments: true,
+            allow_no_entrypoint: false,
             mappings: FxHashMap::default(),
         }
+    }
+
+    #[must_use]
+    pub const fn with_allow_no_entrypoint(mut self, allow_no_entrypoint: bool) -> Self {
+        self.allow_no_entrypoint = allow_no_entrypoint;
+        self
     }
 
     /// Sets mapping that will be used to resolve imports paths.
@@ -121,20 +130,13 @@ impl Compiler {
 
         match result {
             Ok(CompilerInternalResult::Success(result)) => {
-                let debug_marks = if with_debug_info {
-                    parse_marks_dict(&result.debug_mark_base64, &result.code_boc64)
-                        .unwrap_or_default()
-                } else {
-                    HashMap::new()
-                };
                 CompilerResult::Success(CompilerResultSuccess {
                     fift_code: result.fift_code,
                     code_boc64: result.code_boc64,
                     code_hash_hex: result.code_hash_hex,
-                    source_map: result.source_map.map(|source_map| SourceMap {
-                        high_level: source_map,
-                        debug_marks,
-                    }),
+                    debug_mark_base64: result.debug_mark_base64,
+                    source_map: None,
+                    new_source_map: result.source_maps_json,
                     abi: result.abi,
                 })
             }
@@ -163,6 +165,7 @@ impl Compiler {
             collect_source_map: with_debug_info,
             json_errors: check_only,
             check_only,
+            allow_no_entrypoint: self.allow_no_entrypoint,
         })
         .expect("Critical error, cannot serializer path to JSON, should not happen");
 
@@ -173,6 +176,7 @@ impl Compiler {
                 data_ptr: *const c_char,
                 dest_contents: *mut *mut c_char,
                 dest_error: *mut *mut c_char,
+                _callback_payload: *mut c_void,
             ) {
                 fn fail_if_symlink(path: &Path) -> Result<(), String> {
                     match fs::symlink_metadata(path) {
@@ -318,7 +322,7 @@ impl Compiler {
 
             let config_cstr =
                 CString::new(config).expect("Cannot convert JSON to CString, should not happen");
-            tolk_compile(config_cstr.as_ptr(), Some(read_callback))
+            tolk_compile(config_cstr.as_ptr(), Some(read_callback), null_mut())
         };
 
         // SAFETY: we assume that `compilation_result` is valid C string
@@ -329,7 +333,7 @@ impl Compiler {
         };
 
         let result = serde_json::from_str::<TBody>(&compilation_result_str)
-            .context("cannot parse JSON result from compiler")?;
+            .map_err(|error| anyhow::anyhow!("cannot parse JSON result from compiler: {error}"))?;
         Ok(result)
     }
 }
@@ -350,6 +354,8 @@ pub struct CompilerConfig {
     pub check_only: bool,
     #[serde(rename = "jsonErrors")]
     pub json_errors: bool,
+    #[serde(rename = "allowNoEntrypoint")]
+    pub allow_no_entrypoint: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -364,7 +370,9 @@ pub struct CompilerResultSuccess {
     pub fift_code: String,
     pub code_boc64: String,
     pub code_hash_hex: String,
+    pub debug_mark_base64: Option<String>,
     pub source_map: Option<SourceMap>,
+    pub new_source_map: Option<crate::source_map::SourceMap>,
     pub abi: Option<ContractABI>,
 }
 
@@ -384,12 +392,14 @@ pub struct CompilerInternalResultSuccess {
     pub code_boc64: String,
     #[serde(rename = "codeHashHex")]
     pub code_hash_hex: String,
-    #[serde(rename = "debugMarkBase64")]
-    pub debug_mark_base64: String,
-    #[serde(rename = "sourceMap")]
-    pub source_map: Option<HighLevelSourceMap>,
+    #[serde(rename = "debugMarkBase64", default)]
+    pub debug_mark_base64: Option<String>,
+    #[serde(rename = "sourceMapsJson")]
+    pub source_maps_json: Option<crate::source_map::SourceMap>,
     #[serde(rename = "abiJson")]
     pub abi: Option<ContractABI>,
+    #[serde(rename = "tolkVersion")]
+    pub tolk_version: Option<String>,
     #[serde(rename = "stderr")]
     pub stderr: Option<String>,
 }
@@ -453,6 +463,7 @@ unsafe extern "C" {
     pub fn tolk_compile(
         config_json: *const ::std::os::raw::c_char,
         callback: WasmFsReadCallback,
+        callback_payload: *mut c_void,
     ) -> *const ::std::os::raw::c_char;
 }
 
@@ -462,6 +473,7 @@ type WasmFsReadCallback = Option<
         data: *const ::std::os::raw::c_char,
         dest_contents: *mut *mut ::std::os::raw::c_char,
         dest_error: *mut *mut ::std::os::raw::c_char,
+        callback_payload: *mut c_void,
     ),
 >;
 

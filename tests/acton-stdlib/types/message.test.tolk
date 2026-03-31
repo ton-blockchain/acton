@@ -1,11 +1,13 @@
 import "@stdlib/reflection"
-import "@local-acton/types/message"
-import "@local-acton/types/out_actions"
 import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/outlist_expect"
 import "@local-acton/tlb/either"
 import "@local-acton/tlb/maybe"
+import "@local-acton/types/message"
+import "@local-acton/types/message"
+import "@local-acton/types/out_actions"
+import "@local-acton/types/out_actions"
 import "@local-acton/vm/vm"
 
 struct (0x7e8764ef) IncreaseCounter {
@@ -50,7 +52,10 @@ get fun `test-load-opcode`() {
         bounce: false,
         value: ton("1.9999"),
         dest,
-        body: IncreaseCounter { queryId: 0, increaseBy: 1 },
+        body: IncreaseCounter {
+            queryId: 0,
+            increaseBy: 1,
+        },
     });
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
     val out_actions = vm.outActions();
@@ -60,7 +65,7 @@ get fun `test-load-opcode`() {
     if (action is OutActionSendMessage) {
         val message = action.loadGenericMessage();
         val opcode = message.loadOpcode();
-        expect(opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>());
+        expect(opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>().0);
     }
 }
 
@@ -69,8 +74,11 @@ get fun `test-load-opcode-for-bounced-message`() {
     val msg = createMessage({
         bounce: false,
         value: ton("1.9999"),
-        dest: dest,
-        body: beginCell().storeUint(0xFFFFFFFF, 32).storeUint(reflect.serializationPrefixOf<IncreaseCounter>(), 32).endCell(),
+        dest,
+        body: beginCell()
+            .storeUint(0xFFFFFFFF, 32)
+            .storeUint(reflect.serializationPrefixOf<IncreaseCounter>().0, 32)
+            .endCell(),
     });
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
     val out_actions = vm.outActions();
@@ -83,7 +91,7 @@ get fun `test-load-opcode-for-bounced-message`() {
         expect(opcode).toEqual(0xFFFFFFFF);
 
         val actual_opcode = message.loadOpcode(true);
-        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>());
+        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>().0);
     }
 }
 
@@ -111,7 +119,7 @@ get fun `test-load-body-from-inline-and-ref`() {
 }
 
 get fun `test-load-opcode-from-inline-and-ref-body`() {
-    val opcode = reflect.serializationPrefixOf<IncreaseCounter>();
+    val opcode = reflect.serializationPrefixOf<IncreaseCounter>().0;
 
     val inlineMessage = MessageRelaxedGeneric {
         info: internalInfo(),

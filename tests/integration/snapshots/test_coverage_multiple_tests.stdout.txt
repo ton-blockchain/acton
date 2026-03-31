@@ -18,7 +18,7 @@
 ──────────────────────────────────────────────────────────────
  File                   Covered Lines   Total Lines   % Lines 
 ──────────────────────────────────────────────────────────────
- All files                          3             4     75.0% 
- code/calculator.tolk               3             4     75.0% 
+ All files                          2             3     66.7% 
+ code/calculator.tolk               2             3     66.7% 
 
 Text coverage file saved in coverage.txt

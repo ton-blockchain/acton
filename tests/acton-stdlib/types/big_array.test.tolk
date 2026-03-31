@@ -1,5 +1,5 @@
-import "@local-acton/types/big_array"
 import "@local-acton/testing/expect"
+import "@local-acton/types/big_array"
 
 fun createFilledBigArray(size: int): BigArray<int> {
     var big = BigArray<int>.createEmpty();

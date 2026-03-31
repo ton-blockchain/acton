@@ -197,10 +197,11 @@ const TOLK_GRAMMAR = {
         ),
 
     annotation_list: $ => repeat1($.annotation),
+    annotation_name: _ => /[a-zA-Z0-9_.]+/,
     annotation: $ =>
         seq(
             "@",
-            optional(field("name", $.identifier)),
+            optional(field("name", $.annotation_name)),
             optional(field("arguments", $.annotation_arguments)),
         ),
 

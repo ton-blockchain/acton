@@ -1,6 +1,7 @@
-import "@local-acton/emulation/network"
 import "@local-acton/build/build"
+import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
+import "@local-acton/types/big_array"
 import "contracts/tick_tock_types"
 
 struct TickTockContract {
@@ -10,16 +11,22 @@ struct TickTockContract {
 fun TickTockContract.deploy(): TickTockContract {
     val init = ContractState {
         code: build("TickTock", "tests/acton-stdlib/contracts/tick_tock.tolk"),
-        data: TickTockStorage { tickCount: 0, tockCount: 0 }.toCell(),
+        data: TickTockStorage {
+            tickCount: 0,
+            tockCount: 0,
+        }.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
     val deployer = net.treasury("deployer");
-    net.send(deployer.address, createMessage({
-        bounce: false,
-        value: ton("1"),
-        dest: { stateInit: init },
-    }));
+    net.send(
+        deployer.address,
+        createMessage({
+            bounce: false,
+            value: ton("1"),
+            dest: { stateInit: init },
+        }),
+    );
 
     return TickTockContract { address };
 }

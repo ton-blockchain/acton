@@ -75,7 +75,8 @@ pub fn language() -> Language {
 #[cfg(test)]
 mod tests {
     use crate::{
-        AstNode, Func, FunctionLike, HasName, HasTreeSitterKind, ast, match_parents, parse,
+        AnnotationName, AstNode, Func, FunctionLike, HasName, HasTreeSitterKind, Struct, Walker,
+        ast, match_parents, parse,
     };
 
     /// This test does not assert much and instead just shows off the crate's API.
@@ -181,6 +182,99 @@ mod tests {
         // Finally, `match_parents!` is a powerful macro for upward navigation.
         let parent_func = match_parents!(node, Func(...));
         assert_eq!(parent_func.map(|f| f.syntax()), Some(func.syntax()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn dotted_annotation_name_is_exposed_via_ast() -> anyhow::Result<()> {
+        let source = r"
+            @abi.minimalMsgValue(1)
+            struct Message {}
+        ";
+
+        let file = parse(source)?;
+        assert!(!file.has_errors());
+
+        let strukt = file
+            .top_levels()
+            .find_map(|top_level| match top_level {
+                ast::TopLevel::Struct(s) => Some(s),
+                _ => None,
+            })
+            .expect("struct should exist");
+
+        let annotation = strukt
+            .annotations()
+            .expect("struct should have annotations")
+            .annotations()
+            .next()
+            .expect("annotation should exist");
+
+        let name = annotation.name().expect("annotation should have a name");
+        assert_eq!(name.text(source), "abi.minimalMsgValue");
+
+        Ok(())
+    }
+
+    #[test]
+    fn dotted_annotation_name_without_compact_dot_produces_parse_error() -> anyhow::Result<()> {
+        let source = r"
+            @abi . minimalMsgValue(1)
+            struct Message {}
+        ";
+
+        let file = parse(source)?;
+        assert!(file.has_errors());
+
+        Ok(())
+    }
+
+    #[test]
+    fn walker_visits_annotation_name_node() -> anyhow::Result<()> {
+        #[derive(Default)]
+        struct AnnotationNameCollector {
+            names: Vec<String>,
+            source: String,
+        }
+
+        impl<'tree> Walker<'tree> for AnnotationNameCollector {
+            type Result = ();
+
+            fn walk_annotation_name(&mut self, node: &AnnotationName<'tree>) -> Self::Result {
+                self.names.push(node.text(&self.source).to_string());
+            }
+
+            fn default_result(&self) -> Self::Result {}
+        }
+
+        impl AnnotationNameCollector {
+            fn visit_with_source<'tree>(&mut self, source: &str, strukt: &Struct<'tree>) {
+                self.source = source.to_string();
+                self.walk_struct(strukt);
+            }
+        }
+
+        let source = r"
+            @custom.flag
+            struct Message {}
+        ";
+
+        let file = parse(source)?;
+        assert!(!file.has_errors());
+
+        let strukt = file
+            .top_levels()
+            .find_map(|top_level| match top_level {
+                ast::TopLevel::Struct(s) => Some(s),
+                _ => None,
+            })
+            .expect("struct should exist");
+
+        let mut collector = AnnotationNameCollector::default();
+        collector.visit_with_source(source, &strukt);
+
+        assert_eq!(collector.names, vec!["custom.flag"]);
 
         Ok(())
     }

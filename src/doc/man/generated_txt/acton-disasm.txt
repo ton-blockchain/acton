@@ -27,6 +27,9 @@ OPTIONS
        -o, --output path
            Write disassembled output to a file instead of standard output.
 
+           If the parent directory does not exist, Acton creates it
+           automatically. Existing files are overwritten.
+
        --show-hashes
            Show cell hashes alongside code blocks.
 
@@ -45,7 +48,12 @@ OPTIONS
            TonCenter API key for blockchain queries.
 
        --net network
-           Network to use for --address.
+           Network to use for --address and library lookups.
+
+           Supported values: mainnet, testnet, localnet, custom:<name>.
+
+           localnet and custom:<name> resolve through the project network
+           configuration in Acton.toml.
 
            If omitted, Acton tries mainnet first and then falls back to
            testnet.
@@ -76,11 +84,19 @@ OPTIONS
 BLOCKCHAIN LOOKUPS
        When --address is used, Acton fetches code from the selected network.
 
+       o  --net accepts mainnet, testnet, localnet, and custom:<name>
+
+       o  localnet and custom:<name> use URLs from Acton.toml
+
        o  Without --net, Acton tries mainnet first and then testnet
 
        o  --api-key helps avoid TonCenter rate limits
 
        o  --follow-libraries resolves library references when possible
+
+       When --follow-libraries is used with a local file or --string, Acton
+       uses the explicit --net if provided; otherwise library fetches default
+       to testnet.
 
 INPUT PRECEDENCE
        o  BOC_FILE and --string are mutually exclusive
@@ -95,8 +111,11 @@ INPUT PRECEDENCE
 
 SOURCE MAPS
        If you compiled a contract with acton compile --source-map, you can pass
-       that source map here to annotate the disassembly with original Tolk
+       that source map JSON here to annotate the disassembly with original Tolk
        locations.
+
+       --source-map only affects annotations in the output. It does not change
+       which BoC is disassembled.
 
 EXIT STATUS
        o  0: Disassembly completed successfully, including runs with unresolved
@@ -125,6 +144,15 @@ EXAMPLES
        5. Inspect deployed code together with hashes:
 
               acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes --net testnet
+
+       6. Write disassembly to a nested output path:
+
+              acton disasm contract.boc --output build/disasm/contract.tasm
+
+       7. Resolve library references for a local BoC using a configured custom
+          network:
+
+              acton disasm contract.boc --follow-libraries --net custom:staging
 
 SEE ALSO
        o  acton help compile

@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tolkc::TolkSourceMap;
 use tolkc::abi::ContractABI as CompilerContractABI;
 use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
@@ -56,7 +57,8 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
-    pub source_map: Option<Arc<SourceMap>>,
+    pub tolk_source_map: Arc<TolkSourceMap>,
+    pub caller_trace: Option<crate::retrace::TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
 
@@ -190,6 +192,7 @@ impl BuildCache {
         code: &str,
         code_hash: HashBytes,
         source_map: Arc<SourceMap>,
+        tolk_source_map: Arc<TolkSourceMap>,
         abi: Option<Arc<ContractAbi>>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
     ) {
@@ -200,6 +203,7 @@ impl BuildCache {
                 code_boc64: code.to_owned(),
                 code_hash,
                 source_map,
+                tolk_source_map,
                 abi,
                 compiler_abi,
             },
@@ -223,6 +227,7 @@ pub struct CompilationResult {
     pub code_boc64: String,
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
+    pub tolk_source_map: Arc<TolkSourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }

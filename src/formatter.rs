@@ -4,7 +4,9 @@ use crate::context::{
     AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
     KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
-use crate::retrace::{ExecutedAction, InstalledAction, InstalledActions, InvalidAction};
+use crate::retrace::{
+    ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
+};
 use crate::{context, exit_codes, retrace};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
@@ -20,7 +22,7 @@ use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
-use ton_source_map::{DebugLocation, SourceLocation};
+use ton_source_map::SourceLocation;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
@@ -1463,51 +1465,69 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         let code = Self::account_code(&self.accounts, &dst);
         let result = self.build_cache.result_for_code(&code)?;
 
-        let info = retrace::find_exception_info(logs, &result.1.source_map)?;
-        let loc = info.loc?;
-
+        let info = retrace::find_exception_info(logs, &result.1.tolk_source_map)?;
         let backtrace_result = Self::format_backtrace(&info.backtrace)
             .iter()
             .map(|line| format!("{child_prefix}       {line}"))
             .collect::<Vec<String>>()
             .join("\n");
 
-        extra_infos.push(FormattedExtraInfo::Tree(format!(
-            "at {}\n{}",
-            loc.format().dimmed(),
-            backtrace_result
-        )));
+        let mut message = format!("at {}", Self::format_location(&info.loc).dimmed());
+        if !backtrace_result.is_empty() {
+            message.push('\n');
+            message.push_str(&backtrace_result);
+        }
+
+        extra_infos.push(FormattedExtraInfo::Tree(message));
 
         Some(())
     }
 
     #[must_use]
-    pub fn format_backtrace(backtrace: &[DebugLocation]) -> Vec<String> {
+    pub(crate) fn format_backtrace(backtrace: &[TolkBacktraceFrame]) -> Vec<String> {
         let max_function_name_len = backtrace
             .iter()
-            .filter_map(|loc| loc.context.event_function.as_ref())
-            .map(|name| name.len() + 2)
+            .map(|frame| frame.function_name.len() + 2)
             .max()
             .unwrap_or(0);
 
-        let backtrace_lines = backtrace.iter().rev().filter_map(|loc| {
-            let func_name = loc.context.event_function.as_ref()?;
+        backtrace
+            .iter()
+            .map(|frame| {
+                format!(
+                    "{:<width$} at {}",
+                    frame.function_name.green(),
+                    Self::format_location(&frame.loc).dimmed(),
+                    width = max_function_name_len
+                )
+            })
+            .collect()
+    }
 
-            let location = format!(
-                "{}:{}:{}",
-                SourceLocation::normalize_path(&loc.loc.file),
-                loc.loc.line + 1,
-                loc.loc.column + 2
-            );
-            Some(format!(
-                "{:<width$} at {}",
-                func_name.green(),
-                location.dimmed(),
-                width = max_function_name_len
-            ))
-        });
+    pub(crate) fn format_location(loc: &SourceLocation) -> String {
+        format!(
+            "{}:{}:{}",
+            SourceLocation::normalize_path(&loc.file),
+            loc.line,
+            loc.column
+        )
+    }
 
-        backtrace_lines.collect()
+    pub(crate) fn find_failed_get_method_exception(
+        &self,
+        test: &TestReport,
+    ) -> Option<retrace::TolkExceptionInfo> {
+        let failed_get = self
+            .emulations
+            .results_of(test.name.as_ref())?
+            .get_methods
+            .iter()
+            .rev()
+            .find(|result| result.vm_exit_code != 0)?;
+        let code = Boc::decode_base64(failed_get.code.as_ref()).ok()?;
+        let build = self.build_cache.result_for_code(&Some(code))?.1;
+
+        retrace::find_exception_info(&failed_get.vm_log, &build.tolk_source_map)
     }
 
     fn format_ext_out_message(&self, msg: &RelaxedMessage) -> Option<String> {
@@ -1755,7 +1775,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             let result = self.build_cache.result_for_code(&code);
 
             if let Some(result) = result {
-                return retrace::find_source_loc(&result.1.source_map, loc_hash, loc_offset);
+                return retrace::find_source_loc(&result.1.tolk_source_map, loc_hash, loc_offset);
             }
         }
 
@@ -2896,33 +2916,17 @@ impl FormatterContext<'_> {
         )
         .ok();
 
-        let exception_info = failure
-            .source_map
-            .as_ref()
-            .and_then(|source_map| retrace::find_exception_info(&failure.vm_log, source_map));
+        let replayed_exception =
+            retrace::find_exception_info(&failure.vm_log, &failure.tolk_source_map);
 
-        if let Some(info) = &exception_info {
-            if let Some(loc) = &info.loc {
-                writeln!(details, "at {}", loc.format_normalized()).ok();
+        if let Some(info) = &replayed_exception {
+            writeln!(details, "at {}", Self::format_location(&info.loc)).ok();
 
-                let backtrace_lines = Self::format_backtrace(&info.backtrace);
-                if !backtrace_lines.is_empty() {
-                    writeln!(details, "Backtrace:").ok();
-                    for line in backtrace_lines {
-                        writeln!(details, "  {line}").ok();
-                    }
+            if !info.backtrace.is_empty() {
+                writeln!(details, "Backtrace:").ok();
+                for line in Self::format_backtrace(&info.backtrace) {
+                    writeln!(details, "  {line}").ok();
                 }
-            } else if self.backtrace.is_none() {
-                writeln!(
-                    details,
-                    "Re-run with {} to get more information",
-                    "--backtrace full".yellow()
-                )
-                .ok();
-            }
-
-            if !info.description.is_empty() {
-                writeln!(details, "Description: {}", info.description).ok();
             }
         } else if self.backtrace.is_none() {
             writeln!(
@@ -2933,14 +2937,28 @@ impl FormatterContext<'_> {
             .ok();
         }
 
-        if let Some(info) = exit_codes::find(failure.vm_exit_code) {
-            let should_show_fallback_description = exception_info
-                .as_ref()
-                .is_none_or(|exception| exception.description.is_empty());
-            if should_show_fallback_description {
-                writeln!(details, "Description: {}", info.description).ok();
+        if let Some(info) = &failure.caller_trace {
+            writeln!(details, "Called from:").ok();
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if backtrace_lines.is_empty() {
+                writeln!(details, "  at {}", Self::format_location(&info.loc)).ok();
+            } else {
+                for line in backtrace_lines {
+                    writeln!(details, "  {line}").ok();
+                }
             }
+        }
+
+        if let Some(info) = exit_codes::find(failure.vm_exit_code) {
+            writeln!(details, "Description: {}", info.description).ok();
             writeln!(details, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = &replayed_exception {
+            let description = if info.description.is_empty() {
+                format!("uncaught exception {}", info.errno)
+            } else {
+                info.description.clone()
+            };
+            writeln!(details, "Description: {description}").ok();
         }
 
         let details = details.trim();
@@ -3205,41 +3223,59 @@ impl FormatterContext<'_> {
         let mut output = String::new();
         writeln!(output, "exit_code={exit_code}").ok();
 
-        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.tolk_source_map);
+        let get_method_info = self.find_failed_get_method_exception(test);
 
-        if let Some(info) = &exit_code_info {
-            if let Some(loc) = &info.loc {
-                writeln!(
-                    output,
-                    "at {}:{}:{}",
-                    SourceLocation::normalize_path(&loc.file),
-                    loc.line + 1,
-                    loc.column + 2
-                )
-                .ok();
+        if let Some(info) = &get_method_info {
+            writeln!(output, "Get method:").ok();
+            writeln!(output, "  at {}", Self::format_location(&info.loc)).ok();
 
-                let backtrace_lines = Self::format_backtrace(&info.backtrace);
-                if !backtrace_lines.is_empty() {
-                    writeln!(output, "Backtrace:").ok();
-                    for line in backtrace_lines {
-                        writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
-                    }
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if !backtrace_lines.is_empty() {
+                writeln!(output, "  Backtrace:").ok();
+                for line in backtrace_lines {
+                    writeln!(output, "    {}", strip_ansi_codes(&line)).ok();
                 }
-            }
-
-            if !info.description.is_empty() {
-                writeln!(output, "Description: {}", info.description).ok();
             }
         }
 
-        if let Some(info) = exit_codes::find(exit_code) {
-            let should_show_fallback_description = exit_code_info
-                .as_ref()
-                .is_none_or(|exception| exception.description.is_empty());
-            if should_show_fallback_description {
-                writeln!(output, "Description: {}", info.description).ok();
+        if let Some(info) = &exit_code_info {
+            if get_method_info.is_some() {
+                writeln!(output, "Called from:").ok();
+            } else {
+                writeln!(output, "at {}", Self::format_location(&info.loc)).ok();
             }
+
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if !backtrace_lines.is_empty() {
+                if get_method_info.is_none() {
+                    writeln!(output, "Backtrace:").ok();
+                }
+                for line in backtrace_lines {
+                    writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
+                }
+            } else if get_method_info.is_some() {
+                writeln!(output, "  at {}", Self::format_location(&info.loc)).ok();
+            }
+        } else if test.backtrace.is_none() {
+            writeln!(
+                output,
+                "Re-run with {} to get more information",
+                "--backtrace full".yellow()
+            )
+            .ok();
+        }
+
+        if let Some(info) = exit_codes::find(exit_code) {
+            writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = &exit_code_info {
+            let description = if info.description.is_empty() {
+                format!("uncaught exception {}", info.errno)
+            } else {
+                info.description.clone()
+            };
+            writeln!(output, "Description: {description}").ok();
         }
 
         output.trim().to_string()

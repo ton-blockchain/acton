@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tolkc::TolkSourceMap;
 use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
-use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,7 +32,7 @@ pub(super) struct TransactionList {
 pub(super) struct ContractInfo {
     pub name: String,
     pub code_boc64: String,
-    pub source_map: Arc<SourceMap>,
+    pub tolk_source_map: TolkSourceMap,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
@@ -185,7 +185,7 @@ pub(super) fn dump_test_transactions(
                     let contract_info = build.map(|(_, info)| ContractInfo {
                         name: info.name.clone(),
                         code_boc64: info.code_boc64.clone(),
-                        source_map: info.source_map.clone(),
+                        tolk_source_map: (*info.tolk_source_map).clone(),
                         abi: info.abi,
                         compiler_abi: info.compiler_abi,
                     });
@@ -246,7 +246,7 @@ pub(super) fn dump_test_transactions(
             compiler_abi: result.compiler_abi.clone(),
             name: result.name.clone(),
             code_boc64: result.code_boc64.clone(),
-            source_map: result.source_map.clone(),
+            tolk_source_map: (*result.tolk_source_map).clone(),
         };
 
         known_contracts.insert(result.name.clone(), info);

@@ -6,6 +6,7 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/tlb/maybe"
 "#;
 
 const RECEIVER_CONTRACT: &str = r"

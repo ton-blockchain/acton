@@ -7,6 +7,7 @@ const DB_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
+import "../../lib/tlb/maybe"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
 
@@ -76,11 +77,11 @@ get fun `test-db-stdlib-transaction-load-body-nested-inline`() {
     expect(inMsg.info.dest).toEqual(destination);
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
-    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>());
+    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>().0);
 
     var rawBody = genericInMsg.body;
     expect(rawBody.loadBool()).toBeFalse();
-    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DbNestedPayload>());
+    expect(rawBody.loadUint(32)).toEqual(reflect.serializationPrefixOf<DbNestedPayload>().0);
     expect(rawBody.loadUint(64)).toEqual(payload.queryId);
     expect(rawBody.loadUint(32)).toEqual(payload.amount);
 }
@@ -132,7 +133,7 @@ get fun `test-db-stdlib-transaction-load-body-nested-fixture`() {
     expect(inMsg.info.dest).toEqual(destination);
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
-    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>());
+    expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>().0);
 }
 "#
     );

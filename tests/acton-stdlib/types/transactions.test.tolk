@@ -1,10 +1,10 @@
-import "@local-acton/types/message"
-import "@local-acton/types/transaction"
 import "@local-acton/build/build"
 import "@local-acton/emulation/network"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
 import "@local-acton/tlb/maybe"
+import "@local-acton/types/message"
+import "@local-acton/types/transaction"
 import "contracts/types"
 
 struct Counter {
@@ -18,7 +18,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 
 fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
@@ -38,14 +38,12 @@ fun setupTest(): (Counter, Treasury) {
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
-        dest: {
-            stateInit: counter.init,
-        },
+        dest: { stateInit: counter.init },
     });
     val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
-    return (counter, deployer)
+    return (counter, deployer);
 }
 
 get fun `test-load-transaction-body`() {

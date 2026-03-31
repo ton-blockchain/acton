@@ -18,6 +18,7 @@ num-traits = { workspace = true }
 tycho-types = { workspace = true }
 smallvec = { workspace = true }
 anyhow = { workspace = true }
+tolkc = { workspace = true }
 ton-source-map = { workspace = true }
 
 [lints]

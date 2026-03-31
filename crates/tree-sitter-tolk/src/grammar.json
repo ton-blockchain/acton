@@ -1271,6 +1271,10 @@
         "name": "annotation"
       }
     },
+    "annotation_name": {
+      "type": "PATTERN",
+      "value": "[a-zA-Z0-9_.]+"
+    },
     "annotation": {
       "type": "SEQ",
       "members": [
@@ -1286,7 +1290,7 @@
               "name": "name",
               "content": {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "annotation_name"
               }
             },
             {

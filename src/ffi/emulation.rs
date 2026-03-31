@@ -23,6 +23,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
+use tolkc::TolkSourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
@@ -120,6 +121,13 @@ fn build_impl(
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
 
+        let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
+        let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+            cached_entry.new_source_map.clone().unwrap_or_default(),
+            &code_cell,
+            cached_entry.debug_mark_base64.as_deref(),
+        )?);
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         ctx.build.build_cache.memoize(
             &name,
@@ -127,12 +135,11 @@ fn build_impl(
             &cached_entry.code_boc64,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
+            tolk_source_map,
             Some(contract_abi(content, &path, &mappings).into()),
             cached_entry.abi.clone().map(Into::into),
         );
 
-        let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
-            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
         stk.push(TupleItem::Cell(code_cell));
         return Ok(());
     }
@@ -159,18 +166,24 @@ fn build_impl(
             }
 
             let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
+            let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
+                anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
+            })?;
+            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                success.new_source_map.unwrap_or_default(),
+                &code_cell,
+                success.debug_mark_base64.as_deref(),
+            )?);
             ctx.build.build_cache.memoize(
                 &name,
                 Path::new(&path),
                 &success.code_boc64,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
+                tolk_source_map,
                 Some(contract_abi(content, &path, &mappings).into()),
                 success.abi.clone().map(Into::into),
             );
-            let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
-                anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
-            })?;
             stk.push(TupleItem::Cell(code_cell));
         }
         tolkc::CompilerResult::Error(error) => {
@@ -1430,11 +1443,18 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let source_map = ctx
+    let compilation_result = ctx
         .build
         .build_cache
         .result_for_code(&Some(code))
-        .map(|res| res.1.source_map);
+        .map(|(_, result)| result);
+    let source_map = compilation_result
+        .as_ref()
+        .map(|result| result.source_map.clone());
+    let tolk_source_map = compilation_result
+        .as_ref()
+        .map(|result| result.tolk_source_map.clone())
+        .unwrap_or_else(|| Arc::new(TolkSourceMap::without_debug_info()));
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -1450,7 +1470,7 @@ fn run_get_method_impl(
             .begin_thread(
                 2,
                 AnyExecutor::Get(step_executor.clone()),
-                source_map.clone(),
+                source_map,
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
@@ -1527,9 +1547,8 @@ fn run_get_method_impl(
                     None
                 };
 
-                let location = source_map.as_ref().and_then(|map| {
-                    retrace::find_exception_info(&result.vm_log, map).and_then(|info| info.loc)
-                });
+                let location = retrace::find_exception_info(&result.vm_log, &tolk_source_map)
+                    .map(|info| info.loc);
 
                 *ctx.asserts.assert_failure =
                     Some(AssertFailure::GetMethod(GetMethodAssertFailure {
@@ -1537,7 +1556,8 @@ fn run_get_method_impl(
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
-                        source_map,
+                        tolk_source_map,
+                        caller_trace: None,
                         location,
                     }));
 

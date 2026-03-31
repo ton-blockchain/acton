@@ -1,6 +1,6 @@
-import "@local-acton/tlb/maybe"
-import "@local-acton/tlb/either"
 import "@local-acton/testing/expect"
+import "@local-acton/tlb/either"
+import "@local-acton/tlb/maybe"
 
 fun branchScore(choice: Either<int, int>): int {
     return match (choice) {

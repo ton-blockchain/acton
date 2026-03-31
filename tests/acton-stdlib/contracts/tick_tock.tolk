@@ -11,6 +11,7 @@ fun onRunTickTock(isTock: bool) {
 }
 
 fun onInternalMessage(_: InMessage) {}
+
 fun onBouncedMessage(_: InMessageBounced) {}
 
 get fun tickCount(): int {

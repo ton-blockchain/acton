@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const EN_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
+import "../../lib/types/big_array"
 
 struct (0xEE100001) EnExternalNotice {
     queryId: uint64

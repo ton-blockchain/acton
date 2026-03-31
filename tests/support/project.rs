@@ -107,7 +107,7 @@ impl ProcessCommandBuilder {
         self
     }
 
-    fn env(mut self, key: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> Self {
+    pub(crate) fn env(mut self, key: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> Self {
         self.cmd.env(key, value);
         self
     }
@@ -1027,7 +1027,9 @@ pub(crate) struct Project {
 impl Project {
     #[allow(dead_code)]
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = ProcessCommandBuilder::new(acton_exe()).env("PATH", acton_path_env());
+        let cmd = ProcessCommandBuilder::new(acton_exe())
+            .env("PATH", acton_path_env())
+            .env("ACTON_LOG_DIR", self.path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
             project: Arc::new(ProjectRef {
@@ -1047,6 +1049,8 @@ impl Project {
             disasm_api_key: None,
             disasm_net: None,
             disasm_follow_libraries: false,
+            disasm_show_hashes: false,
+            disasm_show_offsets: false,
             compile_json: false,
             compile_base64_only: false,
             compile_boc: None,
@@ -1096,6 +1100,8 @@ pub(crate) struct ActonCommand {
     pub(crate) disasm_api_key: Option<String>,
     pub(crate) disasm_net: Option<String>,
     pub(crate) disasm_follow_libraries: bool,
+    pub(crate) disasm_show_hashes: bool,
+    pub(crate) disasm_show_offsets: bool,
     pub(crate) compile_json: bool,
     pub(crate) compile_base64_only: bool,
     pub(crate) compile_boc: Option<String>,
@@ -1338,6 +1344,16 @@ impl ActonCommand {
     /// ```
     pub(crate) fn follow_libraries(mut self) -> Self {
         self.disasm_follow_libraries = true;
+        self
+    }
+
+    pub(crate) fn show_hashes(mut self) -> Self {
+        self.disasm_show_hashes = true;
+        self
+    }
+
+    pub(crate) fn show_offsets(mut self) -> Self {
+        self.disasm_show_offsets = true;
         self
     }
 
@@ -1786,6 +1802,14 @@ impl ActonCommand {
 
         if self.disasm_follow_libraries {
             self.cmd = self.cmd.arg("--follow-libraries");
+        }
+
+        if self.disasm_show_hashes {
+            self.cmd = self.cmd.arg("--show-hashes");
+        }
+
+        if self.disasm_show_offsets {
+            self.cmd = self.cmd.arg("--show-offsets");
         }
 
         if self.compile_json {

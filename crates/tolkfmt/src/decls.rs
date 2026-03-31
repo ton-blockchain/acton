@@ -807,7 +807,7 @@ pub fn print_annotation_list<'a>(ctx: &Context<'_>, a: &AnnotationList) -> Optio
 pub fn print_annotation<'a>(ctx: &Context<'_>, a: &Annotation) -> Option<RcDoc<'a>> {
     let mut parts = vec![RcDoc::text("@")];
     if let Some(name) = a.name() {
-        parts.push(exprs::print_ident(ctx, &name)?);
+        parts.push(common::print_node_text(ctx, &name.syntax())?);
     }
     if let Some(args) = a.args() {
         let mut args_parts = vec![print_annotation_arguments(ctx, &args)?];

@@ -1,8 +1,8 @@
 import "errors"
+import "fees-management"
 import "jetton-utils"
 import "messages"
 import "storage"
-import "fees-management"
 
 contract JettonMinter {
     incomingMessages: AllowedMessageToMinter
@@ -23,7 +23,14 @@ fun onInternalMessage(in: InMessage) {
     match (msg) {
         BurnNotificationForMinter => {
             var storage = lazy MinterStorage.load();
-            assert (in.senderAddress == calcAddressOfJettonWallet(msg.burnInitiator, contract.getAddress(), storage.jettonWalletCode)) throw ERR_UNAUTHORIZED_BURN;
+            assert (
+                in.senderAddress ==
+                calcAddressOfJettonWallet(
+                    msg.burnInitiator,
+                    contract.getAddress(),
+                    storage.jettonWalletCode,
+                )
+            ) throw ERR_UNAUTHORIZED_BURN;
 
             storage.totalSupply -= msg.jettonAmount;
             storage.save();
@@ -36,9 +43,7 @@ fun onInternalMessage(in: InMessage) {
                 bounce: BounceMode.NoBounce,
                 dest: msg.sendExcessesTo,
                 value: 0,
-                body: ReturnExcessesBack {
-                    queryId: msg.queryId
-                }
+                body: ReturnExcessesBack { queryId: msg.queryId },
             });
             excessesMsg.send(SEND_MODE_IGNORE_ERRORS + SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
         }
@@ -55,7 +60,11 @@ fun onInternalMessage(in: InMessage) {
             var walletAddress: address? = null;
             if (msg.ownerAddress.getWorkchain() == BASECHAIN) {
                 val storage = lazy MinterStorage.load();
-                walletAddress = calcAddressOfJettonWallet(msg.ownerAddress, contract.getAddress(), storage.jettonWalletCode);
+                walletAddress = calcAddressOfJettonWallet(
+                    msg.ownerAddress,
+                    contract.getAddress(),
+                    storage.jettonWalletCode,
+                );
             }
 
             val respondMsg = createMessage({
@@ -66,7 +75,7 @@ fun onInternalMessage(in: InMessage) {
                     queryId: msg.queryId,
                     jettonWalletAddress: walletAddress,
                     ownerAddress: respondOwnerAddress,
-                }
+                },
             });
             respondMsg.send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
         }
@@ -81,9 +90,13 @@ fun onInternalMessage(in: InMessage) {
 
             val deployMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
-                dest: calcDeployedJettonWallet(msg.mintRecipient, contract.getAddress(), storage.jettonWalletCode),
+                dest: calcDeployedJettonWallet(
+                    msg.mintRecipient,
+                    contract.getAddress(),
+                    storage.jettonWalletCode,
+                ),
                 value: msg.tonAmount,
-                body: msg.internalTransferMsg,  // a newly-deployed wallet contract will immediately handle it
+                body: msg.internalTransferMsg, // a newly-deployed wallet contract will immediately handle it
             });
             deployMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
         }
@@ -104,7 +117,7 @@ fun onInternalMessage(in: InMessage) {
 
         else => {
             // ignore empty messages, "wrong opcode" for others
-            assert (in.body.isEmpty()) throw 0xFFFF
+            assert (in.body.isEmpty()) throw 0xFFFF;
         }
     }
 }
@@ -118,7 +131,7 @@ get fun get_jetton_data(): JettonDataReply {
         adminAddress: storage.adminAddress,
         jettonContent: storage.content,
         jettonWalletCode: storage.jettonWalletCode,
-    }
+    };
 }
 
 get fun get_wallet_address(ownerAddress: address): address {

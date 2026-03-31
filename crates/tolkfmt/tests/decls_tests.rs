@@ -756,6 +756,26 @@ fn test_annotation_with_arguments() {
 }
 
 #[test]
+fn test_dotted_annotation_name() {
+    check(
+        "@abi.minimalMsgValue(1)\nstruct Message {}",
+        expect![[r"
+                @abi.minimalMsgValue(1)
+                struct Message {}"]],
+    );
+}
+
+#[test]
+fn test_custom_dotted_annotation_name() {
+    check(
+        "@custom.flag\nfun foo() {}",
+        expect![[r"
+                @custom.flag
+                fun foo() {}"]],
+    );
+}
+
+#[test]
 fn test_annotation_with_multiple_arguments() {
     check(
         "@test(1, \"hello\", true)\nfun foo() {}",

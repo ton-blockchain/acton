@@ -941,6 +941,11 @@ pub struct Annotation<'tree>(pub Node<'tree>);
 
 impl_ast_node!(Annotation, "annotation");
 
+#[derive(Clone, Copy, Debug)]
+pub struct AnnotationName<'tree>(pub Node<'tree>);
+
+impl_ast_node!(AnnotationName, "annotation_name");
+
 impl<'tree> Annotation<'tree> {
     #[must_use]
     pub fn args(&self) -> Option<AnnotationArgs<'tree>> {
@@ -949,9 +954,9 @@ impl<'tree> Annotation<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Annotation<'tree> {
-    type Name = Ident<'tree>;
+    type Name = AnnotationName<'tree>;
 
-    fn name(&self) -> Option<Ident<'tree>> {
+    fn name(&self) -> Option<AnnotationName<'tree>> {
         self.0.field("name")
     }
 }
