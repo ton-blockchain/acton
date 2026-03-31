@@ -1,6 +1,5 @@
 use crate::debugger::dap::{DapMessage, DapTransport};
-use crate::debugger::debug_context::StepMode;
-use crate::debugger::session::{ChildDebugContextSpec, DebugSession};
+use crate::debugger::session::{ChildDebugContextSpec, DebugSession, StepMode};
 use crate::replayer::{self, CallFrameInfo, ExceptionInfo, LocalVarRendered, TolkReplayer};
 use crate::types_render::RenderedValue;
 use anyhow::anyhow;
@@ -130,14 +129,11 @@ impl ReplayerDebugSession {
     }
 
     fn send_terminated(&self) -> anyhow::Result<()> {
-        self.send_event(Event::Exited(ExitedEventBody {
-            exit_code: 0,
-            ..Default::default()
-        }))?;
+        self.send_event(Event::Exited(ExitedEventBody { exit_code: 0 }))?;
         self.send_event(Event::Terminated(Some(TerminatedEventBody::default())))
     }
 
-    fn alloc_req_id(&mut self) -> i64 {
+    const fn alloc_req_id(&mut self) -> i64 {
         let id = self.next_req_id;
         self.next_req_id += 1;
         id
@@ -149,7 +145,7 @@ impl ReplayerDebugSession {
         id
     }
 
-    fn apply_breakpoints_to_context(&mut self, ctx_index: usize) {
+    fn apply_breakpoints_to_context(&self, ctx_index: usize) {
         let stored = self.breakpoints.clone();
         let Some(ctx) = self.contexts.get(ctx_index) else {
             return;
@@ -185,7 +181,7 @@ impl ReplayerDebugSession {
         }
     }
 
-    fn apply_breakpoints_to_all_contexts(&mut self) {
+    fn apply_breakpoints_to_all_contexts(&self) {
         for idx in 0..self.contexts.len() {
             self.apply_breakpoints_to_context(idx);
         }
@@ -208,7 +204,7 @@ impl ReplayerDebugSession {
         ctx.resolved_breakpoints.get(&(file_id, line)).cloned()
     }
 
-    fn replayer_step_mode(mode: StepMode) -> replayer::StepMode {
+    const fn replayer_step_mode(mode: StepMode) -> replayer::StepMode {
         match mode {
             StepMode::StepIn => replayer::StepMode::StepInto,
             StepMode::StepOver => replayer::StepMode::StepOver,
@@ -219,7 +215,7 @@ impl ReplayerDebugSession {
         }
     }
 
-    fn step_active_context(&mut self, mode: StepMode) -> bool {
+    fn step_active_context(&self, mode: StepMode) -> bool {
         let Some(ctx) = self.active_context() else {
             return true;
         };
@@ -537,7 +533,7 @@ impl ReplayerDebugSession {
             }
             Command::Evaluate(args) => {
                 self.send_response(req.success(ResponseBody::Evaluate(EvaluateResponse {
-                    result: args.expression.clone(),
+                    result: args.expression,
                     type_field: None,
                     presentation_hint: None,
                     variables_reference: 0,
@@ -778,7 +774,7 @@ enum StopReason {
     Exception(ExceptionInfo),
 }
 
-fn encode_frame_id(context_idx: usize, depth_from_top: usize) -> i64 {
+const fn encode_frame_id(context_idx: usize, depth_from_top: usize) -> i64 {
     (((context_idx as i64) + 1) << 32) | ((depth_from_top as i64) + 1)
 }
 

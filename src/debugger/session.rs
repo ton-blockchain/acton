@@ -1,14 +1,21 @@
 use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::debug_context::StepMode;
 use std::sync::Arc;
 use tolkc::TolkSourceMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepMode {
+    StepIn,
+    StepOver,
+    StepOut,
+    Continue,
+    ContinueWithoutBreakpoints,
+}
 
 #[derive(Clone)]
 pub struct ChildDebugContextSpec {
     pub thread_id: i64,
     pub name: String,
     pub executor: AnyExecutor,
-    pub legacy_source_map: Option<Arc<ton_source_map::SourceMap>>,
     pub tolk_source_map: Option<Arc<TolkSourceMap>>,
     pub stop_on_entry: bool,
 }

@@ -35,6 +35,7 @@ pub enum RuntimeBackendKind {
 }
 
 /// Explicit gaps of the current live-VM backend compared to replaying VM logs.
+///
 /// These are surfaced on the replayer so callers can branch on degraded behavior,
 /// and so the missing executor API is documented in code rather than implied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,7 +75,7 @@ impl RuntimeCapabilityGap {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExceptionBreakMode {
     Never,
     Uncaught,
@@ -1065,7 +1066,7 @@ impl TolkReplayer {
             }
             Tick::TvmStackValues { values } => {
                 self.clear_caught_exception();
-                self.tvm_stack_values = values.clone();
+                self.tvm_stack_values = values;
 
                 if let Some(exec) = self.exec_stack.last_mut() {
                     exec.accumulated_needs_reset = true;

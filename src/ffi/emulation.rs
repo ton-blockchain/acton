@@ -4,8 +4,8 @@ use crate::context::{
     PendingMessageStep, TransactionNotFoundParams, Wallet, to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::debug_context::StepMode;
 use crate::debugger::session::ChildDebugContextSpec;
+use crate::debugger::session::StepMode;
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::ffi::assert::parse_search_params;
 use crate::retrace;
@@ -888,9 +888,6 @@ fn send_message_debug(
         .build_cache
         .result_for_code(&code)
         .map(|(_, result)| result);
-    let legacy_source_map = compilation_result
-        .as_ref()
-        .map(|result| result.source_map.clone());
     let tolk_source_map = compilation_result
         .as_ref()
         .map(|result| result.tolk_source_map.clone());
@@ -932,7 +929,6 @@ fn send_message_debug(
             thread_id: 2,
             name: "Send internal message".to_string(),
             executor: AnyExecutor::Message(step_executor.clone()),
-            legacy_source_map,
             tolk_source_map,
             stop_on_entry: need_to_stop_on_entry,
         })
@@ -1356,9 +1352,6 @@ fn run_get_method_impl(
         .build_cache
         .result_for_code(&Some(code))
         .map(|(_, result)| result);
-    let legacy_source_map = compilation_result
-        .as_ref()
-        .map(|result| result.source_map.clone());
     let tolk_source_map = compilation_result
         .as_ref()
         .map(|result| result.tolk_source_map.clone())
@@ -1383,7 +1376,6 @@ fn run_get_method_impl(
                 thread_id: 2,
                 name: "Run get method".to_string(),
                 executor: AnyExecutor::Get(step_executor.clone()),
-                legacy_source_map: legacy_source_map.clone(),
                 tolk_source_map: Some(tolk_source_map.clone()),
                 stop_on_entry: need_to_stop_on_entry,
             })
