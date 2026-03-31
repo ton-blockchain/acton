@@ -933,7 +933,10 @@ fn send_message_debug(
         .context("Cannot start nested debug context")?;
 
     let child_step_mode = if need_to_stop_on_entry {
-        StepMode::StepInto
+        match ctx.debug.performing_step() {
+            Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
+            _ => StepMode::StepInto,
+        }
     } else {
         StepMode::RunUntilBreakpoint
     };
@@ -1378,7 +1381,10 @@ fn run_get_method_impl(
             .context("Cannot send response")?;
 
         let child_step_mode = if need_to_stop_on_entry {
-            StepMode::StepInto
+            match ctx.debug.performing_step() {
+                Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
+                _ => StepMode::StepInto,
+            }
         } else {
             StepMode::RunUntilBreakpoint
         };

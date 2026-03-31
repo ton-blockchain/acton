@@ -28,6 +28,16 @@ use std::sync::Arc;
 
 const THREAD_ID: i64 = 1;
 
+const fn resolve_step_mode(
+    granularity: Option<&dap::types::SteppingGranularity>,
+    default: StepMode,
+) -> StepMode {
+    match granularity {
+        Some(dap::types::SteppingGranularity::Instruction) => StepMode::EachAsmInstruction,
+        _ => default,
+    }
+}
+
 #[derive(Debug, Clone)]
 struct SourceBreakpointInfo {
     id: i64,
@@ -478,10 +488,11 @@ impl ReplayerDebugSession {
                     return Ok(true);
                 }
             }
-            Command::StepIn(_) => {
+            Command::StepIn(args) => {
                 self.send_response(req.success(ResponseBody::StepIn))?;
 
-                let is_end = self.step(StepMode::StepInto);
+                let mode = resolve_step_mode(args.granularity.as_ref(), StepMode::StepInto);
+                let is_end = self.step(mode);
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -491,10 +502,11 @@ impl ReplayerDebugSession {
 
                 self.send_stop_reason(self.stop_reason_for_active_context())?;
             }
-            Command::Next(_) => {
+            Command::Next(args) => {
                 self.send_response(req.success(ResponseBody::Next))?;
 
-                let is_end = self.step(StepMode::StepOver);
+                let mode = resolve_step_mode(args.granularity.as_ref(), StepMode::StepOver);
+                let is_end = self.step(mode);
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -684,7 +696,10 @@ impl DebugSession for ReplayerDebugSession {
     }
 
     fn need_to_stop_child_thread_on_start(&self) -> bool {
-        self.performing_step == Some(StepMode::StepInto)
+        matches!(
+            self.performing_step,
+            Some(StepMode::StepInto | StepMode::EachAsmInstruction)
+        )
     }
 
     fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
