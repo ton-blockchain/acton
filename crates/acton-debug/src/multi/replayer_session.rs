@@ -54,6 +54,7 @@ struct ReplayerContext {
     label: Arc<str>,
     replayer: TolkReplayer,
     resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
+    outer_frames: Vec<CollectedFrame>,
 }
 
 impl ReplayerContext {
@@ -62,6 +63,20 @@ impl ReplayerContext {
             label,
             replayer,
             resolved_breakpoints: HashMap::new(),
+            outer_frames: Vec::new(),
+        }
+    }
+
+    fn with_outer_frames(
+        label: Arc<str>,
+        replayer: TolkReplayer,
+        outer_frames: Vec<CollectedFrame>,
+    ) -> Self {
+        Self {
+            label,
+            replayer,
+            resolved_breakpoints: HashMap::new(),
+            outer_frames,
         }
     }
 }
@@ -73,6 +88,7 @@ pub struct ReplayerDebugSession {
     next_breakpoint_id: i64,
     exception_mode: replayer::ExceptionBreakMode,
     performing_step: Option<StepMode>,
+    cached_visible_frames: RefCell<Vec<CollectedFrame>>,
     frame_to_depth: HashMap<i64, FrameLocator>,
     vars_debug_values: HashMap<i64, RenderedValue>,
     next_req_id: i64,
@@ -89,6 +105,7 @@ impl ReplayerDebugSession {
             next_breakpoint_id: 1,
             exception_mode: replayer::ExceptionBreakMode::Never,
             performing_step: None,
+            cached_visible_frames: RefCell::new(Vec::new()),
             frame_to_depth: HashMap::new(),
             vars_debug_values: HashMap::new(),
             next_req_id: 1_000_000,
@@ -242,20 +259,42 @@ impl ReplayerDebugSession {
         let Some(ctx) = self.active_context() else {
             return true;
         };
+        let visible_frames_cache = &self.cached_visible_frames;
         let mut ctx = ctx.borrow_mut();
-        ctx.replayer.step(mode);
+        let context_idx = self.contexts.len().saturating_sub(1);
+        let label = Arc::clone(&ctx.label);
+        let outer_frames = ctx.outer_frames.clone();
+        ctx.replayer.step_with_callback(mode, |_tick, replayer| {
+            *visible_frames_cache.borrow_mut() = Self::build_visible_frames_for(
+                context_idx,
+                label.as_ref(),
+                &outer_frames,
+                replayer,
+            );
+        });
         ctx.replayer.is_finished()
     }
 
-    fn step_active_context_without_breakpoints(&self, mode: StepMode) -> bool {
+    fn step_active_context_without_breakpoints(&mut self, mode: StepMode) -> bool {
         let Some(ctx) = self.active_context() else {
             return true;
         };
+        let visible_frames_cache = &self.cached_visible_frames;
         let mut ctx = ctx.borrow_mut();
         ctx.replayer.clear_all_breakpoints();
         ctx.replayer
             .set_exception_breakpoints(replayer::ExceptionBreakMode::Never);
-        ctx.replayer.step(mode);
+        let context_idx = self.contexts.len().saturating_sub(1);
+        let label = Arc::clone(&ctx.label);
+        let outer_frames = ctx.outer_frames.clone();
+        ctx.replayer.step_with_callback(mode, |_tick, replayer| {
+            *visible_frames_cache.borrow_mut() = Self::build_visible_frames_for(
+                context_idx,
+                label.as_ref(),
+                &outer_frames,
+                replayer,
+            );
+        });
         ctx.replayer.is_finished()
     }
 
@@ -300,6 +339,13 @@ impl ReplayerDebugSession {
         }) == Some(replayer::RuntimeBackendKind::LiveVm)
     }
 
+    fn child_stop_on_entry_step_mode(&self) -> StepMode {
+        match self.performing_step {
+            Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
+            _ => StepMode::StepInto,
+        }
+    }
+
     fn reapply_pending_debug_state(&mut self) {
         self.set_exception_mode(self.exception_mode);
         self.apply_breakpoints_to_all_contexts();
@@ -324,38 +370,48 @@ impl ReplayerDebugSession {
         }
     }
 
-    fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
-        Source {
-            name: Some(replayer.file_display_name(file_id).to_string()),
-            path: replayer.file_full_path(file_id).map(|s| s.to_string()),
-            ..Default::default()
+    fn build_source(replayer: &TolkReplayer, file_id: usize) -> Option<Source> {
+        let path = replayer.file_full_path(file_id).map(str::to_owned);
+        let name = replayer.file_display_name(file_id);
+
+        if path.is_none() && name == "unknown-file" {
+            return None;
         }
+
+        Some(Source {
+            name: Some(name.to_string()),
+            path,
+            ..Default::default()
+        })
     }
 
-    fn build_replayer_frames(
-        &self,
+    fn build_visible_frames_for(
         ctx_index: usize,
-        ctx: &ReplayerContext,
+        context_label: &str,
+        outer_frames: &[CollectedFrame],
+        replayer: &TolkReplayer,
     ) -> Vec<CollectedFrame> {
-        let call_stack = ctx.replayer.call_stack();
-        let file_id = ctx.replayer.current_file_id();
-        let line = ctx.replayer.current_line();
-        let column = ctx.replayer.current_column();
-        let top_source = Self::build_source(&ctx.replayer, file_id);
-        let top_name = Self::format_frame_name(
-            ctx.label.as_ref(),
-            call_stack.last(),
-            ctx.replayer.current_file_name(),
-        );
-        let top_is_builtin = call_stack.last().map(|f| f.is_builtin).unwrap_or(false);
-        let stopped_on_exception = ctx.replayer.last_exception().is_some();
+        let call_stack = replayer.call_stack();
+        let file_id = replayer.current_file_id();
+        let line = replayer.current_line();
+        let column = replayer.current_column();
+        let top_frame = call_stack.last();
+        let top_source = Self::build_source(replayer, file_id).or_else(|| {
+            top_frame
+                .and_then(|frame| frame.definition_loc.as_ref())
+                .and_then(|loc| Self::build_source(replayer, loc.file_id()))
+        });
+        let top_name =
+            Self::format_frame_name(context_label, top_frame, replayer.current_file_name());
+        let top_is_builtin = top_frame.map(|f| f.is_builtin).unwrap_or(false);
+        let stopped_on_exception = replayer.last_exception().is_some();
 
         let mut frames = Vec::new();
         frames.push(CollectedFrame {
             context_idx: ctx_index,
             depth_from_top: 0,
             name: top_name,
-            source: Some(top_source),
+            source: top_source,
             line: line as i64,
             column: column as i64,
             is_builtin: top_is_builtin && !stopped_on_exception,
@@ -368,7 +424,7 @@ impl ReplayerDebugSession {
             let child_frame = &call_stack[frame_idx + 1];
             let (source, line, col) = match &child_frame.call_site_loc {
                 Some(loc) => (
-                    Some(Self::build_source(&ctx.replayer, loc.file_id())),
+                    Self::build_source(replayer, loc.file_id()),
                     loc.start_line() as i64,
                     loc.start_col() as i64,
                 ),
@@ -377,11 +433,7 @@ impl ReplayerDebugSession {
             frames.push(CollectedFrame {
                 context_idx: ctx_index,
                 depth_from_top: depth,
-                name: Self::format_frame_name(
-                    ctx.label.as_ref(),
-                    Some(frame),
-                    frame.f_name.as_str(),
-                ),
+                name: Self::format_frame_name(context_label, Some(frame), frame.f_name.as_str()),
                 source,
                 line,
                 column: col,
@@ -389,7 +441,33 @@ impl ReplayerDebugSession {
             });
         }
 
+        frames.extend(outer_frames.iter().cloned());
         frames
+    }
+
+    fn build_replayer_frames(
+        &self,
+        ctx_index: usize,
+        ctx: &ReplayerContext,
+    ) -> Vec<CollectedFrame> {
+        Self::build_visible_frames_for(
+            ctx_index,
+            ctx.label.as_ref(),
+            &ctx.outer_frames,
+            &ctx.replayer,
+        )
+    }
+
+    fn collect_visible_frames_snapshot(&self) -> Vec<CollectedFrame> {
+        let Some(active_ctx) = self.active_context() else {
+            return self.cached_visible_frames.borrow().clone();
+        };
+        let Ok(active_ctx) = active_ctx.try_borrow() else {
+            return self.cached_visible_frames.borrow().clone();
+        };
+
+        let active_idx = self.contexts.len().saturating_sub(1);
+        self.build_replayer_frames(active_idx, &active_ctx)
     }
 
     fn handle_variables(&mut self, args: &VariablesArguments) -> ResponseBody {
@@ -723,12 +801,7 @@ impl ReplayerDebugSession {
         self.frame_to_depth.clear();
         self.vars_debug_values.clear();
 
-        let mut collected = Vec::new();
-        for (idx, ctx) in self.contexts.iter().enumerate().rev() {
-            if let Ok(ctx) = ctx.try_borrow() {
-                collected.extend(self.build_replayer_frames(idx, &ctx));
-            }
-        }
+        let collected = self.collect_visible_frames_snapshot();
 
         let mut stack_frames = Vec::new();
         for frame in collected {
@@ -796,18 +869,42 @@ impl ReplayerDebugSession {
         };
         replayer.set_exception_breakpoints(self.exception_mode);
 
+        let outer_frames = self.cached_visible_frames.borrow().clone();
         let label: Arc<str> = spec.name.into();
         self.contexts
-            .push(Rc::new(RefCell::new(ReplayerContext::new(label, replayer))));
+            .push(Rc::new(RefCell::new(ReplayerContext::with_outer_frames(
+                label,
+                replayer,
+                outer_frames,
+            ))));
         let new_idx = self.contexts.len() - 1;
         self.apply_breakpoints_to_context(new_idx);
 
         if spec.stop_on_entry {
-            self.send_stopped(
-                StoppedEventReason::Entry,
-                Some(self.contexts[new_idx].borrow().label.to_string()),
-                None,
-            )?;
+            let step_mode = self.child_stop_on_entry_step_mode();
+            self.performing_step = Some(step_mode);
+            let is_end = self.step_active_context(step_mode);
+
+            if is_end {
+                self.send_terminated()?;
+                return Ok(true);
+            }
+
+            if let Some(ids) = self.current_breakpoint_ids() {
+                self.send_stopped(
+                    StoppedEventReason::Breakpoint,
+                    Some("Breakpoint hit".to_string()),
+                    Some(ids),
+                )?;
+            } else if let StopReason::Exception(exc) = self.stop_reason_for_active_context() {
+                self.send_exception_stop(&exc)?;
+            } else {
+                self.send_stopped(
+                    StoppedEventReason::Entry,
+                    Some(self.contexts[new_idx].borrow().label.to_string()),
+                    None,
+                )?;
+            }
         }
 
         Ok(true)

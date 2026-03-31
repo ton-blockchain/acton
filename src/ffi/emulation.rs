@@ -53,7 +53,14 @@ fn run_nested_executor_until_finished(
     mut direct_step: impl FnMut() -> bool,
 ) -> anyhow::Result<()> {
     if child_debug_started {
-        ctx.debug.step(child_step_mode);
+        let child_was_bootstrapped = matches!(
+            child_step_mode,
+            StepMode::StepInto | StepMode::EachAsmInstruction
+        );
+
+        if !child_was_bootstrapped {
+            ctx.debug.step(child_step_mode);
+        }
 
         if !ctx.debug.active_context_is_terminated() {
             ctx.debug
