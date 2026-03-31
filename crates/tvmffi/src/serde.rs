@@ -227,6 +227,7 @@ fn parse_vm_control_data(parser: &mut CellSlice<'_>) -> Result<VmControlData, an
 /// vmc_while_body$110011 cond:^VmCont body:^VmCont after:^VmCont = VmCont;
 /// vmc_pushint$1111    value:int32 next:^VmCont = VmCont;
 /// ```
+#[allow(clippy::branches_sharing_code)]
 fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> {
     let first_bit = parser.load_bit()?;
 

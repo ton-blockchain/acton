@@ -107,7 +107,7 @@ impl PartialEq for Tuple {
 /// Parsed data from a TVM continuation (VmCont).
 ///
 /// Stores the code cell, optionally the captured stack, and the save list from VmControlData.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ContData {
     /// The code cell (VmCellSlice) of the continuation.
     pub code: Cell,
@@ -121,19 +121,9 @@ pub struct ContData {
 
 impl ContData {
     /// Create a ContData with just a code cell and no captured stack.
-    pub fn from_code(code: Cell) -> Self {
+    pub const fn from_code(code: Cell) -> Self {
         Self {
             code,
-            stack: None,
-            savelist: None,
-        }
-    }
-}
-
-impl Default for ContData {
-    fn default() -> Self {
-        Self {
-            code: Cell::default(),
             stack: None,
             savelist: None,
         }

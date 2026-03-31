@@ -263,6 +263,7 @@ fn execute_script<'a>(
             fork_net: None,
             api_key: None,
             running_id: "script".into(),
+            test_code: None,
         },
         io: IoContext {
             stdout_buffer: String::new(),

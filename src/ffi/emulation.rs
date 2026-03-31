@@ -605,12 +605,11 @@ where
 
             step.externals = externals;
 
-            if let IterationStop::UntilMatch(predicates, executor) = &stop {
-                if transaction_matches_predicates(&step.transaction, predicates, executor)
+            if let IterationStop::UntilMatch(predicates, executor) = &stop
+                && transaction_matches_predicates(&step.transaction, predicates, executor)
                     .unwrap_or(false)
-                {
-                    matched = true;
-                }
+            {
+                matched = true;
             }
         }
 
@@ -1160,11 +1159,26 @@ fn parse_search_params_tuple(params: &Tuple) -> ParsedSearchParams {
 }
 
 /// Check if a transaction matches all predicate search params by calling each predicate via run_continuation.
+#[allow(clippy::collapsible_if)]
 fn transaction_matches_predicates(
     tx: &Transaction,
     predicates: &ParsedSearchParams,
     executor: &GetExecutor,
 ) -> anyhow::Result<bool> {
+    /// Helper: check a predicate field against a value, return false on mismatch.
+    macro_rules! check {
+        ($field:expr, $val:expr) => {
+            if let Some(ref field) = $field {
+                if !call_predicate(executor, &field.predicate, $val)? {
+                    return Ok(false);
+                }
+            }
+        };
+    }
+
+    let bool_item = |v: bool| TupleItem::Int(BigInt::from(if v { -1 } else { 0 }));
+    let int_item = |v: i64| TupleItem::Int(BigInt::from(v));
+
     let requires_internal_in_msg = predicates.opcode.is_some()
         || predicates.bounced.is_some()
         || predicates.bounce.is_some()
@@ -1172,18 +1186,9 @@ fn transaction_matches_predicates(
         || predicates.from.is_some()
         || predicates.to.is_some();
 
-    // Deploy predicate
-    if let Some(ref field) = predicates.deploy {
-        let is_deploy =
-            tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
-        if !call_predicate(
-            executor,
-            &field.predicate,
-            TupleItem::Int(BigInt::from(if is_deploy { -1 } else { 0 })),
-        )? {
-            return Ok(false);
-        }
-    }
+    let is_deploy =
+        tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
+    check!(predicates.deploy, bool_item(is_deploy));
 
     let in_msg = tx.load_in_msg();
     if let Ok(Some(in_msg)) = &in_msg
@@ -1194,68 +1199,19 @@ fn transaction_matches_predicates(
             let Ok(opcode) = slice.load_u32() else {
                 return Ok(false);
             };
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(opcode)),
-            )? {
+            if !call_predicate(executor, &field.predicate, int_item(opcode as i64))? {
                 return Ok(false);
             }
         }
-        if let Some(ref field) = predicates.bounced {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(if info.bounced { -1 } else { 0 })),
-            )? {
-                return Ok(false);
-            }
-        }
-        if let Some(ref field) = predicates.bounce {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(if info.bounce { -1 } else { 0 })),
-            )? {
-                return Ok(false);
-            }
-        }
-        if let Some(ref field) = predicates.value {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(info.value.tokens.into_inner())),
-            )? {
-                return Ok(false);
-            }
-        }
-        if let Some(ref field) = predicates.from {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Slice(to_cell(&info.src)),
-            )? {
-                return Ok(false);
-            }
-        }
-        if let Some(ref field) = predicates.to {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Slice(to_cell(&info.dst)),
-            )? {
-                return Ok(false);
-            }
-        }
-        if let Some(ref field) = predicates.body {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Cell(to_cell(&in_msg.body)),
-            )? {
-                return Ok(false);
-            }
-        }
+        check!(predicates.bounced, bool_item(info.bounced));
+        check!(predicates.bounce, bool_item(info.bounce));
+        check!(
+            predicates.value,
+            int_item(info.value.tokens.into_inner() as i64)
+        );
+        check!(predicates.from, TupleItem::Slice(to_cell(&info.src)));
+        check!(predicates.to, TupleItem::Slice(to_cell(&info.dst)));
+        check!(predicates.body, TupleItem::Cell(to_cell(&in_msg.body)));
     } else if requires_internal_in_msg {
         return Ok(false);
     }
@@ -1264,58 +1220,20 @@ fn transaction_matches_predicates(
         return Ok(false);
     };
 
-    if let Some(ref field) = predicates.compute_phase_skipped {
-        let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
-        if !call_predicate(
-            executor,
-            &field.predicate,
-            TupleItem::Int(BigInt::from(if is_skipped { -1 } else { 0 })),
-        )? {
-            return Ok(false);
-        }
-    }
-    if let Some(ref field) = predicates.aborted {
-        if !call_predicate(
-            executor,
-            &field.predicate,
-            TupleItem::Int(BigInt::from(if ord_info.aborted { -1 } else { 0 })),
-        )? {
-            return Ok(false);
-        }
-    }
-    if let Some(ref field) = predicates.action_exit_code {
-        let code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
-        if !call_predicate(
-            executor,
-            &field.predicate,
-            TupleItem::Int(BigInt::from(code)),
-        )? {
-            return Ok(false);
-        }
-    }
-    if let Some(ref field) = predicates.exit_code {
-        if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(compute.exit_code)),
-            )? {
-                return Ok(false);
-            }
-        }
-    }
-    if let Some(ref field) = predicates.success {
-        if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
-            let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
-            let is_success = action_success && compute.success;
-            if !call_predicate(
-                executor,
-                &field.predicate,
-                TupleItem::Int(BigInt::from(if is_success { -1 } else { 0 })),
-            )? {
-                return Ok(false);
-            }
-        }
+    let is_skipped = matches!(ord_info.compute_phase, ComputePhase::Skipped(_));
+    check!(predicates.compute_phase_skipped, bool_item(is_skipped));
+    check!(predicates.aborted, bool_item(ord_info.aborted));
+
+    let action_code = ord_info.action_phase.as_ref().map_or(-1, |a| a.result_code);
+    check!(predicates.action_exit_code, int_item(action_code as i64));
+
+    // Exit code and success: only check if compute phase was executed
+    if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+        check!(predicates.exit_code, int_item(compute.exit_code as i64));
+
+        let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
+        let is_success = action_success && compute.success;
+        check!(predicates.success, bool_item(is_success));
     }
 
     Ok(true)
