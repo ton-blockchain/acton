@@ -4,12 +4,12 @@ use crate::context::{
     AssertFailure, BuildCache, EmulationsState, GetMethodAssertFailure, KnownAddresses,
     TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
+use crate::retrace::{
+    self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
+};
 use crate::{context, exit_codes};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
-use acton_debug::retrace::{
-    self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
-};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashMap;

@@ -6,6 +6,7 @@ use crate::context::{
 use crate::exit_codes;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::retrace;
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
@@ -15,7 +16,6 @@ use acton_debug::debugger::any_executor::AnyExecutor;
 use acton_debug::debugger::dap::{reserve_dap_listener, start_dap_server_with_listener};
 use acton_debug::debugger::replayer_session::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::retrace;
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;

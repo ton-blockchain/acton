@@ -1,7 +1,7 @@
-use crate::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
-pub use retrace::trace::{
+pub use ::retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
+use acton_debug::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
 use tolkc::TolkSourceMap;
 use ton_source_map::SourceLocation;
 use vmlogs::parser::VmLine;
@@ -174,7 +174,6 @@ pub fn find_source_loc(
     offset: u16,
 ) -> Option<SourceLocation> {
     if tolk_source_map.source_map.is_empty() {
-        // `--backtrace full` is not enabled
         return None;
     }
 
@@ -183,5 +182,5 @@ pub fn find_source_loc(
 
 #[must_use]
 pub fn find_installed_actions(vm_logs: &str) -> InstalledActions {
-    retrace::trace::Trace::new(vm_logs, None).actions()
+    ::retrace::trace::Trace::new(vm_logs, None).actions()
 }

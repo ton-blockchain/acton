@@ -19,6 +19,7 @@ use crate::context::{
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
@@ -30,7 +31,6 @@ use acton_debug::debugger::dap::{
 };
 use acton_debug::debugger::replayer_session::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::retrace;
 use anyhow::anyhow;
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
