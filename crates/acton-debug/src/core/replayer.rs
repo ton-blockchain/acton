@@ -34,47 +34,6 @@ pub enum RuntimeBackendKind {
     LiveVm,
 }
 
-/// Explicit gaps of the current live-VM backend compared to replaying VM logs.
-///
-/// These are surfaced on the replayer so callers can branch on degraded behavior,
-/// and so the missing executor API is documented in code rather than implied.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuntimeCapabilityGap {
-    InstructionEvents,
-    ExceptionEvents,
-    LogCompatibleStackValues,
-}
-
-impl RuntimeCapabilityGap {
-    pub const fn impact(self) -> &'static str {
-        match self {
-            RuntimeCapabilityGap::InstructionEvents => {
-                "EachAsmInstruction parity is incomplete; PUSHCONT/IFRET-specific control-flow handling stays best-effort"
-            }
-            RuntimeCapabilityGap::ExceptionEvents => {
-                "exception breakpoints and caught-vs-uncaught detection are unavailable on live VM"
-            }
-            RuntimeCapabilityGap::LogCompatibleStackValues => {
-                "locals and stack rendering are best-effort; slices/continuations/log-shape stack values are lossy"
-            }
-        }
-    }
-
-    pub const fn required_executor_api(self) -> &'static str {
-        match self {
-            RuntimeCapabilityGap::InstructionEvents => {
-                "step executor should expose before/after-step instruction metadata, ideally including opcode/instruction name"
-            }
-            RuntimeCapabilityGap::ExceptionEvents => {
-                "step executor should expose exception events or last-step exception status with caught/uncaught information"
-            }
-            RuntimeCapabilityGap::LogCompatibleStackValues => {
-                "step executor should expose structured stack items with exact kinds, slice windows, continuation values and stable stack ordering"
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExceptionBreakMode {
     Never,
@@ -122,10 +81,6 @@ pub trait RuntimeEventSource {
     fn next_event(&mut self) -> Option<RuntimeEvent>;
     fn is_exhausted(&self) -> bool;
     fn backend_kind(&self) -> RuntimeBackendKind;
-
-    fn capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
-        &[]
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -325,12 +280,6 @@ impl RuntimeEventSource for VmLogRuntimeEventSource {
     }
 }
 
-const LIVE_VM_CAPABILITY_GAPS: &[RuntimeCapabilityGap] = &[
-    RuntimeCapabilityGap::InstructionEvents,
-    RuntimeCapabilityGap::ExceptionEvents,
-    RuntimeCapabilityGap::LogCompatibleStackValues,
-];
-
 pub struct LiveVmRuntimeEventSource {
     executor: DebugExecutorHandle,
     terminated: bool,
@@ -358,10 +307,11 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
         }
 
         // Live SBS execution currently only exposes "step, then inspect current state".
-        // The missing executor API is recorded via `capability_gaps()`:
-        // - no before/after instruction metadata;
-        // - no exception callbacks/status;
-        // - stack snapshot is tuple-shaped, not VM-log compatible.
+        // Because of that:
+        // - EachAsmInstruction is only best-effort compared to VM-log replay;
+        // - exception breakpoints and caught-vs-uncaught detection do not work;
+        // - locals/stack rendering are lossy because the executor snapshot shape is poorer
+        //   than VM logs, especially for slices, continuations and exact stack layout.
         let is_end = self.executor.step();
         let snapshot = self.executor.snapshot();
 
@@ -386,10 +336,6 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
 
     fn backend_kind(&self) -> RuntimeBackendKind {
         RuntimeBackendKind::LiveVm
-    }
-
-    fn capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
-        LIVE_VM_CAPABILITY_GAPS
     }
 }
 
@@ -623,10 +569,6 @@ impl TolkReplayer {
 
     pub fn runtime_backend_kind(&self) -> RuntimeBackendKind {
         self.runtime_source.backend_kind()
-    }
-
-    pub fn runtime_capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
-        self.runtime_source.capability_gaps()
     }
 
     pub fn is_finished(&self) -> bool {
