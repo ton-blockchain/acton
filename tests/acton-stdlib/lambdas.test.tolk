@@ -5,7 +5,6 @@ import "@local-acton/ffi/reverse-ffi"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
 import "contracts/types"
-import "../projects/basic/.acton/tolk-stdlib/reflection"
 
 fun x2(x: int): int {
     return x * 2;
@@ -101,14 +100,7 @@ get fun `test toHaveAllSuccessfulTxs`() {
     expect(res).toHaveAllSuccessfulTxs();
 }
 
-fun isNotZero(code: int32): bool { return code != 0; }
-fun isZero(code: int32): bool { return code == 0; }
-fun isFalse(s: bool): bool { return !s; }
-fun isTrue(s: bool): bool { return s; }
-fun alwaysFalseAddr(addr: address): bool { addr; return false; }
-fun anyAddress(addr: address): bool { addr; return true; }
-
-/// Test predicate for `exitCode` — non-zero exit code
+/// Test predicate for `exitCode` — inline lambda
 get fun `test predicate exitCode`() {
     val (counter, deployer) = setupTest();
     val msg = createMessage({
@@ -120,11 +112,11 @@ get fun `test predicate exitCode`() {
     val res = net.send(deployer.address, msg);
     expect(res).toHaveTx({
         to: counter.address,
-        exitCode: isNotZero,
+        exitCode: fun(code: int32): bool { return code != 0; },
     });
 }
 
-/// Test predicate for `success`
+/// Test predicate for `success` — inline lambda
 get fun `test predicate success`() {
     val (counter, deployer) = setupTest();
     val msg = createMessage({
@@ -136,27 +128,27 @@ get fun `test predicate success`() {
     val res = net.send(deployer.address, msg);
     expect(res).toHaveTx({
         to: counter.address,
-        success: isFalse,
+        success: fun(s: bool): bool { return !s; },
     });
 }
 
-/// Test mixed: plain value + predicate
+/// Test mixed: plain value + inline lambda predicates
 get fun `test predicate mixed`() {
     val (counter, deployer) = setupTest();
     val res = counter.sendIncrease(deployer.address, 42);
     expect(res).toHaveSuccessfulTx({
         to: counter.address,
-        from: anyAddress,
-        exitCode: isZero,
-        success: isTrue,
+        from: fun(addr: address): bool { addr; return true; },
+        exitCode: fun(code: int32): bool { return code == 0; },
+        success: fun(s: bool): bool { return s; },
     });
 }
 
-/// Test negative: predicate that never matches
+/// Test negative: inline lambda that never matches
 get fun `test predicate toNotHaveTx`() {
     val (counter, deployer) = setupTest();
     val res = counter.sendIncrease(deployer.address, 42);
     expect(res).toNotHaveTx({
-        to: alwaysFalseAddr,
+        to: fun(addr: address): bool { addr; return false; },
     });
 }

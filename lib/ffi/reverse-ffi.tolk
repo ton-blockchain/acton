@@ -18,7 +18,7 @@ fun ffi.__executeInSeparateLibemulator<Ret, Args = array<unknown>>(functionToCal
             return Ret.fromTuple(res);
         } catch (e) {
             if (e == 7) {
-                Assert.fail(format2("Calling for cont returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.",res, reflect.typeNameOf<Ret>()))
+                Assert.fail(format2("Calling for cont returned '{}' that cannot be deserialized to '{}'.",res, reflect.typeNameOf<Ret>()))
             }
             throw e
         }
