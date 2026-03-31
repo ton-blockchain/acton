@@ -73,15 +73,14 @@ impl Instruction {
         if let Some(source_map) = &opts.source_map
             && let Some(off) = offset
             && let Some(location) = get_source_location(source_map, instr.source_cell.as_ref(), off)
+            && let Some(source_context) = format_source_context(&location)
         {
-            if let Some(source_context) = format_source_context(&location) {
-                let before = format!("    └{}┐\n", "─".repeat(56));
-                let after = format!("    ┌{}┘", "─".repeat(56));
-                return format!(
-                    "{}{:>padding$}\n{before}{}{after}",
-                    result, "", source_context
-                );
-            }
+            let before = format!("    └{}┐\n", "─".repeat(56));
+            let after = format!("    ┌{}┘", "─".repeat(56));
+            return format!(
+                "{}{:>padding$}\n{before}{}{after}",
+                result, "", source_context
+            );
         }
 
         result
