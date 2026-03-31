@@ -1200,7 +1200,18 @@ fn transaction_matches_predicates(
                 return Ok(false);
             };
             if !call_predicate(executor, &field.predicate, int_item(opcode as i64))? {
-                return Ok(false);
+                // For bounced messages, the real opcode follows the 0xFFFFFFFF prefix
+                if info.bounced {
+                    let Ok(bounced_opcode) = slice.load_u32() else {
+                        return Ok(false);
+                    };
+                    if !call_predicate(executor, &field.predicate, int_item(bounced_opcode as i64))?
+                    {
+                        return Ok(false);
+                    }
+                } else {
+                    return Ok(false);
+                }
             }
         }
         check!(predicates.bounced, bool_item(info.bounced));
