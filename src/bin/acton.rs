@@ -46,7 +46,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
-use tolkc::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
+use tolkc::TolkSourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -551,17 +551,23 @@ enum Commands {
         after_help = detailed_help_pointer("disasm")
     )]
     Disasm {
-        #[arg(help = "Binary/Hex/Base64 BoC file to disassemble (use -s flag to pass a string)")]
+        #[arg(
+            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)"
+        )]
         boc_file: Option<String>,
         #[arg(short, long, help = "BoC string in hex or base64 format")]
         string: Option<String>,
-        #[arg(short, long, help = "Output file (if not specified, output to stdout)")]
+        #[arg(
+            short,
+            long,
+            help = "Write output to file (creates parent dirs, overwrites existing file)"
+        )]
         output: Option<String>,
         #[arg(long, help = "Show cell hashes and offsets for each cell")]
         show_hashes: bool,
         #[arg(long, help = "Show instruction offsets in left column")]
         show_offsets: bool,
-        #[arg(long, help = "Source map file for showing Tolk source locations")]
+        #[arg(long, help = "Source map JSON from `acton compile --source-map`")]
         source_map: Option<String>,
         #[arg(
             long,
@@ -570,7 +576,7 @@ enum Commands {
         address: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
-        #[arg(long, help = "Network to use for fetching from blockchain")]
+        #[arg(long, help = "Network for `--address` and library lookups")]
         net: Option<String>,
         #[arg(
             long,
@@ -1956,13 +1962,11 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
             anyhow::bail!("{} is not a file", path.yellow());
         }
 
-        let content = fs::read_to_string(path).expect("Failed to read source map file");
-        let result = serde_json::from_str::<TolkSourceMap>(content.as_str())
-            .or_else(|_| {
-                serde_json::from_str::<TolkCompilerSourceMap>(content.as_str())
-                    .map(TolkSourceMap::new)
-            })
-            .expect("Failed to parse source map JSON");
+        let content = fs::read_to_string(&path)
+            .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
+        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+            anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
+        })?;
         Some(Box::new(result))
     } else {
         None

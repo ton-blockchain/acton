@@ -4,17 +4,73 @@ use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
     pub(crate) status: u16,
     pub(crate) body: String,
 }
 
+#[derive(Clone)]
+pub(crate) struct ToncenterV3MockResponse {
+    pub(crate) status: u16,
+    pub(crate) body: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CapturedToncenterRequest {
+    pub(crate) method: String,
+    pub(crate) path: String,
+    pub(crate) headers: Vec<(String, String)>,
+}
+
 pub(crate) fn spawn_toncenter_v2_mock(
     responses: Vec<ToncenterV2MockResponse>,
 ) -> (String, thread::JoinHandle<()>) {
+    let (url, handle, _) = spawn_toncenter_v2_mock_with_capture(responses);
+    (url, handle)
+}
+
+pub(crate) fn spawn_toncenter_v2_mock_with_capture(
+    responses: Vec<ToncenterV2MockResponse>,
+) -> (
+    String,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedToncenterRequest>>>,
+) {
+    spawn_toncenter_mock_with_capture(
+        responses
+            .into_iter()
+            .map(|response| (response.status, response.body))
+            .collect(),
+    )
+}
+
+pub(crate) fn spawn_toncenter_v3_mock(
+    responses: Vec<ToncenterV3MockResponse>,
+) -> (
+    String,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedToncenterRequest>>>,
+) {
+    spawn_toncenter_mock_with_capture(
+        responses
+            .into_iter()
+            .map(|response| (response.status, response.body))
+            .collect(),
+    )
+}
+
+pub(crate) fn spawn_toncenter_mock_with_capture(
+    responses: Vec<(u16, String)>,
+) -> (
+    String,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedToncenterRequest>>>,
+) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind toncenter v2 mock");
     listener
         .set_nonblocking(true)
@@ -23,8 +79,11 @@ pub(crate) fn spawn_toncenter_v2_mock(
         .local_addr()
         .expect("failed to get toncenter v2 mock address");
 
+    let captured_requests = Arc::new(Mutex::new(Vec::<CapturedToncenterRequest>::new()));
+    let captured_requests_thread = Arc::clone(&captured_requests);
+
     let handle = thread::spawn(move || {
-        for response in responses {
+        for (status, body) in responses {
             let wait_until = Instant::now() + Duration::from_secs(30);
             let mut stream = loop {
                 match listener.accept() {
@@ -75,6 +134,11 @@ pub(crate) fn spawn_toncenter_v2_mock(
                 }
             }
 
+            let mut parts = request_line.split_whitespace();
+            let method = parts.next().unwrap_or_default().to_string();
+            let path = parts.next().unwrap_or_default().to_string();
+
+            let mut headers = Vec::new();
             let mut content_length = 0_usize;
             loop {
                 let mut header_line = String::new();
@@ -90,6 +154,10 @@ pub(crate) fn spawn_toncenter_v2_mock(
                 {
                     content_length = value.trim().parse().unwrap_or(0);
                 }
+
+                if let Some((name, value)) = header_line.split_once(':') {
+                    headers.push((name.trim().to_string(), value.trim().to_string()));
+                }
             }
 
             if content_length > 0 {
@@ -99,12 +167,21 @@ pub(crate) fn spawn_toncenter_v2_mock(
                     .expect("failed to read toncenter v2 request body");
             }
 
+            captured_requests_thread
+                .lock()
+                .expect("captured toncenter requests mutex poisoned")
+                .push(CapturedToncenterRequest {
+                    method,
+                    path,
+                    headers,
+                });
+
             let raw_response = format!(
                 "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                response.status,
-                status_text(response.status),
-                response.body.len(),
-                response.body
+                status,
+                status_text(status),
+                body.len(),
+                body
             );
             stream
                 .write_all(raw_response.as_bytes())
@@ -115,7 +192,7 @@ pub(crate) fn spawn_toncenter_v2_mock(
         }
     });
 
-    (format!("http://{addr}"), handle)
+    (format!("http://{addr}"), handle, captured_requests)
 }
 
 pub(crate) fn append_custom_network(project_path: &Path, network_name: &str, v2_url: &str) {
@@ -127,6 +204,26 @@ pub(crate) fn append_custom_network(project_path: &Path, network_name: &str, v2_
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}" }}
+"#
+    ));
+    fs::write(&acton_toml_path, acton_toml)
+        .expect("failed to write Acton.toml with custom network");
+}
+
+pub(crate) fn append_custom_network_with_urls(
+    project_path: &Path,
+    network_name: &str,
+    v2_url: &str,
+    v3_url: &str,
+) {
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str(&format!(
+        r#"
+
+[networks.{network_name}]
+api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
     ));
     fs::write(&acton_toml_path, acton_toml)
@@ -166,6 +263,51 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
         status,
         body: serde_json::json!({
             "ok": false,
+            "error": error
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "result": [{
+                    "found": true,
+                    "data": data
+                }]
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v3_account_states_ok_response(
+    address: &str,
+    code_boc: Option<&str>,
+    status: &str,
+) -> ToncenterV3MockResponse {
+    ToncenterV3MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "accounts": [{
+                "address": address,
+                "balance": "0",
+                "code_boc": code_boc,
+                "status": status
+            }]
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v3_error_response(status: u16, error: &str) -> ToncenterV3MockResponse {
+    ToncenterV3MockResponse {
+        status,
+        body: serde_json::json!({
             "error": error
         })
         .to_string(),

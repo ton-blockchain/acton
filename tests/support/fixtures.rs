@@ -101,7 +101,8 @@ impl FixtureProject {
 
     /// Get `ActonCommand` builder for this project
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = ProcessCommandBuilder::new(acton_exe());
+        let cmd = ProcessCommandBuilder::new(acton_exe())
+            .env("ACTON_LOG_DIR", self.project_path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
             project: Arc::new(crate::support::project::ProjectRef {
@@ -121,6 +122,8 @@ impl FixtureProject {
             disasm_api_key: None,
             disasm_net: None,
             disasm_follow_libraries: false,
+            disasm_show_hashes: false,
+            disasm_show_offsets: false,
             compile_json: false,
             compile_base64_only: false,
             compile_boc: None,

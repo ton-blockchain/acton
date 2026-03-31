@@ -35,6 +35,9 @@ BoC value in hex or base64 format.
 
 {{#option "`-o`, `--output` _path_" }}
 Write disassembled output to a file instead of standard output.
+
+If the parent directory does not exist, Acton creates it automatically.
+Existing files are overwritten.
 {{/option}}
 
 {{#option "`--show-hashes`" }}
@@ -59,7 +62,12 @@ TonCenter API key for blockchain queries.
 {{/option}}
 
 {{#option "`--net` _network_" }}
-Network to use for `--address`.
+Network to use for `--address` and library lookups.
+
+Supported values: `mainnet`, `testnet`, `localnet`, `custom:<name>`.
+
+`localnet` and `custom:<name>` resolve through the project network
+configuration in `Acton.toml`.
 
 If omitted, Acton tries mainnet first and then falls back to testnet.
 {{/option}}
@@ -83,9 +91,15 @@ instead of showing only the library hash reference.
 
 When `--address` is used, Acton fetches code from the selected network.
 
+- `--net` accepts `mainnet`, `testnet`, `localnet`, and `custom:<name>`
+- `localnet` and `custom:<name>` use URLs from `Acton.toml`
 - Without `--net`, Acton tries mainnet first and then testnet
 - `--api-key` helps avoid TonCenter rate limits
 - `--follow-libraries` resolves library references when possible
+
+When `--follow-libraries` is used with a local file or `--string`, Acton uses
+the explicit `--net` if provided; otherwise library fetches default to
+testnet.
 
 ## INPUT PRECEDENCE
 
@@ -98,7 +112,10 @@ When `--address` is used, Acton fetches code from the selected network.
 ## SOURCE MAPS
 
 If you compiled a contract with `acton compile --source-map`, you can pass that
-source map here to annotate the disassembly with original Tolk locations.
+source map JSON here to annotate the disassembly with original Tolk locations.
+
+`--source-map` only affects annotations in the output. It does not change which
+BoC is disassembled.
 
 ## EXIT STATUS
 
@@ -137,6 +154,18 @@ source map here to annotate the disassembly with original Tolk locations.
 
    ```bash
    acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes --net testnet
+   ```
+
+6. Write disassembly to a nested output path:
+
+   ```bash
+   acton disasm contract.boc --output build/disasm/contract.tasm
+   ```
+
+7. Resolve library references for a local BoC using a configured custom network:
+
+   ```bash
+   acton disasm contract.boc --follow-libraries --net custom:staging
    ```
 
 ## SEE ALSO

@@ -1,0 +1,13 @@
+off │ instruction
+────┼───────────────────────────────────────
+0   │ SETCP 0
+16  │ DICTPUSHCONST 19 [
+    │     0 => {
+8   │         DROP
+16  │         INMSG_BOUNCED
+32  │         IFRET
+    │     }
+    │ ]
+40  │ DICTIGETJMPZ
+56  │ THROWARG 11
+

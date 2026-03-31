@@ -1,0 +1,4 @@
+Error: Failed to fetch contract boc from mock-remote
+
+Caused by:
+  TonCenter API returned status: 404 Not Found

@@ -32,6 +32,9 @@ BoC value in hex or base64 format.
 \fB\-o\fR, \fB\-\-output\fR \fIpath\fR
 .RS 4
 Write disassembled output to a file instead of standard output.
+.sp
+If the parent directory does not exist, Acton creates it automatically.
+Existing files are overwritten.
 .RE
 .sp
 \fB\-\-show\-hashes\fR
@@ -62,7 +65,12 @@ TonCenter API key for blockchain queries.
 .sp
 \fB\-\-net\fR \fInetwork\fR
 .RS 4
-Network to use for \fB\-\-address\fR\&.
+Network to use for \fB\-\-address\fR and library lookups.
+.sp
+Supported values: \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, \fBcustom:<name>\fR\&.
+.sp
+\fBlocalnet\fR and \fBcustom:<name>\fR resolve through the project network
+configuration in \fBActon.toml\fR\&.
 .sp
 If omitted, Acton tries mainnet first and then falls back to testnet.
 .RE
@@ -101,6 +109,14 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 When \fB\-\-address\fR is used, Acton fetches code from the selected network.
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-net\fR accepts \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and \fBcustom:<name>\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR and \fBcustom:<name>\fR use URLs from \fBActon.toml\fR
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'Without \fB\-\-net\fR, Acton tries mainnet first and then testnet
 .RE
 .sp
@@ -111,6 +127,10 @@ When \fB\-\-address\fR is used, Acton fetches code from the selected network.
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR resolves library references when possible
 .RE
+.sp
+When \fB\-\-follow\-libraries\fR is used with a local file or \fB\-\-string\fR, Acton uses
+the explicit \fB\-\-net\fR if provided; otherwise library fetches default to
+testnet.
 .SH "INPUT PRECEDENCE"
 .sp
 .RS 4
@@ -131,7 +151,10 @@ single library reference and the library lookup succeeds
 .RE
 .SH "SOURCE MAPS"
 If you compiled a contract with \fBacton compile \-\-source\-map\fR, you can pass that
-source map here to annotate the disassembly with original Tolk locations.
+source map JSON here to annotate the disassembly with original Tolk locations.
+.sp
+\fB\-\-source\-map\fR only affects annotations in the output. It does not change which
+BoC is disassembled.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -191,6 +214,26 @@ acton disasm contract.boc \-\-show\-hashes \-\-show\-offsets \-\-source\-map con
 .RS 4
 .nf
 acton disasm \-\-address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-show\-hashes \-\-net testnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Write disassembly to a nested output path:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-output build/disasm/contract.tasm
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Resolve library references for a local BoC using a configured custom network:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-follow\-libraries \-\-net custom:staging
 .fi
 .RE
 .RE
