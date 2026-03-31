@@ -47,10 +47,8 @@ fun reflect.stackSizeOfObject<T>(anyVariable: T): int
     builtin
 
 /// Returns serialization prefix of a struct.
-/// Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`,
-/// where `.0` is the prefix/opcode value and `.1` is its bit length.
+/// Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`.
 /// ```
-/// reflect.serializationPrefixOf<AssetRegular>().0   // 240
 /// reflect.serializationPrefixOf<AssetRegular>().1   // 8
 /// ```
 @pure
