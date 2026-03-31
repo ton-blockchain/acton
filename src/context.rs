@@ -1,8 +1,9 @@
-use crate::debugger::session::{ChildDebugContextSpec, DebugSession, StepMode};
 use crate::file_build_cache::FileBuildCache;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
+use acton_debug::debugger::session::{ChildDebugContextSpec, DebugSession, StepMode};
+use acton_debug::retrace::TolkTraceInfo;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
@@ -58,7 +59,7 @@ pub struct GetMethodAssertFailure {
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
     pub tolk_source_map: Arc<TolkSourceMap>,
-    pub caller_trace: Option<crate::retrace::TolkTraceInfo>,
+    pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
 

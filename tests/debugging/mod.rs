@@ -2,13 +2,14 @@ use acton::context::{
     AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, EmulationsState,
     Env, IoContext, KnownAddresses,
 };
-use acton::debugger::any_executor::AnyExecutor;
-use acton::debugger::replayer_session::ReplayerDebugSession;
+use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
-use acton::replayer::TolkReplayer;
-use acton::{debugger, ffi};
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_debug::debugger;
+use acton_debug::debugger::any_executor::AnyExecutor;
+use acton_debug::debugger::replayer_session::ReplayerDebugSession;
+use acton_debug::replayer::TolkReplayer;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;

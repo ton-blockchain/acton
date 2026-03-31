@@ -35,6 +35,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
+acton-debug = { path = "crates/acton-debug" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolkc = { path = "crates/tolkc" }
@@ -192,6 +193,7 @@ cc = "1.2"
 [dependencies]
 # local crates
 acton-config = { workspace = true }
+acton-debug = { workspace = true }
 acton-mdman = { workspace = true }
 tolkc = { workspace = true }
 ton-abi = { workspace = true }
@@ -242,8 +244,6 @@ toml = { workspace = true }
 
 include_dir = { workspace = true } # include stdlib and Acton lib
 inquire = { workspace = true } # for interactive cli
-crossbeam-channel = { workspace = true } # dap communication
-dap = { workspace = true }
 log = { workspace = true } # overall logging
 fern = { workspace = true } # overall logging
 chrono = { workspace = true }
@@ -303,6 +303,7 @@ expectrl = "0.5.2"
 dap-client = { workspace = true }
 function_name = { workspace = true }
 owo-colors = { workspace = true } # overall coloring
+dap = { workspace = true }
 
 [build-dependencies]
 chrono = { workspace = true }

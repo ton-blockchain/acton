@@ -776,7 +776,7 @@ fn expand_debug_value(state: &mut DapState, dv: &RenderedValue) -> Vec<Variable>
 // Entry point
 // ---------------------------------------------------------------------------
 
-pub(super) fn serve_retrace_dap(
+pub fn serve_retrace_dap(
     replayer: TolkReplayer,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {

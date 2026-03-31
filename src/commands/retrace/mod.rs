@@ -1,11 +1,11 @@
-mod dap;
-
 use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
-use crate::replayer::TolkReplayer;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_debug::commands::retrace::dap::serve_retrace_dap;
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::retrace as debug_retrace;
 use anyhow::{Context, anyhow};
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
@@ -87,7 +87,7 @@ pub fn retrace_cmd(
                     ensure_contract_matches_transaction(contract_name, &result, artifacts)?;
 
                     if let Some(port) = dap_port {
-                        let replayer = crate::retrace::build_tolk_replayer(
+                        let replayer = debug_retrace::build_tolk_replayer(
                             &result.emulated_tx.vm_logs,
                             &artifacts.tolk_source_map,
                         )
@@ -98,7 +98,7 @@ pub fn retrace_cmd(
                             )
                         })?;
 
-                        dap::serve_retrace_dap(replayer, port)
+                        serve_retrace_dap(replayer, port)
                             .map_err(|err| anyhow!(err.to_string()))?;
                     }
                 }
@@ -118,7 +118,7 @@ pub fn retrace_cmd(
 
 #[allow(dead_code)]
 pub(crate) fn serve_prepared_retrace_dap(replayer: TolkReplayer, port: u16) -> anyhow::Result<()> {
-    dap::serve_retrace_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
+    serve_retrace_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
 }
 
 fn print_retrace_result(

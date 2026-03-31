@@ -16,18 +16,21 @@ use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
 };
-use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::dap::DapTransport;
-use crate::debugger::replayer_session::ReplayerDebugSession;
+use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
-use crate::replayer::TolkReplayer;
-use crate::{debugger, ffi};
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
+use acton_debug::debugger::any_executor::AnyExecutor;
+use acton_debug::debugger::dap::{
+    DapTransport, reserve_dap_listener, start_dap_server_with_listener,
+};
+use acton_debug::debugger::replayer_session::ReplayerDebugSession;
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::retrace;
 use anyhow::anyhow;
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -109,7 +112,7 @@ impl<'a> TestRunner<'a> {
         mutation_overrides: BTreeMap<String, Cell>,
     ) -> anyhow::Result<TestRunner<'a>> {
         let transport = if let Some(listener) = debug_listener {
-            debugger::dap::start_dap_server_with_listener(listener)?
+            start_dap_server_with_listener(listener)?
         } else {
             DapTransport::dummy()
         };
@@ -478,7 +481,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     let acton_config = ActonConfig::load()?;
     let debug_listener = if config.debug {
-        Some(debugger::dap::reserve_dap_listener(config.debug_port)?)
+        Some(reserve_dap_listener(config.debug_port)?)
     } else {
         None
     };
@@ -1007,8 +1010,7 @@ fn run_file_tests(
         if let (Some(AssertFailure::GetMethod(failure)), GetMethodResult::Success(result)) =
             (&mut assert_failure, &get_result)
         {
-            failure.caller_trace =
-                crate::retrace::find_execution_trace(&result.vm_log, &tolk_source_map);
+            failure.caller_trace = retrace::find_execution_trace(&result.vm_log, &tolk_source_map);
         }
 
         let (exit_code, gas_used) = match &get_result {

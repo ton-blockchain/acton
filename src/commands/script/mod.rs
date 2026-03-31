@@ -3,17 +3,19 @@ use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
 };
-use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::replayer_session::ReplayerDebugSession;
 use crate::exit_codes;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
-use crate::retrace;
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
 use acton_config::test::BacktraceMode;
+use acton_debug::debugger::any_executor::AnyExecutor;
+use acton_debug::debugger::dap::{reserve_dap_listener, start_dap_server_with_listener};
+use acton_debug::debugger::replayer_session::ReplayerDebugSession;
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::retrace;
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;
@@ -98,7 +100,7 @@ pub fn script_cmd(
         None => None,
     };
     let debug_listener = if debug {
-        Some(crate::debugger::dap::reserve_dap_listener(debug_port)?)
+        Some(reserve_dap_listener(debug_port)?)
     } else {
         None
     };
@@ -306,14 +308,14 @@ fn execute_script(
 
         let listener = debug_listener
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
-        let transport = crate::debugger::dap::start_dap_server_with_listener(listener)?;
+        let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
         executor.prepare(0, &stack_b64)?;
         let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
             anyhow!("Compiler did not return debug info for script debug session")
         })?;
 
-        let replayer = crate::replayer::TolkReplayer::new_live_vm(
+        let replayer = TolkReplayer::new_live_vm(
             tolk_source_map.source_map.clone(),
             marks_dict,
             AnyExecutor::Get(executor.clone()),

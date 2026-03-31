@@ -1,4 +1,3 @@
-use crate::commands::common::error_fmt;
 use anyhow::Context;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::errors::{DeserializationError, ServerError};
@@ -106,15 +105,17 @@ impl DapTransport {
     }
 }
 
-pub(crate) fn reserve_dap_listener(port: u16) -> anyhow::Result<TcpListener> {
-    let address = format!("127.0.0.1:{port}");
-    TcpListener::bind(&address)
-        .with_context(|| error_fmt::port_bind_failure("debug server", &address, "--debug-port"))
+fn port_bind_failure(service: &str, address: &str, flag: &str) -> String {
+    format!("Failed to bind {service} on {address}. Use {flag} to choose a free port.")
 }
 
-pub(crate) fn start_dap_server_with_listener(
-    listener: TcpListener,
-) -> anyhow::Result<DapTransport> {
+pub fn reserve_dap_listener(port: u16) -> anyhow::Result<TcpListener> {
+    let address = format!("127.0.0.1:{port}");
+    TcpListener::bind(&address)
+        .with_context(|| port_bind_failure("debug server", &address, "--debug-port"))
+}
+
+pub fn start_dap_server_with_listener(listener: TcpListener) -> anyhow::Result<DapTransport> {
     let address = listener
         .local_addr()
         .context("Failed to inspect reserved debug server address")?
