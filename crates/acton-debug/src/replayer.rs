@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use crate::debugger::any_executor::AnyExecutor;
+use crate::debugger::AnyExecutor;
 use crate::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -394,7 +394,7 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
 
 fn live_vm_code_pos(executor: &AnyExecutor) -> Option<(String, i32)> {
     let pos = executor.get_code_pos();
-    let (hash, offset) = pos.split_once(':')?;
+    let (hash, offset): (&str, &str) = pos.split_once(':')?;
     let offset = offset.parse::<i32>().ok()?;
     Some((hash.to_string(), offset))
 }

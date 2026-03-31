@@ -6,10 +6,9 @@ use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
-use acton_debug::debugger;
-use acton_debug::debugger::any_executor::AnyExecutor;
-use acton_debug::debugger::replayer_session::ReplayerDebugSession;
+use acton_debug::debugger::{AnyExecutor, ReplayerDebugSession};
 use acton_debug::replayer::TolkReplayer;
+use acton_debug::start_dap_server;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -303,7 +302,7 @@ fn execute_script<'a>(
     let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
 
-    let transport = debugger::start_dap_server(debug_port)?;
+    let transport = start_dap_server(debug_port)?;
     executor.prepare(0, &stack)?;
     let replayer =
         TolkReplayer::new_live_vm(tolk_source_map.as_ref(), AnyExecutor::Get(executor.clone()))?;

@@ -76,7 +76,6 @@ impl<R: BufRead, W: Write> Server<R, W> {
         }
     }
 
-    #[allow(clippy::never_loop)]
     fn poll_request(&mut self) -> Result<Option<IncomingRequest>, Box<dyn std::error::Error>> {
         poll_incoming_request(&mut self.input_buffer).map_err(Into::into)
     }

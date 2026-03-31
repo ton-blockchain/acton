@@ -3,7 +3,7 @@ use crate::retrace::TolkTraceInfo;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
-use acton_debug::debugger::session::{ChildDebugContextSpec, DebugSession};
+use acton_debug::debugger::{ChildDebugContextSpec, DebugSession};
 use acton_debug::replayer::StepMode;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};

@@ -1,1 +1,1 @@
-pub mod dap;
+pub(crate) mod dap;

@@ -113,14 +113,14 @@ impl fmt::Display for RenderedValue {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy)]
-pub enum SlotValue<'a> {
+pub(crate) enum SlotValue<'a> {
     Live(&'a VmStackValue),
     LastSeen(&'a VmStackValue),
     OptimizedOut,
 }
 
 impl<'a> SlotValue<'a> {
-    pub const fn is_optimized_out(&self) -> bool {
+    pub(crate) const fn is_optimized_out(&self) -> bool {
         matches!(self, SlotValue::OptimizedOut)
     }
 }
@@ -709,7 +709,11 @@ fn debug_format(
     }
 }
 
-pub fn debug_print_from_stack(symbols: &SourceMap, slots: &[SlotValue], ty: &Ty) -> RenderedValue {
+pub(crate) fn debug_print_from_stack(
+    symbols: &SourceMap,
+    slots: &[SlotValue],
+    ty: &Ty,
+) -> RenderedValue {
     let mut r = StackReader::new(slots);
     debug_format(symbols, &mut r, ty, false)
 }
@@ -721,7 +725,7 @@ pub fn debug_print_from_stack(symbols: &SourceMap, slots: &[SlotValue], ty: &Ty)
 // least one MARK_STACK during replay so far.
 // ---------------------------------------------------------------------------
 
-pub fn debug_format_lazy(
+pub(crate) fn debug_format_lazy(
     symbols: &SourceMap,
     slot_values: &[SlotValue],
     ir_slots: &[usize],

@@ -25,11 +25,10 @@ use acton_config::config::{
     ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
-use acton_debug::debugger::any_executor::AnyExecutor;
-use acton_debug::debugger::dap::{
-    DapTransport, reserve_dap_listener, start_dap_server_with_listener,
+use acton_debug::debugger::{
+    AnyExecutor, DapTransport, ReplayerDebugSession, reserve_dap_listener,
+    start_dap_server_with_listener,
 };
-use acton_debug::debugger::replayer_session::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
 use anyhow::anyhow;
 use dunce;
