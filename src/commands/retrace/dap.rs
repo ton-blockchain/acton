@@ -173,7 +173,7 @@ impl<R: BufRead, W: Write> Server<R, W> {
     fn send_json_value(&mut self, value: &Value) -> Result<(), Box<dyn std::error::Error>> {
         let json = serde_json::to_string(value)?;
         write!(self.output_buffer, "Content-Length: {}\r\n\r\n", json.len())?;
-        write!(self.output_buffer, "{json}\r\n")?;
+        write!(self.output_buffer, "{json}")?;
         self.output_buffer.flush()?;
         Ok(())
     }
@@ -192,10 +192,10 @@ struct DapState {
     config_done: bool,
 
     next_req_id: i64,
-    /// Maps frame ref_id (returned in StackTrace) -> depth_from_top (0 = innermost).
+    /// Maps frame ref_id (returned in StackTrace) → depth_from_top (0 = innermost).
     /// Rebuilt on every StackTrace request.
     frame_to_depth: HashMap<i64, usize>,
-    /// Maps variable req_id -> RenderedValue for structured drill-down.
+    /// Maps variable req_id → RenderedValue for structured drill-down.
     /// Rebuilt on every StackTrace request (old values are stale after stepping).
     vars_debug_values: HashMap<i64, RenderedValue>,
 }
@@ -451,7 +451,7 @@ fn handle_launch(
         state.config_done = false;
         Ok(req.success(ResponseBody::Launch))
     } else {
-        Ok(req.error("Retrace replayer is not initialized"))
+        Ok(req.error("Debugger is not initialized"))
     }
 }
 
@@ -466,7 +466,7 @@ fn handle_attach(
         state.config_done = false;
         Ok(req.success(ResponseBody::Attach))
     } else {
-        Ok(req.error("Retrace replayer is not initialized"))
+        Ok(req.error("Debugger is not initialized"))
     }
 }
 
@@ -653,7 +653,7 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
         }));
     };
 
-    // Now allocate frame IDs (mutable borrow of state - no conflict with replayer)
+    // Now allocate frame IDs (mutable borrow of state — no conflict with replayer)
     state.frame_to_depth.clear();
     state.vars_debug_values.clear();
     let total = 1 + parents.len();
@@ -731,7 +731,7 @@ fn handle_variables(
 ) -> Response {
     let req_id = args.variables_reference;
 
-    // Path A: frame-level request - return top-level locals
+    // Path A: frame-level request — return top-level locals
     if let Some(&depth) = state.frame_to_depth.get(&req_id) {
         let locals = state
             .replayer
