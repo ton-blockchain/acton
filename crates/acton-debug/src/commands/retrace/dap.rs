@@ -19,6 +19,7 @@ use dap::types::{
 };
 use serde_json::Value;
 
+use crate::debugger::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::types_render::RenderedValue;
 
@@ -57,13 +58,6 @@ fn make_capabilities() -> types::Capabilities {
 // Transport
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
-enum IncomingRequest {
-    Known(Request),
-    Unsupported { seq: i64, command: String },
-}
-
 /// Local transport with the same API surface we use from `dap::Server`,
 /// but with tolerant parsing of unknown custom requests.
 struct Server<R: BufRead, W: Write> {
@@ -83,59 +77,7 @@ impl<R: BufRead, W: Write> Server<R, W> {
 
     #[allow(clippy::never_loop)]
     fn poll_request(&mut self) -> Result<Option<IncomingRequest>, Box<dyn std::error::Error>> {
-        loop {
-            let mut content_length = None;
-
-            loop {
-                let mut line = String::new();
-                let read_size = self.input_buffer.read_line(&mut line)?;
-                if read_size == 0 {
-                    return Ok(None);
-                }
-
-                let trimmed = line.trim_end();
-                if trimmed.is_empty() {
-                    if content_length.is_some() {
-                        break;
-                    }
-                    continue;
-                }
-
-                let Some((header, value)) = trimmed.split_once(':') else {
-                    return Err(format!("Invalid DAP header: {trimmed}").into());
-                };
-
-                if header == "Content-Length" {
-                    content_length = Some(value.trim().parse()?);
-                }
-            }
-
-            let Some(content_length) = content_length else {
-                return Err("Missing Content-Length header".into());
-            };
-
-            let mut content = vec![0; content_length];
-            self.input_buffer.read_exact(&mut content)?;
-
-            let value: Value = serde_json::from_slice(&content)?;
-            match serde_json::from_value::<Request>(value.clone()) {
-                Ok(request) => return Ok(Some(IncomingRequest::Known(request))),
-                Err(err) => {
-                    let is_request = value.get("type").and_then(Value::as_str) == Some("request");
-                    let seq = value.get("seq").and_then(Value::as_i64);
-                    let command = value
-                        .get("command")
-                        .and_then(Value::as_str)
-                        .map(str::to_owned);
-
-                    if is_request && let (Some(seq), Some(command)) = (seq, command) {
-                        return Ok(Some(IncomingRequest::Unsupported { seq, command }));
-                    }
-
-                    return Err(format!("Error while deserializing DAP request: {err}").into());
-                }
-            }
-        }
+        poll_incoming_request(&mut self.input_buffer).map_err(Into::into)
     }
 
     fn send(&mut self, body: Sendable) -> Result<(), Box<dyn std::error::Error>> {

@@ -1,11 +1,11 @@
+use crate::debugger::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
 use anyhow::Context;
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use dap::errors::{DeserializationError, ServerError};
 use dap::events::Event;
 use dap::prelude::{Request, Response, Server};
 use log::{debug, error, info, warn};
-use std::io::{BufRead, BufReader, BufWriter, Cursor, Read};
-use std::net::{TcpListener, TcpStream};
+use std::io::{BufReader, BufWriter, Cursor};
+use std::net::TcpListener;
 use std::thread;
 use std::time::Duration;
 
@@ -13,78 +13,6 @@ use std::time::Duration;
 pub enum DapMessage {
     Response(Response),
     Event(Event),
-}
-
-#[derive(Debug)]
-enum ServerState {
-    /// Expecting a header
-    Header,
-    /// Expecting content
-    Content,
-}
-
-pub fn poll_request(
-    input_buffer: &mut BufReader<TcpStream>,
-) -> Result<Option<Request>, ServerError> {
-    let mut state = ServerState::Header;
-    let mut buffer = String::new();
-    let mut content_length: usize = 0;
-
-    loop {
-        match input_buffer.read_line(&mut buffer) {
-            Ok(read_size) => {
-                if read_size == 0 {
-                    break Ok(None);
-                }
-                match state {
-                    ServerState::Header => {
-                        let parts: Vec<&str> = buffer.trim_end().split(':').collect();
-                        if parts.len() == 2 {
-                            match parts[0] {
-                                "Content-Length" => {
-                                    content_length = match parts[1].trim().parse() {
-                                        Ok(val) => val,
-                                        Err(_) => {
-                                            return Err(ServerError::HeaderParseError {
-                                                line: buffer,
-                                            });
-                                        }
-                                    };
-                                    buffer.clear();
-                                    buffer.reserve(content_length);
-                                    state = ServerState::Content;
-                                }
-                                other => {
-                                    return Err(ServerError::UnknownHeader {
-                                        header: other.to_string(),
-                                    });
-                                }
-                            }
-                        } else {
-                            return Err(ServerError::HeaderParseError { line: buffer });
-                        }
-                    }
-                    ServerState::Content => {
-                        buffer.clear();
-                        let mut content = vec![0; content_length];
-                        input_buffer
-                            .read_exact(content.as_mut_slice())
-                            .map_err(ServerError::IoError)?;
-
-                        let content = std::str::from_utf8(content.as_slice()).map_err(|e| {
-                            ServerError::ParseError(DeserializationError::DecodingError(e))
-                        })?;
-                        let request: Request = serde_json::from_str(content).map_err(|e| {
-                            ServerError::ParseError(DeserializationError::SerdeError(e))
-                        })?;
-                        debug!("Received DAP request: {request:?}");
-                        return Ok(Some(request));
-                    }
-                }
-            }
-            Err(e) => return Err(ServerError::IoError(e)),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -141,11 +69,14 @@ pub fn start_dap_server_with_listener(listener: TcpListener) -> anyhow::Result<D
             // Since `poll_request` is blocking, run it in the separate thread
             let reader_thread = thread::spawn(move || -> anyhow::Result<()> {
                 loop {
-                    let req = poll_request(&mut input);
+                    let req = poll_incoming_request(&mut input);
                     match req {
-                        Ok(Some(req)) => {
+                        Ok(Some(IncomingRequest::Known(req))) => {
                             debug!("Processing DAP request: {:?}", req.command);
                             req_sender_for_reader.send(req.clone())?;
+                        }
+                        Ok(Some(IncomingRequest::Unsupported { command, .. })) => {
+                            info!("Ignoring custom DAP request {command}");
                         }
                         Ok(None) => {
                             // No more requests, connection might be closed
