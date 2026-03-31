@@ -264,8 +264,15 @@ impl ReplayerDebugSession {
         }
     }
 
-    fn send_initial_stop(&self) -> anyhow::Result<()> {
-        self.send_stopped(StoppedEventReason::Step, None, None)
+    fn has_breakpoints(&self) -> bool {
+        self.breakpoints
+            .values()
+            .any(|breakpoints| !breakpoints.is_empty())
+    }
+
+    fn reapply_pending_debug_state(&mut self) {
+        self.set_exception_mode(self.exception_mode);
+        self.apply_breakpoints_to_all_contexts();
     }
 
     fn format_frame_name(
@@ -427,23 +434,15 @@ impl ReplayerDebugSession {
                 self.send_event(Event::Initialized)?;
             }
             Command::Launch(_) => {
+                self.reapply_pending_debug_state();
                 self.send_response(req.success(ResponseBody::Launch))?;
             }
             Command::Attach(AttachRequestArguments { .. }) => {
+                self.reapply_pending_debug_state();
                 self.send_response(req.success(ResponseBody::Attach))?;
             }
             Command::ConfigurationDone => {
-                self.send_response(req.success(ResponseBody::ConfigurationDone))?;
-
-                let is_end = self.step(StepMode::StepInto);
-                if is_end {
-                    if terminate_at_end {
-                        self.send_terminated()?;
-                    }
-                    return Ok(true);
-                }
-
-                self.send_initial_stop()?;
+                return self.handle_configuration_done(req, terminate_at_end);
             }
             Command::Threads => {
                 self.send_response(req.success(ResponseBody::Threads(ThreadsResponse {
@@ -462,7 +461,7 @@ impl ReplayerDebugSession {
                 self.send_response(req.success(body))?;
             }
             Command::ExceptionInfo(_) => {
-                self.send_response(req.success(self.exception_info()?))?;
+                self.send_response(self.handle_exception_info(req)?)?;
             }
             Command::StackTrace(_) => {
                 let body = self.stack_trace();
@@ -555,6 +554,44 @@ impl ReplayerDebugSession {
             _ => {
                 return Err(anyhow!("Unhandled command: {:?}", req.command));
             }
+        }
+
+        Ok(false)
+    }
+
+    fn handle_exception_info(&self, req: Request) -> anyhow::Result<Response> {
+        Ok(req.success(self.exception_info()?))
+    }
+
+    fn handle_configuration_done(
+        &mut self,
+        req: Request,
+        terminate_at_end: bool,
+    ) -> anyhow::Result<bool> {
+        self.send_response(req.success(ResponseBody::ConfigurationDone))?;
+
+        let step_mode = if self.has_breakpoints() {
+            StepMode::RunUntilBreakpoint
+        } else {
+            StepMode::StepOver
+        };
+        self.performing_step = Some(step_mode);
+        let is_end = self.step_active_context(step_mode);
+        if is_end {
+            if terminate_at_end {
+                self.send_terminated()?;
+            }
+            return Ok(true);
+        }
+
+        if let Some(ids) = self.current_breakpoint_ids() {
+            self.send_stopped(
+                StoppedEventReason::Breakpoint,
+                Some("Breakpoint hit".to_string()),
+                Some(ids),
+            )?;
+        } else {
+            self.send_stopped(StoppedEventReason::Entry, None, None)?;
         }
 
         Ok(false)
