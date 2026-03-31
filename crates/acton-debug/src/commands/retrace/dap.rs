@@ -10,8 +10,9 @@ use std::net::TcpListener;
 use dap::base_message::{BaseMessage, Sendable};
 use dap::prelude::*;
 use dap::responses::{
-    ContinueResponse, ExceptionInfoResponse, ScopesResponse, SetBreakpointsResponse,
-    SetExceptionBreakpointsResponse, StackTraceResponse, ThreadsResponse, VariablesResponse,
+    ContinueResponse, EvaluateResponse, ExceptionInfoResponse, ScopesResponse,
+    SetBreakpointsResponse, SetExceptionBreakpointsResponse, StackTraceResponse, ThreadsResponse,
+    VariablesResponse,
 };
 use dap::types::{
     Breakpoint, ExceptionBreakMode, ExceptionBreakpointsFilter, Scope, ScopePresentationhint,
@@ -415,6 +416,15 @@ fn handle_request(
             state.replayer = None;
             req.success(ResponseBody::Disconnect)
         }
+        Command::Evaluate(args) => req.success(ResponseBody::Evaluate(EvaluateResponse {
+            result: args.expression,
+            type_field: None,
+            presentation_hint: None,
+            variables_reference: 0,
+            named_variables: None,
+            indexed_variables: None,
+            memory_reference: None,
+        })),
         _ => req.error("Unsupported command"),
     };
 
