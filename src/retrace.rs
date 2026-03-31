@@ -20,12 +20,6 @@ pub struct TolkBacktraceFrame {
 }
 
 #[derive(Debug, Clone)]
-pub struct TolkTraceLine {
-    pub function_name: String,
-    pub loc: SourceLocation,
-}
-
-#[derive(Debug, Clone)]
 pub struct TolkTraceInfo {
     pub loc: SourceLocation,
     pub backtrace: Vec<TolkBacktraceFrame>,
