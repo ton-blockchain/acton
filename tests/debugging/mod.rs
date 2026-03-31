@@ -3,9 +3,10 @@ use acton::context::{
     Env, IoContext, KnownAddresses,
 };
 use acton::debugger::any_executor::AnyExecutor;
-use acton::debugger::debug_context::DebugContext;
+use acton::debugger::replayer_session::ReplayerDebugSession;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
+use acton::replayer::TolkReplayer;
 use acton::{debugger, ffi};
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use dap::events::Event;
@@ -21,7 +22,7 @@ use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use std::{fs, thread};
 use tasm::printer::FormatOptions;
-use tolkc::CompilerResult;
+use tolkc::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -32,7 +33,6 @@ use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -163,16 +163,22 @@ pub(crate) fn run_script_file(
 
     match compiler.compile(Path::new(file_path), true) {
         CompilerResult::Success(result) => {
+            let code = Boc::decode_base64(&result.code_boc64)?;
             let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
             let data_cell = TonCell::empty().clone();
+            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                result.new_source_map.unwrap_or_default(),
+                &code,
+                result.debug_mark_base64.as_deref(),
+            )?);
 
             fs::write(
                 "out.source_map.json",
-                serde_json::to_string(&result.source_map)?,
+                serde_json::to_string(&*tolk_source_map)?,
             )?;
 
             let disasm = tasm::decompile::Disassembler::new();
-            let code = disasm.decompile_cell(&Boc::decode_base64(&result.code_boc64)?)?;
+            let code = disasm.decompile_cell(&code)?;
             fs::write(
                 "out.disasm.txt",
                 code.print(&FormatOptions {
@@ -184,12 +190,11 @@ pub(crate) fn run_script_file(
             fs::write("out.disasm.fif", result.fift_code)?;
             fs::write("out.boc", code_cell.to_boc()?)?;
 
-            let source_map = result.source_map.unwrap_or_default();
             let (script_result, io, formatter) = execute_script(
                 &code_cell,
                 &data_cell,
                 abi.into(),
-                source_map.into(),
+                tolk_source_map,
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
                 stack,
@@ -206,7 +211,7 @@ fn execute_script<'a>(
     code_cell: &'a TonCell,
     data_cell: &'a TonCell,
     abi: Arc<ContractAbi>,
-    source_map: Arc<SourceMap>,
+    tolk_source_map: Arc<TolkSourceMap>,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
@@ -298,17 +303,18 @@ fn execute_script<'a>(
     ffi::register(&mut executor, &mut ctx);
 
     let transport = debugger::start_dap_server(debug_port)?;
-
-    let mut dbg_ctx = DebugContext::new(
-        transport,
-        AnyExecutor::Get(executor.clone()),
-        source_map,
-        "main".into(),
-    );
-
-    ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
     executor.prepare(0, &stack)?;
+    let marks_dict = tolk_source_map
+        .marks_dict
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Compiler did not return debug info for debug test"))?;
+    let replayer = TolkReplayer::new_live_vm(
+        tolk_source_map.source_map.clone(),
+        marks_dict,
+        AnyExecutor::Get(executor.clone()),
+    );
+    let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
+    ctx.debug = DebugCtx::new(&mut dbg_session);
 
     ctx.debug.process_incoming_requests(true)?;
 

@@ -18,9 +18,10 @@ use crate::context::{
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::dap::DapTransport;
-use crate::debugger::debug_context::DebugContext;
+use crate::debugger::replayer_session::ReplayerDebugSession;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::replayer::TolkReplayer;
 use crate::{debugger, ffi};
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -227,7 +228,7 @@ impl<'a> TestRunner<'a> {
         code_cell: &Cell,
         dest_address: &str,
         abi: Arc<ContractAbi>,
-        source_map: Arc<SourceMap>,
+        tolk_source_map: Arc<TolkSourceMap>,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.minimal_log_verbosity();
 
@@ -322,17 +323,18 @@ impl<'a> TestRunner<'a> {
                 let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
-
-                let mut dbg_ctx = DebugContext::new(
-                    self.transport.clone(),
-                    AnyExecutor::Get(executor.clone()),
-                    source_map,
-                    test.name.clone(),
-                );
-
-                ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
                 executor.prepare(test.id, &stack)?;
+                let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
+                    anyhow!("Compiler did not return debug info for unit test debug session")
+                })?;
+                let replayer = TolkReplayer::new_live_vm(
+                    tolk_source_map.source_map.clone(),
+                    marks_dict,
+                    AnyExecutor::Get(executor.clone()),
+                );
+                let mut dbg_session =
+                    ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
+                ctx.debug = DebugCtx::new(&mut dbg_session);
 
                 ctx.debug.process_incoming_requests(true)?;
 
@@ -974,8 +976,13 @@ fn run_file_tests(
         }
 
         let start_time = Instant::now();
-        let result =
-            runner.execute_test(test, code, &dest_address, abi.clone(), source_map.clone());
+        let result = runner.execute_test(
+            test,
+            code,
+            &dest_address,
+            abi.clone(),
+            tolk_source_map.clone(),
+        );
         let result = match result {
             Ok(result) => result,
             Err(err) => {
