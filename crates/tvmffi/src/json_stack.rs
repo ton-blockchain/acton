@@ -231,6 +231,14 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(TupleItem::Tuple(Tuple(items)))
         }
+        "cont" => {
+            let bytes = val
+                .get("bytes")
+                .and_then(|v| v.as_str())
+                .context("cont must have bytes")?;
+            let c = Boc::decode_base64(bytes)?;
+            Ok(TupleItem::Cont(crate::stack::ContData::from_code(c)))
+        }
         "list" => {
             let elements = val
                 .get("elements")
