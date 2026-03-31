@@ -37,6 +37,20 @@ pub fn retrace_cmd(
         }
     }
 
+    if dap_port.is_some() && contract.is_none() {
+        anyhow::bail!(
+            "{} requires {}",
+            "--dap-port".yellow(),
+            "--contract <NAME>".yellow()
+        );
+    }
+
+    let contract_artifacts = if let Some(contract_name) = contract.as_deref() {
+        Some(build_contract_trace_artifacts(contract_name)?)
+    } else {
+        None
+    };
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -66,17 +80,10 @@ pub fn retrace_cmd(
                 }
                 print_retrace_result(network, &result, verbose, logs_dir.as_ref());
 
-                if dap_port.is_some() && contract.is_none() {
-                    anyhow::bail!(
-                        "{} requires {}",
-                        "--dap-port".yellow(),
-                        "--contract <NAME>".yellow()
-                    );
-                }
-
-                if let Some(contract_name) = &contract {
-                    let artifacts = build_contract_trace_artifacts(contract_name)?;
-                    ensure_contract_matches_transaction(contract_name, &result, &artifacts)?;
+                if let (Some(contract_name), Some(artifacts)) =
+                    (contract.as_deref(), contract_artifacts.as_ref())
+                {
+                    ensure_contract_matches_transaction(contract_name, &result, artifacts)?;
 
                     if let Some(port) = dap_port {
                         let replayer = crate::retrace::build_tolk_replayer(
@@ -489,7 +496,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
             anyhow::bail!(
                 "Failed to compile contract {} for source-level retrace: {}",
                 contract_name.yellow(),
-                error.message
+                error.message.trim_end()
             );
         }
     }

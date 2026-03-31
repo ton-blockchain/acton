@@ -783,10 +783,7 @@ pub(super) fn serve_retrace_dap(
     let address = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&address)?;
 
-    println!("Retrace DAP listening on {address}");
-    println!(
-        "Use a VS Code launch config with type 'tolk', request 'launch', and debugServer={port}"
-    );
+    println!("Debugger listening on {address}");
 
     let (stream, remote_addr) = listener.accept()?;
     println!("DAP client connected from {remote_addr}");
@@ -808,7 +805,6 @@ pub(super) fn serve_retrace_dap(
                 }
             }
             IncomingRequest::Unsupported { seq, command } => {
-                println!("Ignoring custom DAP request {command}");
                 server.respond_custom_success(seq, &command)?;
             }
         }
@@ -818,7 +814,6 @@ pub(super) fn serve_retrace_dap(
         match server.poll_request()? {
             Some(IncomingRequest::Known(req)) => handle_request(&mut state, req, &mut server)?,
             Some(IncomingRequest::Unsupported { seq, command }) => {
-                println!("Ignoring custom DAP request {command}");
                 server.respond_custom_success(seq, &command)?;
             }
             None => break,
