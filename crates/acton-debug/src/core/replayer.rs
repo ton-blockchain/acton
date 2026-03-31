@@ -5,8 +5,8 @@
 
 #![allow(clippy::unwrap_used)]
 
-use crate::debugger::AnyExecutor;
-use crate::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
+use super::any_executor::AnyExecutor;
+use super::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
 use tolkc::TolkSourceMap;

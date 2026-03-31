@@ -1,13 +1,11 @@
-//! DAP-facing debugger components built on top of [`crate::replayer`].
+//! Multi-context DAP transport and session glue built on top of the shared replayer.
 
-mod any_executor;
-mod dap;
+mod dap_transport;
 mod replayer_session;
 pub(crate) mod request_parser;
 mod session;
 
-pub use any_executor::AnyExecutor;
-pub use dap::{
+pub use dap_transport::{
     DapMessage, DapTransport, reserve_dap_listener, start_dap_server,
     start_dap_server_with_listener,
 };

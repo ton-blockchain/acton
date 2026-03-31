@@ -1,4 +1,4 @@
-use crate::debugger::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
+use crate::multi::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
 use anyhow::Context;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::Event;

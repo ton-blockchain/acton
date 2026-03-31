@@ -4,7 +4,7 @@ use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::serve_retrace_dap;
+use acton_debug::serve_single_replayer_dap;
 use anyhow::{Context, anyhow};
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
@@ -96,7 +96,7 @@ pub fn retrace_cmd(
                                 )
                             })?;
 
-                        serve_retrace_dap(replayer, port)
+                        serve_single_replayer_dap(replayer, port)
                             .map_err(|err| anyhow!(err.to_string()))?;
                     }
                 }
@@ -116,7 +116,7 @@ pub fn retrace_cmd(
 
 #[allow(dead_code)]
 pub(crate) fn serve_prepared_retrace_dap(replayer: TolkReplayer, port: u16) -> anyhow::Result<()> {
-    serve_retrace_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
+    serve_single_replayer_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
 }
 
 fn print_retrace_result(

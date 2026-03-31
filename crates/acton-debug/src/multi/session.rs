@@ -1,4 +1,4 @@
-use crate::debugger::any_executor::AnyExecutor;
+use crate::AnyExecutor;
 use crate::replayer::StepMode;
 use std::sync::Arc;
 use tolkc::TolkSourceMap;

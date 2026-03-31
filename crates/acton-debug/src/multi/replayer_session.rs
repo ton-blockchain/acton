@@ -1,5 +1,5 @@
-use crate::debugger::dap::{DapMessage, DapTransport};
-use crate::debugger::session::{ChildDebugContextSpec, DebugSession};
+use crate::multi::dap_transport::{DapMessage, DapTransport};
+use crate::multi::session::{ChildDebugContextSpec, DebugSession};
 use crate::replayer::{
     self, CallFrameInfo, ExceptionInfo, LocalVarRendered, StepMode, TolkReplayer,
 };

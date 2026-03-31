@@ -12,10 +12,10 @@ use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
 use acton_config::test::BacktraceMode;
-use acton_debug::debugger::{
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::{
     AnyExecutor, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
 };
-use acton_debug::replayer::TolkReplayer;
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;

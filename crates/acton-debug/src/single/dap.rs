@@ -1,4 +1,4 @@
-//! DAP (Debug Adapter Protocol) server for Tolk retrace sessions.
+//! Standalone DAP (Debug Adapter Protocol) server for a single `TolkReplayer`.
 //! Mirrors `tolk-replay` DAP as closely as possible, but:
 //! 1. uses tolerant request parsing for custom VS Code messages
 //! 2. attaches to an already prepared `TolkReplayer`
@@ -20,7 +20,7 @@ use dap::types::{
 };
 use serde_json::Value;
 
-use crate::debugger::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
+use crate::multi::request_parser::{IncomingRequest, poll_request as poll_incoming_request};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::types_render::RenderedValue;
 
@@ -793,7 +793,7 @@ fn expand_debug_value(state: &mut DapState, dv: &RenderedValue) -> Vec<Variable>
 // Entry point
 // ---------------------------------------------------------------------------
 
-pub fn serve_retrace_dap(
+pub fn serve_single_replayer_dap(
     replayer: TolkReplayer,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
