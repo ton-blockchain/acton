@@ -283,7 +283,13 @@ impl RuntimeEventSource for VmLogRuntimeEventSource {
 pub struct LiveVmRuntimeEventSource {
     executor: DebugExecutorHandle,
     terminated: bool,
+    pending_instruction: Option<PendingLiveInstruction>,
     pending_events: VecDeque<RuntimeEvent>,
+}
+
+enum PendingLiveInstruction {
+    Normal(String),
+    ImplicitJmpRef,
 }
 
 impl LiveVmRuntimeEventSource {
@@ -291,6 +297,7 @@ impl LiveVmRuntimeEventSource {
         Self {
             executor,
             terminated: false,
+            pending_instruction: None,
             pending_events: VecDeque::new(),
         }
     }
@@ -306,12 +313,46 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
             return None;
         }
 
-        // Live SBS execution currently only exposes "step, then inspect current state".
-        // Because of that:
-        // - EachAsmInstruction is only best-effort compared to VM-log replay;
-        // - exception breakpoints and caught-vs-uncaught detection do not work;
-        // - locals/stack rendering are lossy because the executor snapshot shape is poorer
-        //   than VM logs, especially for slices, continuations and exact stack layout.
+        if let Some(pending_instruction) = self.pending_instruction.take() {
+            let is_end = self.executor.step();
+            match pending_instruction {
+                PendingLiveInstruction::Normal(instr_name) => {
+                    self.pending_events
+                        .push_back(RuntimeEvent::AfterInstruction { instr_name });
+                }
+                PendingLiveInstruction::ImplicitJmpRef => {}
+            }
+
+            let snapshot = self.executor.snapshot();
+            if let Some(values) = snapshot.stack_values {
+                self.pending_events
+                    .push_back(RuntimeEvent::Stack { values });
+            }
+            if let Some(position) = snapshot.code_position {
+                self.pending_events.push_back(RuntimeEvent::Position {
+                    cell_hash: position.cell_hash,
+                    offset: position.offset,
+                });
+            }
+
+            self.terminated = is_end;
+            return self.pending_events.pop_front();
+        }
+
+        // Live SBS execution still lacks explicit exception events, and our live stack adapter
+        // is lossy because `get_stack()` plus `Tuple::deserialize()` do not preserve everything
+        // we can recover from parsed VM logs, notably continuation values and slice bit/ref
+        // windows.
+        if let Some(instr_name) = self.executor.current_instruction() {
+            if instr_name == "implicit JMPREF" {
+                self.pending_instruction = Some(PendingLiveInstruction::ImplicitJmpRef);
+                return Some(RuntimeEvent::ImplicitJmpRef);
+            }
+
+            self.pending_instruction = Some(PendingLiveInstruction::Normal(instr_name));
+            return Some(RuntimeEvent::BeforeInstruction);
+        }
+
         let is_end = self.executor.step();
         let snapshot = self.executor.snapshot();
 

@@ -41,6 +41,20 @@ impl DebugExecutorHandle {
     }
 
     #[must_use]
+    pub fn current_instruction(&self) -> Option<String> {
+        let instr = match self {
+            DebugExecutorHandle::Get(get) => get.get_current_instr(),
+            DebugExecutorHandle::Message(msg) => msg.get_current_instr(),
+        };
+        let instr = instr.trim();
+        if instr.is_empty() || instr == "unknown" {
+            None
+        } else {
+            Some(instr.to_owned())
+        }
+    }
+
+    #[must_use]
     fn code_pos_text(&self) -> String {
         match self {
             DebugExecutorHandle::Get(get) => get.get_code_pos(),

@@ -151,6 +151,18 @@ impl StepExecutor {
         unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
     }
 
+    /// Gets the current TVM instruction at the current code position.
+    #[must_use]
+    pub fn get_current_instr(&self) -> String {
+        // SAFETY: `em_sbs_current_instr` is safe function
+        let ptr = unsafe { em_sbs_current_instr(self.inner.as_ptr()) };
+        if ptr.is_null() {
+            return String::new();
+        }
+        // SAFETY: `ptr` is valid non-null pointer
+        unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+    }
+
     /// Gets the current stack (Base64 `BoC`).
     #[must_use]
     pub fn get_stack(&self) -> String {
@@ -278,6 +290,7 @@ unsafe extern "C" {
 
     fn em_sbs_step(em: *mut c_void) -> bool;
     fn em_sbs_code_pos(em: *mut c_void) -> *mut c_char;
+    fn em_sbs_current_instr(em: *mut c_void) -> *mut c_char;
     fn em_sbs_stack(em: *mut c_void) -> *mut c_char;
     fn em_sbs_c7(em: *mut c_void) -> *mut c_char;
     fn transaction_emulator_sbs_get_control_register(em: *mut c_void, idx: c_int) -> *mut c_char;
