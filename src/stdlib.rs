@@ -1,9 +1,22 @@
+use crate::build_info;
 use acton_config::color::OwoColorize;
 use include_dir::{Dir, include_dir};
 use std::fs;
 use std::path::Path;
 
 pub static LIB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
+
+pub(crate) fn current_stdlib_version() -> String {
+    let package_version = build_info::PACKAGE_VERSION;
+    let release_channel = build_info::RELEASE_CHANNEL;
+    let git_hash = build_info::GIT_HASH;
+
+    if release_channel == "trunk" {
+        format!("{package_version}-trunk+{git_hash}")
+    } else {
+        package_version.to_owned()
+    }
+}
 
 pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
     // Only run if we are in an Acton project
@@ -17,7 +30,7 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
     }
 
     let version_path = acton_dir.join(".version");
-    let current_version = env!("CARGO_PKG_VERSION");
+    let current_version = current_stdlib_version();
 
     let needs_update = if version_path.exists() {
         let stored_version = fs::read_to_string(&version_path)?;
@@ -48,7 +61,7 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
 
         LIB_DIR.extract(&acton_dir)?;
         tolkc::compiler::TOLK_STDLIB_DIR.extract(&tolk_stdlib_dir)?;
-        fs::write(version_path, current_version)?;
+        fs::write(version_path, &current_version)?;
     }
 
     Ok(())
