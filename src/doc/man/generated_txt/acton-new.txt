@@ -220,7 +220,7 @@ COUNTER APP LAYOUT
 
        Before running frontend commands, install the app dependencies:
 
-           npm install
+           npm ci
 
 SIDE EFFECTS
        acton new writes only inside the chosen target directory. When _path_ is

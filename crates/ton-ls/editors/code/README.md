@@ -11,7 +11,7 @@ Simple extension to support Tolk, TASM, Fift and TL-B languages using `acton`.
 2. Build the extension:
    ```bash
    cd crates/ton-ls/editors/code
-   npm install
+   npm ci
    npm run compile
    ```
 3. Link or Install the extension in VS Code.
