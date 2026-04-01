@@ -913,7 +913,7 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
     session.expect("License: MIT");
     session.expect("Created Acton.toml with project configuration");
     session.expect("acton build");
-    session.expect("npm install");
+    session.expect("npm ci");
     session.expect("npm run dev");
     session.expect(Eof);
     session.assert_file_snapshot_matches(

@@ -207,26 +207,18 @@ fn setup_counter_project() -> DebugSession {
         .build();
 
     DebugBuilder::new("debug-callback")
-        .project(project.path())
+        .project_ref(project)
         .script_file("main.tolk")
         .build()
 }
 
 #[test]
-#[cfg_attr(target_os = "linux", ignore)]
 fn test_real_counter_contract_tests() -> anyhow::Result<()> {
     let session = setup_counter_project();
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
+        executor.step_over_times(8)?;
         Ok(())
     })?;
 
@@ -239,20 +231,13 @@ fn test_real_counter_contract_tests() -> anyhow::Result<()> {
 }
 
 #[test]
-#[cfg_attr(target_os = "linux", ignore)]
 fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
     let session = setup_counter_project();
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-
-        for _ in 0..50 {
-            executor.step_over()?;
-        }
+        executor.step_in_times(4)?;
+        executor.step_over_times(50)?;
         Ok(())
     })?;
 

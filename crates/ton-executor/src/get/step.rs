@@ -120,6 +120,18 @@ impl StepGetExecutor {
         unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
     }
 
+    /// Gets the current TVM instruction at the current code position.
+    #[must_use]
+    pub fn get_current_instr(&self) -> String {
+        // SAFETY: `sbs_get_current_instr` is safe function
+        let ptr = unsafe { sbs_get_current_instr(self.inner.as_ptr()) };
+        if ptr.is_null() {
+            return String::new();
+        }
+        // SAFETY: `ptr` is valid non-null pointer
+        unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+    }
+
     /// Gets the current stack (Base64 `BoC`).
     #[must_use]
     pub fn get_stack(&self) -> String {
@@ -260,5 +272,6 @@ unsafe extern "C" {
     fn sbs_get_c7(tvm: *mut c_void) -> *mut c_char;
     fn tvm_emulator_sbs_get_control_register(tvm: *mut c_void, idx: c_int) -> *mut c_char;
     fn sbs_get_code_pos(tvm: *mut c_void) -> *mut c_char;
+    fn sbs_get_current_instr(tvm: *mut c_void) -> *mut c_char;
     fn sbs_get_method_result(tvm: *mut c_void) -> *mut c_char;
 }

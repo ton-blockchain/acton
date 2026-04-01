@@ -1,4 +1,4 @@
-use crate::debugging::support::debug::DebugResult;
+use crate::debugging::support::debug::{DebugResult, render_variable_value};
 
 pub(crate) struct DebugTestOutput {
     pub result: DebugResult,
@@ -12,6 +12,7 @@ impl DebugTestOutput {
 
 pub(crate) trait DebugTestOutputExt {
     fn assert_trace_steps(&self, expected_count: usize) -> &Self;
+    #[allow(dead_code)]
     fn assert_variable_at_step(
         &self,
         step_index: usize,
@@ -49,11 +50,12 @@ impl DebugTestOutputExt for DebugTestOutput {
             .iter()
             .find(|v| v.name == var_name)
             .unwrap_or_else(|| panic!("Variable '{var_name}' not found at step {step_index}"));
+        let actual_value = render_variable_value(var);
 
         assert_eq!(
-            &var.value, expected_value,
+            actual_value, expected_value,
             "Variable '{}' value mismatch at step {}: expected '{}', got '{}'",
-            var_name, step_index, expected_value, var.value
+            var_name, step_index, expected_value, actual_value
         );
         self
     }

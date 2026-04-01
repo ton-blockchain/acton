@@ -1,61 +1,22 @@
 Step 1 (before):
-  Bytecode position: F9F66FAC18C6267BA6EC6A94B7A28BC0E54F5B87403C75EFBFF4D2B27D60E779:6
   Code:
      10| }
      11| 
      12| fun main() {
      13|     foo = 5;
-             ^^^
+                   ^
      14|     val res = fib(foo);
      15|     return res + foo;
      16| }
 
 Step 2 (step_over):
-  Bytecode position: F9F66FAC18C6267BA6EC6A94B7A28BC0E54F5B87403C75EFBFF4D2B27D60E779:30
   Code:
      11| 
      12| fun main() {
      13|     foo = 5;
      14|     val res = fib(foo);
-                 ^^^
-     15|     return res + foo;
-     16| }
-
-Step 3 (step_over):
-  Bytecode position: F9F66FAC18C6267BA6EC6A94B7A28BC0E54F5B87403C75EFBFF4D2B27D60E779:46
-  Code:
-     11| 
-     12| fun main() {
-     13|     foo = 5;
-     14|     val res = fib(foo);
-                       ^^^^^^^^
+                           ^^^
      15|     return res + foo;
      16| }
   Variables:
-    g_foo = 5
-
-Step 4 (step_over):
-  Bytecode position: F9F66FAC18C6267BA6EC6A94B7A28BC0E54F5B87403C75EFBFF4D2B27D60E779:62
-  Code:
-     11| 
-     12| fun main() {
-     13|     foo = 5;
-     14|     val res = fib(foo);
-                       ^^^^^^^^
-     15|     return res + foo;
-     16| }
-  Variables:
-    '4 = 5
-
-Step 5 (step_over):
-  Bytecode position: F9F66FAC18C6267BA6EC6A94B7A28BC0E54F5B87403C75EFBFF4D2B27D60E779:78
-  Code:
-     12| fun main() {
-     13|     foo = 5;
-     14|     val res = fib(foo);
-     15|     return res + foo;
-                    ^^^^^^^^^
-     16| }
-  Variables:
-    g_foo = 5
-    res = 5
+    global foo = 5

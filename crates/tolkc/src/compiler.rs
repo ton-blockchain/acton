@@ -12,7 +12,6 @@ use std::fs;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
-use ton_source_map::SourceMap;
 
 thread_local! {
     static CURRENT_MAPPINGS: RefCell<FxHashMap<String, String>> = RefCell::new(FxHashMap::default());
@@ -135,7 +134,6 @@ impl Compiler {
                     code_boc64: result.code_boc64,
                     code_hash_hex: result.code_hash_hex,
                     debug_mark_base64: result.debug_mark_base64,
-                    source_map: None,
                     new_source_map: result.source_maps_json,
                     abi: result.abi,
                 })
@@ -371,7 +369,6 @@ pub struct CompilerResultSuccess {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub debug_mark_base64: Option<String>,
-    pub source_map: Option<SourceMap>,
     pub new_source_map: Option<crate::source_map::SourceMap>,
     pub abi: Option<ContractABI>,
 }

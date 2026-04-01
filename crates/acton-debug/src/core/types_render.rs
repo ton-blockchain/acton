@@ -1,8 +1,15 @@
 use std::collections::HashMap;
 use std::fmt::{self, Write};
+use std::sync::OnceLock;
 use tolkc::source_map::SourceMap;
 use tolkc::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
-use vmlogs::parser::{CellSlice, VmStackValue};
+use tvmffi::from_stack::FromStack;
+use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
+use tycho_types::dict;
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
+use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // RenderedValue — structured intermediate format for rendered values
@@ -10,15 +17,26 @@ use vmlogs::parser::{CellSlice, VmStackValue};
 
 #[derive(Debug, Clone)]
 pub enum RenderedValue {
-    Leaf(String),
+    Leaf {
+        value: String,
+        type_field: Option<String>,
+    },
     Struct {
         type_name: String,
         fields: Vec<(String, RenderedValue)>,
     },
+    Address {
+        type_name: String,
+        legacy_value: String,
+        value: String,
+        fields: Vec<(String, RenderedValue)>, // various formats
+    },
     Tensor {
+        type_name: String,
         items: Vec<RenderedValue>,
     },
     ArrayOf {
+        type_name: String,
         items: Vec<RenderedValue>,
     },
 
@@ -33,15 +51,63 @@ pub enum RenderedValue {
 }
 
 impl RenderedValue {
-    /// Short summary for DAP tree view ("StructName" for structs, "N items" for tensors).
-    /// Distinct from Display which produces the full flat string for CLI/tests.
-    pub fn dap_value(&self) -> String {
+    pub fn leaf(value: impl Into<String>) -> Self {
+        Self::Leaf {
+            value: value.into(),
+            type_field: None,
+        }
+    }
+
+    pub fn typed_leaf(value: impl Into<String>, type_field: impl Into<String>) -> Self {
+        Self::Leaf {
+            value: value.into(),
+            type_field: Some(type_field.into()),
+        }
+    }
+
+    /// Build `(value, type)` the way DAP UIs expect it.
+    ///
+    /// For structs we keep the type name in `type` instead of duplicating it in `value`.
+    pub fn dap_parts(&self) -> (String, Option<String>) {
         match self {
-            RenderedValue::Leaf(s) => s.clone(),
+            RenderedValue::Leaf { value, type_field } => (value.clone(), type_field.clone()),
+            RenderedValue::Struct { type_name, .. } => (String::new(), Some(type_name.clone())),
+            RenderedValue::Address {
+                type_name, value, ..
+            } => (value.clone(), Some(type_name.clone())),
+            RenderedValue::Tensor { type_name, items } => {
+                (format!("{} items", items.len()), Some(type_name.clone()))
+            }
+            RenderedValue::ArrayOf { type_name, items } => {
+                (format!("{} items", items.len()), Some(type_name.clone()))
+            }
+            RenderedValue::LastSeen { inner } => {
+                let (value, type_field) = inner.dap_parts();
+                let value = if value.is_empty() {
+                    "(last seen)".to_string()
+                } else {
+                    format!("{value} (last seen)")
+                };
+                (value, type_field)
+            }
+            RenderedValue::OptimizedOut => ("<optimized out>".to_string(), None),
+            RenderedValue::NotYetLoaded => ("<not loaded>".to_string(), None),
+            RenderedValue::LazyUnresolved { type_name } => {
+                ("(lazy, unresolved)".to_string(), Some(type_name.clone()))
+            }
+        }
+    }
+
+    fn legacy_dap_value(&self) -> String {
+        match self {
+            RenderedValue::Leaf { value, .. } => value.clone(),
             RenderedValue::Struct { type_name, .. } => type_name.clone(),
-            RenderedValue::Tensor { items } => format!("{} items", items.len()),
-            RenderedValue::ArrayOf { items } => format!("{} items", items.len()),
-            RenderedValue::LastSeen { inner } => format!("{} (last seen)", inner.dap_value()),
+            RenderedValue::Address { legacy_value, .. } => legacy_value.clone(),
+            RenderedValue::Tensor { items, .. } => format!("{} items", items.len()),
+            RenderedValue::ArrayOf { items, .. } => format!("{} items", items.len()),
+            RenderedValue::LastSeen { inner } => {
+                format!("{} (last seen)", inner.legacy_dap_value())
+            }
             RenderedValue::OptimizedOut => "<optimized out>".to_string(),
             RenderedValue::NotYetLoaded => "<not loaded>".to_string(),
             RenderedValue::LazyUnresolved { type_name } => {
@@ -50,13 +116,60 @@ impl RenderedValue {
         }
     }
 
+    pub fn dap_parts_for_client(&self) -> (String, Option<String>) {
+        if dap_legacy_value_enabled() {
+            (self.legacy_dap_value(), None)
+        } else {
+            self.dap_parts()
+        }
+    }
+
+    pub fn dap_value(&self) -> String {
+        self.dap_parts().0
+    }
+
     pub fn has_children(&self) -> bool {
         match self {
             RenderedValue::Struct { fields, .. } => !fields.is_empty(),
-            RenderedValue::Tensor { items } => !items.is_empty(),
-            RenderedValue::ArrayOf { items } => !items.is_empty(),
+            RenderedValue::Address { fields, .. } => !fields.is_empty(),
+            RenderedValue::Tensor { items, .. } => !items.is_empty(),
+            RenderedValue::ArrayOf { items, .. } => !items.is_empty(),
             RenderedValue::LastSeen { inner } => inner.has_children(),
             _ => false,
+        }
+    }
+}
+
+const DAP_LEGACY_VALUE_ENV: &str = "ACTON_DEBUG_DAP_USE_LEGACY_VALUE";
+
+fn dap_legacy_value_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+
+    *ENABLED.get_or_init(|| {
+        std::env::var(DAP_LEGACY_VALUE_ENV)
+            .ok()
+            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"))
+            .unwrap_or(false)
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MapScalarType {
+    Int { bits: u16, signed: bool },
+    VarInt { len_bits: u8, signed: bool },
+    Bool,
+    Address,
+    Cell,
+    String,
+}
+
+impl MapScalarType {
+    const fn bit_len(self) -> u16 {
+        match self {
+            Self::Int { bits, .. } => bits,
+            Self::Bool => 1,
+            Self::Address => StdAddr::BITS_WITHOUT_ANYCAST,
+            Self::VarInt { .. } | Self::Cell | Self::String => 0,
         }
     }
 }
@@ -64,10 +177,11 @@ impl RenderedValue {
 impl fmt::Display for RenderedValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RenderedValue::Leaf(s) => write!(f, "{s}"),
+            RenderedValue::Leaf { value, .. } => write!(f, "{value}"),
             RenderedValue::Struct { type_name, fields } if fields.is_empty() => {
                 write!(f, "{type_name} {{}}")
             }
+            RenderedValue::Address { value, .. } => write!(f, "{value}"),
             RenderedValue::Struct { type_name, fields } => {
                 write!(f, "{type_name} {{ ")?;
                 for (i, (name, val)) in fields.iter().enumerate() {
@@ -78,7 +192,7 @@ impl fmt::Display for RenderedValue {
                 }
                 write!(f, " }}")
             }
-            RenderedValue::Tensor { items } => {
+            RenderedValue::Tensor { items, .. } => {
                 write!(f, "(")?;
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
@@ -88,7 +202,7 @@ impl fmt::Display for RenderedValue {
                 }
                 write!(f, ")")
             }
-            RenderedValue::ArrayOf { items } => {
+            RenderedValue::ArrayOf { items, .. } => {
                 write!(f, "[")?;
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
@@ -113,14 +227,14 @@ impl fmt::Display for RenderedValue {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy)]
-pub enum SlotValue<'a> {
+pub(crate) enum SlotValue<'a> {
     Live(&'a VmStackValue),
     LastSeen(&'a VmStackValue),
     OptimizedOut,
 }
 
 impl<'a> SlotValue<'a> {
-    pub const fn is_optimized_out(&self) -> bool {
+    pub(crate) const fn is_optimized_out(&self) -> bool {
         matches!(self, SlotValue::OptimizedOut)
     }
 }
@@ -209,6 +323,10 @@ fn get_bits_u8(nibbles: &[u8], start: usize, count: usize) -> u8 {
 /// `bits: start..end` are positions within cell data.
 /// addr_std = `10` (2b) + `0` (1b anycast) + workchain (8b) + hash (256b) = 267 bits.
 fn try_parse_address(cs: &CellSlice) -> Option<String> {
+    if cs.bits.is_none() && cs.refs.is_none() {
+        return try_parse_full_address_hex(&cs.value);
+    }
+
     let (start_s, end_s) = cs.bits.as_ref()?;
     let start: usize = start_s.parse().ok()?;
     let end: usize = end_s.parse().ok()?;
@@ -235,6 +353,255 @@ fn try_parse_address(cs: &CellSlice) -> Option<String> {
         write!(hash, "{:02x}", get_bits_u8(&nibbles, start + 11 + i * 8, 8)).ok()?;
     }
     Some(format!("{}:{}", wc, hash))
+}
+
+fn try_parse_full_address_hex(hex: &str) -> Option<String> {
+    let cell = Boc::decode_hex(hex).ok()?;
+    StdAddr::from_item(TupleItem::Slice(cell))
+        .ok()
+        .map(|addr| addr.to_string())
+}
+
+fn render_std_address(type_name: String, legacy_value: String, addr: &StdAddr) -> RenderedValue {
+    let raw = addr.to_string();
+    let mainnet = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: false,
+            base64_url: true,
+            bounceable: true,
+        },
+    }
+    .to_string();
+    let testnet = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: true,
+            base64_url: true,
+            bounceable: true,
+        },
+    }
+    .to_string();
+
+    RenderedValue::Address {
+        type_name,
+        legacy_value,
+        value: raw.clone(),
+        fields: vec![
+            ("raw".to_string(), RenderedValue::leaf(raw)),
+            ("mainnet".to_string(), RenderedValue::leaf(mainnet)),
+            ("testnet".to_string(), RenderedValue::leaf(testnet)),
+        ],
+    }
+}
+
+fn try_parse_string_hex(hex: &str) -> Option<String> {
+    let cell = Boc::decode_hex(hex).ok()?;
+    Tuple::parse_snake_string(&cell)
+}
+
+fn try_parse_string_cell_like(cell: &CellLike) -> Option<String> {
+    match cell {
+        CellLike::Cell(hex) | CellLike::Builder(hex) => try_parse_string_hex(hex),
+    }
+}
+
+fn try_parse_string_slice(cs: &CellSlice) -> Option<String> {
+    if cs.bits.is_none() && cs.refs.is_none() {
+        return try_parse_string_hex(&cs.value);
+    }
+
+    None
+}
+
+fn render_cell_like(cell: &CellLike) -> String {
+    match cell {
+        CellLike::Cell(hex) | CellLike::Builder(hex) => format!("cell{{{hex}}}"),
+    }
+}
+
+fn decode_cell_like(cell: &CellLike) -> Option<Cell> {
+    match cell {
+        CellLike::Cell(hex) | CellLike::Builder(hex) => Boc::decode_hex(hex).ok(),
+    }
+}
+
+fn map_type_name(k: &Ty, v: &Ty) -> String {
+    format!("map<{k}, {v}>")
+}
+
+fn render_map_raw(type_name: String, root: Option<&Cell>) -> RenderedValue {
+    match root {
+        Some(root) => RenderedValue::typed_leaf(
+            format!("{type_name} {{raw: cell{{{}}}}}", Boc::encode_hex(root)),
+            type_name,
+        ),
+        None => RenderedValue::Struct {
+            type_name,
+            fields: vec![],
+        },
+    }
+}
+
+fn parse_map_key_type(ty: &Ty) -> Option<MapScalarType> {
+    match ty {
+        Ty::Bool => Some(MapScalarType::Bool),
+        Ty::Address | Ty::AddressAny => Some(MapScalarType::Address),
+        Ty::Int => Some(MapScalarType::Int {
+            bits: 257,
+            signed: true,
+        }),
+        Ty::UintN { n: 256 } => Some(MapScalarType::Int {
+            bits: 256,
+            signed: false,
+        }),
+        Ty::UintN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+            bits: *n as u16,
+            signed: false,
+        }),
+        Ty::IntN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+            bits: *n as u16,
+            signed: true,
+        }),
+        _ => None,
+    }
+}
+
+fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
+    match ty {
+        Ty::Nullable { .. } | Ty::MapKV { .. } => None,
+        Ty::Cell | Ty::CellOf { .. } => Some(MapScalarType::Cell),
+        Ty::String => Some(MapScalarType::String),
+        Ty::Bool => Some(MapScalarType::Bool),
+        Ty::Address | Ty::AddressAny => Some(MapScalarType::Address),
+        Ty::Coins => Some(MapScalarType::VarInt {
+            len_bits: 4,
+            signed: false,
+        }),
+        Ty::Int => Some(MapScalarType::Int {
+            bits: 257,
+            signed: true,
+        }),
+        Ty::UintN { n: 256 } => Some(MapScalarType::Int {
+            bits: 256,
+            signed: false,
+        }),
+        Ty::UintN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+            bits: *n as u16,
+            signed: false,
+        }),
+        Ty::IntN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+            bits: *n as u16,
+            signed: true,
+        }),
+        Ty::VarintN { n: 16 } => Some(MapScalarType::VarInt {
+            len_bits: 4,
+            signed: true,
+        }),
+        Ty::VarintN { n: 32 } => Some(MapScalarType::VarInt {
+            len_bits: 5,
+            signed: true,
+        }),
+        Ty::VaruintN { n: 16 } => Some(MapScalarType::VarInt {
+            len_bits: 4,
+            signed: false,
+        }),
+        Ty::VaruintN { n: 32 } => Some(MapScalarType::VarInt {
+            len_bits: 5,
+            signed: false,
+        }),
+        _ => None,
+    }
+}
+
+fn format_map_scalar(slice: &mut TyCellSlice<'_>, ty: MapScalarType) -> Result<String, String> {
+    match ty {
+        MapScalarType::Int { bits, signed } => {
+            if !signed && bits == 256 {
+                return Ok(format!(
+                    "0x{}",
+                    slice.load_u256().map_err(|e| e.to_string())?
+                ));
+            }
+
+            Ok(slice
+                .load_bigint(bits, signed)
+                .map_err(|e| e.to_string())?
+                .to_string())
+        }
+        MapScalarType::VarInt { len_bits, signed } => Ok(slice
+            .load_var_bigint(u16::from(len_bits), signed)
+            .map_err(|e| e.to_string())?
+            .to_string()),
+        MapScalarType::Bool => Ok(slice.load_bit().map_err(|e| e.to_string())?.to_string()),
+        MapScalarType::Address => Ok(IntAddr::load_from(slice)
+            .map_err(|e| e.to_string())?
+            .to_string()),
+        MapScalarType::Cell => Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(
+            &slice.load_reference_cloned().map_err(|e| e.to_string())?,
+        )))),
+        MapScalarType::String => {
+            let cell = slice.load_reference_cloned().map_err(|e| e.to_string())?;
+            if let Some(string) = Tuple::parse_snake_string(&cell) {
+                return Ok(format!("\"{string}\""));
+            }
+            Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))))
+        }
+    }
+}
+
+fn format_map_raw_value(slice: TyCellSlice<'_>) -> Result<String, String> {
+    let mut builder = CellBuilder::new();
+    builder.store_slice(slice).map_err(|e| e.to_string())?;
+    let cell = builder.build().map_err(|e| e.to_string())?;
+    Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))))
+}
+
+fn render_map_value(value_slice: TyCellSlice<'_>, value_ty: &Ty) -> RenderedValue {
+    let scalar_type = parse_map_value_type(value_ty);
+    let allow_raw_value_fallback =
+        scalar_type.is_none() && !matches!(value_ty, Ty::Nullable { .. } | Ty::MapKV { .. });
+
+    let mut value_slice = value_slice;
+    if let Some(scalar_type) = scalar_type {
+        return match format_map_scalar(&mut value_slice, scalar_type) {
+            Ok(value) => typed_leaf_for_ty(value_ty, value),
+            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+        };
+    }
+
+    if allow_raw_value_fallback {
+        return match format_map_raw_value(value_slice) {
+            Ok(value) => typed_leaf_for_ty(value_ty, value),
+            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+        };
+    }
+
+    typed_leaf_for_ty(value_ty, "<value>")
+}
+
+fn render_map_dict(root: Option<Cell>, key_ty: &Ty, value_ty: &Ty) -> RenderedValue {
+    let type_name = map_type_name(key_ty, value_ty);
+
+    let Some(key_type) = parse_map_key_type(key_ty) else {
+        return render_map_raw(type_name, root.as_ref());
+    };
+
+    let mut fields = Vec::new();
+    for entry in dict::RawIter::new(&root, key_type.bit_len()) {
+        let Ok((key_data, value_slice)) = entry else {
+            return RenderedValue::typed_leaf(format!("{type_name} {{...}}"), type_name);
+        };
+
+        let key = {
+            let mut key_slice = key_data.as_data_slice();
+            format_map_scalar(&mut key_slice, key_type).unwrap_or_else(|_| "<key>".to_string())
+        };
+        let value = render_map_value(value_slice, value_ty);
+        fields.push((key, value));
+    }
+
+    RenderedValue::Struct { type_name, fields }
 }
 
 /// Convert a range of bits from nibbles to a hex string.
@@ -368,6 +735,10 @@ fn flatten_lisp_list(items: &[VmStackValue]) -> Vec<&VmStackValue> {
     }
 }
 
+fn typed_leaf_for_ty(ty: &Ty, value: impl Into<String>) -> RenderedValue {
+    RenderedValue::typed_leaf(value, ty.to_string())
+}
+
 // ---------------------------------------------------------------------------
 // debug_format — recursive type-aware renderer (uses StackReader cursor)
 // ---------------------------------------------------------------------------
@@ -418,53 +789,67 @@ fn debug_format(
         | Ty::VarintN { .. }
         | Ty::VaruintN { .. }
         | Ty::Coins => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Integer(s)) => RenderedValue::Leaf(s.to_string()),
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM int".to_string()),
+            SlotValue::Live(VmStackValue::Integer(s)) => typed_leaf_for_ty(ty, s.to_string()),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM int"),
         },
 
         Ty::Bool => match r.read_slot() {
             SlotValue::Live(VmStackValue::Integer(s)) => {
                 if s == "0" {
-                    RenderedValue::Leaf("false".to_string())
+                    typed_leaf_for_ty(ty, "false")
                 } else {
-                    RenderedValue::Leaf("true".to_string())
+                    typed_leaf_for_ty(ty, "true")
                 }
             }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM int".to_string()),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM int"),
         },
 
         Ty::Cell => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Cell(_)) => RenderedValue::Leaf("cell".to_string()),
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM cell".to_string()),
+            SlotValue::Live(VmStackValue::Cell(cell)) => {
+                typed_leaf_for_ty(ty, render_cell_like(cell))
+            }
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
         },
 
         Ty::CellOf { inner } => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Cell(_)) => RenderedValue::Leaf(format!("Cell<{inner}>")),
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM cell".to_string()),
+            SlotValue::Live(VmStackValue::Cell(cell)) => {
+                typed_leaf_for_ty(ty, format!("Cell<{inner}> {}", render_cell_like(cell)))
+            }
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
         },
 
         Ty::String => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Cell(_)) => {
-                RenderedValue::Leaf("string (contents unavailable)".to_string())
-            }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM cell".to_string()),
+            SlotValue::Live(VmStackValue::String(s)) => typed_leaf_for_ty(ty, format!("\"{s}\"")),
+            SlotValue::Live(VmStackValue::Cell(cell)) => typed_leaf_for_ty(
+                ty,
+                try_parse_string_cell_like(cell)
+                    .map(|string| format!("\"{string}\""))
+                    .unwrap_or_else(|| render_cell_like(cell)),
+            ),
+            SlotValue::Live(VmStackValue::CellSlice(cs)) => typed_leaf_for_ty(
+                ty,
+                try_parse_string_slice(cs)
+                    .map(|string| format!("\"{string}\""))
+                    .unwrap_or_else(|| render_slice(cs)),
+            ),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
         },
 
         Ty::Builder => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Builder(b)) => RenderedValue::Leaf(render_builder(b)),
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM builder".to_string()),
+            SlotValue::Live(VmStackValue::Builder(b)) => typed_leaf_for_ty(ty, render_builder(b)),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM builder"),
         },
 
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
-            SlotValue::Live(VmStackValue::CellSlice(cs)) => RenderedValue::Leaf(render_slice(cs)),
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM slice".to_string()),
+            SlotValue::Live(VmStackValue::CellSlice(cs)) => typed_leaf_for_ty(ty, render_slice(cs)),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM slice"),
         },
 
         Ty::ArrayOf { inner } => {
@@ -477,10 +862,13 @@ fn debug_format(
                         .iter()
                         .map(|_| debug_format(symbols, &mut sub, inner, true))
                         .collect();
-                    RenderedValue::ArrayOf { items }
+                    RenderedValue::ArrayOf {
+                        type_name: ty.to_string(),
+                        items,
+                    }
                 }
-                SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-                _ => RenderedValue::Leaf("not a TVM tuple".to_string()),
+                SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+                _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
             }
         }
 
@@ -493,45 +881,60 @@ fn debug_format(
                 let items: Vec<RenderedValue> = (0..n)
                     .map(|_| debug_format(symbols, &mut sub, inner, true))
                     .collect();
-                RenderedValue::ArrayOf { items }
+                RenderedValue::ArrayOf {
+                    type_name: ty.to_string(),
+                    items,
+                }
             }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::ArrayOf { items: vec![] },
-            _ => RenderedValue::Leaf("not a TVM tuple".to_string()),
+            SlotValue::Live(VmStackValue::Null) => RenderedValue::ArrayOf {
+                type_name: ty.to_string(),
+                items: vec![],
+            },
+            _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
         },
 
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
-            SlotValue::Live(VmStackValue::CellSlice(cs)) => {
-                RenderedValue::Leaf(try_parse_address(cs).unwrap_or_else(|| render_slice(cs)))
-            }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM slice".to_string()),
+            SlotValue::Live(VmStackValue::CellSlice(cs)) => match try_parse_address(cs) {
+                Some(raw) => match raw.parse::<StdAddr>() {
+                    Ok(addr) => render_std_address(ty.to_string(), render_slice(cs), &addr),
+                    Err(_) => typed_leaf_for_ty(ty, raw),
+                },
+                None => typed_leaf_for_ty(ty, render_slice(cs)),
+            },
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM slice"),
         },
 
-        Ty::MapKV { .. } => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("empty map".to_string()),
-            SlotValue::Live(VmStackValue::Cell(_)) => {
-                RenderedValue::Leaf("non-empty map".to_string())
+        Ty::MapKV { k, v } => match r.read_slot() {
+            SlotValue::Live(VmStackValue::Null) => RenderedValue::Struct {
+                type_name: map_type_name(k, v),
+                fields: vec![],
+            },
+            SlotValue::Live(VmStackValue::Cell(cell)) => {
+                if let Some(root) = decode_cell_like(cell) {
+                    render_map_dict(Some(root), k, v)
+                } else {
+                    typed_leaf_for_ty(ty, "not a TVM cell")
+                }
             }
-            _ => RenderedValue::Leaf("not a TVM cell".to_string()),
+            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
         },
 
         Ty::NullLiteral => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM null".to_string()),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM null"),
         },
 
-        Ty::Void => RenderedValue::Leaf("(void)".to_string()),
+        Ty::Void => typed_leaf_for_ty(ty, "(void)"),
 
         Ty::Callable => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Continuation(_)) => {
-                RenderedValue::Leaf("continuation".to_string())
-            }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM continuation".to_string()),
+            SlotValue::Live(VmStackValue::Continuation(_)) => typed_leaf_for_ty(ty, "continuation"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM continuation"),
         },
         Ty::Unknown => match r.read_slot() {
-            SlotValue::Live(any) => RenderedValue::Leaf(any.to_string()),
-            _ => RenderedValue::Leaf("unreachable".to_string()),
+            SlotValue::Live(any) => RenderedValue::leaf(any.to_string()),
+            _ => RenderedValue::leaf("unreachable"),
         },
 
         Ty::Nullable {
@@ -545,7 +948,7 @@ fn debug_format(
                     SlotValue::Live(VmStackValue::Integer(type_id))
                     | SlotValue::LastSeen(VmStackValue::Integer(type_id)) => {
                         if type_id == "0" {
-                            RenderedValue::Leaf("null".to_string())
+                            typed_leaf_for_ty(ty, "null")
                         } else {
                             let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
                             debug_format(symbols, &mut sub, inner, false)
@@ -555,7 +958,7 @@ fn debug_format(
                         let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
                         debug_format(symbols, &mut sub, inner, false)
                     }
-                    _ => RenderedValue::Leaf("corrupted stack for nullable".to_string()),
+                    _ => typed_leaf_for_ty(ty, "corrupted stack for nullable"),
                 }
             } else {
                 // read a primitive one-slot nullable: either TVM null or a value of type inner
@@ -563,7 +966,7 @@ fn debug_format(
                     SlotValue::Live(VmStackValue::Null)
                     | SlotValue::LastSeen(VmStackValue::Null) => {
                         r.read_slot();
-                        RenderedValue::Leaf("null".to_string())
+                        typed_leaf_for_ty(ty, "null")
                     }
                     _ => debug_format(symbols, r, inner, false),
                 }
@@ -635,10 +1038,10 @@ fn debug_format(
                     .find(|m| &m.value == s)
                     .map(|m| format!("{}.{}", enum_ref.name, m.name))
                     .unwrap_or_else(|| format!("{}({})", enum_ref.name, s));
-                RenderedValue::Leaf(text)
+                typed_leaf_for_ty(ty, text)
             }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM int".to_string()),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM int"),
         },
 
         Ty::Tensor { items } => {
@@ -646,7 +1049,10 @@ fn debug_format(
                 .iter()
                 .map(|item| debug_format(symbols, r, item, false))
                 .collect();
-            RenderedValue::Tensor { items }
+            RenderedValue::Tensor {
+                type_name: ty.to_string(),
+                items,
+            }
         }
 
         Ty::ShapedTuple { items } => match r.read_slot() {
@@ -657,10 +1063,13 @@ fn debug_format(
                     .iter()
                     .map(|item| debug_format(symbols, &mut sub, item, true))
                     .collect();
-                RenderedValue::ArrayOf { items }
+                RenderedValue::ArrayOf {
+                    type_name: ty.to_string(),
+                    items,
+                }
             }
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::Leaf("null".to_string()),
-            _ => RenderedValue::Leaf("not a TVM tuple".to_string()),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
+            _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
         },
 
         Ty::Union {
@@ -685,23 +1094,25 @@ fn debug_format(
                         if matches!(&variant.variant_ty, Ty::StructRef { .. }) {
                             inner
                         } else {
-                            RenderedValue::Leaf(format!("#{} {inner}", variant.variant_ty))
+                            typed_leaf_for_ty(ty, format!("#{} {inner}", variant.variant_ty))
                         }
                     } else {
                         // corrupted stack, type_id on a stack mismatches all variants
-                        RenderedValue::Leaf("union with unknown variant".to_string())
+                        typed_leaf_for_ty(ty, "union with unknown variant")
                     }
                 }
                 SlotValue::OptimizedOut => {
                     // this should not happen in practice, because if UTag for a union was erased during compilation,
                     // a union was definitely smart cast, and its type is narrowed, not Ty::Union
-                    RenderedValue::Leaf("union with unknown variant".to_string())
+                    typed_leaf_for_ty(ty, "union with unknown variant")
                 }
-                _ => RenderedValue::Leaf("corrupted stack for union".to_string()),
+                _ => typed_leaf_for_ty(ty, "corrupted stack for union"),
             }
         }
 
-        Ty::GenericT { name_t } => RenderedValue::Leaf(format!("unexpected genericT={name_t}")),
+        Ty::GenericT { name_t } => {
+            RenderedValue::typed_leaf(format!("unexpected genericT={name_t}"), name_t.clone())
+        }
 
         _ => {
             panic!("unexpected TVM type");
@@ -709,7 +1120,11 @@ fn debug_format(
     }
 }
 
-pub fn debug_print_from_stack(symbols: &SourceMap, slots: &[SlotValue], ty: &Ty) -> RenderedValue {
+pub(crate) fn debug_print_from_stack(
+    symbols: &SourceMap,
+    slots: &[SlotValue],
+    ty: &Ty,
+) -> RenderedValue {
     let mut r = StackReader::new(slots);
     debug_format(symbols, &mut r, ty, false)
 }
@@ -721,7 +1136,7 @@ pub fn debug_print_from_stack(symbols: &SourceMap, slots: &[SlotValue], ty: &Ty)
 // least one MARK_STACK during replay so far.
 // ---------------------------------------------------------------------------
 
-pub fn debug_format_lazy(
+pub(crate) fn debug_format_lazy(
     symbols: &SourceMap,
     slot_values: &[SlotValue],
     ir_slots: &[usize],

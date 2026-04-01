@@ -17,6 +17,11 @@ Download a transaction by hash and replay it locally in the TON sandbox.
 reviewing VM and executor logs, and comparing local replay results with the
 original on-chain execution.
 
+When `--contract` is provided, Acton also prepares a source-level retrace for
+the named project contract by recompiling it with debug info and source maps.
+When `--dap-port` is added, the prepared replay is exposed as a local Debug
+Adapter Protocol (DAP) server for editor integration.
+
 ## OPTIONS
 
 ### Retrace Options
@@ -82,6 +87,41 @@ Show full cell hex in outgoing actions instead of only hashes.
 </CommandOptionTitle>
 
 Write VM and executor logs into the specified directory.
+
+</CommandOption>
+
+
+</CommandOptions>
+
+### Source-Level Debugging Options
+
+<CommandOptions>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--contract` _name_
+
+</CommandOptionTitle>
+
+Contract ID from `Acton.toml` used to build a source-level trace for the
+retraced transaction.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--dap-port` _port_
+
+</CommandOptionTitle>
+
+Expose the prepared source-level retrace as a DAP server on the given local TCP
+port.
+
+Requires `--contract`.
 
 </CommandOption>
 
@@ -156,6 +196,73 @@ This conflicts with `--manifest-path`.
 For library fallback lookups, retrace also supports `DTON_API_KEY` from the
 environment.
 
+## SOURCE-LEVEL RETRACE
+
+When `--contract` is set:
+
+- the contract must exist in the resolved `Acton.toml`
+- the selected source must be a `.tolk` contract
+- Acton recompiles the contract for the current invocation with debug info and
+  source maps
+- the compiled local code hash must match the code hash used by the retraced
+  transaction
+
+If you run the command outside the project directory, use `--manifest-path` or
+`--project-root` so Acton can resolve the contract configuration and mappings.
+
+## DAP MODE
+
+When `--dap-port` is used together with `--contract`:
+
+- Acton starts a local DAP server on `127.0.0.1:<port>`
+- the normal retrace summary is still printed before the debug server starts
+- the command stays attached to that debug session until the client disconnects
+
+This mode is intended for editor integrations that speak the Debug Adapter
+Protocol.
+
+## VS CODE SETUP
+
+Typical setup:
+
+1. Install or load the TON VS Code extension.
+2. Make sure VS Code can find your `acton` binary.
+
+   If needed, point the extension at a specific binary with an environment
+   variable such as `ACTON_BIN`, or start VS Code from a shell where `acton` is
+   already on `PATH`.
+
+3. Open the project workspace that contains the target contract in
+   `Acton.toml`.
+4. Start a retrace debug session either through the extension command or
+   through a manual `launch.json` entry.
+
+For a manual setup, create `.vscode/launch.json` like this:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "tolk",
+      "request": "launch",
+      "name": "Attach to Acton Retrace",
+      "debugServer": 4711
+    }
+  ]
+}
+```
+
+Then start retrace in a terminal from the project root:
+
+```bash
+acton retrace <HASH> --contract <NAME> --dap-port 4711
+```
+
+After the DAP server is listening, launch the matching VS Code debug
+configuration. Breakpoints should be set in the same `.tolk` sources that
+belong to the selected contract from `Acton.toml`.
+
 ## OUTPUT
 
 The command prints:
@@ -165,6 +272,8 @@ The command prints:
 - compute and action phase summaries
 - decoded outgoing actions
 - additional full VM and executor logs when `--logs-dir` is used
+- source-level debug preparation errors when `--contract` is used
+- DAP startup status when `--dap-port` is used
 
 When `--logs-dir` is set, Acton creates the target directory and writes
 `vm.log` plus `executor.log` there.
@@ -173,7 +282,9 @@ When `--logs-dir` is set, Acton creates the target directory and writes
 
 - `0`: The transaction was fetched and replayed successfully.
 - `1`: The transaction could not be found, network lookup failed, replay data
-  was incomplete, or local log files could not be written.
+  was incomplete, local contract validation or compilation failed, the local
+  code hash did not match the retraced account code, the DAP server could not
+  start, or local log files could not be written.
 
 ## EXAMPLES
 
@@ -193,6 +304,18 @@ When `--logs-dir` is set, Acton creates the target directory and writes
 
    ```bash
    acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --verbose --logs-dir .acton/retrace
+   ```
+
+4. Prepare a source-level retrace for a project contract:
+
+   ```bash
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter
+   ```
+
+5. Start a local DAP server for editor debugging:
+
+   ```bash
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter --dap-port 4711
    ```
 
 ## SEE ALSO

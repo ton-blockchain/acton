@@ -2,6 +2,8 @@
   "name": "acton",
   "version": "0.1.4",
   "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
   "type": "module",
   "workspaces": [
     "crates/acton-litenode-ui",
@@ -9,13 +11,13 @@
     "crates/acton-test-ui"
   ],
   "scripts": {
-    "lint": "bun --filter '*' lint",
-    "lint:fix": "bun --filter '*' lint:fix",
-    "fmt": "bun --filter '*' fmt",
-    "fmt:check": "bun --filter '*' fmt:check",
     "build": "bun --filter '*' build",
     "dev:litenode": "bun --filter acton-litenode-ui dev",
-    "dev:test": "bun --filter acton-test-ui dev"
+    "dev:test": "bun --filter acton-test-ui dev",
+    "fmt": "bun --filter '*' fmt",
+    "fmt:check": "bun --filter '*' fmt:check",
+    "lint": "bun --filter '*' lint",
+    "lint:fix": "bun --filter '*' lint:fix"
   },
   "prettier": {
     "arrowParens": "avoid",
@@ -49,10 +51,10 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "eslint-plugin-unicorn": "^56.0.1",
     "eslint-plugin-unused-imports": "^4.1.4",
     "globals": "^16.0.0",
     "prettier": "3.4.2",
-    "typescript-eslint": "^8.30.1",
-    "eslint-plugin-unicorn": "^56.0.1"
+    "typescript-eslint": "^8.30.1"
   }
 }

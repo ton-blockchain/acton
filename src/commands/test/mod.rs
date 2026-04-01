@@ -16,17 +16,19 @@ use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
 };
-use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::dap::DapTransport;
-use crate::debugger::debug_context::DebugContext;
+use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
-use crate::{debugger, ffi};
+use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::{
+    DapTransport, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
+};
 use anyhow::anyhow;
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -52,7 +54,6 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -109,7 +110,7 @@ impl<'a> TestRunner<'a> {
         mutation_overrides: BTreeMap<String, Cell>,
     ) -> anyhow::Result<TestRunner<'a>> {
         let transport = if let Some(listener) = debug_listener {
-            debugger::dap::start_dap_server_with_listener(listener)?
+            start_dap_server_with_listener(listener)?
         } else {
             DapTransport::dummy()
         };
@@ -227,7 +228,7 @@ impl<'a> TestRunner<'a> {
         code_cell: &Cell,
         dest_address: &str,
         abi: Arc<ContractAbi>,
-        source_map: Arc<SourceMap>,
+        source_map: Arc<TolkSourceMap>,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.minimal_log_verbosity();
 
@@ -323,19 +324,14 @@ impl<'a> TestRunner<'a> {
                 let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
-
-                let mut dbg_ctx = DebugContext::new(
-                    self.transport.clone(),
-                    AnyExecutor::Get(executor.clone()),
-                    source_map,
-                    test.name.clone(),
-                );
-
-                ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
                 executor.prepare(test.id, &stack)?;
+                let replayer =
+                    TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+                let mut dbg_session =
+                    ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
+                ctx.debug = DebugCtx::new(&mut dbg_session);
 
-                ctx.debug.ctx().process_incoming_requests(true)?;
+                ctx.debug.process_incoming_requests(true)?;
 
                 let get_result = executor.finish(&params.code)?;
 
@@ -478,7 +474,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     let acton_config = ActonConfig::load()?;
     let debug_listener = if config.debug {
-        Some(debugger::dap::reserve_dap_listener(config.debug_port)?)
+        Some(reserve_dap_listener(config.debug_port)?)
     } else {
         None
     };
@@ -792,7 +788,6 @@ fn compile_test_file(
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
                 debug_mark_base64: cache_entry.debug_mark_base64,
-                source_map: cache_entry.source_map,
                 new_source_map: cache_entry.new_source_map,
                 abi: cache_entry.abi,
             },
@@ -867,8 +862,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     };
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
-    let source_map = result.source_map.unwrap_or_default();
-    let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+    let source_map = Arc::new(TolkSourceMap::from_code_cell(
         result.new_source_map.unwrap_or_default(),
         &code_cell,
         result.debug_mark_base64.as_deref(),
@@ -881,8 +875,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         &code_cell,
         Arc::new(abi),
         compiler_abi,
-        Arc::new(source_map),
-        tolk_source_map,
+        source_map,
     )?;
     Ok(stats)
 }
@@ -895,8 +888,7 @@ fn run_file_tests(
     code: &Cell,
     abi: Arc<ContractAbi>,
     compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
-    source_map: Arc<SourceMap>,
-    tolk_source_map: Arc<TolkSourceMap>,
+    source_map: Arc<TolkSourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
@@ -946,7 +938,6 @@ fn run_file_tests(
             abi: abi.clone(),
             compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
-            tolk_source_map: tolk_source_map.clone(),
             show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
@@ -1007,8 +998,7 @@ fn run_file_tests(
         if let (Some(AssertFailure::GetMethod(failure)), GetMethodResult::Success(result)) =
             (&mut assert_failure, &get_result)
         {
-            failure.caller_trace =
-                crate::retrace::find_execution_trace(&result.vm_log, &tolk_source_map);
+            failure.caller_trace = retrace::find_execution_trace(&result.vm_log, &source_map);
         }
 
         let (exit_code, gas_used) = match &get_result {
@@ -1150,7 +1140,6 @@ fn run_file_tests(
                     &code_boc64,
                     *code.repr_hash(),
                     source_map.clone(),
-                    tolk_source_map.clone(),
                     Some(
                         contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
                             .into(),

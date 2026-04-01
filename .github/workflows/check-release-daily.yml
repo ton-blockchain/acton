@@ -1,21 +1,7 @@
 name: Check Release Daily
 
 on:
-  schedule:
-    # 00:00 Europe/Moscow every day (21:00 UTC)
-    - cron: "0 21 * * *"
-  pull_request:
-    branches:
-      - master
-    paths:
-      - ".cargo/**"
-      - "crates/ton-objs/**"
-  push:
-    branches:
-      - master
-    paths:
-      - ".cargo/**"
-      - "crates/ton-objs/**"
+  # Disabled for automatic runs; kept for ad hoc checks from the Actions UI.
   workflow_dispatch:
 
 concurrency:

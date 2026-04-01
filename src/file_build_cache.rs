@@ -16,10 +16,9 @@ use std::time::{Duration, UNIX_EPOCH};
 use tolkc::abi::ContractABI;
 use tolkc::compiler::CompilerResultSuccess;
 use ton_abi;
-use ton_source_map::SourceMap;
 use xxhash_rust::xxh3::Xxh3;
 
-const CACHE_SCHEMA_VERSION: u32 = 4;
+const CACHE_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheEntry {
@@ -27,7 +26,6 @@ pub struct CacheEntry {
     pub code_hash_hex: String,
     pub debug_mark_base64: Option<String>,
     pub fift_code: String,
-    pub source_map: Option<SourceMap>,
     pub new_source_map: Option<tolkc::SourceMap>,
     pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
@@ -215,7 +213,6 @@ impl FileBuildCache {
             code_hash_hex: result.code_hash_hex.clone(),
             debug_mark_base64: result.debug_mark_base64.clone(),
             fift_code: result.fift_code.clone(),
-            source_map: result.source_map.clone(),
             new_source_map: result.new_source_map.clone(),
             abi: result.abi.clone(),
             dependencies_hash,
@@ -587,7 +584,6 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             debug_mark_base64: Some("test_debug_marks".to_string()),
-            source_map: None,
             new_source_map: None,
             abi: None,
         };

@@ -266,9 +266,8 @@ fn write_source_map(
         )
     })?;
 
-    let tolk_source_map =
-        TolkSourceMap::from_code_cell(source_map.clone(), code, debug_mark_base64)?;
-    let json_string = serde_json::to_string_pretty(&tolk_source_map).map_err(|err| {
+    let source_map = TolkSourceMap::from_code_cell(source_map.clone(), code, debug_mark_base64)?;
+    let json_string = serde_json::to_string_pretty(&source_map).map_err(|err| {
         anyhow!(
             "Failed to serialize source map {}: {err}",
             source_map_path.yellow()

@@ -270,24 +270,15 @@ fun main() {
 }
 ";
 
-    let session = DebugBuilder::new("debug-callback").code(code).build();
+    let session = DebugBuilder::new("debug-callback")
+        .code(code)
+        .expect_execution_error("VM exit code 65535")
+        .build();
 
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
+        executor.step_over_times(13)?;
         Ok(())
     })?;
 

@@ -1,4 +1,5 @@
 use crate::context::Context;
+use crate::formatter::FormatterContext;
 use anyhow::bail;
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
@@ -17,8 +18,10 @@ fn println_impl(
 ) -> anyhow::Result<()> {
     let typed_arg = arg.unwrap_single().to_typed(&type_name);
 
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
-    let formatted = formatter.format_with_color(&typed_arg);
+    let formatted = {
+        let formatter = FormatterContext::from_context(ctx);
+        formatter.format_with_color(&typed_arg)
+    };
 
     if ctx.io.capture_output {
         ctx.io.stdout_buffer.push_str(&formatted);
@@ -239,17 +242,13 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
     Ok(tokens)
 }
 
-fn format_default(
-    formatter: &crate::formatter::FormatterContext<'_>,
-    type_name: &str,
-    arg: TupleItem,
-) -> String {
+fn format_default(formatter: &FormatterContext<'_>, type_name: &str, arg: TupleItem) -> String {
     let typed_arg = arg.to_typed(type_name);
     formatter.format(&typed_arg)
 }
 
 fn format_single_arg(
-    formatter: &crate::formatter::FormatterContext<'_>,
+    formatter: &FormatterContext<'_>,
     kind: PlaceholderKind,
     type_name: &str,
     arg: TupleItem,
@@ -286,7 +285,7 @@ fn format_args(
     let tokens = parse_format(&fmt)?;
     let mut out = String::with_capacity(fmt.len());
     let mut args_iter = args.into_iter();
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
+    let formatter = FormatterContext::from_context(ctx);
 
     for token in tokens {
         match token {

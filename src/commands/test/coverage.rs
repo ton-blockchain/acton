@@ -83,7 +83,7 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
 
 struct SourceMapAndLogs {
     build_path: PathBuf,
-    tolk_source_map: Arc<TolkSourceMap>,
+    source_map: Arc<TolkSourceMap>,
     logs: Arc<str>,
 }
 
@@ -99,12 +99,12 @@ fn collect_source_data(
         };
 
         let build_path = build_result.0;
-        let tolk_source_map = build_result.1.tolk_source_map;
+        let source_map = build_result.1.source_map;
         let logs = message.vm_log.clone();
 
         data.push(SourceMapAndLogs {
             build_path,
-            tolk_source_map,
+            source_map,
             logs,
         });
     }
@@ -118,12 +118,12 @@ fn collect_source_data(
         };
 
         let build_path = build_result.0;
-        let tolk_source_map = build_result.1.tolk_source_map;
+        let source_map = build_result.1.source_map;
         let logs = get_result.vm_log.clone();
 
         data.push(SourceMapAndLogs {
             build_path,
-            tolk_source_map,
+            source_map,
             logs,
         });
     }
@@ -148,9 +148,7 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
     let mut branch_hits_per_file: HashMap<String, HashMap<i64, BranchHits>> = HashMap::new();
 
     for SourceMapAndLogs {
-        tolk_source_map,
-        logs,
-        ..
+        source_map, logs, ..
     } in data
     {
         let trace = Trace::new(logs, Some(1_000_000));
@@ -167,7 +165,7 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
                 continue;
             };
 
-            let Some((file, line)) = find_coverage_loc(tolk_source_map, hash, *offset) else {
+            let Some((file, line)) = find_coverage_loc(source_map, hash, *offset) else {
                 continue;
             };
 
@@ -193,12 +191,8 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
     }
 }
 
-fn find_coverage_loc(
-    tolk_source_map: &TolkSourceMap,
-    hash: &str,
-    offset: u16,
-) -> Option<(String, i64)> {
-    let marks = tolk_source_map.marks_dict.as_ref()?.get(hash)?;
+fn find_coverage_loc(source_map: &TolkSourceMap, hash: &str, offset: u16) -> Option<(String, i64)> {
+    let marks = source_map.marks_dict.as_ref()?.get(hash)?;
     let target_offset = i32::from(offset);
     let mut loc = None;
 
@@ -208,7 +202,7 @@ fn find_coverage_loc(
         }
 
         let Some((file, line)) =
-            coverage_location_for_mark(&tolk_source_map.source_map, mark_id as usize)
+            coverage_location_for_mark(&source_map.source_map, mark_id as usize)
         else {
             continue;
         };
@@ -262,7 +256,7 @@ fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String
 
     for SourceMapAndLogs {
         build_path,
-        tolk_source_map,
+        source_map,
         ..
     } in data
     {
@@ -270,7 +264,7 @@ fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String
             continue;
         }
 
-        build_executable_lines_per_file(&mut executable_lines_per_file, tolk_source_map);
+        build_executable_lines_per_file(&mut executable_lines_per_file, source_map);
     }
 
     executable_lines_per_file
@@ -278,9 +272,9 @@ fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String
 
 fn build_executable_lines_per_file(
     executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
-    tolk_source_map: &TolkSourceMap,
+    source_map: &TolkSourceMap,
 ) {
-    let source_map = &tolk_source_map.source_map;
+    let source_map = &source_map.source_map;
 
     for mark_id in 0..source_map.debug_marks_count() {
         let DebugMark::Loc { range, .. } = source_map.get_debug_mark(mark_id) else {

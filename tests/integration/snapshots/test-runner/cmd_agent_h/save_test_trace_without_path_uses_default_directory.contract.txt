@@ -32,7 +32,7 @@
     "thrownErrors": []
   },
   "name": "simple",
-  "tolk_source_map": {
+  "source_map": {
     "source_map": {
       "debug_marks": [],
       "declarations": [],

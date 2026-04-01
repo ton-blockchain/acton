@@ -11,7 +11,7 @@ use tolkc::TolkSourceMap;
 use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::{SourceLocation, SourceMap};
+use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::{ShardAccount, StdAddr};
 
@@ -71,9 +71,7 @@ pub struct TestReport {
     #[serde(skip)]
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
     #[serde(skip)]
-    pub source_map: Arc<SourceMap>,
-    #[serde(skip)]
-    pub tolk_source_map: Arc<TolkSourceMap>,
+    pub source_map: Arc<TolkSourceMap>,
     #[serde(skip)]
     pub show_bodies: bool,
     #[serde(skip)]

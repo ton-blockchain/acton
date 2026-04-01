@@ -2,23 +2,18 @@
   "name": "@acton/shared-ui",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./styles/*": "./src/styles/*"
   },
   "scripts": {
-    "lint": "eslint --max-warnings 0 . --cache",
-    "lint:fix": "eslint --fix . --cache",
     "fmt": "prettier --write -l --cache .",
-    "fmt:check": "prettier --check --cache ."
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "typescript": "^5.9.3"
+    "fmt:check": "prettier --check --cache .",
+    "lint": "eslint --max-warnings 0 . --cache",
+    "lint:fix": "eslint --fix . --cache"
   },
   "dependencies": {
     "@ton/core": "^0.62.0",
@@ -27,5 +22,12 @@
     "react-d3-tree": "^3.6.6",
     "react-icons": "^5.5.0",
     "shiki": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }

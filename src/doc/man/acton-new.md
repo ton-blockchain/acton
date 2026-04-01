@@ -129,7 +129,7 @@ When `acton new --template counter --app` is used, the project includes:
 Before running frontend commands, install the app dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 ## SIDE EFFECTS

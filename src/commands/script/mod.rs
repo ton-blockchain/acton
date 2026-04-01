@@ -3,8 +3,6 @@ use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
 };
-use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::debug_context::DebugContext;
 use crate::exit_codes;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -14,6 +12,8 @@ use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer, project_root};
 use acton_config::test::BacktraceMode;
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::{ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener};
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;
@@ -36,7 +36,6 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -99,7 +98,7 @@ pub fn script_cmd(
         None => None,
     };
     let debug_listener = if debug {
-        Some(crate::debugger::dap::reserve_dap_listener(debug_port)?)
+        Some(reserve_dap_listener(debug_port)?)
     } else {
         None
     };
@@ -153,8 +152,7 @@ fn run_script_file(
         tolkc::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
-            let source_map = Arc::new(result.source_map.unwrap_or_default());
-            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+            let source_map = Arc::new(TolkSourceMap::from_code_cell(
                 result.new_source_map.unwrap_or_default(),
                 &code_cell,
                 result.debug_mark_base64.as_deref(),
@@ -166,7 +164,6 @@ fn run_script_file(
                 stack,
                 Arc::new(abi),
                 source_map,
-                tolk_source_map,
                 debug,
                 backtrace,
                 debug_listener,
@@ -189,7 +186,7 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    tolk_source_map: Arc<TolkSourceMap>,
+    source_map: Arc<TolkSourceMap>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -198,8 +195,7 @@ fn execute_script(
     data_cell: &Cell,
     stack: Tuple,
     abi: Arc<ContractAbi>,
-    source_map: Arc<SourceMap>,
-    tolk_source_map: Arc<TolkSourceMap>,
+    source_map: Arc<TolkSourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -304,55 +300,36 @@ fn execute_script(
         network: net.cloned(),
     };
 
+    let stack_b64 = Boc::encode_base64(serialize_tuple(&stack)?);
+
     if debug {
-        let stack = Boc::encode_base64(serialize_tuple(&stack)?);
-        let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
+        let mut executor = StepGetExecutor::new(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
         ffi::register(&mut executor, &mut ctx);
 
         let listener = debug_listener
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
-        let transport = crate::debugger::dap::start_dap_server_with_listener(listener)?;
+        let transport = start_dap_server_with_listener(listener)?;
+        executor.prepare(0, &stack_b64)?;
+        let replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
 
-        let mut dbg_ctx = DebugContext::new(
-            transport,
-            AnyExecutor::Get(executor.clone()),
-            source_map,
-            "main".into(),
-        );
-
-        ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
-        executor.prepare(0, &stack)?;
-
-        ctx.debug.ctx().process_incoming_requests(true)?;
+        let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
+        ctx.debug = DebugCtx::new(&mut dbg_session);
+        ctx.debug.process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
-        print_script_result(
-            &ctx,
-            ScriptResult {
-                result,
-                tolk_source_map,
-            },
-        );
+        print_script_result(&ctx, ScriptResult { result, source_map });
         return Ok(());
     }
 
     let mut executor = GetExecutor::new(&params)?;
     ffi::register(&mut executor, &mut ctx);
+    let result = executor.run_get_method(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
 
-    let stack = Boc::encode_base64(serialize_tuple(&stack)?);
-    let result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
-    print_script_result(
-        &ctx,
-        ScriptResult {
-            result,
-            tolk_source_map,
-        },
-    );
+    print_script_result(&ctx, ScriptResult { result, source_map });
     Ok(())
 }
 
-fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
+fn print_script_result<'a>(ctx: &'a Context<'a>, result: ScriptResult) {
     match &result.result {
         GetMethodResult::Success(success_result) => {
             let exit_code = success_result.vm_exit_code;
@@ -399,8 +376,8 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
     }
 }
 
-fn print_nonzero_script_exit_code(
-    ctx: &Context<'_>,
+fn print_nonzero_script_exit_code<'a>(
+    ctx: &'a Context<'a>,
     result: &GetMethodResultSuccess,
     script_result: &ScriptResult,
     exit_code: i32,
@@ -420,16 +397,15 @@ fn print_nonzero_script_exit_code(
     }
 }
 
-fn format_nonzero_script_exit_code_details(
-    ctx: &Context<'_>,
+fn format_nonzero_script_exit_code_details<'a>(
+    ctx: &'a Context<'a>,
     result: &GetMethodResultSuccess,
     script_result: &ScriptResult,
     exit_code: i32,
 ) -> String {
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
-    let exit_code_info =
-        retrace::find_exception_info(&result.vm_log, &script_result.tolk_source_map);
+    let exit_code_info = retrace::find_exception_info(&result.vm_log, &script_result.source_map);
 
     if let Some(info) = &exit_code_info {
         writeln!(

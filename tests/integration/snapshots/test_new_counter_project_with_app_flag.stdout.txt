@@ -18,6 +18,6 @@ Next steps:
   # Run tests
   acton test
   # Install app dependencies
-  npm install
+  npm ci
   # Start the TypeScript app
   npm run dev

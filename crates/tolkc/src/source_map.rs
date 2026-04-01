@@ -3,7 +3,7 @@
 // that map IR variables and stack positions back to the original Tolk source.
 
 use crate::types_kernel::Ty;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -14,7 +14,7 @@ use std::path::Path;
 
 type BigintAsString = String;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Debug, Default)]
 pub struct SourceMap {
     files: Vec<SrcFileInfo>,
     declarations: Vec<Declaration>,
@@ -37,22 +37,24 @@ impl SourceMap {
     }
 
     pub fn from_json_str(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut sm: SourceMap = serde_json::from_str(json)?;
-        sm.index_declarations();
-        Ok(sm)
+        Ok(serde_json::from_str(json)?)
     }
 
     fn index_declarations(&mut self) {
-        for decl in std::mem::take(&mut self.declarations) {
+        self.structs.clear();
+        self.aliases.clear();
+        self.enums.clear();
+
+        for decl in &self.declarations {
             match decl {
                 Declaration::Struct(s) => {
-                    self.structs.insert(s.name.clone(), s);
+                    self.structs.insert(s.name.clone(), s.clone());
                 }
                 Declaration::Alias(a) => {
-                    self.aliases.insert(a.name.clone(), a);
+                    self.aliases.insert(a.name.clone(), a.clone());
                 }
                 Declaration::Enum(e) => {
-                    self.enums.insert(e.name.clone(), e);
+                    self.enums.insert(e.name.clone(), e.clone());
                 }
             }
         }
@@ -68,6 +70,22 @@ impl SourceMap {
         } else {
             "unknown-function".to_string()
         }
+    }
+
+    pub fn innermost_function_at(&self, file_id: usize, line: usize) -> Option<&FunctionInfo> {
+        self.functions
+            .iter()
+            .filter(|function| {
+                function.ident_loc.file_id() == file_id
+                    && line >= function.ident_loc.start_line()
+                    && line <= function.end_loc.end_line()
+            })
+            .min_by_key(|function| {
+                function
+                    .end_loc
+                    .end_line()
+                    .saturating_sub(function.ident_loc.start_line())
+            })
     }
 
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
@@ -161,6 +179,41 @@ impl SourceMap {
 
     pub const fn is_empty(&self) -> bool {
         self.debug_marks.is_empty()
+    }
+}
+
+#[derive(Deserialize)]
+struct SourceMapDe {
+    #[serde(default)]
+    files: Vec<SrcFileInfo>,
+    #[serde(default)]
+    declarations: Vec<Declaration>,
+    #[serde(default)]
+    unique_ty: Vec<UniqueTy>,
+    #[serde(default)]
+    functions: Vec<FunctionInfo>,
+    #[serde(default)]
+    debug_marks: Vec<DebugMark>,
+}
+
+impl<'de> Deserialize<'de> for SourceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = SourceMapDe::deserialize(deserializer)?;
+        let mut sm = SourceMap {
+            files: raw.files,
+            declarations: raw.declarations,
+            unique_ty: raw.unique_ty,
+            functions: raw.functions,
+            debug_marks: raw.debug_marks,
+            structs: HashMap::new(),
+            aliases: HashMap::new(),
+            enums: HashMap::new(),
+        };
+        sm.index_declarations();
+        Ok(sm)
     }
 }
 

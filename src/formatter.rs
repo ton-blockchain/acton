@@ -5,9 +5,9 @@ use crate::context::{
     KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::retrace::{
-    ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
+    self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
 };
-use crate::{context, exit_codes, retrace};
+use crate::{context, exit_codes};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
@@ -1465,7 +1465,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         let code = Self::account_code(&self.accounts, &dst);
         let result = self.build_cache.result_for_code(&code)?;
 
-        let info = retrace::find_exception_info(logs, &result.1.tolk_source_map)?;
+        let info = retrace::find_exception_info(logs, &result.1.source_map)?;
         let backtrace_result = Self::format_backtrace(&info.backtrace)
             .iter()
             .map(|line| format!("{child_prefix}       {line}"))
@@ -1527,7 +1527,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         let code = Boc::decode_base64(failed_get.code.as_ref()).ok()?;
         let build = self.build_cache.result_for_code(&Some(code))?.1;
 
-        retrace::find_exception_info(&failed_get.vm_log, &build.tolk_source_map)
+        retrace::find_exception_info(&failed_get.vm_log, &build.source_map)
     }
 
     fn format_ext_out_message(&self, msg: &RelaxedMessage) -> Option<String> {
@@ -1775,7 +1775,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             let result = self.build_cache.result_for_code(&code);
 
             if let Some(result) = result {
-                return retrace::find_source_loc(&result.1.tolk_source_map, loc_hash, loc_offset);
+                return retrace::find_source_loc(&result.1.source_map, loc_hash, loc_offset);
             }
         }
 
@@ -2916,8 +2916,7 @@ impl FormatterContext<'_> {
         )
         .ok();
 
-        let replayed_exception =
-            retrace::find_exception_info(&failure.vm_log, &failure.tolk_source_map);
+        let replayed_exception = retrace::find_exception_info(&failure.vm_log, &failure.source_map);
 
         if let Some(info) = &replayed_exception {
             writeln!(details, "at {}", Self::format_location(&info.loc)).ok();
@@ -3223,7 +3222,7 @@ impl FormatterContext<'_> {
         let mut output = String::new();
         writeln!(output, "exit_code={exit_code}").ok();
 
-        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.tolk_source_map);
+        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
         let get_method_info = self.find_failed_get_method_exception(test);
 
         if let Some(info) = &get_method_info {

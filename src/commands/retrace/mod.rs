@@ -1,10 +1,24 @@
+use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
+use crate::stdlib;
 use acton_config::color::OwoColorize;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::serve_single_replayer_dap;
+use anyhow::{Context, anyhow};
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
+
+struct ContractTraceArtifacts {
+    code_cell: Cell,
+    source_map: tolkc::TolkSourceMap,
+}
 
 #[allow(unsafe_code)]
 pub fn retrace_cmd(
@@ -13,6 +27,8 @@ pub fn retrace_cmd(
     api_key: Option<String>,
     verbose: bool,
     logs_dir: Option<String>,
+    contract: Option<String>,
+    dap_port: Option<u16>,
 ) -> anyhow::Result<()> {
     if let Some(key) = api_key {
         // SAFETY: this is a single thread program
@@ -20,6 +36,20 @@ pub fn retrace_cmd(
             std::env::set_var("TONCENTER_API_KEY", key);
         }
     }
+
+    if dap_port.is_some() && contract.is_none() {
+        anyhow::bail!(
+            "{} requires {}",
+            "--dap-port".yellow(),
+            "--contract <NAME>".yellow()
+        );
+    }
+
+    let contract_artifacts = if let Some(contract_name) = contract.as_deref() {
+        Some(build_contract_trace_artifacts(contract_name)?)
+    } else {
+        None
+    };
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -37,18 +67,39 @@ pub fn retrace_cmd(
         match rt.block_on(retrace_future) {
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {
-                    std::fs::create_dir_all(logs_dir)?;
-                    std::fs::write(
+                    fs::create_dir_all(logs_dir)?;
+                    fs::write(
                         format!("{logs_dir}/vm.log"),
                         result.emulated_tx.vm_logs.as_ref(),
                     )?;
-                    std::fs::write(
+                    fs::write(
                         format!("{logs_dir}/executor.log"),
                         result.emulated_tx.executor_logs.as_ref(),
                     )?;
                     println!("{} Logs saved to {}", "Success:".green(), logs_dir);
                 }
-                print_retrace_result(network, result, verbose, logs_dir.as_ref());
+                print_retrace_result(network, &result, verbose, logs_dir.as_ref());
+
+                if let (Some(contract_name), Some(artifacts)) =
+                    (contract.as_deref(), contract_artifacts.as_ref())
+                {
+                    ensure_contract_matches_transaction(contract_name, &result, artifacts)?;
+
+                    if let Some(port) = dap_port {
+                        let vm_logs = &result.emulated_tx.vm_logs;
+                        let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+                        let replayer = TolkReplayer::new(&artifacts.source_map, &vm_lines)
+                            .with_context(|| {
+                                format!(
+                                    "Cannot build replayer for contract {}",
+                                    contract_name.yellow()
+                                )
+                            })?;
+
+                        serve_single_replayer_dap(replayer, port)
+                            .map_err(|err| anyhow!(err.to_string()))?;
+                    }
+                }
                 return Ok(());
             }
             Err(e) => {
@@ -63,9 +114,14 @@ pub fn retrace_cmd(
     anyhow::bail!("Failed to retrace transaction");
 }
 
+#[allow(dead_code)]
+pub(crate) fn serve_prepared_retrace_dap(replayer: TolkReplayer, port: u16) -> anyhow::Result<()> {
+    serve_single_replayer_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
+}
+
 fn print_retrace_result(
     network: Network,
-    result: retrace::TraceResult,
+    result: &retrace::TraceResult,
     verbose: bool,
     logs_dir: Option<&String>,
 ) {
@@ -381,6 +437,109 @@ fn print_retrace_result(
 
     if logs_dir.is_none() {
         println!("Help: Use --logs-dir <DIR> to save full VM and executor logs to files.");
+    }
+}
+
+fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<ContractTraceArtifacts> {
+    stdlib::ensure_latest(configured_project_root())?;
+
+    let acton_config = ActonConfig::load()?;
+    let contract = acton_config
+        .get_contract(contract_name)
+        .cloned()
+        .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&acton_config, contract_name)))?;
+    let contract_path = resolve_project_config_path(configured_project_root(), &contract.src);
+
+    if contract_path.extension().and_then(|ext| ext.to_str()) != Some("tolk") {
+        anyhow::bail!(
+            "Contract {} uses {} source. Source-level retrace requires a {} contract.",
+            contract_name.yellow(),
+            contract_path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("unknown")
+                .yellow(),
+            ".tolk".yellow()
+        );
+    }
+
+    let mappings = acton_config.mappings();
+    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let compilation_result = compiler.compile(&contract_path, true);
+
+    match compilation_result {
+        tolkc::CompilerResult::Success(res) => {
+            let code_cell = Boc::decode_base64(res.code_boc64)
+                .with_context(|| "Failed to decode compiled contract code BoC".to_string())?;
+            let source_map = res.new_source_map.ok_or_else(|| {
+                anyhow!(
+                    "Compiler did not return source maps for {}",
+                    contract_path.display()
+                )
+            })?;
+
+            let debug_mark_base64 = res.debug_mark_base64.ok_or_else(|| {
+                anyhow!(
+                    "Compiler did not return debug marks for {}",
+                    contract_path.display()
+                )
+            })?;
+
+            let source_map = tolkc::TolkSourceMap::from_code_cell(
+                source_map,
+                &code_cell,
+                Some(&debug_mark_base64),
+            )?;
+
+            Ok(ContractTraceArtifacts {
+                code_cell,
+                source_map,
+            })
+        }
+        tolkc::CompilerResult::Error(error) => {
+            anyhow::bail!(
+                "Failed to compile contract {} for source-level retrace: {}",
+                contract_name.yellow(),
+                error.message.trim_end()
+            );
+        }
+    }
+}
+
+fn ensure_contract_matches_transaction(
+    contract_name: &str,
+    result: &retrace::TraceResult,
+    artifacts: &ContractTraceArtifacts,
+) -> anyhow::Result<()> {
+    let Some(tx_code_hash) = result
+        .code_cell
+        .as_ref()
+        .or(result.original_code_cell.as_ref())
+        .map(|cell| cell.repr_hash())
+    else {
+        return Ok(());
+    };
+
+    let local_code_hash = artifacts.code_cell.repr_hash();
+    if local_code_hash == tx_code_hash {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "Contract {} does not match code of account {}: local hash {}, transaction hash {}",
+        contract_name.yellow(),
+        format_address(result.in_msg.contract.clone()).cyan(),
+        local_code_hash.to_string().yellow(),
+        tx_code_hash.to_string().yellow()
+    );
+}
+
+fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
+    let path = Path::new(path);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        project_root.join(path)
     }
 }
 

@@ -1,34 +1,33 @@
 Step 1 (before):
-  Bytecode position: B1AE5CFBC22486DEE3ED69BC83E301B0D8A5284E2E61688BB81FFAEC8BA5220E:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-             ^^^
+                   ^^^
       6|     foo = 200;
       7|     return foo;
       8| }
 
 Step 2 (step_over):
-  Bytecode position: B1AE5CFBC22486DEE3ED69BC83E301B0D8A5284E2E61688BB81FFAEC8BA5220E:40
   Code:
       3| 
       4| fun main() {
       5|     foo = 100;
       6|     foo = 200;
-             ^^^
+                   ^^^
       7|     return foo;
       8| }
+  Variables:
+    global foo = 100
 
 Step 3 (step_over):
-  Bytecode position: B1AE5CFBC22486DEE3ED69BC83E301B0D8A5284E2E61688BB81FFAEC8BA5220E:96
   Code:
       4| fun main() {
       5|     foo = 100;
       6|     foo = 200;
       7|     return foo;
-             ^^^^^^^^^^
+                    ^^^
       8| }
   Variables:
-    g_foo = 200
+    global foo = 200
