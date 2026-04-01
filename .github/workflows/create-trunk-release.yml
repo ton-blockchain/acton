@@ -1,7 +1,24 @@
 name: Create Trunk Release
 
 on:
-  workflow_call:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Workflow run id that produced the trunk artifacts
+        required: true
+        type: string
+      source_branch:
+        description: Branch name for concurrency grouping
+        required: true
+        type: string
+      target_sha:
+        description: Commit SHA for the trunk release target
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.source_branch }}
+  cancel-in-progress: false
 
 permissions: { }
 
@@ -13,8 +30,10 @@ jobs:
   create-trunk-release:
     name: Create Trunk Release
     runs-on: ubicloud-standard-2-ubuntu-2204
+    if: github.repository == 'ton-blockchain/acton'
     env:
-      TARGET_SHA: ${{ github.sha }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      TARGET_SHA: ${{ inputs.target_sha }}
 
     permissions:
       actions: write
@@ -27,6 +46,8 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
 
       - name: Delete downloaded artifacts
         uses: actions/github-script@v8
@@ -34,7 +55,7 @@ jobs:
           github-token: ${{ github.token }}
           # language=JavaScript
           script: |
-            const runId = context.runId;
+            const runId = process.env.SOURCE_RUN_ID;
             const {
               data: artifacts
             } = await github.rest.actions.listWorkflowRunArtifacts({
