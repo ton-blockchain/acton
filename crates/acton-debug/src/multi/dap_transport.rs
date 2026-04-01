@@ -34,7 +34,9 @@ impl DapTransport {
 }
 
 fn port_bind_failure(service: &str, address: &str, flag: &str) -> String {
-    format!("Failed to bind {service} on {address}. Use {flag} to choose a free port.")
+    format!(
+        "Failed to start {service} on {address}\nChoose another port with {flag}\nOr stop the process currently listening on that port"
+    )
 }
 
 pub fn reserve_dap_listener(port: u16) -> anyhow::Result<TcpListener> {

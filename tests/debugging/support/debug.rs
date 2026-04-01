@@ -159,8 +159,25 @@ impl DebugSession {
         });
 
         let address = format!("127.0.0.1:{port}");
-        let client = DebuggerClient::connect_with_retry(&address, Duration::from_millis(2000))
-            .expect("Failed to connect to debug server");
+        let client = match DebuggerClient::connect_with_retry(&address, Duration::from_secs(5)) {
+            Ok(client) => client,
+            Err(connect_err) => {
+                let worker_result = handle.join();
+                match worker_result {
+                    Ok(Err(worker_err)) => {
+                        panic!(
+                            "Failed to connect to debug server: {connect_err}\nWorker exited early with: {worker_err}"
+                        );
+                    }
+                    Ok(Ok(_)) => {
+                        panic!(
+                            "Failed to connect to debug server: {connect_err}\nWorker finished before debugger handshake"
+                        );
+                    }
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+        };
 
         self.client_handle = Some(handle);
 
