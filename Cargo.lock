@@ -2819,12 +2819,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nacl"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30aefc44d813c51b5e7952950e87c17f2e0e1a3274d63c8281a701e05323d548"
-
-[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4998,9 +4992,9 @@ checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
 
 [[package]]
 name = "ton"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ad3c4063617be0ab40da3e07cdeedd4cb029a2358ad523e2d394324b302ee8"
+checksum = "99a00f193fc180a8ac138d457634334689ea3c59e0174d66c63dd099ddc65c36"
 dependencies = [
  "adnl",
  "async-recursion",
@@ -5010,6 +5004,7 @@ dependencies = [
  "base64-serde",
  "crc",
  "derive_setters",
+ "ed25519-dalek",
  "fastnum",
  "futures-util",
  "hex",
@@ -5017,7 +5012,6 @@ dependencies = [
  "libc",
  "log",
  "moka",
- "nacl",
  "num-bigint",
  "num-traits",
  "parking_lot",

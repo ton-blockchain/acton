@@ -79,7 +79,7 @@ url = "2.5.7"
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
-ton = "0.1.1"
+ton = "0.1.2"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
 
 num-bigint = "0.4.6"
