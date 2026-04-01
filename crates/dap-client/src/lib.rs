@@ -174,8 +174,12 @@ impl DapClient {
 
     pub fn wait_for_response(&self, seq: u64, timeout: Duration) -> Result<Response> {
         let start = std::time::Instant::now();
+        let mut pending_events = Vec::new();
         loop {
             if start.elapsed() > timeout {
+                for event in pending_events.into_iter() {
+                    self.event_sender.send(event).unwrap_or(());
+                }
                 return Err(anyhow!("Timeout waiting for response seq={seq}"));
             }
 
@@ -184,15 +188,23 @@ impl DapClient {
                 .recv_timeout(Duration::from_millis(100))
                 && response_seq == seq
             {
+                for event in pending_events.into_iter() {
+                    self.event_sender.send(event).unwrap_or(());
+                }
                 return Ok(response);
             }
 
-            if let Ok(event) = self.event_receiver.recv_timeout(Duration::from_millis(100))
-                && matches!(event, Event::Terminated(_))
-            {
-                anyhow::bail!(
-                    "The debugger terminated, probably because you stepped too many times, check stacktrace"
-                );
+            if let Ok(event) = self.event_receiver.recv_timeout(Duration::from_millis(100)) {
+                if matches!(event, Event::Terminated(_)) {
+                    for event in pending_events.into_iter() {
+                        self.event_sender.send(event).unwrap_or(());
+                    }
+                    anyhow::bail!(
+                        "The debugger terminated, probably because you stepped too many times, check stacktrace"
+                    );
+                }
+
+                pending_events.push(event);
             }
         }
     }

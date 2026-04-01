@@ -1,41 +1,4 @@
 Step 1 (before):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:8
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null ? foo : 100;
-                 ^
-      4|     return a + 1;
-      5| }
-  Variables:
-    foo = 200
-
-Step 2 (step_in):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:8
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null ? foo : 100;
-                     ^^^^^^^^^^^^^^^^^^^^^^^
-      4|     return a + 1;
-      5| }
-  Variables:
-    foo = 200
-
-Step 3 (step_in):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:8
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null ? foo : 100;
-                     ^^^^^^^^^^^^^^^^^^^^^^^
-      4|     return a + 1;
-      5| }
-  Variables:
-    foo = 200
-
-Step 4 (step_in):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:8
   Code:
       1| 
       2| fun main(foo: int?) {
@@ -46,27 +9,36 @@ Step 4 (step_in):
   Variables:
     foo = 200
 
-Step 5 (step_in):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:32
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null ? foo : 100;
-                                         ^^^
-      4|     return a + 1;
-      5| }
-  Variables:
-    '2 = true
-    foo = 200
-
-Step 6 (step_in):
-  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:72
+Step 2 (step_in):
   Code:
       1| 
       2| fun main(foo: int?) {
       3|     val a = foo != null ? foo : 100;
       4|     return a + 1;
-                        ^
+                    ^^^^^
       5| }
   Variables:
+    foo = 200 (last seen)
     a = 200
+
+Step 3 (step_in):
+  Code:
+      1| 
+      2| fun main(foo: int?) {
+      3|     val a = foo != null ? foo : 100;
+      4|     return a + 1;
+             ^^^^^^^^^^^^
+      5| }
+  Variables:
+    foo = 200 (last seen)
+    a = 200 (last seen)
+    (return value) = 201
+
+Step 4 (step_in):
+  Code:
+      1| 
+      2| fun main(foo: int?) {
+      3|     val a = foo != null ? foo : 100;
+      4|     return a + 1;
+             ^^^^^^^^^^^^
+      5| }

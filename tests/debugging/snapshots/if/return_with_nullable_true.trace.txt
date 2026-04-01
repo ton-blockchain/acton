@@ -1,23 +1,9 @@
 Step 1 (before):
-  Bytecode position: 72CF4B484A213AFA84D9814EC30E84CF52115A4DF470D6598A848A18E38E474D:8
   Code:
       1| 
       2| fun main(foo: int?) {
       3|     if (foo == null) {
-             ^
-      4|         return
-      5|     }
-      6| 
-  Variables:
-    foo = null
-
-Step 2 (step_in):
-  Bytecode position: 72CF4B484A213AFA84D9814EC30E84CF52115A4DF470D6598A848A18E38E474D:8
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     if (foo == null) {
-                 ^^^^^^^^^^^
+             ^^
       4|         return
       5|     }
       6| 

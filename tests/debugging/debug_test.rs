@@ -26,7 +26,7 @@ fun main() {
     })?;
 
     let debug_output = DebugTestOutput::new(result);
-    debug_output.assert_trace_steps(6);
+    debug_output.assert_trace_steps(4);
     debug_output.assert_trace_snapshot_matches(
         "debugging/snapshots/test_simple_step_by_step_execution.trace.txt",
     );
@@ -122,8 +122,6 @@ fun main(arg: int) {
     })?;
 
     let debug_output = DebugTestOutput::new(result);
-
-    debug_output.assert_variable_at_step(6, "g_result", "42");
     debug_output.assert_trace_snapshot_matches(
         "debugging/snapshots/test_simple_debug_with_stack_argument.trace.txt",
     );

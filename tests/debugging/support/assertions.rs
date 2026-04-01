@@ -12,6 +12,7 @@ impl DebugTestOutput {
 
 pub(crate) trait DebugTestOutputExt {
     fn assert_trace_steps(&self, expected_count: usize) -> &Self;
+    #[allow(dead_code)]
     fn assert_variable_at_step(
         &self,
         step_index: usize,

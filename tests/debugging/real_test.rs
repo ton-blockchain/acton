@@ -207,7 +207,7 @@ fn setup_counter_project() -> DebugSession {
         .build();
 
     DebugBuilder::new("debug-callback")
-        .project(project.path())
+        .project_ref(project)
         .script_file("main.tolk")
         .build()
 }

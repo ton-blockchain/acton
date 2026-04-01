@@ -8,7 +8,7 @@ use acton::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use acton_debug::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
-use acton_debug::start_dap_server;
+use acton_debug::{start_dap_server, start_dap_server_with_listener};
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -17,6 +17,7 @@ use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
+use std::net::TcpListener;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
@@ -149,6 +150,7 @@ pub(crate) fn run_script_file(
     file_path: &str,
     content: &str,
     debug_port: u16,
+    debug_listener: Option<TcpListener>,
     stack: Tuple,
 ) -> anyhow::Result<String> {
     let abi = contract_abi(content.into(), file_path, &None);
@@ -196,6 +198,7 @@ pub(crate) fn run_script_file(
                 abi.into(),
                 tolk_source_map,
                 debug_port,
+                debug_listener,
                 ExecutorVerbosity::FullLocationStackVerbose,
                 stack,
             )?;
@@ -207,12 +210,14 @@ pub(crate) fn run_script_file(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_script<'a>(
     code_cell: &'a TonCell,
     data_cell: &'a TonCell,
     abi: Arc<ContractAbi>,
     tolk_source_map: Arc<TolkSourceMap>,
     debug_port: u16,
+    debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
 ) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
@@ -302,7 +307,11 @@ fn execute_script<'a>(
     let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
 
-    let transport = start_dap_server(debug_port)?;
+    let transport = if let Some(listener) = debug_listener {
+        start_dap_server_with_listener(listener)?
+    } else {
+        start_dap_server(debug_port)?
+    };
     executor.prepare(0, &stack)?;
     let replayer = TolkReplayer::new_live_vm(tolk_source_map.as_ref(), executor.clone().into())?;
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());

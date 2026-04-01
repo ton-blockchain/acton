@@ -541,6 +541,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
         let file_id = r.current_file_id();
         let line = r.current_line();
         let column = r.current_column();
+        let end_line = r.current_end_line();
+        let end_column = r.current_end_column();
         let top_source = build_source(r, file_id);
         let top_name = call_stack
             .last()
@@ -555,6 +557,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
             source: Option<Source>,
             line: i64,
             col: i64,
+            end_line: i64,
+            end_column: i64,
         }
 
         let n = call_stack.len();
@@ -563,13 +567,15 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
             let frame_idx = n - 1 - depth;
             let frame = &call_stack[frame_idx];
             let child_frame = &call_stack[frame_idx + 1];
-            let (source, line, col) = match &child_frame.call_site_loc {
+            let (source, line, col, end_line, end_column) = match &child_frame.call_site_loc {
                 Some(loc) => (
                     Some(build_source(r, loc.file_id())),
                     loc.start_line() as i64,
                     loc.start_col() as i64,
+                    loc.end_line() as i64,
+                    loc.end_col() as i64,
                 ),
-                None => (None, 0, 0),
+                None => (None, 0, 0, 0, 0),
             };
             parents.push(ParentData {
                 name: format_frame_name(frame),
@@ -577,12 +583,16 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
                 source,
                 line,
                 col,
+                end_line,
+                end_column,
             });
         }
 
         (
             line,
             column,
+            end_line,
+            end_column,
             top_name,
             top_is_builtin,
             top_source,
@@ -591,8 +601,17 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
         )
     });
 
-    let Some((line, column, top_name, top_is_builtin, top_source, parents, stopped_on_exception)) =
-        collected
+    let Some((
+        line,
+        column,
+        end_line,
+        end_column,
+        top_name,
+        top_is_builtin,
+        top_source,
+        parents,
+        stopped_on_exception,
+    )) = collected
     else {
         return req.success(ResponseBody::StackTrace(StackTraceResponse {
             stack_frames: Vec::new(),
@@ -618,8 +637,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
         source: Some(top_source),
         line: line as i64,
         column: column as i64,
-        end_line: None,
-        end_column: None,
+        end_line: (end_line > 0).then_some(end_line as i64),
+        end_column: (end_column > 0).then_some(end_column as i64),
         can_restart: None,
         module_id: None,
         presentation_hint: top_hint,
@@ -639,8 +658,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
             source: p.source,
             line: p.line,
             column: p.col,
-            end_line: None,
-            end_column: None,
+            end_line: (p.end_line > 0).then_some(p.end_line),
+            end_column: (p.end_column > 0).then_some(p.end_column),
             can_restart: None,
             module_id: None,
             presentation_hint: hint,

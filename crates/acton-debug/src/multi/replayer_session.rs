@@ -95,6 +95,27 @@ pub struct ReplayerDebugSession {
 }
 
 impl ReplayerDebugSession {
+    fn is_transparent_step_into_function(path: &str, function_name: &str) -> bool {
+        let normalized = path.replace('\\', "/");
+        if !normalized.ends_with("/emulation/network.tolk") {
+            return false;
+        }
+
+        matches!(
+            function_name,
+            "send"
+                | "net.send"
+                | "sendSingle"
+                | "net.sendSingle"
+                | "sendIter"
+                | "net.sendIter"
+                | "sendExternal"
+                | "net.sendExternal"
+                | "net.isDeployed"
+                | "net.getDeployedCode"
+        ) || function_name.contains("runGetMethod")
+    }
+
     pub fn new(transport: DapTransport, replayer: TolkReplayer, root_name: Arc<str>) -> Self {
         Self {
             transport,
@@ -275,7 +296,7 @@ impl ReplayerDebugSession {
         ctx.replayer.is_finished()
     }
 
-    fn step_active_context_without_breakpoints(&mut self, mode: StepMode) -> bool {
+    fn step_active_context_without_breakpoints(&self, mode: StepMode) -> bool {
         let Some(ctx) = self.active_context() else {
             return true;
         };
@@ -339,10 +360,46 @@ impl ReplayerDebugSession {
         }) == Some(replayer::RuntimeBackendKind::LiveVm)
     }
 
-    fn child_stop_on_entry_step_mode(&self) -> StepMode {
+    const fn child_stop_on_entry_step_mode(&self) -> StepMode {
         match self.performing_step {
             Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
             _ => StepMode::StepInto,
+        }
+    }
+
+    fn should_skip_step_into_stop(&self) -> bool {
+        if !matches!(self.stop_reason_for_active_context(), StopReason::Step) {
+            return false;
+        }
+
+        let Some(ctx) = self.active_context() else {
+            return false;
+        };
+        let Ok(ctx) = ctx.try_borrow() else {
+            return false;
+        };
+        let call_stack = ctx.replayer.call_stack();
+        let Some(top_frame) = call_stack.last() else {
+            return false;
+        };
+        let file_id = top_frame
+            .definition_loc
+            .as_ref()
+            .map(|loc| loc.file_id())
+            .unwrap_or_else(|| ctx.replayer.current_file_id());
+        let Some(path) = ctx.replayer.file_full_path(file_id) else {
+            return true;
+        };
+
+        Self::is_transparent_step_into_function(path, top_frame.f_name.as_str())
+    }
+
+    fn step_into_until_user_visible_stop(&mut self) -> bool {
+        loop {
+            let is_end = self.step(StepMode::StepInto);
+            if is_end || !self.should_skip_step_into_stop() {
+                return is_end;
+            }
         }
     }
 
@@ -395,6 +452,8 @@ impl ReplayerDebugSession {
         let file_id = replayer.current_file_id();
         let line = replayer.current_line();
         let column = replayer.current_column();
+        let end_line = replayer.current_end_line();
+        let end_column = replayer.current_end_column();
         let top_frame = call_stack.last();
         let top_source = Self::build_source(replayer, file_id).or_else(|| {
             top_frame
@@ -414,6 +473,8 @@ impl ReplayerDebugSession {
             source: top_source,
             line: line as i64,
             column: column as i64,
+            end_line: end_line as i64,
+            end_column: end_column as i64,
             is_builtin: top_is_builtin && !stopped_on_exception,
         });
 
@@ -422,13 +483,15 @@ impl ReplayerDebugSession {
             let frame_idx = n - 1 - depth;
             let frame = &call_stack[frame_idx];
             let child_frame = &call_stack[frame_idx + 1];
-            let (source, line, col) = match &child_frame.call_site_loc {
+            let (source, line, col, end_line, end_column) = match &child_frame.call_site_loc {
                 Some(loc) => (
                     Self::build_source(replayer, loc.file_id()),
                     loc.start_line() as i64,
                     loc.start_col() as i64,
+                    loc.end_line() as i64,
+                    loc.end_col() as i64,
                 ),
-                None => (None, 0, 0),
+                None => (None, 0, 0, 0, 0),
             };
             frames.push(CollectedFrame {
                 context_idx: ctx_index,
@@ -437,6 +500,8 @@ impl ReplayerDebugSession {
                 source,
                 line,
                 column: col,
+                end_line,
+                end_column,
                 is_builtin: frame.is_builtin,
             });
         }
@@ -599,7 +664,11 @@ impl ReplayerDebugSession {
                 self.send_response(req.success(ResponseBody::StepIn))?;
 
                 let mode = resolve_step_mode(args.granularity.as_ref(), StepMode::StepInto);
-                let is_end = self.step(mode);
+                let is_end = if mode == StepMode::StepInto {
+                    self.step_into_until_user_visible_stop()
+                } else {
+                    self.step(mode)
+                };
                 if is_end {
                     if terminate_at_end {
                         self.send_terminated()?;
@@ -816,6 +885,8 @@ impl ReplayerDebugSession {
                 source: frame.source,
                 line: frame.line,
                 column: frame.column,
+                end_line: (frame.end_line > 0).then_some(frame.end_line),
+                end_column: (frame.end_column > 0).then_some(frame.end_column),
                 presentation_hint: frame
                     .is_builtin
                     .then_some(StackFramePresentationhint::Subtle),
@@ -954,6 +1025,8 @@ struct CollectedFrame {
     source: Option<Source>,
     line: i64,
     column: i64,
+    end_line: i64,
+    end_column: i64,
     is_builtin: bool,
 }
 

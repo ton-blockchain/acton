@@ -635,6 +635,14 @@ impl TolkReplayer {
         self.current_loc.start_col()
     }
 
+    pub fn current_end_line(&self) -> usize {
+        self.current_loc.end_line()
+    }
+
+    pub fn current_end_column(&self) -> usize {
+        self.current_loc.end_col()
+    }
+
     pub fn function_name_by_idx(&self, f_idx: usize) -> String {
         self.source_map.get_function_name_by_idx(f_idx)
     }

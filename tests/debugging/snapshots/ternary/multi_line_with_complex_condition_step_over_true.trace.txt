@@ -1,5 +1,29 @@
 Step 1 (before):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:8
+  Code:
+      1| 
+      2| fun main(foo: int?) {
+      3|     val a = foo != null && foo == 100
+                     ^^^^^^^^^^^
+      4|         ? foo + 1
+      5|         : 100;
+      6|     return a + 1;
+  Variables:
+    foo = 100
+
+Step 2 (step_over):
+  Code:
+      1| 
+      2| fun main(foo: int?) {
+      3|     val a = foo != null && foo == 100
+      4|         ? foo + 1
+                   ^^^^^^^
+      5|         : 100;
+      6|     return a + 1;
+      7| }
+  Variables:
+    foo = 100
+
+Step 3 (step_over):
   Code:
       1| 
       2| fun main(foo: int?) {
@@ -9,87 +33,16 @@ Step 1 (before):
       5|         : 100;
       6|     return a + 1;
   Variables:
-    foo = 100
-
-Step 2 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:40
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null && foo == 100
-                                    ^^^^^^^^^^
-      4|         ? foo + 1
-      5|         : 100;
-      6|     return a + 1;
-  Variables:
-    foo = 100
-
-Step 3 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:64
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null && foo == 100
-                                    ^^^^^^^^^^
-      4|         ? foo + 1
-      5|         : 100;
-      6|     return a + 1;
-  Variables:
-    '5 = true
-    foo = 100
+    foo = 100 (last seen)
 
 Step 4 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:64
   Code:
-      1| 
-      2| fun main(foo: int?) {
       3|     val a = foo != null && foo == 100
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^
       4|         ? foo + 1
       5|         : 100;
       6|     return a + 1;
-  Variables:
-    '5 = true
-    foo = 100
-
-Step 5 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:80
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null && foo == 100
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^
-      4|         ? foo + 1
-      5|         : 100;
-      6|     return a + 1;
-  Variables:
-    '7 = -1
-    foo = 100
-
-Step 6 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:112
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null && foo == 100
-      4|         ? foo + 1
-                   ^^^^^^^
-      5|         : 100;
-      6|     return a + 1;
+                    ^^^^^
       7| }
   Variables:
-    foo = 100
-
-Step 7 (step_over):
-  Bytecode position: 92071B770823BD2F6A70223D03D27C463070E8B437B042AEE5B4FE82ED68568A:120
-  Code:
-      1| 
-      2| fun main(foo: int?) {
-      3|     val a = foo != null && foo == 100
-      4|         ? foo + 1
-                   ^^^^^^^
-      5|         : 100;
-      6|     return a + 1;
-      7| }
-  Variables:
-    '11 = 101
+    foo = 100 (last seen)
+    a = 101
