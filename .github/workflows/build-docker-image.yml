@@ -4,8 +4,7 @@ on:
   workflow_call:
     inputs:
       plan:
-        required: false
-        default: ""
+        required: true
         type: string
 
 concurrency:
@@ -18,6 +17,8 @@ jobs:
   build-docker-image:
     name: Build Docker image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    env:
+      VERSION_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
     strategy:
       matrix:
         include:
@@ -69,19 +70,18 @@ jobs:
           file: Dockerfile
           platforms: ${{ matrix.docker_platform }}
           labels: |
-            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.version=${{ env.VERSION_TAG }}
             org.opencontainers.image.revision=${{ github.sha }}
           outputs: type=docker,dest=${{ matrix.docker_archive }}
           provenance: false
           push: false
-#         TODO: использовать тег
-          tags: acton:${{ github.ref_name }}-${{ matrix.image_tag_suffix }}
+          tags: acton:${{ env.VERSION_TAG }}-${{ matrix.image_tag_suffix }}
 
       - name: Smoke test ${{ matrix.arch }} Docker archive
         # language=Bash
         run: |
           docker load -i "${{ matrix.docker_archive }}"
-          docker run --rm "acton:${GITHUB_REF_NAME}-${{ matrix.image_tag_suffix }}" --help
+          docker run --rm "acton:${VERSION_TAG}-${{ matrix.image_tag_suffix }}" --help
 
       - name: Upload Docker archive
         uses: actions/upload-artifact@v7

@@ -4,8 +4,7 @@ on:
   workflow_call:
     inputs:
       plan:
-        required: false
-        default: ""
+        required: true
         type: string
 
 concurrency:
@@ -18,13 +17,13 @@ jobs:
   publish-docker-image:
     name: Publish Docker image
     runs-on: ubicloud-standard-2-ubuntu-2204
+    env:
+      ACTON_NAME: ghcr.io/ton-blockchain/acton
+      VERSION_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
 
     permissions:
       contents: read
       packages: write
-
-    env:
-      ACTON_NAME: ghcr.io/ton-blockchain/acton
 
     steps:
       - name: Download Docker archives
@@ -51,8 +50,6 @@ jobs:
           docker load -i docker-artifacts/acton-linux-arm64.docker.tar
 
       - name: Push platform images and manifest
-        env:
-          VERSION_TAG: ${{ github.ref_name }}
         # language=Bash
         run: |
           docker tag "acton:${VERSION_TAG}-linux-amd64" "${ACTON_NAME}:${VERSION_TAG}-amd64"
@@ -67,8 +64,6 @@ jobs:
             "${ACTON_NAME}:${VERSION_TAG}-arm64"
 
       - name: Inspect published manifest
-        env:
-          VERSION_TAG: ${{ github.ref_name }}
         # language=Bash
         run: |
           docker buildx imagetools inspect "${ACTON_NAME}:${VERSION_TAG}"
