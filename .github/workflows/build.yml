@@ -322,7 +322,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
-          path: artifacts/
+          path: artifacts
           merge-multiple: true
 
       - name: Delete download artifacts
@@ -332,7 +332,7 @@ jobs:
           # language=JavaScript
           script: |
             const {
-              data: artifacts
+              data: artifacts,
             } = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -358,11 +358,11 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -lhR artifacts
 
-      - name: Delete previous trunk release and tag
+      - name: Delete previous trunk
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete trunk --repo "${GITHUB_REPOSITORY}" -y || true
+          gh release delete trunk --repo "${GITHUB_REPOSITORY}" --cleanup-tag -y || true
 
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk \
@@ -387,12 +387,12 @@ jobs:
             --target "${GITHUB_SHA}" \
             --prerelease
 
-      - name: Delete previous trunk release and tag (mirror)
+      - name: Delete previous trunk (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
-          gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+          gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" --cleanup-tag -y || true
 
           gh api \
             repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk \
