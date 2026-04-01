@@ -1,15 +1,7 @@
 name: Create Trunk Release
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: false
+  workflow_call:
 
 permissions: { }
 
@@ -21,12 +13,8 @@ jobs:
   create-trunk-release:
     name: Create Trunk Release
     runs-on: ubicloud-standard-2-ubuntu-2204
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.repository.full_name == 'ton-blockchain/acton'
     env:
-      TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+      TARGET_SHA: ${{ github.sha }}
 
     permissions:
       actions: write
@@ -39,8 +27,6 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Delete downloaded artifacts
         uses: actions/github-script@v8
@@ -48,7 +34,7 @@ jobs:
           github-token: ${{ github.token }}
           # language=JavaScript
           script: |
-            const runId = context.payload.workflow_run.id;
+            const runId = context.runId;
             const {
               data: artifacts
             } = await github.rest.actions.listWorkflowRunArtifacts({

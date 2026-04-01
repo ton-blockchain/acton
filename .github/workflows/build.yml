@@ -302,3 +302,10 @@ jobs:
             acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
+
+  create-trunk-release:
+    name: Create Trunk Release
+    needs: [ build-linux, build-macos, lint, ui ]
+    if: github.repository == 'ton-blockchain/acton'
+    uses: ./.github/workflows/create-trunk-release.yml
+    secrets: inherit
