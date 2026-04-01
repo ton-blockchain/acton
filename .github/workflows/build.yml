@@ -101,7 +101,7 @@ jobs:
           acton test
 
       - name: Prepare trunk archive
-        if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+        if: github.repository == 'ton-blockchain/acton'
         shell: bash
         # language=Bash
         run: |
@@ -116,7 +116,7 @@ jobs:
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload trunk archive artifact
-        if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+        if: github.repository == 'ton-blockchain/acton'
         uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ env.TARGET_NAME }}
@@ -278,7 +278,7 @@ jobs:
           acton test
 
       - name: Prepare trunk archive
-        if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+        if: github.repository == 'ton-blockchain/acton'
         shell: bash
         # language=Bash
         run: |
@@ -293,7 +293,7 @@ jobs:
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload trunk archive artifact
-        if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+        if: github.repository == 'ton-blockchain/acton'
         uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ env.TARGET_NAME }}
