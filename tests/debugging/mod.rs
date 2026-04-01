@@ -21,7 +21,7 @@ use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolkc::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
@@ -45,6 +45,7 @@ mod tests;
 // The shared Fift/Tolk compile path crashes under higher test concurrency,
 // so serialize setup while keeping the debug session itself parallel.
 static DEBUG_COMPILER_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) struct DebuggerClient {
     client: DapClient,
@@ -129,7 +130,14 @@ impl DebuggerClient {
 }
 
 fn wait_for_initialized(client: &DapClient) -> anyhow::Result<()> {
+    let deadline = Instant::now() + DEBUG_EVENT_TIMEOUT;
     loop {
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "Timed out waiting for DAP initialized event after {:?}",
+                DEBUG_EVENT_TIMEOUT
+            );
+        }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_secs(1))
             && matches!(event, Event::Initialized)
         {
@@ -140,7 +148,14 @@ fn wait_for_initialized(client: &DapClient) -> anyhow::Result<()> {
 }
 
 fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
+    let deadline = Instant::now() + DEBUG_EVENT_TIMEOUT;
     loop {
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "Timed out waiting for DAP stopped event after {:?}",
+                DEBUG_EVENT_TIMEOUT
+            );
+        }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_millis(100))
             && matches!(event, Event::Stopped(_))
         {

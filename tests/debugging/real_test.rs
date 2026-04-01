@@ -219,14 +219,7 @@ fn test_real_counter_contract_tests() -> anyhow::Result<()> {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
-        executor.step_over()?;
+        executor.step_over_times(8)?;
         Ok(())
     })?;
 
@@ -245,14 +238,8 @@ fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-
-        for _ in 0..50 {
-            executor.step_over()?;
-        }
+        executor.step_in_times(4)?;
+        executor.step_over_times(50)?;
         Ok(())
     })?;
 

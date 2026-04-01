@@ -17,11 +17,7 @@ fun main() {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
+        executor.step_in_times(5)?;
         Ok(())
     })?;
 
@@ -51,8 +47,7 @@ fun main() {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_over()?;
-        executor.step_over()?;
+        executor.step_over_times(2)?;
         Ok(())
     })?;
 
@@ -112,12 +107,7 @@ fun main(arg: int) {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
-        executor.step_in()?;
+        executor.step_in_times(6)?;
         Ok(())
     })?;
 

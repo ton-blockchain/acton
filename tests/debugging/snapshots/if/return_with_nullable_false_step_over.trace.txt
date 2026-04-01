@@ -9,3 +9,14 @@ Step 1 (before):
       6| 
   Variables:
     foo = 100
+
+Step 2 (step_over):
+  Code:
+      4|         return
+      5|     }
+      6| 
+      7|     debug.print("aaa");
+                         ^^^^^
+      8| }
+  Variables:
+    foo = 100 (last seen)

@@ -2,6 +2,7 @@ use crate::debugging::{DebuggerClient, run_script_file};
 use crate::support::project::Project;
 use crate::support::snapshots::normalize_output;
 use crate::support::tempdir::create_tmp_dir;
+use anyhow::Context;
 use dap::types::StackFrame;
 use std::cmp::max;
 use std::fs;
@@ -27,6 +28,7 @@ pub(crate) struct DebugBuilder {
     script_file: Option<String>,
     debug_port: Option<u16>,
     stack: Option<Tuple>,
+    expected_execution_error: Option<String>,
 }
 
 impl DebugBuilder {
@@ -41,6 +43,7 @@ impl DebugBuilder {
             script_file: None,
             debug_port: None,
             stack: None,
+            expected_execution_error: None,
         }
     }
 
@@ -69,6 +72,11 @@ impl DebugBuilder {
         let mut tuple = Tuple::empty();
         tuple.push(TupleItem::Int(value.into()));
         self.stack = Some(tuple);
+        self
+    }
+
+    pub(crate) fn expect_execution_error(mut self, expected_error: &str) -> Self {
+        self.expected_execution_error = Some(expected_error.to_string());
         self
     }
 
@@ -117,6 +125,7 @@ impl DebugBuilder {
             debug_port,
             debug_listener,
             stack,
+            expected_execution_error: self.expected_execution_error,
             _project: self.project,
             _temp_dir: self.temp_dir,
             client_handle: None,
@@ -130,9 +139,10 @@ pub(crate) struct DebugSession {
     debug_port: u16,
     debug_listener: Option<TcpListener>,
     stack: Tuple,
+    expected_execution_error: Option<String>,
     _project: Option<Project>,
     _temp_dir: TempDir,
-    client_handle: Option<JoinHandle<()>>,
+    client_handle: Option<JoinHandle<anyhow::Result<String>>>,
 }
 
 impl DebugSession {
@@ -145,10 +155,7 @@ impl DebugSession {
 
         let stack = self.stack.clone();
         let handle = thread::spawn(move || {
-            match run_script_file(&code, &source_content, port, debug_listener, stack) {
-                Ok(result) => println!("Debug execution finished: {result}"),
-                Err(err) => eprintln!("Debug execution finished with error: {err}"),
-            }
+            run_script_file(&code, &source_content, port, debug_listener, stack)
         });
 
         let address = format!("127.0.0.1:{port}");
@@ -186,6 +193,7 @@ impl DebugClient {
         executor.record_state_with_action("before".to_owned())?;
 
         actions(&mut executor)?;
+        self.finish_execution()?;
 
         Ok(DebugResult {
             trace: self.trace.clone(),
@@ -195,11 +203,76 @@ impl DebugClient {
 
     #[allow(dead_code)]
     pub(crate) fn terminate(mut self) -> anyhow::Result<()> {
-        if let Some(mut client) = self.client.take() {
-            client.terminate()
-        } else {
-            Ok(())
+        self.finish_execution()
+    }
+
+    fn finish_execution(&mut self) -> anyhow::Result<()> {
+        let Some(handle) = self.session.client_handle.take() else {
+            return Ok(());
+        };
+
+        let mut client = self.client.take();
+        if !handle.is_finished()
+            && let Some(client) = client.as_mut()
+        {
+            match client.terminate() {
+                Ok(()) => {}
+                Err(err)
+                    if DebugActionExecutor::is_terminated_error(&err)
+                        || Self::is_closed_transport_error(&err) => {}
+                Err(err) => {
+                    if !handle.is_finished() {
+                        return Err(err).context("failed to terminate debug session");
+                    }
+                }
+            }
         }
+
+        match handle.join() {
+            Ok(Ok(_output)) => {
+                if let Some(expected_error) = &self.session.expected_execution_error {
+                    anyhow::bail!(
+                        "expected debug execution to fail with '{expected_error}', but it succeeded"
+                    );
+                }
+                Ok(())
+            }
+            Ok(Err(err)) => {
+                if let Some(expected_error) = &self.session.expected_execution_error {
+                    if err.to_string().contains(expected_error) {
+                        return Ok(());
+                    }
+                    return Err(err).context(format!(
+                        "debug execution failed with an unexpected error, expected '{expected_error}'"
+                    ));
+                }
+                Err(err).context("debug execution failed")
+            }
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+
+    fn is_closed_transport_error(err: &anyhow::Error) -> bool {
+        err.to_string().contains("Timeout waiting for response")
+            || err.downcast_ref::<std::io::Error>().is_some_and(|io_err| {
+                matches!(
+                    io_err.kind(),
+                    std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::NotConnected
+                        | std::io::ErrorKind::UnexpectedEof
+                )
+            })
+    }
+}
+
+impl Drop for DebugClient {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            return;
+        }
+
+        let _ = self.finish_execution();
     }
 }
 
@@ -261,12 +334,34 @@ impl DebugActionExecutor<'_> {
         self.run_step("step_in".to_string(), |client| client.step_in(1))
     }
 
+    pub(crate) fn step_in_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_in()?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn step_over(&mut self) -> anyhow::Result<()> {
         self.run_step("step_over".to_string(), |client| client.step_over(1))
     }
 
+    pub(crate) fn step_over_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_over()?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn step_out(&mut self) -> anyhow::Result<()> {
         self.run_step("step_out".to_string(), |client| client.step_out(1))
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn step_out_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_out()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn continue_execution(&mut self) -> anyhow::Result<()> {
