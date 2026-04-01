@@ -19,10 +19,9 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpListener;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
-use std::{fs, thread};
-use tasm::printer::FormatOptions;
 use tolkc::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
@@ -42,6 +41,10 @@ mod debug_test;
 mod real_test;
 mod support;
 mod tests;
+
+// The shared Fift/Tolk compile path crashes under higher test concurrency,
+// so serialize setup while keeping the debug session itself parallel.
+static DEBUG_COMPILER_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 pub(crate) struct DebuggerClient {
     client: DapClient,
@@ -153,61 +156,53 @@ pub(crate) fn run_script_file(
     debug_listener: Option<TcpListener>,
     stack: Tuple,
 ) -> anyhow::Result<String> {
-    let abi = contract_abi(content.into(), file_path, &None);
+    let script_path = Path::new(file_path);
 
-    let config = ActonConfig::load();
+    let (abi, code_cell, tolk_source_map) = {
+        let _compile_guard = DEBUG_COMPILER_LOCK
+            .lock()
+            .expect("debug compiler lock poisoned");
 
-    let mut compiler = tolkc::Compiler::new(2);
-    if let Ok(config) = &config {
-        let mappings = config.mappings();
-        compiler = compiler.with_mappings(&mappings);
-    }
+        let abi = contract_abi(content.into(), file_path, &None);
 
-    match compiler.compile(Path::new(file_path), true) {
-        CompilerResult::Success(result) => {
-            let code = Boc::decode_base64(&result.code_boc64)?;
-            let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
-            let data_cell = TonCell::empty().clone();
-            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
-                result.new_source_map.unwrap_or_default(),
-                &code,
-                result.debug_mark_base64.as_deref(),
-            )?);
+        let config = ActonConfig::load();
 
-            fs::write(
-                "out.source_map.json",
-                serde_json::to_string(&*tolk_source_map)?,
-            )?;
-
-            let disasm = tasm::decompile::Disassembler::new();
-            let code = disasm.decompile_cell(&code)?;
-            fs::write(
-                "out.disasm.txt",
-                code.print(&FormatOptions {
-                    show_offsets: true,
-                    show_hashes: true,
-                    source_map: None,
-                }),
-            )?;
-            fs::write("out.disasm.fif", result.fift_code)?;
-            fs::write("out.boc", code_cell.to_boc()?)?;
-
-            let (script_result, io, formatter) = execute_script(
-                &code_cell,
-                &data_cell,
-                abi.into(),
-                tolk_source_map,
-                debug_port,
-                debug_listener,
-                ExecutorVerbosity::FullLocationStackVerbose,
-                stack,
-            )?;
-            get_script_result(script_result, io, formatter)
+        let mut compiler = tolkc::Compiler::new(2);
+        if let Ok(config) = &config {
+            let mappings = config.mappings();
+            compiler = compiler.with_mappings(&mappings);
         }
-        CompilerResult::Error(error) => {
-            anyhow::bail!("Cannot compile script file {}", error.message)
+
+        match compiler.compile(script_path, true) {
+            CompilerResult::Success(result) => {
+                let code = Boc::decode_base64(&result.code_boc64)?;
+                let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
+                let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                    result.new_source_map.unwrap_or_default(),
+                    &code,
+                    result.debug_mark_base64.as_deref(),
+                )?);
+
+                (abi, code_cell, tolk_source_map)
+            }
+            CompilerResult::Error(error) => {
+                anyhow::bail!("Cannot compile script file {}", error.message)
+            }
         }
-    }
+    };
+
+    let data_cell = TonCell::empty().clone();
+    let (script_result, io, formatter) = execute_script(
+        &code_cell,
+        &data_cell,
+        abi.into(),
+        tolk_source_map,
+        debug_port,
+        debug_listener,
+        ExecutorVerbosity::FullLocationStackVerbose,
+        stack,
+    )?;
+    get_script_result(script_result, io, formatter)
 }
 
 #[allow(clippy::too_many_arguments)]
