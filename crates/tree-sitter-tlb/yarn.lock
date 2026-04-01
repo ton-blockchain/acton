@@ -724,6 +724,11 @@ __metadata:
     tree-sitter-cli: "npm:^0.25.10"
   peerDependencies:
     tree-sitter: ^0.22.4
+  dependenciesMeta:
+    tree-sitter:
+      built: true
+    tree-sitter-cli:
+      built: true
   peerDependenciesMeta:
     tree-sitter:
       optional: true

@@ -34,6 +34,14 @@
     "tree-sitter": "^0.22.4",
     "tree-sitter-cli": "^0.25.10"
   },
+  "dependenciesMeta": {
+    "tree-sitter": {
+      "built": true
+    },
+    "tree-sitter-cli": {
+      "built": true
+    }
+  },
   "peerDependencies": {
     "tree-sitter": "^0.22.4"
   },
