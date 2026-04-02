@@ -1,0 +1,22 @@
+Coverage Summary:
+Lines: 1/1 (100.00%)
+Total Hits: 1
+
+File: [ROOT]/code/empty_functions.tolk
+Annotated Code:
+ 1   |                                                   |
+ 2   |             fun singleLineTouched() {}            |
+ 3   |                                                   |
+ 4   |             fun singleLineUntouched() {}          |
+ 5   |                                                   |
+ 6   |             fun multiLineTouched() {              |
+ 7   |             }                                     |
+ 8   |                                                   |
+ 9   |             fun multiLineUntouched() {            |
+10   |             }                                     |
+11   |                                                   |
+12   |             fun nonEmptyTouched() {               |
+13 ✓ |                 val doubled = 2 * 2;              | hits:1
+14   |             }                                     |
+15   |                                                   |
+

@@ -169,7 +169,7 @@ fn collect_executed_lines_per_files(
 
         while !replayer.is_finished() {
             replayer.step_with_callback(StepMode::StepInto, |tick, replayer| match tick {
-                Tick::Loc { .. } | Tick::AtFunReturn { .. } => {
+                Tick::Loc { .. } => {
                     record_current_line_hit(
                         &mut line_hits_per_file,
                         &mut last_recorded_loc,
@@ -314,7 +314,6 @@ fn build_executable_lines_per_file(
                 is_inlined: true,
                 ..
             } => Some(range),
-            DebugMark::LeaveFun { range, .. } => Some(range),
             _ => None,
         }) else {
             continue;

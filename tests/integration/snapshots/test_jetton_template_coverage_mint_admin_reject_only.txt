@@ -1,6 +1,6 @@
 Coverage Summary:
-Lines: 25/79 (31.65%)
-Total Hits: 42
+Lines: 24/77 (31.17%)
+Total Hits: 38
 
 File: [ROOT]/contracts/jetton-utils.tolk
 Annotated Code:
@@ -152,12 +152,12 @@ Annotated Code:
 119 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;                                 | hits:1 branches:throw=0 continue=1
 120   |         }                                                                                           |
 121   |     }                                                                                               |
-122 ✓ | }                                                                                                   | hits:1
+122   | }                                                                                                   |
 123   |                                                                                                     |
 124   | get fun get_jetton_data(): JettonDataReply {                                                        |
 125 ✓ |     val storage = lazy MinterStorage.load();                                                        | hits:2
 126   |                                                                                                     |
-127 ✓ |     return {                                                                                        | hits:4
+127 ✓ |     return {                                                                                        | hits:2
 128 ✓ |         totalSupply: storage.totalSupply,                                                           | hits:2
 129 ✓ |         mintable: true,                                                                             | hits:2
 130 ✓ |         adminAddress: storage.adminAddress,                                                         | hits:2
@@ -168,7 +168,7 @@ Annotated Code:
 135   |                                                                                                     |
 136   | get fun get_wallet_address(ownerAddress: address): address {                                        |
 137 ✓ |     val storage = lazy MinterStorage.load();                                                        | hits:1
-138 ✓ |     return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);| hits:2
+138 ✓ |     return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);| hits:1
 139   | }                                                                                                   |
 
 File: [ROOT]/contracts/storage.tolk
@@ -192,7 +192,7 @@ Annotated Code:
 17   |                                                                 |
 18   | fun MinterStorage.save(self) {                                  |
 19 ✗ |     contract.setData(self.toCell());                            | hits:0
-20 ✗ | }                                                               | hits:0
+20   | }                                                               |
 21   |                                                                 |
 22   | fun WalletStorage.load(): WalletStorage {                       |
 23   |     return WalletStorage.fromCell(contract.getData());          |

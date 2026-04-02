@@ -488,6 +488,127 @@ fn test_coverage_exports_files_with_zero_hits() {
 }
 
 #[test]
+fn test_coverage_does_not_mark_function_closing_braces_as_executable() {
+    let project = ProjectBuilder::new("coverage-no-closing-braces")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/helpers",
+            r"
+            fun touch(x: int) {
+                val doubled = x * 2;
+            }
+
+            fun neverTouched(x: int) {
+                val tripled = x * 3;
+            }
+        ",
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/helpers"
+
+            get fun `test-touch`() {
+                touch(5);
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("no-closing-braces.txt")
+        .run()
+        .success();
+
+    output.assert_passed(1);
+
+    let report = fs::read_to_string(project.path().join("no-closing-braces.txt"))
+        .expect("Should read no-closing-braces.txt");
+    let normalized = normalize_output(report.as_str(), project.path());
+
+    assert!(
+        !normalized.contains("✓ | }"),
+        "closing brace should not be marked as covered:\n{normalized}"
+    );
+    assert!(
+        !normalized.contains("✗ | }"),
+        "closing brace should not be marked as executable with zero hits:\n{normalized}"
+    );
+}
+
+#[test]
+fn test_coverage_empty_functions_snapshot() {
+    let project = ProjectBuilder::new("coverage-empty-functions")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/empty_functions",
+            r"
+            fun singleLineTouched() {}
+
+            fun singleLineUntouched() {}
+
+            fun multiLineTouched() {
+            }
+
+            fun multiLineUntouched() {
+            }
+
+            fun nonEmptyTouched() {
+                val doubled = 2 * 2;
+            }
+        ",
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/empty_functions"
+
+            get fun `test-empty-functions-coverage`() {
+                singleLineTouched();
+                multiLineTouched();
+                nonEmptyTouched();
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("empty-functions-coverage.txt")
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_file_snapshot_matches(
+        "empty-functions-coverage.txt",
+        "integration/snapshots/test_coverage_empty_functions.txt",
+    );
+
+    let report = fs::read_to_string(project.path().join("empty-functions-coverage.txt"))
+        .expect("Should read empty-functions-coverage.txt");
+    let normalized = normalize_output(report.as_str(), project.path());
+
+    assert!(
+        !normalized.contains("✓ | }"),
+        "empty function closing brace should not be marked as covered:\n{normalized}"
+    );
+    assert!(
+        !normalized.contains("✗ | }"),
+        "empty function closing brace should not be marked as executable with zero hits:\n{normalized}"
+    );
+}
+
+#[test]
 fn test_counter_template_coverage_text_snapshots() {
     let project =
         build_counter_template_project("coverage-counter-template", COUNTER_TEMPLATE_TESTS);
