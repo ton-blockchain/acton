@@ -42,6 +42,11 @@ pub fn verify_cmd(
         .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
 
     let network = Network::from_str(&network)?;
+    if !matches!(network, Network::Mainnet | Network::Testnet) {
+        anyhow::bail!(
+            "Unsupported verification network {network}. Verification backends are available only for mainnet and testnet"
+        );
+    }
 
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 

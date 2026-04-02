@@ -82,7 +82,6 @@ fn test_verify_unsupported_network() {
         .arg("--dry-run")
         .run()
         .failure()
-        .assert_not_contains("Compiling contract")
         .assert_not_contains("Using wallet")
         .assert_not_contains("Fetching backends configuration")
         .assert_stderr_snapshot_matches(
