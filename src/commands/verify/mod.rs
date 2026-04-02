@@ -80,7 +80,7 @@ pub fn verify_cmd(
     println!(
         "  {} Code hash: {}",
         "→".blue().bold(),
-        hex::encode(code_hash).dimmed()
+        format!("0x{}", hex::encode(code_hash)).dimmed()
     );
 
     let contract_address = if let Some(addr) = address {
@@ -249,9 +249,10 @@ pub fn verify_cmd(
         }
     }
 
-    let source_max_attempts = parse_max_attempts_from_env("ACTON_VERIFY_SOURCE_MAX_ATTEMPTS", 8);
+    let source_max_attempts = 8;
     let mut response = None;
     let mut last_send_error = None;
+
     for attempt in 1..=source_max_attempts {
         let form = build_verify_form(&upload_parts, &json_str)?;
         let source_client = build_verify_http_client()
@@ -744,15 +745,6 @@ fn build_verify_form(
     );
 
     Ok(form)
-}
-
-fn parse_max_attempts_from_env(env_key: &str, default_value: usize) -> usize {
-    let parsed = std::env::var(env_key)
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-        .filter(|v| *v > 0)
-        .unwrap_or(default_value);
-    parsed.min(64)
 }
 
 fn source_retry_delay(attempt: usize) -> std::time::Duration {
