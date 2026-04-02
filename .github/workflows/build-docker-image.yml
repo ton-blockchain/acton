@@ -62,7 +62,7 @@ jobs:
           tar -C dist/docker -xzf "target/distrib/acton-${{ matrix.target_name }}.tar.gz" ./acton
 
       - name: Build ${{ matrix.arch }} Docker archive
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         env:
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
