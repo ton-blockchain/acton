@@ -1,22 +1,4 @@
 rules:
-  unpinned-uses:
-    config:
-      policies:
-        actions/cache/restore: ref-pin
-        actions/cache/save: ref-pin
-        actions/cache: ref-pin
-        actions/checkout: ref-pin
-        actions/download-artifact: ref-pin
-        actions/github-script: ref-pin
-        actions/labeler: ref-pin
-        actions/setup-node: ref-pin
-        actions/setup-python: ref-pin
-        actions/upload-artifact: ref-pin
-        docker/build-push-action: ref-pin
-        docker/login-action: ref-pin
-        docker/setup-buildx-action: ref-pin
-        ton-blockchain/setup-acton: ref-pin
-        zizmorcore/zizmor-action: ref-pin
   dangerous-triggers:
     ignore:
       - labeler.yml:3:1
