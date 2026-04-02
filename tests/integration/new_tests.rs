@@ -362,6 +362,8 @@ fn test_new_empty_project_non_interactive() {
     assert!(content.contains(r#"name = "test-project""#));
     assert!(content.contains(r#"description = "test description""#));
     assert!(content.contains(r#"license = "MIT""#));
+    assert!(content.contains("Check full Acton.toml reference and all available keys"));
+    assert!(content.contains("https://ton-blockchain.github.io/acton/docs/acton-toml"));
 
     assert!(project.path().join("foobar/contracts").exists());
     assert!(project.path().join("foobar/tests").exists());

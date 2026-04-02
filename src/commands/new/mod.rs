@@ -82,6 +82,11 @@ indent_size = 4
 max_line_length = 100
 ";
 
+const ACTON_TOML_REFERENCE_FOOTER: &str = "
+# Check full Acton.toml reference and all available keys:
+# https://ton-blockchain.github.io/acton/docs/acton-toml
+";
+
 #[derive(Clone, Copy)]
 struct TemplateSelectItem(ProjectTemplate);
 
@@ -237,7 +242,9 @@ pub fn new_cmd(
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
 
-    config.save()?;
+    let mut acton_toml = toml::to_string_pretty(&config)?;
+    acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
+    fs::write("Acton.toml", acton_toml)?;
 
     if scaffold.layout().includes_typescript_app() {
         update_npm_package_metadata(&project_name)?;
