@@ -21,6 +21,8 @@ use tycho_types::models::{CurrencyCollection, IntAddr, MsgInfo, OwnedMessage, St
 const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
 const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
 const TESTNET_SOURCE_REGISTRY: &str = "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8";
+const MAINNET_VERIFIER_BACKEND: &str = "https://verifier-mainnet.tonstudio.io";
+const TESTNET_VERIFIER_BACKEND: &str = "https://verifier-testnet.tonstudio.io";
 
 #[allow(clippy::too_many_arguments)]
 pub fn verify_cmd(
@@ -118,7 +120,7 @@ pub fn verify_cmd(
         format_ton_address(&wallet.wallet.address, network == Network::Testnet).dimmed()
     );
 
-    println!("  {} Fetching backends configuration", "→".blue().bold());
+    println!("  {} Using built-in verifier backends", "→".blue().bold());
     let backends_config = get_backends()?;
     let mut backend_info = get_backend_info(&network, &backends_config)?;
 
@@ -187,8 +189,7 @@ pub fn verify_cmd(
         })
         .collect();
 
-    // TODO: currently hardcoded to 1.1.0 since Verifier doesn't support 1.2.0 yet
-    let version = compiler_version.unwrap_or_else(|| "1.1.0".to_owned());
+    let version = compiler_version.unwrap_or_else(|| "1.2.0".to_owned());
 
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {
@@ -368,12 +369,12 @@ pub fn verify_cmd(
             .compile_result
             .error
             .unwrap_or_else(|| "Unknown error".to_string());
-        if error_msg == "Contract is already deployed" {
+        if error_msg == "Proof has already been deployed" {
             // This is kinda strange error, trying to show it somehow
             println!(
-                "  {}: Contract with the hash {} has already been verified previously, no further action is required\n",
+                "\n  {}: Contract with the hash {} has already been verified previously, no further action is required\n",
                 "Warning".yellow().bold(),
-                format!("'{contract_hash}'").dimmed()
+                contract_hash.dimmed()
             );
             show_verifier_link(&network, contract_address);
             return Ok(());
@@ -655,19 +656,22 @@ struct UploadPart {
 }
 
 fn get_backends() -> anyhow::Result<BackendsConfig> {
-    let url =
-        "https://raw.githubusercontent.com/ton-community/contract-verifier-config/main/config.json";
-
-    let response =
-        reqwest::blocking::get(url).context("Failed to fetch verifier backends config")?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("Failed to fetch backends: HTTP {}", response.status());
-    }
-
-    let config: BackendsConfig = response.json().context("Failed to parse backends config")?;
-
-    Ok(config)
+    Ok(BackendsConfig {
+        verifiers: vec![
+            VerifierBackends {
+                id: DEFAULT_VERIFIER_ID.to_string(),
+                network: "mainnet".to_string(),
+                backends: vec![MAINNET_VERIFIER_BACKEND.to_string()],
+            },
+            VerifierBackends {
+                id: DEFAULT_VERIFIER_ID.to_string(),
+                network: "testnet".to_string(),
+                backends: vec![TESTNET_VERIFIER_BACKEND.to_string()],
+            },
+        ],
+        backends: Vec::new(),
+        backends_testnet: Vec::new(),
+    })
 }
 
 fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Result<BackendInfo> {
@@ -732,13 +736,14 @@ fn build_verify_form(
     parts: &[UploadPart],
     json_str: &str,
 ) -> anyhow::Result<reqwest::blocking::multipart::Form> {
-    let mut form = reqwest::blocking::multipart::Form::new();
+    let mut form = reqwest::blocking::multipart::Form::new().percent_encode_noop();
 
     for part in parts {
         form = form.part(
             part.field_name.clone(),
             reqwest::blocking::multipart::Part::bytes(part.bytes.clone())
-                .file_name(part.file_name.clone()),
+                .file_name(part.file_name.clone())
+                .mime_str("application/octet-stream")?,
         );
     }
 
