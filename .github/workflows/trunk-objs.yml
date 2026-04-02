@@ -62,7 +62,7 @@ jobs:
       - name: Restore TON objects archive cache
         if: github.ref == 'refs/heads/master'
         id: archive-cache
-        uses: actions/cache@v5
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
@@ -93,7 +93,7 @@ jobs:
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ env.TON_REPOSITORY }}
@@ -171,7 +171,7 @@ jobs:
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -205,7 +205,7 @@ jobs:
       - name: Restore TON objects archive cache
         if: github.ref == 'refs/heads/master'
         id: archive-cache
-        uses: actions/cache@v5
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
@@ -214,7 +214,7 @@ jobs:
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           repository: ${{ env.TON_REPOSITORY }}
@@ -283,7 +283,7 @@ jobs:
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -304,13 +304,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           fetch-depth: 1
 
       - name: Download TON objects artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: ton-objs-*
           path: dist
@@ -339,7 +339,7 @@ jobs:
           cat dist/artifacts_manifest.toml
 
       - name: Upload TON artifacts manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-manifest
           path: dist/artifacts_manifest.toml
@@ -358,14 +358,14 @@ jobs:
 
     steps:
       - name: Download TON objects artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: ton-objs-*
           path: dist
           merge-multiple: true
 
       - name: Delete download artifacts
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ github.token }}
           # language=JavaScript
