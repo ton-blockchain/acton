@@ -164,10 +164,12 @@ fn test_completion_test_coverage_format_default_value_in_string() {
     case_toml_completion(
         function_name!(),
         r#"
-            [test]
-            coverage-format = "<caret>foo"
+            [test.coverage]
+            format = "<caret>foo"
         "#,
-        expect![[r#"0: label="lcov" kind=Value detail=Default value format=plain"#]],
+        expect![[r#"
+            0: label="lcov" kind=EnumMember detail=Enum value format=plain
+            1: label="text" kind=EnumMember detail=Enum value format=plain"#]],
     );
 }
 
@@ -287,14 +289,14 @@ fn test_apply_completion_value_in_string_literal() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage = <caret>false
+            [test.coverage]
+            enabled = <caret>false
         "#,
         &["true", "false"],
         0,
         r#"
-            [test]
-            coverage = true<caret>
+            [test.coverage]
+            enabled = true<caret>
         "#,
     );
 }
@@ -305,14 +307,14 @@ fn test_apply_completion_boolean_partial_replace() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage = f<caret>alse
+            [test.coverage]
+            enabled = f<caret>alse
         "#,
         &["true", "false"],
         0,
         r#"
-            [test]
-            coverage = true<caret>
+            [test.coverage]
+            enabled = true<caret>
         "#,
     );
 }
@@ -359,14 +361,14 @@ fn test_apply_completion_default_string_value_in_string_literal() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage-format = "<caret>foo"
+            [test.coverage]
+            format = "<caret>foo"
         "#,
         &["\"lcov\""],
         0,
         r#"
-            [test]
-            coverage-format = "lcov<caret>"
+            [test.coverage]
+            format = "lcov<caret>"
         "#,
     );
 }

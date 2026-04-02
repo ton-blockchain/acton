@@ -985,30 +985,6 @@ version = "0.1.0"
                 toml_content.push_str(&format!("backtrace = \"{backtrace}\"\n"));
             }
 
-            if let Some(coverage) = config.coverage {
-                toml_content.push_str(&format!("coverage = {coverage}\n"));
-            }
-
-            if let Some(coverage_format) = &config.coverage_format {
-                toml_content.push_str(&format!("coverage-format = \"{coverage_format}\"\n"));
-            }
-
-            if let Some(coverage_file) = &config.coverage_file {
-                toml_content.push_str(&format!("coverage-file = \"{coverage_file}\"\n"));
-            }
-
-            if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
-                toml_content.push_str(&format!(
-                    "coverage-include-wrappers = {coverage_include_wrappers}\n"
-                ));
-            }
-
-            if let Some(coverage_include_tests) = config.coverage_include_tests {
-                toml_content.push_str(&format!(
-                    "coverage-include-tests = {coverage_include_tests}\n"
-                ));
-            }
-
             if let Some(junit_path) = &config.junit_path {
                 toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
             }
@@ -1023,6 +999,36 @@ version = "0.1.0"
 
             if let Some(fail_on_diff) = config.fail_on_diff {
                 toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+            }
+
+            if config.coverage.is_some()
+                || config.coverage_format.is_some()
+                || config.coverage_file.is_some()
+                || config.coverage_include_wrappers.is_some()
+                || config.coverage_include_tests.is_some()
+            {
+                toml_content.push_str("\n[test.coverage]\n");
+
+                if let Some(coverage) = config.coverage {
+                    toml_content.push_str(&format!("enabled = {coverage}\n"));
+                }
+
+                if let Some(coverage_format) = &config.coverage_format {
+                    toml_content.push_str(&format!("format = \"{coverage_format}\"\n"));
+                }
+
+                if let Some(coverage_file) = &config.coverage_file {
+                    toml_content.push_str(&format!("output-file = \"{coverage_file}\"\n"));
+                }
+
+                if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
+                    toml_content
+                        .push_str(&format!("include-wrappers = {coverage_include_wrappers}\n"));
+                }
+
+                if let Some(coverage_include_tests) = config.coverage_include_tests {
+                    toml_content.push_str(&format!("include-tests = {coverage_include_tests}\n"));
+                }
             }
 
             toml_content.push('\n');

@@ -218,8 +218,10 @@ fn test_hover_defaults_and_enums() {
         r#"
             [test]
             <caret>debug-port = 12345
-            <caret>coverage-format = "<caret>lcov"
             reporter = ["<caret>console"]
+
+            [test.coverage]
+            <caret>format = "<caret>lcov"
         "#,
         expect![[r#"
             ```toml
@@ -234,32 +236,56 @@ fn test_hover_defaults_and_enums() {
             ---
 
             ```toml
-            test.coverage-format
-            ```
-
-            Format for coverage reports (e.g., 'lcov')
-
-            - Type: `string`
-            - Default: `"lcov"`
-
-            ---
-
-            ```toml
-            test.coverage-format
-            ```
-
-            Format for coverage reports (e.g., 'lcov')
-
-            - Type: `string`
-            - Default: `"lcov"`
-
-            ---
-
-            ```toml
             test.reporter[0]
             ```
 
+            Human-readable console output
+
+            TeamCity service messages
+
+            JUnit XML report
+
+            Compact dot-progress output
+
+            Output formats supported by `acton test`
+
             - Type: `string`
-            - Enum: `"console" | "teamcity" | "junit" | "dot"`"#]],
+            - Enum: `"console" | "teamcity" | "junit" | "dot"`
+
+            ---
+
+            ```toml
+            test.coverage.format
+            ```
+
+            LCOV coverage report
+
+            Plain-text coverage summary
+
+            Coverage output formats supported by `acton test`
+
+            Format for coverage reports
+
+            - Type: `string`
+            - Default: `"lcov"`
+            - Enum: `"lcov" | "text"`
+
+            ---
+
+            ```toml
+            test.coverage.format
+            ```
+
+            LCOV coverage report
+
+            Plain-text coverage summary
+
+            Coverage output formats supported by `acton test`
+
+            Format for coverage reports
+
+            - Type: `string`
+            - Default: `"lcov"`
+            - Enum: `"lcov" | "text"`"#]],
     );
 }

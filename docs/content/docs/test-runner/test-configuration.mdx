@@ -32,12 +32,13 @@ name = "my-ton-project"
 version = "0.1.0"
 
 [test]
-# Enable code coverage by default
-coverage = true
-coverage-format = "lcov"
-
 # Enable detailed backtraces
 backtrace = "full"
+
+[test.coverage]
+# Enable code coverage by default
+enabled = true
+format = "lcov"
 ```
 
 ## Command Line Override
@@ -147,20 +148,21 @@ backtrace = "full"
 
 ### Coverage Options
 
-| Configuration               | CLI Flag                      | Type    | Description                                                    |
-|-----------------------------|-------------------------------|---------|----------------------------------------------------------------|
-| `coverage`                  | `--coverage`                  | Boolean | Enable code coverage                                           |
-| `coverage-format`           | `--coverage-format`           | String  | Coverage output format ("lcov")                                |
-| `coverage-include-wrappers` | `--coverage-include-wrappers` | Boolean | Include files from the `@wrappers` mapping in coverage reports |
-| `coverage-include-tests`    | `--coverage-include-tests`    | Boolean | Include `.test.tolk` files in coverage reports                 |
+| Configuration                      | CLI Flag                      | Type    | Description                                                    |
+|------------------------------------|-------------------------------|---------|----------------------------------------------------------------|
+| `[test.coverage].enabled`          | `--coverage`                  | Boolean | Enable code coverage                                           |
+| `[test.coverage].format`           | `--coverage-format`           | String  | Coverage output format (`lcov`, `text`)                        |
+| `[test.coverage].output-file`      | `--coverage-file`             | String  | Path to save the coverage report                               |
+| `[test.coverage].include-wrappers` | `--coverage-include-wrappers` | Boolean | Include files from the `@wrappers` mapping in coverage reports |
+| `[test.coverage].include-tests`    | `--coverage-include-tests`    | Boolean | Include `.test.tolk` files in coverage reports                 |
 
 **Examples:**
 ```toml
-[test]
-coverage = true
-coverage-format = "lcov"
-coverage-include-wrappers = true
-coverage-include-tests = true
+[test.coverage]
+enabled = true
+format = "lcov"
+include-wrappers = true
+include-tests = true
 ```
 
 ### Profiling Options

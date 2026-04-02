@@ -566,6 +566,37 @@
         }
       ]
     },
+    "TestCoverageSettings": {
+      "description": "Coverage settings for the test runner",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable code coverage reporting",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Format for coverage reports",
+          "default": "lcov",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CoverageFormat"
+            }
+          ]
+        },
+        "include-tests": {
+          "description": "Include `.test.tolk` files in coverage reports",
+          "type": "boolean"
+        },
+        "include-wrappers": {
+          "description": "Include files from the `@wrappers` mapping in coverage reports",
+          "type": "boolean"
+        },
+        "output-file": {
+          "description": "Path to save the coverage report",
+          "type": "string"
+        }
+      }
+    },
     "TestSettings": {
       "description": "Default settings for the test runner",
       "type": "object",
@@ -583,29 +614,12 @@
           ]
         },
         "coverage": {
-          "description": "Enable code coverage reporting",
-          "type": "boolean"
-        },
-        "coverage-file": {
-          "description": "Path to save the coverage report",
-          "type": "string"
-        },
-        "coverage-format": {
-          "description": "Format for coverage reports",
-          "default": "lcov",
+          "description": "Coverage settings for test runs",
           "allOf": [
             {
-              "$ref": "#/definitions/CoverageFormat"
+              "$ref": "#/definitions/TestCoverageSettings"
             }
           ]
-        },
-        "coverage-include-tests": {
-          "description": "Include `.test.tolk` files in coverage reports",
-          "type": "boolean"
-        },
-        "coverage-include-wrappers": {
-          "description": "Include files from the `@wrappers` mapping in coverage reports",
-          "type": "boolean"
         },
         "debug": {
           "description": "Enable debug mode for tests",

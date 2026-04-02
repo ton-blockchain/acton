@@ -187,11 +187,7 @@ Configures the behavior of `acton test`.
 | `debug`                     | `boolean`  | `false`       | Enable debug mode (activates debugger).                                |
 | `debug-port`                | `integer`  | `12345`       | Port for the debug server.                                             |
 | `backtrace`                 | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
-| `coverage`                  | `boolean`  | `false`       | Enable code coverage collection.                                       |
-| `coverage-format`           | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).                           |
-| `coverage-file`             | `string`   | -             | Path to save the coverage report.                                      |
-| `coverage-include-wrappers` | `boolean`  | `false`       | Include files from the `@wrappers` mapping in coverage reports.        |
-| `coverage-include-tests`    | `boolean`  | `false`       | Include `.test.tolk` files in coverage reports.                        |
+| `coverage`                  | `object`   | -             | Coverage settings subtree under `[test.coverage]` (see below).         |
 | `exclude`                   | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
 | `include`                   | `string[]` | -             | Glob patterns of files to include in testing.                          |
 | `junit-path`                | `string`   | -             | Directory for JUnit XML reports.                                       |
@@ -202,6 +198,18 @@ Configures the behavior of `acton test`.
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+### `[test.coverage]` Section
+
+Configures default coverage behavior for `acton test`.
+
+| Field              | Type      | Default | Description                                                     |
+|:-------------------|:----------|:--------|:----------------------------------------------------------------|
+| `enabled`          | `boolean` | `false` | Enable code coverage collection.                                |
+| `format`           | `string`  | `lcov`  | Format for coverage report (`lcov`, `text`).                    |
+| `output-file`      | `string`  | -       | Path to save the coverage report.                               |
+| `include-wrappers` | `boolean` | `false` | Include files from the `@wrappers` mapping in coverage reports. |
+| `include-tests`    | `boolean` | `false` | Include `.test.tolk` files in coverage reports.                 |
 
 ### Mutation Testing Configuration
 
@@ -215,9 +223,14 @@ Example:
 ```toml
 [test]
 reporter = ["console", "junit"]
-coverage = true
 fail-fast = true
 fail-on-diff = true
+
+[test.coverage]
+enabled = true
+format = "lcov"
+include-wrappers = true
+include-tests = true
 
 [test.mutation]
 disable-rules = ["flip_plus"]

@@ -225,6 +225,24 @@ pub struct PackageConfig {
     pub license: Option<String>,
 }
 
+/// Coverage settings for the test runner
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct TestCoverageSettings {
+    /// Enable code coverage reporting
+    pub enabled: Option<bool>,
+    /// Format for coverage reports
+    #[schemars(with = "Option<CoverageFormat>")]
+    #[schemars(default = "default_test_coverage_format")]
+    pub format: Option<String>,
+    /// Path to save the coverage report
+    pub output_file: Option<String>,
+    /// Include files from the `@wrappers` mapping in coverage reports
+    pub include_wrappers: Option<bool>,
+    /// Include `.test.tolk` files in coverage reports
+    pub include_tests: Option<bool>,
+}
+
 /// Default settings for the test runner
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -242,18 +260,8 @@ pub struct TestSettings {
     /// Enable stack traces for failed tests
     #[schemars(with = "Option<BacktraceMode>")]
     pub backtrace: Option<String>,
-    /// Enable code coverage reporting
-    pub coverage: Option<bool>,
-    /// Format for coverage reports
-    #[schemars(with = "Option<CoverageFormat>")]
-    #[schemars(default = "default_test_coverage_format")]
-    pub coverage_format: Option<String>,
-    /// Path to save the coverage report
-    pub coverage_file: Option<String>,
-    /// Include files from the `@wrappers` mapping in coverage reports
-    pub coverage_include_wrappers: Option<bool>,
-    /// Include `.test.tolk` files in coverage reports
-    pub coverage_include_tests: Option<bool>,
+    /// Coverage settings for test runs
+    pub coverage: Option<TestCoverageSettings>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
@@ -1083,6 +1091,34 @@ pub fn global_libraries_path() -> Option<PathBuf> {
 }
 
 impl TestSettings {
+    fn coverage_enabled(&self) -> Option<bool> {
+        self.coverage.as_ref().and_then(|coverage| coverage.enabled)
+    }
+
+    fn coverage_format_value(&self) -> Option<&str> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.format.as_deref())
+    }
+
+    fn coverage_file_value(&self) -> Option<String> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.output_file.clone())
+    }
+
+    fn coverage_include_wrappers_value(&self) -> Option<bool> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.include_wrappers)
+    }
+
+    fn coverage_include_tests_value(&self) -> Option<bool> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.include_tests)
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn to_test_config(
@@ -1151,21 +1187,20 @@ impl TestSettings {
                         _ => None,
                     })
             }),
-            coverage: coverage_override.unwrap_or_else(|| self.coverage.unwrap_or(false)),
+            coverage: coverage_override.unwrap_or_else(|| self.coverage_enabled().unwrap_or(false)),
             coverage_format: coverage_format_override.or_else(|| {
-                self.coverage_format
-                    .as_ref()
+                self.coverage_format_value()
                     .and_then(|f| match f.to_lowercase().as_str() {
                         "lcov" => Some(CoverageFormat::Lcov),
                         "text" => Some(CoverageFormat::Text),
                         _ => None,
                     })
             }),
-            coverage_file: coverage_file_override.or_else(|| self.coverage_file.clone()),
+            coverage_file: coverage_file_override.or_else(|| self.coverage_file_value()),
             coverage_include_wrappers: coverage_include_wrappers_override
-                .unwrap_or_else(|| self.coverage_include_wrappers.unwrap_or(false)),
+                .unwrap_or_else(|| self.coverage_include_wrappers_value().unwrap_or(false)),
             coverage_include_tests: coverage_include_tests_override
-                .unwrap_or_else(|| self.coverage_include_tests.unwrap_or(false)),
+                .unwrap_or_else(|| self.coverage_include_tests_value().unwrap_or(false)),
             exclude_patterns: exclude_override
                 .unwrap_or_else(|| self.exclude.clone().unwrap_or_default()),
             include_patterns: include_override
@@ -1472,14 +1507,17 @@ reporter = ["console", "junit"]
 debug = true
 debug-port = 9999
 backtrace = "full"
-coverage = true
-coverage-format = "lcov"
-coverage-include-wrappers = true
-coverage-include-tests = true
 exclude = ["**/integration/**"]
 include = ["**/unit/**"]
 junit-path = "custom-reports"
 junit-merge = true
+
+[test.coverage]
+enabled = true
+format = "lcov"
+output-file = "coverage.txt"
+include-wrappers = true
+include-tests = true
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1493,10 +1531,15 @@ junit-merge = true
         assert_eq!(test_settings.debug, Some(true));
         assert_eq!(test_settings.debug_port, Some(9999));
         assert_eq!(test_settings.backtrace, Some("full".to_string()));
-        assert_eq!(test_settings.coverage, Some(true));
-        assert_eq!(test_settings.coverage_format, Some("lcov".to_string()));
-        assert_eq!(test_settings.coverage_include_wrappers, Some(true));
-        assert_eq!(test_settings.coverage_include_tests, Some(true));
+        let coverage = test_settings
+            .coverage
+            .as_ref()
+            .expect("coverage settings should be parsed");
+        assert_eq!(coverage.enabled, Some(true));
+        assert_eq!(coverage.format, Some("lcov".to_string()));
+        assert_eq!(coverage.output_file, Some("coverage.txt".to_string()));
+        assert_eq!(coverage.include_wrappers, Some(true));
+        assert_eq!(coverage.include_tests, Some(true));
         assert_eq!(
             test_settings.exclude,
             Some(vec!["**/integration/**".to_string()])

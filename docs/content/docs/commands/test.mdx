@@ -556,12 +556,14 @@ Defaults can be configured in `Acton.toml`:
 ```toml
 [test]
 reporter = ["console"]
-coverage = true
-coverage-include-tests = true
-coverage-include-wrappers = true
 filter = "test-.*"
 junit-path = "reports"
 junit-merge = false
+
+[test.coverage]
+enabled = true
+include-tests = true
+include-wrappers = true
 ```
 
 CLI flags override config values for the current invocation.
