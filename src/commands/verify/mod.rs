@@ -4,22 +4,19 @@ use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use base64::Engine;
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
 use ton_api::{GetMethodResult, Network, TonApiClient};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::cell::dict::predefined_readers::{
-    key_reader_uint, val_reader_cell, val_reader_uint,
-};
-use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
-use tonlib_core::tlb_types::primitives::either::EitherRef;
-use tonlib_core::tlb_types::tlb::TLB;
-use tvmffi::stack::TupleItem;
-use tycho_types::boc::Boc;
+use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::{Boc, BocRepr};
+use tycho_types::cell::{Cell, CellSlice, CellSliceParts, HashBytes, Load};
+use tycho_types::dict::{Dict, RawDict};
+use tycho_types::models::{CurrencyCollection, IntAddr, MsgInfo, OwnedMessage, StdAddr};
 
 const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
 const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
@@ -99,9 +96,7 @@ pub fn verify_cmd(
     println!(
         "  {} Contract address: {}",
         "→".blue().bold(),
-        contract_address
-            .to_base64_url_flags(true, network == Network::Testnet)
-            .dimmed()
+        format_ton_address(&contract_address, network == Network::Testnet).dimmed()
     );
 
     let wallet_name = select_wallet(wallet_name, &config)?;
@@ -115,11 +110,7 @@ pub fn verify_cmd(
         "  {} Using wallet: {} {}",
         "→".blue().bold(),
         wallet_name.cyan(),
-        wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, network == Network::Testnet)
-            .dimmed()
+        format_ton_address(&wallet.wallet.address, network == Network::Testnet).dimmed()
     );
 
     println!("  {} Fetching backends configuration", "→".blue().bold());
@@ -197,12 +188,8 @@ pub fn verify_cmd(
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {
         known_contract_hash: contract_hash.clone(),
-        known_contract_address: contract_address
-            .to_base64_url_flags(true, network == Network::Testnet),
-        sender_address: wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, network == Network::Testnet),
+        known_contract_address: format_ton_address(&contract_address, network == Network::Testnet),
+        sender_address: format_ton_address(&wallet.wallet.address, network == Network::Testnet),
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
@@ -487,8 +474,7 @@ pub fn verify_cmd(
     println!("  {} Sending verification transaction", "→".blue().bold());
 
     let cell_data = &msg_cell.data;
-    let cell = Boc::decode(cell_data)?;
-    let cell_boc64 = Boc::encode_base64(&cell);
+    let body_cell = Boc::decode(cell_data)?;
 
     wait_for_rate_limit(&api_key);
 
@@ -501,39 +487,37 @@ pub fn verify_cmd(
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
 
-    let body_cell = ArcCell::from_boc_b64(&cell_boc64)?;
-
-    let message_info = tonlib_core::tlb_types::block::message::IntMsgInfo {
+    let message_info = tycho_types::models::IntMsgInfo {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: wallet.wallet.address.to_msg_address(),
-        dest: registry_address.to_msg_address(),
-        value: CurrencyCollection::new(BigUint::from(100_000_000u64)), // 0.1 TON
-        ihr_fee: Grams::new(BigUint::from(0u64)),
-        fwd_fee: Grams::new(BigUint::from(0u64)),
-        created_at: 0,
+        src: IntAddr::Std(wallet.address()),
+        dst: IntAddr::Std(ton_address_to_std_addr(&registry_address)),
+        value: CurrencyCollection::new(100_000_000u128), // 0.1 TON
+        ihr_fee: Default::default(),
+        fwd_fee: Default::default(),
         created_lt: 0,
+        created_at: 0,
     };
 
-    let message = tonlib_core::tlb_types::block::message::Message {
-        info: tonlib_core::tlb_types::block::message::CommonMsgInfo::Int(message_info),
+    let message = OwnedMessage {
+        info: MsgInfo::Int(message_info),
         init: None,
-        body: EitherRef::new(body_cell),
+        body: CellSliceParts::from(body_cell),
+        layout: None,
     };
 
-    let message_cell = message.to_cell()?;
+    let message_cell_boc = BocRepr::encode(message)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
 
-    let external = wallet.wallet.create_external_msg(
-        expire_at,
-        seqno,
-        need_state_init,
-        vec![message_cell.to_arc()],
-    )?;
+    let external =
+        wallet
+            .wallet
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
-        .context("Failed to send verification transaction")?;
+        .send_boc(&external.to_boc_base64()?)
+        .map_err(|error| anyhow!("Failed to send verification transaction: {error}"))?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
     println!();
@@ -776,6 +760,21 @@ fn source_retry_delay(attempt: usize) -> std::time::Duration {
     std::time::Duration::from_secs(secs)
 }
 
+fn format_ton_address(address: &TonAddress, is_testnet: bool) -> String {
+    address.to_base64(!is_testnet, false, true)
+}
+
+fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
+    StdAddr {
+        anycast: None,
+        address: HashBytes(
+            <[u8; 32]>::try_from(address.hash.as_slice())
+                .expect("TonAddress hash must be exactly 32 bytes"),
+        ),
+        workchain: address.workchain as i8,
+    }
+}
+
 fn normalize_source_path_for_verifier(path: &Path, project_root: &Path) -> String {
     let relative = path.strip_prefix(project_root).unwrap_or(path);
     relative.to_string_lossy().replace('\\', "/")
@@ -825,7 +824,7 @@ fn show_verifier_link(network: &Network, contract_address: TonAddress) {
         "View at: {}",
         format!(
             "https://verifier.ton.org/{}{}",
-            contract_address.to_base64_url_flags(true, is_testnet),
+            format_ton_address(&contract_address, is_testnet),
             if is_testnet { "?testnet" } else { "" }
         )
         .blue()
@@ -856,16 +855,14 @@ fn get_verifier_quorum(
     verifier_id: &str,
     is_testnet: bool,
 ) -> anyhow::Result<u8> {
-    let registry_address = registry_address.to_base64_url_flags(true, is_testnet);
+    let registry_address = format_ton_address(registry_address, is_testnet);
     let result = api_client.run_get_method(&registry_address, "get_verifiers", &[])?;
     parse_verifier_quorum_from_get_method(&result, verifier_id)
 }
 
 fn parse_verifier_registry_address(result: &GetMethodResult) -> anyhow::Result<TonAddress> {
     let cell = parse_stack_cell(result, "get_verifier_registry_address")?;
-    let mut slice = cell.parser();
-    slice
-        .load_address()
+    TonAddress::from_cell(&TonCell::from_boc(Boc::encode(cell))?)
         .context("Failed to parse registry address from object")
 }
 
@@ -874,22 +871,21 @@ fn parse_verifier_quorum_from_get_method(
     verifier_id: &str,
 ) -> anyhow::Result<u8> {
     let cell = parse_stack_cell(result, "get_verifiers")?;
-    let mut parser = cell.parser();
-    let verifiers = parser
-        .load_dict(256, key_reader_uint, val_reader_cell)
+    let mut parser = cell
+        .as_slice()
+        .context("Failed to parse verifier cell slice")?;
+    let verifiers = Dict::<HashBytes, CellSlice>::load_from(&mut parser)
         .context("Failed to parse verifier dictionary")?;
 
     let mut available_verifiers = Vec::new();
-    for (_, verifier_cell) in verifiers {
-        let mut verifier = verifier_cell.parser();
-        let _admin = verifier
-            .load_address()
-            .context("Failed to parse verifier admin address")?;
+    for verifier_entry in verifiers.iter() {
+        let (_, mut verifier) = verifier_entry.context("Failed to iterate verifier dictionary")?;
+        let _admin =
+            IntAddr::load_from(&mut verifier).context("Failed to parse verifier admin address")?;
         let quorum = verifier
-            .load_u8(8)
+            .load_u8()
             .context("Failed to parse verifier quorum")?;
-        let _pub_key_endpoints = verifier
-            .load_dict(256, key_reader_uint, val_reader_uint)
+        let _pub_key_endpoints = RawDict::<256>::load_from(&mut verifier)
             .context("Failed to parse verifier endpoints")?;
         let name = parse_string_ref(&mut verifier).context("Failed to parse verifier name")?;
         let _url = parse_string_ref(&mut verifier).context("Failed to parse verifier URL")?;
@@ -915,7 +911,7 @@ fn parse_verifier_quorum_from_get_method(
     );
 }
 
-fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Result<ArcCell> {
+fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Result<Cell> {
     if result.exit_code != 0 {
         anyhow::bail!(
             "{method_name} returned non-zero exit code: {}",
@@ -930,27 +926,20 @@ fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Resu
         anyhow::bail!("Stack from '{method_name}' is empty");
     };
 
-    let cell = match item {
-        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+    match item {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => Ok(cell.clone()),
         _ => {
             anyhow::bail!("Unexpected stack item type for '{method_name}'");
         }
-    };
-
-    let cell_b64 = Boc::encode_base64(cell);
-    ArcCell::from_boc_b64(&cell_b64)
-        .with_context(|| format!("Failed to decode stack cell from '{method_name}'"))
+    }
 }
 
-fn parse_string_ref(parser: &mut tonlib_core::cell::CellParser) -> anyhow::Result<String> {
+fn parse_string_ref(parser: &mut CellSlice<'_>) -> anyhow::Result<String> {
     let string_cell = parser
-        .next_reference()
+        .load_reference_cloned()
         .context("Expected string reference")?;
-    let mut string_parser = string_cell.parser();
-    let bytes = string_parser
-        .load_snake_format_aligned(false)
-        .context("Failed to read string reference bytes")?;
-    String::from_utf8(bytes).context("String reference is not valid UTF-8")
+    Tuple::parse_snake_string(&string_cell)
+        .ok_or_else(|| anyhow!("String reference is not valid UTF-8"))
 }
 
 #[cfg(test)]
@@ -1030,7 +1019,7 @@ mod tests {
 
         let address = parse_verifier_registry_address(&result).expect("address must parse");
         assert_eq!(
-            address.to_base64_url_flags(true, false),
+            format_ton_address(&address, false),
             "UQDn0lCfJbUPhD6ST-Lwh8bj-9xcc24_G_C1QAk6uBAfab7I"
         );
     }
