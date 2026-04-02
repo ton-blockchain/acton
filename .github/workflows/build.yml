@@ -166,7 +166,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
         with:
-          tool: just@1.48.1,cargo-shear@1.11.2,typos-cli
+          tool: just@1.48.1,cargo-shear@1.11.2,typos@1.45.0
 
       - name: Download TON objects archive
         env:
