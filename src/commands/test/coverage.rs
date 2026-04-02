@@ -1,15 +1,18 @@
 use crate::context::{BuildCache, EmulationsState};
 use acton_config::color::OwoColorize;
+use acton_debug::replayer::{StepMode, Tick, TolkReplayer};
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
-use retrace::trace::{Trace, TraceStep};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolkc::{TolkSourceMap, source_map::DebugMark};
+use tolkc::{
+    TolkSourceMap,
+    source_map::{DebugMark, SrcRange},
+};
 use tycho_types::boc::Boc;
-use vmlogs::parser::{VmStack, VmStackValue};
+use vmlogs::parser::VmStackValue;
 
 #[derive(Debug, Clone)]
 pub(super) struct Coverage {
@@ -30,21 +33,18 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
     // To build coverage we need two things: source maps and virtual machine logs.
     //
     // The first provides us with the necessary information about which lines in the source code are
-    // executable and can be covered, as well as information about how specific locations in bytecode
-    // relate to source code lines.
+    // executable and can be covered.
     //
-    // The second provides us with an execution trace from which we can determine which instructions
-    // were executed during test execution. Thanks to source maps, we can correlate the executed
-    // instruction with the source code that generated it. And since the instruction appeared in the
-    // execution trace, we can say that those source code lines were executed and thus covered by tests.
+    // The second provides us with the executed VM log stream. Instead of mapping raw
+    // `(cell_hash, offset)` pairs back to source lines manually, we replay those logs through
+    // `TolkReplayer`, which already contains the source-level debug reconstruction logic used by
+    // debugger flows. That lets coverage consume the exact lines the replayer visited.
     let data = collect_source_data(emulations, build_cache);
     // Not all lines of code in source code can be executed, for example, struct definitions
-    // or comments. We collect executable file lines using the fact that the source map
-    // contains a mapping of each executable line to bytecode instructions, which means we
-    // can build a per-file mapping that indicates whether a specific line is executable.
+    // or comments. We collect executable lines from the same stoppable debug marks the
+    // replayer relies on, so the denominator matches the source-level lines we can actually hit.
     let executable_lines_per_file = build_executable_lines_per_files(&data);
-    // Having VM traces and the new Tolk source map, we can correlate executed bytecode
-    // back to source lines and collect covered lines.
+    // Having source-level replay over VM logs, we can collect visited lines and branch hits.
     let result = collect_executed_lines_per_files(&data);
     let (line_hits_per_file, branch_hits_per_file) = (result.lines, result.branches);
 
@@ -77,6 +77,8 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
             branch_hits,
         });
     }
+
+    files.sort_by(|left, right| left.file.cmp(&right.file));
 
     Coverage { files }
 }
@@ -151,37 +153,34 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
         source_map, logs, ..
     } in data
     {
-        let trace = Trace::new(logs, Some(1_000_000));
+        let vm_lines = vmlogs::parser::parse_lines(logs);
+        let Ok(mut replayer) = TolkReplayer::new(source_map, &vm_lines) else {
+            continue;
+        };
+        let mut last_stack_values = Vec::new();
+        let mut last_recorded_loc: Option<(String, i64)> = None;
 
-        for step in &trace.steps {
-            let TraceStep::Execute {
-                instr,
-                stack,
-                hash,
-                offset,
-                ..
-            } = step
-            else {
-                continue;
-            };
-
-            let Some((file, line)) = find_coverage_loc(source_map, hash, *offset) else {
-                continue;
-            };
-
-            if is_ignored_coverage_file(&file) {
-                continue;
-            }
-
-            if instr.contains("THROWANYIFNOT")
-                || instr.contains("THROWIFNOT")
-                || instr.contains("THROWIFNOT_SHORT")
-            {
-                process_throw_instruction(&mut branch_hits_per_file, &file, line, stack);
-            }
-
-            let entry = line_hits_per_file.entry(file).or_default();
-            *entry.entry(line).or_insert(0) += 1;
+        while !replayer.is_finished() {
+            replayer.step_with_callback(StepMode::StepInto, |tick, replayer| match tick {
+                Tick::Loc { .. } | Tick::AtFunReturn { .. } => {
+                    record_current_line_hit(
+                        &mut line_hits_per_file,
+                        &mut last_recorded_loc,
+                        replayer,
+                    );
+                }
+                Tick::TvmStackValues { values } => {
+                    last_stack_values = values.clone();
+                }
+                Tick::TvmAfterExecute { instr_name } if is_throw_branch_instruction(instr_name) => {
+                    process_throw_instruction(
+                        &mut branch_hits_per_file,
+                        replayer,
+                        &last_stack_values,
+                    );
+                }
+                _ => {}
+            });
         }
     }
 
@@ -191,36 +190,48 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
     }
 }
 
-fn find_coverage_loc(source_map: &TolkSourceMap, hash: &str, offset: u16) -> Option<(String, i64)> {
-    let marks = source_map.marks_dict.as_ref()?.get(hash)?;
-    let target_offset = i32::from(offset);
-    let mut loc = None;
-
-    for &(mark_offset, mark_id) in marks {
-        if mark_offset > target_offset {
-            break;
-        }
-
-        let Some((file, line)) =
-            coverage_location_for_mark(&source_map.source_map, mark_id as usize)
-        else {
-            continue;
-        };
-
-        loc = Some((file, line));
-    }
-
-    loc
-}
-
-fn coverage_location_for_mark(
-    source_map: &tolkc::SourceMap,
-    mark_id: usize,
-) -> Option<(String, i64)> {
-    let DebugMark::Loc { range, .. } = source_map.get_debug_mark(mark_id) else {
-        return None;
+fn record_current_line_hit(
+    line_hits_per_file: &mut HashMap<String, BTreeMap<i64, u64>>,
+    last_recorded_loc: &mut Option<(String, i64)>,
+    replayer: &TolkReplayer,
+) {
+    let Some((file, line)) = current_coverage_loc(replayer) else {
+        return;
     };
 
+    if last_recorded_loc.as_ref() == Some(&(file.clone(), line)) {
+        return;
+    }
+
+    *last_recorded_loc = Some((file.clone(), line));
+
+    let entry = line_hits_per_file.entry(file).or_default();
+    *entry.entry(line).or_insert(0) += 1;
+}
+
+fn current_coverage_loc(replayer: &TolkReplayer) -> Option<(String, i64)> {
+    let line = replayer.current_line();
+    if line == 0 {
+        return None;
+    }
+
+    let file_id = replayer.current_file_id();
+    let file = replayer
+        .file_full_path(file_id)
+        .unwrap_or_else(|| replayer.current_file_name())
+        .to_owned();
+
+    if is_ignored_coverage_file(&file) {
+        return None;
+    }
+
+    Some((file, zero_based_line(line)))
+}
+
+fn coverage_location_for_range(
+    source_map: &tolkc::SourceMap,
+    range: &SrcRange,
+) -> Option<(String, i64)> {
     let file = source_map
         .resolve_file_full_path(range.file_id())
         .unwrap_or_else(|| source_map.resolve_file_name(range.file_id()))
@@ -231,15 +242,16 @@ fn coverage_location_for_mark(
 
 fn process_throw_instruction(
     branch_hits_per_file: &mut HashMap<String, HashMap<i64, BranchHits>>,
-    file: &str,
-    line: i64,
-    stack: &str,
+    replayer: &TolkReplayer,
+    stack_values: &[VmStackValue],
 ) {
-    let elements = VmStack::new(stack).parsed();
+    let Some((file, line)) = current_coverage_loc(replayer) else {
+        return;
+    };
 
-    if let [.., VmStackValue::Integer(value)] = &elements[..] {
+    if let [.., VmStackValue::Integer(value)] = stack_values {
         let taken = value == "0";
-        let entry = branch_hits_per_file.entry(file.to_owned()).or_default();
+        let entry = branch_hits_per_file.entry(file).or_default();
         let entry = entry.entry(line).or_default();
 
         if taken {
@@ -277,24 +289,37 @@ fn build_executable_lines_per_file(
     let source_map = &source_map.source_map;
 
     for mark_id in 0..source_map.debug_marks_count() {
-        let DebugMark::Loc { range, .. } = source_map.get_debug_mark(mark_id) else {
+        let Some(range) = (match source_map.get_debug_mark(mark_id) {
+            DebugMark::Loc { range, .. } => Some(range),
+            DebugMark::EnterFun {
+                range,
+                is_inlined: true,
+                ..
+            } => Some(range),
+            DebugMark::LeaveFun { range, .. } => Some(range),
+            _ => None,
+        }) else {
+            continue;
+        };
+        let Some((file, line)) = coverage_location_for_range(source_map, range) else {
             continue;
         };
 
-        let file_id = range.file_id();
-        let file = source_map
-            .resolve_file_full_path(file_id)
-            .unwrap_or_else(|| source_map.resolve_file_name(file_id));
-
-        if is_ignored_coverage_file(file) {
+        if is_ignored_coverage_file(&file) {
             continue;
         }
 
         executable_lines_per_file
-            .entry(file.to_owned())
+            .entry(file)
             .or_default()
-            .insert(zero_based_line(range.start_line()));
+            .insert(line);
     }
+}
+
+fn is_throw_branch_instruction(instr_name: &str) -> bool {
+    instr_name.contains("THROWANYIFNOT")
+        || instr_name.contains("THROWIFNOT")
+        || instr_name.contains("THROWIFNOT_SHORT")
 }
 
 fn is_ignored_coverage_file(file: &str) -> bool {
@@ -469,7 +494,10 @@ pub(super) fn generate_lcov_file(
         lcov_content.push_str(&format!("LH:{}\n", file_coverage.covered_lines_count));
 
         if !file_coverage.branch_hits.is_empty() {
-            for (idx, (line, info)) in file_coverage.branch_hits.iter().enumerate() {
+            let mut branch_lines: Vec<_> = file_coverage.branch_hits.iter().collect();
+            branch_lines.sort_by_key(|(line, _)| **line);
+
+            for (idx, (line, info)) in branch_lines.into_iter().enumerate() {
                 let line = line + 1;
                 lcov_content.push_str(&format!("BRDA:{line},{idx},0,{}\n", info.if_true));
                 lcov_content.push_str(&format!("BRDA:{line},{idx},1,{}\n", info.if_false));
@@ -549,7 +577,10 @@ fn generate_text_report(coverage: &Coverage) -> String {
                         .copied()
                         .unwrap_or(0);
                     let status = if hits > 0 { "✓ " } else { "✗ " };
-                    let hits_info = format!(" hits:{hits}");
+                    let hits_info = format!(
+                        " hits:{hits}{}",
+                        format_branch_hits_suffix(file_coverage, line_idx as i64)
+                    );
 
                     let padding = " ".repeat(code_width.saturating_sub(line.len()));
                     result.push_str(&format!(
@@ -576,4 +607,15 @@ fn generate_text_report(coverage: &Coverage) -> String {
     }
 
     result
+}
+
+fn format_branch_hits_suffix(file_coverage: &FileCoverage, line: i64) -> String {
+    let Some(info) = file_coverage.branch_hits.get(&line) else {
+        return String::new();
+    };
+
+    format!(
+        " branches:throw={} continue={}",
+        info.if_true, info.if_false
+    )
 }

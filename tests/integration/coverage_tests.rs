@@ -1,6 +1,6 @@
 use crate::common::assertion;
 use crate::support::TestOutputExt;
-use crate::support::project::{ProjectBuilder, TestConfig};
+use crate::support::project::{Project, ProjectBuilder, TestConfig};
 use crate::support::snapshots::normalize_output;
 use std::fs;
 
@@ -8,6 +8,117 @@ const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+
+const COUNTER_TEMPLATE_CONTRACT: &str =
+    include_str!("../../src/commands/new/templates/counter/contracts/counter.tolk");
+const COUNTER_TEMPLATE_TYPES: &str =
+    include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
+const COUNTER_TEMPLATE_WRAPPER: &str =
+    include_str!("../../src/commands/new/templates/counter/tests/wrappers/Counter.tolk");
+const COUNTER_TEMPLATE_TESTS: &str =
+    include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
+
+const COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS: &str = r#"
+import "@acton/emulation/network"
+import "@acton/testing/expect"
+import "@acton/testing/transaction_expect"
+
+import "@contracts/types"
+import "@wrappers/Counter"
+
+get fun `test unknown message reject`() {
+    val (contract, deployer, _) = setupTest();
+
+    val res = contract.sendAny(deployer.address, beginCell().storeInt(0x999, 32).endCell());
+    expect(res).toHaveFailedTx({
+        from: deployer.address,
+        to: contract.address,
+        exitCode: Errors.InvalidMessage as int,
+    });
+}
+
+get fun `test unknown message accept`() {
+    val (contract, deployer, _) = setupTest();
+
+    val res = contract.sendAny(deployer.address, createEmptyCell());
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: contract.address });
+}
+
+fun setupTest(): (Counter, Treasury, Treasury) {
+    val deployer = net.treasury("deployer");
+    val notDeployer = net.treasury("not_deployer");
+
+    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val res = contract.deploy(deployer.address, { value: ton("1") });
+    expect(res).toHaveSuccessfulDeploy({ to: contract.address });
+
+    return (contract, deployer, notDeployer);
+}
+"#;
+
+fn build_counter_template_project(name: &str, test_source: &str) -> Project {
+    let project = ProjectBuilder::new(name)
+        .contract("counter", COUNTER_TEMPLATE_CONTRACT)
+        .file("contracts/types", COUNTER_TEMPLATE_TYPES)
+        .file("tests/wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
+        .test_file("counter", test_source)
+        .mapping("acton", "./.acton")
+        .mapping("contracts", "contracts")
+        .mapping("wrappers", "tests/wrappers")
+        .build();
+    project.acton().init().run().success();
+    project
+}
+
+fn build_jetton_template_project(name: &str) -> Project {
+    let project = ProjectBuilder::new(name)
+        .contract_from_path(
+            "jetton_minter",
+            "src/commands/new/templates/jetton/contracts/jetton-minter-contract.tolk",
+        )
+        .contract_from_path(
+            "jetton_wallet",
+            "src/commands/new/templates/jetton/contracts/jetton-wallet-contract.tolk",
+        )
+        .file_from_path(
+            "contracts/errors",
+            "src/commands/new/templates/jetton/contracts/errors.tolk",
+        )
+        .file_from_path(
+            "contracts/fees-management",
+            "src/commands/new/templates/jetton/contracts/fees-management.tolk",
+        )
+        .file_from_path(
+            "contracts/jetton-utils",
+            "src/commands/new/templates/jetton/contracts/jetton-utils.tolk",
+        )
+        .file_from_path(
+            "contracts/messages",
+            "src/commands/new/templates/jetton/contracts/messages.tolk",
+        )
+        .file_from_path(
+            "contracts/storage",
+            "src/commands/new/templates/jetton/contracts/storage.tolk",
+        )
+        .file_from_path(
+            "tests/wrappers/JettonMinter",
+            "src/commands/new/templates/jetton/tests/wrappers/JettonMinter.tolk",
+        )
+        .file_from_path(
+            "tests/wrappers/JettonWallet",
+            "src/commands/new/templates/jetton/tests/wrappers/JettonWallet.tolk",
+        )
+        .test_file_from_path(
+            "wallet",
+            "src/commands/new/templates/jetton/tests/wallet.test.tolk",
+        )
+        .mapping("acton", "./.acton")
+        .mapping("contracts", "contracts")
+        .mapping("wrappers", "tests/wrappers")
+        .build();
+    project.acton().init().run().success();
+    project
+}
 
 #[test]
 fn test_coverage_basic_output() {
@@ -296,6 +407,160 @@ fn test_coverage_lcov_snapshot() {
         normalize_output(lcov_content.as_str(), project.path()),
         snapbox::file!("snapshots/test_coverage_lcov_snapshot.lcov"),
     );
+}
+
+#[test]
+fn test_counter_template_coverage_text_snapshots() {
+    let project =
+        build_counter_template_project("coverage-counter-template", COUNTER_TEMPLATE_TESTS);
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("counter-template-all.txt")
+        .run()
+        .success()
+        .assert_passed(5)
+        .assert_file_snapshot_matches(
+            "counter-template-all.txt",
+            "integration/snapshots/test_counter_template_coverage_all.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter("test unknown message")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("counter-template-unknown-only.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_snapshot_matches(
+            "counter-template-unknown-only.txt",
+            "integration/snapshots/test_counter_template_coverage_unknown_only.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter("test deploy starts at zero|test increase counter|test any account can increase counter|test reset counter")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("counter-template-non-branch.txt")
+        .run()
+        .success()
+        .assert_passed(4)
+        .assert_file_snapshot_matches(
+            "counter-template-non-branch.txt",
+            "integration/snapshots/test_counter_template_coverage_non_branch.txt",
+        );
+}
+
+#[test]
+fn test_counter_template_split_unknown_message_branch_text_snapshots() {
+    let project = build_counter_template_project(
+        "coverage-counter-template-split-unknown",
+        COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS,
+    );
+
+    project
+        .acton()
+        .test()
+        .filter("test unknown message reject")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("counter-template-reject-only.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_snapshot_matches(
+            "counter-template-reject-only.txt",
+            "integration/snapshots/test_counter_template_coverage_reject_only.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter("test unknown message accept")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("counter-template-accept-only.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_snapshot_matches(
+            "counter-template-accept-only.txt",
+            "integration/snapshots/test_counter_template_coverage_accept_only.txt",
+        );
+}
+
+#[test]
+fn test_jetton_template_coverage_text_snapshots() {
+    let project = build_jetton_template_project("coverage-jetton-template");
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("jetton-template-all.txt")
+        .run()
+        .success()
+        .assert_passed(25)
+        .assert_file_snapshot_matches(
+            "jetton-template-all.txt",
+            "integration/snapshots/test_jetton_template_coverage_all.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter(
+            "test minter admin should be able to mint jettons|test not a minter admin should not be able to mint jettons",
+        )
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("jetton-template-mint-admin-pair.txt")
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_file_snapshot_matches(
+            "jetton-template-mint-admin-pair.txt",
+            "integration/snapshots/test_jetton_template_coverage_mint_admin_pair.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter("test minter admin should be able to mint jettons")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("jetton-template-mint-admin-accept-only.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_snapshot_matches(
+            "jetton-template-mint-admin-accept-only.txt",
+            "integration/snapshots/test_jetton_template_coverage_mint_admin_accept_only.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .filter("test not a minter admin should not be able to mint jettons")
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("jetton-template-mint-admin-reject-only.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_snapshot_matches(
+            "jetton-template-mint-admin-reject-only.txt",
+            "integration/snapshots/test_jetton_template_coverage_mint_admin_reject_only.txt",
+        );
 }
 
 #[test]
