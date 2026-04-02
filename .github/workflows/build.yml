@@ -130,6 +130,13 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Check Acton target binary
+        shell: bash
+        run: |
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
+            --binary "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" \
+            --target "${TARGET_NAME}"
+
   lint:
     name: Lint Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: *runner_linux_strategy
@@ -306,6 +313,13 @@ jobs:
             acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
+
+      - name: Check Acton target binary
+        shell: bash
+        run: |
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
+            --binary "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" \
+            --target "${TARGET_NAME}"
 
   create-trunk-release:
     name: Create Trunk Release

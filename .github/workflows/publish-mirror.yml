@@ -16,7 +16,7 @@ jobs:
   publish-mirror:
     runs-on: ubicloud-standard-2-ubuntu-2204
     steps:
-      - name: "Download GitHub Artifacts"
+      - name: Download GitHub Artifacts
         uses: actions/download-artifact@v7
         with:
           pattern: artifacts-*

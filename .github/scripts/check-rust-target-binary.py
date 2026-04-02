@@ -269,11 +269,11 @@ def main() -> None:
     except ValueError as error:
         parser.error(str(error))
 
+    print(json.dumps(target._asdict()))
+
     errors = run_target_checks(target, args.binary)
     if len(errors) != 0:
         parser.error("\n".join(errors))
-
-    print(json.dumps(target._asdict()))
 
 
 if __name__ == "__main__":

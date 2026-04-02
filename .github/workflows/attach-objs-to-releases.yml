@@ -1,4 +1,4 @@
-name: "Attach TON Objs to releases"
+name: Attach TON Objs to releases
 
 on:
   workflow_call:

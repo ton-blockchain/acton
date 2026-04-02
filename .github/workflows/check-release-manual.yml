@@ -1,0 +1,54 @@
+name: Check Release Daily
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_run:
+        description: Confirm running the release check workflow
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: check-release-daily
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  confirm-run:
+    name: Confirm manual run
+    if: github.repository == 'ton-blockchain/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    steps:
+      - name: Require confirmation
+        shell: bash
+        # language=Bash
+        run: |
+          if [[ "${{ inputs.confirm_run }}" != 'true' ]]; then
+            echo "::error::Set the 'confirm_run' checkbox when starting this workflow."
+            exit 1
+          fi
+
+  build-release-binaries:
+    name: Build release binaries
+    if: github.repository == 'ton-blockchain/acton'
+    needs: [ confirm-run ]
+
+    permissions:
+      contents: read
+
+    uses: ./.github/workflows/build-release-binaries.yml
+    secrets: inherit
+
+  check-release:
+    name: Check release
+    if: github.repository == 'ton-blockchain/acton'
+    needs: [ build-release-binaries ]
+
+    permissions:
+      contents: read
+
+    uses: ./.github/workflows/check-release.yml
+    secrets: inherit
