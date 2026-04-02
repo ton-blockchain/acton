@@ -32,9 +32,9 @@ Beyond testing gaps, mutation testing can also reveal implementation issues. For
 2.  **Compilation**: Each mutant is compiled. If a mutant doesn't compile (e.g., syntax error), it's discarded.
 3.  **Testing**: Acton runs your test suite against each valid mutant.
 4.  **Reporting**:
-    - **Killed**: The tests failed (good!).
-    - **Survived**: The tests passed (bad!). This indicates a gap in testing.
-    - **Compile errors**: Mutants that fail to compile are reported separately and excluded from the mutation score.
+- **Killed**: The tests failed (good!).
+- **Survived**: The tests passed (bad!). This indicates a gap in testing.
+- **Compile errors**: Mutants that fail to compile are reported separately and excluded from the mutation score.
 
 ## Running Mutation Tests
 
@@ -68,7 +68,18 @@ Mutation testing analyzes the contract specified by `--mutate-contract` and its 
 
 ## Mutation Rules
 
-Acton includes several built-in mutation rules categorized by their impact level.
+Acton currently includes 49 built-in mutation rules for assertions, storage and
+upgrade calls, external-message handling, control flow, arithmetic,
+comparisons, booleans, logical operators, and bitwise or shift operators.
+
+### Available Rule IDs
+
+- Critical: `remove_assert`, `remove_throw`, `remove_storage_save_call`, `remove_set_data_call`, `remove_accept_external_message`, `remove_commit_contract_data_and_actions`, `remove_set_code_postponed`, `if_condition_true`, `if_condition_false`, `while_condition_false`, `remove_logical_not`
+- Arithmetic: `flip_plus`, `flip_minus`, `flip_mul_div`, `flip_div_mul`, `flip_mul_assign`, `flip_div_assign`, `flip_mul_assign_mod`, `flip_mod_assign`, `flip_plus_assign`, `flip_minus_assign`, `remove_unary_minus`
+- Comparison: `flip_eq_ne`, `flip_ne_eq`, `flip_lt_le`, `flip_gt_ge`, `flip_le_lt`, `flip_ge_gt`
+- Boolean and logical: `invert_bool_true`, `invert_bool_false`, `flip_logical_and`, `flip_logical_or`
+- Bitwise and shifts: `flip_bitwise_and`, `flip_bitwise_or`, `flip_bitwise_and_xor`, `flip_bitwise_or_xor`, `flip_bitwise_xor`, `flip_bitwise_xor_or`, `flip_bitwise_and_assign_or`, `flip_bitwise_and_assign_xor`, `flip_bitwise_or_assign_and`, `flip_bitwise_or_assign_xor`, `flip_bitwise_xor_assign_and`, `flip_bitwise_xor_assign_or`, `flip_lshift_assign`, `flip_rshift_assign`, `flip_lshift`, `flip_rshift`, `remove_bitwise_not`
+
 See [Mutation Rules](/docs/test-runner/mutation-testing/rules) for complete list.
 
 ## Interpreting Results
@@ -106,12 +117,12 @@ For survived mutants, Acton provides a diff showing exactly what was changed and
   Level: critical
   Group: assertion
   at contracts/jetton-minter.tolk:46:13
-    44 │ 
+    44 │
     45 │         RequestWalletAddress => {
     46 │             assert (
     47 │                 in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND
     48 │             ) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
-    49 │ 
+    49 │
     50 │             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
 
   Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.

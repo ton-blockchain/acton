@@ -3,37 +3,47 @@ title: "Mutation Rules"
 description: "Reference of all available mutation rules in Acton"
 ---
 
-This page lists all mutation rules available in Acton, categorized by their type.
+This page lists all 49 mutation rules available in Acton, categorized by their type.
+Use these rule IDs with `acton test --disable-rule <RULE>` or in
+`[test.mutation].disable-rules` inside `Acton.toml`.
 
 ## Critical Rules
 
-These rules affect control flow and security assertions. Mutations in this category that survive are often indicators of missing tests for edge cases or security validation.
+These rules affect control flow, assertions, storage persistence, and contract
+upgrade or external-message semantics. Mutations in this category that survive
+are often indicators of missing tests for security-critical behavior.
 
-| Rule                       | Description                       | Explanation                                                                                                            |
-|----------------------------|-----------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `remove_assert`            | Remove assert statements          | This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.  |
-| `remove_throw`             | Remove throw keyword              | This exception path is not covered by tests. Missing error handling might leave the contract in an inconsistent state. |
-| `remove_storage_save_call` | Remove save() method calls        | This storage save operation is not covered by tests. Without this call, data changes won't be persisted to storage.    |
-| `if_condition_true`        | Replace if condition with `true`  | The conditional logic is not fully covered.                                                                            |
-| `if_condition_false`       | Replace if condition with `false` | The conditional logic is not fully covered.                                                                            |
-| `remove_logical_not`       | Remove logical NOT (`!`)          | The logical negation is not fully covered.                                                                             |
+| Rule                                      | Description                                   | Explanation                                                                                                               |
+|-------------------------------------------|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| `remove_assert`                           | Remove assert statements                      | This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.     |
+| `remove_throw`                            | Remove throw keyword                          | This exception path is not covered by tests. Missing error handling might leave the contract in an inconsistent state.    |
+| `remove_storage_save_call`                | Remove save() method calls                    | This storage save operation is not covered by tests. Without this call, data changes won't be persisted to storage.       |
+| `remove_set_data_call`                    | Remove `contract.setData()` calls             | This storage write is not covered by tests. Without this call, updated state will not be persisted.                       |
+| `remove_accept_external_message`          | Remove `acceptExternalMessage()` calls        | This external accept path is not covered by tests. Without this call, external message handling semantics may break.      |
+| `remove_commit_contract_data_and_actions` | Remove `commitContractDataAndActions()` calls | This commit path is not covered by tests. Without this call, state persistence and replay-protection semantics may break. |
+| `remove_set_code_postponed`               | Remove `contract.setCodePostponed()` calls    | This upgrade path is not covered by tests. Without this call, code-upgrade semantics may break.                           |
+| `if_condition_true`                       | Replace if condition with `true`              | The conditional logic is not fully covered.                                                                               |
+| `if_condition_false`                      | Replace if condition with `false`             | The conditional logic is not fully covered.                                                                               |
+| `while_condition_false`                   | Replace while condition with `false`          | The loop execution path is not fully covered.                                                                             |
+| `remove_logical_not`                      | Remove logical NOT (`!`)                      | The logical negation is not fully covered.                                                                                |
 
 ## Arithmetic Rules
 
 These rules mutate arithmetic operations to ensure calculations are verified by tests.
 
-| Rule                 | Description              |
-|----------------------|--------------------------|
-| `flip_plus`          | Replace `+` with `-`     |
-| `flip_minus`         | Replace `-` with `+`     |
-| `flip_mul_div`       | Replace `*` with `/`     |
-| `flip_div_mul`       | Replace `/` with `*`     |
-| `flip_mul_assign`    | Replace `*=` with `/=`   |
-| `flip_div_assign`    | Replace `/=` with `*=`   |
-| `flip_mod_assign`    | Replace `%=` with `*=`   |
-| `flip_plus_assign`   | Replace `+=` with `-=`   |
-| `flip_minus_assign`  | Replace `-=` with `+=`   |
-| `remove_unary_minus` | Remove unary minus (`-`) |
+| Rule                  | Description              |
+|-----------------------|--------------------------|
+| `flip_plus`           | Replace `+` with `-`     |
+| `flip_minus`          | Replace `-` with `+`     |
+| `flip_mul_div`        | Replace `*` with `/`     |
+| `flip_div_mul`        | Replace `/` with `*`     |
+| `flip_mul_assign`     | Replace `*=` with `/=`   |
+| `flip_div_assign`     | Replace `/=` with `*=`   |
+| `flip_mul_assign_mod` | Replace `*=` with `%=`   |
+| `flip_mod_assign`     | Replace `%=` with `*=`   |
+| `flip_plus_assign`    | Replace `+=` with `-=`   |
+| `flip_minus_assign`   | Replace `-=` with `+=`   |
+| `remove_unary_minus`  | Remove unary minus (`-`) |
 
 ## Comparison Rules
 
@@ -61,13 +71,24 @@ These rules invert boolean values and logical operators.
 
 ## Bitwise Rules
 
-These rules mutate bitwise operations.
+These rules mutate bitwise operators, compound bitwise assignments, and shifts.
 
-| Rule                 | Description              |
-|----------------------|--------------------------|
-| `flip_bitwise_and`   | Replace `&` with `\|`    |
-| `flip_bitwise_or`    | Replace `\|` with `&`    |
-| `flip_bitwise_xor`   | Replace `^` with `&`     |
-| `flip_lshift`        | Replace `<<` with `>>`   |
-| `flip_rshift`        | Replace `>>` with `<<`   |
-| `remove_bitwise_not` | Remove bitwise NOT (`~`) |
+| Rule                          | Description              |
+|-------------------------------|--------------------------|
+| `flip_bitwise_and`            | Replace `&` with `\|`    |
+| `flip_bitwise_or`             | Replace `\|` with `&`    |
+| `flip_bitwise_and_xor`        | Replace `&` with `^`     |
+| `flip_bitwise_or_xor`         | Replace `\|` with `^`    |
+| `flip_bitwise_xor`            | Replace `^` with `&`     |
+| `flip_bitwise_xor_or`         | Replace `^` with `\|`    |
+| `flip_bitwise_and_assign_or`  | Replace `&=` with `\|=`  |
+| `flip_bitwise_and_assign_xor` | Replace `&=` with `^=`   |
+| `flip_bitwise_or_assign_and`  | Replace `\|=` with `&=`  |
+| `flip_bitwise_or_assign_xor`  | Replace `\|=` with `^=`  |
+| `flip_bitwise_xor_assign_and` | Replace `^=` with `&=`   |
+| `flip_bitwise_xor_assign_or`  | Replace `^=` with `\|=`  |
+| `flip_lshift_assign`          | Replace `<<=` with `>>=` |
+| `flip_rshift_assign`          | Replace `>>=` with `<<=` |
+| `flip_lshift`                 | Replace `<<` with `>>`   |
+| `flip_rshift`                 | Replace `>>` with `<<`   |
+| `remove_bitwise_not`          | Remove bitwise NOT (`~`) |
