@@ -55,7 +55,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
         with:
-          tool: just
+          tool: just@1.48.1
 
       - name: Install LLVM and Clang (don't cache)
         run: |
@@ -156,7 +156,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
         with:
-          tool: just
+          tool: just@1.48.1
 
       - name: Download TON objects archive
         env:
