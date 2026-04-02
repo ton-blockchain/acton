@@ -1,0 +1,17 @@
+
+Remote Account
+  Network:           localnet
+  Address:           [WALLET_ADDRESS_BASE]
+  Raw Address:       0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c
+  Status:            active
+  Balance:           99.993892 TON
+  Last Tx LT:        3
+  Last Tx Hash:      [TX_HASH]
+  Code Hash:         0xfeb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0
+  Data Hash:         0xedcec1db765c9ca1ef98e8507707483dfbb869e87ab4f06bafce18df2ff9446c
+
+Local Match
+  Contract:          <none>
+
+Decoded Storage
+  <local ABI not found>

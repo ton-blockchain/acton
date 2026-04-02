@@ -1,0 +1,55 @@
+---
+title: "E030: enum-cast-missing-safety-comment"
+description: "Requires a `SAFETY` comment for non-literal `as` casts to enum types."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E030`
+- `Rule`: `enum-cast-missing-safety-comment`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Requires a `SAFETY` comment for non-literal `as` casts to enum types.
+
+### Why is this bad?
+Casting arbitrary values to enums can construct invalid enum values.
+Compiler optimizations may rely on enum invariants, so invalid values
+can lead to subtle and hard-to-debug behavior.
+
+### Example
+```tolk
+enum Op { Add = 0, Sub = 1 }
+
+fun parse(v: int): Op {
+    return v as Op;
+}
+```
+
+Use instead:
+```tolk
+enum Op { Add = 0, Sub = 1 }
+
+fun parse(v: int): Op {
+    if (v != 0 && v != 1) {
+        throw 7
+    }
+    // SAFETY: input is validated and guaranteed to be either 0 or 1.
+    return v as Op;
+}
+
+// or even better, use match
+
+fun parse(v: int): Op {
+    return match (v) {
+        0 => Op.Add,
+        1 => Op.Sub,
+        else => throw 7,
+    }
+}
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/enum_cast_missing_safety_comment.rs#L50" />

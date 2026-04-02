@@ -3,7 +3,7 @@ struct Storage {
     counter: uint32
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 
@@ -47,5 +47,5 @@ get fun currentCounter(): int {
 }
 
 get fun currentCounter2(arg: int): int {
-    return arg
+    return arg;
 }

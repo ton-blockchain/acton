@@ -1,0 +1,209 @@
+name: Check release binaries
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: false
+        type: string
+
+concurrency:
+  group: build-release-binaries-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build-linux:
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-8-ubuntu-2204
+            arch: x86_64
+            vendor: unknown
+            sys: linux
+            abi: gnu
+          - runner: ubicloud-standard-8-arm-ubuntu-2204
+            arch: aarch64
+            vendor: unknown
+            sys: linux
+            abi: gnu
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ runner.os }}-${{ runner.arch }}
+          save-if: false
+          lookup-only: true
+
+      - name: Install Rust
+        run: rustup target add "${TARGET_NAME}"
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        with:
+          tool: just@1.48.1
+
+      - name: Install LLVM and Clang (don't cache)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          mkdir -p objs
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          no-cache: true
+
+      - name: Build acton binary
+        env:
+          CC: clang-16
+          CXX: clang++-16
+        run: |
+          just build-ui
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+
+      - name: Test acton binary
+        run: |
+          "./target/${TARGET_NAME}/release-size/acton" --help
+
+      - name: Prepare Acton archive
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          ARTIFACTS_DIR="acton-${TARGET_NAME}"
+          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
+
+          mkdir -p "${ARTIFACTS_DIR}"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
+          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+
+      - name: Upload Acton archive as artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: artifacts-${{ env.TARGET_NAME }}
+          path: |
+            acton-${{ env.TARGET_NAME }}.tar.gz
+            acton-${{ env.TARGET_NAME }}.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+  build-macos:
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x86_64
+            vendor: apple
+            sys: darwin
+          - runner: macos-15
+            arch: aarch64
+            vendor: apple
+            sys: darwin
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ runner.os }}-${{ runner.arch }}
+          save-if: false
+          lookup-only: true
+
+      - name: Install Rust
+        run: rustup target add "${TARGET_NAME}"
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        with:
+          tool: just@1.48.1
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          mkdir -p objs
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          no-cache: true
+
+      - name: Build acton binary
+        run: |
+          just build-ui
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+
+      - name: Test acton binary
+        run: |
+          "./target/${TARGET_NAME}/release-size/acton" --help
+
+      - name: Prepare Acton archive
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          ARTIFACTS_DIR="acton-${TARGET_NAME}"
+          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
+
+          mkdir -p "${ARTIFACTS_DIR}"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
+          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+
+      - name: Upload Acton archive as artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: artifacts-${{ env.TARGET_NAME }}
+          path: |
+            acton-${{ env.TARGET_NAME }}.tar.gz
+            acton-${{ env.TARGET_NAME }}.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error

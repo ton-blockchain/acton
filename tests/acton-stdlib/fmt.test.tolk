@@ -42,14 +42,31 @@ get fun `test-format-struct-with-single-field`() {
 }
 
 get fun `test-format-struct-with-two-fields`() {
-    expect(format1("{}", DoubleInt { a: 100, b: 200 })).toEqual("""DoubleInt {
+    expect(
+        format1(
+            "{}",
+            DoubleInt {
+                a: 100,
+                b: 200,
+            },
+        ),
+    ).toEqual("""DoubleInt {
     a: 100,
     b: 200
 }""");
 }
 
 get fun `test-format-struct-with-nested-single-int`() {
-    expect(format1("{}", DoubleIntAndNestedSingleInt { a: 100, b: 200, nested: SingleInt { a: 300 } })).toEqual("""DoubleIntAndNestedSingleInt {
+    expect(
+        format1(
+            "{}",
+            DoubleIntAndNestedSingleInt {
+                a: 100,
+                b: 200,
+                nested: SingleInt { a: 300 },
+            },
+        ),
+    ).toEqual("""DoubleIntAndNestedSingleInt {
     a: 100,
     b: 200,
     nested: SingleInt {
@@ -59,7 +76,9 @@ get fun `test-format-struct-with-nested-single-int`() {
 }
 
 get fun `test-format-struct-with-nested-double-int`() {
-    expect(format1("{}", DoubleIntAndNestedDoubleInt {})).toEqual("""DoubleIntAndNestedDoubleInt {
+    expect(
+        format1("{}", DoubleIntAndNestedDoubleInt {}),
+    ).toEqual("""DoubleIntAndNestedDoubleInt {
     a: 3,
     b: 4,
     nested: DoubleInt {
@@ -70,8 +89,10 @@ get fun `test-format-struct-with-nested-double-int`() {
 }
 
 get fun `test-format-struct-with-very-nested-`() {
-    val formatted = format1("{}", VeryNested { });
-    expect(formatted).toEqual("""VeryNested {
+    val formatted = format1("{}", VeryNested {});
+    expect(
+        formatted,
+    ).toEqual("""VeryNested {
     a: 3,
     nested: VeryNested1 {
         a: 4,
@@ -100,7 +121,9 @@ get fun `test-format-message`() {
         var loaded = inMsg.value.load();
         loaded.info.createdLt = 0;
         loaded.info.createdAt = 0;
-        expect(format1("{}", loaded)).toEqual("""MessageRelaxedGeneric {
+        expect(
+            format1("{}", loaded),
+        ).toEqual("""MessageRelaxedGeneric {
     info: IntMsgInfoRelaxed {
         ihrDisabled: true,
         bounce: false,
@@ -109,7 +132,7 @@ get fun `test-format-message`() {
         dest: kQC0663BO7-gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
         value: CurrencyCollection {
             grams: 1999900000,
-            other: null
+            other: map<int32, varuint32> {}
         },
         extraFlags: 0,
         fwdFee: 266669,
@@ -120,4 +143,20 @@ get fun `test-format-message`() {
     body: null
 }""");
     }
+}
+
+get fun `test-format-multiple-arguments-and-modifiers`() {
+    expect(format2("{} {:x}", "hex", 255)).toEqual("hex ff");
+    expect(format3("{} {} {:ton}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 TON");
+    expect(format4("{{{}}} {} {} {}", 1, 2, 3, 4)).toEqual("{1} 2 3 4");
+    expect(
+        format5(
+            "{} {} {} {} {}",
+            1,
+            2,
+            3,
+            4,
+            5,
+        ),
+    ).toEqual("1 2 3 4 5");
 }

@@ -1,12 +1,18 @@
-use crate::integration::check::run_simple_test;
+use crate::integration::check::run_rule_test;
 use function_name::named;
+
+const RULE_CODE: &str = "E009";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
 
 #[test]
 #[named]
 fn test_check_method_can_be_static_with_unused_self() {
     run_simple_test(
         "method_can_be_static",
-        r#"
+        r"
             struct Foo {}
 
             fun Foo.bar(self, a: int): int {
@@ -16,9 +22,9 @@ fn test_check_method_can_be_static_with_unused_self() {
             fun main() {
                 Foo{}.bar(10);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -26,7 +32,7 @@ fn test_check_method_can_be_static_with_unused_self() {
 fn test_check_method_can_be_static_with_used_self() {
     run_simple_test(
         "method_can_be_static",
-        r#"
+        r"
             struct Foo {
                 value: int,
             }
@@ -38,9 +44,9 @@ fn test_check_method_can_be_static_with_used_self() {
             fun main() {
                 Foo { value: 10 }.bar();
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -48,7 +54,7 @@ fn test_check_method_can_be_static_with_used_self() {
 fn test_check_method_can_be_static_with_recursive_self_only() {
     run_simple_test(
         "method_can_be_static",
-        r#"
+        r"
             struct Foo {}
 
             fun Foo.bar(self, n: int): int {
@@ -61,9 +67,9 @@ fn test_check_method_can_be_static_with_recursive_self_only() {
             fun main() {
                 Foo{}.bar(2);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -71,7 +77,7 @@ fn test_check_method_can_be_static_with_recursive_self_only() {
 fn test_check_method_can_be_static_with_recursive_and_normal_self_usage() {
     run_simple_test(
         "method_can_be_static",
-        r#"
+        r"
             struct Foo {
                 value: int,
             }
@@ -86,9 +92,9 @@ fn test_check_method_can_be_static_with_recursive_and_normal_self_usage() {
             fun main() {
                 Foo { value: 2 }.bar(2);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -96,7 +102,7 @@ fn test_check_method_can_be_static_with_recursive_and_normal_self_usage() {
 fn test_check_method_can_be_static_for_static_method() {
     run_simple_test(
         "method_can_be_static",
-        r#"
+        r"
             struct Foo {}
 
             fun Foo.bar(_n: int): int {
@@ -106,7 +112,7 @@ fn test_check_method_can_be_static_for_static_method() {
             fun main() {
                 Foo.bar(2);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

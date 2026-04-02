@@ -180,7 +180,7 @@ fn run_resolve_test(test_case: &TestCase) -> String {
 
 fn run_resolve_tests_from_file(path: &Path) {
     let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read test file at {:?}: {}", path, e));
+        .unwrap_or_else(|e| panic!("Failed to read test file at {path:?}: {e}"));
     let tests = TestParser::parse_all(&content);
 
     let has_only = tests.iter().any(|t| t.properties.contains_key("only"));

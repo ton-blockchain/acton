@@ -16,6 +16,15 @@ variable @currentdebugmarks
   <b swap ref, // markid markiddictb
   swap @debugmarks @ @marksize b>udict! { abort"could not set debug mark" } ifnot @debugmarks ! } : @adddebugmark
 { over bbits @adddebugmark } : DEBUGMARK
+{ DEBUGMARK } : MARK_LOC
+{ DEBUGMARK } : MARK_STACK
+{ DEBUGMARK } : MARK_ENTER_FUN
+{ DEBUGMARK } : MARK_LEAVE_FUN
+{ DEBUGMARK } : MARK_VAR
+{ DEBUGMARK } : MARK_SCOPE_START
+{ DEBUGMARK } : MARK_SCOPE_END
+{ DEBUGMARK } : MARK_SMART_CAST
+{ DEBUGMARK } : MARK_SET_GLOB
 
 32 constant @zcount
 { u@?+ { swap abort"first bits are not zeroes" } if } : @cut-zeroes

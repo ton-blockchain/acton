@@ -6,12 +6,13 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/tlb/maybe"
 "#;
 
-const RECEIVER_CONTRACT: &str = r#"
+const RECEIVER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 #[test]
 fn wait_for_transaction_returns_true_in_emulation_mode() {

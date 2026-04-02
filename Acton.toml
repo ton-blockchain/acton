@@ -1,7 +1,7 @@
 [package]
 name = "Acton"
 description = "All-in-one toolkit for TON Blockchain smartcontract development"
-version = "0.0.8"
+version = "0.1.5"
 license = "MIT"
 
 [contracts.counter]
@@ -21,6 +21,7 @@ depends = []
 
 [test]
 include = ["tests/acton-stdlib/**", ".jetton/**"]
+fail-on-diff = false
 
 [test.mutation]
 
@@ -29,8 +30,7 @@ port = 3010
 accounts = ["local-wallet"]
 
 [networks.localnet]
-v2-url = "http://localhost:3010/api/v2"
-v3-url = "http://localhost:3010/api/v3"
+api = { v2 = "http://localhost:3010/api/v2", v3 = "http://localhost:3010/api/v3" }
 
 [mappings]
 acton = ".acton"

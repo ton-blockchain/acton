@@ -1,4 +1,5 @@
 use crate::context::Context;
+use crate::formatter::FormatterContext;
 use anyhow::bail;
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
@@ -17,8 +18,10 @@ fn println_impl(
 ) -> anyhow::Result<()> {
     let typed_arg = arg.unwrap_single().to_typed(&type_name);
 
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
-    let formatted = formatter.format_with_color(&typed_arg);
+    let formatted = {
+        let formatter = FormatterContext::from_context(ctx);
+        formatter.format_with_color(&typed_arg)
+    };
 
     if ctx.io.capture_output {
         ctx.io.stdout_buffer.push_str(&formatted);
@@ -173,17 +176,12 @@ fn parse_placeholder_kind(
             "x" => Ok(PlaceholderKind::Hex),
             "ton" => Ok(PlaceholderKind::Ton),
             _ => bail!(
-                "Invalid format string at byte {}: unknown format modifier '{}' in {} (supported: :x, :ton)",
-                byte_pos,
-                modifier,
-                placeholder
+                "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :ton)"
             ),
         };
     }
     bail!(
-        "Invalid format string at byte {}: unsupported placeholder {} (supported: {{}}, {{:x}}, {{:ton}})",
-        byte_pos,
-        placeholder
+        "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:ton}})"
     )
 }
 
@@ -208,10 +206,7 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
 
         if let Some(stripped) = rem.strip_prefix('{') {
             let Some(close_rel) = stripped.find('}') else {
-                bail!(
-                    "Invalid format string at byte {}: unclosed '{{' placeholder",
-                    i
-                );
+                bail!("Invalid format string at byte {i}: unclosed '{{' placeholder");
             };
 
             let close_pos = i + 1 + close_rel;
@@ -229,7 +224,7 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
         }
 
         if rem.starts_with('}') {
-            bail!("Invalid format string at byte {}: unmatched '}}'", i);
+            bail!("Invalid format string at byte {i}: unmatched '}}'");
         }
 
         let ch = rem
@@ -247,17 +242,13 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
     Ok(tokens)
 }
 
-fn format_default(
-    formatter: &crate::formatter::FormatterContext<'_>,
-    type_name: &str,
-    arg: TupleItem,
-) -> String {
+fn format_default(formatter: &FormatterContext<'_>, type_name: &str, arg: TupleItem) -> String {
     let typed_arg = arg.to_typed(type_name);
     formatter.format(&typed_arg)
 }
 
 fn format_single_arg(
-    formatter: &crate::formatter::FormatterContext<'_>,
+    formatter: &FormatterContext<'_>,
     kind: PlaceholderKind,
     type_name: &str,
     arg: TupleItem,
@@ -294,7 +285,7 @@ fn format_args(
     let tokens = parse_format(&fmt)?;
     let mut out = String::with_capacity(fmt.len());
     let mut args_iter = args.into_iter();
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
+    let formatter = FormatterContext::from_context(ctx);
 
     for token in tokens {
         match token {

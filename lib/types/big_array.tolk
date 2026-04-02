@@ -25,9 +25,7 @@ struct BigArray<T> {
 ///
 /// Use this constructor to initialize a new chunked array.
 fun BigArray<T>.createEmpty(): BigArray<T> {
-    return BigArray<T> {
-        arr: [array<array<T>> [], 0],
-    }
+    return BigArray<T> { arr: [array<array<T>> [], 0] };
 }
 
 /// Creates [BigArray] and fills it with all elements from [items].
@@ -39,9 +37,7 @@ fun BigArray<T>.createFromArray(items: array<T>): BigArray<T> {
         return BigArray<T>.createEmpty();
     }
 
-    return BigArray<T> {
-        arr: [[items], items.size()],
-    };
+    return BigArray<T> { arr: [[items], items.size()] };
 }
 
 /// Returns the first element of a non-empty [BigArray].
@@ -71,7 +67,7 @@ fun BigArray<T>.last(self): T {
 /// Appends [value] to the end of [BigArray].
 ///
 /// Fails if array capacity exceeds 65025 elements.
-fun BigArray<T>.push(mutate self, value: T) {
+fun BigArray<T>.push(mutate self, value: T): void {
     var [topLevel, itemsCount] = self.arr;
 
     if (itemsCount >= 65025) {
@@ -94,7 +90,7 @@ fun BigArray<T>.push(mutate self, value: T) {
 /// Removes the last element from [BigArray].
 ///
 /// Fails if the array is empty.
-fun BigArray<T>.pop(mutate self) {
+fun BigArray<T>.pop(mutate self): void {
     var [topLevel, itemsCount] = self.arr;
     val binIdx = (itemsCount - 1) / 255;
     var bin = topLevel.get(binIdx);
@@ -112,7 +108,7 @@ fun BigArray<T>.pop(mutate self) {
 /// Replaces element at [index] with [value].
 ///
 /// Fails if [index] is out of bounds.
-fun BigArray<T>.set(mutate self, value: T, index: int) {
+fun BigArray<T>.set(mutate self, value: T, index: int): void {
     var [topLevel, itemsCount] = self.arr;
     val binIdx = index / 255;
     var bin = topLevel.get(binIdx);

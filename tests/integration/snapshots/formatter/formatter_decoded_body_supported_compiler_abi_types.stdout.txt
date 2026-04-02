@@ -1,0 +1,108 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_abi_mega_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_abi_mega.test.tolk (1 test)
+  ✓ formatter-decoded-body-supported-compiler-abi-types [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmAbiMegaIncoming 0.4 TON -> fm_abi_mega_sink B                             gas=297
+               flag: true
+               amount: 777000000
+               owner: [WALLET_ADDRESS_BASE] (sender)
+               scalars: {
+                   addresses: {
+                       ownerOrNull: null
+                       ownerOrFriend: [WALLET_ADDRESS_BASE] (friend)
+                       anyInternal: [WALLET_ADDRESS_BASE] (sender)
+                       anyExternal: :beef0001
+                       anyNone: null
+                   }
+                   values: {
+                       tiny: 7
+                       medium: 70000
+                       signed: -17
+                       varAmount: 66000
+                       varDebt: -1234
+                       nibble: 0xABC0 (12 bits)
+                       bytesTag: 0xCAFEBABE
+                       rawCell: [BOC_HEX]
+                       mode: FmAbiMegaMode.Beta
+                   }
+               }
+               tuples: {
+                   pair: [7, true, [WALLET_ADDRESS_BASE] (friend)]
+                   maybePair: [9, false]
+               }
+               objects: {
+                   maybeLeaf: {
+                       amount: 50000000
+                       owner: [WALLET_ADDRESS_BASE] (friend)
+                       tag: 0x11223344
+                   }
+                   aliasLeaf: {
+                       amount: 60000000
+                       owner: null
+                       tag: 0x55667788
+                   }
+                   boxedLeaf: {
+                       amount: 70000000
+                       owner: [WALLET_ADDRESS_BASE] (sender)
+                       tag: 0x99AABBCC
+                   }
+                   nested: {
+                       nonce: 77
+                       enabled: false
+                       target: [WALLET_ADDRESS_BASE] (friend)
+                       meta: {
+                           amount: 80000000
+                           owner: [WALLET_ADDRESS_BASE] (sender)
+                           tag: 0xDDEEFF00
+                       }
+                   }
+               }
+               tail: {
+                   collections: {
+                       items: {
+                           1 => {
+                               amount: 10000000
+                               owner: [WALLET_ADDRESS_BASE] (sender)
+                               tag: 0x01020304
+                           }
+                           2 => {
+                               amount: 20000000
+                               owner: null
+                               tag: 0x0A0B0C0D
+                           }
+                       }
+                       boxedItems: {
+                           1 => {
+                               amount: 200000000
+                               owner: [WALLET_ADDRESS_BASE] (sender)
+                               tag: 0xA1B2C3D4
+                           }
+                           2 => {
+                               amount: 300000000
+                               owner: [WALLET_ADDRESS_BASE] (friend)
+                               tag: 0x0BADF00D
+                           }
+                       }
+                   }
+                   trailing: { marker: 3, payload: [BOC_HEX] }
+                   choice: {
+                       value: 513
+                       extra: {
+                           nonce: 88
+                           enabled: true
+                           target: [WALLET_ADDRESS_BASE] (sender)
+                           meta: null
+                       }
+                   }
+               }
+
+ ✓ 1 passed in 1 file

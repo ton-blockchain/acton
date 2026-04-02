@@ -7,6 +7,7 @@ const OUTLIST_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/outlist_expect"
+import "../../lib/types/out_actions"
 import "../../lib/vm/vm"
 "#;
 
@@ -27,13 +28,13 @@ fn run_outlist_success(project_name: &str, test_body: &str, snapshot_path: &str)
 fn outlist_to_be_empty_passes_for_empty_out_actions() {
     run_outlist_success(
         "cc-stdlib-outlist-to-be-empty-pass",
-        r#"
+        r"
 get fun `test-cc-outlist-to-be-empty-pass`() {
     val out_actions = [];
     expect(out_actions).toBeEmpty();
     expect(out_actions.size()).toEqual(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/outlist_to_be_empty_passes_for_empty_out_actions/outlist_to_be_empty_passes_for_empty_out_actions.stdout.txt",
     );
 }

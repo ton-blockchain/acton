@@ -1,4 +1,3 @@
-
 type ForwardPayloadRemainder = RemainingBitsAndRefs
 
 struct (0x0f8a7ea5) AskToTransfer {
@@ -80,7 +79,6 @@ struct JettonWalletDataReply {
     minterAddress: address
     jettonWalletCode: cell
 }
-
 
 struct JettonDataReply {
     totalSupply: int

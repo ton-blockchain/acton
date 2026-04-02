@@ -1,0 +1,10 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      - labeler.yml:3:1
+  excessive-permissions:
+    ignore:
+      - release.yml
+  template-injection:
+    ignore:
+      - release.yml

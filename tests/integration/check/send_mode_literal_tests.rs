@@ -1,6 +1,15 @@
-use crate::integration::check::run_fix_test;
-use crate::integration::check::run_simple_test;
+use crate::integration::check::{run_rule_fix_test, run_rule_test};
 use function_name::named;
+
+const RULE_CODE: &str = "E016";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
+
+fn run_fix_test(before: &str, after: &str, name: &str) {
+    run_rule_fix_test(RULE_CODE, before, after, name);
+}
 
 #[test]
 #[named]
@@ -18,7 +27,7 @@ fn test_check_send_mode_literal_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -37,7 +46,7 @@ fn test_check_send_mode_literal_addition() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -56,7 +65,7 @@ fn test_check_send_mode_literal_unmappable_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -75,7 +84,7 @@ fn test_check_send_mode_literal_non_additive_expression() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -94,7 +103,7 @@ fn test_check_send_mode_literal_addition_with_unmappable_literal() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -113,7 +122,7 @@ fn test_check_send_mode_literal_constants_only() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -141,7 +150,7 @@ fn test_fix_send_mode_literal_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -169,7 +178,7 @@ fn test_fix_send_mode_literal_addition() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -197,7 +206,7 @@ fn test_fix_send_mode_literal_unmappable_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -225,7 +234,7 @@ fn test_fix_send_mode_literal_non_additive_expression() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -253,7 +262,7 @@ fn test_fix_send_mode_literal_addition_with_unmappable_literal() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -272,7 +281,7 @@ fn test_check_send_mode_literal_mixed_constant_and_literal_left_const() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -291,7 +300,7 @@ fn test_check_send_mode_literal_mixed_constant_and_literal_right_const() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -319,7 +328,7 @@ fn test_fix_send_mode_literal_mixed_constant_and_literal_left_const() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -347,7 +356,7 @@ fn test_fix_send_mode_literal_mixed_constant_and_literal_right_const() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -355,29 +364,29 @@ fn test_fix_send_mode_literal_mixed_constant_and_literal_right_const() {
 fn test_check_send_mode_literal_send_raw_message() {
     run_simple_test(
         "send_mode_literal",
-        r#"
+        r"
             fun onInternalMessage(_: InMessage) {
                 sendRawMessage(beginCell().endCell(), 3);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_send_mode_literal_send_raw_message() {
     run_fix_test(
-        r#"
+        r"
             fun onInternalMessage(_: InMessage) {
                 sendRawMessage(beginCell().endCell(), 3);
             }
-        "#,
-        r#"
+        ",
+        r"
             fun onInternalMessage(_: InMessage) {
                 sendRawMessage(beginCell().endCell(), SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

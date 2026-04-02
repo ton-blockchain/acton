@@ -1,0 +1,23 @@
+Coverage Summary:
+Lines: 2/2 (100.00%)
+Total Hits: 3
+
+File: [ROOT]/code/math.tolk
+Annotated Code:
+1   |                                                |
+2   |             fun addOne(x: int): int {          |
+3 ✓ |                 return x + 1;                  | hits:1
+4   |             }                                  |
+5   |                                                |
+
+File: [ROOT]/tests/test.test.tolk
+Annotated Code:
+1   |                                                                    |
+2   |             import "../../lib/testing/expect"                      |
+3   |             import "@wrappers/TestWrapper"                         |
+4   |                                                                    |
+5   |             get fun `test-coverage-scope`() {                      |
+6 ✓ |                 expect(callThroughWrapper(5)).toEqual(6);          | hits:2
+7   |             }                                                      |
+8   |                                                                    |
+

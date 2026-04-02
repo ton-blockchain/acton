@@ -60,6 +60,7 @@ pub struct GetTransactionsRequest {
     pub to_lt: Option<u64>,
 }
 
+#[must_use]
 pub const fn default_limit() -> usize {
     10
 }
@@ -185,6 +186,18 @@ pub struct GetJettonWalletsRequest {
     pub owner_address: Option<String>,
     pub jetton_address: Option<String>,
     pub exclude_zero_balance: Option<bool>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct GetNftItemsRequest {
+    pub address: Option<String>,
+    pub owner_address: Option<String>,
+    pub collection_address: Option<String>,
+    pub index: Option<String>,
+    pub include_on_sale: Option<bool>,
+    pub sort_by_last_transaction_lt: Option<bool>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }

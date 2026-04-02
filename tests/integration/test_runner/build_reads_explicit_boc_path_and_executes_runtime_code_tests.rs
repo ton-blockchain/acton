@@ -2,14 +2,14 @@ use crate::support::TestOutputExt;
 use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_RUNTIME_CONTRACT: &str = r#"
+const SIMPLE_RUNTIME_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 
 get fun ping(): int {
     return 7;
 }
-"#;
+";
 
 #[test]
 fn build_reads_explicit_boc_path_and_executes_runtime_code() {

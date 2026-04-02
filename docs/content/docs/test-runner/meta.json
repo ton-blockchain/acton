@@ -5,11 +5,14 @@
     "generating-wrappers",
     "test-attributes",
     "test-configuration",
+    "world-state-snapshots",
+    "step-by-step-execution",
     "gas-profiling-with-snapshots",
     "fork-testing",
     "code-coverage",
     "mutation-testing",
     "test-ui",
+    "reading-transaction-chains",
     "writing-your-own-matchers",
     "cookbook"
   ]

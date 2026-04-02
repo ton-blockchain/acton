@@ -12,6 +12,8 @@ pub(crate) mod project;
 pub(crate) mod snapshots;
 #[cfg(test)]
 pub(crate) mod tempdir;
+#[cfg(test)]
+pub(crate) mod toncenter;
 
 #[allow(unused_imports)]
 pub(crate) use assertions::TestOutputExt;

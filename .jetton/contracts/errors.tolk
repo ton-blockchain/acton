@@ -1,4 +1,3 @@
-
 // these error codes are quite strange, but they are exactly the same as in FunC implementation
 
 const ERR_INVALID_OP = 709

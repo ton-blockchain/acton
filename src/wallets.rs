@@ -9,21 +9,29 @@ use rand::Rng;
 use retrace::Network;
 use ring::pbkdf2;
 use sha2::Sha512;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tonlib_core::TonAddress;
-use tonlib_core::wallet::mnemonic::WORDLIST_EN_SET;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::versioned::{
-    DEFAULT_WALLET_ID, DEFAULT_WALLET_ID_V5R1, DEFAULT_WALLET_ID_V5R1_TESTNET,
+use std::sync::{LazyLock, Mutex};
+use ton::ton_core::types::TonAddress;
+use ton::ton_wallet::{
+    Mnemonic, TonWallet, WALLET_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET,
+    WORDLIST_EN_SET, WalletVersion,
 };
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
+
+type MnemonicBundle = BTreeMap<String, String>;
+
+static KEYRING_BUNDLE_CACHE: LazyLock<Mutex<HashMap<String, MnemonicBundle>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn format_ton_address(address: &TonAddress, testnet: bool, bounceable: bool) -> String {
+    address.to_base64(!testnet, bounceable, true)
+}
 
 fn test_keyring_file_path(id: &str) -> Option<PathBuf> {
     let dir = std::env::var(TEST_KEYRING_DIR_ENV).ok()?;
@@ -35,20 +43,70 @@ fn test_keyring_file_path(id: &str) -> Option<PathBuf> {
     Some(PathBuf::from(dir).join(format!("{encoded_id}.mnemonic")))
 }
 
-pub fn load_mnemonic_from_keyring(id: &str) -> anyhow::Result<String> {
-    if let Some(path) = test_keyring_file_path(id) {
-        return fs::read_to_string(&path)
-            .with_context(|| format!("Failed to load mnemonic from test keyring for {id}"))
-            .map(|s| s.trim().to_owned());
+fn keyring_cache_key(id: &str) -> String {
+    match std::env::var(TEST_KEYRING_DIR_ENV) {
+        Ok(dir) => format!("test:{dir}:{id}"),
+        Err(_) => format!("native:{id}"),
     }
-
-    let entry = Entry::new(KEYRING_SERVICE, id)?;
-    entry
-        .get_password()
-        .with_context(|| format!("Failed to load mnemonic from keyring for {id}"))
 }
 
-pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()> {
+fn parse_keyring_bundle(id: &str, raw: &str) -> anyhow::Result<MnemonicBundle> {
+    serde_json::from_str(raw)
+        .with_context(|| format!("Failed to decode keyring bundle for {id} as JSON"))
+}
+
+fn serialize_keyring_bundle(id: &str, bundle: &MnemonicBundle) -> anyhow::Result<String> {
+    serde_json::to_string(bundle)
+        .with_context(|| format!("Failed to encode keyring bundle for {id} as JSON"))
+}
+
+fn load_keyring_bundle(id: &str) -> anyhow::Result<MnemonicBundle> {
+    let cache_key = keyring_cache_key(id);
+    let bundle = KEYRING_BUNDLE_CACHE
+        .lock()
+        .expect("keyring bundle cache mutex poisoned")
+        .get(&cache_key)
+        .cloned();
+    if let Some(bundle) = bundle {
+        return Ok(bundle);
+    }
+
+    let bundle = if let Some(path) = test_keyring_file_path(id) {
+        match fs::read_to_string(&path) {
+            Ok(raw) => parse_keyring_bundle(id, &raw).with_context(|| {
+                format!("Failed to load mnemonic bundle from test keyring for {id}")
+            })?,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => MnemonicBundle::new(),
+            Err(err) => {
+                return Err(err).with_context(|| {
+                    format!("Failed to load mnemonic bundle from test keyring for {id}")
+                });
+            }
+        }
+    } else {
+        let entry = Entry::new(KEYRING_SERVICE, id)?;
+        match entry.get_password() {
+            Ok(raw) => parse_keyring_bundle(id, &raw)
+                .with_context(|| format!("Failed to load mnemonic bundle from keyring for {id}"))?,
+            Err(KeyringError::NoEntry) => MnemonicBundle::new(),
+            Err(err) => {
+                return Err(err).with_context(|| {
+                    format!("Failed to load mnemonic bundle from keyring for {id}")
+                });
+            }
+        }
+    };
+
+    KEYRING_BUNDLE_CACHE
+        .lock()
+        .expect("keyring bundle cache mutex poisoned")
+        .insert(cache_key, bundle.clone());
+    Ok(bundle)
+}
+
+fn write_keyring_bundle(id: &str, bundle: &MnemonicBundle) -> anyhow::Result<()> {
+    let serialized = serialize_keyring_bundle(id, bundle)?;
+
     if let Some(path) = test_keyring_file_path(id) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).with_context(|| {
@@ -58,33 +116,80 @@ pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()>
                 )
             })?;
         }
-        fs::write(&path, mnemonic)
-            .with_context(|| format!("Failed to store mnemonic in test keyring for {id}"))?;
+        fs::write(&path, serialized)
+            .with_context(|| format!("Failed to store mnemonic bundle in test keyring for {id}"))?;
+    } else {
+        let entry = Entry::new(KEYRING_SERVICE, id)?;
+        entry
+            .set_password(&serialized)
+            .with_context(|| format!("Failed to store mnemonic bundle in keyring for {id}"))?;
+    }
+
+    KEYRING_BUNDLE_CACHE
+        .lock()
+        .expect("keyring bundle cache mutex poisoned")
+        .insert(keyring_cache_key(id), bundle.clone());
+    Ok(())
+}
+
+fn delete_keyring_bundle(id: &str) -> anyhow::Result<()> {
+    if let Some(path) = test_keyring_file_path(id) {
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err).with_context(|| {
+                format!("Failed to delete mnemonic bundle in test keyring for {id}")
+            }),
+        }?;
+    } else {
+        let entry = Entry::new(KEYRING_SERVICE, id)?;
+        match entry.delete_credential() {
+            Ok(()) | Err(KeyringError::NoEntry) => {}
+            Err(err) => {
+                return Err(err).with_context(|| {
+                    format!("Failed to delete mnemonic bundle in keyring for {id}")
+                });
+            }
+        }
+    }
+
+    KEYRING_BUNDLE_CACHE
+        .lock()
+        .expect("keyring bundle cache mutex poisoned")
+        .remove(&keyring_cache_key(id));
+    Ok(())
+}
+
+pub fn load_mnemonic_from_keyring(id: &str, wallet_name: &str) -> anyhow::Result<String> {
+    let bundle = load_keyring_bundle(id)?;
+    bundle.get(wallet_name).cloned().ok_or_else(|| {
+        anyhow!(
+            "Failed to load mnemonic from keyring for wallet {wallet_name}: no entry found in bundle {id}"
+        )
+    })
+}
+
+pub fn store_mnemonic_in_keyring(
+    id: &str,
+    wallet_name: &str,
+    mnemonic: &str,
+) -> anyhow::Result<()> {
+    let mut bundle = load_keyring_bundle(id)?;
+    bundle.insert(wallet_name.to_owned(), mnemonic.to_owned());
+    write_keyring_bundle(id, &bundle)
+}
+
+pub fn delete_mnemonic_from_keyring(id: &str, wallet_name: &str) -> anyhow::Result<()> {
+    let mut bundle = load_keyring_bundle(id)?;
+    if !bundle.contains_key(wallet_name) {
         return Ok(());
     }
 
-    let entry = Entry::new(KEYRING_SERVICE, id)?;
-    entry
-        .set_password(mnemonic)
-        .with_context(|| format!("Failed to store mnemonic in keyring for {id}"))
-}
-
-pub fn delete_mnemonic_from_keyring(id: &str) -> anyhow::Result<()> {
-    if let Some(path) = test_keyring_file_path(id) {
-        return match fs::remove_file(&path) {
-            Ok(()) => Ok(()),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(err) => Err(err)
-                .with_context(|| format!("Failed to delete mnemonic in test keyring for {id}")),
-        };
-    }
-
-    let entry = Entry::new(KEYRING_SERVICE, id)?;
-    match entry.delete_credential() {
-        Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
-        Err(err) => {
-            Err(err).with_context(|| format!("Failed to delete mnemonic in keyring for {id}"))
-        }
+    bundle.remove(wallet_name);
+    if bundle.is_empty() {
+        delete_keyring_bundle(id)
+    } else {
+        write_keyring_bundle(id, &bundle)
     }
 }
 
@@ -114,7 +219,7 @@ pub fn is_keyring_supported() -> bool {
     }
 }
 
-pub fn load_mnemonic(wallet: &config::WalletConfig) -> anyhow::Result<String> {
+pub fn load_mnemonic(wallet_name: &str, wallet: &config::WalletConfig) -> anyhow::Result<String> {
     if let Some(env) = &wallet.keys.mnemonic_env {
         std::env::var(env).map_err(|err| {
             anyhow!(
@@ -132,7 +237,7 @@ pub fn load_mnemonic(wallet: &config::WalletConfig) -> anyhow::Result<String> {
             })
             .map(|s| s.trim().to_string())
     } else if let Some(keyring_id) = &wallet.keys.mnemonic_keyring {
-        load_mnemonic_from_keyring(keyring_id)
+        load_mnemonic_from_keyring(keyring_id, wallet_name)
     } else if let Some(mnemonic) = &wallet.keys.mnemonic {
         Ok(mnemonic.clone())
     } else {
@@ -159,10 +264,10 @@ pub fn open_wallets(
     let mut open_wallets: BTreeMap<String, Wallet> = BTreeMap::new();
 
     for (name, wallet) in wallets {
-        let mnemonic_str = load_mnemonic(&wallet)
+        let mnemonic_str = load_mnemonic(&name, &wallet)
             .with_context(|| format!("No mnemonic found for '{name}' wallet"))?;
 
-        let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::from_str(&mnemonic_str, &None)?;
+        let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
         let wallet_id = wallet_id(wallet_version, net);
@@ -179,11 +284,11 @@ pub fn open_wallets(
                 Network::Mainnet => expected
                     .address_mainnet
                     .as_ref()
-                    .map(|a| TonAddress::from_str(&a.to_string())),
-                Network::Testnet => expected
+                    .map(|a| TonAddress::from_str(&a.clone())),
+                Network::Testnet | Network::Localnet => expected
                     .address_testnet
                     .as_ref()
-                    .map(|a| TonAddress::from_str(&a.to_string())),
+                    .map(|a| TonAddress::from_str(&a.clone())),
                 _ => None,
             };
 
@@ -191,18 +296,23 @@ pub fn open_wallets(
                 match expected_addr {
                     Ok(expected_addr) => {
                         if ton_wallet.address != expected_addr {
+                            let derived_address = ton_wallet.address;
+                            let derived_address = format_ton_address(
+                                &derived_address,
+                                net.uses_testnet_address_format(),
+                                false,
+                            );
                             anyhow::bail!(
-                                "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
-                                ton_wallet
-                                    .address
-                                    .to_base64_url_flags(true, net == &Network::Testnet),
+                                "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {derived_address}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
                             );
                         }
                     }
                     Err(err) => {
                         let expected_address = match net {
                             Network::Mainnet => expected.address_mainnet.as_deref(),
-                            Network::Testnet => expected.address_testnet.as_deref(),
+                            Network::Testnet | Network::Localnet => {
+                                expected.address_testnet.as_deref()
+                            }
                             _ => None,
                         }
                         .unwrap_or("<unknown>");
@@ -279,15 +389,15 @@ pub fn open_selected_wallets(
 }
 
 #[must_use]
-pub fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
+pub const fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
     match wallet {
         WalletVersion::V5R1 => {
-            if net == &Network::Testnet {
-                return DEFAULT_WALLET_ID_V5R1_TESTNET;
+            if net.uses_testnet_address_format() {
+                return WALLET_V5R1_ID_DEFAULT_TESTNET;
             }
-            DEFAULT_WALLET_ID_V5R1
+            WALLET_V5R1_ID_DEFAULT
         }
-        _ => DEFAULT_WALLET_ID,
+        _ => WALLET_ID_DEFAULT,
     }
 }
 
@@ -303,11 +413,11 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
-        "highloadv1r1" => Ok(WalletVersion::HighloadV1R1),
-        "highloadv1r2" => Ok(WalletVersion::HighloadV1R2),
-        "highloadv2" => Ok(WalletVersion::HighloadV2),
-        "highloadv2r1" => Ok(WalletVersion::HighloadV2R1),
-        "highloadv2r2" => Ok(WalletVersion::HighloadV2R2),
+        "highloadv1r1" => Ok(WalletVersion::HLV1R1),
+        "highloadv1r2" => Ok(WalletVersion::HLV1R2),
+        "highloadv2" => Ok(WalletVersion::HLV2),
+        "highloadv2r1" => Ok(WalletVersion::HLV2R1),
+        "highloadv2r2" => Ok(WalletVersion::HLV2R2),
         _ => Err(anyhow!(
             "Unsupported wallet kind: {kind}. Supported kinds: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2"
         )),
@@ -315,7 +425,7 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
 }
 
 pub fn new_mnemonic() -> anyhow::Result<Vec<String>> {
-    let wordlist: Vec<&str> = WORDLIST_EN_SET.keys().copied().collect();
+    let wordlist: Vec<&str> = WORDLIST_EN_SET.iter().copied().collect();
     let mut rng = rand::thread_rng();
     let mut indices = [0usize; 24];
     let mut joined = String::with_capacity(256);

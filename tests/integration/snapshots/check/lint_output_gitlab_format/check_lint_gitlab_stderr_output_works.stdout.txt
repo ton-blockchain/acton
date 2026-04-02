@@ -1,0 +1,17 @@
+[
+  {
+    "description": "variable is unused",
+    "check_name": "E002:unused-variable",
+    "fingerprint": "4398a0f1385fe113360a6c6bc502f3adda327b69dc149d65524971051b972b38",
+    "severity": "minor",
+    "location": {
+      "path": "contracts/main.tolk",
+      "lines": {
+        "begin": 3
+      }
+    },
+    "content": {
+      "body": "Rule: `unused-variable` (`E002`)/nPrimary: unused variable `x`/nFixes:/n- [auto] prefix with underscore: `_x`"
+    }
+  }
+]

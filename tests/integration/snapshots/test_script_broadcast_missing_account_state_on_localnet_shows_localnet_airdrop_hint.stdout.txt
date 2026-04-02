@@ -1,0 +1,9 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 100
+Re-run with --backtrace full to get more information
+Failed to send message to real network: wallet deployer has no active state on network localnet and the deployment message was not accepted; likely causes:
+- wallet is not deployed yet on localnet
+- wallet configuration/address does not match localnet
+
+Possible fix:
+- request funds to the wallet with acton wallet airdrop deployer --net localnet

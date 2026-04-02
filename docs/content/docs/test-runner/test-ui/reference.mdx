@@ -3,7 +3,9 @@ title: "Reference"
 description: "Complete reference for all Test UI features and interface sections"
 ---
 
-Test UI is a browser interface for reviewing completed `acton test` runs with traces, transaction trees, logs, and source links.
+Test UI is a browser interface for reviewing completed `acton test` runs with
+traces, transaction trees, logs, source links, and coverage data when the run
+includes `--coverage`.
 
 ## 1. Start Test UI
 
@@ -20,6 +22,9 @@ acton test --ui --ui-port 23456
 
 # Run only selected tests in UI
 acton test tests/counter.test.tolk --ui --filter "test-deploy"
+
+# Open Test UI with coverage viewer enabled
+acton test --coverage --ui
 ```
 
 ![Test UI overview with test list sidebar, summary cards, and details pane](../imgs/test-ui-first-screen.png)
@@ -27,6 +32,11 @@ acton test tests/counter.test.tolk --ui --filter "test-deploy"
 <Callout type="warn">
   If `--ui-port` is already in use, Test UI server cannot start. Choose another
   free port, for example `--ui-port 23456`.
+</Callout>
+
+<Callout type="tip">
+  The `Coverage` tab is available only when the test run is started with both
+  `--coverage` and `--ui`.
 </Callout>
 
 ## 2. Sidebar Features
@@ -158,3 +168,18 @@ When action phase has out actions:
 Logs tab shows `Executor Log` and `VM Log` grouped by transaction for the selected trace. If a transaction has no logs, it is skipped; if all are empty, UI shows `No logs for this trace`.
 
 ![Logs tab with Executor Log and VM Log grouped by transaction](../imgs/test-ui-logs.png)
+
+## 7. Coverage Tab
+
+When the run includes `acton test --coverage --ui`, Test UI adds a dedicated
+`Coverage` tab.
+
+The Coverage view includes:
+
+- summary cards for overall coverage
+- file list sorted by coverage score
+- source viewer with annotated covered and uncovered lines
+- search field for filtering files
+
+Use this tab when you want a fast visual pass over untested areas without
+leaving the browser UI.

@@ -120,7 +120,7 @@ fn run_type_test(test_case: &TestCase) -> String {
             }
 
             if found_type.is_none() && name.span().contains(pos.offset) {
-                found_type = type_db.top_level_types.get(&index_decl.id).cloned()
+                found_type = type_db.top_level_types.get(&index_decl.id).copied();
             }
 
             if let Some(ty_id) = found_type {
@@ -155,7 +155,7 @@ fn run_tests_from_file(path: &Path) {
     // }
 
     let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read test file at {:?}: {}", path, e));
+        .unwrap_or_else(|e| panic!("Failed to read test file at {path:?}: {e}"));
     let tests = TestParser::parse_all(&content);
 
     let has_only = tests.iter().any(|t| t.properties.contains_key("only"));

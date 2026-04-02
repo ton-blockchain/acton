@@ -1,0 +1,23 @@
+[package]
+name = "ton-syntax"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+memchr = { workspace = true }
+tree-sitter = { workspace = true }
+
+[lints]
+workspace = true
+
+[lib]
+test = false
+doctest = false

@@ -25,14 +25,14 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_get_precompiled_contracts_config_default_decodes_with_builtin_entry() {
     run_config_success_case(
         "dt-stdlib-config-precompiled-default-builtin-entry",
-        r#"
+        r"
 get fun `test-dt-stdlib-config-precompiled-default-builtin-entry`() {
     val config = net.getConfig();
     val precompiled = config.getPrecompiledContractsConfig();
 
     expect(precompiled.list).toHaveLength(1);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_get_precompiled_contracts_config_default_decodes_with_builtin_entry/config_get_precompiled_contracts_config_default_decodes_with_builtin_entry.stdout.txt",
     );
 }
@@ -41,7 +41,7 @@ get fun `test-dt-stdlib-config-precompiled-default-builtin-entry`() {
 fn config_get_precompiled_contracts_config_roundtrips_explicit_empty_value() {
     run_config_success_case(
         "dt-stdlib-config-precompiled-explicit-empty",
-        r#"
+        r"
 get fun `test-dt-stdlib-config-precompiled-explicit-empty`() {
     var config = net.getConfig();
 
@@ -54,7 +54,7 @@ get fun `test-dt-stdlib-config-precompiled-explicit-empty`() {
     val updated = net.getConfig().getPrecompiledContractsConfig();
     expect(updated.list).toHaveLength(0);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_get_precompiled_contracts_config_default_decodes_with_builtin_entry/config_get_precompiled_contracts_config_roundtrips_explicit_empty_value.stdout.txt",
     );
 }

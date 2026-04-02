@@ -12,6 +12,7 @@ use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 
+#[must_use]
 pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     serde_json::json!({
         "@type": "ton.blockIdExt",
@@ -84,6 +85,7 @@ pub fn map_transaction_std(tx: &LiteNodeTransaction) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     if msg.hash.0 == [0; 32] {
         return serde_json::json!({ "@type": "msg.message" });
@@ -91,9 +93,9 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     serde_json::json!({
         "@type": "raw.message",
         "hash": msg.hash.to_base64(),
-        "opcode": msg.opcode.map(|op| format!("0x{:08x}", op)),
-        "source": msg.source.as_ref().map(|a| a.to_string()).unwrap_or_default(),
-        "destination": msg.destination.as_ref().map(|a| a.to_string()).unwrap_or_default(),
+        "opcode": msg.opcode.map(|op| format!("0x{op:08x}")),
+        "source": msg.source.as_ref().map(ToString::to_string).unwrap_or_default(),
+        "destination": msg.destination.as_ref().map(ToString::to_string).unwrap_or_default(),
         "value": msg.value.to_string(),
         "fwd_fee": msg.fwd_fee.to_string(),
         "ihr_fee": msg.ihr_fee.to_string(),
@@ -108,6 +110,7 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_message_std(msg: &crate::litenode::LiteNodeMessage) -> Value {
     if msg.hash.0 == [0; 32] {
         return serde_json::json!({ "@type": "msg.message" });
@@ -131,6 +134,7 @@ pub fn map_message_std(msg: &crate::litenode::LiteNodeMessage) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
     serde_json::json!({
         "@type": "raw.fullAccountState",
@@ -140,7 +144,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
         "block_id": map_block_id(&s.block_id),
         "code": encode_optional_boc(s.code.as_ref()),
         "data": encode_optional_boc(s.data.as_ref()),
-        "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default(),
+        "frozen_hash": s.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
         "sync_utime": s.sync_utime,
         "state": match s.state {
             AccountStatus::Active => "active",
@@ -151,6 +155,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
     serde_json::json!({
         "@type": "fullAccountState",
@@ -169,13 +174,14 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
                 "@type": "raw.accountState",
                 "code": encode_optional_boc(s.code.as_ref()),
                 "data": encode_optional_boc(s.data.as_ref()),
-                "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default()
+                "frozen_hash": s.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default()
             }),
         },
         "revision": 0
     })
 }
 
+#[must_use]
 pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Value {
     let stack_cell = Boc::decode(&r.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
@@ -201,6 +207,7 @@ pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Va
     })
 }
 
+#[must_use]
 pub fn map_block_transactions(_: &LiteNodeBlockTransactions) -> Value {
     serde_json::json!({
       "@type": "ok",
@@ -217,6 +224,7 @@ pub fn map_block_transactions_ext(bt: &LiteNodeBlockTransactions) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
     serde_json::json!({
         "@type": "blocks.masterchainInfo",
@@ -226,6 +234,7 @@ pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_consensus_block(cb: &LiteNodeConsensusBlock) -> Value {
     serde_json::json!({
         "@type": "ext.blocks.consensusBlock",
@@ -234,6 +243,7 @@ pub fn map_consensus_block(cb: &LiteNodeConsensusBlock) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_libraries(libs: &[LiteNodeLibrary]) -> Value {
     serde_json::json!({
         "@type": "smc.libraryResult",
@@ -251,11 +261,12 @@ pub fn map_libraries(libs: &[LiteNodeLibrary]) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_send_boc_return_hash(bt: &LiteNodeBlockTransactions) -> Value {
     let msg_hash = bt
         .msg_hash
         .as_ref()
-        .map(|h| h.to_base64())
+        .map(super::super::types::Hash256::to_base64)
         .unwrap_or_default();
     serde_json::json!({
         "@type": "ok",
@@ -263,6 +274,7 @@ pub fn map_send_boc_return_hash(bt: &LiteNodeBlockTransactions) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_block_header(bh: &LiteNodeBlockHeader) -> Value {
     serde_json::json!({
         "@type": "ton.blockHeader",
@@ -282,10 +294,12 @@ pub fn map_shards(shards: &Vec<LiteNodeBlockId>) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_lookup_block(id: &LiteNodeBlockId) -> Value {
     map_block_id(id)
 }
 
+#[must_use]
 pub fn map_config_info(config: &BocBytes) -> Value {
     serde_json::json!({
         "@type": "configInfo",
@@ -296,6 +310,7 @@ pub fn map_config_info(config: &BocBytes) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_out_msg_queue_sizes(mi: &LiteNodeMasterchainInfo) -> Value {
     serde_json::json!({
         "@type": "blocks.outMsgQueueSizes",
@@ -308,6 +323,7 @@ pub fn map_out_msg_queue_sizes(mi: &LiteNodeMasterchainInfo) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_detect_address(addr: &StdAddr, flags: Base64StdAddrFlags, given_type: &str) -> Value {
     let bounceable_b64 = DisplayBase64StdAddr {
         addr,
@@ -365,6 +381,7 @@ pub fn map_detect_address(addr: &StdAddr, flags: Base64StdAddrFlags, given_type:
     })
 }
 
+#[must_use]
 pub fn map_detect_hash(hash: &crate::types::Hash256) -> Value {
     serde_json::json!({
         "@type": "ext.utils.detectedHash",
@@ -374,6 +391,7 @@ pub fn map_detect_hash(hash: &crate::types::Hash256) -> Value {
     })
 }
 
+#[must_use]
 pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> Value {
     DisplayBase64StdAddr {
         addr,
@@ -387,6 +405,7 @@ pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> Value {
     .into()
 }
 
+#[must_use]
 pub fn map_unpack_address(addr: &StdAddr) -> Value {
     addr.to_string().into()
 }

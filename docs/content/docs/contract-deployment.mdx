@@ -106,7 +106,7 @@ By default, Acton targets the testnet when broadcasting.
 acton script scripts/deploy.tolk --broadcast
 ```
 
-To deploy to testnet, your wallet must have testnet TONs. You can get them for free from the [Testnet Faucet](https://t.me/testgiver_ton_bot).
+To deploy to testnet, your wallet must have testnet TONs. You can get them for free with `acton wallet airdrop` command or from the [Testnet Faucet](https://t.me/testgiver_ton_bot).
 
 ### Mainnet
 
@@ -118,6 +118,18 @@ acton script scripts/deploy.tolk --broadcast --net mainnet
 
 <Callout type="warning">
 When deploying to mainnet, real value is transferred. Ensure your contract logic is tested and audit-ready.
+</Callout>
+
+### Localnet
+
+Deployment to a local network allows you to get closer to real networks than tests, but at the same time not depend on the external network and remain completely local.
+
+```bash
+acton script scripts/deploy.tolk --broadcast --net localnet
+```
+
+<Callout type="warning">
+  Before deploying, make sure you have launched the [litenode](/docs/local-development-node/).
 </Callout>
 
 ### Using API Keys

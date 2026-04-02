@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use tolk_syntax::{AstNode, ast};
+use tolk_syntax::{AstNode, CONTRACT_ENTRYPOINTS, HasName, ast};
 use tree_sitter::{Node, Tree};
 
 /// Holds information about a single processed source file.
@@ -31,37 +31,61 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
+    #[must_use]
     pub const fn id(&self) -> FileId {
         self.id
     }
 
+    #[must_use]
     pub const fn index(&self) -> &Arc<FileIndex> {
         &self.index
     }
 
+    #[must_use]
     pub fn path(&self) -> &PathBuf {
         &self.index.path
     }
 
+    #[must_use]
     pub const fn source(&self) -> &ast::SourceFile {
         &self.source
     }
 
+    #[must_use]
+    pub fn has_contract_declaration(&self) -> bool {
+        self.source
+            .top_levels()
+            .any(|top_level| matches!(top_level, ast::TopLevel::Contract(_)))
+    }
+
+    #[must_use]
+    pub fn is_contract_entry(&self) -> bool {
+        self.source
+            .functions()
+            .filter_map(|func| func.name())
+            .filter_map(|name| self.text(&name.0).ok())
+            .any(|name| CONTRACT_ENTRYPOINTS.contains(&name))
+    }
+
+    #[must_use]
     pub fn line_offsets(&self) -> &[usize] {
         &self.line_offsets
     }
 
     /// Checks if passed file resides in Tolk standard library.
+    #[must_use]
     pub fn is_stdlib_file(&self) -> bool {
         self.index.source_kind == FileSource::Stdlib
     }
 
     /// Checks if passed file resides in Acton standard library.
+    #[must_use]
     pub fn is_acton_file(&self) -> bool {
         self.index.source_kind == FileSource::Acton
     }
 
     /// Checks if passed file resides in workspace, not in Tolk stdlib or Acton files.
+    #[must_use]
     pub fn is_workspace_file(&self) -> bool {
         self.index.source_kind == FileSource::Workspace
     }
@@ -84,12 +108,14 @@ impl FileInfo {
     }
 
     /// Finds the `Symbol` declaration containing given offset.
+    #[must_use]
     pub fn find_symbol_at(&self, offset: usize) -> Option<&Symbol> {
         let idx = self.index.find_symbol_index_at_offset(offset)?;
         Some(&self.index.decls[idx])
     }
 
     /// Finds AST node for declaration with given name span.
+    #[must_use]
     pub fn find_syntax_declaration(&self, decl_id: SymbolId) -> Option<ast::TopLevel<'_>> {
         let idx = self.index.symbol_id_to_decl_index.get(&decl_id.local_id)?;
         let child = self.source.root_node().child(*idx)?;
@@ -120,6 +146,7 @@ impl Debug for FileDb {
 
 impl FileDb {
     /// Creates a new, empty `FileDb`.
+    #[must_use]
     pub fn new(stdlib_path: PathBuf, acton_stdlib_path: Option<PathBuf>) -> Self {
         FileDb {
             files: DashMap::new(),
@@ -168,7 +195,7 @@ impl FileDb {
         }
 
         let existing = self.files.get(&path);
-        let file_id = existing.map(|e| e.id).unwrap_or_else(|| self.alloc_id());
+        let file_id = existing.map_or_else(|| self.alloc_id(), |e| e.id);
 
         let source_kind = match (&self.stdlib_path, &self.acton_stdlib_path) {
             (stdlib_path, _) if path.starts_with(stdlib_path) => FileSource::Stdlib,

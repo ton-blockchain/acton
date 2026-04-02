@@ -1,0 +1,1 @@
+Error: Hooks directory .githooks already exists. Delete it before running `acton hooks new`.

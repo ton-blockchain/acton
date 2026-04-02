@@ -7,11 +7,11 @@ import "../../lib/io"
 
 fn run_stdlib_io_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let test_code = format!(
-        r#"
+        r"
 {TEST_IMPORTS}
 
 {test_body}
-"#
+"
     );
 
     ProjectBuilder::new(project_name)

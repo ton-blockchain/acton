@@ -1,1 +1,1 @@
-Error: Failed to read [ROOT]/contracts/secret.tolk: Permission denied (os error 13)
+Error: Failed to read [ROOT]/contracts/secret.tolk: Permission denied ([OS_ERROR])

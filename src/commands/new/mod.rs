@@ -1,15 +1,22 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
+use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
-use inquire::{Select, Text};
+use acton_config::config::{
+    ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
+};
+use anyhow::{Context, anyhow};
+use inquire::{Confirm, Select, Text};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
+use std::io::{IsTerminal, Write, stdin, stdout};
 use std::path::Path;
 
 mod licenses;
 mod template;
+use template::ProjectLayout;
+pub use template::ProjectTemplate;
 
 const BASE_GITIGNORE: &str = "
 # Acton main directory
@@ -17,6 +24,7 @@ const BASE_GITIGNORE: &str = "
 
 # Build directory
 build/
+dist/
 
 .DS_Store
 node_modules/
@@ -58,12 +66,46 @@ const BASE_DOT_ENV: &str = "
 # TONCENTER_API_KEY=\"your-key-here\"
 ";
 
+const BASE_EDITORCONFIG: &str = "
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.tolk]
+indent_size = 4
+max_line_length = 100
+";
+
+const ACTON_TOML_REFERENCE_FOOTER: &str = "
+# Check full Acton.toml reference and all available keys:
+# https://ton-blockchain.github.io/acton/docs/acton-toml
+";
+
+#[derive(Clone, Copy)]
+struct TemplateSelectItem(ProjectTemplate);
+
+impl std::fmt::Display for TemplateSelectItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:<8} {}", self.0.as_str(), self.0.description(),)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn new_cmd(
     path: &str,
     name: Option<String>,
     description: Option<String>,
-    template: Option<String>,
+    template: Option<ProjectTemplate>,
     license: Option<String>,
+    app: bool,
+    hooks: bool,
+    agents: bool,
 ) -> anyhow::Result<()> {
     let project_path = if path == "." {
         std::env::current_dir()?
@@ -107,15 +149,30 @@ pub fn new_cmd(
             .prompt()?
     };
 
-    let template_options = template::get_available_templates();
     let template = if let Some(template) = template {
         template
     } else {
+        let template_options = template::get_available_templates()
+            .into_iter()
+            .map(TemplateSelectItem)
+            .collect::<Vec<_>>();
+
         Select::new("Template:", template_options)
             .with_starting_cursor(0)
             .prompt()?
-            .to_string()
+            .0
     };
+
+    let git_available = is_git_available();
+    let include_app = resolve_include_app(template, app)?;
+    let include_hooks = resolve_include_hooks(hooks, git_available)?;
+    let include_agents = resolve_include_agents(agents)?;
+    let scaffold = template::project_scaffold(template, include_app).ok_or_else(|| {
+        anyhow!(
+            "Template {} does not include a TypeScript app scaffold",
+            template.to_string().cyan()
+        )
+    })?;
 
     let license_options = vec![
         "MIT",
@@ -151,44 +208,15 @@ pub fn new_cmd(
     std::env::set_current_dir(&project_path)?;
 
     // use `.` since we explicitly change current dir to project dir
-    template::create_project_from_template(&template, Path::new("."))?;
+    template::create_project_from_scaffold(scaffold, Path::new("."), include_agents)?;
 
     let mut contracts = BTreeMap::new();
-    if template == "empty" {
+    for contract in scaffold.contracts() {
         contracts.insert(
-            "empty".to_owned(),
+            contract.id.to_owned(),
             ContractConfig {
-                name: "Empty".to_owned(),
-                src: "contracts/contract.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-    } else if template == "counter" {
-        contracts.insert(
-            "counter".to_owned(),
-            ContractConfig {
-                name: "counter".to_owned(),
-                src: "contracts/counter.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-    } else if template == "jetton" {
-        contracts.insert(
-            "jetton_minter".to_owned(),
-            ContractConfig {
-                name: "Minter".to_owned(),
-                src: "contracts/jetton-minter-contract.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-        contracts.insert(
-            "jetton_wallet".to_owned(),
-            ContractConfig {
-                name: "Wallet".to_owned(),
-                src: "contracts/jetton-wallet-contract.tolk".to_owned(),
+                name: contract.name.to_owned(),
+                src: contract.src.to_owned(),
                 depends: Some(vec![]),
                 output: None,
             },
@@ -202,23 +230,25 @@ pub fn new_cmd(
     let mut scripts = BTreeMap::new();
     scripts.insert(
         "deploy-emulation".to_owned(),
-        "acton script scripts/deploy.tolk".to_owned(),
+        format!("acton script {}", scaffold.layout().deploy_script_path()),
     );
     scripts.insert(
         "deploy-testnet".to_owned(),
-        "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
+        format!(
+            "acton script {} --broadcast --net testnet",
+            scaffold.layout().deploy_script_path()
+        ),
     );
     config.scripts = Some(scripts);
+    config.mappings = Some(project_mappings(scaffold.layout()));
 
-    let mut mappings = BTreeMap::new();
-    mappings.insert("acton".to_owned(), ".acton".to_owned());
-    mappings.insert("contracts".to_owned(), "contracts".to_owned());
-    mappings.insert("tests".to_owned(), "tests".to_owned());
-    mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
-    mappings.insert("gen".to_owned(), "gen".to_owned());
-    config.mappings = Some(mappings);
+    let mut acton_toml = toml::to_string_pretty(&config)?;
+    acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
+    fs::write("Acton.toml", acton_toml)?;
 
-    config.save()?;
+    if scaffold.layout().includes_typescript_app() {
+        update_npm_package_metadata(&project_name)?;
+    }
 
     stdlib::ensure_latest(Path::new("."))?;
 
@@ -230,6 +260,7 @@ pub fn new_cmd(
 
     fs::write(".gitignore", BASE_GITIGNORE.trim_start())?;
     fs::write(".env", BASE_DOT_ENV.trim_start())?;
+    fs::write(".editorconfig", BASE_EDITORCONFIG.trim_start())?;
 
     if let Err(e) = symlink_global_wallets() {
         println!(
@@ -247,8 +278,12 @@ pub fn new_cmd(
         );
     }
 
-    if is_git_available() {
+    if git_available {
         initialize_git_repository()?;
+        if include_hooks {
+            scaffold_and_install_default_hooks(Path::new("."))?;
+        }
+        stage_git_repository()?;
     } else {
         println!(
             "  {} git command not found, skipping git repository initialization",
@@ -263,7 +298,24 @@ pub fn new_cmd(
         project_name.cyan().bold()
     );
     println!("  {} {}", "Description:".bright_black(), description);
-    println!("  {} {}", "Template:".bright_black(), template.cyan());
+    println!(
+        "  {} {}",
+        "Template:".bright_black(),
+        template.to_string().cyan()
+    );
+    if scaffold.layout().includes_typescript_app() {
+        println!(
+            "  {} {}",
+            "TypeScript app:".bright_black(),
+            "included".cyan()
+        );
+    }
+    if include_hooks {
+        println!("  {} {}", "Git hooks:".bright_black(), "installed".cyan());
+    }
+    if include_agents {
+        println!("  {} {}", "AGENTS.md:".bright_black(), "included".cyan());
+    }
     println!("  {} {}", "License:".bright_black(), license.cyan());
     println!();
     println!("Created {} with project configuration", "Acton.toml".cyan());
@@ -276,8 +328,308 @@ pub fn new_cmd(
     println!("  {} build", "acton".bold());
     println!("  {}", "# Run tests".dimmed());
     println!("  {} test", "acton".bold());
+    if scaffold.layout().includes_typescript_app() {
+        println!("  {}", "# Install app dependencies".dimmed());
+        println!("  npm ci");
+        println!("  {}", "# Start the TypeScript app".dimmed());
+        println!("  npm run dev");
+    }
 
     Ok(())
+}
+
+fn resolve_include_app(template: ProjectTemplate, app: bool) -> anyhow::Result<bool> {
+    if app {
+        if !template::template_supports_app(template) {
+            anyhow::bail!(
+                "Template {} does not include a TypeScript app scaffold",
+                template.to_string().cyan()
+            );
+        }
+
+        return Ok(true);
+    }
+
+    if !template::template_supports_app(template) {
+        return Ok(false);
+    }
+
+    if stdin().is_terminal() && stdout().is_terminal() {
+        Confirm::new("Include the TypeScript app scaffold?")
+            .with_default(false)
+            .prompt()
+            .map_err(Into::into)
+    } else {
+        Ok(false)
+    }
+}
+
+fn resolve_include_hooks(hooks: bool, git_available: bool) -> anyhow::Result<bool> {
+    if hooks {
+        if !git_available {
+            anyhow::bail!("Git hooks require the `git` command to be available in PATH");
+        }
+
+        return Ok(true);
+    }
+
+    if !git_available {
+        return Ok(false);
+    }
+
+    if stdin().is_terminal() && stdout().is_terminal() {
+        Confirm::new("Install the default Git hooks?")
+            .with_default(false)
+            .prompt()
+            .map_err(Into::into)
+    } else {
+        Ok(false)
+    }
+}
+
+fn resolve_include_agents(agents: bool) -> anyhow::Result<bool> {
+    if agents {
+        return Ok(true);
+    }
+
+    if stdin().is_terminal() && stdout().is_terminal() {
+        Confirm::new("Include AGENTS.md guidance for coding agents?")
+            .with_default(false)
+            .prompt()
+            .map_err(Into::into)
+    } else {
+        Ok(false)
+    }
+}
+
+fn project_mappings(layout: ProjectLayout) -> BTreeMap<String, String> {
+    if !layout.includes_typescript_app() {
+        return default_project_mappings();
+    }
+
+    let mut mappings = default_project_mappings();
+    mappings.insert(
+        "contracts".to_owned(),
+        layout.contracts_mapping().to_owned(),
+    );
+    mappings.insert("tests".to_owned(), layout.tests_mapping().to_owned());
+    mappings.insert("wrappers".to_owned(), layout.wrappers_mapping().to_owned());
+    mappings
+}
+
+fn update_npm_package_metadata(project_name: &str) -> anyhow::Result<()> {
+    let normalized_name = normalize_npm_package_name(project_name);
+    let has_workspaces = update_package_json_name(&normalized_name)?;
+    update_package_lock_name(&normalized_name, has_workspaces)?;
+    Ok(())
+}
+
+fn update_package_json_name(normalized_name: &str) -> anyhow::Result<bool> {
+    let package_json_path = Path::new("package.json");
+
+    if !package_json_path.exists() {
+        return Ok(false);
+    }
+
+    let content = fs::read_to_string(package_json_path)
+        .with_context(|| format!("Failed to read {}", package_json_path.display()))?;
+    let mut package_json: JsonValue = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
+    let has_workspaces = matches!(
+        &package_json,
+        JsonValue::Object(object) if object.contains_key("workspaces")
+    );
+
+    if matches!(package_json, JsonValue::Object(_))
+        && let Some(updated_content) =
+            replace_top_level_json_string_field(&content, "name", normalized_name)
+    {
+        fs::write(package_json_path, updated_content)
+            .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
+        return Ok(has_workspaces);
+    }
+
+    match &mut package_json {
+        JsonValue::Object(object) => {
+            object.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+        }
+        _ => {
+            let mut object = JsonMap::new();
+            object.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+            package_json = JsonValue::Object(object);
+        }
+    }
+
+    let formatted =
+        serde_json::to_string_pretty(&package_json).context("Failed to serialize package.json")?;
+    fs::write(package_json_path, format!("{formatted}\n"))
+        .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
+    Ok(has_workspaces)
+}
+
+fn replace_top_level_json_string_field(content: &str, field: &str, value: &str) -> Option<String> {
+    let bytes = content.as_bytes();
+    let field_literal = serde_json::to_string(field).ok()?;
+    let replacement_literal = serde_json::to_string(value).ok()?;
+    let mut index = 0;
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        match byte {
+            b'"' => {
+                if depth == 1 && bytes[index..].starts_with(field_literal.as_bytes()) {
+                    let key_end = index + field_literal.len();
+                    let mut value_start = key_end;
+
+                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+                        value_start += 1;
+                    }
+
+                    if bytes.get(value_start) != Some(&b':') {
+                        in_string = true;
+                        index += 1;
+                        continue;
+                    }
+
+                    value_start += 1;
+                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+                        value_start += 1;
+                    }
+
+                    if bytes.get(value_start) != Some(&b'"') {
+                        return None;
+                    }
+
+                    let value_end = find_json_string_end(bytes, value_start)?;
+                    let mut updated = String::with_capacity(
+                        content.len() + replacement_literal.len() - (value_end - value_start),
+                    );
+                    updated.push_str(&content[..value_start]);
+                    updated.push_str(&replacement_literal);
+                    updated.push_str(&content[value_end..]);
+                    return Some(updated);
+                }
+
+                in_string = true;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+
+        index += 1;
+    }
+
+    None
+}
+
+fn find_json_string_end(bytes: &[u8], start_quote: usize) -> Option<usize> {
+    let mut index = start_quote + 1;
+    let mut escaped = false;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+
+        if escaped {
+            escaped = false;
+        } else if byte == b'\\' {
+            escaped = true;
+        } else if byte == b'"' {
+            return Some(index + 1);
+        }
+
+        index += 1;
+    }
+
+    None
+}
+
+fn update_package_lock_name(normalized_name: &str, has_workspaces: bool) -> anyhow::Result<()> {
+    let package_lock_path = Path::new("package-lock.json");
+
+    if !package_lock_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(package_lock_path)
+        .with_context(|| format!("Failed to read {}", package_lock_path.display()))?;
+    let mut package_lock: JsonValue = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", package_lock_path.display()))?;
+
+    let JsonValue::Object(root) = &mut package_lock else {
+        anyhow::bail!("{} must contain a JSON object", package_lock_path.display());
+    };
+
+    root.insert(
+        "name".to_owned(),
+        JsonValue::String(normalized_name.to_owned()),
+    );
+
+    if let Some(packages) = root.get_mut("packages").and_then(JsonValue::as_object_mut) {
+        if let Some(root_package) = packages.get_mut("").and_then(JsonValue::as_object_mut) {
+            root_package.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+        }
+
+        if !has_workspaces {
+            packages.retain(|path, _| path.is_empty() || path.starts_with("node_modules"));
+        }
+    }
+
+    let formatted =
+        serde_json::to_string_pretty(&package_lock).context("Failed to serialize package-lock")?;
+    fs::write(package_lock_path, format!("{formatted}\n"))
+        .with_context(|| format!("Failed to write {}", package_lock_path.display()))?;
+    Ok(())
+}
+
+fn normalize_npm_package_name(project_name: &str) -> String {
+    let mut normalized = String::new();
+    let mut last_was_separator = false;
+
+    for ch in project_name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            normalized.push(ch.to_ascii_lowercase());
+            last_was_separator = false;
+        } else if !last_was_separator && !normalized.is_empty() {
+            normalized.push('-');
+            last_was_separator = true;
+        }
+    }
+
+    while normalized.ends_with('-') {
+        normalized.pop();
+    }
+
+    if normalized.is_empty() {
+        "acton-app".to_owned()
+    } else {
+        normalized
+    }
 }
 
 fn get_git_user_name() -> Option<String> {
@@ -306,7 +658,7 @@ fn is_git_available() -> bool {
 
 fn initialize_git_repository() -> anyhow::Result<()> {
     print!("{} ", ">".green().bold());
-    std::io::stdout().flush()?;
+    stdout().flush()?;
     std::process::Command::new("git")
         .arg("init")
         .status()?
@@ -314,6 +666,10 @@ fn initialize_git_repository() -> anyhow::Result<()> {
         .then_some(())
         .ok_or_else(|| anyhow::anyhow!("Failed to initialize git repository"))?;
 
+    Ok(())
+}
+
+fn stage_git_repository() -> anyhow::Result<()> {
     std::process::Command::new("git")
         .args(["add", "."])
         .status()?

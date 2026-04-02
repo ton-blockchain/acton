@@ -1,0 +1,11 @@
+# Canonical author names and emails.
+#
+# Use this to provide a canonical name and email for an author when their
+# name is not always written the same way and/or they have commits authored
+# under different email addresses.
+#
+# Reference: https://git-scm.com/docs/gitmailmap
+
+Petr Makhnev <51853996+i582@users.noreply.github.com> <51853996+i582@users.noreply.github.com>
+B4ckSl4sh <andrei.sh@ton.org> <andreyturkey683@gmail.com>
+Maksim Lagus <80884234+Kaladin13@users.noreply.github.com> <80884234+Kaladin13@users.noreply.github.com>

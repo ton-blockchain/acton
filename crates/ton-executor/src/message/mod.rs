@@ -23,10 +23,9 @@
 //!
 //! # Important Note on Concurrency
 //!
-//! The underlying C++ implementation uses **global variables**. As a result:
-//! - It is impossible to have multiple active [`Executor`] instances simultaneously.
-//! - Any tests or logic using this module **must be run in a single thread**.
-//! - In Rust tests, use `cargo test -- --test-threads=1` to ensure correct behavior.
+//! Native emulator state is not safe for unsynchronized shared access.
+//! [`Executor`] serializes FFI calls per instance, so one executor can be shared
+//! across threads, but concurrent calls on that executor are executed one at a time.
 //!
 //! # Examples
 //!
@@ -69,22 +68,25 @@ pub use types::*;
 
 use crate::common::ExecutorVerbosity;
 use crate::config::DEFAULT_CONFIG;
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
+use parking_lot::ReentrantMutex;
 use std::ffi::{CStr, CString, c_void};
-use std::marker::PhantomData;
 use std::ptr::{NonNull, null};
-use std::rc::Rc;
 use std::sync::Arc;
+
+// Opaque native emulator handle guarded by `Executor::inner`.
+struct RawExecutorHandle(NonNull<c_void>);
+
+// SAFETY: the native emulator handle is only accessed while holding `Executor::inner`.
+unsafe impl Send for RawExecutorHandle {}
 
 /// A thin wrapper around the C++ TON transaction emulator.
 ///
-/// Due to the use of global variables in the C++ implementation, only one
-/// `Executor` should exist at a time, and it must be used from a single thread.
+/// Native calls on the same executor are serialized with a reentrant lock.
 pub struct Executor {
-    inner: NonNull<c_void>,
+    inner: ReentrantMutex<RawExecutorHandle>,
     ext_methods: HashSet<i32>, // track extension methods to catch redefinitions
-    phantom: PhantomData<Rc<()>>, // mark as !Send and !Sync
 }
 
 impl Executor {
@@ -107,9 +109,8 @@ impl Executor {
         let inner = NonNull::new(emulator_ptr).context("create_emulator returned null")?;
 
         Ok(Executor {
-            inner,
+            inner: ReentrantMutex::new(RawExecutorHandle(inner)),
             ext_methods: HashSet::new(),
-            phantom: PhantomData,
         })
     }
 
@@ -139,16 +140,19 @@ impl Executor {
             .transpose()?;
         let libs_ptr = libs_cstr.as_ref().map_or(null(), |c| c.as_ptr());
 
-        let internal_params = EmulationInternalParams::from(params);
+        let internal_params = EmulationInternalParams::try_from(params)
+            .context("cannot build internal emulator params")?;
         let params_str =
             serde_json::to_string(&internal_params).context("cannot serialize params to JSON")?;
         let params_cstr = CString::new(params_str).context("params string contains null bytes")?;
+
+        let inner = self.inner.lock();
 
         // SAFETY: `libs_ptr`, `shard_account_b64_cstr`, `message_cstr`, `params_cstr`
         // do not outlive the `emulate_with_emulator` call.
         let result_ptr = unsafe {
             emulate_with_emulator(
-                self.inner.as_ptr(),
+                inner.0.as_ptr(),
                 libs_ptr,
                 shard_account_b64_cstr.as_ptr(),
                 message_cstr.as_ptr(),
@@ -230,7 +234,7 @@ impl Executor {
         // SAFETY: `transaction_emulator_register_extmethod` is safe function
         unsafe {
             transaction_emulator_register_extmethod(
-                self.inner.as_ptr(),
+                self.inner.lock().0.as_ptr(),
                 id,
                 std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
                 c_int::from(stack_items_count),
@@ -247,11 +251,33 @@ impl Executor {
     pub fn set_config(&self, config_b64: &str) -> anyhow::Result<bool> {
         let config_cstr = CString::new(config_b64).context("config contains null bytes")?;
 
+        let inner = self.inner.lock();
         // SAFETY: `transaction_emulator_set_config` is safe function
         let result =
-            unsafe { transaction_emulator_set_config(self.inner.as_ptr(), config_cstr.as_ptr()) };
+            unsafe { transaction_emulator_set_config(inner.0.as_ptr(), config_cstr.as_ptr()) };
 
         Ok(result)
+    }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `transaction_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            transaction_emulator_register_missing_library_callback(
+                self.inner.lock().0.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        };
+
+        Ok(())
     }
 }
 
@@ -298,6 +324,12 @@ unsafe extern "C" {
         ctx: *mut c_void,
         stack_items_count: c_int,
         callback: ExtMethodCallback<c_void>,
+    ) -> *const c_char;
+
+    pub(crate) fn transaction_emulator_register_missing_library_callback(
+        transaction_emulator: *mut c_void,
+        ctx: *mut c_void,
+        callback: MissingLibraryCallback<c_void>,
     ) -> *const c_char;
 
     pub(crate) fn transaction_emulator_set_config(

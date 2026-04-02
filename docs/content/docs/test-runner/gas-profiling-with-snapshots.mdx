@@ -107,6 +107,21 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
   In comparison tables, changed chains are shown as baseline row, current row, and diff row.
 </Callout>
 
+### 2.1 Fail CI on drift
+
+Use strict mode to return non-zero exit code when baseline and current profile differ:
+
+```bash
+acton test --baseline-snapshot gas-baseline.json --fail-on-diff
+```
+
+You can also enable it by default in `Acton.toml`:
+
+```toml
+[test]
+fail-on-diff = true
+```
+
 ### 3. Update baseline intentionally
 
 If changes are expected, recreate baseline:
@@ -196,7 +211,9 @@ acton test tests/wallet.test.tolk --baseline-snapshot gas-baseline.json
 
 ### Baseline file is missing or invalid
 
-Acton prints a warning and continues without baseline comparison.
+Default behavior: Acton prints a warning and continues without baseline comparison.
+
+With strict mode (`--fail-on-diff` or `[test].fail-on-diff = true`), Acton exits with error.
 
 ### Snapshot is not created
 

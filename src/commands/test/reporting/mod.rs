@@ -7,9 +7,11 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use tolkc::TolkSourceMap;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::{SourceLocation, SourceMap};
+use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::{ShardAccount, StdAddr};
 
@@ -24,6 +26,7 @@ pub struct TestExecutionContext {
     pub gas_used: u64,
     pub stdout: String,
     pub stderr: String,
+    pub vm_log_diff: Option<String>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
     pub failure: Option<TestFailureExecutionContext>,
@@ -66,7 +69,11 @@ pub struct TestReport {
     #[serde(skip)]
     pub abi: Arc<ContractAbi>,
     #[serde(skip)]
-    pub source_map: Arc<SourceMap>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    #[serde(skip)]
+    pub source_map: Arc<TolkSourceMap>,
+    #[serde(skip)]
+    pub show_bodies: bool,
     #[serde(skip)]
     pub backtrace: Option<BacktraceMode>,
     #[serde(skip)]
@@ -162,6 +169,7 @@ impl std::fmt::Debug for ReporterManager {
 }
 
 impl ReporterManager {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             reporters: Vec::new(),

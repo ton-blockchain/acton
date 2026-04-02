@@ -1,0 +1,248 @@
+'\" t
+.TH "ACTON\-DISASM" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-disasm \[em] Disassemble TVM bytecode into human\-readable TASM
+.SH "SYNOPSIS"
+\fBacton disasm\fR [\fIoptions\fR] [\fIboc\-file\fR]
+.SH "DESCRIPTION"
+Disassemble compiled TVM bytecode from a file, a literal BoC string, or a live
+contract address.
+.sp
+This command is useful for debugging compiler output, inspecting deployed code,
+following library references, and correlating bytecode with Tolk source via
+source maps.
+.SH "OPTIONS"
+.SS "Disassembly Options"
+.sp
+\fIboc\-file\fR
+.RS 4
+Binary, hex, or base64 BoC file to disassemble.
+.sp
+Use \fB\-\-string\fR to pass the code directly instead of reading a file.
+.RE
+.sp
+\fB\-s\fR, \fB\-\-string\fR \fIstring\fR
+.RS 4
+BoC value in hex or base64 format.
+.RE
+.sp
+\fB\-o\fR, \fB\-\-output\fR \fIpath\fR
+.RS 4
+Write disassembled output to a file instead of standard output.
+.sp
+If the parent directory does not exist, Acton creates it automatically.
+Existing files are overwritten.
+.RE
+.sp
+\fB\-\-show\-hashes\fR
+.RS 4
+Show cell hashes alongside code blocks.
+.RE
+.sp
+\fB\-\-show\-offsets\fR
+.RS 4
+Show instruction bit offsets in the left column.
+.RE
+.sp
+\fB\-\-source\-map\fR \fIpath\fR
+.RS 4
+Use a source map to show original Tolk source locations together with
+disassembly output.
+.RE
+.sp
+\fB\-\-address\fR \fIaddress\fR
+.RS 4
+Fetch contract code from the blockchain by address and disassemble it.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain queries.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to use for \fB\-\-address\fR and library lookups.
+.sp
+Supported values: \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, \fBcustom:<name>\fR\&.
+.sp
+\fBlocalnet\fR and \fBcustom:<name>\fR resolve through the project network
+configuration in \fBActon.toml\fR\&.
+.sp
+If omitted, Acton tries mainnet first and then falls back to testnet.
+.RE
+.sp
+\fB\-\-follow\-libraries\fR
+.RS 4
+If the code references a library, fetch and disassemble the actual library code
+instead of showing only the library hash reference.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "BLOCKCHAIN LOOKUPS"
+When \fB\-\-address\fR is used, Acton fetches code from the selected network.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-net\fR accepts \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and \fBcustom:<name>\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR and \fBcustom:<name>\fR use URLs from \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Without \fB\-\-net\fR, Acton tries mainnet first and then testnet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-api\-key\fR helps avoid TonCenter rate limits
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR resolves library references when possible
+.RE
+.sp
+When \fB\-\-follow\-libraries\fR is used with a local file or \fB\-\-string\fR, Acton uses
+the explicit \fB\-\-net\fR if provided; otherwise library fetches default to
+testnet.
+.SH "INPUT PRECEDENCE"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBBOC_FILE\fR and \fB\-\-string\fR are mutually exclusive
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-address\fR is used only when neither a file nor \fB\-\-string\fR is provided
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR only replaces the input when the fetched code is a
+single library reference and the library lookup succeeds
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if library lookup fails, Acton warns and disassembles the original code
+.RE
+.SH "SOURCE MAPS"
+If you compiled a contract with \fBacton compile \-\-source\-map\fR, you can pass that
+source map JSON here to annotate the disassembly with original Tolk locations.
+.sp
+\fB\-\-source\-map\fR only affects annotations in the output. It does not change which
+BoC is disassembled.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Disassembly completed successfully, including runs with unresolved
+library references that were left as warnings.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: BoC input was invalid, a blockchain fetch failed, source\-map loading
+failed, or the output file could not be written.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Disassemble a local BoC file:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Disassemble a literal BoC string:
+.sp
+.RS 4
+.nf
+acton disasm \-\-string "b5ee9c72010104...0840f01c700f2f4"
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Disassemble code from a blockchain address:
+.sp
+.RS 4
+.nf
+acton disasm \-\-address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-net testnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Show hashes, offsets, and source locations:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-show\-hashes \-\-show\-offsets \-\-source\-map contract.json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Inspect deployed code together with hashes:
+.sp
+.RS 4
+.nf
+acton disasm \-\-address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-show\-hashes \-\-net testnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Write disassembly to a nested output path:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-output build/disasm/contract.tasm
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Resolve library references for a local BoC using a configured custom network:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-follow\-libraries \-\-net custom:staging
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help compile\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIDisassembly command guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/disasm>
+.RE

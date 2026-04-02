@@ -1,8 +1,8 @@
-import "../../../lib/emulation/network"
-import "../../../lib/build/build"
-
 import "../../contracts/messages"
 import "../../contracts/storage"
+
+import "../../../lib/build/build"
+import "../../../lib/emulation/network"
 
 struct JettonWallet {
     address: address
@@ -10,44 +10,64 @@ struct JettonWallet {
 
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0
+        return 0;
     }
 
     val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    return result.jettonBalance;
 }
 
-fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recipient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?) {
+fun JettonWallet.sendTransfer(
+    self,
+    from: address,
+    value: int,
+    jettonAmount: int,
+    recipient: address,
+    responseAddress: address,
+    customPayload: cell?,
+    forwardTonAmount: int,
+    forwardPayload: cell?,
+): SendResultList {
     val msg = createMessage({
         bounce: true,
-        value: value,
+        value,
         dest: self.address,
         body: AskToTransfer {
             queryId: 0,
-            jettonAmount: jettonAmount,
+            jettonAmount,
             transferRecipient: recipient,
             sendExcessesTo: responseAddress,
-            customPayload: customPayload,
-            forwardTonAmount: forwardTonAmount,
-            forwardPayload: beginCell().storeMaybeRef(forwardPayload.toCell()).endCell().beginParse(),
+            customPayload,
+            forwardTonAmount,
+            forwardPayload: beginCell()
+                .storeMaybeRef(forwardPayload.toCell())
+                .endCell()
+                .beginParse(),
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
-fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?) {
+fun JettonWallet.sendBurn(
+    self,
+    from: address,
+    value: int,
+    jettonAmount: int,
+    responseAddress: address,
+    customPayload: cell?,
+): SendResultList {
     val msg = createMessage({
         bounce: false,
-        value: value,
+        value,
         dest: self.address,
         body: AskToBurn {
             queryId: 0,
-            jettonAmount: jettonAmount,
+            jettonAmount,
             sendExcessesTo: responseAddress,
-            customPayload: customPayload,
+            customPayload,
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
 struct JettonMinter {
@@ -55,57 +75,68 @@ struct JettonMinter {
     init: ContractState
 }
 
-fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool, value: coins = ton("0.1")) {
+fun JettonMinter.sendDiscovery(
+    self,
+    from: address,
+    ownerAddress: address,
+    includeOwnerAddress: bool,
+    value: coins = ton("0.1"),
+): SendResultList {
     val msg = createMessage({
         bounce: false,
         value,
         dest: self.address,
         body: RequestWalletAddress {
             queryId: 0,
-            ownerAddress: ownerAddress,
-            includeOwnerAddress: includeOwnerAddress,
+            ownerAddress,
+            includeOwnerAddress,
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
-fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
+fun JettonMinter.sendChangeContent(self, from: address, newContent: cell): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.1"),
         dest: self.address,
         body: ChangeMinterContent {
             queryId: 0,
-            newContent: newContent,
+            newContent,
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
-fun JettonMinter.fromStorage(storage: MinterStorage) {
+fun JettonMinter.fromStorage(storage: MinterStorage): JettonMinter {
     val init = ContractState {
         code: build("jetton-minter"),
         data: storage.toCell(),
     };
     val addr = AutoDeployAddress { stateInit: init }.calculateAddress();
     return JettonMinter {
-        address: addr, init
-    }
+        address: addr,
+        init,
+    };
 }
 
-fun JettonMinter.sendDeploy(self, params: SendParams) {
-    val msg = createMessage({
+fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResultList {
+    val deployMsg = createMessage({
         bounce: false,
         value: params.value,
-        dest: {
-            workchain: 0,
-            stateInit: self.init,
-        },
+        dest: { workchain: 0, stateInit: self.init },
     });
-    return net.send(net.treasury("treasury").address, msg);
+    return net.send(from, deployMsg);
 }
 
-fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount: int, forward_ton_amount: int, total_ton_amount: int) {
+fun JettonMinter.sendMint(
+    self,
+    from: address,
+    recipient: address,
+    jetton_amount: int,
+    forward_ton_amount: int,
+    total_ton_amount: int,
+): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: total_ton_amount + ton("0.015"),
@@ -124,10 +155,10 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount
             }.toCell(),
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
-fun JettonMinter.sendChangeAdmin(self, from: address, new_owner: address) {
+fun JettonMinter.sendChangeAdmin(self, from: address, new_owner: address): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.05"),
@@ -137,7 +168,7 @@ fun JettonMinter.sendChangeAdmin(self, from: address, new_owner: address) {
             newAdminAddress: new_owner,
         },
     });
-    return net.send(from, msg)
+    return net.send(from, msg);
 }
 
 fun JettonMinter.getJettonData(self): JettonDataReply {
@@ -145,17 +176,17 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 }
 
 fun JettonMinter.getTotalSupply(self): int {
-    return self.getJettonData().totalSupply
+    return self.getJettonData().totalSupply;
 }
 
 fun JettonMinter.getAdminAddress(self): address {
-    return self.getJettonData().adminAddress
+    return self.getJettonData().adminAddress;
 }
 
 fun JettonMinter.getContent(self): cell {
-    return self.getJettonData().jettonContent
+    return self.getJettonData().jettonContent;
 }
 
 fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", owner)
+    return net.runGetMethod(self.address, "get_wallet_address", owner);
 }

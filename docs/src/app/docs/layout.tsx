@@ -7,7 +7,7 @@ export default function Layout({children}: { children: ReactNode }) {
     return (
         <DocsLayout
             tree={source.pageTree}
-            githubUrl={"https://github.com/i582/acton"}
+            githubUrl={"https://github.com/ton-blockchain/acton"}
             {...baseOptions()}
         >
             {children}

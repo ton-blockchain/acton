@@ -52,15 +52,25 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'tolk' }],
+        documentSelector: [
+            { scheme: 'file', language: 'tolk' },
+            { scheme: 'file', language: 'tasm' },
+            { scheme: 'file', language: 'fift' },
+            { scheme: 'file', language: 'tlb' },
+            { scheme: 'file', language: 'toml', pattern: '**/Acton.toml' },
+            { scheme: 'file', pattern: '**/Acton.toml' },
+        ],
         synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/*.tolk'),
+            fileEvents: [
+                vscode.workspace.createFileSystemWatcher('**/*.{tolk,tasm,fif,fift,tlb}'),
+                vscode.workspace.createFileSystemWatcher('**/Acton.toml'),
+            ],
         },
     };
 
     client = new LanguageClient(
         'ton-ls',
-        'Tolk Language Server',
+        'TON Language Server',
         serverOptions,
         clientOptions
     );

@@ -91,7 +91,7 @@ get fun `test-s-lib-api-disable-broadcast-restores-local-wallet`() {
 fn broadcast_toggle_roundtrip_updates_mode() {
     run_wallet_mode_success(
         "s-lib-api-broadcast-toggle-roundtrip",
-        r#"
+        r"
 get fun `test-s-lib-api-broadcast-toggle-roundtrip`() {
     expect(net.isBroadcasting()).toEqual(false);
 
@@ -105,7 +105,7 @@ get fun `test-s-lib-api-broadcast-toggle-roundtrip`() {
     net.disableBroadcast();
     expect(net.isBroadcasting()).toEqual(false);
 }
-"#,
+",
         "integration/snapshots/test-runner/api_wallet_mode/lib_api_broadcast_toggle_roundtrip_updates_mode.stdout.txt",
     );
 }

@@ -1,0 +1,16 @@
+Coverage Summary:
+Lines: 2/3 (66.67%)
+Total Hits: 2
+
+File: [ROOT]/code/math.tolk
+Annotated Code:
+1   |                                                  |
+2   |             fun classify(x: int): int {          |
+3 ✓ |                 if (x > 0) {                     | hits:1 branches:true=1 false=0
+4 ✓ |                     return 1;                    | hits:1
+5   |                 } else {                         |
+6 ✗ |                     return -1;                   | hits:0
+7   |                 }                                |
+8   |             }                                    |
+9   |                                                  |
+

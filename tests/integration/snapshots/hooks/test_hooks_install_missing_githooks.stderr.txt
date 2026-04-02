@@ -1,0 +1,1 @@
+Error: Hooks directory .githooks does not exist. Run `acton hooks new` first.

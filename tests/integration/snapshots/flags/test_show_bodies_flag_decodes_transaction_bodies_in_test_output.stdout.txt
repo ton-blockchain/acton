@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling test_body_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/print_bodies.test.tolk (1 test)
+  ✓ show-bodies-prints-decoded-transaction-body [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── TestBodyMsg 0.1 TON -> test_body_sink B                                     gas=333
+               queryId: 11
+               recipient: [WALLET_ADDRESS_BASE] (sender)
+               amount: 20000000
+
+ ✓ 1 passed in 1 file

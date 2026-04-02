@@ -1,21 +1,24 @@
 import "storage"
 
-fun calcDeployedJettonWallet(ownerAddress: address, minterAddress: address, jettonWalletCode: cell): AutoDeployAddress {
+fun calcDeployedJettonWallet(
+    ownerAddress: address,
+    minterAddress: address,
+    jettonWalletCode: cell,
+): AutoDeployAddress {
     val emptyWalletStorage: WalletStorage = {
         jettonBalance: 0,
         ownerAddress,
         minterAddress,
     };
 
-    return {
-        stateInit: {
-            code: jettonWalletCode,
-            data: emptyWalletStorage.toCell()
-        }
-    }
+    return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };
 }
 
-fun calcAddressOfJettonWallet(ownerAddress: address, minterAddress: address, jettonWalletCode: cell) {
+fun calcAddressOfJettonWallet(
+    ownerAddress: address,
+    minterAddress: address,
+    jettonWalletCode: cell,
+): address {
     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);
-    return jwDeployed.calculateAddress()
+    return jwDeployed.calculateAddress();
 }

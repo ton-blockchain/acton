@@ -1,9 +1,122 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{Project, ProjectBuilder};
+use crate::support::toncenter::{
+    append_custom_network, append_localnet_network, spawn_toncenter_v2_mock,
+    toncenter_v2_error_response, toncenter_v2_seqno_ok_response,
+};
 
 use std::fs;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
+
+const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
+    let project = ProjectBuilder::new(project_name)
+        .script_file(
+            "deploy",
+            r#"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                val wallet = net.wallet("deployer");
+                net.send(wallet.address, createMessage({
+                    bounce: false,
+                    value: ton("0.05"),
+                    dest: address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"),
+                }));
+            }
+        "#,
+        )
+        .build();
+
+    fs::write(project.path().join("mnemonic.txt"), DEPLOYER_MNEMONIC)
+        .expect("failed to write mnemonic");
+    fs::write(
+        project.path().join("wallets.toml"),
+        r#"[wallets.deployer]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic-file = "mnemonic.txt" }
+"#,
+    )
+    .expect("failed to write wallets.toml");
+
+    project
+}
+
+fn script_body_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/script_body_messages",
+            r"
+struct (0xF8000001) ScriptBodyMsg {
+    queryId: uint64
+    recipient: address
+    amount: coins
+}
+",
+        )
+        .contract(
+            "script_body_sink",
+            r#"
+import "script_body_messages"
+
+contract ScriptBodySink {
+    incomingMessages: ScriptBodyMsg
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptBodyMsg.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "print_txs",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../contracts/script_body_messages"
+
+fun main() {
+    val sender = net.treasury("sender");
+    val init = ContractState {
+        code: build("script_body_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: sinkAddress,
+        body: ScriptBodyMsg {
+            queryId: 11,
+            recipient: sender.address,
+            amount: ton("0.02"),
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+}
 
 #[test]
 fn test_script_simple_execution() {
@@ -23,6 +136,56 @@ fn test_script_simple_execution() {
     let output = project.acton().script("scripts/hello.tolk").run().code(0);
 
     output.assert_contains("Hello from script!");
+}
+
+#[test]
+fn test_script_ensure_latest_uses_project_root_from_nested_directory() {
+    let project = ProjectBuilder::new("script-ensure-latest-project-root")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("Hello from nested script!");
+            }
+        "#,
+        )
+        .build();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_stdlib = project.path().join(".acton/tolk-stdlib");
+    let nested_stdlib = nested_dir.join(".acton/tolk-stdlib");
+    let script_path = project.path().join("scripts/hello.tolk");
+    assert!(
+        !root_stdlib.exists(),
+        "stdlib must not exist before script command"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not exist in nested cwd before script command"
+    );
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg("..")
+        .script(script_path.to_string_lossy().as_ref())
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_contains("Hello from nested script!");
+
+    assert!(
+        root_stdlib.exists(),
+        "stdlib should be installed in project root"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not be installed in nested cwd"
+    );
 }
 
 #[test]
@@ -49,6 +212,35 @@ fn test_script_with_calculations() {
         .code(0)
         .assert_contains("Result:")
         .assert_contains("6");
+}
+
+#[test]
+fn test_script_hides_transaction_bodies_without_show_bodies_flag() {
+    let project = script_body_project("script-hides-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
+    let project = script_body_project("script-shows-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
+        );
 }
 
 #[test]
@@ -563,23 +755,25 @@ fn test_script_with_clear_cache() {
 fn test_script_custom_exit_code() {
     let project = ProjectBuilder::new("script-exit")
         .script_file(
-            "exit_42",
+            "exit_777",
             r#"
             import "../../lib/io"
 
             fun main() {
-                println("Exiting with code 42");
-                throw 42
+                println("Exiting with code 777");
+                throw 777
             }
         "#,
         )
         .build();
 
-    project
+    let output = project
         .acton()
-        .script("scripts/exit_42.tolk")
+        .script("scripts/exit_777.tolk")
         .run()
-        .code(42);
+        .code(1);
+
+    output.assert_snapshot_matches("integration/snapshots/test_script_custom_exit_code.stdout.txt");
 }
 
 #[test]
@@ -597,7 +791,98 @@ fn test_script_success_exit_code() {
         )
         .build();
 
-    project.acton().script("scripts/success.tolk").run().code(0);
+    project
+        .acton()
+        .script("scripts/success.tolk")
+        .run()
+        .code(0)
+        .assert_snapshot_matches("integration/snapshots/test_script_success_exit_code.stdout.txt");
+}
+
+#[test]
+fn test_script_known_exit_code_shows_description_and_phase() {
+    let project = ProjectBuilder::new("script-known-exit")
+        .script_file(
+            "exit_2",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("Exiting with code 2");
+                throw 2
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_2.tolk")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_known_exit_code_shows_description_and_phase.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
+    let project = ProjectBuilder::new("script-known-exit-backtrace")
+        .script_file(
+            "exit_2_backtrace",
+            r#"
+            import "../../lib/io"
+
+            fun explode() {
+                throw 2
+            }
+
+            fun nested() {
+                explode();
+            }
+
+            fun main() {
+                nested();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_2_backtrace.tolk")
+        .with_backtrace("full")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_invalid_message_exit_code_shows_description_and_phase() {
+    let project = ProjectBuilder::new("script-invalid-message-exit")
+        .script_file(
+            "exit_65535",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("Exiting with code 65535");
+                throw 65535
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_65535.tolk")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_invalid_message_exit_code_shows_description_and_phase.stdout.txt",
+        );
 }
 
 // ========================================
@@ -639,10 +924,10 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
     let project = ProjectBuilder::new("script-tx-not-found")
         .contract(
             "simple",
-            r#"
+            r"
             fun onInternalMessage(_: InMessage) {}
             fun onBouncedMessage(_: InMessageBounced) {}
-        "#,
+        ",
         )
         .script_file(
             "tx_not_found",
@@ -688,6 +973,75 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
 }
 
 #[test]
+fn test_script_run_get_method_on_undeployed_contract_shows_actionable_error() {
+    let project = ProjectBuilder::new("script-get-method-undeployed")
+        .script_file(
+            "get_undeployed",
+            r#"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                val target = net.randomAddress("target");
+                val _: int = net.runGetMethod(target, "seqno");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/get_undeployed.tolk")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_run_get_method_on_undeployed_contract_shows_actionable_error.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_run_get_method_on_contract_without_code_shows_actionable_error() {
+    let project = ProjectBuilder::new("script-get-method-null-code")
+        .script_file(
+            "get_null_code",
+            r#"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                val deployer = net.treasury("deployer");
+                val address = AutoDeployAddress {
+                    stateInit: beginCell()
+                        .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
+                        .storeBool(false) // special:(Maybe TickTock)
+                        .storeBool(false) // code:(Maybe ^Cell)
+                        .storeBool(false) // data:(Maybe ^Cell)
+                        .storeBool(false) // library:(Maybe ^Cell)
+                        .endCell(),
+                };
+
+                val outMsg = createMessage({
+                    bounce: BounceMode.NoBounce,
+                    value: ton("0.1"),
+                    dest: address,
+                });
+                net.send(deployer.address, outMsg);
+
+                val _: int = net.runGetMethod(address.calculateAddress(), "counter");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/get_null_code.tolk")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_run_get_method_on_contract_without_code_shows_actionable_error.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_output_snapshot() {
     let project = ProjectBuilder::new("script-snapshot")
         .script_file(
@@ -710,6 +1064,34 @@ fn test_script_output_snapshot() {
         .run()
         .code(0)
         .assert_snapshot_matches("integration/snapshots/test_script_output_snapshot.stdout.txt");
+}
+
+#[test]
+fn test_script_multi_arg_println_helpers_snapshot() {
+    let project = ProjectBuilder::new("script-println-multiarg-snapshot")
+        .script_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println2("{} + {}", "left", "right");
+                println3("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+                println4("{} {} {} {}", "a", "b", "c", "d");
+                println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/output.tolk")
+        .run()
+        .code(0)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
+        );
 }
 
 // ========================================
@@ -974,6 +1356,200 @@ version = "0.1.0"
 }
 
 #[test]
+fn test_script_broadcast_treasury_recommends_wallet_api() {
+    let project = ProjectBuilder::new("script-broadcast-treasury-recommends-wallet")
+        .script_file(
+            "deploy",
+            r#"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                net.treasury("deployer");
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_treasury_recommends_wallet_api.stdout.txt",
+    );
+}
+
+#[test]
+fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
+    let project = build_broadcast_wallet_error_project("script-broadcast-wallet-rejection");
+
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_error_response(
+            400,
+            "LITE_SERVER_UNKNOWN: cannot apply external message to current state : External message was not accepted: cannot run message on account: inbound external message rejected by account 3029B3EAEDA86A5381D86100F2A8B761C38DE45642EDB6E4BB1CCA2E6DD7FFED before smart-contract execution",
+        ),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("custom:mock-v2")
+        .arg("--api-key")
+        .arg("test-api-key")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-state");
+
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_error_response(
+            400,
+            "LITE_SERVER_UNKNOWN: cannot apply external message to current state : Failed to unpack account state",
+        ),
+    ]);
+    append_custom_network(project.path(), "mock-v2-missing-account", &mock_url);
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("custom:mock-v2-missing-account")
+        .arg("--api-key")
+        .arg("test-api-key")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-localnet");
+
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_error_response(
+            400,
+            "LITE_SERVER_UNKNOWN: cannot apply external message to current state : Failed to unpack account state",
+        ),
+    ]);
+    append_localnet_network(project.path(), &format!("{mock_url}/api/v2"));
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("localnet")
+        .arg("--api-key")
+        .arg("test-api-key")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-with-init");
+
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_error_response(400, "account is not active"),
+        toncenter_v2_error_response(
+            400,
+            "LITE_SERVER_UNKNOWN: cannot apply external message to current state : Failed to unpack account state",
+        ),
+    ]);
+    append_custom_network(
+        project.path(),
+        "mock-v2-missing-account-with-init",
+        &mock_url,
+    );
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("custom:mock-v2-missing-account-with-init")
+        .arg("--api-key")
+        .arg("test-api-key")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-wallet-rejection-with-init");
+
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_error_response(400, "account is not active"),
+        toncenter_v2_error_response(
+            400,
+            "LITE_SERVER_UNKNOWN: cannot apply external message to current state : External message was not accepted: cannot run message on account: inbound external message rejected by account 3029B3EAEDA86A5381D86100F2A8B761C38DE45642EDB6E4BB1CCA2E6DD7FFED before smart-contract execution",
+        ),
+    ]);
+    append_custom_network(
+        project.path(),
+        "mock-v2-wallet-rejection-with-init",
+        &mock_url,
+    );
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("custom:mock-v2-wallet-rejection-with-init")
+        .arg("--api-key")
+        .arg("test-api-key")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
 fn test_script_address_print_default() {
     let project = ProjectBuilder::new("script-simple")
         .script_file(
@@ -1231,6 +1807,39 @@ fn test_script_env_vars_extended() {
 }
 
 #[test]
+fn test_script_env_vars_support_coins() {
+    let project = ProjectBuilder::new("script-env-vars-coins")
+        .script_file(
+            "env_coins",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                val amount = env<coins>("TEST_COINS");
+                if (amount != null) {
+                    println1("coins: {:ton}", amount);
+                }
+
+                val fallback = envOr<coins>("TEST_COINS_MISSING", ton("0.75"));
+                println1("coins_default: {:ton}", fallback);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/env_coins.tolk")
+        .env("TEST_COINS", "1500000000")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_env_vars_support_coins.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_env_or_vars() {
     let project = ProjectBuilder::new("script-env-or-vars")
         .script_file(
@@ -1315,4 +1924,289 @@ fn test_println_nullable_values() {
         .run()
         .success()
         .assert_snapshot_matches("integration/snapshots/test_println_nullable_values.stderr.txt");
+}
+
+#[test]
+fn test_println_non_empty_map_values() {
+    let project = ProjectBuilder::new("script-println-map-values")
+        .script_file(
+            "map_values",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                var balances = createEmptyMap<int32, int32>();
+                balances.set(1, 10);
+                balances.set(2, 20);
+                println(balances);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_values.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_non_empty_map_values.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_empty_map_values() {
+    let project = ProjectBuilder::new("script-println-empty-map-values")
+        .script_file(
+            "map_empty_values",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val emptyInts = createEmptyMap<int32, int32>();
+                println(emptyInts);
+
+                val emptyStrings = createEmptyMap<int32, string>();
+                println(emptyStrings);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_empty_values.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/test_println_empty_map_values.stderr.txt");
+}
+
+#[test]
+fn test_println_map_supported_key_types() {
+    let project = ProjectBuilder::new("script-println-map-key-types")
+        .script_file(
+            "map_key_types",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
+
+                var byBool = createEmptyMap<bool, int32>();
+                byBool.set(false, 10);
+                println(byBool);
+
+                var byAddress = createEmptyMap<address, int32>();
+                byAddress.set(ownerRaw, 20);
+                println(byAddress);
+
+                var byInt8 = createEmptyMap<int8, int32>();
+                byInt8.set(-1, 30);
+                println(byInt8);
+
+                var byUint16 = createEmptyMap<uint16, int32>();
+                byUint16.set(65535, 40);
+                println(byUint16);
+
+                var byInt257 = createEmptyMap<int257, int32>();
+                byInt257.set(-1, 50);
+                println(byInt257);
+
+                var byUint256 = createEmptyMap<uint256, int32>();
+                byUint256.set(1, 60);
+                println(byUint256);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_key_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_supported_key_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_supported_value_types() {
+    let project = ProjectBuilder::new("script-println-map-value-types")
+        .script_file(
+            "map_value_types",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
+                val ownerAny = ownerRaw as any_address;
+
+                var withBool = createEmptyMap<int32, bool>();
+                withBool.set(1, true);
+                println(withBool);
+
+                var withAddress = createEmptyMap<int32, address>();
+                withAddress.set(2, ownerRaw);
+                println(withAddress);
+
+                var withAnyAddress = createEmptyMap<int32, any_address>();
+                withAnyAddress.set(3, ownerAny);
+                println(withAnyAddress);
+
+                var withCell = createEmptyMap<int32, cell>();
+                withCell.set(11, beginCell().storeUint(42, 8).endCell());
+                println(withCell);
+
+                var withString = createEmptyMap<int32, string>();
+                withString.set(12, "hello");
+                println(withString);
+
+                var withInt257 = createEmptyMap<int32, int257>();
+                withInt257.set(4, -123);
+                println(withInt257);
+
+                var withUint32 = createEmptyMap<int32, uint32>();
+                withUint32.set(5, 123);
+                println(withUint32);
+
+                var withCoins = createEmptyMap<int32, coins>();
+                withCoins.set(6, ton("1.5"));
+                println(withCoins);
+
+                var withVarInt16 = createEmptyMap<int32, varint16>();
+                withVarInt16.set(7, -77);
+                println(withVarInt16);
+
+                var withVarInt32 = createEmptyMap<int32, varint32>();
+                withVarInt32.set(8, -888888888);
+                println(withVarInt32);
+
+                var withVarUInt16 = createEmptyMap<int32, varuint16>();
+                withVarUInt16.set(9, 65535);
+                println(withVarUInt16);
+
+                var withVarUInt32 = createEmptyMap<int32, varuint32>();
+                withVarUInt32.set(10, 4294967296);
+                println(withVarUInt32);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_value_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_supported_value_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_fallback_for_unformattable_types() {
+    let project = ProjectBuilder::new("script-println-map-fallback-types")
+        .script_file(
+            "map_fallback_types",
+            r#"
+            import "../../lib/io"
+
+            struct Key {
+                id: int32,
+            }
+
+            fun main() {
+                var byStructKey = createEmptyMap<Key, int32>();
+                byStructKey.set(Key { id: 1 }, 10);
+                println(byStructKey);
+
+                var nested = createEmptyMap<int32, int32>();
+                nested.set(7, 70);
+                var withMapValue = createEmptyMap<int32, map<int32, int32>>();
+                withMapValue.set(3, nested);
+                println(withMapValue);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_fallback_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_fallback_for_unformattable_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_retyped_from_low_level_dict_parse_failures() {
+    let project = ProjectBuilder::new("script-println-map-retyped-from-dict")
+        .script_file(
+            "map_retyped_from_dict",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                var source = createEmptyMap<int32, int32>();
+                source.set(1, 10);
+                source.set(2, 20);
+
+                val lowLevel = source.toLowLevelDict();
+
+                val asAddress = createMapFromLowLevelDict<int32, address>(lowLevel);
+                println(asAddress);
+
+                val asCell = createMapFromLowLevelDict<int32, cell>(lowLevel);
+                println(asCell);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_retyped_from_dict.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_struct_value_falls_back_to_raw_hex() {
+    let project = ProjectBuilder::new("script-println-map-struct-value-raw-hex")
+        .script_file(
+            "map_struct_value_raw_hex",
+            r#"
+            import "../../lib/io"
+
+            struct Payload {
+                a: int32,
+                b: bool,
+            }
+
+            fun main() {
+                var byStructValue = createEmptyMap<int32, Payload>();
+                byStructValue.set(1, Payload {
+                    a: 7,
+                    b: true,
+                });
+                println(byStructValue);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_struct_value_raw_hex.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
+        );
 }

@@ -8,6 +8,8 @@ Warning: Wallet was created, but automatic airdrop failed: Faucet returned error
 
 NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
 
+To check wallet balances run acton wallet list --balance.
+
 SECURITY WARNING:
 [SECURITY_WARNING_MNEMONIC]
 - Do NOT commit this file to version control (already added to .gitignore)

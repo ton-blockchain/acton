@@ -51,9 +51,9 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
         TupleItem::Slice(cell) => {
             builder.store_small_uint(0x04, 8)?;
             builder.store_uint(0, 10)?;
-            builder.store_uint(cell.bit_len() as u64, 10)?;
+            builder.store_uint(u64::from(cell.bit_len()), 10)?;
             builder.store_uint(0, 3)?;
-            builder.store_uint(cell.reference_count() as u64, 3)?;
+            builder.store_uint(u64::from(cell.reference_count()), 3)?;
             builder.store_reference(cell.clone())?;
         }
         TupleItem::Builder(cell) => {

@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, comments, common, exprs, stmts, types};
-use pretty::RcDoc;
 use tolk_syntax::{
     Annotation, AnnotationArgs, AnnotationList, AsmBody, AstNode, Constant, Contract, ContractBody,
     ContractField, ContractFieldValue, Enum, EnumBody, EnumMember, Expr, Func, FuncBody,
@@ -8,14 +8,16 @@ use tolk_syntax::{
     StructField, TolkRequiredVersion, TopLevel, Type, TypeAlias, TypeAliasUnderlyingType,
     TypeParameter, TypeParameters,
 };
+use tree_sitter::Node;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ImportGroup {
     Stdlib,
     Acton,
     Other,
-    RelativeParent,
+    Plain,
     RelativeCurrent,
+    RelativeParent,
 }
 
 #[derive(Clone)]
@@ -42,12 +44,13 @@ fn import_group(path: &str) -> ImportGroup {
         ImportGroup::Acton
     } else if path.starts_with('@') {
         ImportGroup::Other
+    } else if !path.starts_with("./") && !path.starts_with("../") {
+        ImportGroup::Plain
     } else if path.starts_with("./") {
         ImportGroup::RelativeCurrent
     } else if path.starts_with("../") {
         ImportGroup::RelativeParent
     } else {
-        // Plain imports like `import "foo"` are resolved relative to current directory.
         ImportGroup::RelativeCurrent
     }
 }
@@ -284,7 +287,7 @@ pub fn print_contract_body<'a>(ctx: &Context<'_>, body: &ContractBody) -> Option
         &fields,
         print_contract_field_declaration,
         |f| f.0,
-        |_| vec![],
+        |_| collect_lonely_body_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
 }
@@ -421,7 +424,7 @@ pub fn print_struct_body<'a>(ctx: &Context<'_>, body: &StructBody) -> Option<RcD
         &fields,
         print_struct_field_declaration,
         |f| f.0,
-        |_| vec![],
+        |_| collect_lonely_body_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
 }
@@ -482,9 +485,16 @@ pub fn print_enum_body<'a>(ctx: &Context<'_>, body: &EnumBody) -> Option<RcDoc<'
         &members,
         print_enum_member_declaration,
         |m| m.0,
-        |_| vec![],
+        |_| collect_lonely_body_comments(body.0),
         common::ListOptions::curly_bracket_body(),
     )
+}
+
+fn collect_lonely_body_comments(body: Node) -> Vec<Node> {
+    let mut cursor = body.walk();
+    body.named_children(&mut cursor)
+        .filter(|node| node.kind() == "comment")
+        .collect()
 }
 
 #[must_use]
@@ -524,12 +534,11 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Func) -> Option<RcDoc<'a>> {
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -567,12 +576,11 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcD
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -599,12 +607,11 @@ pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -617,8 +624,35 @@ pub fn print_method_receiver<'a>(ctx: &Context<'_>, r: &MethodReceiver) -> Optio
     Some(RcDoc::concat([typ_doc, RcDoc::text(".")]))
 }
 
+fn should_print_inline_function_body(ctx: &Context<'_>, body: &FuncBody<'_>) -> bool {
+    match body {
+        FuncBody::Block(_) => true,
+        FuncBody::AsmBody(asm) => is_single_triple_quoted_asm_body(ctx, asm),
+        _ => false,
+    }
+}
+
+fn is_single_triple_quoted_asm_body(ctx: &Context<'_>, asm: &AsmBody<'_>) -> bool {
+    let mut instructions = asm.instructions();
+    let Some(first) = instructions.next() else {
+        return false;
+    };
+    if instructions.next().is_some() {
+        return false;
+    }
+
+    first
+        .0
+        .utf8_text(ctx.code.as_ref().as_ref())
+        .ok()
+        .is_some_and(|text| {
+            let trimmed = text.trim();
+            trimmed.starts_with("\"\"\"") && trimmed.ends_with("\"\"\"")
+        })
+}
+
 pub trait ParameterTrait {
-    fn syntax<'tree>(&self) -> tree_sitter::Node<'tree>
+    fn syntax<'tree>(&self) -> Node<'tree>
     where
         Self: 'tree;
     fn mutate(&self) -> bool;
@@ -634,7 +668,7 @@ pub trait ParameterTrait {
 }
 
 impl ParameterTrait for Parameter<'_> {
-    fn syntax<'t>(&self) -> tree_sitter::Node<'t>
+    fn syntax<'t>(&self) -> Node<'t>
     where
         Self: 't,
     {
@@ -664,7 +698,7 @@ impl ParameterTrait for Parameter<'_> {
 }
 
 impl ParameterTrait for LambdaParameter<'_> {
-    fn syntax<'t>(&self) -> tree_sitter::Node<'t>
+    fn syntax<'t>(&self) -> Node<'t>
     where
         Self: 't,
     {
@@ -737,18 +771,27 @@ where
 #[must_use]
 pub fn print_annotation_list<'a>(ctx: &Context<'_>, a: &AnnotationList) -> Option<RcDoc<'a>> {
     let annotations: Vec<_> = a.annotations().collect();
+    let list_comments = ctx.comments.get(&a.0);
 
     let mut docs = vec![];
+    comments::print_leading_comments(ctx, &mut docs, list_comments);
+
     for (i, annotation) in annotations.iter().enumerate() {
         let node = &annotation.0;
-        let comments = ctx.comments.get(node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
+        let annotation_comments = ctx.comments.get(node);
+        comments::print_leading_comments(ctx, &mut docs, annotation_comments);
 
         docs.push(print_annotation(ctx, annotation)?);
 
-        comments::print_inline_comments(ctx, &mut docs, comments);
+        comments::print_inline_comments(ctx, &mut docs, annotation_comments);
+        if i + 1 == annotations.len() {
+            comments::print_inline_comments(ctx, &mut docs, list_comments);
+        }
         docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut docs, comments);
+        comments::print_trailing_comments(ctx, &mut docs, annotation_comments);
+        if i + 1 == annotations.len() {
+            comments::print_trailing_comments(ctx, &mut docs, list_comments);
+        }
 
         if let Some(next) = annotations.get(i + 1)
             && common::empty_lines_between(ctx, node, &next.0) > 1
@@ -764,10 +807,13 @@ pub fn print_annotation_list<'a>(ctx: &Context<'_>, a: &AnnotationList) -> Optio
 pub fn print_annotation<'a>(ctx: &Context<'_>, a: &Annotation) -> Option<RcDoc<'a>> {
     let mut parts = vec![RcDoc::text("@")];
     if let Some(name) = a.name() {
-        parts.push(exprs::print_ident(ctx, &name)?);
+        parts.push(common::print_node_text(ctx, &name.syntax())?);
     }
     if let Some(args) = a.args() {
-        parts.push(print_annotation_arguments(ctx, &args)?);
+        let mut args_parts = vec![print_annotation_arguments(ctx, &args)?];
+        let args_comments = ctx.comments.get(&args.0);
+        comments::print_inline_comments(ctx, &mut args_parts, args_comments);
+        parts.push(RcDoc::concat(args_parts));
     }
     Some(RcDoc::concat(parts))
 }
@@ -846,13 +892,26 @@ pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>>
 
     let instructions: Vec<_> = asm.instructions().collect();
     let mut inst_docs = vec![];
+    let keep_first_instruction_inline = instructions.len() == 1
+        && instructions[0]
+            .0
+            .utf8_text(ctx.code.as_ref().as_ref())
+            .ok()
+            .is_some_and(|text| {
+                let trimmed = text.trim();
+                trimmed.starts_with("\"\"\"") && trimmed.ends_with("\"\"\"")
+            });
 
     for (i, inst) in instructions.iter().enumerate() {
         let node = &inst.0;
         let comments = ctx.comments.get(node);
 
         if i == 0 {
-            inst_docs.push(RcDoc::line());
+            if keep_first_instruction_inline {
+                inst_docs.push(RcDoc::space());
+            } else {
+                inst_docs.push(RcDoc::line());
+            }
         }
 
         comments::print_leading_comments(ctx, &mut inst_docs, comments);

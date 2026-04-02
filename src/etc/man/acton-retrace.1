@@ -1,0 +1,305 @@
+'\" t
+.TH "ACTON\-RETRACE" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-retrace \[em] Replay an on\-chain transaction locally for inspection
+.SH "SYNOPSIS"
+\fBacton retrace\fR [\fIoptions\fR] \fIhash\fR
+.SH "DESCRIPTION"
+Download a transaction by hash and replay it locally in the TON sandbox.
+.sp
+\fBacton retrace\fR is useful for debugging failures, inspecting outgoing actions,
+reviewing VM and executor logs, and comparing local replay results with the
+original on\-chain execution.
+.sp
+When \fB\-\-contract\fR is provided, Acton also prepares a source\-level retrace for
+the named project contract by recompiling it with debug info and source maps.
+When \fB\-\-dap\-port\fR is added, the prepared replay is exposed as a local Debug
+Adapter Protocol (DAP) server for editor integration.
+.SH "OPTIONS"
+.SS "Retrace Options"
+.sp
+\fIhash\fR
+.RS 4
+Transaction hash in hex format.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to retrace from.
+.sp
+Without this flag, Acton tries mainnet first and then falls back to testnet.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain queries.
+.RE
+.sp
+\fB\-v\fR, \fB\-\-verbose\fR
+.RS 4
+Show full cell hex in outgoing actions instead of only hashes.
+.RE
+.sp
+\fB\-\-logs\-dir\fR \fIdir\fR
+.RS 4
+Write VM and executor logs into the specified directory.
+.RE
+.SS "Source-Level Debugging Options"
+.sp
+\fB\-\-contract\fR \fIname\fR
+.RS 4
+Contract ID from \fBActon.toml\fR used to build a source\-level trace for the
+retraced transaction.
+.RE
+.sp
+\fB\-\-dap\-port\fR \fIport\fR
+.RS 4
+Expose the prepared source\-level retrace as a DAP server on the given local TCP
+port.
+.sp
+Requires \fB\-\-contract\fR\&.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "NETWORK AND API BEHAVIOR"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Without \fB\-\-net\fR, Acton tries mainnet and then testnet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR and \fBcustom:<name>\fR are not supported by the retrace backend
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'If no \fB\-\-api\-key\fR is provided, Acton throttles requests to reduce rate\-limit
+failures
+.RE
+.sp
+For library fallback lookups, retrace also supports \fBDTON_API_KEY\fR from the
+environment.
+.SH "SOURCE-LEVEL RETRACE"
+When \fB\-\-contract\fR is set:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the contract must exist in the resolved \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the selected source must be a \fB\&.tolk\fR contract
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Acton recompiles the contract for the current invocation with debug info and
+source maps
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the compiled local code hash must match the code hash used by the retraced
+transaction
+.RE
+.sp
+If you run the command outside the project directory, use \fB\-\-manifest\-path\fR or
+\fB\-\-project\-root\fR so Acton can resolve the contract configuration and mappings.
+.SH "DAP MODE"
+When \fB\-\-dap\-port\fR is used together with \fB\-\-contract\fR:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Acton starts a local DAP server on \fB127.0.0.1:<port>\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the normal retrace summary is still printed before the debug server starts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the command stays attached to that debug session until the client disconnects
+.RE
+.sp
+This mode is intended for editor integrations that speak the Debug Adapter
+Protocol.
+.SH "VS CODE SETUP"
+Typical setup:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Install or load the TON VS Code extension.
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Make sure VS Code can find your \fBacton\fR binary.
+.sp
+If needed, point the extension at a specific binary with an environment
+variable such as \fBACTON_BIN\fR, or start VS Code from a shell where \fBacton\fR is
+already on \fBPATH\fR\&.
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Open the project workspace that contains the target contract in
+\fBActon.toml\fR\&.
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Start a retrace debug session either through the extension command or
+through a manual \fBlaunch.json\fR entry.
+.RE
+.sp
+For a manual setup, create \fB\&.vscode/launch.json\fR like this:
+.sp
+.RS 4
+.nf
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "tolk",
+      "request": "launch",
+      "name": "Attach to Acton Retrace",
+      "debugServer": 4711
+    }
+  ]
+}
+.fi
+.RE
+.sp
+Then start retrace in a terminal from the project root:
+.sp
+.RS 4
+.nf
+acton retrace <HASH> \-\-contract <NAME> \-\-dap\-port 4711
+.fi
+.RE
+.sp
+After the DAP server is listening, launch the matching VS Code debug
+configuration. Breakpoints should be set in the same \fB\&.tolk\fR sources that
+belong to the selected contract from \fBActon.toml\fR\&.
+.SH "OUTPUT"
+The command prints:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'network selection and state\-hash check status
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'transaction metadata and fee summary
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compute and action phase summaries
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'decoded outgoing actions
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'additional full VM and executor logs when \fB\-\-logs\-dir\fR is used
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'source\-level debug preparation errors when \fB\-\-contract\fR is used
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'DAP startup status when \fB\-\-dap\-port\fR is used
+.RE
+.sp
+When \fB\-\-logs\-dir\fR is set, Acton creates the target directory and writes
+\fBvm.log\fR plus \fBexecutor.log\fR there.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The transaction was fetched and replayed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The transaction could not be found, network lookup failed, replay data
+was incomplete, local contract validation or compilation failed, the local
+code hash did not match the retraced account code, the DAP server could not
+start, or local log files could not be written.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Retrace with automatic network fallback:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Force mainnet and use an API key:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-net mainnet \-\-api\-key YOUR_API_KEY
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Save logs and show full outgoing cell bodies:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-verbose \-\-logs\-dir .acton/retrace
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Prepare a source\-level retrace for a project contract:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Start a local DAP server for editor debugging:
+.sp
+.RS 4
+.nf
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter \-\-dap\-port 4711
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help disasm\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIRetrace command guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/retrace>
+.RE

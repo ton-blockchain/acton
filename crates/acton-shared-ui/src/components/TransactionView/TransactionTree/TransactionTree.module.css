@@ -130,6 +130,13 @@
   overflow-wrap: break-word;
 }
 
+.tooltipFieldValueStructured {
+  word-wrap: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+  margin-top: 10px;
+}
+
 .tooltipSubValue {
   margin-top: var(--spacing-xs);
   font-size: var(--font-size-xs);
@@ -153,6 +160,45 @@
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
   background-color: var(--bg-color);
   margin: 0 var(--spacing-md);
+}
+
+.storageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.storageMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--border-radius-full);
+  border: 1px solid transparent;
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+}
+
+.storageMetaBadgeCreated {
+  color: var(--color-passed-text);
+  background-color: var(--color-passed-bg);
+  border-color: color-mix(in srgb, var(--color-passed) 24%, transparent);
+}
+
+.storageMetaBadgeDestroyed {
+  color: var(--color-failed-text);
+  background-color: var(--color-failed-bg);
+  border-color: color-mix(in srgb, var(--color-failed) 24%, transparent);
+}
+
+.storageDiffScroll {
+  overflow-x: auto;
+  padding-bottom: var(--spacing-xs);
+}
+
+.storageUnavailable {
+  color: var(--text-muted);
 }
 
 .topText {

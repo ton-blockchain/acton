@@ -17,11 +17,13 @@
     "linting",
     "local-development-node",
     "acton-toml.mdx",
+    "ci-setup.mdx",
     "--- Advanced ---",
     "advanced/libraries",
     "--- Miscellaneous ---",
     "miscellaneous/ide-support",
     "standard_library",
-    "tolk_standard_library"
+    "tolk_standard_library",
+    "miscellaneous/support-policy"
   ]
 }

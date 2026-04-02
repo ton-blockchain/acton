@@ -12,3 +12,10 @@ depends = []
 [fmt]
 width = 100
 ignore = []
+
+[mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "tests/wrappers"

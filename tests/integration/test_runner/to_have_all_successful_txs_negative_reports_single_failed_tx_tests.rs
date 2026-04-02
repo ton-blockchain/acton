@@ -10,13 +10,13 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 "#;
 
-const FAILING_CONTRACT: &str = r#"
+const FAILING_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {
     throw 77;
 }
 
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn run_project_builder_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{TX_EXPECT_IMPORTS}\n{test_body}\n");

@@ -27,14 +27,14 @@ pub async fn set_state_source(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<node::StateSource>,
 ) -> Json<Value> {
-    handle_result(node.set_state_source(payload), |_| Value::Null).await
+    handle_result(node.set_state_source(payload), |()| Value::Null).await
 }
 
 pub async fn set_address_name(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<SetAddressNameRequest>,
 ) -> Json<Value> {
-    handle_result(node.set_address_name(payload.address, payload.name), |_| {
+    handle_result(node.set_address_name(payload.address, payload.name), |()| {
         Value::Null
     })
     .await

@@ -1,0 +1,92 @@
+name: Build Docker image
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+concurrency:
+  group: build-docker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build-docker-image:
+    name: Build Docker image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubicloud-standard-2-ubuntu-2204
+            docker_platform: linux/amd64
+            target_name: x86_64-unknown-linux-gnu
+            docker_archive: acton-linux-amd64.docker.tar
+            image_tag_suffix: linux-amd64
+          - arch: arm64
+            runner: ubicloud-standard-2-arm-ubuntu-2204
+            docker_platform: linux/arm64
+            target_name: aarch64-unknown-linux-gnu
+            docker_archive: acton-linux-arm64.docker.tar
+            image_tag_suffix: linux-arm64
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-${{ matrix.target_name }}
+          path: target/distrib/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          cache-binary: false
+
+      - name: Prepare Docker context
+        # language=Bash
+        run: |
+          mkdir -p dist/docker
+          tar -C dist/docker -xzf "target/distrib/acton-${{ matrix.target_name }}.tar.gz" ./acton
+
+      - name: Build ${{ matrix.arch }} Docker archive
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.docker_platform }}
+          labels: |
+            org.opencontainers.image.version=${{ env.VERSION_TAG }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          outputs: type=docker,dest=${{ matrix.docker_archive }}
+          provenance: false
+          push: false
+          tags: acton:${{ env.VERSION_TAG }}-${{ matrix.image_tag_suffix }}
+
+      - name: Smoke test ${{ matrix.arch }} Docker archive
+        # language=Bash
+        run: |
+          docker load -i "${{ matrix.docker_archive }}"
+          docker run --rm "acton:${VERSION_TAG}-${{ matrix.image_tag_suffix }}" --help
+
+      - name: Upload Docker archive
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: intermediate-docker-image-${{ matrix.arch }}
+          path: ${{ matrix.docker_archive }}
+          retention-days: 1
+          if-no-files-found: error

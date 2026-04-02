@@ -1,0 +1,1 @@
+Warning: Failed to load baseline gas snapshot 'invalid-baseline.json': key must be a string at line 1 column 2

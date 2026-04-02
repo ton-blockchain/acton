@@ -1,0 +1,14 @@
+Inspect remote account and contract state
+
+Usage: acton rpc [OPTIONS] <COMMAND>
+
+Commands:
+  info  Show remote account information and decode storage when ABI is known
+
+Options:
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --manifest-path <PATH>  Path to Acton.toml
+      --project-root <PATH>   Path to project root
+  -h, --help                  Print help
+
+Run 'acton help rpc' for more detailed information.

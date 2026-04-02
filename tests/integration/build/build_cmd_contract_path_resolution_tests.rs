@@ -34,10 +34,10 @@ fn build_resolves_relative_contract_src_with_normalized_segments() {
     let project = ProjectBuilder::new("build-contract-src-relative-normalized")
         .raw_file(
             "contracts/nested/relative_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -61,10 +61,10 @@ fn build_resolves_absolute_contract_src() {
     let project = ProjectBuilder::new("build-contract-src-absolute")
         .raw_file(
             "contracts/absolute_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -90,10 +90,10 @@ fn build_resolves_relative_contract_src_with_parent_traversal_outside_contracts_
         .raw_file("contracts/nested/marker.txt", "marker")
         .raw_file(
             "shared/traversal_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -118,10 +118,10 @@ fn build_resolves_relative_contract_src_with_mixed_dot_and_parent_segments() {
         .raw_file("contracts/corner/deep/marker.txt", "marker")
         .raw_file(
             "contracts/corner_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -146,10 +146,10 @@ fn build_resolves_relative_contract_src_with_nested_relative_roots_when_intermed
         .raw_file("contracts/root/inner/branch/marker.txt", "marker")
         .raw_file(
             "contracts/root/relative_nested_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -173,10 +173,10 @@ fn build_relative_contract_src_with_parent_segments_through_missing_dir_is_not_n
     let project = ProjectBuilder::new("build-contract-src-relative-missing-parent")
         .raw_file(
             "contracts/relative_missing_parent_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -204,10 +204,10 @@ fn build_relative_contract_src_with_nested_relative_roots_through_missing_interm
     let project = ProjectBuilder::new("build-contract-src-relative-nested-roots-missing")
         .raw_file(
             "contracts/root/relative_nested_missing_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -236,10 +236,10 @@ fn build_resolves_absolute_contract_src_with_parent_segments_when_intermediate_d
         .raw_file("contracts/absolute_root/nested/marker.txt", "marker")
         .raw_file(
             "contracts/absolute_root/absolute_existing_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -268,10 +268,10 @@ fn build_absolute_contract_src_with_parent_segments_is_not_normalized_bug() {
     let project = ProjectBuilder::new("build-contract-src-absolute-normalized")
         .raw_file(
             "contracts/absolute_normalized_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 
@@ -303,10 +303,10 @@ fn build_absolute_contract_src_with_nested_missing_intermediate_dirs_is_not_cano
     let project = ProjectBuilder::new("build-contract-src-absolute-nested-missing-roots")
         .raw_file(
             "contracts/absolute_nested_missing_target.tolk",
-            r#"
+            r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#,
+",
         )
         .build();
 

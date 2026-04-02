@@ -1,0 +1,19 @@
+
+Remote Account
+  Network:           mock
+  Address:           [WALLET_ADDRESS_BASE]
+  Raw Address:       0:2222222222222222222222222222222222222222222222222222222222222222
+  Status:            active
+  Balance:           1.234 TON
+  Last Tx LT:        999
+  Last Tx Hash:      c0ffee
+  Code Hash:         0x1f6548a25e04497496242ad7804b653e6da9a47e474dc17436313ffa04e15f18
+  Data Hash:         0x9f4fe898a7910db94963ae08b06f6ea70f78e1f2e083a5deb96fb5a12e7a7e26
+
+Local Match
+  Contract:          counter (counter)
+  ABI:               counter
+
+Decoded Storage
+  counter: 42
+  id: 7

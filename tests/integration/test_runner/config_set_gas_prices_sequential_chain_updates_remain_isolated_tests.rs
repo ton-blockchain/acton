@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_set_gas_prices_sequential_chain_updates_remain_isolated() {
     run_config_success_case(
         "ds-stdlib-config-gas-prices-sequential-isolation",
-        r#"
+        r"
 get fun `test-ds-stdlib-config-gas-prices-sequential-isolation`() {
     var firstConfig = net.getConfig();
     val initialBase = firstConfig.getGasPrices(BASECHAIN);
@@ -128,7 +128,7 @@ get fun `test-ds-stdlib-config-gas-prices-sequential-isolation`() {
     expect(finalMaster.other.freezeDueLimit).toEqual(masterBeforeThirdWrite.other.freezeDueLimit);
     expect(finalMaster.other.deleteDueLimit).toEqual(masterBeforeThirdWrite.other.deleteDueLimit);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_set_gas_prices_sequential_chain_updates_remain_isolated/config_set_gas_prices_sequential_chain_updates_remain_isolated.stdout.txt",
     );
 }

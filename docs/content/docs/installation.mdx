@@ -13,8 +13,15 @@ import {SiApple, SiLinux} from "react-icons/si";
 
 ## Overview
 
-Acton ships as a single, dependency-free executable. You can install it via script,
-Homebrew, or download single binary from releases.
+Acton ships as a single, dependency-free executable. You can install it via the
+public installer or by downloading a release asset directly.
+
+<Callout type="info" title="Support policy">
+    First-class support is currently limited to versioned releases on macOS
+    (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). `trunk` builds and
+    native Windows usage are beta surfaces today. See
+    [Support policy](/docs/miscellaneous/support-policy) for the full matrix.
+</Callout>
 
 <Callout>
     After installation, verify with `acton --version`
@@ -26,14 +33,14 @@ Homebrew, or download single binary from releases.
     <Tab value="macOS">
 
         ```bash
-        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
         ```
 
     </Tab>
     <Tab value="Linux">
 
         ```bash
-        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
         ```
 
     </Tab>
@@ -96,13 +103,13 @@ You should see the version number of Acton.
 
 ## Direct Downloads
 
-To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/i582/acton/releases) or use the links below.
+To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/i582/acton-public/releases) or use the latest release links below.
 
 <Cards cols={2}>
     <Card
         icon={<SiApple/>}
         title="macOS ARM64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-aarch64.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-apple-darwin.tar.gz"
     >
         Apple Silicon (M1/M2/M3/etc.)
     </Card>
@@ -110,7 +117,7 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiApple/>}
         title="macOS x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-x64.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-apple-darwin.tar.gz"
     >
         Intel Macs
     </Card>
@@ -118,11 +125,22 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiLinux/>}
         title="Linux x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-linux-x64.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz"
     >
         Standard Linux x64 binary
     </Card>
+    <Card
+        icon={<SiLinux/>}
+        title="Linux ARM64"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz"
+    >
+        Linux ARM64 binary
+    </Card>
 </Cards>
+
+## CI/CD
+
+See the [CI integration guide](/docs/ci-setup/) for GitHub Actions.
 
 ## Updating
 
@@ -138,7 +156,7 @@ acton up
 
 ### List available versions
 
-To see all available versions, including canary releases:
+To see all available versions, including the trunk release:
 
 ```bash
 acton up --list
@@ -152,12 +170,12 @@ To install a specific version:
 acton up 0.1.5
 ```
 
-### Switch to canary
+### Switch to trunk
 
-If you want to try the latest features before they are officially released, you can install the canary version:
+If you want to try the latest features before they are officially released, you can install the trunk version:
 
 ```bash
-acton up --canary
+acton up --trunk
 ```
 
 ## Uninstall

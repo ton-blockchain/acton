@@ -69,6 +69,8 @@ fn test_check_acton_import_with_mappings_direct() {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E014")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
@@ -109,6 +111,8 @@ fn test_check_acton_import_with_mappings_transitive_dependency() {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E014")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
@@ -162,6 +166,8 @@ fn run_check(group: &str, main_content: &str, files: &[(&str, &str)], name: &str
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E014")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!("integration/snapshots/check/{group}/{name}.txt"));

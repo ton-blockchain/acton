@@ -33,7 +33,7 @@ val first = list.first(); // 10
 val last = list.last();   // 20
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L20" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L20" />
 
 ## `BigArray<T>.createEmpty`
 
@@ -45,7 +45,7 @@ Creates an empty [BigArray](#bigarray).
 
 Use this constructor to initialize a new chunked array.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L27" />
 
 ## `BigArray<T>.createFromArray`
 
@@ -58,7 +58,7 @@ Creates [BigArray](#bigarray) and fills it with all elements from [items](#bigar
 Elements preserve the original order from [items](#bigarray\<t>createfromarray).
 All elements are copied into the first bin directly.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L37" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L35" />
 
 ## `BigArray<T>.first`
 
@@ -70,7 +70,7 @@ Returns the first element of a non-empty [BigArray](#bigarray).
 
 Fails if the array is empty.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L50" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L46" />
 
 ## `BigArray<T>.size`
 
@@ -80,7 +80,7 @@ fun BigArray<T>.size(self): int
 
 Returns current number of elements in [BigArray](#bigarray).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L56" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L52" />
 
 ## `BigArray<T>.last`
 
@@ -92,43 +92,43 @@ Returns the last element of a non-empty [BigArray](#bigarray).
 
 Fails if the array is empty.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L64" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L60" />
 
 ## `BigArray<T>.push`
 
 ```tolk
-fun BigArray<T>.push(mutate self, value: T)
+fun BigArray<T>.push(mutate self, value: T): void
 ```
 
 Appends [value](#bigarray\<t>push) to the end of [BigArray](#bigarray).
 
 Fails if array capacity exceeds 65025 elements.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L70" />
 
 ## `BigArray<T>.pop`
 
 ```tolk
-fun BigArray<T>.pop(mutate self)
+fun BigArray<T>.pop(mutate self): void
 ```
 
 Removes the last element from [BigArray](#bigarray).
 
 Fails if the array is empty.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L97" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L93" />
 
 ## `BigArray<T>.set`
 
 ```tolk
-fun BigArray<T>.set(mutate self, value: T, index: int)
+fun BigArray<T>.set(mutate self, value: T, index: int): void
 ```
 
 Replaces element at [index](#bigarray\<t>set) with [value](#bigarray\<t>push).
 
 Fails if [index](#bigarray\<t>set) is out of bounds.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L115" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L111" />
 
 ## `BigArray<T>.get`
 
@@ -140,5 +140,5 @@ Returns element at [index](#bigarray\<t>set).
 
 Fails if [index](#bigarray\<t>set) is out of bounds.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/big_array.tolk#L129" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L125" />
 

@@ -1,0 +1,1 @@
+Error: Localnet faucet returned error 500 Internal Server Error: {"error":"backend unavailable"}

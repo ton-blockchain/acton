@@ -1,0 +1,30 @@
+[package]
+name = "counter-app-project"
+description = "counter description"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.counter]
+name = "Counter"
+src = "contracts/src/counter.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+deploy-emulation = "acton script contracts/scripts/deploy.tolk"
+deploy-testnet = "acton script contracts/scripts/deploy.tolk --broadcast --net testnet"
+
+[mappings]
+acton = ".acton"
+contracts = "contracts/src"
+gen = "gen"
+tests = "contracts/tests"
+wrappers = "contracts/tests/wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# [ACTON_DOCS_URL]/acton-toml

@@ -3,7 +3,7 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const CS_MESSAGES: &str = r#"
+const CS_MESSAGES: &str = r"
 struct (0xCC510001) CsRoute {
     queryId: uint64
     mid: address
@@ -19,7 +19,7 @@ struct (0xCC510003) CsDelivered {
     queryId: uint64
     hop: uint8
 }
-"#;
+";
 
 const CS_ROOT_CONTRACT: &str = r#"
 import "cs_messages"

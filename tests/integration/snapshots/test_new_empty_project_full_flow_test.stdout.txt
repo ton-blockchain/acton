@@ -4,7 +4,10 @@
 
  TEST  [ROOT]/foobar
 
- > tests/contract.test.tolk (1 test)
-  ✓ something important [TIME]
+ > tests/contract.test.tolk (4 tests)
+  ✓ deploy exposes initial owner [TIME]
+  ✓ owner can transfer ownership [TIME]
+  ✓ non-owner cannot transfer ownership [TIME]
+  ✓ unknown message fails with named error [TIME]
 
- ✓ 1 passed in 1 file
+ ✓ 4 passed in 1 file

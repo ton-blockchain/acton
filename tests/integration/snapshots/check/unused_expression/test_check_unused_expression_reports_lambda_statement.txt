@@ -1,0 +1,11 @@
+warning[E032]: unused expression has no effect
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             fun() {};
+  |             ^^^^^^^^ expression result is ignored
+  |
+  = remove the expression or replace it with an assignment / mutation if you meant to update state
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E032

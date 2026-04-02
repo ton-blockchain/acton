@@ -1,0 +1,630 @@
+[
+  {
+    "type": "declaration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "global_var",
+          "named": true
+        },
+        {
+          "type": "method_declaration",
+          "named": true
+        },
+        {
+          "type": "proc_declaration",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "definition",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "method_definition",
+          "named": true
+        },
+        {
+          "type": "proc_definition",
+          "named": true
+        },
+        {
+          "type": "proc_inline_definition",
+          "named": true
+        },
+        {
+          "type": "proc_ref_definition",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "global_var",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "if_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "ifjmp_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "include_directive",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "instruction",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "hex_literal",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "if_statement",
+          "named": true
+        },
+        {
+          "type": "ifjmp_statement",
+          "named": true
+        },
+        {
+          "type": "instruction_block",
+          "named": true
+        },
+        {
+          "type": "negative_identifier",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "proc_call",
+          "named": true
+        },
+        {
+          "type": "repeat_statement",
+          "named": true
+        },
+        {
+          "type": "slice_literal",
+          "named": true
+        },
+        {
+          "type": "stack_op",
+          "named": true
+        },
+        {
+          "type": "stack_ref",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "until_statement",
+          "named": true
+        },
+        {
+          "type": "while_statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "instruction_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "method_declaration",
+    "named": true,
+    "fields": {
+      "id": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "method_definition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "negative_identifier",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "number",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "proc_call",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "proc_declaration",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "proc_definition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "proc_inline_definition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "proc_ref_definition",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "program",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "declaration",
+          "named": true
+        },
+        {
+          "type": "definition",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "repeat_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "slice_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "include_directive",
+          "named": true
+        },
+        {
+          "type": "program",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "stack_index",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "stack_op",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "stack_index",
+          "named": true
+        },
+        {
+          "type": "stack_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "stack_ref",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "string",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "until_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "while_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "\"",
+    "named": false
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": "-",
+    "named": false
+  },
+  {
+    "type": "<{",
+    "named": false
+  },
+  {
+    "type": "B{",
+    "named": false
+  },
+  {
+    "type": "CALLDICT",
+    "named": false
+  },
+  {
+    "type": "DECLGLOBVAR",
+    "named": false
+  },
+  {
+    "type": "DECLMETHOD",
+    "named": false
+  },
+  {
+    "type": "DECLPROC",
+    "named": false
+  },
+  {
+    "type": "ELSE<{",
+    "named": false
+  },
+  {
+    "type": "END>c",
+    "named": false
+  },
+  {
+    "type": "IF:<{",
+    "named": false
+  },
+  {
+    "type": "IFJMP:<{",
+    "named": false
+  },
+  {
+    "type": "INLINECALLDICT",
+    "named": false
+  },
+  {
+    "type": "METHOD:<{",
+    "named": false
+  },
+  {
+    "type": "PROC:<{",
+    "named": false
+  },
+  {
+    "type": "PROCINLINE:<{",
+    "named": false
+  },
+  {
+    "type": "PROCREF:<{",
+    "named": false
+  },
+  {
+    "type": "PROGRAM{",
+    "named": false
+  },
+  {
+    "type": "REPEAT:<{",
+    "named": false
+  },
+  {
+    "type": "UNTIL:<{",
+    "named": false
+  },
+  {
+    "type": "WHILE:<{",
+    "named": false
+  },
+  {
+    "type": "b{",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "hex_literal",
+    "named": true
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "include",
+    "named": false
+  },
+  {
+    "type": "s",
+    "named": false
+  },
+  {
+    "type": "x{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  },
+  {
+    "type": "}>",
+    "named": false
+  },
+  {
+    "type": "}>DO<{",
+    "named": false
+  }
+]

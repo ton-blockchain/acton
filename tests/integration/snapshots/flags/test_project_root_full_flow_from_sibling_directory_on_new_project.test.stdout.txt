@@ -1,0 +1,13 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]/runner
+
+ > ../generated-project/tests/contract.test.tolk (4 tests)
+  ✓ deploy exposes initial owner [TIME]
+  ✓ owner can transfer ownership [TIME]
+  ✓ non-owner cannot transfer ownership [TIME]
+  ✓ unknown message fails with named error [TIME]
+
+ ✓ 4 passed in 1 file

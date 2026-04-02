@@ -12,11 +12,11 @@ import "../../lib/types/message"
 import "../contracts/cu_messages"
 "#;
 
-const CU_MESSAGES: &str = r#"
+const CU_MESSAGES: &str = r"
 struct (0xC011AA11) CuNotice {
     queryId: uint64
 }
-"#;
+";
 
 const CU_FANOUT_CONTRACT: &str = r#"
 import "cu_messages"
@@ -40,11 +40,11 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const CU_FIXTURE_MESSAGES: &str = r#"
+const CU_FIXTURE_MESSAGES: &str = r"
 struct (0xC011AA22) CuFixtureNotice {
     id: uint32
 }
-"#;
+";
 
 const CU_FIXTURE_CONTRACT: &str = r#"
 import "cu_fixture_messages"

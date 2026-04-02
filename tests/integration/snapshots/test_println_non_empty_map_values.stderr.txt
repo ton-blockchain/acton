@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+map<int32, int32> {
+    1: 10,
+    2: 20,
+}

@@ -46,7 +46,7 @@
 use super::create_emulator;
 use crate::config::DEFAULT_CONFIG;
 use crate::message::types::{EmulationInternalParams, EmulationResult, RunTransactionArgs};
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -102,7 +102,8 @@ impl StepExecutor {
             .transpose()?;
         let libs_ptr = libs_cstr.as_ref().map_or(null(), |c| c.as_ptr());
 
-        let internal_params = EmulationInternalParams::from(params);
+        let internal_params = EmulationInternalParams::try_from(params)
+            .context("cannot build internal emulator params")?;
         let params_str =
             serde_json::to_string(&internal_params).context("cannot serialize params to JSON")?;
         let params_cstr = CString::new(params_str).context("params string contains null bytes")?;
@@ -148,6 +149,27 @@ impl StepExecutor {
         }
         // SAFETY: `ptr` is valid non-null pointer
         unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+    }
+
+    /// Gets the current TVM instruction at the current code position.
+    #[must_use]
+    pub fn get_current_instr(&self) -> String {
+        // SAFETY: `em_sbs_current_instr` is safe function
+        let ptr = unsafe { em_sbs_current_instr(self.inner.as_ptr()) };
+        if ptr.is_null() {
+            return String::new();
+        }
+        // SAFETY: `ptr` is valid non-null pointer
+        unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+    }
+
+    /// Gets the terminal uncaught exception code, if the SBS execution ended with one.
+    #[must_use]
+    pub fn get_uncaught_exception_code(&self) -> Option<i32> {
+        // SAFETY: `transaction_emulator_sbs_get_uncaught_exception_code` is safe function
+        let code =
+            unsafe { transaction_emulator_sbs_get_uncaught_exception_code(self.inner.as_ptr()) };
+        (code >= 0).then_some(code)
     }
 
     /// Gets the current stack (Base64 `BoC`).
@@ -231,6 +253,27 @@ impl StepExecutor {
 
         Ok(())
     }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &mut self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `transaction_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            crate::message::transaction_emulator_register_missing_library_callback(
+                self.inner.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 impl BaseExecutor for StepExecutor {
@@ -256,8 +299,10 @@ unsafe extern "C" {
 
     fn em_sbs_step(em: *mut c_void) -> bool;
     fn em_sbs_code_pos(em: *mut c_void) -> *mut c_char;
+    fn em_sbs_current_instr(em: *mut c_void) -> *mut c_char;
     fn em_sbs_stack(em: *mut c_void) -> *mut c_char;
     fn em_sbs_c7(em: *mut c_void) -> *mut c_char;
     fn transaction_emulator_sbs_get_control_register(em: *mut c_void, idx: c_int) -> *mut c_char;
+    fn transaction_emulator_sbs_get_uncaught_exception_code(em: *mut c_void) -> c_int;
     fn em_sbs_result(em: *mut c_void) -> *mut c_char;
 }

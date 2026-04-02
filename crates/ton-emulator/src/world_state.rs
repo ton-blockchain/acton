@@ -4,27 +4,47 @@
 //! and global libraries. The state can be managed purely locally or forked from a remote
 //! TON network (mainnet or testnet).
 
-use crate::remote;
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use num_traits::cast::ToPrimitive;
 use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
+use ton_api::TonApiClient;
 use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_CELL, DEFAULT_CONFIG_DICT};
 use ton_networks::Network;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellFamily, HashBytes, Lazy};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict;
 use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
-    StdAddr, StorageInfo,
+    StdAddr, StdAddrFormat, StorageInfo,
 };
+
+const WORLD_STATE_SNAPSHOT_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorldStateSnapshot {
+    pub version: u32,
+    pub current_lt: u64,
+    pub current_now: u32,
+    pub config_boc64: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub libraries_boc64: Vec<String>,
+    pub accounts: Vec<WorldStateAccountSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorldStateAccountSnapshot {
+    pub address: String,
+    pub shard_account_boc64: String,
+}
 
 /// Represents the source of the world state.
 ///
@@ -170,7 +190,9 @@ pub struct RemoteAccountState {
     pub fork_block_number: Option<u64>,
     /// Optional API key for `TonCenter`.
     pub api_key: Option<String>,
-    pub acton_config: Option<ActonConfig>,
+
+    /// Shared API client for network fetches.
+    api_client: OnceCell<TonApiClient>,
     /// Cache for less network queries in subsequent tests.
     cache: RemoteSnapshotCache,
 }
@@ -184,12 +206,14 @@ impl RemoteAccountState {
         api_key: Option<String>,
         cache: RemoteSnapshotCache,
     ) -> Self {
+        let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
+
         Self {
             accounts: FxHashMap::default(),
             fork_net,
             fork_block_number,
             api_key,
-            acton_config: ActonConfig::load().ok(),
+            api_client: OnceCell::new(),
             cache,
         }
     }
@@ -237,24 +261,9 @@ impl RemoteAccountState {
             return Ok(cached);
         }
 
-        let network = &self.fork_net;
-        let api_key = self
-            .api_key
-            .clone()
-            .or_else(|| env::var("TONCENTER_API_KEY").ok());
-
-        let mut custom_networks = HashMap::new();
-        if let Some(config) = &self.acton_config {
-            custom_networks = config.custom_networks()
-        }
-
-        let info = remote::get_account_info(
-            self.fork_block_number,
-            address,
-            network,
-            api_key,
-            custom_networks,
-        )?;
+        let info = self
+            .api_client()?
+            .get_account_info(self.fork_block_number, &address.to_string())?;
 
         let balance = info
             .balance
@@ -264,8 +273,8 @@ impl RemoteAccountState {
 
         let account_state = match info.state.as_str() {
             "active" => AccountState::Active(StateInit {
-                code: remote::decode_optional_cell(&info.code)?,
-                data: remote::decode_optional_cell(&info.data)?,
+                code: TonApiClient::decode_optional_cell(&info.code)?,
+                data: TonApiClient::decode_optional_cell(&info.data)?,
                 ..Default::default()
             }),
             "uninitialized" => AccountState::Uninit,
@@ -288,6 +297,22 @@ impl RemoteAccountState {
         };
         self.cache.insert(cache_key, acc.clone());
         Ok(acc)
+    }
+
+    fn api_client(&self) -> anyhow::Result<&TonApiClient> {
+        if self.api_client.get().is_none() {
+            let custom_networks = ActonConfig::load()
+                .ok()
+                .map(|config| config.custom_networks())
+                .unwrap_or_default();
+            let client =
+                TonApiClient::new(self.fork_net.clone(), custom_networks, self.api_key.clone())?;
+            let _ = self.api_client.set(client);
+        }
+
+        self.api_client
+            .get()
+            .ok_or_else(|| anyhow!("Failed to initialize Ton API client"))
     }
 }
 
@@ -402,7 +427,11 @@ impl WorldState {
     /// If the state is `Remote` and the account is not in the local cache, it will
     /// attempt to fetch it from the network to determine its status.
     pub fn check_deployed(&mut self, raw_addr: &StdAddr) -> bool {
-        let deployed = self.accounts_state.accounts().contains_key(raw_addr);
+        let deployed = self
+            .accounts_state
+            .accounts()
+            .get(raw_addr)
+            .is_some_and(shard_account_exists);
         if !deployed && matches!(self.accounts_state, AccountsState::Remote(_)) {
             // we need to populate address for the first time
             let account = self.get_account(raw_addr);
@@ -459,5 +488,112 @@ impl WorldState {
     #[must_use]
     pub const fn get_now(&self) -> u32 {
         self.current_now
+    }
+
+    pub fn snapshot(&self) -> anyhow::Result<WorldStateSnapshot> {
+        let mut accounts = self
+            .accounts_state
+            .accounts()
+            .iter()
+            .map(|(address, account)| {
+                if !shard_account_exists(account) {
+                    return Ok(None);
+                }
+
+                Ok(Some(WorldStateAccountSnapshot {
+                    address: address.display_base64_url(false).to_string(),
+                    shard_account_boc64: encode_shard_account_boc64(account)?,
+                }))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        accounts.sort_by(|left, right| left.address.cmp(&right.address));
+
+        let libraries_boc64 = self
+            .libraries
+            .iter()
+            .map(Boc::encode_base64)
+            .collect::<Vec<_>>();
+
+        Ok(WorldStateSnapshot {
+            version: WORLD_STATE_SNAPSHOT_VERSION,
+            current_lt: self.current_lt,
+            current_now: self.current_now,
+            config_boc64: self.snapshot_config_b64()?.into_owned(),
+            libraries_boc64,
+            accounts,
+        })
+    }
+
+    pub fn from_snapshot(snapshot: WorldStateSnapshot) -> anyhow::Result<Self> {
+        if snapshot.version != WORLD_STATE_SNAPSHOT_VERSION {
+            anyhow::bail!(
+                "Unsupported world state snapshot version: {}",
+                snapshot.version
+            );
+        }
+
+        let mut accounts = FxHashMap::default();
+        for entry in snapshot.accounts {
+            let (address, _) = StdAddr::from_str_ext(&entry.address, StdAddrFormat::any())
+                .map_err(|_| anyhow!("Invalid account address in snapshot: {}", entry.address))?;
+            let shard_account = decode_shard_account_boc64(&entry.shard_account_boc64)?;
+            if accounts.insert(address, shard_account).is_some() {
+                anyhow::bail!("Duplicate account address in snapshot: {}", entry.address);
+            }
+        }
+
+        let mut state = Self::new(
+            AccountsState::Local(LocalAccountsState { accounts }),
+            Some(&snapshot.config_boc64),
+        )?;
+        state.current_lt = snapshot.current_lt;
+        state.current_now = snapshot.current_now;
+
+        for lib_boc64 in snapshot.libraries_boc64 {
+            state.register_lib(Boc::decode_base64(&lib_boc64)?);
+        }
+
+        Ok(state)
+    }
+
+    pub fn load_snapshot(&mut self, snapshot: WorldStateSnapshot) -> anyhow::Result<()> {
+        *self = Self::from_snapshot(snapshot)?;
+        Ok(())
+    }
+}
+
+fn encode_shard_account_boc64(account: &ShardAccount) -> anyhow::Result<String> {
+    let mut builder = CellBuilder::new();
+    account.store_into(&mut builder, Cell::empty_context())?;
+    Ok(Boc::encode_base64(builder.build()?))
+}
+
+fn decode_shard_account_boc64(boc64: &str) -> anyhow::Result<ShardAccount> {
+    Ok(Boc::decode_base64(boc64)?.parse::<ShardAccount>()?)
+}
+
+fn shard_account_exists(account: &ShardAccount) -> bool {
+    account
+        .account
+        .load()
+        .map(|loaded| loaded.0.is_some())
+        .unwrap_or(false)
+}
+
+impl WorldState {
+    fn snapshot_config_b64(&self) -> anyhow::Result<Cow<'_, str>> {
+        if self.config == *DEFAULT_CONFIG_DICT {
+            return Ok(Cow::Borrowed(DEFAULT_CONFIG));
+        }
+
+        let root = self
+            .config
+            .root()
+            .clone()
+            .ok_or_else(|| anyhow!("Config has no root"))?;
+        Ok(Cow::Owned(Boc::encode_base64(root)))
     }
 }

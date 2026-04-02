@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const AM_MESSAGES: &str = r#"
+const AM_MESSAGES: &str = r"
 struct (0xA0C0A001) Ping {
     queryId: uint64
     amount: uint32
@@ -16,7 +16,7 @@ struct (0xA0C0A002) Notify {
 struct (0xA0C0A003) Other {
     queryId: uint64
 }
-"#;
+";
 
 const AM_WORKER_CONTRACT: &str = r#"
 import "messages"
@@ -64,6 +64,7 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/message"
 import "../../lib/types/transaction"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
@@ -145,7 +146,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints() {
     run_success_case(
         "am-stdlib-transaction-load-body-and-load-in-msg",
-        r#"
+        r"
 get fun `test-am-transaction-load-body-and-load-in-msg`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 11, 7);
@@ -166,7 +167,7 @@ get fun `test-am-transaction-load-body-and-load-in-msg`() {
     expect(inMsg.info.src).toEqual(sender.address as any_address);
     expect(inMsg.info.dest).toEqual(workerAddress);
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints.stdout.txt",
     );
 }
@@ -175,7 +176,7 @@ get fun `test-am-transaction-load-body-and-load-in-msg`() {
 fn transaction_load_body_reports_exit_code63_for_mismatched_message_type() {
     run_success_case(
         "am-stdlib-transaction-load-body-mismatch",
-        r#"
+        r"
 get fun `test-am-transaction-load-body-mismatch`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 21, 9);
@@ -187,7 +188,7 @@ get fun `test-am-transaction-load-body-mismatch`() {
     expectToEndWithExitCode(63);
     tx.loadBody<Other>();
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_load_body_reports_exit_code63_for_mismatched_message_type.stdout.txt",
     );
 }
@@ -196,7 +197,7 @@ get fun `test-am-transaction-load-body-mismatch`() {
 fn transaction_load_in_msg_reports_exit_code63_for_mismatched_message_type() {
     run_success_case(
         "am-stdlib-transaction-load-in-msg-mismatch",
-        r#"
+        r"
 get fun `test-am-transaction-load-in-msg-mismatch`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 31, 5);
@@ -208,7 +209,7 @@ get fun `test-am-transaction-load-in-msg-mismatch`() {
     expectToEndWithExitCode(63);
     tx.loadInMsg<Other>().loadBody();
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_load_in_msg_reports_exit_code63_for_mismatched_message_type.stdout.txt",
     );
 }
@@ -217,7 +218,7 @@ get fun `test-am-transaction-load-in-msg-mismatch`() {
 fn transaction_get_used_gas_matches_send_result_for_root_and_child_transactions() {
     run_success_case(
         "am-stdlib-transaction-get-used-gas-for-root-and-child",
-        r#"
+        r"
 get fun `test-am-transaction-get-used-gas-for-root-and-child`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 41, 10);
@@ -239,7 +240,7 @@ get fun `test-am-transaction-get-used-gas-for-root-and-child`() {
     expect(rootTx.getUsedGas()).toBeGreater(255);
     expect(childTx.getUsedGas()).toBeGreater(255);
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_get_used_gas_matches_send_result_for_root_and_child_transactions.stdout.txt",
     );
 }
@@ -284,7 +285,7 @@ get fun `test-am-transaction-get-used-gas-skipped-compute`() {
 fn transaction_get_action_fee_matches_transaction_description_and_none_branch() {
     run_success_case(
         "am-stdlib-transaction-get-action-fee-match-and-none",
-        r#"
+        r"
 fun expectedActionFee(tx: Transaction): Maybe<coins> {
     val descr = tx.description.load();
     if (descr is TransOrd) {
@@ -320,7 +321,7 @@ get fun `test-am-transaction-get-action-fee-match-and-none`() {
     expect(noActionTx.getActionFee()).toEqual(expectedActionFee(noActionTx));
     expect(noActionTx.getActionFee()).toBeNone();
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_get_action_fee_matches_transaction_description_and_none_branch.stdout.txt",
     );
 }
@@ -329,7 +330,7 @@ get fun `test-am-transaction-get-action-fee-match-and-none`() {
 fn transaction_get_account_address_defaults_to_basechain_and_supports_masterchain_override() {
     run_success_case(
         "am-stdlib-transaction-get-account-address-workchain-override",
-        r#"
+        r"
 get fun `test-am-transaction-get-account-address-workchain-override`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 71, 3);
@@ -343,7 +344,7 @@ get fun `test-am-transaction-get-account-address-workchain-override`() {
     expect(tx.getAccountAddress(BASECHAIN)).toEqual(workerAddress);
     expect(tx.getAccountAddress(MASTERCHAIN)).toNotEqual(workerAddress);
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_get_account_address_defaults_to_basechain_and_supports_masterchain_override.stdout.txt",
     );
 }
@@ -352,7 +353,7 @@ get fun `test-am-transaction-get-account-address-workchain-override`() {
 fn transaction_varuint7_roundtrip_for_storage_used_large_values_bug() {
     run_success_case(
         "am-stdlib-transaction-varuint7-roundtrip-bug",
-        r#"
+        r"
 get fun `test-am-transaction-varuint7-roundtrip-bug`() {
     val original = StorageUsed {
         cells: 1024,
@@ -363,7 +364,7 @@ get fun `test-am-transaction-varuint7-roundtrip-bug`() {
     expect(decoded.cells).toEqual(original.cells);
     expect(decoded.bits).toEqual(original.bits);
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_varuint7_roundtrip_for_storage_used_large_values_bug.stdout.txt",
     );
 }

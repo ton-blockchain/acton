@@ -1,16 +1,28 @@
 use crate::debugging::{DebuggerClient, run_script_file};
+use crate::support::project::Project;
 use crate::support::snapshots::normalize_output;
 use crate::support::tempdir::create_tmp_dir;
+use anyhow::Context;
 use dap::types::StackFrame;
 use std::cmp::max;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::net::TcpListener;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tempfile::TempDir;
 use tvmffi::stack::{Tuple, TupleItem};
+
+pub(crate) fn render_variable_value(var: &dap::types::Variable) -> String {
+    match (var.value.as_str(), var.type_field.as_deref()) {
+        ("", Some(type_name)) => type_name.to_string(),
+        ("(last seen)", Some(type_name)) => format!("{type_name} (last seen)"),
+        ("(lazy, unresolved)", Some(type_name)) => format!("{type_name} (lazy, unresolved)"),
+        _ => var.value.clone(),
+    }
+}
 
 pub(crate) struct ProjectRef {
     pub path: PathBuf,
@@ -21,9 +33,11 @@ pub(crate) struct DebugBuilder {
     temp_dir: TempDir,
     code: String,
     project_path: Option<PathBuf>,
+    project: Option<Project>,
     script_file: Option<String>,
     debug_port: Option<u16>,
     stack: Option<Tuple>,
+    expected_execution_error: Option<String>,
 }
 
 impl DebugBuilder {
@@ -34,9 +48,11 @@ impl DebugBuilder {
             temp_dir,
             code: String::new(),
             project_path: None,
+            project: None,
             script_file: None,
             debug_port: None,
             stack: None,
+            expected_execution_error: None,
         }
     }
 
@@ -45,8 +61,9 @@ impl DebugBuilder {
         self
     }
 
-    pub(crate) fn project<P: AsRef<Path>>(mut self, path: P) -> Self {
-        self.project_path = Some(path.as_ref().to_path_buf());
+    pub(crate) fn project_ref(mut self, project: Project) -> Self {
+        self.project_path = Some(project.path().to_path_buf());
+        self.project = Some(project);
         self
     }
 
@@ -64,6 +81,11 @@ impl DebugBuilder {
         let mut tuple = Tuple::empty();
         tuple.push(TupleItem::Int(value.into()));
         self.stack = Some(tuple);
+        self
+    }
+
+    pub(crate) fn expect_execution_error(mut self, expected_error: &str) -> Self {
+        self.expected_execution_error = Some(expected_error.to_string());
         self
     }
 
@@ -91,7 +113,17 @@ impl DebugBuilder {
             project_path.join("debug_script.tolk")
         };
 
-        let debug_port = self.debug_port.unwrap_or_else(find_available_port);
+        let (debug_port, debug_listener) = if let Some(port) = self.debug_port {
+            (port, None)
+        } else {
+            let listener =
+                TcpListener::bind(("127.0.0.1", 0)).expect("Failed to reserve a debug port");
+            let port = listener
+                .local_addr()
+                .expect("Failed to inspect reserved debug port")
+                .port();
+            (port, Some(listener))
+        };
 
         let project_ref = Arc::new(ProjectRef { path: project_path });
         let stack = self.stack.unwrap_or_else(Tuple::empty);
@@ -100,50 +132,61 @@ impl DebugBuilder {
             project_ref,
             code_path,
             debug_port,
+            debug_listener,
             stack,
+            expected_execution_error: self.expected_execution_error,
+            _project: self.project,
             _temp_dir: self.temp_dir,
             client_handle: None,
         }
     }
 }
 
-fn find_available_port() -> u16 {
-    use std::net::TcpListener;
-
-    for port in 42075..43000 {
-        if TcpListener::bind(("127.0.0.1", port)).is_ok() {
-            return port;
-        }
-    }
-    panic!("No available debug ports found");
-}
-
 pub(crate) struct DebugSession {
     project_ref: Arc<ProjectRef>,
     code_path: PathBuf,
     debug_port: u16,
+    debug_listener: Option<TcpListener>,
     stack: Tuple,
+    expected_execution_error: Option<String>,
+    _project: Option<Project>,
     _temp_dir: TempDir,
-    client_handle: Option<JoinHandle<()>>,
+    client_handle: Option<JoinHandle<anyhow::Result<String>>>,
 }
 
 impl DebugSession {
     pub(crate) fn start(mut self) -> DebugClient {
         let code = self.code_path.to_string_lossy().to_string();
         let port = self.debug_port;
+        let debug_listener = self.debug_listener.take();
 
         let source_content = fs::read_to_string(&code).expect("Failed to read code file");
 
         let stack = self.stack.clone();
         let handle = thread::spawn(move || {
-            let result = run_script_file(&code, &source_content, port, stack)
-                .expect("Failed to run debug script");
-            println!("Debug execution finished: {}", result);
+            run_script_file(&code, &source_content, port, debug_listener, stack)
         });
 
-        let address = format!("127.0.0.1:{}", port);
-        let client = DebuggerClient::connect_with_retry(&address, Duration::from_millis(2000))
-            .expect("Failed to connect to debug server");
+        let address = format!("127.0.0.1:{port}");
+        let client = match DebuggerClient::connect_with_retry(&address, Duration::from_secs(5)) {
+            Ok(client) => client,
+            Err(connect_err) => {
+                let worker_result = handle.join();
+                match worker_result {
+                    Ok(Err(worker_err)) => {
+                        panic!(
+                            "Failed to connect to debug server: {connect_err}\nWorker exited early with: {worker_err}"
+                        );
+                    }
+                    Ok(Ok(_)) => {
+                        panic!(
+                            "Failed to connect to debug server: {connect_err}\nWorker finished before debugger handshake"
+                        );
+                    }
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+        };
 
         self.client_handle = Some(handle);
 
@@ -151,6 +194,7 @@ impl DebugSession {
             client: Some(client),
             session: self,
             trace: ExecutionTrace::new(),
+            terminated: false,
         }
     }
 }
@@ -159,6 +203,7 @@ pub(crate) struct DebugClient {
     client: Option<DebuggerClient>,
     pub session: DebugSession,
     trace: ExecutionTrace,
+    terminated: bool,
 }
 
 impl DebugClient {
@@ -169,10 +214,12 @@ impl DebugClient {
         let mut executor = DebugActionExecutor {
             client: self.client.as_mut().unwrap(),
             trace: &mut self.trace,
+            terminated: &mut self.terminated,
         };
         executor.record_state_with_action("before".to_owned())?;
 
         actions(&mut executor)?;
+        self.finish_execution()?;
 
         Ok(DebugResult {
             trace: self.trace.clone(),
@@ -182,46 +229,179 @@ impl DebugClient {
 
     #[allow(dead_code)]
     pub(crate) fn terminate(mut self) -> anyhow::Result<()> {
-        if let Some(mut client) = self.client.take() {
-            client.terminate()
-        } else {
-            Ok(())
+        self.finish_execution()
+    }
+
+    fn finish_execution(&mut self) -> anyhow::Result<()> {
+        let Some(handle) = self.session.client_handle.take() else {
+            return Ok(());
+        };
+
+        let mut client = self.client.take();
+        if !handle.is_finished()
+            && let Some(client) = client.as_mut()
+        {
+            match client.terminate() {
+                Ok(()) => {}
+                Err(err)
+                    if DebugActionExecutor::is_terminated_error(&err)
+                        || Self::is_closed_transport_error(&err) => {}
+                Err(err) => {
+                    if !handle.is_finished() {
+                        return Err(err).context("failed to terminate debug session");
+                    }
+                }
+            }
         }
+
+        match handle.join() {
+            Ok(Ok(_output)) => {
+                if let Some(expected_error) = &self.session.expected_execution_error {
+                    anyhow::bail!(
+                        "expected debug execution to fail with '{expected_error}', but it succeeded"
+                    );
+                }
+                Ok(())
+            }
+            Ok(Err(err)) => {
+                if let Some(expected_error) = &self.session.expected_execution_error {
+                    if err.to_string().contains(expected_error) {
+                        return Ok(());
+                    }
+                    return Err(err).context(format!(
+                        "debug execution failed with an unexpected error, expected '{expected_error}'"
+                    ));
+                }
+                Err(err).context("debug execution failed")
+            }
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+
+    fn is_closed_transport_error(err: &anyhow::Error) -> bool {
+        err.to_string().contains("Timeout waiting for response")
+            || err.downcast_ref::<std::io::Error>().is_some_and(|io_err| {
+                matches!(
+                    io_err.kind(),
+                    std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::NotConnected
+                        | std::io::ErrorKind::UnexpectedEof
+                )
+            })
+    }
+}
+
+impl Drop for DebugClient {
+    fn drop(&mut self) {
+        if thread::panicking() {
+            return;
+        }
+
+        let _ = self.finish_execution();
     }
 }
 
 pub(crate) struct DebugActionExecutor<'a> {
     client: &'a mut DebuggerClient,
     trace: &'a mut ExecutionTrace,
+    terminated: &'a mut bool,
 }
 
-impl<'a> DebugActionExecutor<'a> {
+impl DebugActionExecutor<'_> {
+    fn is_terminated_error(err: &anyhow::Error) -> bool {
+        err.to_string()
+            .contains("The debugger terminated, probably because you stepped too many times")
+    }
+
+    fn run_step<T>(
+        &mut self,
+        action: String,
+        step: impl FnOnce(&mut DebuggerClient) -> anyhow::Result<T>,
+    ) -> anyhow::Result<()> {
+        if *self.terminated {
+            return Ok(());
+        }
+
+        match step(self.client) {
+            Ok(_) => self.record_state_with_action(action),
+            Err(err) if Self::is_terminated_error(&err) => {
+                *self.terminated = true;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     fn record_state_with_action(&mut self, action: String) -> anyhow::Result<()> {
         let thread_id = 1;
-        let positions = self.client.stack_trace(thread_id)?;
-        let variables = self.client.variables(thread_id)?;
+        let positions = match self.client.stack_trace(thread_id) {
+            Ok(positions) => positions,
+            Err(err) if Self::is_terminated_error(&err) => {
+                *self.terminated = true;
+                return Ok(());
+            }
+            Err(err) => return Err(err),
+        };
+        let variables = match self.client.variables(thread_id) {
+            Ok(variables) => variables,
+            Err(err) if Self::is_terminated_error(&err) => {
+                *self.terminated = true;
+                return Ok(());
+            }
+            Err(err) => return Err(err),
+        };
 
         self.trace.add_step(positions, variables, action);
         Ok(())
     }
 
     pub(crate) fn step_in(&mut self) -> anyhow::Result<()> {
-        self.client.step_in(1)?;
-        self.record_state_with_action("step_in".to_string())
+        self.run_step("step_in".to_string(), |client| client.step_in(1))
+    }
+
+    pub(crate) fn step_in_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_in()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn step_over(&mut self) -> anyhow::Result<()> {
-        self.client.step_over(1)?;
-        self.record_state_with_action("step_over".to_string())
+        self.run_step("step_over".to_string(), |client| client.step_over(1))
+    }
+
+    pub(crate) fn step_over_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_over()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn step_out(&mut self) -> anyhow::Result<()> {
-        self.client.step_out(1)?;
-        self.record_state_with_action("step_out".to_string())
+        self.run_step("step_out".to_string(), |client| client.step_out(1))
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn step_out_times(&mut self, count: usize) -> anyhow::Result<()> {
+        for _ in 0..count {
+            self.step_out()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn continue_execution(&mut self) -> anyhow::Result<()> {
-        self.client.continue_execution(1)?;
+        if *self.terminated {
+            return Ok(());
+        }
+
+        match self.client.continue_execution(1) {
+            Ok(_) => {}
+            Err(err) if Self::is_terminated_error(&err) => {
+                *self.terminated = true;
+            }
+            Err(err) => return Err(err),
+        }
         Ok(())
         // self.record_state_with_action("continue".to_string())
     }
@@ -260,7 +440,6 @@ pub(crate) struct ExecutionTrace {
 #[derive(Debug, Clone)]
 pub(crate) struct ExecutionStep {
     pub step_number: usize,
-    pub positions: Vec<StackFrame>,
     pub variables: Vec<dap::types::Variable>,
     pub action: String,
     pub code_context: Vec<String>,
@@ -281,7 +460,6 @@ impl ExecutionTrace {
         let code_context = self.get_code_context(&positions);
         self.steps.push(ExecutionStep {
             step_number,
-            positions,
             variables,
             action,
             code_context,
@@ -309,7 +487,7 @@ impl ExecutionTrace {
 
                 for (i, line) in content.iter().enumerate().take(end_line).skip(start_line) {
                     let line_num = i + 1;
-                    context.push(format!("{:3}| {}", line_num, line));
+                    context.push(format!("{line_num:3}| {line}"));
                 }
 
                 if line_idx >= start_line && line_idx < end_line {
@@ -359,27 +537,21 @@ impl ExecutionTrace {
         for step in &self.steps {
             result.push_str(&format!("Step {} ({}):\n", step.step_number, step.action));
 
-            result.push_str(&format!(
-                "  Bytecode position: {}\n",
-                step.positions
-                    .first()
-                    .cloned()
-                    .unwrap_or_default()
-                    .instruction_pointer_reference
-                    .unwrap_or_else(|| "<unknown-position>".to_owned())
-            ));
-
             if !step.code_context.is_empty() {
                 result.push_str("  Code:\n");
                 for line in &step.code_context {
-                    result.push_str(&format!("    {}\n", line));
+                    result.push_str(&format!("    {line}\n"));
                 }
             }
 
             if !step.variables.is_empty() {
                 result.push_str("  Variables:\n");
                 for var in &step.variables {
-                    result.push_str(&format!("    {} = {}\n", var.name, var.value));
+                    result.push_str(&format!(
+                        "    {} = {}\n",
+                        var.name,
+                        render_variable_value(var)
+                    ));
                 }
             }
 

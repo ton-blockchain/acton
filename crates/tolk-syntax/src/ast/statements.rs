@@ -1,7 +1,6 @@
 use crate::ast::AstNode;
 use crate::ast::expressions::{Expr, Ident, Match};
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::HasTreeSitterKind;
 use crate::{AstNodeBytesKind, impl_ast_node};
 use tree_sitter::Node;
 
@@ -101,6 +100,7 @@ pub struct Block<'tree>(pub Node<'tree>);
 impl_ast_node!(Block, "block_statement");
 
 impl<'tree> Block<'tree> {
+    #[must_use]
     pub fn stmts(&self) -> AstChildren<'tree, Stmt<'tree>> {
         AstChildren::new(self.0)
     }

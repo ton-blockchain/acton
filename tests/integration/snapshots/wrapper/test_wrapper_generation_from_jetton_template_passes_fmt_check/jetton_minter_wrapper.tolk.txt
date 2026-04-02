@@ -1,0 +1,160 @@
+import "@stdlib/gas-payments"
+import "@acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/assert"
+import "@acton/testing/expect"
+import "@acton/types/message"
+import "@contracts/messages"
+import "@contracts/storage"
+
+struct JettonMinterContract {
+    address: address
+    stateInit: ContractState? = null
+}
+
+/// Creates a contract wrapper instance from the storage data
+fun JettonMinterContract.fromStorage(
+    storage: MinterStorage,
+    toShard: AddressShardingOptions? = null,
+) {
+    val stateInit = ContractState {
+        code: build("jetton_minter"),
+        data: storage.toCell(),
+    };
+    val address = toShard == null
+        ? AutoDeployAddress { stateInit }.calculateAddress()
+        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    return JettonMinterContract { address, stateInit };
+}
+
+/// Creates a contract wrapper instance from the address
+fun JettonMinterContract.fromAddress(address: address) {
+    return JettonMinterContract { address };
+}
+
+/// Deploys the contract to the blockchain
+fun JettonMinterContract.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    if (self.stateInit == null) {
+        Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
+    }
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: { stateInit: self.stateInit },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.sendBurnNotificationForMinter(
+    self,
+    from: address,
+    queryId: uint64,
+    jettonAmount: coins,
+    burnInitiator: address,
+    sendExcessesTo: address?,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: BurnNotificationForMinter { queryId, jettonAmount, burnInitiator, sendExcessesTo },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.sendRequestWalletAddress(
+    self,
+    from: address,
+    queryId: uint64,
+    ownerAddress: address,
+    includeOwnerAddress: bool,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: RequestWalletAddress { queryId, ownerAddress, includeOwnerAddress },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.sendMintNewJettons(
+    self,
+    from: address,
+    queryId: uint64,
+    mintRecipient: address,
+    tonAmount: coins,
+    internalTransferMsg: InternalTransferStep,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: MintNewJettons {
+            queryId,
+            mintRecipient,
+            tonAmount,
+            internalTransferMsg: internalTransferMsg.toCell(),
+        },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.sendChangeMinterAdmin(
+    self,
+    from: address,
+    queryId: uint64,
+    newAdminAddress: address,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: ChangeMinterAdmin { queryId, newAdminAddress },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.sendChangeMinterContent(
+    self,
+    from: address,
+    queryId: uint64,
+    newContent: cell,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: ChangeMinterContent { queryId, newContent },
+    });
+    return net.send(from, genericMsg);
+}
+
+/// Send message to the contract with a custom body cell
+fun JettonMinterContract.sendAny(
+    self,
+    from: address,
+    body: cell,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body,
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinterContract.getJettonData(self): JettonDataReply {
+    return net.runGetMethod(self.address, "get_jetton_data");
+}
+
+fun JettonMinterContract.getWalletAddress(self, ownerAddress: address): address {
+    return net.runGetMethod(self.address, "get_wallet_address", ownerAddress);
+}

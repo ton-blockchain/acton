@@ -1,0 +1,26 @@
+[package]
+name = "my-acton-project"
+description = "A TON blockchain project"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.my_contract]
+name = "My Contract"
+src = "contracts/my_contract.tolk"
+depends = []
+
+[contracts.my_contract_v2]
+name = "My Contract V2"
+src = "contracts/my-contract-v2.tolk"
+depends = []
+
+[fmt]
+width = 100
+ignore = []
+
+[mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "tests/wrappers"

@@ -1,0 +1,4 @@
+Error: In simple:
+
+Failed to save build artifact file readonly/simple.json: Permission denied ([OS_ERROR])
+Build failed with 1 error

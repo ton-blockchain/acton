@@ -235,10 +235,7 @@ struct (0b11) ExternalOutMessageInfo {
 /// - `0b0`: [InternalMessage]
 /// - `0b10`: [ExternalInMessageInfo]
 /// - `0b11`: [ExternalOutMessageInfo]
-type CommonMessageInfo =
-    | InternalMessage
-    | ExternalInMessageInfo
-    | ExternalOutMessageInfo
+type CommonMessageInfo = InternalMessage | ExternalInMessageInfo | ExternalOutMessageInfo
 
 /// Generic message structure with configurable body and info types.
 ///
@@ -265,7 +262,7 @@ fun Message<TBody, TInfo>.loadBody(self): TBody {
 
 struct implMsg
 
-fun implMsg.loadOpcode(body: slice, skipBounce: bool) {
+fun implMsg.loadOpcode(body: slice, skipBounce: bool): int? {
     var slice = body;
     if (slice.loadBool()) {
         // actual body in the ref

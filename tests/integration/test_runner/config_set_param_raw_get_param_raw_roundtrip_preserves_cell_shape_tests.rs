@@ -25,7 +25,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape() {
     run_config_success_case(
         "dm-stdlib-config-raw-roundtrip",
-        r#"
+        r"
 get fun `test-dm-stdlib-config-raw-roundtrip`() {
     var config = net.getConfig();
 
@@ -45,7 +45,7 @@ get fun `test-dm-stdlib-config-raw-roundtrip`() {
     var nested = parsed.loadRef().beginParse();
     expect(nested.loadInt(8)).toEqual(-77);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape/config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape.stdout.txt",
     );
 }
@@ -54,7 +54,7 @@ get fun `test-dm-stdlib-config-raw-roundtrip`() {
 fn config_set_param_raw_overwrite_keeps_neighbor_slot_unchanged() {
     run_config_success_case(
         "dm-stdlib-config-neighbor-isolation",
-        r#"
+        r"
 get fun `test-dm-stdlib-config-neighbor-isolation`() {
     var config = net.getConfig();
 
@@ -80,7 +80,7 @@ get fun `test-dm-stdlib-config-neighbor-isolation`() {
     expect(rightSlice.loadUint(8)).toEqual(0x22);
     expect(rightSlice.loadUint(8)).toEqual(0xBB);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape/config_set_param_raw_overwrite_keeps_neighbor_slot_unchanged.stdout.txt",
     );
 }

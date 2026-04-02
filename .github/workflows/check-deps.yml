@@ -1,0 +1,60 @@
+name: Check Dependencies
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-deps.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "deny.toml"
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  check-dependencies:
+    name: Check Dependencies
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-2-ubuntu-2204
+            os: linux
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        with:
+          tool: cargo-deny@0.19.0
+
+      - name: Run cargo-deny
+        run: cargo deny check

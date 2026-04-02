@@ -2963,9 +2963,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"docs2@workspace:.":
+"docs@workspace:.":
   version: 0.0.0-use.local
-  resolution: "docs2@workspace:."
+  resolution: "docs@workspace:."
   dependencies:
     "@orama/orama": "npm:^3.1.16"
     "@tailwindcss/postcss": "npm:^4.1.17"

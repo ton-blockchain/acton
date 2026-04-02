@@ -1,0 +1,27 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions: { }
+
+jobs:
+  label:
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    if: github.repository == 'ton-blockchain/acton'
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Label PR by changed files
+        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          sync-labels: true

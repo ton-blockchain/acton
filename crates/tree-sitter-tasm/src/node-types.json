@@ -1,0 +1,388 @@
+[
+  {
+    "type": "argument",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "code",
+          "named": true
+        },
+        {
+          "type": "control_register",
+          "named": true
+        },
+        {
+          "type": "data_literal",
+          "named": true
+        },
+        {
+          "type": "dictionary",
+          "named": true
+        },
+        {
+          "type": "integer_literal",
+          "named": true
+        },
+        {
+          "type": "stack_element",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "code",
+    "named": true,
+    "fields": {
+      "instructions": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "instructions",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "data_literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "bin_literal",
+          "named": true
+        },
+        {
+          "type": "boc_literal",
+          "named": true
+        },
+        {
+          "type": "hex_literal",
+          "named": true
+        },
+        {
+          "type": "string_literal",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "default_exotic",
+    "named": true,
+    "fields": {
+      "data": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "data_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "dictionary",
+    "named": true,
+    "fields": {
+      "entries": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "dictionary_entry",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "dictionary_entry",
+    "named": true,
+    "fields": {
+      "code": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "code",
+            "named": true
+          }
+        ]
+      },
+      "id": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "integer_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "embed_slice",
+    "named": true,
+    "fields": {
+      "data": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "data_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "kw_embed",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "exotic",
+    "named": true,
+    "fields": {
+      "lib": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "default_exotic",
+            "named": true
+          },
+          {
+            "type": "exotic_library",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "kw_exotic",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "exotic_library",
+    "named": true,
+    "fields": {
+      "data": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "data_literal",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "kw_library",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "explicit_ref",
+    "named": true,
+    "fields": {
+      "code": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "code",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "kw_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "instruction",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "argument",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "instructions",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "embed_slice",
+          "named": true
+        },
+        {
+          "type": "exotic",
+          "named": true
+        },
+        {
+          "type": "explicit_ref",
+          "named": true
+        },
+        {
+          "type": "instruction",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "instructions",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "=>",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "bin_literal",
+    "named": true
+  },
+  {
+    "type": "boc_literal",
+    "named": true
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "control_register",
+    "named": true
+  },
+  {
+    "type": "hex_literal",
+    "named": true
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "integer_literal",
+    "named": true
+  },
+  {
+    "type": "kw_embed",
+    "named": true
+  },
+  {
+    "type": "kw_exotic",
+    "named": true
+  },
+  {
+    "type": "kw_library",
+    "named": true
+  },
+  {
+    "type": "kw_ref",
+    "named": true
+  },
+  {
+    "type": "stack_element",
+    "named": true
+  },
+  {
+    "type": "string_literal",
+    "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]

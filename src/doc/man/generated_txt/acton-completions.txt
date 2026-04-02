@@ -1,0 +1,161 @@
+ACTON-COMPLETIONS(1)
+
+NAME
+       acton-completions — Generate static shell completion scripts
+
+SYNOPSIS
+       acton completions [options] shell
+
+DESCRIPTION
+       Generate a static completion script for the selected shell.
+
+       Acton also supports dynamic completions through the COMPLETE=<shell>
+       acton mechanism. Dynamic completions are usually more powerful because
+       they can use project context such as contract and script names.
+
+QUICK START
+       o  for dynamic completions, prefer COMPLETE=<shell> acton
+
+       o  for a static script without editing shell startup files yet, run
+          acton completions <shell> and inspect the output first
+
+       o  regenerate static completion files after upgrading Acton
+
+OPTIONS
+   Completion Options
+       shell
+           Shell to generate completions for.
+
+           Possible values: bash, elvish, fish, powershell, zsh
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project manifest for its
+           primary workflow. It remains mutually exclusive with --project-root.
+
+       --project-root path
+           Accepted as a global Acton option for CLI consistency.
+
+           This command does not require an existing project root for its
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
+
+DYNAMIC COMPLETIONS
+       Dynamic completions are recommended when your shell supports them.
+
+   Zsh
+       Add this to ~/.zshrc:
+
+           source <(COMPLETE=zsh acton)
+
+   Bash
+       Add this to ~/.bashrc:
+
+           source <(COMPLETE=bash acton)
+
+   Fish
+       Add this to ~/.config/fish/config.fish:
+
+           COMPLETE=fish acton | source
+
+STATIC INSTALLATION
+       acton completions writes the completion script to standard output.
+       Typical installation patterns include:
+
+   Bash
+       For the current shell session:
+
+           source <(acton completions bash)
+
+       For a persistent setup, either append to ~/.bashrc:
+
+           acton completions bash >> ~/.bashrc
+
+       or install into the system completion directory:
+
+           acton completions bash | sudo tee /usr/share/bash-completion/completions/acton
+
+   Zsh
+       Zsh usually expects the completion file in a directory listed in $fpath:
+
+           mkdir -p ~/.zsh/completions
+           acton completions zsh > ~/.zsh/completions/_acton
+           echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+           echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+
+       Reload the shell or run:
+
+           source ~/.zshrc
+
+   Fish
+           acton completions fish > ~/.config/fish/completions/acton.fish
+
+   PowerShell
+       For the current session:
+
+           acton completions powershell | Out-String | Invoke-Expression
+
+       For a persistent setup, add the generated script to your PowerShell
+       profile.
+
+   Elvish
+           acton completions elvish > ~/.elvish/completions/acton.elv
+
+       Then load it from ~/.elvish/rc.elv:
+
+           use completions/acton
+
+VERIFYING INSTALLATION
+       After installation, try:
+
+           acton <TAB>
+           acton test --<TAB>
+
+       You should see command names and flag suggestions from the selected
+       shell.
+
+TROUBLESHOOTING
+       o  if static completions show old commands, regenerate them after
+          updating Acton
+
+       o  Zsh usually needs compinit after changing completion locations
+
+       o  if Zsh still does not complete, delete ~/.zcompdump and rerun
+          compinit
+
+       o  Bash may require the shell-specific completion package to be
+          installed
+
+       o  if PowerShell completions do not persist, verify that the generated
+          script is loaded from $PROFILE
+
+EXIT STATUS
+       o  0: The completion script was generated successfully.
+
+       o  1: The shell value was unsupported or output could not be written.
+
+EXAMPLES
+       1. Generate a static Zsh script:
+
+              acton completions zsh
+
+       2. Enable dynamic Bash completions:
+
+              source <(COMPLETE=bash acton)
+
+       3. Inspect generated output without installing it:
+
+              acton completions zsh | head
+
+SEE ALSO
+       o  Shell completions guide
+          <https://ton-blockchain.github.io/acton/docs/commands/shell-completions>
+

@@ -17,7 +17,17 @@
 //! }
 //! ```
 
+use ton_objs as _;
+
 pub mod abi;
 pub mod compiler;
+pub mod debug_marks_dict;
+pub mod source_map;
+pub mod tolk_source_map;
+pub mod types_kernel;
+mod version;
 
 pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};
+pub use source_map::SourceMap;
+pub use tolk_source_map::TolkSourceMap;
+pub use version::{NativeTolkVersion, native_tolk_version};

@@ -287,7 +287,7 @@ mod tests {
     fn test_string_from_stack() {
         // Test successful string conversion from slice
         let mut tuple = Tuple::empty();
-        tuple.push_string("Hello World");
+        tuple.push_string_slice("Hello World");
         let TupleItem::Slice(slice) = &tuple.0[0] else {
             panic!("Expected slice");
         };
@@ -297,7 +297,7 @@ mod tests {
 
         // Test empty string
         let mut tuple = Tuple::empty();
-        tuple.push_string("");
+        tuple.push_string_slice("");
         let TupleItem::Slice(slice) = &tuple.0[0] else {
             panic!("Expected slice");
         };
@@ -308,7 +308,7 @@ mod tests {
         // Test large string (snake string)
         let large_string = "A".repeat(200);
         let mut tuple = Tuple::empty();
-        tuple.push_string(&large_string);
+        tuple.push_string_slice(&large_string);
         let TupleItem::Slice(slice) = &tuple.0[0] else {
             panic!("Expected slice");
         };
@@ -373,7 +373,7 @@ mod tests {
     fn test_tuple_from_stack() {
         // Test successful tuple conversion
         let mut inner_tuple = Tuple::empty();
-        inner_tuple.push_string("test");
+        inner_tuple.push_string_slice("test");
         inner_tuple.push(TupleItem::Int(BigInt::from(42)));
 
         let tuple_item = TupleItem::Tuple(Tuple(inner_tuple.0.clone()));
@@ -406,7 +406,7 @@ mod tests {
         assert_eq!(result, Ok(original));
 
         let mut tuple = Tuple::empty();
-        tuple.push_string("test");
+        tuple.push_string_slice("test");
         let TupleItem::Slice(slice) = &tuple.0[0] else {
             panic!("Expected slice");
         };
@@ -428,7 +428,7 @@ mod tests {
 
         // Test BigInt from non-int
         let mut tuple = Tuple::empty();
-        tuple.push_string("test");
+        tuple.push_string_slice("test");
         let TupleItem::Slice(slice) = &tuple.0[0] else {
             panic!("Expected slice");
         };
@@ -485,9 +485,9 @@ mod tests {
     #[test]
     fn test_vec_string_from_stack() {
         let mut words = Tuple::empty();
-        words.push_string("one");
-        words.push_string("two");
-        words.push_string("three");
+        words.push_string_slice("one");
+        words.push_string_slice("two");
+        words.push_string_slice("three");
 
         let parsed = Vec::<String>::from_item(TupleItem::Tuple(words)).unwrap();
         assert_eq!(parsed, vec!["one", "two", "three"]);
@@ -509,11 +509,11 @@ mod tests {
     #[test]
     fn test_vec_string_from_big_array() {
         let mut one = Tuple::empty();
-        one.push_string("one");
+        one.push_string_slice("one");
         let mut two = Tuple::empty();
-        two.push_string("two");
+        two.push_string_slice("two");
         let mut three = Tuple::empty();
-        three.push_string("three");
+        three.push_string_slice("three");
 
         let big_array =
             TupleItem::big_array_from_items(vec![one[0].clone(), two[0].clone(), three[0].clone()]);

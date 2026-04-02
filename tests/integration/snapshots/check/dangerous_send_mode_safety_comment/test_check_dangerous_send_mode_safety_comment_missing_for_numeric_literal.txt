@@ -1,17 +1,3 @@
-warning[E016]: send mode should use SEND_MODE_* constants
-  --> [ROOT]/contracts/main[LINE]
-  |
-8 |                 outMsg.send(128);
-  |                             ^^^ numeric send mode literal is used here
-  |
-  = use named `SEND_MODE_*` constants instead of numeric mode literals
-
-help: replace with SEND_MODE_* constants
-  --> [ROOT]/contracts/main[LINE]
-  |
-8 |                 outMsg.send(128);
-  |                             ^^^ SEND_MODE_CARRY_ALL_BALANCE
-
 warning[E021]: send with dangerous mode requires safety comment
   --> [ROOT]/contracts/main[LINE]
   |
@@ -21,7 +7,5 @@ warning[E021]: send with dangerous mode requires safety comment
   = document why this dangerous send mode is safe in this context and which invariants are required
 
 
-1 issue can be fixed automatically, rerun with --fix flag.
-
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E016
+For example: acton check --explain E021

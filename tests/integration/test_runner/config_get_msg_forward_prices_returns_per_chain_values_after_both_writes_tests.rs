@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_get_msg_forward_prices_returns_per_chain_values_after_both_writes() {
     run_config_success_case(
         "dn-stdlib-config-msg-forward-prices-dual-write",
-        r#"
+        r"
 get fun `test-dn-stdlib-config-msg-forward-prices-dual-write`() {
     var config = net.getConfig();
     var basechain = config.getMsgForwardPrices(BASECHAIN);
@@ -88,7 +88,7 @@ get fun `test-dn-stdlib-config-msg-forward-prices-dual-write`() {
     expect(baseAfter.lumpPrice).toNotEqual(expectedMasterLump);
     expect(masterAfter.lumpPrice).toNotEqual(expectedBaseLump);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_get_msg_forward_prices_returns_per_chain_values_after_both_writes/config_get_msg_forward_prices_returns_per_chain_values_after_both_writes.stdout.txt",
     );
 }

@@ -69,6 +69,28 @@ fn test_verify_invalid_network() {
 }
 
 #[test]
+fn test_verify_unsupported_network() {
+    let project = ProjectBuilder::new("verify-unsupported-net")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .verify()
+        .verify_contract("simple")
+        .verify_network("custom:no-such-net")
+        .arg("--dry-run")
+        .run()
+        .failure()
+        .assert_not_contains("Compiling contract")
+        .assert_not_contains("Using wallet")
+        .assert_not_contains("Fetching backends configuration")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_verify_unsupported_network.stderr.txt",
+        );
+}
+
+#[test]
 fn test_verify_invalid_address() {
     let project = ProjectBuilder::new("verify-invalid-addr")
         .contract("simple", SIMPLE_CONTRACT)

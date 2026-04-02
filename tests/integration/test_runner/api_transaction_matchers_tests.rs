@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const ACTION_FAIL_CONTRACT: &str = r#"
 fun onInternalMessage(_: InMessage) {
@@ -24,7 +24,7 @@ import "../../lib/testing/transaction_expect"
 fn to_have_and_not_have_tx_by_action_exit_code() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-action-exit-code-filter`() {{
                 val init = ContractState {{
@@ -53,7 +53,6 @@ fn to_have_and_not_have_tx_by_action_exit_code() {
                 }});
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-action-exit-code")
@@ -74,7 +73,7 @@ fn to_have_and_not_have_tx_by_action_exit_code() {
 fn to_have_and_not_have_tx_by_compute_phase_skipped() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-compute-phase-skipped-filter`() {{
                 val sender = net.treasury("sender");
@@ -99,7 +98,6 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
                 }});
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-compute-phase-skipped")
@@ -120,7 +118,7 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
 fn to_have_and_not_have_tx_by_body() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-body-filter`() {{
                 val init = ContractState {{
@@ -158,7 +156,6 @@ fn to_have_and_not_have_tx_by_body() {
                 }});
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-body")
@@ -179,7 +176,7 @@ fn to_have_and_not_have_tx_by_body() {
 fn to_have_and_not_have_tx_by_opcode() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-opcode-filter`() {{
                 val init = ContractState {{
@@ -208,7 +205,6 @@ fn to_have_and_not_have_tx_by_opcode() {
                 }});
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-opcode")
@@ -229,7 +225,7 @@ fn to_have_and_not_have_tx_by_opcode() {
 fn find_transaction_by_explicit_opcode_without_generic() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-find-transaction-opcode-filter`() {{
                 val init = ContractState {{
@@ -261,7 +257,6 @@ fn find_transaction_by_explicit_opcode_without_generic() {
                 expect(missing).toBeNone();
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-find-transaction-opcode")
@@ -282,7 +277,7 @@ fn find_transaction_by_explicit_opcode_without_generic() {
 fn to_have_tx_with_bounced_opcode_prefix() {
     let test_code = format!(
         r#"
-            {}
+            {TEST_IMPORTS}
 
             get fun `test-bounced-opcode-filter`() {{
                 val init = ContractState {{
@@ -328,7 +323,6 @@ fn to_have_tx_with_bounced_opcode_prefix() {
                 }});
             }}
         "#,
-        TEST_IMPORTS,
     );
 
     ProjectBuilder::new("p-lib-api-bounced-opcode")

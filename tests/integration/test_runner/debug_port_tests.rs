@@ -2,6 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton_config::config::TestSettings;
 use acton_config::test::TestConfig as RunnerTestConfig;
+use std::net::TcpListener;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -16,6 +17,19 @@ get fun `test-debug-smoke`() {
 }
 "#;
 
+fn reserve_debug_port() -> (Option<TcpListener>, String) {
+    if let Ok(listener) = TcpListener::bind("127.0.0.1:0") {
+        let port = listener
+            .local_addr()
+            .expect("Reserved TCP port has no address")
+            .port()
+            .to_string();
+        return (Some(listener), port);
+    }
+
+    (None, "1".to_string())
+}
+
 fn merge_test_config(
     settings: TestSettings,
     debug_override: Option<bool>,
@@ -24,6 +38,7 @@ fn merge_test_config(
     settings.to_test_config(
         None,
         vec![],
+        false,
         debug_override,
         debug_port_override,
         None,
@@ -34,6 +49,9 @@ fn merge_test_config(
         None,
         None,
         None,
+        None,
+        None,
+        None,
         false,
         None,
         None,
@@ -45,6 +63,7 @@ fn merge_test_config(
         None,
         None,
         vec![],
+        None,
         None,
         false,
         None,
@@ -103,6 +122,33 @@ fn debug_port_rejects_non_numeric_value() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_debug_port/debug_port_rejects_non_numeric_value.stderr.txt",
         );
+}
+
+#[test]
+fn debug_port_conflict_is_reported_immediately() {
+    let project = ProjectBuilder::new("g-debug-port-conflict")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("test", SIMPLE_TEST)
+        .build();
+
+    let (listener, port) = reserve_debug_port();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--debug")
+        .arg("--debug-port")
+        .arg(&port)
+        .run()
+        .failure();
+
+    output.assert_not_contains("Debugger server listening on");
+
+    if listener.is_some() {
+        output.assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_debug_port/debug_port_conflict_is_reported_immediately.stderr.txt",
+        );
+    }
 }
 
 #[test]

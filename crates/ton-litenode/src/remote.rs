@@ -104,7 +104,7 @@ pub fn fetch_remote_shard_account(
 
     let sa = ShardAccount {
         account: Lazy::new(&OptionalAccount(Some(acc)))?,
-        last_trans_hash: HashBytes(last_trans_hash.map(|h| h.0).unwrap_or([0; 32])),
+        last_trans_hash: HashBytes(last_trans_hash.map_or([0; 32], |h| h.0)),
         last_trans_lt,
     };
 

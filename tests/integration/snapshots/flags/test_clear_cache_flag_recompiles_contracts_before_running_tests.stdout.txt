@@ -1,0 +1,13 @@
+  ✓ Cache cleared
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ clear-cache [TIME]
+
+ ✓ 1 passed in 1 file

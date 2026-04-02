@@ -1,24 +1,124 @@
 ---
 title: "Welcome to Acton"
-description: "Acton is all-in-one toolkit for TON Blockchain smart contract development"
+description: "Acton is an all-in-one TON smart contract development toolkit"
 ---
 
+import {Callout} from "fumadocs-ui/components/callout";
 import {Cards, Card} from "fumadocs-ui/components/card";
-import {
-    DownloadIcon,
-    SparkleIcon
-} from 'lucide-react';
+import {Step, Steps} from "fumadocs-ui/components/steps";
 
-## Get started
+Acton is an all-in-one TON smart contract development toolkit written in Rust.
+It combines project scaffolding, build, testing, scripting, wallet and network
+operations, verification, linting, formatting, and low-level VM tooling in one
+CLI.
 
-Acton ships as a single, dependency free binary. New to Acton?
+<Callout>
+    New to Acton? Start with [Installation](/docs/installation), then follow
+    the [Quickstart](/docs/quickstart). If you already have a project, use the
+    sections below to jump straight to the part of the workflow you need.
+</Callout>
+
+## What you can do with Acton
+
+- Create a new Tolk project from a ready-made template.
+- Build contracts, run tests, and script interactions from one CLI.
+- Manage wallets, deploy to the network, and verify published contracts.
+- Work locally with a TON-compatible development node, faucet, snapshots, and
+  forked state.
+
+## Start here
 
 <Cards>
-    <Card href="/docs/installation" title="Install Acton" icon={<DownloadIcon />}>
-        Supported platforms and all install methods.
+    <Card href="/docs/installation" title="Installation">
+        Install Acton and verify that the binary is available in your shell.
     </Card>
-    <Card href="/docs/quickstart" title="Quickstart"  icon={<SparkleIcon />}>
-        Build and deploy your first contract with Acton
+    <Card href="/docs/quickstart" title="Quickstart">
+        Build, test, deploy, and verify your first Tolk smart contract.
+    </Card>
+    <Card href="/docs/project-init" title="Project initialization">
+        Learn how `acton new` structures a project and which templates are
+        available.
     </Card>
 </Cards>
 
+## First production workflow
+
+<Cards>
+    <Card href="/docs/test-runner" title="Test Runner">
+        Write unit and integration tests in Tolk, inspect traces, and measure
+        coverage.
+    </Card>
+    <Card href="/docs/setup-wallets" title="Wallet setup">
+        Create local or global wallets and prepare them for deployment
+        workflows.
+    </Card>
+    <Card href="/docs/contract-deployment" title="Contract deployment">
+        Deploy compiled contracts through scripts and understand the required
+        inputs.
+    </Card>
+    <Card href="/docs/contract-verification" title="Contract verification">
+        Verify that deployed bytecode matches your source code.
+    </Card>
+</Cards>
+
+## Go deeper
+
+<Cards>
+    <Card href="/docs/commands" title="Commands reference">
+        Browse all Acton CLI commands, flags, and related workflows.
+    </Card>
+    <Card href="/docs/build-system" title="Build system">
+        Understand contract configuration, dependency handling, and build
+        outputs.
+    </Card>
+    <Card href="/docs/scripting" title="Scripting">
+        Run standalone Tolk scripts for deployment, automation, and blockchain
+        interaction.
+    </Card>
+    <Card href="/docs/local-development-node" title="Local development node">
+        Use a local node with faucet, persistence, snapshots, and fork mode.
+    </Card>
+    <Card href="/docs/linting" title="Linting">
+        Check Tolk code, configure rules, and integrate checks into CI.
+    </Card>
+    <Card href="/docs/standard_library" title="Standard library">
+        Explore the built-in Acton and Tolk libraries available in your
+        projects.
+    </Card>
+</Cards>
+
+## Recommended reading order
+
+<Steps>
+    <Step title="Install Acton">
+        Start with [Installation](/docs/installation) and make sure
+        `acton --version` works in a fresh shell.
+    </Step>
+    <Step title="Create or open a project">
+        Use [Project initialization](/docs/project-init) if you are starting
+        from scratch, or move into an existing project with an `Acton.toml`
+        file.
+    </Step>
+    <Step title="Build and test locally">
+        Follow the [Quickstart](/docs/quickstart) and the
+        [Test Runner](/docs/test-runner) docs to get a reliable local feedback
+        loop first.
+    </Step>
+    <Step title="Prepare deployment">
+        Set up wallets, then use the deployment and scripting guides when you
+        are ready to send messages or publish contracts.
+    </Step>
+    <Step title="Move to repeatable workflows">
+        Once the basics are working, read the build system, linting, and CI
+        sections to make the project reproducible for a team or pipeline.
+    </Step>
+</Steps>
+
+## Need something specific?
+
+- Want the shortest path to a running project? Go to
+  [Quickstart](/docs/quickstart).
+- Looking for command syntax? Open [Commands](/docs/commands).
+- Working on tests? Start with [Test Runner](/docs/test-runner).
+- Need environment and dependency details? Read
+  [Acton.toml](/docs/acton-toml) and [Build system](/docs/build-system).

@@ -1,7 +1,7 @@
 use crate::type_interner::{TyId, TypeInterner};
 use crate::types::TyData;
 
-/// TypeInferringUnifyStrategy unifies types from various branches to a common result (lca).
+/// `TypeInferringUnifyStrategy` unifies types from various branches to a common result (lca).
 /// It's used to auto infer function return type based on return statements, like in TypeScript.
 /// Example: `fun f() { ... return 1; ... return null; }` inferred as `int?`.
 ///
@@ -46,12 +46,11 @@ impl TypeInferringUnifyStrategy {
             }
         }
 
-        let current = match self.unified_result {
-            Some(res) => res,
-            None => {
-                self.unified_result = Some(next);
-                return;
-            }
+        let current = if let Some(res) = self.unified_result {
+            res
+        } else {
+            self.unified_result = Some(next);
+            return;
         };
 
         if type_interner.equals(current, next) {

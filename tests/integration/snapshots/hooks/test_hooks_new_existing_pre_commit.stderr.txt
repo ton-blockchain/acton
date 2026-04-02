@@ -1,0 +1,1 @@
+Error: Found existing pre-commit hook at [ROOT]/.githooks/pre-commit. Delete it before running `acton hooks new`.

@@ -212,3 +212,65 @@ fn test_doc_tvm_empty_sub_category_does_not_print_separator() {
         .assert_contains("dictionary")
         .assert_not_contains("Category:      dictionary /");
 }
+
+#[test]
+fn test_doc_without_subcommand() {
+    let project = ProjectBuilder::new("doc-without-subcommand").build();
+    let log_dir = project.path().join(".acton/logs");
+    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+
+    project
+        .acton()
+        .env(
+            "ACTON_LOG_DIR",
+            log_dir.to_str().expect("log dir path is not valid UTF-8"),
+        )
+        .arg("doc")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/doc/test_doc_without_subcommand.stderr.txt",
+        );
+}
+
+#[test]
+fn test_doc_tvm_empty_query_is_rejected() {
+    let project = ProjectBuilder::new("doc-tvm-empty-query").build();
+    let log_dir = project.path().join(".acton/logs");
+    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+
+    project
+        .acton()
+        .env(
+            "ACTON_LOG_DIR",
+            log_dir.to_str().expect("log dir path is not valid UTF-8"),
+        )
+        .arg("doc")
+        .arg("tvm")
+        .arg("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/doc/test_doc_tvm_empty_query.stderr.txt",
+        );
+}
+
+#[test]
+fn test_doc_tvm_whitespace_query_is_normalized() {
+    let project = ProjectBuilder::new("doc-tvm-whitespace-query").build();
+    let log_dir = project.path().join(".acton/logs");
+    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+
+    project
+        .acton()
+        .env(
+            "ACTON_LOG_DIR",
+            log_dir.to_str().expect("log dir path is not valid UTF-8"),
+        )
+        .arg("doc")
+        .arg("tvm")
+        .arg("   ADD   ")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/doc/test_doc_tvm_add.stdout.txt");
+}

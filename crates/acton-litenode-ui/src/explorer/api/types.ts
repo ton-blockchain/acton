@@ -201,3 +201,30 @@ export interface JettonWallet {
   readonly last_transaction_lt: string
   readonly owner: string
 }
+
+export interface NftCollection {
+  readonly address: string
+  readonly code_hash?: string
+  readonly collection_content?: Record<string, unknown>
+  readonly data_hash?: string
+  readonly last_transaction_lt?: string
+  readonly next_item_index?: string
+  readonly owner_address?: string
+}
+
+export interface NftItem {
+  readonly address: string
+  readonly auction_contract_address?: string
+  readonly code_hash: string
+  readonly collection?: NftCollection | null
+  readonly collection_address?: string
+  readonly content: Record<string, unknown>
+  readonly data_hash: string
+  readonly index: string
+  readonly init: boolean
+  readonly last_transaction_lt: string
+  readonly on_sale: boolean
+  readonly owner_address?: string
+  readonly real_owner?: string
+  readonly sale_contract_address?: string
+}

@@ -30,6 +30,7 @@ pub struct GlobalLibraryLookup {
 }
 
 impl CellStore {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             conn: None,
@@ -57,6 +58,7 @@ impl CellStore {
         hash
     }
 
+    #[must_use]
     pub fn get(&self, hash: &Hash256) -> Option<BocBytes> {
         if let Some(conn) = &self.conn {
             let conn = conn.lock().expect("Failed to lock DB connection");
@@ -95,7 +97,7 @@ impl Display for AccountStatus {
             AccountStatus::Frozen => "frozen".to_owned(),
             AccountStatus::Nonexist => "nonexist".to_owned(),
         };
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }
 
@@ -112,6 +114,7 @@ pub struct AccountMeta {
 }
 
 impl AccountMeta {
+    #[must_use]
     pub fn last_tx_id(&self) -> LiteNodeTransactionId {
         LiteNodeTransactionId {
             lt: self.last_trans_lt.unwrap_or(0),
@@ -144,11 +147,25 @@ pub struct JettonWalletMeta {
     pub owner_address: Addr,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NftItemMeta {
+    pub address: Addr,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub collection_address: Option<Addr>,
+    pub owner_address: Option<Addr>,
+    pub content: serde_json::Value,
+    pub index: String,
+    pub init: bool,
+    pub last_transaction_lt: Lt,
+}
+
 pub struct LatestState {
     pub accounts: HashMap<Addr, AccountMeta>,
 }
 
 impl LatestState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             accounts: HashMap::new(),
@@ -174,6 +191,7 @@ pub struct BlockMeta {
 }
 
 impl BlockMeta {
+    #[must_use]
     pub const fn block_id(&self) -> LiteNodeBlockId {
         LiteNodeBlockId {
             workchain: 0,
@@ -243,6 +261,7 @@ pub struct EmulateTraceResult {
 }
 
 impl TraceNode {
+    #[must_use]
     pub fn max_lt(&self) -> u64 {
         let mut max = self.transaction.meta.lt;
         for child in &self.children {
@@ -251,6 +270,7 @@ impl TraceNode {
         max
     }
 
+    #[must_use]
     pub fn max_utime(&self) -> u32 {
         let mut max = self.transaction.meta.now;
         for child in &self.children {
@@ -279,6 +299,7 @@ pub struct History {
     pub address_names: HashMap<Addr, String>,
     pub jetton_masters: HashMap<Addr, JettonMasterMeta>,
     pub jetton_wallets: HashMap<Addr, JettonWalletMeta>,
+    pub nft_items: HashMap<Addr, NftItemMeta>,
 }
 
 impl Default for History {
@@ -288,6 +309,7 @@ impl Default for History {
 }
 
 impl History {
+    #[must_use]
     pub fn new() -> Self {
         let address_names = Self::build_address_names();
 
@@ -301,6 +323,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 
@@ -317,6 +340,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 
@@ -328,7 +352,7 @@ impl History {
         ) {
             address_names.insert(
                 Addr {
-                    workchain: addr.workchain as i32,
+                    workchain: i32::from(addr.workchain),
                     addr: addr.address.0,
                 },
                 "Faucet".to_string(),
@@ -353,6 +377,7 @@ impl Default for Indexes {
 }
 
 impl Indexes {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tx_by_account: HashMap::new(),
@@ -379,6 +404,7 @@ pub struct Globals {
 }
 
 impl Globals {
+    #[must_use]
     pub const fn new(config_boc_hash: Hash256) -> Self {
         Self {
             head_seqno: 0,
@@ -404,6 +430,7 @@ impl Default for MessagePool {
 }
 
 impl MessagePool {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             external: VecDeque::new(),

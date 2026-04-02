@@ -4,7 +4,7 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
-import "../../contracts/types"
+import "../../contracts/my_contract"
 
 struct MyContract {
     address: address
@@ -20,12 +20,12 @@ fun MyContract.fromStorage(toShard: AddressShardingOptions? = null) {
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
         : AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return MyContract { address, stateInit }
+    return MyContract { address, stateInit };
 }
 
 /// Creates a contract wrapper instance from the address
 fun MyContract.fromAddress(address: address) {
-    return MyContract { address }
+    return MyContract { address };
 }
 
 /// Deploys the contract to the blockchain
@@ -36,11 +36,24 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: {
-            stateInit: self.stateInit,
-        },
+        dest: { stateInit: self.stateInit },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
+}
+
+fun MyContract.sendIncrement(
+    self,
+    from: address,
+    value: int32,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: Increment { value },
+    });
+    return net.send(from, genericMsg);
 }
 
 /// Send message to the contract with a custom body cell
@@ -51,5 +64,5 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
         dest: self.address,
         body,
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }

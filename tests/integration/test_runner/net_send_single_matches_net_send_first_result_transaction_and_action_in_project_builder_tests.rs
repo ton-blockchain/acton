@@ -3,7 +3,7 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const DF_MESSAGES: &str = r#"
+const DF_MESSAGES: &str = r"
 struct (0xDF000001) DfPing {
     queryId: uint64
 }
@@ -11,7 +11,7 @@ struct (0xDF000001) DfPing {
 struct (0xDF000002) DfNotice {
     queryId: uint64
 }
-"#;
+";
 
 const DF_ECHO_CONTRACT: &str = r#"
 import "df_messages"
@@ -41,6 +41,8 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/big_array"
+import "../../lib/types/message"
 import "../../lib/types/out_actions"
 import "../../lib/types/transaction"
 import "../contracts/df_messages"

@@ -1,10 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
@@ -30,7 +30,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn set_config_param_keeps_neighbor_slots_consistent() {
     run_success_case(
         "cl-stdlib-set-config-param-neighbor-slots",
-        r#"
+        r"
 get fun `test-cl-stdlib-set-config-param-neighbor-slots`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
@@ -46,7 +46,7 @@ get fun `test-cl-stdlib-set-config-param-neighbor-slots`() {
     expect(paramsAfter.get(4) as int).toEqual(401234567);
     expect(paramsAfter.get(5) as int).toEqual(501234567);
 }
-"#,
+",
         "integration/snapshots/test-runner/set_config_param_keeps_neighbor_slots_consistent/set_config_param_keeps_neighbor_slots_consistent.stdout.txt",
     );
 }
@@ -55,7 +55,7 @@ get fun `test-cl-stdlib-set-config-param-neighbor-slots`() {
 fn set_config_param_slot_three_updates_blockchain_now_and_c7() {
     run_success_case(
         "cl-stdlib-set-config-param-slot-three",
-        r#"
+        r"
 get fun `test-cl-stdlib-set-config-param-slot-three`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
@@ -72,7 +72,7 @@ get fun `test-cl-stdlib-set-config-param-slot-three`() {
     expect(paramsAfter.get(4) as int).toEqual(beforeBlockLogicalTime);
     expect(paramsAfter.get(5) as int).toEqual(beforeLogicalTime);
 }
-"#,
+",
         "integration/snapshots/test-runner/set_config_param_keeps_neighbor_slots_consistent/set_config_param_slot_three_updates_blockchain_now_and_c7.stdout.txt",
     );
 }

@@ -9,18 +9,18 @@ import "../../lib/emulation/network"
 import "../../lib/io"
 "#;
 
-const CR_SIMPLE_ALPHA: &str = r#"
+const CR_SIMPLE_ALPHA: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
-const CR_SIMPLE_BETA: &str = r#"
+const CR_SIMPLE_BETA: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 get fun betaMarker(): int {
     return 7;
 }
-"#;
+";
 
 fn run_project_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{CR_IMPORTS}\n{test_body}\n");

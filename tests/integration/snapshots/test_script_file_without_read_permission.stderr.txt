@@ -1,1 +1,1 @@
-Error: Cannot access scripts/secret.tolk: Permission denied (os error 13)
+Error: Cannot access scripts/secret.tolk: Permission denied ([OS_ERROR])

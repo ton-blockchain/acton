@@ -1,8 +1,8 @@
 use super::client::{Asset, Release, ReleaseClient};
 use crate::commands::up::workflow;
 use anyhow::{Result, bail};
-use flate2::Compression;
-use flate2::write::GzEncoder;
+use flate2::{Compression, GzBuilder};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -14,13 +14,13 @@ fn test_update_stable_to_stable_upgrade() -> Result<()> {
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.2.0");
-    client.set_latest("0.2.0", vec![asset]);
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -39,13 +39,13 @@ fn test_update_stable_already_latest() -> Result<()> {
     let current_version = "0.2.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.2.0");
-    client.set_latest("0.2.0", vec![asset]);
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -59,18 +59,18 @@ fn test_update_stable_already_latest() -> Result<()> {
 }
 
 #[test]
-fn test_update_stable_from_canary() -> Result<()> {
+fn test_update_stable_from_trunk() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
-    let current_version = "canary";
+    let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.2.0");
-    client.set_latest("0.2.0", vec![asset]);
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         false,
         true,
@@ -86,18 +86,18 @@ fn test_update_stable_from_canary() -> Result<()> {
 }
 
 #[test]
-fn test_update_canary_to_canary() -> Result<()> {
+fn test_update_trunk_to_trunk() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
-    let current_version = "canary";
+    let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("canary");
-    client.set_canary(vec![asset]);
+    client.set_trunk(MockReleaseClient::create_release_assets("trunk"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         true,
         false,
@@ -105,7 +105,38 @@ fn test_update_canary_to_canary() -> Result<()> {
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
-    assert_eq!(content, "binary-data-canary");
+    assert_eq!(content, "binary-data-trunk");
+
+    assert_backup_created(&bin_path, current_version, "old_binary")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_update_current_trunk_without_flags_keeps_trunk_channel() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.8.0";
+
+    let mut client = MockReleaseClient::new();
+    client.set_latest("0.9.0", MockReleaseClient::create_release_assets("0.9.0"));
+    client.set_trunk(MockReleaseClient::create_release_assets_with_content(
+        "trunk",
+        "trunk-default-channel",
+    ));
+
+    workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        true,
+        None,
+        false,
+        false,
+        false,
+    )?;
+
+    let content = fs::read_to_string(&bin_path)?;
+    assert_eq!(content, "binary-data-trunk: trunk-default-channel");
 
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
@@ -118,13 +149,13 @@ fn test_downgrade() -> Result<()> {
     let current_version = "0.3.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.2.0");
-    client.add_release("0.2.0", vec![asset]);
+    client.add_release("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         Some("0.2.0".to_owned()),
         false,
         false,
@@ -151,6 +182,7 @@ fn test_network_error() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -171,13 +203,13 @@ fn test_custom_version() -> Result<()> {
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.0.5");
-    client.add_release("0.0.5", vec![asset]);
+    client.add_release("0.0.5", MockReleaseClient::create_release_assets("0.0.5"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         Some("0.0.5".to_string()),
         false,
         false,
@@ -193,19 +225,39 @@ fn test_custom_version() -> Result<()> {
 }
 
 #[test]
-fn test_install_canary_version_and_then_stable() -> Result<()> {
+fn test_validate_version_argument_rejects_unicode_dash_flag_typo() {
+    let err = super::validate_version_argument(Some("\u{2014}trunk"))
+        .expect_err("unicode dash flag typo should be rejected");
+    let err_text = String::from_utf8(strip_ansi_escapes::strip(err.to_string().as_bytes()))
+        .expect("error text should stay utf-8");
+
+    assert_eq!(
+        err_text,
+        "—trunk looks like an option typed with a Unicode dash. Use --trunk instead."
+    );
+}
+
+#[test]
+fn test_validate_version_argument_allows_regular_version() -> Result<()> {
+    super::validate_version_argument(Some("0.1.0"))?;
+    Ok(())
+}
+
+#[test]
+fn test_install_trunk_version_and_then_stable() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    client.add_release("0.2.0", vec![MockReleaseClient::create_asset("0.2.0")]);
-    client.set_latest("0.3.0", vec![MockReleaseClient::create_asset("0.3.0")]);
-    client.set_canary(vec![MockReleaseClient::create_asset("canary")]);
+    client.add_release("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
+    client.set_latest("0.3.0", MockReleaseClient::create_release_assets("0.3.0"));
+    client.set_trunk(MockReleaseClient::create_release_assets("trunk"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         true,
         false,
@@ -213,15 +265,16 @@ fn test_install_canary_version_and_then_stable() -> Result<()> {
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
-    assert_eq!(content, "binary-data-canary");
+    assert_eq!(content, "binary-data-trunk");
 
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
-    let current_version = "canary";
+    let current_version = "0.1.0";
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         false,
         true,
@@ -231,7 +284,7 @@ fn test_install_canary_version_and_then_stable() -> Result<()> {
     let content = fs::read_to_string(&bin_path)?;
     assert_eq!(content, "binary-data-0.3.0");
 
-    assert_backup_created(&bin_path, current_version, "binary-data-canary")?;
+    assert_backup_created(&bin_path, current_version, "binary-data-trunk")?;
 
     Ok(())
 }
@@ -242,12 +295,13 @@ fn test_install_versions() -> Result<()> {
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    client.set_latest("0.2.0", vec![MockReleaseClient::create_asset("0.2.0")]);
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         false,
@@ -260,13 +314,14 @@ fn test_install_versions() -> Result<()> {
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
     // emulate new version
-    client.set_latest("0.3.0", vec![MockReleaseClient::create_asset("0.3.0")]);
+    client.set_latest("0.3.0", MockReleaseClient::create_release_assets("0.3.0"));
 
     let current_version = "0.2.0";
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         false,
@@ -282,19 +337,20 @@ fn test_install_versions() -> Result<()> {
 }
 
 #[test]
-fn test_install_canary_versions() -> Result<()> {
+fn test_install_trunk_versions() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    client.set_canary(vec![MockReleaseClient::create_asset_with_content(
-        "canary", "canary-1",
-    )]);
+    client.set_trunk(MockReleaseClient::create_release_assets_with_content(
+        "trunk", "trunk-1",
+    ));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         true,
         false,
@@ -302,18 +358,19 @@ fn test_install_canary_versions() -> Result<()> {
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
-    assert_eq!(content, "binary-data-canary: canary-1");
+    assert_eq!(content, "binary-data-trunk: trunk-1");
 
-    // emulate new canary version
-    client.set_canary(vec![MockReleaseClient::create_asset_with_content(
-        "canary", "canary-2",
-    )]);
+    // emulate new trunk version
+    client.set_trunk(MockReleaseClient::create_release_assets_with_content(
+        "trunk", "trunk-2",
+    ));
 
-    let current_version = "canary";
+    let current_version = "0.1.0";
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         true,
         false,
@@ -321,9 +378,9 @@ fn test_install_canary_versions() -> Result<()> {
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
-    assert_eq!(content, "binary-data-canary: canary-2");
+    assert_eq!(content, "binary-data-trunk: trunk-2");
 
-    assert_backup_created(&bin_path, current_version, "binary-data-canary: canary-1")?;
+    assert_backup_created(&bin_path, current_version, "binary-data-trunk: trunk-1")?;
 
     Ok(())
 }
@@ -334,13 +391,13 @@ fn test_backup_is_created_correctly() -> Result<()> {
     let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
-    let asset = MockReleaseClient::create_asset("0.2.0");
-    client.set_latest("0.2.0", vec![asset]);
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -348,6 +405,87 @@ fn test_backup_is_created_correctly() -> Result<()> {
     )?;
 
     assert_backup_created(&bin_path, current_version, "old_binary")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_find_asset_for_target_triple_distinguishes_gnu_and_musl() -> Result<()> {
+    let release = Release {
+        tag_name: "v0.2.0".to_owned(),
+        assets: vec![
+            MockReleaseClient::create_named_asset("0.2.0", "acton-x86_64-unknown-linux-gnu.tar.gz"),
+            MockReleaseClient::create_named_asset(
+                "0.2.0",
+                "acton-x86_64-unknown-linux-musl.tar.gz",
+            ),
+        ],
+    };
+
+    let gnu_asset = workflow::find_asset_for_target_triple(&release, "x86_64-unknown-linux-gnu")?;
+    assert_eq!(gnu_asset.name, "acton-x86_64-unknown-linux-gnu.tar.gz");
+
+    let musl_asset = workflow::find_asset_for_target_triple(&release, "x86_64-unknown-linux-musl")?;
+    assert_eq!(musl_asset.name, "acton-x86_64-unknown-linux-musl.tar.gz");
+
+    Ok(())
+}
+
+#[test]
+fn test_update_fails_without_checksum_asset() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    client.set_latest(
+        "0.2.0",
+        vec![MockReleaseClient::create_named_asset(
+            "0.2.0",
+            &MockReleaseClient::current_archive_name()?,
+        )],
+    );
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+    )
+    .expect_err("missing checksum asset must fail");
+
+    assert!(err.to_string().contains("No matching checksum asset found"));
+
+    Ok(())
+}
+
+#[test]
+fn test_update_fails_on_checksum_mismatch() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    let mut assets = MockReleaseClient::create_release_assets("0.2.0");
+    assets[1].content = Some("tampered-checksum".to_owned());
+    client.set_latest("0.2.0", assets);
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+    )
+    .expect_err("checksum mismatch must fail");
+
+    assert!(err.to_string().contains("SHA256 mismatch"));
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
 
     Ok(())
 }
@@ -373,7 +511,7 @@ fn assert_backup_created(bin_path: &Path, version: &str, expected_content: &str)
 
 struct MockReleaseClient {
     releases: HashMap<String, Release>,
-    canary_release: Option<Release>,
+    trunk_release: Option<Release>,
     latest_release: Option<Release>,
     should_fail: bool,
 }
@@ -382,7 +520,7 @@ impl MockReleaseClient {
     fn new() -> Self {
         Self {
             releases: HashMap::new(),
-            canary_release: None,
+            trunk_release: None,
             latest_release: None,
             should_fail: false,
         }
@@ -407,70 +545,103 @@ impl MockReleaseClient {
         self.latest_release = Some(release);
     }
 
-    fn set_canary(&mut self, assets: Vec<Asset>) {
+    fn set_trunk(&mut self, assets: Vec<Asset>) {
         let release = Release {
-            tag_name: "canary".to_string(),
+            tag_name: "trunk".to_string(),
             assets,
         };
-        self.canary_release = Some(release);
+        self.trunk_release = Some(release);
     }
 
-    fn create_asset(version: &str) -> Asset {
-        let os = match std::env::consts::OS {
-            "macos" => "darwin",
-            "linux" => "linux",
-            _ => "unknown",
-        };
-        let arch = match std::env::consts::ARCH {
-            "x86_64" => "x86_64",
-            "aarch64" => "arm64",
-            _ => "unknown",
-        };
+    fn current_archive_name() -> Result<String> {
+        workflow::release_asset_name_for_target_triple(env!("TARGET_TRIPLE"))
+    }
 
+    fn create_named_asset(version: &str, name: &str) -> Asset {
         Asset {
-            name: format!("acton-{os}-{arch}.tar.gz"),
-            url: format!("http://api.mock.url/v{version}/acton.tar.gz"),
+            name: name.to_owned(),
+            url: format!("http://api.mock.url/v{version}/{name}"),
             version: version.to_owned(),
             content: None,
-            browser_download_url: format!("http://mock.url/v{version}/acton.tar.gz"),
+            browser_download_url: format!("http://mock.url/v{version}/{name}"),
             size: 1024,
         }
     }
 
-    fn create_asset_with_content(version: &str, content: &str) -> Asset {
-        let os = match std::env::consts::OS {
-            "macos" => "darwin",
-            "linux" => "linux",
-            _ => "unknown",
-        };
-        let arch = match std::env::consts::ARCH {
-            "x86_64" => "x86_64",
-            "aarch64" => "arm64",
-            _ => "unknown",
-        };
-
+    fn create_named_asset_with_content(version: &str, name: &str, content: &str) -> Asset {
         Asset {
-            name: format!("acton-{os}-{arch}.tar.gz"),
-            url: format!("http://api.mock.url/v{version}/acton.tar.gz"),
+            name: name.to_owned(),
+            url: format!("http://api.mock.url/v{version}/{name}"),
             version: version.to_owned(),
             content: Some(content.to_owned()),
-            browser_download_url: format!("http://mock.url/v{version}/acton.tar.gz"),
+            browser_download_url: format!("http://mock.url/v{version}/{name}"),
             size: 1024,
         }
+    }
+
+    fn create_release_assets(version: &str) -> Vec<Asset> {
+        let archive_name =
+            Self::current_archive_name().expect("current platform must be supported in tests");
+        vec![
+            Self::create_named_asset(version, &archive_name),
+            Self::create_named_asset(version, &format!("{archive_name}.sha256")),
+        ]
+    }
+
+    fn create_release_assets_with_content(version: &str, content: &str) -> Vec<Asset> {
+        let archive_name =
+            Self::current_archive_name().expect("current platform must be supported in tests");
+        vec![
+            Self::create_named_asset_with_content(version, &archive_name, content),
+            Self::create_named_asset_with_content(
+                version,
+                &format!("{archive_name}.sha256"),
+                content,
+            ),
+        ]
+    }
+
+    fn build_archive_bytes(asset: &Asset) -> Result<Vec<u8>> {
+        let encoder = GzBuilder::new()
+            .mtime(0)
+            .write(Vec::new(), Compression::default());
+        let mut tar = tar::Builder::new(encoder);
+
+        let data = format!(
+            "binary-data-{}{}",
+            asset.version,
+            asset
+                .content
+                .as_ref()
+                .map(|c| format!(": {c}"))
+                .unwrap_or_default()
+        );
+
+        let mut header = tar::Header::new_gnu();
+        header.set_path("acton")?;
+        header.set_size(data.len() as u64);
+        header.set_mode(0o755);
+        header.set_mtime(0);
+        header.set_cksum();
+
+        tar.append(&header, data.as_bytes())?;
+
+        let encoder = tar.into_inner()?;
+        Ok(encoder.finish()?)
     }
 }
 
 impl ReleaseClient for MockReleaseClient {
-    fn get_release(&self, version: Option<&str>, canary: bool) -> Result<Release> {
+    fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         if self.should_fail {
             bail!("Mock network failure");
         }
 
-        if canary {
+        if trunk {
             return self
-                .canary_release
+                .trunk_release
                 .clone()
-                .ok_or_else(|| anyhow::anyhow!("No canary release found"));
+                .ok_or_else(|| anyhow::anyhow!("No trunk release found"));
         }
 
         if let Some(v) = version {
@@ -502,8 +673,8 @@ impl ReleaseClient for MockReleaseClient {
         if let Some(latest) = &self.latest_release {
             tags.push(latest.tag_name.clone());
         }
-        if let Some(canary) = &self.canary_release {
-            tags.push(canary.tag_name.clone());
+        if let Some(trunk) = &self.trunk_release {
+            tags.push(trunk.tag_name.clone());
         }
         tags.sort();
         tags.dedup();
@@ -519,28 +690,22 @@ impl ReleaseClient for MockReleaseClient {
         let path = temp_file.path().to_owned();
         temp_file.keep()?;
 
-        let file = File::create(&path)?;
-        let enc = GzEncoder::new(file, Compression::default());
-        let mut tar = tar::Builder::new(enc);
-
-        let data = format!(
-            "binary-data-{}{}",
-            asset.version,
-            asset
-                .content
-                .as_ref()
-                .map(|c| format!(": {c}"))
-                .unwrap_or_default()
-        );
-
-        let mut header = tar::Header::new_gnu();
-        header.set_path("acton")?;
-        header.set_size(data.len() as u64);
-        header.set_mode(0o755);
-        header.set_cksum();
-
-        tar.append(&header, data.as_bytes())?;
-        tar.finish()?;
+        if asset.name.ends_with(".sha256") {
+            let archive_name = asset.name.trim_end_matches(".sha256");
+            let archive_asset = Asset {
+                name: archive_name.to_owned(),
+                url: asset.url.clone(),
+                browser_download_url: asset.browser_download_url.clone(),
+                size: asset.size,
+                version: asset.version.clone(),
+                content: asset.content.clone(),
+            };
+            let archive_bytes = Self::build_archive_bytes(&archive_asset)?;
+            let checksum = format!("{:x}", Sha256::digest(&archive_bytes));
+            fs::write(&path, format!("{checksum}  {archive_name}\n"))?;
+        } else {
+            fs::write(&path, Self::build_archive_bytes(asset)?)?;
+        }
 
         Ok(path)
     }

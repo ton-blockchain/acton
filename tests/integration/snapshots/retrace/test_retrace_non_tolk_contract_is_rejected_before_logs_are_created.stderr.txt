@@ -1,0 +1,1 @@
+Error: Contract legacy uses fc source. Source-level retrace requires a .tolk contract.

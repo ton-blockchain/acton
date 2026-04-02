@@ -8,10 +8,10 @@ import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 "#;
 
-const NOOP_CONTRACT: &str = r#"
+const NOOP_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn run_network_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{NETWORK_IMPORTS}\n{test_body}\n");
@@ -31,7 +31,7 @@ fn run_network_success_case(project_name: &str, test_body: &str, snapshot_path: 
 fn net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder() {
     run_network_success_case(
         "di-stdlib-net-set-now-overwrite-project-builder",
-        r#"
+        r"
 get fun `test-di-net-set-now-overwrite-project-builder`() {
     net.setNow(1700023001);
     expect(net.now()).toEqual(1700023001);
@@ -42,7 +42,7 @@ get fun `test-di-net-set-now-overwrite-project-builder`() {
     net.setNow(1700023111);
     expect(net.now()).toEqual(1700023111);
 }
-"#,
+",
         "integration/snapshots/test-runner/net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder/net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder.stdout.txt",
     );
 }
@@ -52,7 +52,7 @@ fn net_set_now_handles_boundary_and_followup_overwrite_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/di_net_set_now_boundary_overwrite.test.tolk";
     let source = format!(
-        r#"
+        r"
 {NETWORK_IMPORTS}
 get fun `test-di-net-set-now-boundary-overwrite`() {{
     net.setNow(1);
@@ -64,7 +64,7 @@ get fun `test-di-net-set-now-boundary-overwrite`() {{
     net.setNow(77);
     expect(net.now()).toEqual(77);
 }}
-"#
+"
     );
 
     fs::write(fixture.path().join(test_path), source).expect("failed to write di fixture test");

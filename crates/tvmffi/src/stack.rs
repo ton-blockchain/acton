@@ -74,6 +74,7 @@ impl Tuple {
         }));
     }
 
+    #[must_use]
     pub fn equal_to(&self, other: &Self) -> bool {
         if self.len() != other.len() {
             return false;
@@ -121,6 +122,7 @@ pub enum TupleItem {
 }
 
 impl TupleItem {
+    #[must_use]
     pub fn big_array_from_items(v: Vec<TupleItem>) -> Self {
         const BIN_SIZE: usize = 255;
         const MAX_SIZE: usize = BIN_SIZE * BIN_SIZE;

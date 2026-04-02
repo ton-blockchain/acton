@@ -1,5 +1,11 @@
-use crate::integration::check::run_simple_test;
+use crate::integration::check::run_rule_test;
 use function_name::named;
+
+const RULE_CODE: &str = "E021";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
 
 #[test]
 #[named]
@@ -122,11 +128,11 @@ fn test_check_dangerous_send_mode_safety_comment_regular_mode_is_ignored() {
 fn test_check_dangerous_send_mode_safety_comment_send_raw_message_is_ignored() {
     run_simple_test(
         "dangerous_send_mode_safety_comment",
-        r#"
+        r"
             fun onInternalMessage(_: InMessage) {
                 sendRawMessage(beginCell().endCell(), SEND_MODE_CARRY_ALL_BALANCE);
             }
-        "#,
+        ",
         function_name!(),
     );
 }

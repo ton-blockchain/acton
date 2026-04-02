@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/dynamic_string_bug.test.tolk (2 tests)
+  ✓ bz-literal-store-string-works [TIME]
+    └─ Test output:
+       [BOC_HEX]
+  ✓ bz-format1-store-string-not-a-cell [TIME]
+    └─ Test output:
+       [BOC_HEX]
+
+ ✓ 2 passed in 1 file

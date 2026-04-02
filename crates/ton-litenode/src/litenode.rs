@@ -282,6 +282,16 @@ pub(crate) enum Request {
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
+    GetNftItems {
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        collection_address: Option<Addr>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: bool,
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
+    },
     SetAddressName {
         address: Addr,
         name: String,
@@ -319,6 +329,7 @@ impl Default for LiteNode {
 }
 
 impl LiteNode {
+    #[must_use]
     pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
@@ -473,7 +484,7 @@ impl LiteNode {
             id
         } else {
             let crc = CRC16.checksum(method.as_bytes());
-            (crc as i32 & 0xffff) | 0x10000
+            (i32::from(crc) & 0xffff) | 0x10000
         };
 
         let stack = Tuple(
@@ -694,6 +705,39 @@ impl LiteNode {
         rx.await?
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub async fn get_nft_items(
+        &self,
+        address: Option<String>,
+        owner_address: Option<String>,
+        collection_address: Option<String>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: Option<bool>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
+        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let collection_address = collection_address
+            .map(|s| Self::parse_addr(&s))
+            .transpose()?;
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetNftItems {
+                address,
+                owner_address,
+                collection_address,
+                index,
+                sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
+                limit: limit.unwrap_or(10),
+                offset: offset.unwrap_or(0),
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
         let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
@@ -747,7 +791,7 @@ impl LiteNode {
             anyhow::anyhow!("Invalid address, only standard internal address is allowed")
         })?;
         Ok(Addr {
-            workchain: int_addr.workchain as i32,
+            workchain: i32::from(int_addr.workchain),
             addr: int_addr.address.0,
         })
     }
@@ -949,6 +993,27 @@ fn process_loop_request(node: &mut Node, req: Request) {
                 owner_address,
                 jetton_address,
                 exclude_zero_balance,
+                limit,
+                offset,
+            );
+            let _ = resp.send(res);
+        }
+        Request::GetNftItems {
+            address,
+            owner_address,
+            collection_address,
+            index,
+            sort_by_last_transaction_lt,
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = node.get_nft_items(
+                address,
+                owner_address,
+                collection_address,
+                index,
+                sort_by_last_transaction_lt,
                 limit,
                 offset,
             );
@@ -1199,17 +1264,15 @@ fn handle_run_get_method(
     let block_id = block_header.block_id();
     let last_transaction_id = meta.last_tx_id();
 
-    let code_boc = meta
-        .code_hash
-        .and_then(|h| node.get_cell(&h))
-        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
+    let code_boc = meta.code_hash.and_then(|h| node.get_cell(&h)).map_or_else(
+        || EMPTY_CELL_BASE64.to_owned(),
+        |b| base64::engine::general_purpose::STANDARD.encode(b),
+    );
 
-    let data_boc = meta
-        .data_hash
-        .and_then(|h| node.get_cell(&h))
-        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
+    let data_boc = meta.data_hash.and_then(|h| node.get_cell(&h)).map_or_else(
+        || EMPTY_CELL_BASE64.to_owned(),
+        |b| base64::engine::general_purpose::STANDARD.encode(b),
+    );
 
     let balance_tokens = meta.cached_balance.unwrap_or(0);
 
@@ -1254,7 +1317,7 @@ fn handle_run_get_method(
                 last_transaction_id,
             })
         }
-        GetMethodResult::Error(e) => anyhow::bail!("Get method error: {:?}", e),
+        GetMethodResult::Error(e) => anyhow::bail!("Get method error: {e:?}"),
     }
 }
 
@@ -1402,8 +1465,7 @@ fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<LiteNodeMasterchai
     let head_block = node.get_block_header(node.globals.head_seqno);
     let block_id = head_block
         .as_ref()
-        .map(BlockMeta::block_id)
-        .unwrap_or_else(LiteNodeBlockId::first);
+        .map_or_else(LiteNodeBlockId::first, BlockMeta::block_id);
 
     Ok(LiteNodeMasterchainInfo {
         state_root_hash: block_id.root_hash,

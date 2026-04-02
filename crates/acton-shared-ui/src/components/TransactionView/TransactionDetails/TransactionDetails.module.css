@@ -155,6 +155,115 @@
   font-weight: var(--font-weight-medium);
 }
 
+.parsedBodySection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.parsedBodyTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.parsedBodyTree {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
+}
+
+.parsedBodyContent {
+  width: max-content;
+  min-width: 100%;
+}
+
+.parsedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.parsedBadge {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: var(--border-radius-full);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary-color);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.parsedTypeLabel {
+  align-self: flex-start;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: var(--font-weight-medium);
+}
+
+.parsedNested {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--spacing-sm);
+  grid-auto-rows: minmax(30px, auto);
+  row-gap: var(--spacing-xs);
+  min-width: 0;
+  padding-left: var(--spacing-mds);
+  padding-bottom: var(--spacing-mds);
+  border-left: 1px solid var(--border-color);
+}
+
+.parsedEntryKey {
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: left;
+  align-self: center;
+}
+
+.parsedEntryValue {
+  min-width: 0;
+  align-self: center;
+}
+
+.parsedScalar {
+  font-family: var(--font-mono), monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.parsedPlainScalar,
+.parsedNull,
+.parsedEmpty {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.parsedNull,
+.parsedEmpty {
+  color: var(--text-muted);
+}
+
+.parsedMapEntry {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--spacing-sm);
+  grid-auto-rows: minmax(30px, auto);
+  row-gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-secondary-color);
+}
+
 @media (max-width: 768px) {
   .detailRow,
   .labeledSectionRow {
@@ -202,5 +311,10 @@
 
   .multiColumnItemTitle {
     white-space: normal;
+  }
+
+  .parsedEntryKey {
+    white-space: normal;
+    text-align: left;
   }
 }

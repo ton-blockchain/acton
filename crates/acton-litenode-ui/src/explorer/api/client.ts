@@ -3,6 +3,7 @@ import type {
   FullAccountState,
   JettonMaster,
   JettonWallet,
+  NftItem,
   Transaction,
   V3TracesResponse,
 } from "./types"
@@ -110,6 +111,81 @@ export class TonClient {
     return this.request(url, "Failed to fetch traces")
   }
 
+  async getNftItems(options?: {
+    readonly address?: string[]
+    readonly owner_address?: string[]
+    readonly collection_address?: string[]
+    readonly sortByLastTransactionLt?: boolean
+    readonly limit?: number
+    readonly offset?: number
+  }): Promise<NftItem[]> {
+    const addresses = options?.address
+    const ownerAddresses = options?.owner_address
+    const collectionAddresses = options?.collection_address
+    const sortByLastTransactionLt = options?.sortByLastTransactionLt || false
+    const limit = options?.limit ?? 100
+    const offset = options?.offset ?? 0
+
+    const buildAndFetch = async (paramName?: string, value?: string): Promise<NftItem[]> => {
+      const url = this.buildUrl(this.v3BaseUrl, "/nft/items")
+      if (paramName && value) {
+        url.searchParams.append(paramName, value)
+      }
+      url.searchParams.append("limit", limit.toString())
+      url.searchParams.append("offset", offset.toString())
+      if (sortByLastTransactionLt) {
+        url.searchParams.append("sort_by_last_transaction_lt", "true")
+      }
+
+      const response = await this.request<{nft_items: NftItem[]}>(url, "Failed to fetch NFTs")
+      return response.nft_items
+    }
+
+    if (addresses && addresses.length > 0) {
+      const results = await Promise.all(
+        addresses.map(async addr => {
+          try {
+            return await buildAndFetch("address", addr)
+          } catch (error) {
+            console.error(`Failed to fetch NFT for ${addr}`, error)
+            return []
+          }
+        }),
+      )
+      return this.dedupNftItems(results.flat())
+    }
+
+    if (ownerAddresses && ownerAddresses.length > 0) {
+      const results = await Promise.all(
+        ownerAddresses.map(async owner => {
+          try {
+            return await buildAndFetch("owner_address", owner)
+          } catch (error) {
+            console.error(`Failed to fetch NFTs for owner ${owner}`, error)
+            return []
+          }
+        }),
+      )
+      return this.dedupNftItems(results.flat())
+    }
+
+    if (collectionAddresses && collectionAddresses.length > 0) {
+      const results = await Promise.all(
+        collectionAddresses.map(async collection => {
+          try {
+            return await buildAndFetch("collection_address", collection)
+          } catch (error) {
+            console.error(`Failed to fetch NFTs for collection ${collection}`, error)
+            return []
+          }
+        }),
+      )
+      return this.dedupNftItems(results.flat())
+    }
+
+    return buildAndFetch()
+  }
+
   async getAddressName(address: string): Promise<string | undefined> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/admin/address-name")
     url.searchParams.append("address", address)
@@ -132,8 +208,54 @@ export class TonClient {
 
   private async request<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
     const response = await fetch(url.toString(), options)
-    const data = (await response.json()) as ApiResponse<T>
-    if (!data.ok) throw new Error(data.error || errorMessage)
-    return data.result
+    const raw = (await response.json()) as unknown
+
+    if (this.isApiResponse<T>(raw)) {
+      if (!raw.ok) {
+        throw new Error(raw.error || errorMessage)
+      }
+      return raw.result
+    }
+
+    if (!response.ok) {
+      throw new Error(this.extractError(raw) || errorMessage)
+    }
+
+    if (this.isRequestError(raw)) {
+      throw new Error(raw.error || errorMessage)
+    }
+
+    return raw as T
+  }
+
+  private dedupNftItems(items: NftItem[]): NftItem[] {
+    const seen = new Map<string, NftItem>()
+    for (const item of items) {
+      if (!seen.has(item.address)) {
+        seen.set(item.address, item)
+      }
+    }
+    return [...seen.values()]
+  }
+
+  private isApiResponse<T>(value: unknown): value is ApiResponse<T> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      "ok" in value &&
+      typeof (value as {ok: unknown}).ok === "boolean"
+    )
+  }
+
+  private isRequestError(value: unknown): value is {error?: string; code?: number} {
+    return typeof value === "object" && value !== null && "error" in value && "code" in value
+  }
+
+  private extractError(value: unknown): string | undefined {
+    if (typeof value !== "object" || value === null || !("error" in value)) {
+      return undefined
+    }
+    const error = (value as {error?: unknown}).error
+    return typeof error === "string" ? error : undefined
   }
 }

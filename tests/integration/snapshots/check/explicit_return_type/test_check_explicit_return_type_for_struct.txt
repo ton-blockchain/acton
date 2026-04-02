@@ -1,0 +1,19 @@
+warning[S002]: function return type should be explicit
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |             fun buildPayload() {
+  |                 ^^^^^^^^^^^^ return type is not explicitly declared
+  |
+  = declare return type explicitly to keep function signatures clear and stable
+
+help: add `: Payload`
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |             fun buildPayload() {
+  |                               ^ : Payload
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S002

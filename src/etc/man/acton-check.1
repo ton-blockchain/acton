@@ -1,0 +1,217 @@
+'\" t
+.TH "ACTON\-CHECK" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-check \[em] Lint Tolk contracts and files
+.SH "SYNOPSIS"
+\fBacton check\fR [\fIoptions\fR] [\fItarget\fR]
+.SH "DESCRIPTION"
+Run the Tolk linter on the whole project, a specific contract ID from
+\fBActon.toml\fR, or a single \fB\&.tolk\fR file.
+.sp
+By default, Acton checks contracts from \fBActon.toml\fR together with workspace
+test files. The command also supports machine\-readable output formats and rule
+explanations.
+.SH "OPTIONS"
+.SS "Check Options"
+.sp
+\fItarget\fR
+.RS 4
+Contract ID from \fBActon.toml\fR or path to a \fB\&.tolk\fR file.
+.RE
+.sp
+\fB\-\-fix\fR
+.RS 4
+Apply available fixes automatically.
+.sp
+Works only in plain output mode.
+.RE
+.sp
+\fB\-\-output\-format\fR \fIformat\fR
+.RS 4
+Output format for diagnostics.
+.sp
+Possible values: \fBplain\fR, \fBjson\fR, \fBsarif\fR, \fBgithub\fR, \fBgitlab\fR
+.RE
+.sp
+\fB\-\-output\-file\fR \fIpath\fR
+.RS 4
+Write output to a file instead of standard output.
+.RE
+.sp
+\fB\-\-enable\-only\fR \fIcode\fR[,\fIcode\fR\[u2026]]_
+.RS 4
+Enable only selected lint rules, for example \fBE001,S001\fR\&.
+.RE
+.sp
+\fB\-\-explain\fR \fIcode\fR
+.RS 4
+Print an explanation for a lint rule.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "BEHAVIOR"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fix\fR applies edits only in \fBplain\fR output mode
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'non\-plain output formats report diagnostics without rewriting source files
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBgithub\fR emits GitHub Actions workflow annotations
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'output format resolution is: CLI flag, then \fB[lint].output\-format\fR, then
+default \fBplain\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-output\-file\fR is not valid with \fBplain\fR format
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'single\-file mode relaxes \fBE014 (acton\-import\-in\-contract)\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'targets ending with \fB\&.tolk\fR are treated as file paths; other targets are
+resolved as contract IDs from \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use an explicit \fB\&.tolk\fR path such as \fB\&./contracts/counter.tolk\fR when a name
+could be mistaken for a contract ID
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'inline suppressions use \fB// acton\-disable\-next\-line E001,S001\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fix\fR applies only linter\-provided fixes; diagnostics without a safe fix
+remain in the report
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: No lint errors were reported, warning thresholds were respected, and any
+requested autofixes completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Lint errors were found, warning limits were exceeded, autofix failed, or
+configuration/target resolution failed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Check the whole project:
+.sp
+.RS 4
+.nf
+acton check
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Check a specific contract by ID:
+.sp
+.RS 4
+.nf
+acton check counter
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Check one file:
+.sp
+.RS 4
+.nf
+acton check counter.tolk
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Emit SARIF to a file:
+.sp
+.RS 4
+.nf
+acton check \-\-output\-format sarif \-\-output\-file .acton/reports/lint.sarif
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Run only selected rules:
+.sp
+.RS 4
+.nf
+acton check \-\-enable\-only E001,S001
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Emit GitHub Actions annotations in CI:
+.sp
+.RS 4
+.nf
+acton check \-\-output\-format github
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Apply local autofixes where available:
+.sp
+.RS 4
+.nf
+acton check \-\-fix
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help fmt\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fILinting guide\fR <https://ton\-blockchain.github.io/acton/docs/linting>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fILinter rules\fR <https://ton\-blockchain.github.io/acton/docs/linting/rules>
+.RE

@@ -1,14 +1,23 @@
-use crate::integration::check::run_fix_test;
-use crate::integration::check::run_simple_test;
+use crate::integration::check::{run_rule_fix_test, run_rule_test};
 use crate::support::project::ProjectBuilder;
 use function_name::named;
+
+const RULE_CODE: &str = "S001";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
+
+fn run_fix_test(before: &str, after: &str, name: &str) {
+    run_rule_fix_test(RULE_CODE, before, after, name);
+}
 
 #[test]
 #[named]
 fn test_check_name_case_checker_globals() {
     run_simple_test(
         "name_case_checker",
-        r#"
+        r"
             struct low_struct {
                 Bad_field: int,
             }
@@ -45,9 +54,9 @@ fn test_check_name_case_checker_globals() {
                 val fromAlias = useAlias(aliasValue);
                 return fromFunction + fromMethod + fromAlias + badConst;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -55,7 +64,7 @@ fn test_check_name_case_checker_globals() {
 fn test_check_name_case_checker_locals_and_type_parameters() {
     run_simple_test(
         "name_case_checker",
-        r#"
+        r"
             fun localHelper<bad_type>(Bad_param: bad_type): bad_type {
                 val Bad_local = Bad_param;
                 return Bad_local;
@@ -64,9 +73,9 @@ fn test_check_name_case_checker_locals_and_type_parameters() {
             fun main(): int {
                 return localHelper<int>(10);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -74,7 +83,7 @@ fn test_check_name_case_checker_locals_and_type_parameters() {
 fn test_check_name_case_checker_ignores_internal_names_and_get_methods() {
     run_simple_test(
         "name_case_checker",
-        r#"
+        r"
             struct _hidden_struct {
                 _hidden_field: int,
             }
@@ -101,16 +110,16 @@ fn test_check_name_case_checker_ignores_internal_names_and_get_methods() {
                 val fromMethod = _hidden_struct { _hidden_field: fromFun }._hidden_method();
                 return fromFun + fromMethod + get_wallet_info() + _hidden_const + _hidden_global;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_name_case_checker_locals_and_type_parameters() {
     run_fix_test(
-        r#"
+        r"
             fun localHelper<bad_type>(Bad_param: bad_type): bad_type {
                 val Bad_local = Bad_param;
                 return Bad_local;
@@ -119,8 +128,8 @@ fn test_fix_name_case_checker_locals_and_type_parameters() {
             fun main(): int {
                 return localHelper<int>(10);
             }
-        "#,
-        r#"
+        ",
+        r"
             fun localHelper<BadType>(badParam: BadType): BadType {
                 val badLocal = badParam;
                 return badLocal;
@@ -129,16 +138,16 @@ fn test_fix_name_case_checker_locals_and_type_parameters() {
             fun main(): int {
                 return localHelper<int>(10);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_name_case_checker_globals_and_usages() {
     run_fix_test(
-        r#"
+        r"
             struct low_struct {
                 Bad_field: int,
             }
@@ -175,8 +184,8 @@ fn test_fix_name_case_checker_globals_and_usages() {
                 val fromAlias = useAlias(aliasValue);
                 return fromFunction + fromMethod + fromAlias + badConst;
             }
-        "#,
-        r#"
+        ",
+        r"
             struct LowStruct {
                 badField: int,
             }
@@ -213,16 +222,16 @@ fn test_fix_name_case_checker_globals_and_usages() {
                 val fromAlias = useAlias(aliasValue);
                 return fromFunction + fromMethod + fromAlias + BAD_CONST;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_fix_name_case_checker_struct_literal_field_key_usage() {
     run_fix_test(
-        r#"
+        r"
             struct SomeStruct {
                 Bad_field: int,
             }
@@ -232,8 +241,8 @@ fn test_fix_name_case_checker_struct_literal_field_key_usage() {
                 val item = SomeStruct { Bad_field: sourceValue };
                 return item.Bad_field;
             }
-        "#,
-        r#"
+        ",
+        r"
             struct SomeStruct {
                 badField: int,
             }
@@ -243,9 +252,9 @@ fn test_fix_name_case_checker_struct_literal_field_key_usage() {
                 val item = SomeStruct { badField: sourceValue };
                 return item.badField;
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -265,11 +274,11 @@ fn test_fix_name_case_checker_updates_usages_in_another_file() {
         )
         .file(
             "contracts/api",
-            r#"
+            r"
                 fun Bad_fn(): int {
                     return 1;
                 }
-            "#,
+            ",
         )
         .file(
             "contracts/other",
@@ -284,7 +293,14 @@ fn test_fix_name_case_checker_updates_usages_in_another_file() {
         .build();
 
     project.acton().init().run().success();
-    project.acton().check().arg("--fix").run().success();
+    project
+        .acton()
+        .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
+        .arg("--fix")
+        .run()
+        .success();
 
     let main_path = project.path().join("contracts/main.tolk");
     let api_path = project.path().join("contracts/api.tolk");
@@ -310,11 +326,11 @@ fn test_fix_name_case_checker_updates_usages_in_another_file() {
                     return badFn() + otherMain();
                 }
             "#;
-    let expected_api = r#"
+    let expected_api = r"
                 fun badFn(): int {
                     return 1;
                 }
-            "#;
+            ";
     let expected_other = r#"
                 import "./api.tolk";
 

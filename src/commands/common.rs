@@ -1,4 +1,7 @@
-use acton_config::config::{ActonConfig, global_libraries_path, global_wallets_path};
+use acton_config::config::{
+    ActonConfig, global_libraries_path, global_wallets_path,
+    project_root as configured_project_root,
+};
 use anyhow::{Context, anyhow};
 use inquire::Select;
 use std::path::Path;
@@ -120,6 +123,13 @@ pub mod error_fmt {
     }
 
     #[must_use]
+    pub fn port_bind_failure(server: &str, address: &str, flag: &str) -> String {
+        format!(
+            "Failed to start {server} on {address}\nChoose another port with {flag}\nOr stop the process currently listening on that port"
+        )
+    }
+
+    #[must_use]
     pub fn script_not_found(config: &ActonConfig, name: &str) -> String {
         let Some(available) = available_scripts(config) else {
             return format!(
@@ -129,7 +139,7 @@ To define a new script add the following to Acton.toml:
 
 {}
 
-See https://i582.github.io/acton/docs/commands/run/ for more information",
+See https://ton-blockchain.github.io/acton/docs/commands/run/ for more information",
                 name.yellow(),
                 "[scripts]
 script-name = \"command invocation\""
@@ -167,7 +177,7 @@ script-name = \"command invocation\""
     #[must_use]
     pub fn no_scripts_section() -> String {
         format!(
-            "No {} section found in Acton.toml.\nTo add a script add the following section to Acton.toml:\n\n{}\n{}\n{}\n\nSee https://i582.github.io/acton/docs/commands/run/ for more information",
+            "No {} section found in Acton.toml.\nTo add a script add the following section to Acton.toml:\n\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/commands/run/ for more information",
             "[scripts]".yellow(),
             "[scripts]".green(),
             "deploy = \"acton script scripts/deploy.tolk --broadcast\"".green(),
@@ -178,7 +188,7 @@ script-name = \"command invocation\""
     #[must_use]
     pub fn no_wallets_found() -> String {
         format!(
-            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://i582.github.io/acton/docs/setup-wallets/ for more information",
+            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information",
             "wallets.toml".yellow(),
             "acton wallet new".yellow(),
             "wallets.toml".green(),
@@ -270,9 +280,9 @@ pub fn symlink_global_wallets() -> anyhow::Result<()> {
     if let Some(global_path) = global_wallets_path()
         && global_path.exists()
     {
-        let symlink_path = Path::new("global.wallets.toml");
+        let symlink_path = configured_project_root().join("global.wallets.toml");
         if !symlink_path.exists() {
-            create_symlink(&global_path, symlink_path)?;
+            create_symlink(&global_path, &symlink_path)?;
         }
     }
     Ok(())
@@ -282,9 +292,9 @@ pub fn symlink_global_libraries() -> anyhow::Result<()> {
     if let Some(global_path) = global_libraries_path()
         && global_path.exists()
     {
-        let symlink_path = Path::new("global.libraries.toml");
+        let symlink_path = configured_project_root().join("global.libraries.toml");
         if !symlink_path.exists() {
-            create_symlink(&global_path, symlink_path)?;
+            create_symlink(&global_path, &symlink_path)?;
         }
     }
     Ok(())

@@ -6,7 +6,6 @@ fn run_random_requires_initialization_test(content: &str, name: &str) {
     let project = ProjectBuilder::new(&format!("check-{name}"))
         .contract("main", content)
         .with_lint_level("random-requires-initialization", "warn")
-        .with_lint_level("unauthorized-access", "allow")
         .build();
 
     project.acton().init().run().success();
@@ -14,6 +13,8 @@ fn run_random_requires_initialization_test(content: &str, name: &str) {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E024")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -28,8 +29,7 @@ fn run_random_requires_initialization_test_with_files(
 ) {
     let mut builder = ProjectBuilder::new(&format!("check-{name}"))
         .contract("main", main_content)
-        .with_lint_level("random-requires-initialization", "warn")
-        .with_lint_level("unauthorized-access", "allow");
+        .with_lint_level("random-requires-initialization", "warn");
 
     for (path, content) in files {
         builder = builder.file(path, content);
@@ -42,6 +42,8 @@ fn run_random_requires_initialization_test_with_files(
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E024")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -53,11 +55,11 @@ fn run_random_requires_initialization_test_with_files(
 #[named]
 fn test_check_random_requires_initialization_reports_uint256_without_initialize() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main() {
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -66,11 +68,11 @@ fn test_check_random_requires_initialization_reports_uint256_without_initialize(
 #[named]
 fn test_check_random_requires_initialization_reports_range_without_initialize() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main() {
                 val _value = random.range(10);
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -79,12 +81,12 @@ fn test_check_random_requires_initialization_reports_range_without_initialize() 
 #[named]
 fn test_check_random_requires_initialization_allows_after_initialize() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main() {
                 random.initialize();
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -93,12 +95,12 @@ fn test_check_random_requires_initialization_allows_after_initialize() {
 #[named]
 fn test_check_random_requires_initialization_allows_after_initialize_by() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main() {
                 random.initializeBy(1);
                 val _value = random.range(100);
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -107,14 +109,14 @@ fn test_check_random_requires_initialization_allows_after_initialize_by() {
 #[named]
 fn test_check_random_requires_initialization_reports_if_only_one_branch_initializes() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(cond: bool) {
                 if (cond) {
                     random.initializeBy(7);
                 }
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -123,7 +125,7 @@ fn test_check_random_requires_initialization_reports_if_only_one_branch_initiali
 #[named]
 fn test_check_random_requires_initialization_allows_if_all_branches_initialize() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(cond: bool) {
                 if (cond) {
                     random.initialize();
@@ -132,7 +134,7 @@ fn test_check_random_requires_initialization_allows_if_all_branches_initialize()
                 }
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -141,7 +143,7 @@ fn test_check_random_requires_initialization_allows_if_all_branches_initialize()
 #[named]
 fn test_check_random_requires_initialization_allows_when_helper_guarantees_initialize() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRnd() {
                 random.initializeBy(77);
             }
@@ -150,7 +152,7 @@ fn test_check_random_requires_initialization_allows_when_helper_guarantees_initi
                 initRnd();
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -159,7 +161,7 @@ fn test_check_random_requires_initialization_allows_when_helper_guarantees_initi
 #[named]
 fn test_check_random_requires_initialization_reports_when_helper_initializes_conditionally() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRnd(cond: bool) {
                 if (cond) {
                     random.initializeBy(77);
@@ -170,7 +172,7 @@ fn test_check_random_requires_initialization_reports_when_helper_initializes_con
                 initRnd(cond);
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -179,7 +181,7 @@ fn test_check_random_requires_initialization_reports_when_helper_initializes_con
 #[named]
 fn test_check_random_requires_initialization_allows_through_nested_helper_chain() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRndInner() {
                 random.initializeBy(123);
             }
@@ -192,7 +194,7 @@ fn test_check_random_requires_initialization_allows_through_nested_helper_chain(
                 initRnd();
                 val _value = random.range(1000);
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -201,12 +203,12 @@ fn test_check_random_requires_initialization_allows_through_nested_helper_chain(
 #[named]
 fn test_check_random_requires_initialization_reports_when_initialize_happens_after_sink() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main() {
                 val _value = random.uint256();
                 random.initializeBy(1);
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -216,7 +218,7 @@ fn test_check_random_requires_initialization_reports_when_initialize_happens_aft
 fn test_check_random_requires_initialization_allows_when_non_initialized_path_returns_before_sink()
 {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(cond: bool) {
                 if (cond) {
                     return;
@@ -224,7 +226,7 @@ fn test_check_random_requires_initialization_allows_when_non_initialized_path_re
                 random.initialize();
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -233,7 +235,7 @@ fn test_check_random_requires_initialization_allows_when_non_initialized_path_re
 #[named]
 fn test_check_random_requires_initialization_reports_when_helper_has_early_return_without_init() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRnd(cond: bool) {
                 if (cond) {
                     return;
@@ -245,7 +247,7 @@ fn test_check_random_requires_initialization_reports_when_helper_has_early_retur
                 initRnd(cond);
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -254,7 +256,7 @@ fn test_check_random_requires_initialization_reports_when_helper_has_early_retur
 #[named]
 fn test_check_random_requires_initialization_allows_when_helper_initializes_on_all_branches() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRnd(cond: bool) {
                 if (cond) {
                     random.initialize();
@@ -267,7 +269,7 @@ fn test_check_random_requires_initialization_allows_when_helper_initializes_on_a
                 initRnd(cond);
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -276,7 +278,7 @@ fn test_check_random_requires_initialization_allows_when_helper_initializes_on_a
 #[named]
 fn test_check_random_requires_initialization_reports_when_recursive_initializer_not_guaranteed() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initRnd(depth: int): void {
                 if (depth == 0) {
                     return;
@@ -292,7 +294,7 @@ fn test_check_random_requires_initialization_reports_when_recursive_initializer_
                 initRnd(depth);
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -301,7 +303,7 @@ fn test_check_random_requires_initialization_reports_when_recursive_initializer_
 #[named]
 fn test_check_random_requires_initialization_allows_when_second_helper_guarantees_init() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun initMaybe(cond: bool) {
                 if (cond) {
                     random.initialize();
@@ -317,7 +319,7 @@ fn test_check_random_requires_initialization_allows_when_second_helper_guarantee
                 initSure();
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -326,7 +328,7 @@ fn test_check_random_requires_initialization_allows_when_second_helper_guarantee
 #[named]
 fn test_check_random_requires_initialization_reports_when_init_and_sink_control_flow_split() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(a: bool, b: bool) {
                 if (a) {
                     random.initializeBy(1);
@@ -336,7 +338,7 @@ fn test_check_random_requires_initialization_reports_when_init_and_sink_control_
                 }
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -355,11 +357,11 @@ fn test_check_random_requires_initialization_allows_cross_file_helper_with_guara
         "#,
         &[(
             "contracts/helpers/init",
-            r#"
+            r"
                 fun initRnd() {
                     random.initializeBy(9);
                 }
-            "#,
+            ",
         )],
         function_name!(),
     );
@@ -379,13 +381,13 @@ fn test_check_random_requires_initialization_reports_cross_file_helper_with_cond
         "#,
         &[(
             "contracts/helpers/init",
-            r#"
+            r"
                 fun initRnd(cond: bool) {
                     if (cond) {
                         random.initializeBy(9);
                     }
                 }
-            "#,
+            ",
         )],
         function_name!(),
     );
@@ -395,7 +397,7 @@ fn test_check_random_requires_initialization_reports_cross_file_helper_with_cond
 #[named]
 fn test_check_random_requires_initialization_reports_for_each_sink_without_init() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(cond: bool) {
                 if (cond) {
                     random.initialize();
@@ -403,7 +405,7 @@ fn test_check_random_requires_initialization_reports_for_each_sink_without_init(
                 val _first = random.uint256();
                 val _second = random.range(100);
             }
-        "#,
+        ",
         function_name!(),
     );
 }
@@ -412,7 +414,7 @@ fn test_check_random_requires_initialization_reports_for_each_sink_without_init(
 #[named]
 fn test_check_random_requires_initialization_allows_when_non_initialized_path_throws_before_sink() {
     run_random_requires_initialization_test(
-        r#"
+        r"
             fun main(cond: bool) {
                 if (cond) {
                     throw 100;
@@ -420,7 +422,7 @@ fn test_check_random_requires_initialization_allows_when_non_initialized_path_th
                 random.initializeBy(1);
                 val _value = random.uint256();
             }
-        "#,
+        ",
         function_name!(),
     );
 }

@@ -35,6 +35,7 @@ impl Span {
         end: u32::MAX,
     };
 
+    #[must_use]
     pub const fn from_offset(offset: usize) -> Self {
         Span {
             start: offset as u32,
@@ -42,11 +43,13 @@ impl Span {
         }
     }
 
+    #[must_use]
     pub const fn file_start() -> Self {
         Span { start: 0, end: 0 }
     }
 
     /// Creates a span from a tree-sitter node.
+    #[must_use]
     pub fn from_syntax(node: &Node) -> Self {
         Span {
             start: node.start_byte() as u32,
@@ -61,6 +64,7 @@ impl Span {
     }
 
     /// Creates a span from an optional tree-sitter node, returning `DUMMY` if `None`.
+    #[must_use]
     pub fn from_opt_syntax(node: &Option<Node>) -> Self {
         let Some(node) = node else {
             return Self::DUMMY;
@@ -72,6 +76,7 @@ impl Span {
     ///
     /// `LocalDefId.local` represents byte offset, so we need a length
     /// to build a span.
+    #[must_use]
     pub const fn from_def_id(id: LocalDefId, length: u32) -> Self {
         Self {
             start: id.local,
@@ -80,26 +85,31 @@ impl Span {
     }
 
     /// Checks if the given byte offset is within this span.
+    #[must_use]
     pub const fn contains(&self, offset: usize) -> bool {
         self.start() <= offset && offset <= self.end()
     }
 
     /// Returns the start offset as a `usize`.
+    #[must_use]
     pub const fn start(&self) -> usize {
         self.start as usize
     }
 
     /// Returns the end offset as a `usize`.
+    #[must_use]
     pub const fn end(&self) -> usize {
         self.end as usize
     }
 
     /// Returns length of this span.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.end as usize - self.start as usize
     }
 
     /// Returns true if span length equals to zero.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.start == self.end
     }
@@ -236,6 +246,7 @@ pub enum SymbolKind {
 
 impl Symbol {
     /// Returns `true` if this declaration defines a type (struct, enum, or alias).
+    #[must_use]
     pub const fn is_type(&self) -> bool {
         matches!(
             self.kind,
@@ -244,6 +255,7 @@ impl Symbol {
     }
 
     /// Returns `true` if this declaration defines a function.
+    #[must_use]
     pub const fn is_func(&self) -> bool {
         matches!(
             self.kind,
@@ -284,13 +296,14 @@ pub struct FileIndex {
     pub imports: Vec<Import>,
     /// List of top-level declarations in this file.
     pub decls: Vec<Symbol>,
-    /// Mapping from local_id of the [`SymbolId`] to index in tree root children.
+    /// Mapping from `local_id` of the [`SymbolId`] to index in tree root children.
     pub symbol_id_to_decl_index: BTreeMap<u32, usize>, // SymbolId.local_id to idx in top levels
     /// Sorted list of spans for top-level declarations, used for efficient lookup.
     pub body_spans: Vec<(Span, usize)>,
 }
 
 impl FileIndex {
+    #[must_use]
     pub fn find_symbol_index_at_offset(&self, offset: usize) -> Option<usize> {
         let idx = self
             .body_spans
@@ -308,16 +321,19 @@ impl FileIndex {
     }
 
     /// Checks if passed file resides in Tolk standard library.
+    #[must_use]
     pub fn is_stdlib_file(&self) -> bool {
         self.source_kind == FileSource::Stdlib
     }
 
     /// Checks if passed file resides in Acton standard library.
+    #[must_use]
     pub fn is_acton_file(&self) -> bool {
         self.source_kind == FileSource::Acton
     }
 
     /// Checks if passed file resides in workspace, not in Tolk stdlib or Acton files.
+    #[must_use]
     pub fn is_workspace_file(&self) -> bool {
         self.source_kind == FileSource::Workspace
     }
@@ -327,6 +343,7 @@ impl FileIndex {
     /// # Panics
     ///
     /// Panics in debug builds if the path is not absolute.
+    #[must_use]
     pub fn build(
         content: &str,
         file_id: FileId,
@@ -413,7 +430,7 @@ impl FileIndex {
                             let name_ident = f.name()?;
                             let name = Arc::from(name_ident.text(&file.source));
                             let name_span = name_ident.span();
-                            let fqn = Arc::from(format!("{}.{}", struct_name, name));
+                            let fqn = Arc::from(format!("{struct_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
                             let doc_span = None;
@@ -444,7 +461,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::Enum(decl) => {
                     let enum_name = name.clone();
@@ -454,7 +471,7 @@ impl FileIndex {
                             let name_ident = f.name()?;
                             let name = Arc::from(name_ident.text(&file.source));
                             let name_span = name_ident.span();
-                            let fqn = Arc::from(format!("{}.{}", enum_name, name));
+                            let fqn = Arc::from(format!("{enum_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
                             let doc_span = None;
@@ -481,7 +498,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::Func(func) => {
                     let has_return_type = func.return_type().is_some();
@@ -504,7 +521,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::Method(func) => {
                     let sources = file.source.as_ref();
@@ -551,7 +568,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::GetMethod(func) => {
                     let has_return_type = func.return_type().is_some();
@@ -574,7 +591,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::Import(import) => {
                     let Some(path) = import.path() else {
@@ -584,13 +601,13 @@ impl FileIndex {
                     imports.push(Import {
                         path: Arc::from(path),
                         span: import.span(),
-                    })
+                    });
                 }
                 tolk_syntax::TopLevel::TolkRequiredVersion(_) => continue,
                 tolk_syntax::TopLevel::Contract(_) => continue,
                 tolk_syntax::TopLevel::EmptyStmt(_) => continue,
                 tolk_syntax::TopLevel::Unmapped(_) => continue,
-            };
+            }
 
             local_id += 1;
         }
@@ -620,7 +637,7 @@ impl FileIndex {
         decl.type_parameters()
             .map(|tp| {
                 tp.parameters()
-                    .flat_map(|p| {
+                    .filter_map(|p| {
                         let name_ident = p.name()?;
                         Some(TypeParameter {
                             name: Arc::from(name_ident.text(&file.source)),

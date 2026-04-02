@@ -1,0 +1,12 @@
+Coverage Summary:
+Lines: 1/1 (100.00%)
+Total Hits: 1
+
+File: [ROOT]/code/math.tolk
+Annotated Code:
+1   |                                                |
+2   |             fun addOne(x: int): int {          |
+3 ✓ |                 return x + 1;                  | hits:1
+4   |             }                                  |
+5   |                                                |
+

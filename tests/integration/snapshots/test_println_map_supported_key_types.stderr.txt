@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+map<bool, int32> {
+    false: 10,
+}
+map<address, int32> {
+    [WALLET_ADDRESS_BASE]: 20,
+}
+map<int8, int32> {
+    -1: 30,
+}
+map<uint16, int32> {
+    65535: 40,
+}
+map<int257, int32> {
+    -1: 50,
+}
+map<uint256, int32> {
+    0x0000000000000000000000000000000000000000000000000000000000000001: 60,
+}

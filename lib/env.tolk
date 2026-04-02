@@ -1,7 +1,7 @@
 /// Module for accessing environment variables.
 ///
 /// This module provides a type-safe way to access environment variables during test execution or script running.
-/// It supports parsing environment variables into standard Tolk types like `int`, `bool`,
+/// It supports parsing environment variables into standard Tolk types like `int`, `coins`, `bool`,
 /// `string`, `slice`, `address`, and `cell`.
 ///
 /// `env<T>`/`envOr<T>` support only these types. For unsupported generic `T`, execution fails
@@ -14,6 +14,9 @@
 /// ```tolk
 /// // Read an integer configuration
 /// val iterations = envOr<int>("TEST_ITERATIONS", 100);
+///
+/// // Read TON amount in nanotons
+/// val minBalance = envOr<coins>("MIN_BALANCE", ton("0.5"));
 ///
 /// // Read a target address
 /// val target = env<address>("TARGET_ADDRESS");
@@ -37,6 +40,7 @@ import "testing/assert"
 ///
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
+/// - `coins`: parsed the same way as `int` and returned as TON amount in nanotons.
 /// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
 /// - `string`: returns the raw string value.
 /// - `slice`: returns the raw string value as a slice.
@@ -48,6 +52,7 @@ import "testing/assert"
 /// Example:
 /// ```tolk
 /// val foo = env<int>("FOO");
+/// val amount = env<coins>("TRANSFER_VALUE");
 /// val bar = env<string>("BAR");
 /// ```
 fun env<T>(name: string): T? {
@@ -59,6 +64,7 @@ fun env<T>(name: string): T? {
 ///
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
+/// - `coins`: parsed the same way as `int` and returned as TON amount in nanotons.
 /// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
 /// - `string`: returns the raw string value.
 /// - `slice`: returns the raw string value as a slice.
@@ -71,6 +77,7 @@ fun env<T>(name: string): T? {
 /// Example:
 /// ```tolk
 /// val foo = envOr<int>("FOO", 42);
+/// val amount = envOr<coins>("TRANSFER_VALUE", ton("1.5"));
 /// val bar = envOr<string>("BAR", "default");
 /// ```
 fun envOr<T>(name: string, default: T): T {
@@ -83,6 +90,14 @@ fun envOr<T>(name: string, default: T): T {
 
 fun int.__env(name: string): int? {
     return ffi.envInt(name);
+}
+
+fun coins.__env(name: string): coins? {
+    val value = ffi.envInt(name);
+    if (value == null) {
+        return null
+    }
+    return value;
 }
 
 fun bool.__env(name: string): bool? {
@@ -106,7 +121,12 @@ fun cell.__env(name: string): cell? {
 }
 
 fun T.__env(name: string): T? {
-    Assert.fail(format1("env() supports only int, bool, string, slice, address and cell types, but got {}", reflect.typeNameOf<T>()));
+    Assert.fail(
+        format1(
+            "env() supports only int, coins, bool, string, slice, address and cell types, but got {}",
+            reflect.typeNameOf<T>(),
+        ),
+    );
 }
 
 fun ffi.envInt(name: string): int?

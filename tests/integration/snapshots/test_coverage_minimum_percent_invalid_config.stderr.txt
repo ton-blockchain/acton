@@ -1,0 +1,1 @@
+Error: coverage minimum percent must be between 0 and 100, got 101

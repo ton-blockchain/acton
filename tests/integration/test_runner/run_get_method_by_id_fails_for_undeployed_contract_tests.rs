@@ -3,14 +3,14 @@ use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 
 get fun currentCounter(): int {
     return 0;
 }
-"#;
+";
 
 #[test]
 fn run_get_method_by_id_fails_for_undeployed_contract() {
@@ -57,7 +57,7 @@ fn run_get_method_by_id_fails_for_invalid_method_id_on_deployed_contract() {
             init: ContractState
         }
 
-        fun Counter.fromStorage(storage: Storage) {
+        fun Counter.fromStorage(storage: Storage): Counter {
             val init = ContractState {
                 code: build("counter"),
                 data: storage.toCell(),

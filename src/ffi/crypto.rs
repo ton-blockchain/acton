@@ -1,8 +1,9 @@
 use crate::context::Context;
 use crate::wallets::new_mnemonic;
-use nacl::sign::{Keypair, generate_keypair, signature};
+use ed25519_dalek::{Signer, SigningKey};
 use num_bigint::{BigInt, Sign};
 use rand::RngCore;
+use ton::ton_wallet::Mnemonic;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -55,7 +56,7 @@ fn mnemonic_to_key_pair_impl(
 ) -> anyhow::Result<()> {
     let words = words.iter().map(String::as_str).collect();
 
-    let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::new(words, &None)?;
+    let mnemonic = Mnemonic::new(words, None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     // Return KeyPair { privateKey: bytes32, publicKey: bytes32 }
@@ -72,15 +73,14 @@ fn mnemonic_to_key_pair_impl(
     Ok(())
 }
 
-fn seed_to_rust_keypair(seed: BigInt) -> Keypair {
+fn seed_to_signing_key(seed: BigInt) -> SigningKey {
     // Convert private key (32-byte seed) to bytes
     let (_, pk_bytes) = seed.to_bytes_be();
     let mut seed_bytes = [0u8; 32];
     let offset = 32usize.saturating_sub(pk_bytes.len());
     seed_bytes[offset..].copy_from_slice(&pk_bytes[..pk_bytes.len().min(32)]);
 
-    // Derive full 64-byte nacl secret key from the 32-byte seed
-    generate_keypair(&seed_bytes)
+    SigningKey::from_bytes(&seed_bytes)
 }
 
 extension!(raw_sign in (Context) with (data: BigInt, private_key: BigInt) using raw_sign_impl);
@@ -90,7 +90,7 @@ fn raw_sign_impl(
     data: BigInt,
     private_key: BigInt,
 ) -> anyhow::Result<()> {
-    let keypair = seed_to_rust_keypair(private_key);
+    let signing_key = seed_to_signing_key(private_key);
 
     // Convert data (uint256) to 32 bytes
     let (_, data_bytes) = data.to_bytes_be();
@@ -99,12 +99,11 @@ fn raw_sign_impl(
     hash[offset..].copy_from_slice(&data_bytes[..data_bytes.len().min(32)]);
 
     // Sign the hash
-    let sig = signature(&hash, &keypair.skey)
-        .map_err(|e| anyhow::anyhow!("signing failed: {}", e.message))?;
+    let sig = signing_key.sign(&hash);
 
     // Return signature as a 512-bit slice (64 bytes)
     let mut builder = CellBuilder::new();
-    builder.store_raw(&sig, 512)?;
+    builder.store_raw(&sig.to_bytes(), 512)?;
     let cell = builder.build()?;
     stack.push(TupleItem::Slice(cell));
     Ok(())
@@ -112,10 +111,13 @@ fn raw_sign_impl(
 
 extension!(seed_to_keypair in (Context) with (seed: BigInt) using seed_to_keypair_impl);
 fn seed_to_keypair_impl(_ctx: &mut Context, stack: &mut Tuple, seed: BigInt) -> anyhow::Result<()> {
-    let keypair = seed_to_rust_keypair(seed);
+    let signing_key = seed_to_signing_key(seed);
+    let verifying_key = signing_key.verifying_key();
 
-    let priv_as_tuple_item = TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &keypair.skey[..32]));
-    let pub_as_tuple_item = TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &keypair.pkey));
+    let priv_as_tuple_item =
+        TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &signing_key.to_bytes()));
+    let pub_as_tuple_item =
+        TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &verifying_key.to_bytes()));
     let mut result = Tuple::empty();
     result.push(priv_as_tuple_item);
     result.push(pub_as_tuple_item);

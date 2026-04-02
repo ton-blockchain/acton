@@ -9,6 +9,15 @@ use crate::ast::{
 use crate::{AstNodeBytesKind, impl_ast_node};
 use tree_sitter::Node;
 
+pub const CONTRACT_ENTRYPOINTS: &[&str] = &[
+    "onInternalMessage",
+    "onExternalMessage",
+    "onRunTickTock",
+    "onSplitPrepare",
+    "onSplitInstall",
+    "onBouncedMessage",
+];
+
 #[derive(Clone, Copy, Debug)]
 pub enum TopLevel<'tree> {
     TolkRequiredVersion(TolkRequiredVersion<'tree>),
@@ -64,6 +73,8 @@ impl<'tree> TopLevel<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TopLevel<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         let name_node = self.syntax().child_by_field_name("name")?;
         Some(name_node.into())
@@ -229,6 +240,7 @@ impl<'tree> AsmBody<'tree> {
             .unwrap_or_default()
     }
 
+    #[must_use]
     pub fn instructions(&self) -> AstChildren<'tree, ExprStringLiteral<'tree>> {
         AstChildren::new(self.0)
     }
@@ -276,6 +288,8 @@ impl<'tree> Contract<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Contract<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -287,6 +301,7 @@ pub struct ContractBody<'tree>(pub Node<'tree>);
 impl_ast_node!(ContractBody, "contract_body");
 
 impl<'tree> ContractBody<'tree> {
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, ContractField<'tree>> {
         AstChildren::new(self.0)
     }
@@ -305,6 +320,8 @@ impl<'tree> ContractField<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ContractField<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -364,6 +381,8 @@ impl<'tree> Constant<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Constant<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -393,6 +412,8 @@ impl<'tree> GlobalVar<'tree> {
 }
 
 impl<'tree> HasName<'tree> for GlobalVar<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -422,6 +443,8 @@ impl<'tree> TypeAlias<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TypeAlias<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -462,6 +485,8 @@ impl<'tree> Struct<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Struct<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -485,6 +510,7 @@ pub struct StructBody<'tree>(pub Node<'tree>);
 impl_ast_node!(StructBody, "struct_body");
 
 impl<'tree> StructBody<'tree> {
+    #[must_use]
     pub fn fields(&self) -> AstChildren<'tree, StructField<'tree>> {
         AstChildren::new(self.0)
     }
@@ -513,6 +539,8 @@ impl<'tree> StructField<'tree> {
 }
 
 impl<'tree> HasName<'tree> for StructField<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -596,6 +624,8 @@ impl<'tree> Enum<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Enum<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -613,6 +643,7 @@ pub struct EnumBody<'tree>(pub Node<'tree>);
 impl_ast_node!(EnumBody, "enum_body");
 
 impl<'tree> EnumBody<'tree> {
+    #[must_use]
     pub fn members(&self) -> AstChildren<'tree, EnumMember<'tree>> {
         AstChildren::new(self.0)
     }
@@ -636,6 +667,8 @@ impl<'tree> EnumMember<'tree> {
 }
 
 impl<'tree> HasName<'tree> for EnumMember<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -656,6 +689,8 @@ impl<'tree> Func<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Func<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -713,6 +748,8 @@ impl<'tree> Parameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Parameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -754,10 +791,10 @@ impl<'tree> Method<'tree> {
         let skip = skip_self
             && params
                 .peek()
-                .and_then(|first| first.name())
+                .and_then(HasName::name)
                 .is_some_and(|name| name.text_matches(sources, "self"));
 
-        params.skip(if skip { 1 } else { 0 })
+        params.skip(usize::from(skip))
     }
 
     #[must_use]
@@ -780,6 +817,8 @@ impl<'tree> Method<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Method<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -832,6 +871,8 @@ impl<'tree> GetMethod<'tree> {
 }
 
 impl<'tree> HasName<'tree> for GetMethod<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -889,6 +930,7 @@ pub struct AnnotationList<'tree>(pub Node<'tree>);
 impl_ast_node!(AnnotationList, "annotation_list");
 
 impl<'tree> AnnotationList<'tree> {
+    #[must_use]
     pub fn annotations(&self) -> AstChildren<'tree, Annotation<'tree>> {
         AstChildren::new(self.0)
     }
@@ -899,6 +941,11 @@ pub struct Annotation<'tree>(pub Node<'tree>);
 
 impl_ast_node!(Annotation, "annotation");
 
+#[derive(Clone, Copy, Debug)]
+pub struct AnnotationName<'tree>(pub Node<'tree>);
+
+impl_ast_node!(AnnotationName, "annotation_name");
+
 impl<'tree> Annotation<'tree> {
     #[must_use]
     pub fn args(&self) -> Option<AnnotationArgs<'tree>> {
@@ -907,7 +954,9 @@ impl<'tree> Annotation<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Annotation<'tree> {
-    fn name(&self) -> Option<Ident<'tree>> {
+    type Name = AnnotationName<'tree>;
+
+    fn name(&self) -> Option<AnnotationName<'tree>> {
         self.0.field("name")
     }
 }
@@ -918,6 +967,7 @@ pub struct AnnotationArgs<'tree>(pub Node<'tree>);
 impl_ast_node!(AnnotationArgs, "annotation_arguments");
 
 impl<'tree> AnnotationArgs<'tree> {
+    #[must_use]
     pub fn args(&self) -> AstChildren<'tree, Expr<'tree>> {
         AstChildren::new(self.0)
     }
@@ -929,6 +979,7 @@ pub struct TypeParameters<'tree>(pub Node<'tree>);
 impl_ast_node!(TypeParameters, "type_parameters");
 
 impl<'tree> TypeParameters<'tree> {
+    #[must_use]
     pub fn parameters(&self) -> AstChildren<'tree, TypeParameter<'tree>> {
         AstChildren::new(self.0)
     }
@@ -947,6 +998,8 @@ impl<'tree> TypeParameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TypeParameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -1031,6 +1084,8 @@ impl<'tree> BaseFunction<'tree> {
 }
 
 impl<'tree> HasName<'tree> for BaseFunction<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         match self {
             BaseFunction::Function(f) => f.name(),

@@ -1,62 +1,34 @@
 Step 1 (before):
-  Bytecode position: 910F91BCD9D9CDDE84EA168413C142BEC3FDA01872448F5E817E77F3F0F72117:2
   Code:
      13| }
      14| 
      15| fun main() {
      16|     foo = 300;
-             ^^^
+                   ^^^
      17|     val goo = my_sum(foo, foo);
      18|     return foo + goo;
      19| }
 
 Step 2 (step_over):
-  Bytecode position: 910F91BCD9D9CDDE84EA168413C142BEC3FDA01872448F5E817E77F3F0F72117:42
   Code:
      14| 
      15| fun main() {
      16|     foo = 300;
      17|     val goo = my_sum(foo, foo);
-                 ^^^
+                              ^^^
      18|     return foo + goo;
      19| }
+  Variables:
+    global foo = 300
 
 Step 3 (step_over):
-  Bytecode position: 910F91BCD9D9CDDE84EA168413C142BEC3FDA01872448F5E817E77F3F0F72117:74
-  Code:
-     14| 
-     15| fun main() {
-     16|     foo = 300;
-     17|     val goo = my_sum(foo, foo);
-                       ^^^^^^^^^^^^^^^^
-     18|     return foo + goo;
-     19| }
-  Variables:
-    g_foo = 300
-    g_foo = 300
-
-Step 4 (step_over):
-  Bytecode position: 910F91BCD9D9CDDE84EA168413C142BEC3FDA01872448F5E817E77F3F0F72117:130
-  Code:
-     14| 
-     15| fun main() {
-     16|     foo = 300;
-     17|     val goo = my_sum(foo, foo);
-                       ^^^^^^^^^^^^^^^^
-     18|     return foo + goo;
-     19| }
-  Variables:
-    '5 = 600
-
-Step 5 (step_over):
-  Bytecode position: 910F91BCD9D9CDDE84EA168413C142BEC3FDA01872448F5E817E77F3F0F72117:146
   Code:
      15| fun main() {
      16|     foo = 300;
      17|     val goo = my_sum(foo, foo);
      18|     return foo + goo;
-                    ^^^^^^^^^
+                    ^^^
      19| }
   Variables:
-    g_foo = 300
     goo = 600
+    global foo = 300

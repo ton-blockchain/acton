@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entries() {
     run_config_success_case(
         "dq-stdlib-config-storage-prices-set-initial-overwrite-preserves-future",
-        r#"
+        r"
 get fun `test-dq-stdlib-config-storage-prices-set-initial-overwrite-preserves-future`() {
     val futureTsA: uint32 = 1000000;
     val futureTsB: uint32 = 2000000;
@@ -94,7 +94,7 @@ get fun `test-dq-stdlib-config-storage-prices-set-initial-overwrite-preserves-fu
     expect(futureB.masterchainBitPrice).toEqual(122);
     expect(futureB.masterchainCellPrice).toEqual(133);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entries/config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entries.stdout.txt",
     );
 }

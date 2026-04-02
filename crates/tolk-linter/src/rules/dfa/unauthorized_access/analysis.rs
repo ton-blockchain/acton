@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn reports_storage_write_without_admin_check() {
-        let source = r#"
+        let source = r"
             struct Storage {
                 adminAddress: address
             }
@@ -165,7 +165,7 @@ mod tests {
                 val storage = lazy Storage.fromCell(contract.getData());
                 storage.save();
             }
-        "#;
+        ";
 
         let cfg = build_cfg_with_resolution(source);
         let report = run(&cfg);
@@ -175,12 +175,12 @@ mod tests {
 
     #[test]
     fn reports_contract_set_data_without_admin_check() {
-        let source = r#"
+        let source = r"
             fun onInternalMessage(in: InMessage) {
                 val _sender = in.senderAddress;
                 contract.setData(contract.getData());
             }
-        "#;
+        ";
 
         let cfg = build_cfg_with_resolution(source);
         let report = run(&cfg);
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn does_not_report_storage_write_after_admin_assert() {
-        let source = r#"
+        let source = r"
             struct Storage {
                 adminAddress: address
             }
@@ -200,7 +200,7 @@ mod tests {
                 assert (in.senderAddress == storage.adminAddress) throw 5;
                 storage.save();
             }
-        "#;
+        ";
 
         let cfg = build_cfg_with_resolution(source);
         let report = run(&cfg);
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn does_not_treat_plain_comparison_as_admin_check() {
-        let source = r#"
+        let source = r"
             struct Storage {
                 adminAddress: address
             }
@@ -220,7 +220,7 @@ mod tests {
                 val isAdmin = in.senderAddress == storage.adminAddress;
                 storage.save();
             }
-        "#;
+        ";
 
         let cfg = build_cfg_with_resolution(source);
         let report = run(&cfg);

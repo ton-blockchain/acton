@@ -1,5 +1,5 @@
-import "@local-acton/types/big_array"
 import "@local-acton/testing/expect"
+import "@local-acton/types/big_array"
 
 fun createFilledBigArray(size: int): BigArray<int> {
     var big = BigArray<int>.createEmpty();
@@ -23,6 +23,11 @@ get fun `test-big-array-create-from-array`() {
     expect(big.size()).toEqual(3);
     expect(big.first()).toEqual(4);
     expect(big.last()).toEqual(9);
+}
+
+get fun `test-big-array-create-from-empty-array`() {
+    val big = BigArray<int>.createFromArray([]);
+    expect(big).toBeEmpty();
 }
 
 get fun `test-big-array-push-first-last-size`() {
@@ -70,4 +75,15 @@ get fun `test-big-array-second-bin-layout`() {
 
     expect(big.size()).toEqual(256);
     expect(big.last()).toEqual(700);
+}
+
+get fun `test-big-array-get-reads-across-bins`() {
+    var big = createFilledBigArray(260);
+
+    expect(big.get(0)).toEqual(0);
+    expect(big.get(255)).toEqual(255);
+    expect(big.get(259)).toEqual(259);
+
+    big.set(999, 256);
+    expect(big.get(256)).toEqual(999);
 }

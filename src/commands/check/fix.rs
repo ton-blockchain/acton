@@ -42,7 +42,7 @@ pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyho
 
             let edit_file_id = edit.file_id;
             let edit_file_info = file_db.get_by_id(edit_file_id).ok_or_else(|| {
-                anyhow::anyhow!("File info not found for edit file_id {}", edit_file_id)
+                anyhow::anyhow!("File info not found for edit file_id {edit_file_id}")
             })?;
             let edit_file_path = edit_file_info.index().path.clone();
 

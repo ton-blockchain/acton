@@ -98,11 +98,11 @@ fn test_invalid_action_fail() {
     let project = ProjectBuilder::new("action-fail")
         .contract(
             "simple",
-            r#"
+            r"
                 fun onInternalMessage(in: InMessage) {
                     sendRawMessage(beginCell().endCell(), 0);
                 }
-            "#,
+            ",
         )
         .test_file(
             "test",
@@ -153,11 +153,11 @@ fn test_invalid_action_fail_without_backtrace() {
     let project = ProjectBuilder::new("action-fail")
         .contract(
             "simple",
-            r#"
+            r"
                 fun onInternalMessage(in: InMessage) {
                     sendRawMessage(beginCell().endCell(), 0);
                 }
-            "#,
+            ",
         )
         .test_file(
             "test",

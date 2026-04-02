@@ -13,6 +13,8 @@ fn run_unauthorized_access_test(content: &str, name: &str) {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E017")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -24,7 +26,7 @@ fn run_unauthorized_access_test(content: &str, name: &str) {
 #[named]
 fn test_check_storage_write_without_admin_check_detects_storage_save() {
     run_unauthorized_access_test(
-        r#"
+        r"
             struct Storage {
                 adminAddress: address
             }
@@ -39,30 +41,30 @@ fn test_check_storage_write_without_admin_check_detects_storage_save() {
                 };
                 save(storage);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_check_storage_write_without_admin_check_detects_contract_set_data() {
     run_unauthorized_access_test(
-        r#"
+        r"
             fun onInternalMessage(in: InMessage) {
                 val _sender = in.senderAddress;
                 contract.setData(contract.getData());
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }
 
 #[test]
 #[named]
 fn test_check_storage_write_without_admin_check_skips_guarded_storage_write() {
     run_unauthorized_access_test(
-        r#"
+        r"
             struct Storage {
                 adminAddress: address
             }
@@ -78,7 +80,7 @@ fn test_check_storage_write_without_admin_check_skips_guarded_storage_write() {
                 assert (in.senderAddress == storage.adminAddress) throw 100;
                 save(storage);
             }
-        "#,
+        ",
         function_name!(),
-    )
+    );
 }

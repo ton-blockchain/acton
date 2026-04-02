@@ -1,13 +1,16 @@
 use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
+use crate::context;
 use crate::context::{
-    AssertFailure, BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
-    WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, EmulationsState, GetMethodAssertFailure, KnownAddresses,
+    TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
-use crate::retrace::{ExecutedAction, InstalledAction, InstalledActions, InvalidAction};
-use crate::{context, exit_codes, retrace};
+use crate::retrace::{
+    self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
+};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
+use acton_debug::exit_codes;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashMap;
@@ -15,16 +18,20 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
+use tolkc::abi::{ABIType as CompilerAbiType, ContractABI as CompilerContractABI};
+use ton_abi::abi_serde::Data as ParsedAbiData;
+use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
-use ton_source_map::{DebugLocation, SourceLocation};
+use ton_source_map::SourceLocation;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes, Load};
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
+use tycho_types::dict;
 use tycho_types::models::{
-    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, DisplayBase64StdAddr,
-    ExecutedComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ReserveCurrencyFlags,
-    SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
+    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
+    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
 
@@ -46,6 +53,40 @@ struct TransactionNode {
     children: Vec<TransactionNode>,
 }
 
+#[derive(Debug)]
+struct DecodedMessageBody {
+    name: String,
+    data: ParsedAbiData,
+}
+
+enum FormattedExtraInfo {
+    Tree(String),
+    Annotation(String),
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MapScalarType {
+    Int { bits: u16, signed: bool },
+    VarInt { len_bits: u8, signed: bool },
+    Bool,
+    Address,
+    Cell,
+    String,
+}
+
+impl MapScalarType {
+    const fn bit_len(self) -> u16 {
+        match self {
+            Self::Int { bits, .. } => bits,
+            Self::Bool => 1,
+            // Std addr without anycast.
+            Self::Address => StdAddr::BITS_WITHOUT_ANYCAST,
+            // Variable-length integers are not valid dict keys.
+            Self::VarInt { .. } | Self::Cell | Self::String => 0,
+        }
+    }
+}
+
 /// Context for formatting `TupleItems` with rich information
 #[derive(Debug, Clone)]
 pub struct FormatterContext<'a> {
@@ -55,6 +96,7 @@ pub struct FormatterContext<'a> {
     pub emulations: Cow<'a, EmulationsState>,
     pub known_addresses: Cow<'a, KnownAddresses>,
     pub known_code_cells: Cow<'a, FxHashMap<HashBytes, String>>,
+    pub show_bodies: bool,
     pub has_wallets_config: bool,
     pub available_wallets: Vec<String>,
     pub backtrace: Option<BacktraceMode>,
@@ -73,6 +115,7 @@ impl<'a> FormatterContext<'a> {
             emulations: Cow::Owned(EmulationsState::new()),
             known_addresses: Cow::Owned(KnownAddresses::new()),
             known_code_cells: Cow::Owned(FxHashMap::default()),
+            show_bodies: false,
             has_wallets_config: false,
             available_wallets: vec![],
             backtrace: None,
@@ -92,6 +135,7 @@ impl<'a> FormatterContext<'a> {
             emulations: Cow::Borrowed(ctx.chain.emulations),
             known_addresses: Cow::Borrowed(ctx.build.known_addresses),
             known_code_cells: Cow::Borrowed(ctx.build.known_code_cells),
+            show_bodies: ctx.env.show_bodies,
             has_wallets_config: ctx.env.wallets.is_some(),
             available_wallets: ctx.env.open_wallets.keys().cloned().collect(),
             backtrace: ctx.build.backtrace,
@@ -118,7 +162,7 @@ keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
 [wallets.deployer.expected]
 address-testnet = \"<<ADDRESS>>\"
 
-See https://i582.github.io/acton/docs/setup-wallets/ for more information
+See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),
@@ -177,6 +221,15 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
     }
 
+    fn format_annotation_address(&self, address: &IntAddr) -> String {
+        let rendered = self.address_to_string(address);
+        let Some(contract_type) = self.get_contract_type(address) else {
+            return rendered;
+        };
+
+        format!("{rendered} ({contract_type})")
+    }
+
     fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
         let mut parser = slice.as_slice_allow_exotic();
         let Ok(addr) = IntAddr::load_from(&mut parser) else {
@@ -206,8 +259,82 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         let known_contracts = self.collect_known_contracts(&send_results);
         let contract_letters = self.create_contract_letters(&known_contracts);
 
+        if let [send_result] = &send_results[..]
+            && self.is_broadcast_synthetic_send_result(send_result)
+        {
+            return self.format_broadcast_synthetic_send_result(send_result, &contract_letters);
+        }
+
         let tree = self.build_transaction_tree(send_results);
         self.format_transaction_tree(&tree, &contract_letters, 0, "")
+    }
+
+    fn is_broadcast_synthetic_send_result(&self, send_result: &SendResult) -> bool {
+        let tx = &send_result.tx;
+
+        if tx.lt != 0 || tx.prev_trans_lt != 0 {
+            return false;
+        }
+        if tx.orig_status != AccountStatus::Uninit || tx.end_status != AccountStatus::Uninit {
+            return false;
+        }
+        if tx.out_msg_count != 0 {
+            return false;
+        }
+        if send_result.parent_lt.is_some() || !send_result.children_ids.is_empty() {
+            return false;
+        }
+
+        let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
+            return false;
+        };
+
+        if info.action_phase.is_some()
+            || info.storage_phase.is_some()
+            || info.credit_phase.is_some()
+            || info.aborted
+            || info.destroyed
+        {
+            return false;
+        }
+
+        matches!(
+            info.compute_phase,
+            ComputePhase::Skipped(skipped)
+                if skipped.reason == ComputePhaseSkipReason::NoState
+        )
+    }
+
+    fn format_broadcast_synthetic_send_result(
+        &self,
+        send_result: &SendResult,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        let mut lines = vec!["Broadcast send (synthetic result)".to_owned()];
+        let mut message = self.format_message_part(&send_result.tx, contract_letters, true);
+
+        if let Some(in_msg_cell) = &send_result.tx.in_msg
+            && let Ok(in_msg) = in_msg_cell.parse::<RelaxedMessage>()
+            && let RelaxedMsgInfo::Int(info) = &in_msg.info
+            && info.src.is_none()
+        {
+            message = format!("{}{}", "N/A".dimmed(), message);
+        }
+
+        if message.is_empty() {
+            lines.push(format!(
+                "└── submitted to network; call {} to confirm inclusion",
+                "res.wait()".yellow()
+            ));
+            return lines.join("\n");
+        }
+
+        lines.push(format!("└── {message}"));
+        lines.push(format!(
+            "    └── submitted to network; call {} to confirm inclusion",
+            "res.wait()".yellow()
+        ));
+        lines.join("\n")
     }
 
     /// Parse transaction items into `SendResult` structures
@@ -361,7 +488,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     fn build_transaction_tree(&self, send_results: Vec<SendResult>) -> Vec<TransactionNode> {
         let mut lt_to_result: HashMap<i64, SendResult> = HashMap::new();
 
-        for result in send_results.into_iter() {
+        for result in send_results {
             lt_to_result.insert(result.tx.lt as i64, result);
         }
 
@@ -383,6 +510,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             }
         }
 
+        roots.sort_by_key(|node| node.send_result.tx.lt);
         roots
     }
 
@@ -405,6 +533,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 children.push(child_node);
             }
         }
+        children.sort_by_key(|node| node.send_result.tx.lt);
 
         Some(TransactionNode {
             send_result: result.clone(),
@@ -558,8 +687,13 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         if let Some(in_msg) = &tx.in_msg
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
         {
-            let message_part =
-                self.format_single_message(&in_msg, contract_letters, show_full_names);
+            let resolved_body = self.resolve_incoming_message_body(&in_msg);
+            let message_part = self.format_single_message(
+                &in_msg,
+                contract_letters,
+                show_full_names,
+                resolved_body.as_ref(),
+            );
             if !message_part.is_empty() {
                 return message_part;
             }
@@ -568,9 +702,14 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         if let Ok(Some(in_msg)) = tx.load_in_msg()
             && let MsgInfo::ExtIn(info) = &in_msg.info
         {
-            let mut body = in_msg.body;
-            let opcode = body.load_u32().unwrap_or(0);
-            let message_name = self.get_message_name(opcode);
+            let resolved_body = self.resolve_external_incoming_message_body(tx, &in_msg);
+            let message_name = resolved_body.as_ref().map_or_else(
+                || {
+                    let mut body = in_msg.body;
+                    self.get_message_name(body.load_u32().unwrap_or(0))
+                },
+                |body| Self::color_message_name(&body.name),
+            );
             let destination = self.format_address_with_letter(&info.dst, contract_letters, true);
 
             return format!(
@@ -590,6 +729,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         in_msg: &RelaxedMessage,
         contract_letters: &HashMap<IntAddr, String>,
         show_full_names: bool,
+        resolved_body: Option<&DecodedMessageBody>,
     ) -> String {
         let RelaxedMsgInfo::Int(info) = &in_msg.info else {
             if let RelaxedMsgInfo::ExtOut(_) = &in_msg.info {
@@ -615,8 +755,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             result += " -> ".dimmed().to_string().as_str();
         }
 
-        let opcode = Self::extract_opcode(in_msg);
-        let message_name = self.get_message_name(opcode);
+        let message_name = resolved_body.map_or_else(
+            || self.get_message_name(Self::extract_opcode(in_msg)),
+            |body| Self::color_message_name(&body.name),
+        );
         result += &message_name;
         result += " ";
 
@@ -638,6 +780,401 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         format!("{amount} TON").green().to_string()
     }
 
+    fn format_inbound_message_body(&self, tx: &Transaction) -> Option<String> {
+        if !self.show_bodies {
+            return None;
+        }
+
+        if let Some(in_msg) = tx.in_msg.as_ref()
+            && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
+            && let Some(body) = self.resolve_incoming_message_body(&in_msg)
+        {
+            return Some(self.format_decoded_message_body(&body));
+        }
+
+        let in_msg = tx.load_in_msg().ok()??;
+        let body = self.resolve_external_incoming_message_body(tx, &in_msg)?;
+        Some(self.format_decoded_message_body(&body))
+    }
+
+    fn resolve_incoming_message_body(&self, in_msg: &RelaxedMessage) -> Option<DecodedMessageBody> {
+        let build = self.build_result_for_incoming_message(in_msg)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        match &in_msg.info {
+            RelaxedMsgInfo::Int(info) => self.try_decode_message_body_types(
+                in_msg.body,
+                compiler_abi,
+                compiler_abi
+                    .incoming_messages
+                    .iter()
+                    .map(|message| &message.body_ty),
+                if info.bounced { 32 } else { 0 },
+            ),
+            RelaxedMsgInfo::ExtOut(_) => None,
+        }
+    }
+
+    fn format_outgoing_external_message(
+        &self,
+        tx: &Transaction,
+        msg: &RelaxedMessage,
+    ) -> Option<Vec<FormattedExtraInfo>> {
+        let RelaxedMsgInfo::ExtOut(info) = &msg.info else {
+            return None;
+        };
+
+        let resolved_body = self.resolve_outgoing_external_message_body(tx, msg);
+        let message_name = resolved_body.as_ref().map_or_else(
+            || self.get_message_name(Self::extract_opcode(msg)),
+            |body| Self::color_message_name(&body.name),
+        );
+
+        let mut infos = Vec::new();
+        if let Some(ext_addr) = &info.dst {
+            let hex_data = hex::encode(&ext_addr.data);
+            infos.push(FormattedExtraInfo::Tree(format!(
+                "{} {} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                format!("0x{hex_data}").cyan(),
+                format!("({} bits)", ext_addr.data_bit_len).dimmed(),
+            )));
+        } else {
+            infos.push(FormattedExtraInfo::Tree(format!(
+                "{} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                "none".cyan()
+            )));
+        }
+
+        if self.show_bodies
+            && let Some(body) = resolved_body
+        {
+            infos.push(FormattedExtraInfo::Annotation(
+                self.format_decoded_message_body(&body),
+            ));
+        }
+
+        Some(infos)
+    }
+
+    fn resolve_external_incoming_message_body(
+        &self,
+        tx: &Transaction,
+        in_msg: &Message<'_>,
+    ) -> Option<DecodedMessageBody> {
+        let MsgInfo::ExtIn(_) = &in_msg.info else {
+            return None;
+        };
+
+        let build = self.build_result_for_tx_account(tx)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        self.try_decode_message_body_types(
+            in_msg.body,
+            compiler_abi,
+            compiler_abi
+                .incoming_external
+                .iter()
+                .map(|message| &message.body_ty),
+            0,
+        )
+    }
+
+    fn resolve_outgoing_external_message_body(
+        &self,
+        tx: &Transaction,
+        msg: &RelaxedMessage,
+    ) -> Option<DecodedMessageBody> {
+        let build = self.build_result_for_tx_account(tx)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        self.try_decode_message_body_types(
+            msg.body,
+            compiler_abi,
+            compiler_abi
+                .emitted_events
+                .iter()
+                .map(|message| &message.body_ty),
+            0,
+        )
+    }
+
+    fn build_result_for_incoming_message(
+        &self,
+        in_msg: &RelaxedMessage,
+    ) -> Option<context::CompilationResult> {
+        let dst = match &in_msg.info {
+            RelaxedMsgInfo::Int(info) => Some(&info.dst),
+            RelaxedMsgInfo::ExtOut(_) => return None,
+        };
+        self.build_result_for_address(dst)
+    }
+
+    fn build_result_for_tx_account(&self, tx: &Transaction) -> Option<context::CompilationResult> {
+        let code = self
+            .accounts
+            .iter()
+            .find_map(|(addr, _)| {
+                (addr.address == tx.account).then(|| Self::account_code(&self.accounts, addr))
+            })
+            .flatten();
+        self.build_cache
+            .result_for_code(&code)
+            .map(|(_, result)| result)
+    }
+
+    fn build_result_for_address(
+        &self,
+        dst: Option<&IntAddr>,
+    ) -> Option<context::CompilationResult> {
+        let code = match dst? {
+            IntAddr::Std(addr) => Self::account_code(&self.accounts, addr),
+            IntAddr::Var(_) => None,
+        };
+        self.build_cache
+            .result_for_code(&code)
+            .map(|(_, result)| result)
+    }
+
+    fn try_decode_message_body_types<'msg, I>(
+        &self,
+        body: CellSlice<'msg>,
+        abi: &CompilerContractABI,
+        candidates: I,
+        prefix_to_skip: u16,
+    ) -> Option<DecodedMessageBody>
+    where
+        I: IntoIterator<Item = &'msg CompilerAbiType>,
+    {
+        for body_ty in candidates {
+            let mut parser = body;
+            if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
+                continue;
+            }
+
+            let Ok(data) = compiler_abi_serde::decode(&mut parser, abi, body_ty) else {
+                continue;
+            };
+            if parser.size_bits() != 0 || parser.size_refs() != 0 {
+                continue;
+            }
+
+            return Some(DecodedMessageBody {
+                name: Self::compiler_body_type_name(body_ty),
+                data,
+            });
+        }
+
+        None
+    }
+
+    fn compiler_body_type_name(body_ty: &CompilerAbiType) -> String {
+        match body_ty {
+            CompilerAbiType::StructRef { struct_name, .. } => struct_name.clone(),
+            CompilerAbiType::AliasRef { alias_name, .. } => alias_name.clone(),
+            CompilerAbiType::EnumRef { enum_name } => enum_name.clone(),
+            _ => body_ty.render_type(),
+        }
+    }
+
+    fn format_decoded_message_body(&self, body: &DecodedMessageBody) -> String {
+        self.format_annotation_body(&body.data)
+    }
+
+    fn format_annotation_body(&self, data: &ParsedAbiData) -> String {
+        let data = Self::unwrap_annotation_data(data);
+        match data {
+            ParsedAbiData::Object(object) => self.format_annotation_object(object, 0, true),
+            _ => self.format_annotation_value(data, 0),
+        }
+    }
+
+    fn format_annotation_object(
+        &self,
+        object: &ton_abi::abi_serde::DataObject,
+        indent: usize,
+        is_root: bool,
+    ) -> String {
+        if object.fields.is_empty() {
+            return "{}".to_owned();
+        }
+
+        if object.fields.len() <= 2
+            && object
+                .fields
+                .iter()
+                .all(|field| Self::is_annotation_scalar(&field.value))
+        {
+            let inner = object
+                .fields
+                .iter()
+                .map(|field| {
+                    format!(
+                        "{}: {}",
+                        field.name,
+                        self.format_annotation_scalar(&field.value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            return if is_root {
+                inner
+            } else {
+                format!("{{ {inner} }}")
+            };
+        }
+
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let field_indent = if is_root {
+            "    ".repeat(indent)
+        } else {
+            "    ".repeat(Self::annotation_container_inner_indent(indent))
+        };
+        let mut lines = if is_root {
+            Vec::new()
+        } else {
+            vec!["{".to_owned()]
+        };
+        for field in &object.fields {
+            let value = self.format_annotation_value(&field.value, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{field_indent}{}: {first}", field.name));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        if !is_root {
+            lines.push(format!("{indent_str}}}"));
+        }
+        lines.join("\n")
+    }
+
+    fn format_annotation_value(&self, data: &ParsedAbiData, indent: usize) -> String {
+        let data = Self::unwrap_annotation_data(data);
+        match data {
+            ParsedAbiData::Object(object) => self.format_annotation_object(object, indent, false),
+            ParsedAbiData::Array(items) => self.format_annotation_array(items, indent),
+            ParsedAbiData::Map(entries) => self.format_annotation_map(entries, indent),
+            _ => self.format_annotation_scalar(data),
+        }
+    }
+
+    fn format_annotation_array(&self, items: &[ParsedAbiData], indent: usize) -> String {
+        if items.is_empty() {
+            return "[]".to_owned();
+        }
+
+        if items.len() <= 3 && items.iter().all(Self::is_annotation_scalar) {
+            let inner = items
+                .iter()
+                .map(|item| self.format_annotation_scalar(item))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return format!("[{inner}]");
+        }
+
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let item_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
+        let mut lines = vec!["[".to_owned()];
+        for item in items {
+            let value = self.format_annotation_value(item, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{item_indent}{first}"));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        lines.push(format!("{indent_str}]"));
+        lines.join("\n")
+    }
+
+    fn format_annotation_map(
+        &self,
+        entries: &[(ParsedAbiData, ParsedAbiData)],
+        indent: usize,
+    ) -> String {
+        if entries.is_empty() {
+            return "{}".to_owned();
+        }
+
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let entry_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
+        let mut lines = vec!["{".to_owned()];
+        for (key, value) in entries {
+            let key = self.format_annotation_value(key, indent + 1);
+            let value = self.format_annotation_value(value, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{entry_indent}{key} => {first}"));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        lines.push(format!("{indent_str}}}"));
+        lines.join("\n")
+    }
+
+    fn format_annotation_scalar(&self, data: &ParsedAbiData) -> String {
+        let data = Self::unwrap_annotation_data(data);
+        match data {
+            ParsedAbiData::Null => "null".to_owned(),
+            ParsedAbiData::Number(value) => value.to_string(),
+            ParsedAbiData::Bool(value) => value.to_string(),
+            ParsedAbiData::String(value) => format!("{value:?}"),
+            ParsedAbiData::Symbol(value) => value.clone(),
+            ParsedAbiData::Address(value) => self.format_annotation_address(value),
+            ParsedAbiData::ExtAddress(value) => value.to_string(),
+            ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
+                Boc::encode_hex(value)
+            }
+            ParsedAbiData::Bits((bytes, bit_len)) => {
+                let hex = hex::encode_upper(bytes);
+                if bit_len % 8 == 0 {
+                    format!("0x{hex}")
+                } else {
+                    format!("0x{hex} ({bit_len} bits)")
+                }
+            }
+            ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_) => {
+                self.format_annotation_value(data, 0)
+            }
+        }
+    }
+
+    fn is_annotation_scalar(data: &ParsedAbiData) -> bool {
+        let data = Self::unwrap_annotation_data(data);
+        !matches!(
+            data,
+            ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_)
+        )
+    }
+
+    fn unwrap_annotation_data(mut data: &ParsedAbiData) -> &ParsedAbiData {
+        while let ParsedAbiData::Object(object) = data {
+            let Some(next) = Self::annotation_wrapper_value(object) else {
+                break;
+            };
+            data = next;
+        }
+        data
+    }
+
+    fn annotation_wrapper_value(object: &ton_abi::abi_serde::DataObject) -> Option<&ParsedAbiData> {
+        if object.name == "Cell" && object.fields.len() == 1 && object.fields[0].name == "ref" {
+            return Some(&object.fields[0].value);
+        }
+        None
+    }
+
+    const fn annotation_container_inner_indent(indent: usize) -> usize {
+        if indent == 0 { 1 } else { indent }
+    }
+
+    const fn annotation_container_closing_indent(indent: usize) -> usize {
+        indent.saturating_sub(1)
+    }
+
     /// Format transaction execution info (gas, exit code, account changes)
     #[allow(clippy::too_many_arguments)]
     fn format_transaction_info(
@@ -657,6 +1194,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         let mut result = String::new();
         let mut extra_infos = vec![];
 
+        if let Some(body) = self.format_inbound_message_body(tx) {
+            extra_infos.push(FormattedExtraInfo::Annotation(body));
+        }
+
         let padding_len = 80usize.saturating_sub(prefix_len + main_part_visible_len);
 
         if let ComputePhase::Executed(compute) = info.compute_phase {
@@ -671,7 +1212,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             if let Some(debug_logs) = debug_logs
                 && !debug_logs.is_empty()
             {
-                extra_infos.push(format!(
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
                     "Debug logs:\n{}",
                     debug_logs
                         .lines()
@@ -682,7 +1223,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         ))
                         .collect::<Vec<_>>()
                         .join("\n")
-                ));
+                )));
             }
 
             if compute.exit_code != 0 {
@@ -707,10 +1248,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         if tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active {
-            extra_infos.push("account created".to_string());
+            extra_infos.push(FormattedExtraInfo::Tree("account created".to_string()));
         }
         if tx.orig_status == AccountStatus::Active && tx.end_status == AccountStatus::NotExists {
-            extra_infos.push("account destroyed".to_string());
+            extra_infos.push(FormattedExtraInfo::Tree("account destroyed".to_string()));
         }
 
         match info.action_phase {
@@ -721,13 +1262,13 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         .red()
                         .to_string();
 
-                    extra_infos.push("Action phase failed".to_string());
+                    extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
 
                     if let Some(info) = exit_codes::find(action.result_code) {
-                        extra_infos.push(format!(
+                        extra_infos.push(FormattedExtraInfo::Tree(format!(
                             "Description: {}",
                             info.description.to_string().yellow()
-                        ));
+                        )));
                     }
 
                     // Trying to collect installed and executed out actions
@@ -741,10 +1282,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                     let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
                     if let Some(logs) = executor_logs {
                         if self.backtrace.is_none() {
-                            extra_infos.push(format!(
+                            extra_infos.push(FormattedExtraInfo::Tree(format!(
                                 "Re-run with {} to get actions location",
                                 "--backtrace full".yellow()
-                            ));
+                            )));
                         }
 
                         let actions = self.format_actions_retrace(
@@ -755,7 +1296,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                             contract_letters,
                         );
                         if !actions.is_empty() {
-                            extra_infos.push(actions);
+                            extra_infos.push(FormattedExtraInfo::Tree(actions));
                         }
                     }
                 }
@@ -767,11 +1308,11 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 continue;
             };
 
-            let Some(msg_info) = self.format_ext_out_message(&msg) else {
+            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg) else {
                 continue;
             };
 
-            extra_infos.push(msg_info);
+            extra_infos.extend(msg_infos);
         }
 
         if !extra_infos.is_empty() {
@@ -779,15 +1320,67 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         for (idx, info) in extra_infos.iter().enumerate() {
-            result += child_prefix;
+            match info {
+                FormattedExtraInfo::Tree(info) => {
+                    let has_next_sibling = has_children
+                        || extra_infos
+                            .iter()
+                            .skip(idx + 1)
+                            .any(|next| matches!(next, FormattedExtraInfo::Tree(_)));
+                    let branch = if has_next_sibling {
+                        "├── ".dimmed().to_string()
+                    } else {
+                        "└── ".dimmed().to_string()
+                    };
 
-            if has_children || idx < extra_infos.len() - 1 {
-                result += "├── ".dimmed().to_string().as_str();
-            } else {
-                result += "└── ".dimmed().to_string().as_str();
+                    result += child_prefix;
+                    result += &branch;
+
+                    let mut lines = info.lines();
+                    if let Some(first_line) = lines.next() {
+                        result += first_line;
+                    }
+
+                    for line in lines {
+                        result += "\n";
+                        result += child_prefix;
+
+                        let line_without_prefix = line.strip_prefix(child_prefix).unwrap_or(line);
+                        if has_next_sibling {
+                            result += "│   ".dimmed().to_string().as_str();
+                            if let Some(rest) = line_without_prefix.strip_prefix("    ") {
+                                result += rest;
+                            } else {
+                                result += line_without_prefix;
+                            }
+                        } else {
+                            result += line_without_prefix;
+                        }
+                    }
+                }
+                FormattedExtraInfo::Annotation(info) => {
+                    let is_multiline = info.contains('\n');
+                    let has_next_tree = has_children
+                        || extra_infos
+                            .iter()
+                            .skip(idx + 1)
+                            .any(|next| matches!(next, FormattedExtraInfo::Tree(_)));
+                    for (line_idx, line) in info.lines().enumerate() {
+                        if line_idx > 0 {
+                            result += "\n";
+                        }
+                        result += child_prefix;
+                        if is_multiline {
+                            if has_next_tree {
+                                result += "│   ".dimmed().to_string().as_str();
+                            } else {
+                                result += "    ";
+                            }
+                        }
+                        result += line.dimmed().to_string().as_str();
+                    }
+                }
             }
-
-            result += info.as_str();
 
             if idx < extra_infos.len() - 1 {
                 result += "\n";
@@ -801,7 +1394,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         &self,
         tx: &Transaction,
         child_prefix: &str,
-        extra_infos: &mut Vec<String>,
+        extra_infos: &mut Vec<FormattedExtraInfo>,
         compute: &ExecutedComputePhase,
     ) -> String {
         let mut result = String::new();
@@ -810,10 +1403,39 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             .to_string();
 
         if let Some(info) = exit_codes::find(compute.exit_code) {
-            extra_infos.push(format!(
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "Compute phase failed: {}",
                 info.description.to_string().yellow()
+            )));
+        }
+
+        if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt)
+            && !missing_libraries.is_empty()
+        {
+            let mut missing_libraries = missing_libraries.iter().cloned().collect::<Vec<_>>();
+            missing_libraries.sort_unstable();
+
+            if missing_libraries.len() == 1 {
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
+                    "Library {} is missing, which is what causes this error",
+                    missing_libraries.join(", ").yellow()
+                )));
+            } else {
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
+                    "Missing libraries: {}",
+                    missing_libraries.join(", ").yellow()
+                )));
+            }
+            extra_infos.push(FormattedExtraInfo::Tree(
+                "This most likely happened because the library is not registered in tests"
+                    .to_owned(),
             ));
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
+                "To manually register library use {} somewhere in {}-like function",
+                "vm.registerLibrary(code)".yellow(),
+                "setupTests()".yellow(),
+            )));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
@@ -825,7 +1447,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         &self,
         tx: &Transaction,
         child_prefix: &str,
-        extra_infos: &mut Vec<String>,
+        extra_infos: &mut Vec<FormattedExtraInfo>,
     ) -> Option<()> {
         // Trying to retrace exit code to find out exact Tolk source location
         let logs = self.emulations.find_tx_logs(tx.lt)?;
@@ -845,50 +1467,68 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         let result = self.build_cache.result_for_code(&code)?;
 
         let info = retrace::find_exception_info(logs, &result.1.source_map)?;
-        let loc = info.loc?;
-
         let backtrace_result = Self::format_backtrace(&info.backtrace)
             .iter()
             .map(|line| format!("{child_prefix}       {line}"))
             .collect::<Vec<String>>()
             .join("\n");
 
-        extra_infos.push(format!(
-            "at {}\n{}",
-            loc.format().dimmed(),
-            backtrace_result
-        ));
+        let mut message = format!("at {}", Self::format_location(&info.loc).dimmed());
+        if !backtrace_result.is_empty() {
+            message.push('\n');
+            message.push_str(&backtrace_result);
+        }
+
+        extra_infos.push(FormattedExtraInfo::Tree(message));
 
         Some(())
     }
 
     #[must_use]
-    pub fn format_backtrace(backtrace: &[DebugLocation]) -> Vec<String> {
+    pub(crate) fn format_backtrace(backtrace: &[TolkBacktraceFrame]) -> Vec<String> {
         let max_function_name_len = backtrace
             .iter()
-            .filter_map(|loc| loc.context.event_function.as_ref())
-            .map(|name| name.len() + 2)
+            .map(|frame| frame.function_name.len() + 2)
             .max()
             .unwrap_or(0);
 
-        let backtrace_lines = backtrace.iter().rev().filter_map(|loc| {
-            let func_name = loc.context.event_function.as_ref()?;
+        backtrace
+            .iter()
+            .map(|frame| {
+                format!(
+                    "{:<width$} at {}",
+                    frame.function_name.green(),
+                    Self::format_location(&frame.loc).dimmed(),
+                    width = max_function_name_len
+                )
+            })
+            .collect()
+    }
 
-            let location = format!(
-                "{}:{}:{}",
-                SourceLocation::normalize_path(&loc.loc.file),
-                loc.loc.line + 1,
-                loc.loc.column + 2
-            );
-            Some(format!(
-                "{:<width$} at {}",
-                func_name.green(),
-                location.dimmed(),
-                width = max_function_name_len
-            ))
-        });
+    pub(crate) fn format_location(loc: &SourceLocation) -> String {
+        format!(
+            "{}:{}:{}",
+            SourceLocation::normalize_path(&loc.file),
+            loc.line,
+            loc.column
+        )
+    }
 
-        backtrace_lines.collect()
+    pub(crate) fn find_failed_get_method_exception(
+        &self,
+        test: &TestReport,
+    ) -> Option<retrace::TolkExceptionInfo> {
+        let failed_get = self
+            .emulations
+            .results_of(test.name.as_ref())?
+            .get_methods
+            .iter()
+            .rev()
+            .find(|result| result.vm_exit_code != 0)?;
+        let code = Boc::decode_base64(failed_get.code.as_ref()).ok()?;
+        let build = self.build_cache.result_for_code(&Some(code))?.1;
+
+        retrace::find_exception_info(&failed_get.vm_log, &build.source_map)
     }
 
     fn format_ext_out_message(&self, msg: &RelaxedMessage) -> Option<String> {
@@ -896,8 +1536,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             return None;
         };
 
-        let opcode = Self::extract_opcode(msg);
-        let message_name = self.get_message_name(opcode);
+        let message_name = self.get_message_name(Self::extract_opcode(msg));
 
         let msg_info = if let Some(ext_addr) = &info.dst {
             let hex_data = hex::encode(&ext_addr.data);
@@ -955,8 +1594,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         let msg = message.message();
 
                         let formatted = match msg {
-                            Some(msg) => self.format_single_message(&msg, contract_letters, false),
-                            None => hash.to_string(),
+                            Some(msg) => {
+                                self.format_single_message(&msg, contract_letters, false, None)
+                            }
+                            None => hash.clone(),
                         };
 
                         (
@@ -1198,6 +1839,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             &format!("0x{opcode:x}")
         };
 
+        Self::color_message_name(name)
+    }
+
+    fn color_message_name(name: &str) -> String {
         name.purple().bold().to_string()
     }
 
@@ -1300,6 +1945,12 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
 
                 if type_name == "SendResultList" {
                     return self.format_transaction_list(items);
+                }
+
+                if type_name.starts_with("map<")
+                    && let Some(formatted_map) = self.format_map(type_name, items, root, colorize)
+                {
+                    return formatted_map;
                 }
 
                 let abi = self.contract_abi.find_any_type(type_name);
@@ -1415,7 +2066,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             && inner.first() == Some(&TupleItem::Null)
             && matches!(inner.last(), Some(&TupleItem::Int(_)))
         {
-            return format!("{inner_type}{{}}");
+            return format!("{inner_type} {{}}");
         }
 
         self.format_internal(
@@ -1426,6 +2077,333 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             root,
             colorize,
         )
+    }
+
+    fn format_map(
+        &self,
+        type_name: &str,
+        items: &Tuple,
+        is_root: bool,
+        colorize: bool,
+    ) -> Option<String> {
+        let map_item = items.iter().find(|item| {
+            matches!(
+                item,
+                TupleItem::Null | TupleItem::Cell(_) | TupleItem::Slice(_)
+            )
+        })?;
+
+        let dict_root = match map_item {
+            TupleItem::Null => None,
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => Some(cell.clone()),
+            _ => return Some(format!("{type_name} {{...}}")),
+        };
+
+        let Some((key_type_name, value_type_name)) = Self::parse_map_type(type_name) else {
+            return Some(self.format_map_raw(type_name, &dict_root, colorize));
+        };
+
+        let Some(key_type) = Self::parse_map_key_type(&key_type_name) else {
+            return Some(self.format_map_raw(type_name, &dict_root, colorize));
+        };
+        let value_type = Self::parse_map_value_type(&value_type_name);
+        let allow_raw_value_fallback = value_type.is_none()
+            && !value_type_name.ends_with('?')
+            && !value_type_name.starts_with("map<");
+
+        let mut entries = Vec::new();
+        for entry in dict::RawIter::new(&dict_root, key_type.bit_len()) {
+            let Ok((key_data, mut value_slice)) = entry else {
+                return Some(format!("{type_name} {{...}}"));
+            };
+
+            let key = {
+                let mut key_slice = key_data.as_data_slice();
+                self.format_map_scalar(&mut key_slice, key_type, colorize)
+                    .unwrap_or_else(|_| "<key>".to_owned())
+            };
+
+            let value = if let Some(value_type) = value_type {
+                self.format_map_scalar(&mut value_slice, value_type, colorize)
+                    .unwrap_or_else(|err| format!("<value: {err}>"))
+            } else if allow_raw_value_fallback {
+                self.format_map_raw_value(value_slice, colorize)
+                    .unwrap_or_else(|err| format!("<value: {err}>"))
+            } else {
+                "<value>".to_owned()
+            };
+
+            entries.push((key, value));
+        }
+
+        if entries.is_empty() {
+            return Some(format!("{type_name} {{}}"));
+        }
+
+        if !is_root {
+            let mut formatted_entries = Vec::with_capacity(entries.len());
+            for (key, value) in entries {
+                formatted_entries.push(format!("{key}: {value}"));
+            }
+            return Some(format!("{type_name} {{{}}}", formatted_entries.join(", ")));
+        }
+
+        let mut result = String::new();
+        writeln!(result, "{type_name} {{").ok();
+        for (key, value) in &entries {
+            writeln!(result, "    {key}: {value},").ok();
+        }
+        result.push('}');
+
+        Some(result)
+    }
+
+    fn parse_map_type(type_name: &str) -> Option<(String, String)> {
+        let type_name = type_name.trim();
+        let inner = type_name.strip_prefix("map<")?.strip_suffix('>')?;
+        let split_idx = Self::find_top_level_comma(inner)?;
+        let key_type = inner[..split_idx].trim().to_owned();
+        let value_type = inner[split_idx + 1..].trim().to_owned();
+        Some((key_type, value_type))
+    }
+
+    fn find_top_level_comma(source: &str) -> Option<usize> {
+        let mut angle_depth = 0usize;
+        let mut paren_depth = 0usize;
+        let mut square_depth = 0usize;
+
+        for (idx, ch) in source.char_indices() {
+            match ch {
+                '<' => angle_depth += 1,
+                '>' => angle_depth = angle_depth.saturating_sub(1),
+                '(' => paren_depth += 1,
+                ')' => paren_depth = paren_depth.saturating_sub(1),
+                '[' => square_depth += 1,
+                ']' => square_depth = square_depth.saturating_sub(1),
+                ',' if angle_depth == 0 && paren_depth == 0 && square_depth == 0 => {
+                    return Some(idx);
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    fn parse_map_key_type(type_name: &str) -> Option<MapScalarType> {
+        let type_name = type_name.trim();
+        match type_name {
+            "bool" => Some(MapScalarType::Bool),
+            "address" | "any_address" => Some(MapScalarType::Address),
+            "int" => Some(MapScalarType::Int {
+                bits: 257,
+                signed: true,
+            }),
+            "uint" => Some(MapScalarType::Int {
+                bits: 256,
+                signed: false,
+            }),
+            _ => {
+                if let Some(bits) = type_name.strip_prefix("int") {
+                    return bits
+                        .parse::<u16>()
+                        .ok()
+                        .map(|bits| MapScalarType::Int { bits, signed: true });
+                }
+                if let Some(bits) = type_name.strip_prefix("uint") {
+                    return bits.parse::<u16>().ok().map(|bits| MapScalarType::Int {
+                        bits,
+                        signed: false,
+                    });
+                }
+                None
+            }
+        }
+    }
+
+    fn parse_map_value_type(type_name: &str) -> Option<MapScalarType> {
+        let type_name = type_name.trim();
+        if type_name.ends_with('?') || type_name.starts_with("map<") {
+            return None;
+        }
+
+        if type_name == "cell" || type_name.starts_with("Cell<") {
+            return Some(MapScalarType::Cell);
+        }
+        if type_name == "string" {
+            return Some(MapScalarType::String);
+        }
+
+        match type_name {
+            "bool" => Some(MapScalarType::Bool),
+            "address" | "any_address" => Some(MapScalarType::Address),
+            "coins" => Some(MapScalarType::VarInt {
+                len_bits: 4,
+                signed: false,
+            }),
+            "int" => Some(MapScalarType::Int {
+                bits: 257,
+                signed: true,
+            }),
+            "uint" => Some(MapScalarType::Int {
+                bits: 256,
+                signed: false,
+            }),
+            _ => {
+                if let Some(bits) = type_name.strip_prefix("int") {
+                    return bits
+                        .parse::<u16>()
+                        .ok()
+                        .map(|bits| MapScalarType::Int { bits, signed: true });
+                }
+                if let Some(bits) = type_name.strip_prefix("uint") {
+                    return bits.parse::<u16>().ok().map(|bits| MapScalarType::Int {
+                        bits,
+                        signed: false,
+                    });
+                }
+                if let Some(bytes) = type_name.strip_prefix("varint") {
+                    return match bytes {
+                        "16" => Some(MapScalarType::VarInt {
+                            len_bits: 4,
+                            signed: true,
+                        }),
+                        "32" => Some(MapScalarType::VarInt {
+                            len_bits: 5,
+                            signed: true,
+                        }),
+                        _ => None,
+                    };
+                }
+                if let Some(bytes) = type_name.strip_prefix("varuint") {
+                    return match bytes {
+                        "16" => Some(MapScalarType::VarInt {
+                            len_bits: 4,
+                            signed: false,
+                        }),
+                        "32" => Some(MapScalarType::VarInt {
+                            len_bits: 5,
+                            signed: false,
+                        }),
+                        _ => None,
+                    };
+                }
+                None
+            }
+        }
+    }
+
+    fn format_map_scalar(
+        &self,
+        slice: &mut CellSlice<'_>,
+        ty: MapScalarType,
+        colorize: bool,
+    ) -> Result<String, String> {
+        match ty {
+            MapScalarType::Int { bits, signed } => {
+                if !signed && bits == 256 {
+                    let value = format!("0x{}", slice.load_u256().map_err(|e| e.to_string())?);
+                    return Ok(if colorize {
+                        value.yellow().to_string()
+                    } else {
+                        value
+                    });
+                }
+
+                let value = slice
+                    .load_bigint(bits, signed)
+                    .map_err(|e| e.to_string())?
+                    .to_string();
+                Ok(if colorize {
+                    value.yellow().to_string()
+                } else {
+                    value
+                })
+            }
+            MapScalarType::VarInt { len_bits, signed } => {
+                let value = slice
+                    .load_var_bigint(u16::from(len_bits), signed)
+                    .map_err(|e| e.to_string())?
+                    .to_string();
+                Ok(if colorize {
+                    value.yellow().to_string()
+                } else {
+                    value
+                })
+            }
+            MapScalarType::Bool => {
+                let value = slice.load_bit().map_err(|e| e.to_string())?.to_string();
+                Ok(if colorize {
+                    value.yellow().to_string()
+                } else {
+                    value
+                })
+            }
+            MapScalarType::Address => {
+                let value =
+                    self.address_to_string(&IntAddr::load_from(slice).map_err(|e| e.to_string())?);
+                Ok(if colorize {
+                    value.cyan().to_string()
+                } else {
+                    value
+                })
+            }
+            MapScalarType::Cell => {
+                let value =
+                    Boc::encode_hex(&slice.load_reference_cloned().map_err(|e| e.to_string())?);
+                Ok(if colorize {
+                    value.dimmed().to_string()
+                } else {
+                    value
+                })
+            }
+            MapScalarType::String => {
+                let cell = slice.load_reference_cloned().map_err(|e| e.to_string())?;
+                if let Some(string) = Tuple::parse_snake_string(&cell) {
+                    let value = format!("\"{string}\"");
+                    return Ok(if colorize {
+                        value.green().to_string()
+                    } else {
+                        value
+                    });
+                }
+
+                let value = Boc::encode_hex(&cell);
+                Ok(if colorize {
+                    value.dimmed().to_string()
+                } else {
+                    value
+                })
+            }
+        }
+    }
+
+    fn format_map_raw_value(&self, slice: CellSlice<'_>, colorize: bool) -> Result<String, String> {
+        let mut builder = CellBuilder::new();
+        builder.store_slice(slice).map_err(|e| e.to_string())?;
+        let cell = builder.build().map_err(|e| e.to_string())?;
+        let value = Boc::encode_hex(&cell);
+
+        Ok(if colorize {
+            value.dimmed().to_string()
+        } else {
+            value
+        })
+    }
+
+    fn format_map_raw(&self, type_name: &str, root: &Option<Cell>, colorize: bool) -> String {
+        let Some(cell) = root else {
+            return format!("{type_name} {{}}");
+        };
+
+        let raw = Boc::encode_hex(cell);
+        let raw = if colorize {
+            raw.dimmed().to_string()
+        } else {
+            raw
+        };
+
+        format!("{type_name} {{raw: {raw}}}")
     }
 
     fn format_structure(
@@ -1474,7 +2452,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     #[must_use]
-    pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &String, indent: usize) -> String {
+    pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &str, indent: usize) -> String {
         fn add_indent_to_lines(text: &str, indent: usize) -> String {
             let indent_str = " ".repeat(indent);
             text.lines()
@@ -1483,7 +2461,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 .join("\n")
         }
 
-        let item = tuple.to_typed(&type_name.to_string());
+        let item = tuple.to_typed(type_name);
         let formatted = self.format(&item);
 
         if !formatted.contains('\n') {
@@ -1558,7 +2536,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 }
 
-impl<'a> FormatterContext<'a> {
+impl FormatterContext<'_> {
     #[must_use]
     pub fn format_tuple_diff(
         &self,
@@ -1634,7 +2612,7 @@ impl<'a> FormatterContext<'a> {
                 let has_diff = result.contains("\x1b[31m") || result.contains("\x1b[32m");
 
                 let field_name = if has_diff {
-                    field.name.to_string()
+                    field.name.clone()
                 } else {
                     field.name.dimmed().to_string()
                 };
@@ -1901,6 +2879,113 @@ impl<'a> FormatterContext<'a> {
     }
 
     #[must_use]
+    pub fn format_exit_code_with_number(code: i32) -> String {
+        if let Some(info) = exit_codes::find(code) {
+            return format!("{code} ({}): {}", info.name, info.description);
+        }
+
+        code.to_string()
+    }
+
+    #[must_use]
+    pub fn format_get_method_assert_failure_title(failure: &GetMethodAssertFailure) -> String {
+        if failure.vm_exit_code == 11 {
+            if let Some(suggested_name) = &failure.suggested_name {
+                return format!(
+                    "Cannot execute unknown get method {}, did you mean '{suggested_name}'",
+                    failure.get_method_presentation
+                );
+            }
+            return format!(
+                "Cannot execute unknown get method {}",
+                failure.get_method_presentation
+            );
+        }
+
+        if failure.vm_exit_code == 2 {
+            return format!(
+                "Get method {} failed due to stack underflow. Make sure you passed all parameters to the get method.",
+                failure.get_method_presentation
+            );
+        }
+
+        format!(
+            "Cannot execute get method {}",
+            failure.get_method_presentation
+        )
+    }
+
+    #[must_use]
+    pub fn format_get_method_assert_failure(&self, failure: &GetMethodAssertFailure) -> String {
+        let mut output = Self::format_get_method_assert_failure_title(failure);
+
+        if failure.vm_exit_code == 11 || failure.vm_exit_code == 2 {
+            return output;
+        }
+
+        let mut details = String::new();
+        writeln!(
+            details,
+            "exit_code={}",
+            failure.vm_exit_code.to_string().yellow()
+        )
+        .ok();
+
+        let replayed_exception = retrace::find_exception_info(&failure.vm_log, &failure.source_map);
+
+        if let Some(info) = &replayed_exception {
+            writeln!(details, "at {}", Self::format_location(&info.loc)).ok();
+
+            if !info.backtrace.is_empty() {
+                writeln!(details, "Backtrace:").ok();
+                for line in Self::format_backtrace(&info.backtrace) {
+                    writeln!(details, "  {line}").ok();
+                }
+            }
+        } else if self.backtrace.is_none() {
+            writeln!(
+                details,
+                "Re-run with {} to get more information",
+                "--backtrace full".yellow()
+            )
+            .ok();
+        }
+
+        if let Some(info) = &failure.caller_trace {
+            writeln!(details, "Called from:").ok();
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if backtrace_lines.is_empty() {
+                writeln!(details, "  at {}", Self::format_location(&info.loc)).ok();
+            } else {
+                for line in backtrace_lines {
+                    writeln!(details, "  {line}").ok();
+                }
+            }
+        }
+
+        if let Some(info) = exit_codes::find(failure.vm_exit_code) {
+            writeln!(details, "Description: {}", info.description).ok();
+            writeln!(details, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = &replayed_exception {
+            let description = if info.description.is_empty() {
+                format!("uncaught exception {}", info.errno)
+            } else {
+                info.description.clone()
+            };
+            writeln!(details, "Description: {description}").ok();
+        }
+
+        let details = details.trim();
+        if details.is_empty() {
+            return output;
+        }
+
+        output.push('\n');
+        output.push_str(details);
+        output
+    }
+
+    #[must_use]
     pub fn account_code(
         accounts: &FxHashMap<StdAddr, ShardAccount>,
         addr: &StdAddr,
@@ -1960,12 +3045,12 @@ impl<'a> FormatterContext<'a> {
         let send_results = self.parse_send_results(items);
         send_results
             .into_iter()
-            .flat_map(|res| {
+            .map(|res| {
                 let tx = res.tx;
                 let code = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
                 let build = self.build_cache.result_for_code(&code);
 
-                Some(TransactionInfo {
+                TransactionInfo {
                     lt: tx.lt.to_string(),
                     raw_transaction: Boc::encode_base64(to_cell(&tx)).into(),
                     parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
@@ -1989,7 +3074,7 @@ impl<'a> FormatterContext<'a> {
                         .map(crate::commands::test::trace::parse_executor_actions)
                         .unwrap_or_default(),
                     actions: Some(Boc::encode_base64(&res.actions).into()),
-                })
+                }
             })
             .collect()
     }
@@ -2001,12 +3086,13 @@ impl<'a> FormatterContext<'a> {
         abi: Arc<ContractAbi>,
     ) -> String {
         let mut result = String::new();
+        let append_location = !matches!(failure, AssertFailure::GetMethod(_));
 
         if let Some(message) = &failure.message()
             && !message.is_empty()
         {
             let highlighted_message = Self::highlight_actual_expected(message);
-            writeln!(result, "{}", highlighted_message).ok();
+            writeln!(result, "{highlighted_message}").ok();
         }
 
         match failure {
@@ -2052,7 +3138,7 @@ impl<'a> FormatterContext<'a> {
                 writeln!(result, "{tx_tree}").ok();
                 let from_to = if tx_failure.params.from.is_none() && tx_failure.params.to.is_none()
                 {
-                    "".to_string()
+                    String::new()
                 } else {
                     format!(
                         " from {} to {}",
@@ -2073,10 +3159,14 @@ impl<'a> FormatterContext<'a> {
                 let highlighted_message = Self::highlight_actual_expected(&message);
                 writeln!(result, "Error: {highlighted_message}").ok();
             }
+            AssertFailure::GetMethod(failure) => {
+                let message = self.format_get_method_assert_failure(failure);
+                writeln!(result, "{message}").ok();
+            }
             _ => {}
         }
 
-        if let Some(location) = &failure.location() {
+        if append_location && let Some(location) = &failure.location() {
             writeln!(result, "at {}", location.format()).ok();
         }
 
@@ -2099,40 +3189,58 @@ impl<'a> FormatterContext<'a> {
         writeln!(output, "exit_code={exit_code}").ok();
 
         let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+        let get_method_info = self.find_failed_get_method_exception(test);
 
-        if let Some(info) = &exit_code_info {
-            if let Some(loc) = &info.loc {
-                writeln!(
-                    output,
-                    "at {}:{}:{}",
-                    SourceLocation::normalize_path(&loc.file),
-                    loc.line + 1,
-                    loc.column + 2
-                )
-                .ok();
+        if let Some(info) = &get_method_info {
+            writeln!(output, "Get method:").ok();
+            writeln!(output, "  at {}", Self::format_location(&info.loc)).ok();
 
-                let backtrace_lines = Self::format_backtrace(&info.backtrace);
-                if !backtrace_lines.is_empty() {
-                    writeln!(output, "Backtrace:").ok();
-                    for line in backtrace_lines {
-                        writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
-                    }
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if !backtrace_lines.is_empty() {
+                writeln!(output, "  Backtrace:").ok();
+                for line in backtrace_lines {
+                    writeln!(output, "    {}", strip_ansi_codes(&line)).ok();
                 }
-            }
-
-            if !info.description.is_empty() {
-                writeln!(output, "Description: {}", info.description).ok();
             }
         }
 
-        if let Some(info) = exit_codes::find(exit_code) {
-            let should_show_fallback_description = exit_code_info
-                .as_ref()
-                .is_none_or(|exception| exception.description.is_empty());
-            if should_show_fallback_description {
-                writeln!(output, "Description: {}", info.description).ok();
+        if let Some(info) = &exit_code_info {
+            if get_method_info.is_some() {
+                writeln!(output, "Called from:").ok();
+            } else {
+                writeln!(output, "at {}", Self::format_location(&info.loc)).ok();
             }
+
+            let backtrace_lines = Self::format_backtrace(&info.backtrace);
+            if !backtrace_lines.is_empty() {
+                if get_method_info.is_none() {
+                    writeln!(output, "Backtrace:").ok();
+                }
+                for line in backtrace_lines {
+                    writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
+                }
+            } else if get_method_info.is_some() {
+                writeln!(output, "  at {}", Self::format_location(&info.loc)).ok();
+            }
+        } else if test.backtrace.is_none() {
+            writeln!(
+                output,
+                "Re-run with {} to get more information",
+                "--backtrace full".yellow()
+            )
+            .ok();
+        }
+
+        if let Some(info) = exit_codes::find(exit_code) {
+            writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = &exit_code_info {
+            let description = if info.description.is_empty() {
+                format!("uncaught exception {}", info.errno)
+            } else {
+                info.description.clone()
+            };
+            writeln!(output, "Description: {description}").ok();
         }
 
         output.trim().to_string()

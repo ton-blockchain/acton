@@ -1,0 +1,174 @@
+ACTON-VERIFY(1)
+
+NAME
+       acton-verify — Verify contract source code on the TON verifier service
+
+SYNOPSIS
+       acton verify [options] [contract-id]
+
+DESCRIPTION
+       Verify that a deployed contract address matches the local source code
+       for a contract from your project.
+
+       The verification flow compiles local sources, prepares data for the
+       verifier backend, collects the required signatures, and optionally
+       submits the final verification transaction to the blockchain.
+
+OPTIONS
+   Verify Options
+       contract-id
+           Contract ID to verify.
+
+           If omitted, Acton prompts when the project contains multiple
+           contracts.
+
+       --address address
+           Deployed contract address to verify.
+
+           If omitted, Acton prompts for it.
+
+       --wallet wallet
+           Wallet to use for the verification transaction.
+
+           If omitted, Acton auto-selects the only configured wallet or prompts
+           when multiple wallets are available.
+
+       --compiler-version version
+           Tolk compiler version to request on the verifier side.
+
+           Currently defaults to 1.1.0.
+
+       --dry-run
+           Run verification without submitting the final blockchain
+           transaction.
+
+       --api-key key
+           TonCenter API key for blockchain queries.
+
+           Also read from TONCENTER_API_KEY.
+
+   Network Options
+       --net network
+           Network to verify against.
+
+           Defaults to testnet.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+PROCESS
+       Verification usually consists of:
+
+       1. compiling the local contract
+
+       2. calculating the resulting code hash
+
+       3. sending sources to a verifier backend
+
+       4. collecting the required signatures
+
+       5. optionally sending the final verification transaction
+
+PREREQUISITES
+       o  a .tolk contract source in the current project
+
+       o  a supported verifier network: testnet or mainnet
+
+       o  verifier backend availability for the selected network
+
+       o  a configured wallet, funded when not using --dry-run
+
+       o  reproducible compiler settings that match the deployed contract
+
+CONTRACT AND WALLET SELECTION
+       o  if _contract-id_ is omitted and exactly one contract is configured,
+          Acton selects it automatically
+
+       o  if multiple contracts are configured, Acton prompts for the contract
+
+       o  if --wallet is omitted and exactly one wallet is configured, Acton
+          selects it automatically
+
+       o  if multiple wallets are configured, Acton prompts for the wallet
+
+REQUIREMENTS AND LIMITATIONS
+       o  only .tolk sources can be verified
+
+       o  precompiled .boc contracts cannot be verified
+
+       o  localnet and custom:<name> are not supported by verifier backends
+
+       o  verification requires a funded wallet when not using --dry-run
+
+       o  if a contract with the same code hash is already verified, the
+          backend may skip the final transaction
+
+COST AND BACKEND NOTES
+       o  when --dry-run is not used, the final verification transaction sends
+          0.1 TON
+
+       o  if the verifier backend reports that the contract is already
+          verified, Acton exits successfully without sending another
+          transaction
+
+       o  on successful verification, Acton prints a verifier link for the
+          contract
+
+DRY RUN
+       --dry-run still compiles the contract, uploads sources to the verifier
+       backend, and collects the required signatures. It skips only the final
+       blockchain transaction.
+
+EXIT STATUS
+       o  0: Verification completed successfully, including successful dry runs
+          and flows where the backend decides that no final transaction is
+          needed.
+
+       o  1: Compilation failed, the verifier backend rejected the request, not
+          enough signatures could be collected, wallet resolution failed, or
+          the final blockchain transaction could not be sent.
+
+EXAMPLES
+       1. Verify on testnet:
+
+              acton verify counter --address EQDt7LL...
+
+       2. Verify on mainnet:
+
+              acton verify counter --address UQDt7LL... --net mainnet
+
+       3. Use a specific wallet:
+
+              acton verify counter --address EQDt7LL... --wallet deployer
+
+       4. Test the flow without sending the final transaction:
+
+              acton verify counter --address EQDt7LL... --dry-run
+
+       5. Verify with an explicit compiler version:
+
+              acton verify counter --address EQDt7LL... --compiler-version 1.1.0
+
+SEE ALSO
+       o  Contract verification guide
+          <https://ton-blockchain.github.io/acton/docs/contract-verification>
+
+       o  Wallet setup guide
+          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+

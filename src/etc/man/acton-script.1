@@ -1,0 +1,235 @@
+'\" t
+.TH "ACTON\-SCRIPT" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-script \[em] Execute a standalone Tolk script file
+.SH "SYNOPSIS"
+\fBacton script\fR [\fIoptions\fR] \fIpath\fR [\fIargs\fR\[u2026]]
+.SH "DESCRIPTION"
+Execute a standalone Tolk script.
+.sp
+Scripts are useful for experimentation, deployment flows, blockchain queries,
+and one\-off operational tasks. Unlike tests, scripts use a \fBmain()\fR entry point
+and can send real transactions when \fB\-\-broadcast\fR is enabled.
+.SH "OPTIONS"
+.SS "Script Options"
+.sp
+\fIpath\fR
+.RS 4
+Path to the script file to execute.
+.RE
+.sp
+\fIargs\fR\[u2026]
+.RS 4
+Arguments passed through to the script.
+.RE
+.SS "Debugging Options"
+.sp
+\fB\-\-debug\fR
+.RS 4
+Enable debug mode.
+.RE
+.sp
+\fB\-\-backtrace\fR \fIlevel\fR
+.RS 4
+Enable execution backtraces.
+.sp
+Currently supported value: \fBfull\fR\&.
+.RE
+.sp
+\fB\-\-debug\-port\fR \fIport\fR
+.RS 4
+Debug server port.
+.RE
+.SS "Cache Options"
+.sp
+\fB\-\-clear\-cache\fR
+.RS 4
+Clear the compilation cache before running.
+.RE
+.SS "Remote Options"
+.sp
+\fB\-\-fork\-net\fR \fInetwork\fR
+.RS 4
+Fork blockchain state from a remote network for local execution.
+.RE
+.sp
+\fB\-\-fork\-block\-number\fR \fIseqno\fR
+.RS 4
+Historical block sequence number to fork from.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain queries.
+.RE
+.SS "Broadcasting Options"
+.sp
+\fB\-\-broadcast\fR
+.RS 4
+Send transactions to the selected blockchain network instead of emulating them.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to use for broadcasting.
+.RE
+.sp
+\fB\-\-explorer\fR \fIname\fR
+.RS 4
+Explorer to use for transaction links.
+.sp
+Possible values: \fBtonscan\fR, \fBtoncx\fR, \fBdton\fR, \fBtonviewer\fR
+.RE
+.SS "Output Options"
+.sp
+\fB\-\-show\-bodies\fR
+.RS 4
+Show decoded message bodies in printed transaction trees when ABI is known.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "SCRIPT MODEL"
+A Tolk script defines a \fBmain()\fR function and runs as an isolated execution.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'state is not preserved between runs
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'local execution uses emulator wallets and balances
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fork\-net\fR keeps execution local but resolves remote state
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-broadcast\fR sends real transactions using configured wallets
+.RE
+.sp
+Wallet names referenced by the script are resolved from the merged wallet
+configuration, with local \fBwallets.toml\fR entries overriding
+\fBglobal.wallets.toml\fR on name conflicts.
+.SH "ARGUMENT FORWARDING"
+Arguments after \fB_path_\fR are passed through to the script runtime.
+.sp
+If a forwarded argument could be mistaken for an Acton flag, insert \fB\-\-\fR before
+the script arguments:
+.sp
+.RS 4
+.nf
+acton script scripts/query.tolk \-\- \-\-net\-like\-value
+.fi
+.RE
+.SH "SIDE EFFECTS"
+\fBacton script\fR always compiles and executes the selected script. With
+\fB\-\-broadcast\fR, it can send real blockchain transactions; without
+\fB\-\-broadcast\fR, execution stays local even when \fB\-\-fork\-net\fR is used.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The script completed successfully, including successful broadcast flows.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Script execution failed, broadcast submission failed, or remote network
+access such as fork\-state resolution failed.
+.RE
+.SH "SAFE EXECUTION ORDER"
+When a script can affect on\-chain state, the usual safe sequence is:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'\fBacton build\fR
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'\fBacton test\fR
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'\fBacton script <path>\fR without \fB\-\-broadcast\fR
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'only then \fBacton script <path> \-\-broadcast\fR
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Execute locally in the emulator:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Broadcast to testnet:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Query mainnet state without broadcasting:
+.sp
+.RS 4
+.nf
+acton script query.tolk \-\-fork\-net mainnet \-\-api\-key YOUR_API_KEY
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Broadcast a deploy flow and print explorer links:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet \-\-explorer tonviewer
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help run\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIScripting guide\fR <https://ton\-blockchain.github.io/acton/docs/scripting>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIWallet setup\fR <https://ton\-blockchain.github.io/acton/docs/setup\-wallets>
+.RE

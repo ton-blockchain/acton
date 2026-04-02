@@ -1,0 +1,18 @@
+[profile.default]
+fail-fast = false
+
+[profile.ci]
+fail-fast = false
+status-level = "pass"
+
+[test-groups.retrace-serial]
+# Retrace hits rate-limited remote APIs, so keep its tests mutually exclusive.
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = 'package(retrace)'
+test-group = 'retrace-serial'
+
+[[profile.ci.overrides]]
+filter = 'package(retrace)'
+test-group = 'retrace-serial'

@@ -1,5 +1,5 @@
 // A part of standard library for Tolk
-tolk 1.2
+tolk 1.3
 
 /**
     A string is a language primitive — a cell containing snake-formatted text data.
@@ -22,6 +22,7 @@ fun string.depth(self): int
 /// Calculates length of a string in bytes (not unicode symbols, just bytes).
 /// Since strings are stored in snake format (chain of cells), this requires traversing all cells.
 @pure
+@inline_ref
 fun string.calculateLength(self): int {
     var bits = 0;
     var snake = self.beginParse();
@@ -38,6 +39,7 @@ fun string.calculateLength(self): int {
 /// "abcd", "ab" + (ref "cd"), "a" + (ref "bcd" + (ref "")) all produce the same hash.
 /// Uses FNV-1a hashing with standard 128-bit parameters.
 @pure
+@inline_ref
 fun string.hash(self): uint256 {
     val FNV_PRIME = 309485009821345068724781371;
     val MASK = (1 << 128) - 1;
@@ -122,6 +124,7 @@ fun StringBuilder.append(mutate self, s: string): self {
 
 /// Appends an integer as its decimal representation.
 /// For example, `sb.appendInt(-42)` appends "-42".
+@inline_ref
 fun StringBuilder.appendInt(mutate self, n: int): self {
     self.chunks.push(n.toDecimalString());
     return self;
@@ -130,6 +133,7 @@ fun StringBuilder.appendInt(mutate self, n: int): self {
 /// Builds the final string by concatenating all appended parts into a snake chain.
 /// The result is a valid snake-format string where each cell contains data and optionally a ref to next.
 /// Throws an exception if `append()` was not called (a builder is empty).
+@inline_ref
 fun StringBuilder.build(self): string {
     // the last string, as any other, is probably "xyz", probably snaked "x->y->z"
     // we'll leave it as-is (TVM cell), won't even call `beginParse` for it
@@ -167,5 +171,25 @@ fun StringBuilder.build(self): string {
     return tail as unknown as string;
 }
 
-// todo think about onchain/offchain/semichain prefixes (0x00, 0x01, 0x02)
-// do we need structures? or we need just to prepend those bytes before the rest snake?
+/// A string, which contents starts with 0x00/0x01 byte.
+/// By standard, offchain explorers/APIs may treat contents of a string based on 0xXX prefixes:
+/// - 0x00 + "str" — means "this is a regular snake-encoded string"
+/// - 0x01 + "str" — means "this is an off-chain content URL"
+/// Used in jettons and NFTs for responses from GET methods to comply with TEPs (token standards).
+type string_prefixed0x = string
+
+/// Given "str", prefix it with 0x00 byte.
+/// Logically it makes a string "\x00str"; physically, it's 0x00 + ref "str".
+/// See [string_prefixed0x].
+fun string.prefixWith00(self): string_prefixed0x {
+    val cell00 = beginCell().storeUint(0x00, 8).storeString(self).endCell();
+    return cell00 as unknown as string;
+}
+
+/// Given "str", prefix it with 0x01 byte.
+/// Logically it makes a string "\x01str"; physically, it's 0x01 + ref "str".
+/// See [string_prefixed0x].
+fun string.prefixWith01(self): string_prefixed0x {
+    val cell01 = beginCell().storeUint(0x01, 8).storeString(self).endCell();
+    return cell01 as unknown as string;
+}

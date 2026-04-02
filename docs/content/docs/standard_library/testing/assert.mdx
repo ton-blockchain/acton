@@ -34,7 +34,7 @@ Assert.consumesLessThan2(fun(a: int, b: int) {
 const ASSERTION_FAILED = 567
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L27" />
 
 ## `Assert`
 
@@ -58,12 +58,12 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L44" />
 
 ## `Assert.equal`
 
 ```tolk
-fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
+fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = ""): void
 ```
 
 Asserts that two values are equal. If not, throws `ASSERTION_FAILED`.
@@ -75,12 +75,17 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L54" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L54" />
 
 ## `Assert.notEqual`
 
 ```tolk
-fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
+fun Assert.notEqual<V1, V2>(
+    left: V1,
+    right: V2,
+    message: string = "",
+    location: string = "",
+): void
 ```
 
 Asserts that two values are NOT equal. If they are, throws `ASSERTION_FAILED`.
@@ -92,7 +97,7 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L78" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L78" />
 
 ## `Assert.fail`
 
@@ -106,12 +111,12 @@ Optional message can be provided to describe the failure.
 Optional location can be provided to specify the location of the failure to
 be printed in the error message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L99" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L104" />
 
 ## `Assert.consumesLessThan`
 
 ```tolk
-fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int)
+fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int): Ret
 ```
 
 Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
@@ -135,12 +140,12 @@ If you need to pass arguments to the function, you can use the `consumesLessThan
 `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 but accept arguments.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L124" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L129" />
 
 ## `Assert.consumesLessThan1`
 
 ```tolk
-fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int)
+fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int): Ret
 ```
 
 Asserts that the function with a single argument consumes less than or equal to the expected amount of gas.
@@ -162,7 +167,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L150" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L155" />
 
 ## `Assert.consumesLessThan2`
 
@@ -171,8 +176,8 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
     fn: (Arg1, Arg2) -> Ret,
     arg1: Arg1,
     arg2: Arg2,
-    expected: int
-)
+    expected: int,
+): Ret
 ```
 
 Asserts that the function with two arguments consumes less than or equal to the expected amount of gas.
@@ -195,7 +200,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L177" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L182" />
 
 ## `Assert.consumesLessThan3`
 
@@ -205,8 +210,8 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
     arg1: Arg1,
     arg2: Arg2,
     arg3: Arg3,
-    expected: int
-)
+    expected: int,
+): Ret
 ```
 
 Asserts that the function with three arguments consumes less than or equal to the expected amount of gas.
@@ -230,7 +235,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L210" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L215" />
 
 ## `Assert.failWalletNotFound`
 
@@ -245,12 +250,18 @@ It provides detailed information about available wallets and instructions on how
 
 NOT FOR PUBLIC USE.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L230" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L235" />
 
 ## `Assert.equalDecimal`
 
 ```tolk
-fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = "")
+fun Assert.equalDecimal<T>(
+    left: T,
+    right: T,
+    decimals: int,
+    message: string = "",
+    location: string = "",
+): void
 ```
 
 Asserts that two values are equal as decimals with given precision.
@@ -262,5 +273,5 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L243" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L248" />
 

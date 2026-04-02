@@ -1,0 +1,17 @@
+warning[E002]: variable is unused
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             fun onInternalMessage(in: InMessage) { // E002
+  |                                   ^^ unused variable `in`
+
+help: prefix with underscore: `_in`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             fun onInternalMessage(in: InMessage) { // E002
+  |                                   ^^ _in
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E002

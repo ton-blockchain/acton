@@ -1,0 +1,1 @@
+Error: Profiling drift detected against baseline snapshot 'profile-baseline.json'

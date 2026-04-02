@@ -15,16 +15,8 @@
   ✗ formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full [TIME]
     └─ exit_code=63
       ├─ at tests/formatter_linear.test[LINE]
-      │     T.fromCell            at tests/formatter_linear.test[LINE]
-      │     fromCell              at tests/formatter_linear.test[LINE]
-      │     ffi.registerAddress   at ../lib/emulation/network[LINE]
-      │     net.registerAddress   at ../lib/emulation/network[LINE]
-      │     builder.storeUint     at ../lib/emulation/network[LINE]
-      │     net.randomAddress     at tests/formatter_linear.test[LINE]
-      │     ffi.registerAddress   at ../lib/emulation/network[LINE]
-      │     net.registerAddress   at ../lib/emulation/network[LINE]
-      │     builder.storeUint     at ../lib/emulation/network[LINE]
-      │     net.randomAddress     at tests/formatter_linear.test[LINE]
+      │     FmRelay.fromCell                                                                 at tests/formatter_linear.test[LINE]
+      │     test-formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full   at tests/formatter_linear.test[LINE]
       ├─ Unable to load data from cell because prefix does not match
       └─ Phase: Compute phase
 

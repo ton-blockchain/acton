@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling lib
+    Finished in [TIME]
+   Compiling spawner
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ send-iter-live-libraries [TIME]
+
+ ✓ 1 passed in 1 file

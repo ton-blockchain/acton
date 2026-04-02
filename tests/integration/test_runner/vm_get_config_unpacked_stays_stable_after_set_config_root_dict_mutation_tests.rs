@@ -26,7 +26,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation() {
     run_success_case(
         "dk-stdlib-vm-config-unpacked-after-root-dict-mutation",
-        r#"
+        r"
 get fun `test-dk-stdlib-vm-config-unpacked-after-root-dict-mutation`() {
     val unpackedBefore = vm.getConfigUnpacked();
     val beforeStorage = StoragePrices.fromSlice(unpackedBefore.get(0) as slice);
@@ -68,7 +68,7 @@ get fun `test-dk-stdlib-vm-config-unpacked-after-root-dict-mutation`() {
     expect(afterStorage.masterchainBitPrice).toNotEqual(rootStorage.masterchainBitPrice);
     expect(afterStorage.masterchainCellPrice).toNotEqual(rootStorage.masterchainCellPrice);
 }
-"#,
+",
         "integration/snapshots/test-runner/vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation/vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation.stdout.txt",
     );
 }

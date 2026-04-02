@@ -1,6 +1,8 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
-use crate::storage::{self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta};
+use crate::storage::{
+    self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta, NftItemMeta,
+};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -15,12 +17,13 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tonlib_core::TonHash;
-use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
-use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
+use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellFamily, Store};
-use tycho_types::models::{AccountState, LibDescr, Message, MsgInfo, ShardAccount};
+use tycho_types::models::{
+    AccountState, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
+    OwnedMessage, ShardAccount, StdAddr, StdAddrFormat,
+};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,7 +219,7 @@ impl Node {
         let mut globals = Globals::new(config_hash);
         globals.head_seqno = head_seqno;
         // Approximation of global LT
-        globals.global_lt = history.blocks.last().map(|b| b.end_lt).unwrap_or(0);
+        globals.global_lt = history.blocks.last().map_or(0, |b| b.end_lt);
 
         let mut node = Self {
             cas,
@@ -405,8 +408,7 @@ impl Node {
             if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
                 let storage: u128 = ord
                     .storage_phase
-                    .map(|p| p.storage_fees_collected.into())
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.storage_fees_collected.into());
                 let total: u128 = exec_result.tx.total_fees.tokens.into();
                 (storage, total.saturating_sub(storage))
             } else {
@@ -469,6 +471,7 @@ impl Node {
 
         self.detect_jetton_masters(&dst)?;
         self.detect_jetton_wallets(&dst)?;
+        self.detect_nft_items(&dst)?;
 
         Ok((block_meta, tx_meta))
     }
@@ -579,6 +582,57 @@ impl Node {
         Ok(())
     }
 
+    fn detect_nft_items(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let Some(meta) = self.latest.accounts.get(addr) else {
+            return Ok(());
+        };
+
+        if meta.status != AccountStatus::Active {
+            return Ok(());
+        }
+
+        let Some(code_hash) = meta.code_hash else {
+            return Ok(());
+        };
+        let Some(data_hash) = meta.data_hash else {
+            return Ok(());
+        };
+
+        let Some(code_boc) = self.cas.get(&code_hash) else {
+            return Ok(());
+        };
+        let Some(data_boc) = self.cas.get(&data_hash) else {
+            return Ok(());
+        };
+
+        let code = Boc::decode(&code_boc)?;
+        let data = Boc::decode(&data_boc)?;
+
+        if let Some(nft_data) = ton_indexer::nfts::get_nft_item_data(addr.to_string(), code, data) {
+            let nft_meta = NftItemMeta {
+                address: *addr,
+                code_hash,
+                data_hash,
+                collection_address: nft_data
+                    .collection_address
+                    .as_deref()
+                    .and_then(|a| self.parse_addr_internal(a)),
+                owner_address: nft_data
+                    .owner_address
+                    .as_deref()
+                    .and_then(|a| self.parse_addr_internal(a)),
+                content: ton_indexer::nfts::parse_nft_content(nft_data.individual_content),
+                index: nft_data.index.to_str_radix(10),
+                init: nft_data.init,
+                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+            };
+
+            self.history.nft_items.insert(*addr, nft_meta);
+        }
+
+        Ok(())
+    }
+
     pub fn get_jetton_masters(
         &self,
         address: Option<Addr>,
@@ -659,18 +713,72 @@ impl Node {
         Ok(wallets[start..end].to_vec())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_nft_items(
+        &self,
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        collection_address: Option<Addr>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: bool,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<NftItemMeta>> {
+        let mut items: Vec<_> = self
+            .history
+            .nft_items
+            .values()
+            .filter(|item| {
+                if let Some(addr) = address
+                    && item.address != addr
+                {
+                    return false;
+                }
+                if let Some(addr) = owner_address
+                    && item.owner_address != Some(addr)
+                {
+                    return false;
+                }
+                if let Some(addr) = collection_address
+                    && item.collection_address != Some(addr)
+                {
+                    return false;
+                }
+                if let Some(expected_index) = &index
+                    && &item.index != expected_index
+                {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+
+        if sort_by_last_transaction_lt {
+            items.sort_by(|a, b| {
+                b.last_transaction_lt
+                    .cmp(&a.last_transaction_lt)
+                    .then_with(|| a.address.cmp(&b.address))
+            });
+        } else {
+            items.sort_by_key(|item| item.address);
+        }
+
+        let start = offset.min(items.len());
+        let end = (start + limit).min(items.len());
+
+        Ok(items[start..end].to_vec())
+    }
+
     fn parse_addr_internal(&self, s: &str) -> Option<Addr> {
-        let (int_addr, _) = tycho_types::models::StdAddr::from_str_ext(
-            s,
-            tycho_types::models::StdAddrFormat::any(),
-        )
-        .ok()?;
+        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).ok()?;
         Some(Addr {
-            workchain: int_addr.workchain as i32,
+            workchain: i32::from(int_addr.workchain),
             addr: int_addr.address.0,
         })
     }
 
+    #[must_use]
     pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryLookup> {
         hashes
             .iter()
@@ -1041,10 +1149,12 @@ impl Node {
         None
     }
 
+    #[must_use]
     pub fn get_cell(&self, hash: &Hash256) -> Option<BocBytes> {
         self.cas.get(hash)
     }
 
+    #[must_use]
     pub fn get_transactions(
         &self,
         addr: &Addr,
@@ -1088,6 +1198,7 @@ impl Node {
             .collect()
     }
 
+    #[must_use]
     pub fn get_block_header(&self, seqno: Seqno) -> Option<BlockMeta> {
         if seqno == 0 || seqno as usize > self.history.blocks.len() {
             None
@@ -1096,6 +1207,7 @@ impl Node {
         }
     }
 
+    #[must_use]
     pub fn find_block_by_lt(&self, lt: Lt) -> Option<BlockMeta> {
         self.history
             .blocks
@@ -1104,28 +1216,31 @@ impl Node {
             .cloned()
     }
 
+    #[must_use]
     pub fn find_block_by_unixtime(&self, utime: u32) -> Option<BlockMeta> {
         // Find block with gen_utime closest but not greater than utime
         self.history
             .blocks
             .iter()
-            .filter(|b| b.gen_utime <= utime)
-            .next_back()
+            .rfind(|b| b.gen_utime <= utime)
             .cloned()
     }
 
+    #[must_use]
     pub fn get_block_transactions(&self, block_meta: &BlockMeta) -> Option<Vec<TxMeta>> {
         let tx_hash = self.indexes.tx_by_block.get(&block_meta.seqno)?;
         let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
         Some(vec![tx])
     }
 
+    #[must_use]
     pub fn get_message_info(&self, hash: &Hash256) -> Option<MessageInfo> {
         let meta = self.history.msg_by_hash.get(hash).cloned()?;
         let boc = self.cas.get(&meta.msg_boc_hash)?;
         Some(MessageInfo { meta, boc })
     }
 
+    #[must_use]
     pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
         let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
@@ -1304,8 +1419,7 @@ impl Node {
             if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
                 let storage: u128 = ord
                     .storage_phase
-                    .map(|p| p.storage_fees_collected.into())
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.storage_fees_collected.into());
                 let total: u128 = exec_result.tx.total_fees.tokens.into();
                 (storage, total.saturating_sub(storage))
             } else {
@@ -1432,6 +1546,7 @@ impl Node {
         Ok(Some(boc))
     }
 
+    #[must_use]
     pub fn has_pending_messages(&self) -> bool {
         !self.pool.external.is_empty() || !self.pool.internal.is_empty()
     }
@@ -1448,34 +1563,41 @@ impl Node {
             anyhow::bail!("Giver has insufficient balance");
         }
 
-        use tonlib_core::cell::ArcCell;
-        use tonlib_core::tlb_types::block::message::{CommonMsgInfo, IntMsgInfo, Message};
-        use tonlib_core::tlb_types::tlb::TLB;
-        use tonlib_core::types::TonAddress;
-
-        let src = TonAddress::new(GIVER_ADDR.workchain, TonHash::from(&GIVER_ADDR.addr));
-        let dst = TonAddress::new(addr.workchain, TonHash::from(&addr.addr));
+        let src_addr = IntAddr::Std(StdAddr::new(
+            GIVER_ADDR
+                .workchain
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("Invalid giver workchain {}", GIVER_ADDR.workchain))?,
+            HashBytes(GIVER_ADDR.addr),
+        ));
+        let dst_addr = IntAddr::Std(StdAddr::new(
+            addr.workchain
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("Invalid destination workchain {}", addr.workchain))?,
+            HashBytes(addr.addr),
+        ));
 
         let message_info = IntMsgInfo {
             ihr_disabled: true,
             bounce: false,
             bounced: false,
-            src: src.to_msg_address(),
-            dest: dst.to_msg_address(),
-            value: CurrencyCollection::new(amount.into()),
-            ihr_fee: Grams::new(0u64.into()),
-            fwd_fee: Grams::new(0u64.into()),
+            src: src_addr,
+            dst: dst_addr,
+            ihr_fee: Default::default(),
+            value: CurrencyCollection::new(amount),
+            fwd_fee: Default::default(),
             created_at: 0,
             created_lt: 0,
         };
 
-        let message = Message {
-            info: CommonMsgInfo::Int(message_info),
+        let message = OwnedMessage {
+            info: MsgInfo::Int(message_info),
             init: None,
-            body: EitherRef::new(ArcCell::default()),
+            body: Default::default(),
+            layout: None,
         };
 
-        let boc = message.to_cell()?.to_boc(false)?;
+        let boc = BocRepr::encode(message)?;
         let hash = compute_boc_hash(&boc)?;
         self.cas.put(boc.clone().into(), hash);
 
@@ -1585,11 +1707,11 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
     })
 }
 
-const fn convert_addr(addr: &tycho_types::models::IntAddr) -> Addr {
+const fn convert_addr(addr: &IntAddr) -> Addr {
     let mut bytes = [0u8; 32];
     let (workchain, address) = match addr {
-        tycho_types::models::IntAddr::Std(std) => (std.workchain as i32, std.address.0),
-        tycho_types::models::IntAddr::Var(var) => (var.workchain, {
+        IntAddr::Std(std) => (std.workchain as i32, std.address.0),
+        IntAddr::Var(var) => (var.workchain, {
             // skipped from TVM 11
             [0u8; 32]
         }),

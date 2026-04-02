@@ -1,0 +1,212 @@
+'\" t
+.TH "ACTON\-FMT" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-fmt \[em] Format Tolk source files
+.SH "SYNOPSIS"
+\fBacton fmt\fR [\fIoptions\fR] [\fIpaths\fR\[u2026]]
+.SH "DESCRIPTION"
+Format \fB\&.tolk\fR files using the built\-in Tolk formatter.
+.sp
+The command can rewrite files in place or run in \fB\-\-check\fR mode for CI and
+pre\-commit validation. If no \fB_paths_\fR are provided, Acton scans the resolved
+project root recursively.
+.SH "OPTIONS"
+.SS "Format Options"
+.sp
+\fIpaths\fR\[u2026]
+.RS 4
+Files or directories to format.
+.sp
+If omitted, Acton scans the project root.
+.RE
+.sp
+\fB\-\-check\fR
+.RS 4
+Check formatting without rewriting files.
+.sp
+In this mode Acton prints diffs for mismatches and exits non\-zero.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "BEHAVIOR"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Only \fB\&.tolk\fR files are formatted
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Directory traversal is recursive
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Built\-in ignore globs always apply, including \fBnode_modules\fR, \fB\&.git\fR,
+\fBtarget\fR, and \fB\&.acton\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'explicit file arguments are formatted even if they would match \fB[fmt].ignore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'directory traversal applies \fB[fmt].ignore\fR and built\-in excludes to relative
+and absolute paths
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Syntax errors are reported as diagnostics and cause a non\-zero exit
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-check\fR prints a unified diff with three lines of context for each changed
+file
+.RE
+.SH "CONFIGURATION"
+\fBacton fmt\fR reads defaults from \fB[fmt]\fR in \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+[fmt]
+width = 100
+ignore = ["contracts/generated/*.tolk"]
+separate\-import\-groups = true
+.fi
+.RE
+.sp
+Useful fields include:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBwidth\fR for maximum formatted line width
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBignore\fR for additional exclude globs
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBseparate\-import\-groups\fR for blank lines between import groups
+.RE
+.SH "IMPORT SORTING"
+Imports are sorted by group in this order:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'\fB@stdlib\fR
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'\fB@acton\fR
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'other \fB@...\fR imports
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'plain imports
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'\fB\&./...\fR
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'\fB\&../...\fR
+.RE
+.sp
+Within each group, imports are sorted lexicographically.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: All requested files were formatted successfully, or \fB\-\-check\fR found no
+formatting differences.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Files needed formatting in \fB\-\-check\fR mode, syntax errors prevented
+formatting, or path resolution failed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Format all Tolk files in the project:
+.sp
+.RS 4
+.nf
+acton fmt
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Format selected paths:
+.sp
+.RS 4
+.nf
+acton fmt contracts scripts/deploy.tolk
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Validate formatting without writing files:
+.sp
+.RS 4
+.nf
+acton fmt \-\-check
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Run against another project root:
+.sp
+.RS 4
+.nf
+acton \-\-project\-root ../my\-project fmt \-\-check
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Check import grouping after enabling blank lines between groups:
+.sp
+.RS 4
+.nf
+acton fmt contracts/main.tolk \-\-check
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help check\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIFormatting guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/fmt>
+.RE

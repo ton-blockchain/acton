@@ -1,0 +1,462 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-cli",
+  "scopeName": "source.acton-cli",
+  "patterns": [
+    {
+      "include": "#branches"
+    },
+    {
+      "include": "#prompt"
+    },
+    {
+      "include": "#wizardPrompts"
+    },
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#stages"
+    },
+    {
+      "include": "#testHeader"
+    },
+    {
+      "include": "#suiteHeader"
+    },
+    {
+      "include": "#testResults"
+    },
+    {
+      "include": "#summary"
+    },
+    {
+      "include": "#statusLines"
+    },
+    {
+      "include": "#keyValue"
+    },
+    {
+      "include": "#diagnostics"
+    },
+    {
+      "include": "#commands"
+    }
+  ],
+  "repository": {
+    "branches": {
+      "patterns": [
+        {
+          "name": "comment.line.acton-cli",
+          "match": "[\\u2502\\u251C\\u2514\\u2500]+"
+        }
+      ]
+    },
+    "prompt": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\$)(\\s+)((?:acton|cd|git|cargo|yarn|npm|bun)\\b)(.*)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\$)(\\s+)",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "wizardPrompts": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\?)(\\s+)(.+?(?::|\\?))(\\s*)(.*)$",
+          "captures": {
+            "2": {
+              "name": "entity.name.function.acton-cli"
+            },
+            "4": {
+              "name": "comment.line.acton-cli"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(#.*)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Next steps:)$",
+          "captures": {
+            "2": {
+              "name": "support.type.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "stages": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(Compiling)(\\s+contracts)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Running)(\\s+tests)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Finished)(\\s+in\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Installing|Discovered|Created|Patched|Initialized)(\\b.*)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "testHeader": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(TEST)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "entity.name.function.acton-cli"
+            },
+            "4": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "suiteHeader": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(>)(\\s+)(.+?)(\\s+)(\\((?:\\d+) test(?:s)?\\))$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "6": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "testResults": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\u2713)(\\s+)(.+?)(\\s+)(\\d+)(ms|[\\u00B5\\u03BC]s)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "7": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u2717)(\\s+)(.+?)(\\s+)(\\d+)(ms|[\\u00B5\\u03BC]s)$",
+          "captures": {
+            "2": {
+              "name": "markup.deleted.acton-cli"
+            },
+            "6": {
+              "name": "markup.deleted.acton-cli"
+            },
+            "7": {
+              "name": "markup.deleted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25CB)(\\s+)(.+?)(\\s+)(skipped)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli"
+            },
+            "6": {
+              "name": "constant.language.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25A1)(\\s+)(.+?)(\\s+)(\\[.*\\])$",
+          "captures": {
+            "2": {
+              "name": "keyword.control.acton-cli"
+            },
+            "6": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "summary": {
+      "patterns": [
+        {
+          "match": "(^\\s*|,\\s+)(\\u2713)(\\s+)(\\d+)(\\s+)(passed)\\b",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "4": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "(^\\s*|,\\s+)(\\u2717)(\\s+)(\\d+)(\\s+)(failed)\\b",
+          "captures": {
+            "2": {
+              "name": "markup.deleted.acton-cli"
+            },
+            "4": {
+              "name": "markup.deleted.acton-cli"
+            },
+            "6": {
+              "name": "markup.deleted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "(^\\s*|,\\s+)(\\u25CB)(\\s+)(\\d+)(\\s+)(skipped)\\b",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli"
+            },
+            "4": {
+              "name": "constant.language.acton-cli"
+            },
+            "6": {
+              "name": "constant.language.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "(^\\s*|,\\s+)(\\u25A1)(\\s+)(\\d+)(\\s+)(todo)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.acton-cli"
+            },
+            "4": {
+              "name": "keyword.control.acton-cli"
+            },
+            "6": {
+              "name": "keyword.control.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "\\b(in)(\\s+)(\\d+)(\\s+)(file|files)\\b",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-cli"
+            },
+            "3": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "5": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "statusLines": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\u2713)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            },
+            "4": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u2717)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "markup.deleted.acton-cli"
+            },
+            "4": {
+              "name": "markup.deleted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25CB)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli"
+            },
+            "4": {
+              "name": "constant.language.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25A1)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "keyword.control.acton-cli"
+            },
+            "4": {
+              "name": "keyword.control.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Warning:)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(>)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "support.type.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "keyValue": {
+      "patterns": [
+        {
+          "match": "^(\\s+)(Project name:|Description:|Template:|License:|Enter license:)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        }
+      ]
+    },
+    "diagnostics": {
+      "patterns": [
+        {
+          "match": "^(\\s*)([\\u2502\\u251C\\u2514\\u2500]+)(\\s+)(Error:)(.*)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "markup.deleted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)([\\u2502\\u251C\\u2514\\u2500]+)(\\s+)(Test (?:output|stderr):)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "support.type.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)([\\u2502\\u251C\\u2514\\u2500]+)(\\s+)(at\\s+[^\\s]+:\\d+:\\d+)\\b",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli"
+            },
+            "4": {
+              "name": "comment.line.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "\\b(?:exit_code|action_result_code)=\\d+\\b",
+          "name": "constant.language.acton-cli"
+        },
+        {
+          "match": "--backtrace\\s+full",
+          "name": "constant.language.acton-cli"
+        },
+        {
+          "match": "^Some tests failed\\.$",
+          "name": "markup.deleted.acton-cli"
+        }
+      ]
+    },
+    "commands": {
+      "patterns": [
+        {
+          "match": "\\b(?:acton|cd|git|cargo|yarn|npm|bun)\\b",
+          "name": "entity.name.function.acton-cli"
+        },
+        {
+          "match": "--[A-Za-z0-9-]+\\b",
+          "name": "keyword.control.acton-cli"
+        },
+        {
+          "match": "\\b(?:new|test|build|script|run|wallet|compile|check|verify|wrapper|doc|fmt|doctor|library|retrace|litenode|init)\\b",
+          "name": "keyword.control.acton-cli"
+        },
+        {
+          "match": "\\b(?:Acton\\.toml|LICENSE|\\.gitignore|\\.env|\\.editorconfig|\\.acton(?:/[^\\s]*)?)\\b",
+          "name": "variable.parameter.acton-cli"
+        }
+      ]
+    }
+  }
+}

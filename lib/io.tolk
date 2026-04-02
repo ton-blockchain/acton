@@ -14,7 +14,7 @@
 ///
 /// // Formatted output
 /// println1("Iteration: {}", 5);
-/// println1("Address: {}", myAddress);
+/// println2("Transfer {} to {}", amount, myAddress);
 ///
 /// // Error logging
 /// eprintln("Critical failure in setup!");
@@ -62,7 +62,62 @@ fun println<T>(value: T): void {
 /// - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
 /// - `{:ton}` uses floating-point conversion, so very large values can be rounded.
 fun println1<T>(fmt: string, value: T): void {
-    println(format1(fmt, value))
+    println(format1(fmt, value));
+}
+
+/// Prints the given values to the standard output formatted according to format string.
+///
+/// Uses the same placeholder rules and edge-case behavior as [println1].
+///
+/// Example:
+/// ```tolk
+/// println2("{} -> {}", "from", "to");
+/// ```
+fun println2<T1, T2>(fmt: string, value1: T1, value2: T2): void {
+    println(format2(fmt, value1, value2));
+}
+
+/// Prints the given values to the standard output formatted according to format string.
+///
+/// Uses the same placeholder rules and edge-case behavior as [println1].
+///
+/// Example:
+/// ```tolk
+/// println3("{} + {} = {}", 2, 3, 5);
+/// ```
+fun println3<T1, T2, T3>(fmt: string, value1: T1, value2: T2, value3: T3): void {
+    println(format3(fmt, value1, value2, value3));
+}
+
+/// Prints the given values to the standard output formatted according to format string.
+///
+/// Uses the same placeholder rules and edge-case behavior as [println1].
+///
+/// Example:
+/// ```tolk
+/// println4("{} {} {} {}", "a", "b", "c", "d");
+/// ```
+fun println4<T1, T2, T3, T4>(fmt: string, value1: T1, value2: T2, value3: T3, value4: T4): void {
+    println(format4(fmt, value1, value2, value3, value4));
+}
+
+/// Prints the given values to the standard output formatted according to format string.
+///
+/// Uses the same placeholder rules and edge-case behavior as [println1].
+///
+/// Example:
+/// ```tolk
+/// println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+/// ```
+fun println5<T1, T2, T3, T4, T5>(
+    fmt: string,
+    value1: T1,
+    value2: T2,
+    value3: T3,
+    value4: T4,
+    value5: T5,
+): void {
+    println(format5(fmt, value1, value2, value3, value4, value5));
 }
 
 /// Prints the given slice string to the standard error output.

@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling probe
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/is_deployed_null_shard_account.test.tolk (1 test)
+  ✓ cp-net-is-deployed-explicit-null-shard-account [TIME]
+
+ ✓ 1 passed in 1 file

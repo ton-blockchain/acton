@@ -11,7 +11,7 @@ import "../../lib/testing/expect"
 #[test]
 fn assert_consumes_less_than3_returns_computed_result() {
     let source = format!(
-        r#"{ASSERT_IMPORTS}
+        r"{ASSERT_IMPORTS}
 
 get fun `test-bu-consumes-less-than3-returns-result`() {{
     val result = Assert.consumesLessThan3(
@@ -26,7 +26,7 @@ get fun `test-bu-consumes-less-than3-returns-result`() {{
 
     expect(result).toEqual(427);
 }}
-"#
+"
     );
 
     ProjectBuilder::new("bu-stdlib-assert-consumes-less-than3-pass")
@@ -47,7 +47,7 @@ fn assert_consumes_less_than3_rejects_wrong_callback_arity() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/bu_assert_consumes_less_than3_wrong_arity.test.tolk";
     let source = format!(
-        r#"{ASSERT_IMPORTS}
+        r"{ASSERT_IMPORTS}
 
 get fun `test-bu-consumes-less-than3-wrong-arity`() {{
     Assert.consumesLessThan3(
@@ -60,7 +60,7 @@ get fun `test-bu-consumes-less-than3-wrong-arity`() {{
         10000
     );
 }}
-"#
+"
     );
 
     fs::write(fixture.path().join(test_path), source)

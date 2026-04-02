@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_known_address_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_known_address.test.tolk (1 test)
+  ✓ formatter-decoded-body-known-addresses [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmKnownAddressBody 0.05 TON -> fm_known_address_sink B                      gas=333
+           queryId: 0, newAdminAddress: [WALLET_ADDRESS_BASE] (not_deployer)
+
+ ✓ 1 passed in 1 file

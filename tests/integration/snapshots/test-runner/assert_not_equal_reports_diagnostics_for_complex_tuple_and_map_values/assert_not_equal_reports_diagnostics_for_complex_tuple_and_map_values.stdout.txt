@@ -21,7 +21,10 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
   ✗ ej-stdlib-assert-not-equal-complex-map-diagnostic [TIME]
     └─ Error: ej tuple/map notEqual diagnostic map
        Values are equal but expected to be different:
-         [BOC_HEX]
+         map<int32, int32> {
+            7: 70,
+            11: 110,
+        }
 
  ✗ 2 failed in 1 file
 

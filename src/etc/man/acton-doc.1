@@ -1,0 +1,174 @@
+'\" t
+.TH "ACTON\-DOC" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-doc \[em] Look up built\-in reference documentation from the CLI
+.SH "SYNOPSIS"
+\fBacton doc\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Look up built\-in reference documentation from the terminal.
+.sp
+At the moment, \fBacton doc\fR provides TVM instruction lookup through the \fBtvm\fR
+subcommand.
+.SH "SUBCOMMANDS"
+.SS "acton doc tvm"
+Lookup TVM instructions by exact name or fuzzy search query.
+.SS "Synopsis"
+\fBacton doc tvm\fR [\fIoptions\fR] \fIinstruction\fR\[u2026]
+.SS "Options"
+.sp
+\fIinstruction\fR\[u2026]
+.RS 4
+Instruction names or search queries.
+.RE
+.sp
+\fB\-f\fR, \fB\-\-find\fR
+.RS 4
+Treat the input as a fuzzy search query instead of an exact instruction name.
+.RE
+.sp
+\fB\-d\fR, \fB\-\-description\fR
+.RS 4
+Include descriptions in fuzzy matching.
+.sp
+Requires \fB\-\-find\fR\&.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON instead of formatted text.
+.RE
+.SS "Behavior"
+Without \fB\-\-find\fR, each argument is treated as an instruction name.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'name matching is case\-insensitive
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\fR and \fB#\fR are normalized for convenience
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'JSON mode always returns an array of instruction objects
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'at least one instruction name is required
+.RE
+.sp
+With \fB\-\-find\fR, each argument is treated as a search query.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'fuzzy matching uses instruction names by default
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-description\fR also matches instruction descriptions, tags, and operands
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'JSON mode returns query/matches objects
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'at least one query is required
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'queries with no matches return an error instead of an empty result set
+.RE
+.SH "TOPICS"
+Currently available documentation namespaces:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBtvm\fR
+.RE
+.sp
+Additional namespaces may be added in future releases; \fBacton doc tvm\fR is the
+current built\-in reference surface.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The requested documentation was printed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The namespace was unknown, arguments were invalid, or rendering failed.
+.RE
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Exact lookup:
+.sp
+.RS 4
+.nf
+acton doc tvm ADD
+acton doc tvm ADD SUB
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'JSON output:
+.sp
+.RS 4
+.nf
+acton doc tvm SENDRAWMSG \-\-json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Fuzzy search:
+.sp
+.RS 4
+.nf
+acton doc tvm SENRAWMSG \-\-find
+acton doc tvm outcomng \-\-find \-\-description
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Compare exact lookup with fuzzy search:
+.sp
+.RS 4
+.nf
+acton doc tvm SENDRAWMSG
+acton doc tvm SENRAWMSG \-\-find
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fICLI docs lookup guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/doc>
+.RE

@@ -31,11 +31,12 @@
 /// ```
 
 import "@stdlib/reflection"
-import "expect"
 import "assert"
+import "expect"
 import "../fmt"
 import "../emulation/network"
 import "../ffi/ffi"
+import "../types/big_array"
 
 /// Expect the transaction list to have a successful deploy transaction.
 ///
@@ -49,7 +50,10 @@ import "../ffi/ffi"
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -63,7 +67,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, para
             self.location,
             "expect(<actual>).toHaveSuccessfulDeploy(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -86,7 +90,10 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, para
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -102,7 +109,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: 
             self.location,
             "expect(<actual>).toHaveSuccessfulTx(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -122,7 +129,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: 
 ///     actionExitCode: 37,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -134,7 +141,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchPara
             self.location,
             "expect(<actual>).toHaveTx(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -149,7 +156,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchPara
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -161,7 +168,7 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchP
             self.location,
             "expect(<actual>).toNotHaveTx(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -176,7 +183,10 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchP
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -189,7 +199,7 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: Sea
             self.location,
             "expect(<actual>).toHaveBouncedTx(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -212,7 +222,10 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: Sea
 ///     exitCode: 123,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -231,7 +244,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: Sear
             self.location,
             "expect(<actual>).toHaveFailedTx(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -244,10 +257,8 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: Sear
 /// val results = net.send(wallet.address, msg);
 /// expect(results).toHaveAllSuccessfulTxs();
 /// ```
-fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
-    val params = SearchParams {
-        success: false,
-    };
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
+    val params = SearchParams { success: false };
     // trying to find some transaction with success=false
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx != null) {
@@ -256,7 +267,7 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
             self.location,
             "expect(<actual>).toHaveAllSuccessfulTxs(<expected>)",
             self.value,
-            params.toTuple()
+            params.toTuple(),
         );
         throw 567;
     }
@@ -268,7 +279,7 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
 /// ```tolk
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
 /// ```
-fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
+fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
     var i = 0;
     while (i < self.value.size()) {
         val result = self.value.at(i);
@@ -278,7 +289,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
             val external = result.externals.atOrNull<Msg>(j);
             if (external != null) {
                 // message found
-                return
+                return;
             }
             j += 1;
         }
@@ -291,9 +302,9 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
             "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
             reflect.typeNameOf<Msg>(),
             reflect.typeNameOf<Msg>(),
-            reflect.serializationPrefixOf<Msg>()
+            reflect.serializationPrefixOf<Msg>().0,
         ),
-        self.location
+        self.location,
     );
 }
 
@@ -304,24 +315,24 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
 /// val result = net.send(deployer.address, message);
 /// expect(result.at(0)).toConsumeLessThan(1000);
 /// ```
-fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
+fun Expectation<SendResult>.toConsumeLessThan(self, amount: int): void {
     ffi.assertComparison(
         self.value.gasUsed,
         amount,
         "<",
         "expect(<actual>).toConsumeLessThan(<expected>)",
-        self.location
+        self.location,
     );
 }
 
-fun T.getDeclaredPackPrefix() {
-    return reflect.serializationPrefixOf<T>();
+fun T.getDeclaredPackPrefix(): int {
+    return reflect.serializationPrefixOf<T>().0;
 }
 
-fun unknown.getDeclaredPackPrefix() {
+fun unknown.getDeclaredPackPrefix(): int {
     return -1;
 }
 
-fun unknown.getDeclaredPackPrefixLen() {
+fun unknown.getDeclaredPackPrefixLen(): int {
     return -1;
 }

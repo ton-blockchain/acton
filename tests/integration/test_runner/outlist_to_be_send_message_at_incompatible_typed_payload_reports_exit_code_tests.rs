@@ -5,6 +5,7 @@ const OUTLIST_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/outlist_expect"
+import "../../lib/types/out_actions"
 import "../../lib/vm/vm"
 
 struct (0x7e8764ef) IncreaseCounter {

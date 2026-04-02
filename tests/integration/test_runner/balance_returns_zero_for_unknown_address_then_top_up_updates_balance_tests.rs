@@ -1,16 +1,17 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const SIMPLE_CONTRACT: &str = r#"
+const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/io"
+import "../../lib/types/big_array"
 "#;
 
 fn run_case(project_name: &str, test_body: &str, snapshot_path: &str, contains: &[&str]) {

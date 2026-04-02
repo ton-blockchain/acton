@@ -19,7 +19,8 @@
     "paths": {
       "@acton/shared-ui": ["../acton-shared-ui/src/index.ts"],
       "@acton/shared-ui/*": ["../acton-shared-ui/*"],
-      "@/*": ["../acton-shared-ui/src/*"]
+      "@/*": ["../acton-shared-ui/src/*"],
+      "@ton/core": ["../../node_modules/@ton/core"]
     }
   },
   "include": ["src", "vite.config.ts"]

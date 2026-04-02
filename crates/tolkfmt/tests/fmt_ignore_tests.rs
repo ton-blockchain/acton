@@ -17,7 +17,7 @@ fun bar() {
     val   y   =   2;
     return y;
 }",
-        expect![[r#"
+        expect![[r"
 // fmt-ignore
 fun foo(){
     val   x   =   1;
@@ -27,7 +27,7 @@ fun foo(){
 fun bar() {
     val y = 2;
     return y;
-}"#]],
+}"]],
     );
 }
 
@@ -45,7 +45,7 @@ struct OtherStruct {
     field1:   int;
     field2:   slice;
 }",
-        expect![[r#"
+        expect![[r"
             // fmt-ignore
             struct MyStruct {
                 field1:   int;
@@ -55,7 +55,7 @@ struct OtherStruct {
             struct OtherStruct {
                 field1: int
                 field2: slice
-            }"#]],
+            }"]],
     );
 }
 
@@ -72,7 +72,7 @@ fun foo() {
     val z = 3;
     return x + y + z;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -81,7 +81,7 @@ fun foo() {
 
     val z = 3;
     return x + y + z;
-}"#]],
+}"]],
     );
 }
 
@@ -99,7 +99,7 @@ fun foo() {
 
     return x + y + z;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -109,7 +109,7 @@ fun foo() {
     val   z   =   3;
 
     return x + y + z;
-}"#]],
+}"]],
     );
 }
 
@@ -121,11 +121,11 @@ fn test_fmt_ignore_global_variable_declaration() {
 global   global_var   :   int;
 
 global other_var: int",
-        expect![[r#"
+        expect![[r"
 // fmt-ignore
 global   global_var   :   int;
 
-global other_var: int"#]],
+global other_var: int"]],
     );
 }
 
@@ -137,11 +137,11 @@ fn test_fmt_ignore_type_alias() {
 type   MyType   =   int   |   slice;
 
 type OtherType = int   |   slice;",
-        expect![[r#"
+        expect![[r"
 // fmt-ignore
 type   MyType   =   int   |   slice;
 
-type OtherType = int | slice"#]],
+type OtherType = int | slice"]],
     );
 }
 
@@ -157,7 +157,7 @@ fun foo() {
 
     val z = 3;
 }",
-        expect![[r#"
+        expect![[r"
             fun foo() {
                 val x = 1;
 
@@ -165,7 +165,7 @@ fun foo() {
                 val   y   =   2; // this is a comment
 
                 val z = 3;
-            }"#]],
+            }"]],
     );
 }
 
@@ -178,12 +178,12 @@ fun foo(){
     val   x   =   1;
     return x;
 }",
-        expect![[r#"
+        expect![[r"
             //   fmt-ignore
             fun foo() {
                 val x = 1;
                 return x;
-            }"#]],
+            }"]],
     );
 }
 
@@ -202,7 +202,7 @@ fun bar(){
     val   y   =   2;
     return y;
 }",
-        expect![[r#"
+        expect![[r"
 // fmt-ignore-wrong
 fun foo() {
     val x = 1;
@@ -213,7 +213,7 @@ fun foo() {
 fun bar() {
     val y = 2;
     return y;
-}"#]],
+}"]],
     );
 }
 
@@ -231,7 +231,7 @@ fun foo() {
 
     return false;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -241,7 +241,7 @@ fun foo() {
     }
 
     return false;
-}"#]],
+}"]],
     );
 }
 
@@ -255,13 +255,13 @@ fun foo() {
         x   =   x   +   1;
     }
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     // fmt-ignore
     while(x   <   10){
         x   =   x   +   1;
     }
-}"#]],
+}"]],
     );
 }
 
@@ -281,7 +281,7 @@ fun foo() {
         val   b   =   4;
     }
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     // fmt-ignore
     {
@@ -293,7 +293,7 @@ fun foo() {
         val a = 3;
         val b = 4;
     }
-}"#]],
+}"]],
     );
 }
 
@@ -309,7 +309,7 @@ fun foo() {
 
     val z = 4;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -317,7 +317,7 @@ fun foo() {
     val   y   =   2   +   3;
 
     val z = 4;
-}"#]],
+}"]],
     );
 }
 
@@ -335,7 +335,7 @@ fun foo() {
 
     val y = x;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 0;
 
@@ -345,7 +345,7 @@ fun foo() {
     }while(x   <   10);
 
     val y = x;
-}"#]],
+}"]],
     );
 }
 
@@ -363,7 +363,7 @@ fun foo() {
         x = x + 1;
     }
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 0;
 
@@ -373,7 +373,7 @@ fun foo() {
 
         x = x + 1;
     }
-}"#]],
+}"]],
     );
 }
 
@@ -393,7 +393,7 @@ fun foo() {
         val y = x;
     }
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 0;
 
@@ -405,7 +405,7 @@ fun foo() {
 
         val y = x;
     }
-}"#]],
+}"]],
     );
 }
 
@@ -421,7 +421,7 @@ fun foo() {
 
     val y = 2;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -429,7 +429,7 @@ fun foo() {
     throw    x;
 
     val y = 2;
-}"#]],
+}"]],
     );
 }
 
@@ -445,7 +445,7 @@ fun foo() {
 
     val y = 2;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -453,7 +453,7 @@ fun foo() {
     assert(x   >   0,   123);
 
     val y = 2;
-}"#]],
+}"]],
     );
 }
 
@@ -469,7 +469,7 @@ fun foo() {
 
     val y = 3;
 }",
-        expect![[r#"
+        expect![[r"
 fun foo() {
     val x = 1;
 
@@ -477,7 +477,7 @@ fun foo() {
     x   +   2;
 
     val y = 3;
-}"#]],
+}"]],
     );
 }
 
@@ -498,7 +498,7 @@ fn test_fmt_ignore_complex_tuple() {
 
                 val y = 2;
             }",
-        expect![[r#"
+        expect![[r"
             fun foo() {
                 val x = 1;
 
@@ -511,7 +511,7 @@ fn test_fmt_ignore_complex_tuple() {
                             ];
 
                 val y = 2;
-            }"#]],
+            }"]],
     );
 }
 
@@ -524,10 +524,10 @@ type   MyType   <   T   ,   U   >   =   tuple   <   T   ,   U   >   ;
 
 type OtherType<T, U> = tuple<T, U>;
 ",
-        expect![[r#"
+        expect![[r"
             // fmt-ignore
             type   MyType   <   T   ,   U   >   =   tuple   <   T   ,   U   >   ;
 
-            type OtherType<T, U> = tuple<T, U>"#]],
+            type OtherType<T, U> = tuple<T, U>"]],
     );
 }

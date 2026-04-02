@@ -151,7 +151,7 @@ fn write_linter_rule_page(out_dir: &Path, rule: &LinterRuleDoc) -> anyhow::Resul
     ));
     mdx_content.push_str(&format!(
         "description: \"{}\"\n",
-        escape_frontmatter(&rule.summary.to_string())
+        escape_frontmatter(&rule.summary.clone())
     ));
     mdx_content.push_str("---\n\n");
 

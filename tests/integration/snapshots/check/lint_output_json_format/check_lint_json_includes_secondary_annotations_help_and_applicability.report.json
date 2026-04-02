@@ -7,11 +7,11 @@
           "message": "`_value` is marked as unused but used here",
           "range": {
             "end": {
-              "character": 22,
+              "character": 32,
               "line": 3
             },
             "start": {
-              "character": 16,
+              "character": 26,
               "line": 3
             }
           }
@@ -56,11 +56,11 @@
               "newText": "value",
               "range": {
                 "end": {
-                  "character": 22,
+                  "character": 32,
                   "line": 3
                 },
                 "start": {
-                  "character": 16,
+                  "character": 26,
                   "line": 3
                 }
               }

@@ -117,6 +117,44 @@
           ],
           "ruleId": "E010",
           "ruleIndex": 0
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "markdown": "expression result is ignored",
+                "text": "expression result is ignored"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "contracts/main.tolk",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "byteLength": 6,
+                  "byteOffset": 74,
+                  "endColumn": 23,
+                  "endLine": 4,
+                  "startColumn": 17,
+                  "startLine": 4
+                }
+              },
+              "properties": {
+                "actonIsPrimary": true
+              }
+            }
+          ],
+          "message": {
+            "markdown": "unused expression has no effect",
+            "text": "unused expression has no effect"
+          },
+          "properties": {
+            "actonDiagnosticName": "unused-expression",
+            "actonHelp": "remove the expression or replace it with an assignment / mutation if you meant to update state"
+          },
+          "ruleId": "E032",
+          "ruleIndex": 1
         }
       ],
       "tool": {
@@ -146,6 +184,30 @@
               "shortDescription": {
                 "markdown": "E010: identifier marked as unused is used",
                 "text": "E010: identifier marked as unused is used"
+              }
+            },
+            {
+              "fullDescription": {
+                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk\nfun main(a: int, b: int) {\n    a != b;\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
+                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
+              },
+              "help": {
+                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk\nfun main(a: int, b: int) {\n    a != b;\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
+                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
+              },
+              "helpUri": "[ACTON_DOCS_URL]/linting/rules/e032-unused-expression",
+              "id": "E032",
+              "name": "unused-expression",
+              "properties": {
+                "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/unused_expression.rs",
+                "actonDefinitionLine": 28,
+                "actonFixAvailability": "None",
+                "actonRuleGroupSince": "v0.0.1",
+                "actonRuleGroupStatus": "stable"
+              },
+              "shortDescription": {
+                "markdown": "E032: unused expression has no effect",
+                "text": "E032: unused expression has no effect"
               }
             }
           ]

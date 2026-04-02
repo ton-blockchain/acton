@@ -3,11 +3,62 @@ use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fmt;
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 pub use ton_networks::{CustomNetworkUrls, Network};
 use tvmffi::json_stack::{json_to_legacy_stack, json_to_stack};
 use tvmffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
+
+const HTTP_RETRY_ATTEMPTS: usize = 3;
+const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
+const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
+const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
+const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
+static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SendBocErrorKind {
+    MissingAccountState,
+    RejectedBeforeExecution,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub struct SendBocError {
+    kind: SendBocErrorKind,
+    raw: String,
+}
+
+impl SendBocError {
+    fn new(kind: SendBocErrorKind, raw: impl Into<String>) -> Self {
+        Self {
+            kind,
+            raw: raw.into(),
+        }
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> SendBocErrorKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+}
+
+impl fmt::Display for SendBocError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.raw)
+    }
+}
+
+impl std::error::Error for SendBocError {}
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
@@ -22,7 +73,9 @@ impl TonApiClient {
         custom_networks: HashMap<String, CustomNetworkUrls>,
         api_key: Option<String>,
     ) -> anyhow::Result<TonApiClient> {
-        let mut client_builder = reqwest::blocking::ClientBuilder::new();
+        let mut client_builder = reqwest::blocking::ClientBuilder::new()
+            .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
+            .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS));
         if should_disable_system_proxy() {
             client_builder = client_builder.no_proxy();
         }
@@ -69,6 +122,83 @@ impl TonApiClient {
         request
     }
 
+    fn send_with_retry<F>(
+        &self,
+        mut build_request: F,
+        transport_error_context: &str,
+    ) -> anyhow::Result<Response>
+    where
+        F: FnMut() -> reqwest::blocking::RequestBuilder,
+    {
+        for attempt in 0..HTTP_RETRY_ATTEMPTS {
+            self.maybe_wait_for_rate_limit();
+            let request = build_request();
+            log::info!("Send {request:?}");
+            return match request.send() {
+                Ok(response) => {
+                    if Self::should_retry_status(response.status())
+                        && attempt + 1 < HTTP_RETRY_ATTEMPTS
+                    {
+                        std::thread::sleep(Self::http_retry_backoff(attempt));
+                        continue;
+                    }
+                    Ok(response)
+                }
+                Err(err) => {
+                    if Self::should_retry_transport_error(&err) && attempt + 1 < HTTP_RETRY_ATTEMPTS
+                    {
+                        std::thread::sleep(Self::http_retry_backoff(attempt));
+                        continue;
+                    }
+                    Err(err).context(transport_error_context.to_owned())
+                }
+            };
+        }
+
+        unreachable!("retry loop must return on success or final failure");
+    }
+
+    fn maybe_wait_for_rate_limit(&self) {
+        if self.api_key.is_some() {
+            return;
+        }
+
+        if self.network == Network::Localnet {
+            // we don't have rate limit on localnet by default
+            return;
+        }
+
+        let mut last_request = TONCENTER_REQUEST_GATE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        if let Some(last) = *last_request {
+            let elapsed = last.elapsed();
+            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
+                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+                log::debug!("throttle for {wait_for:?}");
+                std::thread::sleep(TONCENTER_MIN_REQUEST_INTERVAL - elapsed);
+            }
+        }
+
+        *last_request = Some(Instant::now());
+    }
+
+    fn should_retry_status(status: reqwest::StatusCode) -> bool {
+        status.is_server_error()
+            || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+            || status == reqwest::StatusCode::REQUEST_TIMEOUT
+    }
+
+    fn should_retry_transport_error(err: &reqwest::Error) -> bool {
+        err.is_timeout() || err.is_connect() || err.is_request()
+    }
+
+    fn http_retry_backoff(attempt: usize) -> Duration {
+        let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
+        Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
+    }
+
     #[must_use]
     pub fn network(&self) -> Network {
         self.network.clone()
@@ -101,10 +231,10 @@ impl TonApiClient {
             url.push_str(&urlencoding::encode(address));
         }
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -161,11 +291,10 @@ impl TonApiClient {
             }
         });
 
-        let response = self
-            .build_post_request(&url)
-            .json(&json)
-            .send()
-            .context("Failed to send runGetMethod request")?;
+        let response = self.send_with_retry(
+            || self.build_post_request(&url).json(&json),
+            "Failed to send runGetMethod request",
+        )?;
 
         if !response.status().is_success() {
             let error_text = response
@@ -222,22 +351,24 @@ impl TonApiClient {
     }
 
     /// Send BOC to network
-    pub fn send_boc(&self, boc: &str) -> anyhow::Result<()> {
-        let url = format!(
-            "{}/sendBoc",
-            self.network.toncenter_v2_url(&self.custom_networks)?
-        );
+    pub fn send_boc(&self, boc: &str) -> Result<(), SendBocError> {
+        let base_url = self
+            .network
+            .toncenter_v2_url(&self.custom_networks)
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+        let url = format!("{base_url}/sendBoc");
 
         let json = serde_json::json!({ "boc": boc });
 
         let response = self
-            .build_post_request(&url)
-            .json(&json)
-            .send()
-            .context("Failed to send BOC")?;
+            .send_with_retry(
+                || self.build_post_request(&url).json(&json),
+                "Failed to send BOC",
+            )
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
 
         if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
+            return Err(Self::handle_send_boc_fail(response));
         }
 
         Ok(())
@@ -249,10 +380,10 @@ impl TonApiClient {
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -294,10 +425,10 @@ impl TonApiClient {
                 .unwrap_or_default(),
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -322,11 +453,13 @@ impl TonApiClient {
         );
         let hash_hex = hash.to_string();
 
-        let response = self
-            .build_request(&url)
-            .query(&[("libraries", hash_hex.as_str())])
-            .send()
-            .context("Failed to send request to TonCenter for library")?;
+        let response = self.send_with_retry(
+            || {
+                self.build_request(&url)
+                    .query(&[("libraries", hash_hex.as_str())])
+            },
+            "Failed to send request to TonCenter for library",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -398,11 +531,10 @@ impl TonApiClient {
             params.push(("hash", hash));
         }
 
-        let response = self
-            .build_request(&url)
-            .query(&params)
-            .send()
-            .context("Failed to send getTransactions request")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(&params),
+            "Failed to send getTransactions request",
+        )?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -430,10 +562,10 @@ impl TonApiClient {
             urlencoding::encode(address)
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send getAddressBalance request")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send getAddressBalance request",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -462,12 +594,74 @@ impl TonApiClient {
             return anyhow!("TonCenter API returned status: {status}");
         };
 
-        anyhow!(
-            data.error
-                .trim_start_matches("LITE_SERVER_UNKNOWN: ")
-                .to_owned()
-        )
+        let raw_msg = data
+            .error
+            .trim_start_matches("LITE_SERVER_UNKNOWN: ")
+            .to_owned();
+
+        if let Some(message) = normalize_toncenter_error_message(&raw_msg) {
+            return anyhow!(message);
+        }
+
+        anyhow!(raw_msg)
     }
+
+    fn handle_send_boc_fail(response: Response) -> SendBocError {
+        let status = response.status();
+        let Ok(data) = response.json::<TonCenterErrorResponse>() else {
+            return SendBocError::new(
+                SendBocErrorKind::Other,
+                format!("TonCenter API returned status: {status}"),
+            );
+        };
+
+        let raw_msg = data
+            .error
+            .trim_start_matches("LITE_SERVER_UNKNOWN: ")
+            .to_owned();
+
+        SendBocError::new(classify_toncenter_send_boc_error(&raw_msg), raw_msg)
+    }
+}
+
+fn classify_toncenter_send_boc_error(raw_msg: &str) -> SendBocErrorKind {
+    if raw_msg == "cannot apply external message to current state : Failed to unpack account state"
+    {
+        return SendBocErrorKind::MissingAccountState;
+    }
+
+    if raw_msg.starts_with(
+        "cannot apply external message to current state : External message was not accepted: cannot run message on account:",
+    ) && raw_msg.contains("before smart-contract execution")
+    {
+        return SendBocErrorKind::RejectedBeforeExecution;
+    }
+
+    SendBocErrorKind::Other
+}
+
+fn normalize_toncenter_error_message(raw_msg: &str) -> Option<&'static str> {
+    if raw_msg == "cannot apply external message to current state : Failed to unpack account state"
+    {
+        return Some(
+            "external message not accepted because account has no state; check if wallet/contract is deployed",
+        );
+    }
+
+    if raw_msg.starts_with(
+        "cannot apply external message to current state : External message was not accepted: cannot run message on account:",
+    ) && raw_msg.contains("before smart-contract execution")
+    {
+        return Some(
+            "wallet/contract rejected the external message before contract execution; likely causes:
+- not enough balance
+- wallet/contract is not deployed
+- seqno is stale
+- message expired",
+        );
+    }
+
+    None
 }
 
 #[derive(Deserialize, Clone)]
@@ -576,4 +770,45 @@ fn should_disable_system_proxy() -> bool {
     std::env::var("ACTON_DISABLE_SYSTEM_PROXY")
         .map(|value| value.trim() == "1")
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_toncenter_error_message;
+
+    #[test]
+    fn normalize_toncenter_error_message_maps_missing_account_state() {
+        assert_eq!(
+            normalize_toncenter_error_message(
+                "cannot apply external message to current state : Failed to unpack account state",
+            ),
+            Some(
+                "external message not accepted because account has no state; check if wallet/contract is deployed",
+            ),
+        );
+    }
+
+    #[test]
+    fn normalize_toncenter_error_message_maps_pre_execution_wallet_rejection() {
+        assert_eq!(
+            normalize_toncenter_error_message(
+                "cannot apply external message to current state : External message was not accepted: cannot run message on account: inbound external message rejected by account 3029B3EAEDA86A5381D86100F2A8B761C38DE45642EDB6E4BB1CCA2E6DD7FFED before smart-contract execution",
+            ),
+            Some(
+                r#"wallet/contract rejected the external message before contract execution; likely causes:
+- not enough balance
+- wallet/contract is not deployed
+- seqno is stale
+- message expired"#,
+            ),
+        );
+    }
+
+    #[test]
+    fn normalize_toncenter_error_message_preserves_other_errors() {
+        assert_eq!(
+            normalize_toncenter_error_message("mock toncenter failure"),
+            None,
+        );
+    }
 }

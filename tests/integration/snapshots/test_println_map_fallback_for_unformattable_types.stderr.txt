@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+map<Key, int32> {raw: [BOC_HEX]}
+map<int32, map<int32, int32>> {
+    3: <value>,
+}

@@ -1,5 +1,6 @@
 use super::{TestReport, TestReporter, TestStatus, TestSuiteStats, escape_xml, extract_suite_name};
 use crate::commands::test::TestDescriptor;
+use acton_config::config::project_root as configured_project_root;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
@@ -20,7 +21,7 @@ pub(crate) struct JUnitConfig {
 impl Default for JUnitConfig {
     fn default() -> Self {
         Self {
-            output_dir: PathBuf::from("test-results"),
+            output_dir: configured_project_root().join("test-results"),
             merge_suites: false,
             include_system_out: true,
             include_system_err: true,

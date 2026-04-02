@@ -4,6 +4,7 @@ use crate::support::compilation::{CompilationOrder, extract_compiled_contracts};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
 use std::fs;
+use std::path::{Path, PathBuf};
 use tycho_types::boc::Boc;
 
 const SIMPLE_CONTRACT: &str = r"
@@ -29,6 +30,45 @@ fn test_build_simple_contract() {
     assert!(
         !gen_dir.exists(),
         "gen directory should not be created without dependencies"
+    );
+}
+
+#[test]
+fn test_build_ensure_latest_uses_project_root_from_nested_directory() {
+    let project = ProjectBuilder::new("build-ensure-latest-project-root")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_stdlib = project.path().join(".acton/tolk-stdlib");
+    let nested_stdlib = nested_dir.join(".acton/tolk-stdlib");
+    assert!(
+        !root_stdlib.exists(),
+        "stdlib must not exist before build command"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not exist in nested cwd before build command"
+    );
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg("..")
+        .build()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    assert!(
+        root_stdlib.exists(),
+        "stdlib should be installed in project root"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not be installed in nested cwd"
     );
 }
 
@@ -502,11 +542,11 @@ fn test_build_with_graph_default_path() {
         .success()
         .assert_contains("dependency graph");
 
-    let svg_file = project.path().join("deps.svg");
-    assert!(svg_file.exists(), "deps.svg should be created");
+    let dot_file = project.path().join("deps.dot");
+    assert!(dot_file.exists(), "deps.dot should be created");
 
-    let content = fs::read_to_string(&svg_file).expect("Should read SVG");
-    assert!(!content.is_empty(), "deps.svg should not be empty");
+    let content = fs::read_to_string(&dot_file).expect("Should read DOT");
+    assert!(!content.is_empty(), "deps.dot should not be empty");
 }
 
 #[test]
@@ -519,18 +559,18 @@ fn test_build_with_graph_custom_path() {
     project
         .acton()
         .build()
-        .with_graph(Some("custom_graph.svg"))
+        .with_graph(Some("custom_graph.dot"))
         .run()
         .success();
 
-    let svg_file = project.path().join("custom_graph.svg");
-    assert!(svg_file.exists(), "custom_graph.svg should be created");
+    let dot_file = project.path().join("custom_graph.dot");
+    assert!(dot_file.exists(), "custom_graph.dot should be created");
 
-    let default_svg = project.path().join("deps.svg");
-    assert!(!default_svg.exists(), "deps.svg should not be created");
+    let default_dot = project.path().join("deps.dot");
+    assert!(!default_dot.exists(), "deps.dot should not be created");
 
-    let content = fs::read_to_string(&svg_file).expect("Should read SVG");
-    assert!(!content.is_empty(), "deps.svg should not be empty");
+    let content = fs::read_to_string(&dot_file).expect("Should read DOT");
+    assert!(!content.is_empty(), "deps.dot should not be empty");
 }
 
 #[test]
@@ -548,7 +588,7 @@ fn test_build_combined_flags() {
         .build()
         .clear_cache()
         .contract("target")
-        .with_graph(Some("filtered.svg"))
+        .with_graph(Some("filtered.dot"))
         .run()
         .success();
 
@@ -561,8 +601,8 @@ fn test_build_combined_flags() {
     assert!(compiled.contains(&"target".to_string()));
     assert!(!compiled.contains(&"independent".to_string()));
 
-    let svg_file = project.path().join("filtered.svg");
-    assert!(svg_file.exists(), "filtered.svg should be created");
+    let dot_file = project.path().join("filtered.dot");
+    assert!(dot_file.exists(), "filtered.dot should be created");
 }
 
 // ========================================
@@ -1100,7 +1140,7 @@ fn test_build_output_boc_write_error() {
         .acton()
         .build()
         .run()
-        .success()
+        .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_build_output_boc_write_error.stderr.txt",
         );
@@ -1221,25 +1261,86 @@ fn test_build_corrupted_cache_file() {
     // Manually corrupt the cache file by writing invalid base64
     let cache_dir = project.path().join(".acton/cache");
     if cache_dir.exists() {
-        for entry in fs::read_dir(&cache_dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().unwrap_or_default() == "cache" {
-                fs::write(&path, "invalid base64 data!!!").unwrap();
-                break;
-            }
-        }
+        let cache_file = first_cache_json_file(&cache_dir);
+        fs::write(&cache_file, "invalid base64 data!!!").unwrap();
     }
 
-    // Second build should fail due to corrupted cache
-    project
-        .acton()
-        .build()
-        .run()
-        .success()
-        .assert_snapshot_matches(
-            "integration/snapshots/test_build_corrupted_cache_file.stdout.txt",
-        );
+    // Second build should recompile from source instead of using the broken cache entry
+    let output = project.acton().build().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_eq!(
+        compiled,
+        vec!["simple"],
+        "Should recompile after cache corruption"
+    );
+}
+
+#[test]
+fn test_build_ignores_unrelated_corrupted_cache_file_and_keeps_it() {
+    let project = ProjectBuilder::new("build-unrelated-corrupted-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let cache_dir = project.path().join(".acton/cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    let broken_path = cache_dir.join("broken.json");
+    fs::write(&broken_path, "not-json").unwrap();
+
+    project.acton().build().run().success();
+
+    assert!(
+        broken_path.exists(),
+        "Unrelated corrupted cache entry should not be eagerly removed"
+    );
+
+    let output = project.acton().build().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert!(
+        compiled.is_empty(),
+        "Existing valid cache entries should still be reused with unrelated junk present"
+    );
+}
+
+#[test]
+fn test_build_clear_cache_removes_nested_cache_subdirectories() {
+    let project = ProjectBuilder::new("build-clear-cache-removes-subdirs")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    let cache_dir = project.path().join(".acton/cache");
+    let debug_dir = cache_dir.join("debug");
+    let nested_dir = cache_dir.join("nested");
+    fs::create_dir_all(&debug_dir).unwrap();
+    fs::create_dir_all(&nested_dir).unwrap();
+    fs::write(debug_dir.join("junk.json"), "junk").unwrap();
+    fs::write(nested_dir.join("junk.txt"), "junk").unwrap();
+
+    let output = project.acton().build().clear_cache().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_eq!(
+        compiled,
+        vec!["simple"],
+        "clear-cache should force recompilation after removing nested cache dirs"
+    );
+    assert!(
+        !debug_dir.exists(),
+        "clear-cache should remove nested debug cache directory"
+    );
+    assert!(
+        !nested_dir.exists(),
+        "clear-cache should remove arbitrary nested cache directory"
+    );
+}
+
+fn first_cache_json_file(cache_dir: &Path) -> PathBuf {
+    fs::read_dir(cache_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().and_then(|s| s.to_str()) == Some("json"))
+        .unwrap_or_else(|| panic!("No cache json file found in {}", cache_dir.display()))
 }
 
 #[test]
@@ -1480,6 +1581,72 @@ fn test_build_with_custom_out_dir() {
 }
 
 #[test]
+fn test_build_with_out_dir_from_config() {
+    let project = ProjectBuilder::new("build-out-dir-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\nout-dir = \"config-artifacts\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project.acton().build().run().success();
+
+    let config_json = project.path().join("config-artifacts/simple.json");
+    assert!(
+        config_json.exists(),
+        "config-artifacts/simple.json should be created"
+    );
+    assert!(
+        !project.path().join("build/simple.json").exists(),
+        "build/simple.json should not be created when [build].out-dir is set"
+    );
+}
+
+#[test]
+fn test_build_with_out_dir_cli_overrides_config() {
+    let project = ProjectBuilder::new("build-out-dir-cli-overrides-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\nout-dir = \"config-artifacts\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("cli-artifacts")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-artifacts/simple.json").exists(),
+        "cli-artifacts/simple.json should be created"
+    );
+    assert!(
+        !project.path().join("config-artifacts/simple.json").exists(),
+        "config-artifacts/simple.json should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_without_output_fift_does_not_emit_fift_by_default() {
+    let project = ProjectBuilder::new("build-output-fift-default-off")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    assert!(
+        !project.path().join("build/fift/simple.fif").exists(),
+        "build/fift/simple.fif should not be created when output-fift is not configured"
+    );
+}
+
+#[test]
 fn test_build_with_output_fift_cli() {
     let project = ProjectBuilder::new("build-output-fift-cli")
         .contract("simple", SIMPLE_CONTRACT)
@@ -1581,6 +1748,62 @@ fn test_build_with_output_fift_for_multiple_contracts() {
 }
 
 #[test]
+fn test_build_with_output_fift_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("build-output-fift-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("readonly")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_output_fift_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_with_out_dir_write_error_is_non_zero() {
+    let project = ProjectBuilder::new("build-out-dir-write-error")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444);
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("readonly")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_out_dir_write_error.stderr.txt",
+        );
+}
+
+#[test]
 fn test_build_with_output_fift_skips_boc_sources() {
     let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
 
@@ -1606,6 +1829,116 @@ fn test_build_with_output_fift_skips_boc_sources() {
     assert!(
         !boc_fift_file.exists(),
         "build/fift/from_boc.fif should not be created for precompiled .boc sources"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_from_config() {
+    let project = ProjectBuilder::new("build-gen-dir-config")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../custom-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\ngen-dir = \"custom-gen\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project.acton().build().run().success();
+
+    assert!(
+        project.path().join("custom-gen/child_code.tolk").exists(),
+        "custom-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("gen/child_code.tolk").exists(),
+        "default gen/child_code.tolk should not be created when [build].gen-dir is set"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_cli_overrides_config() {
+    let project = ProjectBuilder::new("build-gen-dir-cli-overrides-config")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../cli-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\ngen-dir = \"config-gen\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .with_gen_dir("cli-gen")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-gen/child_code.tolk").exists(),
+        "cli-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("config-gen/child_code.tolk").exists(),
+        "config-gen/child_code.tolk should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_cli() {
+    let project = ProjectBuilder::new("build-gen-dir-cli")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../cli-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_gen_dir("cli-gen")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-gen/child_code.tolk").exists(),
+        "cli-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("gen/child_code.tolk").exists(),
+        "default gen/child_code.tolk should not be created when CLI --gen-dir is set"
     );
 }
 

@@ -7,12 +7,11 @@ import "../../lib/io"
 
 fn run_stdlib_io_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let test_code = format!(
-        r#"
-            {}
+        r"
+            {TEST_IMPORTS}
 
-            {}
-        "#,
-        TEST_IMPORTS, test_body
+            {test_body}
+        "
     );
 
     ProjectBuilder::new(project_name)
@@ -39,6 +38,22 @@ fn println_and_println1_support_hex_and_ton_formatters() {
         }
         "#,
         "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println_and_println1_support_hex_and_ton_formatters.stdout.txt",
+    );
+}
+
+#[test]
+fn println2_to_println5_support_multi_argument_formatters() {
+    run_stdlib_io_case(
+        "v-stdlib-println2-to-println5-formatters",
+        r#"
+        get fun `test-println2-to-println5-formatters`() {
+            println2("{} + {}", "left", "right");
+            println3("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+            println4("{} {} {} {}", "a", "b", "c", "d");
+            println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+        }
+        "#,
+        "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println2_to_println5_support_multi_argument_formatters.stdout.txt",
     );
 }
 

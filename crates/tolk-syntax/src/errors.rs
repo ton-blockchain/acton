@@ -1,27 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-use tree_sitter::{Language, Node, Point, Tree, TreeCursor};
+use tree_sitter::{Language, Node, Tree, TreeCursor};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Span {
-    pub start: Point,
-    pub end: Point,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ParseErrorKind {
-    Unexpected, // ERROR node
-    Missing,    // MISSING node
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
-    pub span: Span,
-    pub message: String,
-    pub expected: Vec<String>,
-}
+use ton_syntax::errors::{ParseError, ParseErrorKind, Span};
 
 /// Collects errors for ERROR/MISSING nodes.
 pub(crate) fn collect_errors(
@@ -145,7 +127,7 @@ fn build_missing_error(root: Node<'_>, missing_node: Node<'_>, language: &Langua
     // - if range is not empty, use it.
     let span = missing_insertion_range(root, missing_node, prev_leaf);
 
-    let mut message = format!("syntax error: missing `{}`.", missing_kind);
+    let mut message = format!("syntax error: missing `{missing_kind}`.");
     if !expected.is_empty() {
         message.push_str(" Valid here: ");
         message.push_str(
@@ -220,7 +202,7 @@ fn expected_priority(s: &str) -> u8 {
     }
 }
 
-/// First leaf in subtree (via first_child until exhausted).
+/// First leaf in subtree (via `first_child` until exhausted).
 fn first_leaf(mut n: Node<'_>) -> Option<Node<'_>> {
     loop {
         let c = n.child(0)?;
@@ -242,7 +224,9 @@ fn first_non_extra_leaf(n: Node<'_>) -> Option<Node<'_>> {
         if cur.child_count() == 0 && !cur.is_extra() {
             return Some(cur);
         }
-        if !cursor.goto_next_sibling() {
+        if cursor.goto_next_sibling() {
+            while cursor.goto_first_child() {}
+        } else {
             // go up and find next
             while cursor.goto_parent() {
                 if cursor.goto_next_sibling() {
@@ -254,8 +238,6 @@ fn first_non_extra_leaf(n: Node<'_>) -> Option<Node<'_>> {
                 // reached subtree root and nowhere else to go
                 return None;
             }
-        } else {
-            while cursor.goto_first_child() {}
         }
     }
 }
@@ -336,12 +318,12 @@ fn node_range(n: Node<'_>) -> Span {
 
 /// For ERROR:
 /// - if leaf has non-zero range, use leaf
-/// - otherwise use error_node
+/// - otherwise use `error_node`
 fn node_range_for_display(leaf: Node<'_>, error_node: Node<'_>) -> Span {
-    if leaf.start_byte() != leaf.end_byte() {
-        node_range(leaf)
-    } else {
+    if leaf.start_byte() == leaf.end_byte() {
         node_range(error_node)
+    } else {
+        node_range(leaf)
     }
 }
 
@@ -349,11 +331,11 @@ fn node_range_for_display(leaf: Node<'_>, error_node: Node<'_>) -> Span {
 /// Build insertion point so that highlighting is stable and “between tokens”.
 ///
 /// Logic:
-/// - if missing_node has non-zero range: use it
+/// - if `missing_node` has non-zero range: use it
 /// - иначе:
-///    * if there is next non-extra leaf (starting from missing_node): position = start(next_leaf)
-///    * otherwise if there is prev leaf: position = end(prev_leaf)
-///    * otherwise: start_position(missing_node)
+///    * if there is next non-extra leaf (starting from `missing_node)`: position = `start(next_leaf)`
+///    * otherwise if there is prev leaf: position = `end(prev_leaf)`
+///    * otherwise: `start_position(missing_node)`
 fn missing_insertion_range(
     root: Node<'_>,
     missing_node: Node<'_>,

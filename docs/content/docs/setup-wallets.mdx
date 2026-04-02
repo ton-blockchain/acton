@@ -6,96 +6,6 @@ icon: "Wallet"
 
 Wallets are essential for interacting with the real blockchain in Acton. They enable you to deploy contracts, send transactions, and verify smart contract source code.
 
-## Wallet Storage
-
-Acton supports two levels of wallet configuration:
-
-1.  **Local Wallets (`wallets.toml`)**: Project-specific wallets. Stored in the project root.
-2.  **Global Wallets (`~/.config/acton/wallets/global.wallets.toml`)**: Shared across all your Acton projects.
-
-When you create a project using `acton new` or `acton init`, Acton creates a symbolic link `global.wallets.toml` if global wallets already exist (`~/.config/acton/wallets/global.wallets.toml`).
-
-<Callout type="warn">
-    `wallets.toml` and `global.wallets.toml` may contain sensitive information. With secure keyring storage, these files keep only keyring identifiers; with plaintext storage they contain mnemonics directly. Acton automatically adds these files to your `.gitignore`, but you should always be careful not to commit them.
-</Callout>
-
-## Wallet Configuration
-
-Wallets are defined in a TOML file under the `[wallets]` section. Each wallet gets a unique name that you'll use to reference it in scripts and verification commands.
-
-Here's a basic wallet configuration:
-
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-workchain = 0
-keys = { mnemonic = "word1 word2 word3 ... word24" }
-```
-
-This configuration creates a wallet named `deployer` that:
-- Uses the V5R1 wallet version
-- Operates in workchain 0 (the basechain)
-- Stores the mnemonic directly in the config file
-
-## Providing Mnemonic Phrases
-
-Acton supports four methods for providing wallet mnemonics.
-
-If multiple mnemonic sources are present in one wallet entry, Acton uses this priority:
-1. `mnemonic-env`
-2. `mnemonic-file`
-3. `mnemonic-keyring`
-4. `mnemonic`
-
-### 1. Secure Native Store (Keyring) - Recommended
-
-The most secure way to store mnemonics is using your system's secure native store (Keyring on Linux, Keychain on macOS, Credential Manager on Windows). This is the recommended method and is offered by default when creating or importing a wallet via `acton wallet new` or `acton wallet import`.
-
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-keys = { mnemonic-keyring = "my-project:deployer" }
-```
-
-Acton will automatically retrieve the mnemonic from your system's secure storage when needed.
-
-### 2. Direct Mnemonic
-
-You can store the mnemonic directly in your `wallets.toml` or global config. This is simple but less secure as it stores the mnemonic in plain text.
-
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-keys = { mnemonic = "word1 word2 ... word24" }
-```
-
-### 3. Environment Variables
-
-For higher security in environments where a secure keyring is not available (like CI/CD), you can store mnemonics in environment variables:
-
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-keys = { mnemonic-env = "WALLET_MNEMONIC" }
-```
-
-Set the environment variable before running your script:
-
-```bash
-export WALLET_MNEMONIC="word1 word2 ... word24"
-acton script deploy.tolk --broadcast
-```
-
-### 4. File References
-
-Alternatively, store the mnemonic in a separate file and reference it:
-
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-keys = { mnemonic-file = ".secrets/deployer.txt" }
-```
-
 ## Creating and Managing Wallets
 
 ### Creating a New Wallet
@@ -201,6 +111,62 @@ For CI or other non-interactive scripts, use:
 acton wallet remove deployer -y
 ```
 
+## Using Wallets in Scripts
+
+Once configured, reference wallets by name in your scripts using `net.wallet()`:
+
+```tolk title="deploy.tolk"
+import "@acton/emulation/network"
+import "@acton/io"
+
+fun main() {
+    val deployer = net.wallet("deployer");
+    println1("Deployer address: {}", deployer.address);
+
+    // Use deployer.address for contract deployment
+    // ...
+}
+```
+
+Run the script with the `--broadcast` flag to use the real wallet:
+
+```bash
+acton script deploy.tolk --broadcast
+```
+
+Without `--broadcast`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
+
+## Wallet Storage
+
+Acton supports two levels of wallet configuration:
+
+1.  **Local Wallets (`wallets.toml`)**: Project-specific wallets. Stored in project root right after Acton.toml.
+2.  **Global Wallets (`~/.config/acton/wallets/global.wallets.toml`)**: Shared across all your Acton projects.
+
+When you create a project using `acton new` or `acton init`, Acton creates a symbolic link `global.wallets.toml` if global wallets already exist (`~/.config/acton/wallets/global.wallets.toml`).
+
+<Callout type="warn">
+  `wallets.toml` and `global.wallets.toml` may contain sensitive information. With secure keyring storage, these files keep only keyring identifiers; with plaintext storage they contain mnemonics directly. Acton automatically adds these files to your `.gitignore`, but you should always be careful not to commit them.
+</Callout>
+
+## Wallet Configuration
+
+Wallets are defined in a TOML file under the `[wallets]` section. Each wallet gets a unique name that you'll use to reference it in scripts and verification commands.
+
+Here's a basic wallet configuration:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "word1 word2 word3 ... word24" }
+```
+
+This configuration creates a wallet named `deployer` that:
+- Uses the V5R1 wallet version
+- Operates in workchain 0 (the basechain)
+- Stores the mnemonic directly in the config file
+
 ## Address Safety Checks
 
 To prevent accidental use of wrong wallets, configure expected addresses:
@@ -239,30 +205,64 @@ kind = "v4r2"
 keys = { mnemonic-env = "ADMIN_MNEMONIC" }
 ```
 
-## Using Wallets in Scripts
+## Providing Mnemonic Phrases
 
-Once configured, reference wallets by name in your scripts using `net.wallet()`:
+Acton supports four methods for providing wallet mnemonics.
 
-```tolk title="deploy.tolk"
-import "@acton/emulation/network"
-import "@acton/io"
+If multiple mnemonic sources are present in one wallet entry, Acton uses this priority:
+1. `mnemonic-env`
+2. `mnemonic-file`
+3. `mnemonic-keyring`
+4. `mnemonic`
 
-fun main() {
-    val deployer = net.wallet("deployer");
-    println1("Deployer address: {}", deployer.address);
+### 1. Secure Native Store (Keyring) - Recommended
 
-    // Use deployer.address for contract deployment
-    // ...
-}
+The most secure way to store mnemonics is using your system's secure native store (Keyring on Linux, Keychain on macOS, Credential Manager on Windows). This is the recommended method and is offered by default when creating or importing a wallet via `acton wallet new` or `acton wallet import`.
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic-keyring = "my-project:deployer" }
 ```
 
-Run the script with the `--broadcast` flag to use the real wallet:
+Acton will automatically retrieve the mnemonic from your system's secure storage when needed.
+
+### 2. Direct Mnemonic
+
+You can store the mnemonic directly in your `wallets.toml` or global config. This is simple but less secure as it stores the mnemonic in plain text.
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic = "word1 word2 ... word24" }
+```
+
+### 3. Environment Variables
+
+For higher security in environments where a secure keyring is not available (like CI/CD), you can store mnemonics in environment variables:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic-env = "WALLET_MNEMONIC" }
+```
+
+Set the environment variable before running your script:
 
 ```bash
+export WALLET_MNEMONIC="word1 word2 ... word24"
 acton script deploy.tolk --broadcast
 ```
 
-Without `--broadcast`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
+### 4. File References
+
+Alternatively, store the mnemonic in a separate file and reference it:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic-file = ".secrets/deployer.txt" }
+```
 
 ## Security Best Practices
 

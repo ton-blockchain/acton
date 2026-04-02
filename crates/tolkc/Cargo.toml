@@ -12,6 +12,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ton-objs = { workspace = true, features = ["tolk"] }
 ton-source-map = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -19,6 +20,7 @@ include_dir = { workspace = true }
 rustc-hash = { workspace = true }
 dunce = { workspace = true }
 anyhow = { workspace = true }
+tycho-types = { workspace = true }
 
 [lints]
 workspace = true

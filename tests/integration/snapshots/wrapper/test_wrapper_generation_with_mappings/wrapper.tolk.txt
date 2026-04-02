@@ -4,9 +4,8 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
-import "../../contracts/types"
-import "../../contracts/main"
 import "@core/types"
+import "../../contracts/main"
 
 struct Main {
     address: address
@@ -22,12 +21,12 @@ fun Main.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null) 
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
         : AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return Main { address, stateInit }
+    return Main { address, stateInit };
 }
 
 /// Creates a contract wrapper instance from the address
 fun Main.fromAddress(address: address) {
-    return Main { address }
+    return Main { address };
 }
 
 /// Deploys the contract to the blockchain
@@ -38,11 +37,9 @@ fun Main.deploy(self, from: address, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: {
-            stateInit: self.stateInit,
-        },
+        dest: { stateInit: self.stateInit },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }
 
 fun Main.sendIncrement(self, from: address, value: int32, config: SendParams = {}): SendResultList {
@@ -50,23 +47,19 @@ fun Main.sendIncrement(self, from: address, value: int32, config: SendParams = {
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: Increment {
-            value,
-        },
+        body: Increment { value },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }
 
-fun Main.sendDecrement(self, from: address, value: int, config: SendParams = {}): SendResultList {
+fun Main.sendDecrement(self, from: address, value: int32, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: Decrement {
-            value,
-        },
+        body: Decrement { value },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }
 
 /// Send message to the contract with a custom body cell
@@ -77,5 +70,5 @@ fun Main.sendAny(self, from: address, body: cell, config: SendParams = {}): Send
         dest: self.address,
         body,
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }

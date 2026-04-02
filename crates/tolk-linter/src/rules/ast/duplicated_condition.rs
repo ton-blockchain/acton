@@ -46,11 +46,11 @@ pub fn check_if(checker: &mut Checker, file_id: FileId, node: &If) -> Option<()>
     emit_duplicate_diagnostics(checker, file_id, source, &conditions)
 }
 
-fn emit_duplicate_diagnostics<'tree>(
+fn emit_duplicate_diagnostics(
     checker: &mut Checker,
     file_id: FileId,
     source: &str,
-    conditions: &[Expr<'tree>],
+    conditions: &[Expr<'_>],
 ) -> Option<()> {
     let duplicate_pairs = find_duplicate_condition_pairs(conditions, source);
     if duplicate_pairs.is_empty() {
@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn collects_if_chain_conditions() {
         with_first_if(
-            r#"
+            r"
             fun main(a: int): int {
                 if (a < 1) {
                     return 1;
@@ -154,7 +154,7 @@ mod tests {
                 }
                 return 4;
             }
-            "#,
+            ",
             |if_stmt, source| {
                 let conditions = collect_if_conditions(&if_stmt);
                 assert_eq!(conditions.len(), 3);
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn finds_duplicate_if_conditions() {
         with_first_if(
-            r#"
+            r"
             fun main(a: int): int {
                 if (a < 1) {
                     return 1;
@@ -177,7 +177,7 @@ mod tests {
                 }
                 return 4;
             }
-            "#,
+            ",
             |if_stmt, source| {
                 let conditions = collect_if_conditions(&if_stmt);
                 assert_eq!(find_duplicate_condition_pairs(&conditions, source).len(), 1);
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn detects_else_if_node() {
         with_first_if(
-            r#"
+            r"
             fun main(a: int): int {
                 if (a < 1) {
                     return 1;
@@ -197,7 +197,7 @@ mod tests {
                 }
                 return 4;
             }
-            "#,
+            ",
             |if_stmt, _| {
                 assert!(!is_else_if(&if_stmt));
 
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn finds_all_duplicate_pairs_in_if_conditions() {
         with_first_if(
-            r#"
+            r"
             fun main(a: int): int {
                 if (a > 7) {
                     return 1;
@@ -228,7 +228,7 @@ mod tests {
                 }
                 return 5;
             }
-            "#,
+            ",
             |if_stmt, source| {
                 let conditions = collect_if_conditions(&if_stmt);
                 // Pairs: (1st, 3rd), (1st, 4th), (3rd, 4th).
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn ignores_similar_conditions_with_different_literals() {
         with_first_if(
-            r#"
+            r"
             fun main(a: int): int {
                 if (((a + 1) * (a - 2)) > 10) {
                     return 1;
@@ -249,7 +249,7 @@ mod tests {
                 }
                 return 3;
             }
-            "#,
+            ",
             |if_stmt, source| {
                 let conditions = collect_if_conditions(&if_stmt);
                 assert_eq!(find_duplicate_condition_pairs(&conditions, source).len(), 0);

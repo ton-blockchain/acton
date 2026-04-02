@@ -1,0 +1,3 @@
+Broadcast send (synthetic result)
+└── N/A -> empty 0.2 TON -> EQBS+c..jFM7dP
+    └── submitted to network; call res.wait() to confirm inclusion

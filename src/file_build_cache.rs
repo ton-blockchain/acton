@@ -1,4 +1,4 @@
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;
@@ -9,24 +9,28 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::fs::OpenOptions;
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tolkc::abi::ContractABI;
 use tolkc::compiler::CompilerResultSuccess;
 use ton_abi;
-use ton_source_map::SourceMap;
 use xxhash_rust::xxh3::Xxh3;
 
-const CACHE_SCHEMA_VERSION: u32 = 3;
+const CACHE_SCHEMA_VERSION: u32 = 6;
+const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
+const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
+const DEBUG_CACHE_SUBDIR: &str = "debug";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheEntry {
     pub code_boc64: String,
     pub code_hash_hex: String,
+    pub debug_mark_base64: Option<String>,
     pub fift_code: String,
-    pub source_map: Option<SourceMap>,
+    pub new_source_map: Option<tolkc::SourceMap>,
     pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,
@@ -51,62 +55,48 @@ struct DependenciesCacheEntry {
     dependencies: Vec<String>,
 }
 
+struct CacheWriteLock {
+    file: File,
+}
+
+impl Drop for CacheWriteLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
 #[derive(Debug)]
 pub struct FileBuildCache {
     cache_dir: PathBuf,
     config: ActonConfig,
-    entries: FxHashMap<String, CacheEntry>,
     contract_src_index: FxHashMap<String, String>,
     dependencies_cache: FxHashMap<String, DependenciesCacheEntry>,
     file_hash_cache: FxHashMap<String, FileHashCacheEntry>,
-    cwd: PathBuf,
-    _lock_file: File,
+    project_root: PathBuf,
+    _temp_dir: Option<tempfile::TempDir>,
 }
 
 impl FileBuildCache {
     pub fn new(cache_dir: Option<PathBuf>) -> Result<Self> {
-        let cache_dir = cache_dir.unwrap_or_else(|| PathBuf::from(".acton/cache"));
+        let project_root = configured_project_root().to_path_buf();
+        let cache_dir = cache_dir.unwrap_or_else(|| project_root.join(".acton").join("cache"));
 
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;
         }
 
-        let lock_file_path = cache_dir.join(".lock");
-        let lock_file = File::create(&lock_file_path)?;
-
-        let mut locked = false;
-        for _ in 0..60 {
-            if lock_file.try_lock_exclusive().is_ok() {
-                locked = true;
-                break;
-            }
-
-            debug!("{}", "Cache directory currently locked, waiting...");
-            thread::sleep(Duration::from_millis(1000));
-        }
-
-        if !locked {
-            return Err(anyhow!(
-                "Cache directory is locked by another process for more than 60 seconds"
-            ));
-        }
-
-        let entries = Self::load_cache(&cache_dir)?;
-
         let config = ActonConfig::load().unwrap_or_default();
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let contract_src_index = Self::build_contract_src_index(&config, &cwd);
+        let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
             cache_dir,
-            entries,
             config,
             contract_src_index,
             dependencies_cache: FxHashMap::default(),
             file_hash_cache: FxHashMap::default(),
-            cwd,
-            _lock_file: lock_file,
+            project_root,
+            _temp_dir: None,
         })
     }
 
@@ -114,63 +104,100 @@ impl FileBuildCache {
         let tmp_dir = tempfile::TempDir::new()?;
         let config = ActonConfig::load().unwrap_or_default();
 
-        let lock_file_path = tmp_dir.path().join(".lock");
-        let lock_file = File::create(&lock_file_path)?;
-
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let contract_src_index = Self::build_contract_src_index(&config, &cwd);
+        let project_root = configured_project_root().to_path_buf();
+        let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
             cache_dir: tmp_dir.path().to_path_buf(),
-            entries: FxHashMap::default(),
             config,
             contract_src_index,
             dependencies_cache: FxHashMap::default(),
             file_hash_cache: FxHashMap::default(),
-            cwd,
-            _lock_file: lock_file,
+            project_root,
+            _temp_dir: Some(tmp_dir),
         })
     }
 
-    fn load_cache(cache_dir: &Path) -> Result<FxHashMap<String, CacheEntry>> {
-        let mut entries = FxHashMap::default();
+    fn read_cache_entry(path: &Path) -> Option<CacheEntry> {
+        let file = File::open(path).ok()?;
+        let cache_entry = serde_json::from_reader::<_, CacheEntry>(BufReader::new(file)).ok()?;
+        (cache_entry.schema_version == CACHE_SCHEMA_VERSION).then_some(cache_entry)
+    }
 
-        if !cache_dir.exists() {
-            return Ok(entries);
+    fn debug_cache_dir(&self) -> PathBuf {
+        self.cache_dir.join(DEBUG_CACHE_SUBDIR)
+    }
+
+    fn cache_file_path(&self, key: &str, with_debug_info: bool) -> PathBuf {
+        if with_debug_info {
+            self.debug_cache_dir().join(format!("{key}.json"))
+        } else {
+            self.cache_dir.join(format!("{key}.json"))
+        }
+    }
+
+    fn legacy_cache_file_path(&self, key: &str) -> PathBuf {
+        self.cache_dir.join(format!("{key}.json"))
+    }
+
+    fn acquire_write_lock(&self) -> Result<CacheWriteLock> {
+        fs::create_dir_all(&self.cache_dir)?;
+
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(self.cache_dir.join(".lock"))?;
+
+        for _ in 0..CACHE_LOCK_WAIT_ATTEMPTS {
+            if lock_file.try_lock_exclusive().is_ok() {
+                return Ok(CacheWriteLock { file: lock_file });
+            }
+
+            debug!("Cache directory currently write-locked, waiting...");
+            thread::sleep(CACHE_LOCK_RETRY_DELAY);
         }
 
-        for entry in fs::read_dir(cache_dir)? {
+        Err(anyhow!(
+            "Cache directory is locked by another process for more than 60 seconds"
+        ))
+    }
+
+    fn clear_cache_dir_contents(&self) -> Result<()> {
+        if !self.cache_dir.exists() {
+            return Ok(());
+        }
+
+        for entry in fs::read_dir(&self.cache_dir)? {
             let entry = entry?;
-            let path = entry.path();
-
-            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            if entry.file_name() == ".lock" {
                 continue;
             }
 
-            let Some(file_stem) = path.file_stem().and_then(|s| s.to_str()) else {
-                continue;
-            };
-
-            match File::open(&path) {
-                Ok(file) => match serde_json::from_reader::<_, CacheEntry>(BufReader::new(file)) {
-                    Ok(cache_entry) => {
-                        if cache_entry.schema_version != CACHE_SCHEMA_VERSION {
-                            let _ = fs::remove_file(&path);
-                            continue;
-                        }
-                        entries.insert(file_stem.to_string(), cache_entry);
-                    }
-                    Err(_) => {
-                        let _ = fs::remove_file(&path);
-                    }
-                },
-                Err(_) => {
-                    let _ = fs::remove_file(&path);
-                }
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                fs::remove_dir_all(path)?;
+            } else {
+                fs::remove_file(path)?;
             }
         }
 
-        Ok(entries)
+        Ok(())
+    }
+
+    fn load_entry_for_key(&self, key: &str, with_debug_info: bool) -> Option<CacheEntry> {
+        let primary_path = self.cache_file_path(key, with_debug_info);
+        if let Some(entry) = Self::read_cache_entry(&primary_path) {
+            return Some(entry);
+        }
+
+        if with_debug_info {
+            return Self::read_cache_entry(&self.legacy_cache_file_path(key));
+        }
+
+        None
     }
 
     pub fn get(
@@ -181,14 +208,15 @@ impl FileBuildCache {
         tolk_version: &str,
     ) -> Option<CacheEntry> {
         let key = self.compute_key(file_path, with_debug_info, optimization_level, tolk_version);
-        let expected_dependencies_hash = self.entries.get(&key)?.dependencies_hash.clone();
+        let entry = self.load_entry_for_key(&key, with_debug_info)?;
+        let expected_dependencies_hash = entry.dependencies_hash.clone();
 
         if let Ok(dependencies) = self.get_dependencies(file_path) {
             debug!("Check hash `{file_path}` with dependencies: {dependencies:?}");
             if let Ok(current_hash) = self.compute_dependencies_hash(&dependencies)
                 && current_hash == expected_dependencies_hash
             {
-                return self.entries.get(&key).cloned();
+                return Some(entry);
             }
         }
 
@@ -211,11 +239,12 @@ impl FileBuildCache {
         let entry = CacheEntry {
             code_boc64: result.code_boc64.clone(),
             code_hash_hex: result.code_hash_hex.clone(),
+            debug_mark_base64: result.debug_mark_base64.clone(),
             fift_code: result.fift_code.clone(),
-            source_map: result.source_map.clone(),
+            new_source_map: result.new_source_map.clone(),
             abi: result.abi.clone(),
             dependencies_hash,
-            timestamp: std::time::SystemTime::now()
+            timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
@@ -223,14 +252,20 @@ impl FileBuildCache {
         };
 
         let key = self.compute_key(file_path, with_debug_info, optimization_level, tolk_version);
-        let cache_file = self.cache_dir.join(format!("{key}.json"));
+        let cache_file = self.cache_file_path(&key, with_debug_info);
+        let cache_parent = cache_file
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.cache_dir.clone());
 
+        let _lock = self.acquire_write_lock()?;
+        fs::create_dir_all(&cache_parent)?;
         let content = serde_json::to_vec(&entry)?;
-        let tmp = cache_file.with_extension("json.tmp");
-        fs::write(&tmp, content)?;
-        fs::rename(&tmp, cache_file)?;
-
-        self.entries.insert(key, entry);
+        let mut tmp = tempfile::NamedTempFile::new_in(&cache_parent)?;
+        tmp.write_all(&content)?;
+        tmp.flush()?;
+        tmp.persist(&cache_file)
+            .map_err(|err| anyhow!("Failed to persist cache entry {}: {}", key, err.error))?;
 
         Ok(())
     }
@@ -274,7 +309,8 @@ impl FileBuildCache {
             return Ok(cached.dependencies.clone());
         }
 
-        let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
+        let mappings = self.config.mappings();
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, &mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let Some(contract_name) = self.contract_src_index.get(&normalized_path).cloned() else {
@@ -322,10 +358,7 @@ impl FileBuildCache {
                 .as_ref()
                 .is_some_and(|deps| !deps.is_empty());
             if !has_deps {
-                debug!(
-                    "Skipping deps processing for `{}` in `get_dependencies`",
-                    normalized_path
-                );
+                debug!("Skipping deps processing for `{normalized_path}` in `get_dependencies`");
                 debug!("Using file dependencies: {file_deps:?}");
                 if use_cache {
                     self.dependencies_cache.insert(
@@ -399,50 +432,46 @@ impl FileBuildCache {
 
     fn normalize_path(&self, path: &str) -> String {
         Path::new(path)
-            .absolutize_from(&self.cwd)
+            .absolutize_from(&self.project_root)
             .unwrap_or_else(|_| Path::new(path).into())
             .to_string_lossy()
             .to_string()
     }
 
     pub fn clear(&mut self) -> Result<()> {
-        let _ = FileExt::unlock(&self._lock_file);
-
-        if self.cache_dir.exists() {
-            fs::remove_dir_all(&self.cache_dir)?;
-            fs::create_dir_all(&self.cache_dir)?;
-        }
-        self.entries.clear();
+        let _lock = self.acquire_write_lock()?;
+        fs::create_dir_all(&self.cache_dir)?;
+        self.clear_cache_dir_contents()?;
         self.dependencies_cache.clear();
         self.file_hash_cache.clear();
-
-        let lock_file_path = self.cache_dir.join(".lock");
-        self._lock_file = File::create(&lock_file_path)?;
-
-        let mut locked = false;
-        for _ in 0..50 {
-            if self._lock_file.try_lock_exclusive().is_ok() {
-                locked = true;
-                break;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-
-        if !locked {
-            return Err(anyhow!(
-                "Failed to re-lock cache directory after clearing (waited 5 seconds)"
-            ));
-        }
 
         Ok(())
     }
 
     #[must_use]
     pub fn size(&self) -> usize {
-        self.entries.len()
+        let root_count = fs::read_dir(&self.cache_dir)
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .count();
+        let debug_count = fs::read_dir(self.debug_cache_dir())
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .count();
+
+        root_count + debug_count
     }
 
-    fn build_contract_src_index(config: &ActonConfig, cwd: &Path) -> FxHashMap<String, String> {
+    fn build_contract_src_index(
+        config: &ActonConfig,
+        project_root: &Path,
+    ) -> FxHashMap<String, String> {
         let mut index = FxHashMap::default();
         let Some(contracts) = config.contracts.as_ref().map(|cfg| &cfg.contracts) else {
             return index;
@@ -450,7 +479,7 @@ impl FileBuildCache {
 
         for (name, contract) in contracts {
             let abs_path = Path::new(&contract.src)
-                .absolutize_from(cwd)
+                .absolutize_from(project_root)
                 .unwrap_or_else(|_| Path::new(&contract.src).into())
                 .to_string_lossy()
                 .to_string();
@@ -495,12 +524,6 @@ impl FileBuildCache {
         self.file_hash_cache
             .insert(path.to_string(), FileHashCacheEntry { signature, hash });
         Ok(hash)
-    }
-}
-
-impl Drop for FileBuildCache {
-    fn drop(&mut self) {
-        let _ = FileExt::unlock(&self._lock_file);
     }
 }
 
@@ -566,6 +589,99 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_corrupted_cache_entry_returns_none() {
+        let temp_dir = tempdir().unwrap();
+        let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
+        let key = cache.compute_key(main_path.to_str().unwrap(), false, 2, "1.1");
+        let cache_file = cache.cache_file_path(&key, false);
+
+        fs::write(cache_file, "corrupted cache data").unwrap();
+
+        let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1");
+        assert!(cached.is_none(), "Corrupted cache entry should be ignored");
+    }
+
+    #[test]
+    fn test_new_does_not_eagerly_clean_unrelated_corrupted_entries() {
+        let temp_dir = tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+        fs::create_dir_all(&cache_dir).unwrap();
+
+        let corrupted = cache_dir.join("broken.json");
+        fs::write(&corrupted, "not-json").unwrap();
+
+        let _cache = FileBuildCache::new(Some(cache_dir)).expect("Failed to create cache");
+
+        assert!(
+            corrupted.exists(),
+            "Cache initialization should not scan and mutate unrelated entries"
+        );
+    }
+
+    #[test]
+    fn test_debug_entries_are_retained() {
+        let temp_dir = tempdir().unwrap();
+        let debug_dir = temp_dir.path().join(DEBUG_CACHE_SUBDIR);
+        fs::create_dir_all(&debug_dir).unwrap();
+
+        let first = debug_dir.join("first.json");
+        fs::write(&first, "1111").unwrap();
+        let second = debug_dir.join("second.json");
+        fs::write(&second, "2222").unwrap();
+
+        assert!(first.exists(), "First debug cache entry should remain");
+        assert!(second.exists(), "Second debug cache entry should remain");
+    }
+
+    #[test]
+    fn test_debug_entries_use_debug_subdirectory() {
+        let temp_dir = tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+        let mut cache = FileBuildCache::new(Some(cache_dir)).expect("Failed to create cache");
+
+        let lib_path = temp_dir.path().join("lib.tolk");
+        File::create(&lib_path)
+            .unwrap()
+            .write_all(b"fun helper() { }")
+            .unwrap();
+
+        let main_path = temp_dir.path().join("main.tolk");
+        File::create(&main_path)
+            .unwrap()
+            .write_all(b"import \"lib\";\nfun main() { }")
+            .unwrap();
+
+        let result = CompilerResultSuccess {
+            fift_code: "test_fift_code".to_string(),
+            code_boc64: "test_boc".to_string(),
+            code_hash_hex: "test_hash".to_string(),
+            debug_mark_base64: Some("test_debug_marks".to_string()),
+            new_source_map: None,
+            abi: None,
+        };
+
+        cache
+            .put(main_path.to_str().unwrap(), &result, true, 2, "1.1")
+            .expect("Failed to write debug cache entry");
+
+        let key = cache.compute_key(main_path.to_str().unwrap(), true, 2, "1.1");
+        assert!(
+            cache.cache_file_path(&key, true).exists(),
+            "Debug cache entry should be stored in debug subdirectory"
+        );
+        assert!(
+            !cache.legacy_cache_file_path(&key).exists(),
+            "Debug cache entry should not be written into the root cache namespace"
+        );
+        assert!(
+            cache
+                .get(main_path.to_str().unwrap(), true, 2, "1.1")
+                .is_some(),
+            "Debug cache entry should be readable back"
+        );
+    }
+
     fn prepare_cache(temp_dir: &TempDir) -> Result<(FileBuildCache, PathBuf, PathBuf)> {
         let cache_dir = temp_dir.path().join("cache");
 
@@ -581,7 +697,8 @@ mod tests {
             fift_code: "test_fift_code".to_string(),
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
-            source_map: None,
+            debug_mark_base64: Some("test_debug_marks".to_string()),
+            new_source_map: None,
             abi: None,
         };
 
@@ -589,7 +706,12 @@ mod tests {
 
         let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1");
         assert!(cached.is_some());
-        assert_eq!(cached.unwrap().code_boc64, "test_boc");
+        let cached = cached.unwrap();
+        assert_eq!(cached.code_boc64, "test_boc");
+        assert_eq!(
+            cached.debug_mark_base64.as_deref(),
+            Some("test_debug_marks")
+        );
         Ok((cache, lib_path, main_path))
     }
 }

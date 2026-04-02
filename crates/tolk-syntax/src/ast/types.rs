@@ -1,6 +1,5 @@
 use crate::ast::expressions::NullLit;
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::HasTreeSitterKind;
 use crate::ast::{AstNode, InvalidNodeKindError, TryFromNode};
 use crate::{AstNodeBytesKind, impl_ast_node};
 use tree_sitter::Node;
@@ -117,6 +116,7 @@ pub struct TensorType<'tree>(pub Node<'tree>);
 impl_ast_node!(TensorType, "tensor_type");
 
 impl<'tree> TensorType<'tree> {
+    #[must_use]
     pub fn elements(&self) -> AstChildren<'tree, Type<'tree>> {
         AstChildren::new(self.0)
     }
@@ -128,6 +128,7 @@ pub struct TupleType<'tree>(pub Node<'tree>);
 impl_ast_node!(TupleType, "tuple_type");
 
 impl<'tree> TupleType<'tree> {
+    #[must_use]
     pub fn elements(&self) -> AstChildren<'tree, Type<'tree>> {
         AstChildren::new(self.0)
     }
@@ -197,6 +198,7 @@ pub struct InstantiationTList<'tree>(pub Node<'tree>);
 impl_ast_node!(InstantiationTList, "instantiation_t_list");
 
 impl<'tree> InstantiationTList<'tree> {
+    #[must_use]
     pub fn types(&self) -> AstChildren<'tree, Type<'tree>> {
         AstChildren::new(self.0)
     }

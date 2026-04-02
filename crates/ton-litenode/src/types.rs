@@ -9,6 +9,7 @@ use std::str::FromStr;
 pub struct BocBytes(pub Vec<u8>);
 
 impl BocBytes {
+    #[must_use]
     pub fn to_base64(&self) -> String {
         base64::engine::general_purpose::STANDARD.encode(&self.0)
     }
@@ -89,6 +90,7 @@ impl FromSql for BocBytes {
 pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {
+    #[must_use]
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
     }
@@ -113,6 +115,7 @@ impl Hash256 {
         Ok(Self(arr))
     }
 
+    #[must_use]
     pub fn to_base64(&self) -> String {
         base64::engine::general_purpose::STANDARD.encode(self.0)
     }

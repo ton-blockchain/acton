@@ -1,0 +1,4 @@
+error: invalid value 'unknown-template' for '--template <TEMPLATE>'
+  [possible values: empty, counter, jetton]
+
+For more information, try '--help'.

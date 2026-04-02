@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const AE_MESSAGES: &str = r#"
+const AE_MESSAGES: &str = r"
 struct (0xAE110001) Ping {
     queryId: uint64
 }
@@ -13,7 +13,7 @@ struct (0xAE110002) BounceNotice {
 struct (0xAE110003) ExternalNotice {
     queryId: uint64
 }
-"#;
+";
 
 const AE_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -67,6 +67,7 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/message"
 import "../contracts/messages"
 
 const ERR_FAIL = 701;
@@ -153,7 +154,7 @@ fn run_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn to_have_successful_tx_matches_success_and_opcode_filters() {
     run_success_case(
         "ae-stdlib-successful-tx-search-filters",
-        r#"
+        r"
 get fun `test-ae-successful-tx-search-filters`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 1);
@@ -170,7 +171,7 @@ get fun `test-ae-successful-tx-search-filters`() {
         exitCode: 0,
     });
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_successful_tx_matches_success_and_opcode_filters.stdout.txt",
     );
 }
@@ -179,7 +180,7 @@ get fun `test-ae-successful-tx-search-filters`() {
 fn to_have_failed_tx_matches_compute_exit_code_filter() {
     run_success_case(
         "ae-stdlib-failed-tx-compute-exit-filter",
-        r#"
+        r"
 get fun `test-ae-failed-tx-compute-exit-filter`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 10);
@@ -196,7 +197,7 @@ get fun `test-ae-failed-tx-compute-exit-filter`() {
         exitCode: ERR_FAIL,
     });
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_failed_tx_matches_compute_exit_code_filter.stdout.txt",
     );
 }
@@ -205,7 +206,7 @@ get fun `test-ae-failed-tx-compute-exit-filter`() {
 fn to_have_tx_matches_action_exit_code_filter() {
     run_success_case(
         "ae-stdlib-action-exit-code-filter",
-        r#"
+        r"
 get fun `test-ae-action-exit-code-filter`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 20);
@@ -218,7 +219,7 @@ get fun `test-ae-action-exit-code-filter`() {
         success: false,
     });
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_tx_matches_action_exit_code_filter.stdout.txt",
     );
 }
@@ -274,14 +275,14 @@ get fun `test-ae-bounced-tx-opcode-filter`() {
 fn to_emit_external_message_matches_emitted_type() {
     run_success_case(
         "ae-stdlib-emit-external-message-positive",
-        r#"
+        r"
 get fun `test-ae-emit-external-message-positive`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 30);
 
     expect(res).toEmitExternalMessage<ExternalNotice>();
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_emit_external_message_matches_emitted_type.stdout.txt",
     );
 }
@@ -290,14 +291,14 @@ get fun `test-ae-emit-external-message-positive`() {
 fn to_emit_external_message_fails_for_missing_external_output() {
     run_failure_case(
         "ae-stdlib-emit-external-message-missing",
-        r#"
+        r"
 get fun `test-ae-emit-external-message-missing`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 1);
 
     expect(res).toEmitExternalMessage<ExternalNotice>();
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_emit_external_message_fails_for_missing_external_output.stdout.txt",
     );
 }
@@ -306,7 +307,7 @@ get fun `test-ae-emit-external-message-missing`() {
 fn to_have_failed_tx_requires_non_null_exit_code_param() {
     run_failure_case(
         "ae-stdlib-failed-tx-missing-exit-code",
-        r#"
+        r"
 get fun `test-ae-failed-tx-missing-exit-code`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 10);
@@ -316,7 +317,7 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
         to: harness.address,
     });
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_failed_tx_requires_non_null_exit_code_param.stdout.txt",
     );
 }
@@ -325,7 +326,7 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
 fn deploy_filter_distinguishes_deploy_and_non_deploy_transactions() {
     run_success_case(
         "ae-stdlib-deploy-filter",
-        r#"
+        r"
 get fun `test-ae-deploy-filter`() {
     val (sender, harness, deployRes) = deployHarness();
 
@@ -350,7 +351,7 @@ get fun `test-ae-deploy-filter`() {
         deploy: true,
     });
 }
-"#,
+",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_not_have_tx_with_deploy_false_is_ignored_bug.stdout.txt",
     );
 }

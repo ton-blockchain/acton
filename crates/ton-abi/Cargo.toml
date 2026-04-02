@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 tree-sitter = { workspace = true }
 tolk-syntax = { workspace = true }
+tolkc = { workspace = true }
 crc = { workspace = true }
 num-bigint = { workspace = true }
 anyhow = { workspace = true }
@@ -24,3 +25,6 @@ path-absolutize = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

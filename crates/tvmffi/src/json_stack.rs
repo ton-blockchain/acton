@@ -174,7 +174,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
         "num" => {
             let s = val
                 .as_str()
-                .map(|s| s.to_owned())
+                .map(ToOwned::to_owned)
                 .or_else(|| {
                     if val.is_number() {
                         Some(val.to_string())
@@ -236,7 +236,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(TupleItem::Tuple(Tuple(items)))
         }
-        _ => anyhow::bail!("Unsupported legacy stack entry type: {}", type_str),
+        _ => anyhow::bail!("Unsupported legacy stack entry type: {type_str}"),
     }
 }
 

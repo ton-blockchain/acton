@@ -197,10 +197,11 @@ const TOLK_GRAMMAR = {
         ),
 
     annotation_list: $ => repeat1($.annotation),
+    annotation_name: _ => /[a-zA-Z0-9_.]+/,
     annotation: $ =>
         seq(
             "@",
-            optional(field("name", $.identifier)),
+            optional(field("name", $.annotation_name)),
             optional(field("arguments", $.annotation_arguments)),
         ),
 
@@ -557,6 +558,7 @@ const TOLK_GRAMMAR = {
                 // prec.dynamic is important
                 "<",
                 field("types", commaSep1($._type_hint)),
+                optional(","),
                 ">",
             ),
         ),
@@ -657,7 +659,7 @@ const TOLK_GRAMMAR = {
 
     tensor_type: $ =>
         prec.dynamic(103, choice(seq("(", ")"), seq("(", commaSep2($._type_hint), ")"))),
-    tuple_type: $ => prec(103, seq("[", commaSep($._type_hint), "]")),
+    tuple_type: $ => prec(103, seq("[", commaSep1($._type_hint), "]")),
     parenthesized_type: $ => prec(103, seq("(", field("inner", $._type_hint), ")")),
 
     fun_callable_type: $ =>

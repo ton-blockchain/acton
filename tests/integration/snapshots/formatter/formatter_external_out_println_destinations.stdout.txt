@@ -12,7 +12,10 @@
     └─ Test output:
        N/A -> external
        └── ext-in FmExternalTrigger -> fm_external_root A                              gas=2757
+           queryId: 303
            ├── ext-out FmExternalNoneDest -> none
+           queryId: 1
            └── ext-out FmExternalAddressDest -> 0xa1b2c3d4 (32 bits)
+           queryId: 2
 
  ✓ 1 passed in 1 file

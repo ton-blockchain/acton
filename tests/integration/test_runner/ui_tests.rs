@@ -56,44 +56,53 @@ fn reserve_ui_port() -> (Option<TcpListener>, String) {
 }
 
 #[test]
-fn ui_creates_default_trace_dir_and_runs_tests_before_bind_failure() {
+fn ui_bind_failure_is_reported_before_tests_run_and_skips_default_traces() {
     let project = ProjectBuilder::new("f-ui-default-trace")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file("ui", &ui_deploy_test_source("test-ui-default-trace"))
         .build();
 
-    let (_listener, port) = reserve_ui_port();
+    let (listener, port) = reserve_ui_port();
 
-    project
+    let output = project
         .acton()
         .test()
         .arg("--ui")
         .arg("--ui-port")
         .arg(&port)
         .run()
-        .failure()
-        .assert_passed(1)
-        .assert_file_exists(".acton/traces/test-ui-default-trace_trace.json")
-        .assert_file_exists(".acton/traces/contracts/simple.json")
-        .assert_file_contains(
-            ".acton/traces/test-ui-default-trace_trace.json",
-            "\"name\":\"test-ui-default-trace\"",
-        )
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_creates_default_trace_dir_and_runs_tests_before_bind_failure.stdout.txt",
+        .failure();
+
+    output
+        .assert_not_contains("Starting UI server at")
+        .assert_stderr_contains("Failed to start UI server on 127.0.0.1:")
+        .assert_stderr_contains("Choose another port with --ui-port")
+        .assert_stderr_contains("Or stop the process currently listening on that port");
+
+    if listener.is_some() {
+        output.assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_ui/ui_bind_failure.stderr.txt",
         );
+    }
+
+    let trace_dir = project.path().join(".acton/traces");
+    assert!(
+        !trace_dir.exists(),
+        "UI bind failure must happen before default trace creation: {}",
+        trace_dir.display()
+    );
 }
 
 #[test]
-fn ui_save_test_trace_writes_to_custom_directory() {
+fn ui_bind_failure_skips_custom_trace_output() {
     let project = ProjectBuilder::new("f-ui-custom-trace")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file("ui", &ui_deploy_test_source("test-ui-custom-trace"))
         .build();
 
-    let (_listener, port) = reserve_ui_port();
+    let (listener, port) = reserve_ui_port();
 
-    project
+    let output = project
         .acton()
         .test()
         .arg("--ui")
@@ -102,213 +111,30 @@ fn ui_save_test_trace_writes_to_custom_directory() {
         .arg("--save-test-trace")
         .arg("custom-traces")
         .run()
-        .failure()
-        .assert_passed(1)
-        .assert_file_exists("custom-traces/test-ui-custom-trace_trace.json")
-        .assert_file_exists("custom-traces/contracts/simple.json")
-        .assert_file_contains(
-            "custom-traces/test-ui-custom-trace_trace.json",
-            "\"name\":\"test-ui-custom-trace\"",
-        )
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_save_test_trace_writes_to_custom_directory.stdout.txt",
-        );
+        .failure();
 
-    let default_trace = project
-        .path()
-        .join(".acton/traces/test-ui-custom-trace_trace.json");
+    output
+        .assert_stderr_contains("Failed to start UI server on 127.0.0.1:")
+        .assert_stderr_contains("Choose another port with --ui-port")
+        .assert_stderr_contains("Or stop the process currently listening on that port");
+
+    if listener.is_some() {
+        output.assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_ui/ui_bind_failure.stderr.txt",
+        );
+    }
+
+    let default_trace = project.path().join(".acton/traces");
     assert!(
         !default_trace.exists(),
-        "Default UI trace path must not be used when --save-test-trace is set: {}",
+        "Default UI trace directory must not be created when bind fails: {}",
         default_trace.display()
     );
-}
 
-#[test]
-fn ui_trace_files_are_created_only_for_executed_tests() {
-    let project = ProjectBuilder::new("f-ui-executed-only-traces")
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "ui",
-            r#"
-            import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
-            import "../../lib/build/build"
-            import "../../lib/emulation/network"
-
-            @test("skip")
-            get fun `test-ui-skipped`() {
-                expect(1).toEqual(2); // should never execute
-            }
-
-            @test("todo")
-            get fun `test-ui-todo`() {
-                expect(1).toEqual(2); // should never execute
-            }
-
-            get fun `test-ui-executed`() {
-                val init = ContractState {
-                    code: build("simple"),
-                    data: createEmptyCell(),
-                };
-                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-                val deployer = net.treasury("deployer");
-                val txs = net.send(
-                    deployer.address,
-                    createMessage({
-                        bounce: false,
-                        value: ton("1"),
-                        dest: {
-                            stateInit: init,
-                        },
-                    }),
-                );
-                expect(txs).toHaveSuccessfulDeploy({ to: address });
-            }
-        "#,
-        )
-        .build();
-
-    let (_listener, port) = reserve_ui_port();
-
-    project
-        .acton()
-        .test()
-        .arg("--ui")
-        .arg("--ui-port")
-        .arg(&port)
-        .run()
-        .failure()
-        .assert_passed(1)
-        .assert_skipped(1)
-        .assert_todo(1)
-        .assert_file_exists(".acton/traces/test-ui-executed_trace.json")
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_trace_files_are_created_only_for_executed_tests.stdout.txt",
-        );
-
-    let skipped_trace = project
-        .path()
-        .join(".acton/traces/test-ui-skipped_trace.json");
+    let custom_trace = project.path().join("custom-traces");
     assert!(
-        !skipped_trace.exists(),
-        "Skipped test trace must not be created: {}",
-        skipped_trace.display()
-    );
-
-    let todo_trace = project.path().join(".acton/traces/test-ui-todo_trace.json");
-    assert!(
-        !todo_trace.exists(),
-        "Todo test trace must not be created: {}",
-        todo_trace.display()
-    );
-}
-
-#[test]
-fn ui_works_with_dot_reporter_without_console_summary() {
-    let project = ProjectBuilder::new("f-ui-dot-reporter")
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file("ui", &ui_deploy_test_source("test-ui-dot-reporter"))
-        .build();
-
-    let (_listener, port) = reserve_ui_port();
-
-    project
-        .acton()
-        .test()
-        .with_reporter("dot")
-        .arg("--ui")
-        .arg("--ui-port")
-        .arg(&port)
-        .run()
-        .failure()
-        .assert_contains("·")
-        .assert_not_contains("✓ 1 passed")
-        .assert_file_exists(".acton/traces/test-ui-dot-reporter_trace.json")
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_works_with_dot_reporter_without_console_summary.stdout.txt",
-        );
-}
-
-#[test]
-fn ui_filter_limits_trace_generation_to_selected_tests() {
-    let project = ProjectBuilder::new("f-ui-filter-traces")
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "ui",
-            r#"
-            import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
-            import "../../lib/build/build"
-            import "../../lib/emulation/network"
-
-            get fun `test-ui-filter-alpha`() {
-                val init = ContractState {
-                    code: build("simple"),
-                    data: createEmptyCell(),
-                };
-                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-                val deployer = net.treasury("deployer");
-                val txs = net.send(
-                    deployer.address,
-                    createMessage({
-                        bounce: false,
-                        value: ton("1"),
-                        dest: {
-                            stateInit: init,
-                        },
-                    }),
-                );
-                expect(txs).toHaveSuccessfulDeploy({ to: address });
-            }
-
-            get fun `test-ui-filter-beta`() {
-                val init = ContractState {
-                    code: build("simple"),
-                    data: createEmptyCell(),
-                };
-                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-                val deployer = net.treasury("deployer");
-                val txs = net.send(
-                    deployer.address,
-                    createMessage({
-                        bounce: false,
-                        value: ton("1"),
-                        dest: {
-                            stateInit: init,
-                        },
-                    }),
-                );
-                expect(txs).toHaveSuccessfulDeploy({ to: address });
-            }
-        "#,
-        )
-        .build();
-
-    let (_listener, port) = reserve_ui_port();
-
-    project
-        .acton()
-        .test()
-        .arg("--ui")
-        .arg("--ui-port")
-        .arg(&port)
-        .filter("test-ui-filter-alpha")
-        .run()
-        .failure()
-        .assert_passed(1)
-        .assert_not_contains("filter-beta")
-        .assert_file_exists(".acton/traces/test-ui-filter-alpha_trace.json")
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_filter_limits_trace_generation_to_selected_tests.stdout.txt",
-        );
-
-    let beta_trace = project
-        .path()
-        .join(".acton/traces/test-ui-filter-beta_trace.json");
-    assert!(
-        !beta_trace.exists(),
-        "Filtered out test trace must not be created: {}",
-        beta_trace.display()
+        !custom_trace.exists(),
+        "Custom UI trace directory must not be created when bind fails: {}",
+        custom_trace.display()
     );
 }

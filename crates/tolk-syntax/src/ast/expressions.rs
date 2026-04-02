@@ -1,5 +1,5 @@
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::{HasName, HasTreeSitterKind};
+use crate::ast::traits::HasName;
 use crate::ast::types::{InstantiationTList, Type};
 use crate::ast::{AstNode, Block};
 use crate::ast::{InvalidNodeKindError, TryFromNode};
@@ -40,7 +40,7 @@ pub struct BoolLit<'tree>(pub Node<'tree>);
 
 impl_ast_node!(BoolLit, "boolean_literal");
 
-impl<'tree> BoolLit<'tree> {
+impl BoolLit<'_> {
     #[must_use]
     pub fn value(&self) -> bool {
         let width = self.0.end_byte() - self.0.start_byte();
@@ -674,6 +674,8 @@ impl<'tree> LambdaParameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for LambdaParameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -714,6 +716,7 @@ impl<'tree> VarDeclLhs<'tree> {
         self.kind_node().map_or(VarKind::Var, VarKind::from)
     }
 
+    #[must_use]
     pub fn kind_node(&self) -> Option<Node<'tree>> {
         self.0.field("kind")
     }
@@ -783,6 +786,7 @@ pub struct TupleVars<'tree>(pub Node<'tree>);
 impl_ast_node!(TupleVars, "tuple_vars_declaration");
 
 impl<'tree> TupleVars<'tree> {
+    #[must_use]
     pub fn vars(&self) -> AstChildren<'tree, VarDeclPattern<'tree>> {
         AstChildren::new(self.0)
     }
@@ -794,6 +798,7 @@ pub struct TensorVars<'tree>(pub Node<'tree>);
 impl_ast_node!(TensorVars, "tensor_vars_declaration");
 
 impl<'tree> TensorVars<'tree> {
+    #[must_use]
     pub fn vars(&self) -> AstChildren<'tree, VarDeclPattern<'tree>> {
         AstChildren::new(self.0)
     }
@@ -817,6 +822,8 @@ impl<'tree> VarDecl<'tree> {
 }
 
 impl<'tree> HasName<'tree> for VarDecl<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -838,6 +845,7 @@ pub struct ArgumentList<'tree>(pub Node<'tree>);
 impl_ast_node!(ArgumentList, "argument_list");
 
 impl<'tree> ArgumentList<'tree> {
+    #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, CallArgument<'tree>> {
         AstChildren::new(self.0)
     }
@@ -866,6 +874,7 @@ pub struct MatchBody<'tree>(pub Node<'tree>);
 impl_ast_node!(MatchBody, "match_body");
 
 impl<'tree> MatchBody<'tree> {
+    #[must_use]
     pub fn arms(&self) -> AstChildren<'tree, MatchArm<'tree>> {
         AstChildren::new(self.0)
     }
@@ -950,6 +959,7 @@ pub struct ObjectLiteralBody<'tree>(pub Node<'tree>);
 impl_ast_node!(ObjectLiteralBody, "object_literal_body");
 
 impl<'tree> ObjectLiteralBody<'tree> {
+    #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, InstanceArg<'tree>> {
         AstChildren::new(self.0)
     }
@@ -965,9 +975,19 @@ impl<'tree> InstanceArg<'tree> {
     pub fn value(&self) -> Option<Expr<'tree>> {
         self.0.field("value")
     }
+
+    #[must_use]
+    pub fn has_value_separator(&self) -> bool {
+        let mut cursor = self.0.walk();
+        self.0
+            .children(&mut cursor)
+            .any(|child| child.kind() == ":")
+    }
 }
 
 impl<'tree> HasName<'tree> for InstanceArg<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }

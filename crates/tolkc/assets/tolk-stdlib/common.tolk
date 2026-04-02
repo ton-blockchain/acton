@@ -1,7 +1,7 @@
 // Standard library for Tolk (LGPL licence).
 // It contains common functions that are available out of the box, the user doesn't have to import anything.
 // More specific functions are required to be imported explicitly, like "@stdlib/gas-payments".
-tolk 1.2
+tolk 1.3
 
 /**
     Built-in types.
@@ -664,10 +664,10 @@ fun builder.hash(self): uint256
 fun slice.bitsHash(self): uint256
     asm "SHA256U"
 
-/// Checks whether two cells are identical: have equal content ans refs of arbitrary depth.
-/// Actually, comparison is done by hashes.
+/// Checks whether two cells are equal by comparing their hashes.
+/// Used internally by the compiler for operators `==` and `!=` on cells.
 @pure
-fun cell.equalTo(self, another: cell): bool
+fun cell.hashEqual(self, another: cell): bool
     asm "HASHCU" "SWAP" "HASHCU" "EQUAL"
 
 /// Checks the Ed25519-`signature` of a `hash` (a 256-bit unsigned integer, usually computed as the hash of some data)
@@ -1410,7 +1410,7 @@ fun slice.isEndOfBits(self): bool
 fun slice.isEndOfRefs(self): bool
     asm "SREMPTY"
 
-/// Checks whether data parts of two slices coincide.
+/// Checks whether data parts of two slices coinside.
 @pure
 fun slice.bitsEqual(self, b: slice): bool
     asm "SDEQ"
@@ -1561,7 +1561,7 @@ fun reserveExtraCurrenciesOnBalance(nanoTonCoins: coins, extraAmount: dict, rese
     ```
  */
 
-/// mode = 0 is used for ordinary messages; the gas fees are deducted from the sending amount; action phases should NOT be ignored.
+/// mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phaes should NOT be ignored.
 const SEND_MODE_REGULAR = 0
 /// +1 means that the sender wants to pay transfer fees separately.
 const SEND_MODE_PAY_FEES_SEPARATELY = 1
@@ -1935,7 +1935,7 @@ struct InMessageBounced {
     senderAddress: address          // an internal address from which the message was bounced
     valueCoins: coins               // ton amount attached to a message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to a message
-    originalForwardFee: coins       // commission that the sender has paid to send this message
+    originalForwardFee: coins       // comission that the sender has payed to send this message
     createdLt: uint64               // logical time when a message was created (and bounced)
     createdAt: uint32               // unixtime when a message was created (and bounced)
     bouncedBody: slice              // populated depending on `BounceMode` for `createMessage`

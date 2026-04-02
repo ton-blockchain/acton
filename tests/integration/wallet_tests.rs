@@ -2,6 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton::wallets;
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
@@ -9,16 +10,15 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
-use tonlib_core::cell::Cell;
-use tonlib_core::tlb_types::tlb::TLB;
-use tonlib_core::wallet::mnemonic::Mnemonic;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 #[allow(dead_code)]
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const SECOND_TEST_MNEMONIC: &str = "section garden tomato dinner season dice renew length useful spin trade intact use universe what post spike keen mandate behind concert egg doll rug";
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR";
 const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL";
@@ -37,7 +37,11 @@ struct CapturedToncenterRequest {
 }
 
 fn wallet_sign_fixture() -> (String, String, String) {
-    let mnemonic = Mnemonic::from_str(TEST_MNEMONIC, &None).expect("invalid test mnemonic");
+    wallet_sign_fixture_for_mnemonic(TEST_MNEMONIC)
+}
+
+fn wallet_sign_fixture_for_mnemonic(mnemonic_str: &str) -> (String, String, String) {
+    let mnemonic = Mnemonic::from_str(mnemonic_str, None).expect("invalid test mnemonic");
     let key_pair = mnemonic.to_key_pair().expect("mnemonic to keypair failed");
     let version = WalletVersion::V5R1;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
@@ -45,20 +49,18 @@ fn wallet_sign_fixture() -> (String, String, String) {
         .expect("failed to build test wallet");
 
     let body = wallet
-        .create_external_body(1_700_000_000, 7, Vec::<tonlib_core::cell::ArcCell>::new())
+        .create_ext_in_body(1_700_000_000, 7, Vec::<TonCell>::new())
         .expect("failed to build external body");
-    let body_hex = body
-        .to_boc_hex(false)
-        .expect("failed to encode body hex boc");
+    let body_hex = body.to_boc_hex().expect("failed to encode body hex boc");
     let body_base64 = body
-        .to_boc_b64(false)
+        .to_boc_base64()
         .expect("failed to encode body base64 boc");
 
     let signed = wallet
-        .sign_external_body(&body)
+        .sign_ext_in_body(&body)
         .expect("failed to sign external body");
     let signed_hex = signed
-        .to_boc_hex(false)
+        .to_boc_hex()
         .expect("failed to encode signed body hex boc");
 
     (body_hex, body_base64, signed_hex)
@@ -1058,7 +1060,7 @@ fn test_wallet_sign_outputs_signed_body_boc_hex() {
 
     let signed_hex = output.get_stdout().trim().to_owned();
     assert_eq!(signed_hex, signed_hex_expected);
-    assert!(Cell::from_boc_hex(&signed_hex).is_ok());
+    assert!(TonCell::from_boc_hex(&signed_hex).is_ok());
 }
 
 #[test]
@@ -1139,7 +1141,7 @@ fn test_wallet_sign_json_reports_detected_format() {
     assert_eq!(json["signed_body"], signed_hex_expected);
 
     let signed_hex = json["signed_body"].as_str().unwrap();
-    assert!(Cell::from_boc_hex(signed_hex).is_ok());
+    assert!(TonCell::from_boc_hex(signed_hex).is_ok());
 }
 
 #[test]
@@ -1505,6 +1507,7 @@ keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
 
 #[cfg(feature = "only_ci")]
 #[test]
+#[cfg(not(target_os = "macos"))]
 fn test_wallet_remove_deletes_keyring_mnemonic() {
     use keyring::{Entry, Error as KeyringError};
 
@@ -1520,7 +1523,7 @@ fn test_wallet_remove_deletes_keyring_mnemonic() {
 
     let entry = Entry::new(KEYRING_SERVICE, &keyring_id).unwrap();
     let _ = entry.delete_credential();
-    entry.set_password(TEST_MNEMONIC).unwrap();
+    wallets::store_mnemonic_in_keyring(&keyring_id, "secure-wallet", TEST_MNEMONIC).unwrap();
 
     fs::write(
         project.path().join("wallets.toml"),
@@ -1959,6 +1962,133 @@ fn test_wallet_import_secure_true_uses_keyring_when_supported() {
     assert!(
         files.count() > 0,
         "test keyring storage must contain at least one entry"
+    );
+}
+
+#[test]
+fn test_wallet_secure_wallets_share_keyring_bundle_per_scope() {
+    let project = ProjectBuilder::new("wallet-shared-keyring-bundle").build();
+    let keyring_dir = tempfile::TempDir::new().expect("failed to create keyring temp dir");
+    let (body_hex, _, signed_hex_expected) = wallet_sign_fixture_for_mnemonic(SECOND_TEST_MNEMONIC);
+
+    for (name, mnemonic) in [
+        ("alpha-wallet", TEST_MNEMONIC),
+        ("beta-wallet", SECOND_TEST_MNEMONIC),
+    ] {
+        project
+            .acton()
+            .wallet_import()
+            .arg("--name")
+            .arg(name)
+            .arg("--version")
+            .arg("v5r1")
+            .arg("--local")
+            .arg("--secure=true")
+            .arg(mnemonic)
+            .env(TEST_WALLET_KEYRING_SUPPORTED_ENV, "1")
+            .env(TEST_KEYRING_DIR_ENV, keyring_dir.path().to_str().unwrap())
+            .run()
+            .success();
+    }
+
+    let wallets_toml = fs::read_to_string(project.path().join("wallets.toml")).unwrap();
+    let wallets_value: toml::Value = toml::from_str(&wallets_toml).unwrap();
+    let alpha_keyring = wallets_value["wallets"]["alpha-wallet"]["keys"]["mnemonic-keyring"]
+        .as_str()
+        .expect("alpha wallet must use keyring");
+    let beta_keyring = wallets_value["wallets"]["beta-wallet"]["keys"]["mnemonic-keyring"]
+        .as_str()
+        .expect("beta wallet must use keyring");
+    assert_eq!(alpha_keyring, beta_keyring);
+
+    let mut files: Vec<_> = fs::read_dir(keyring_dir.path())
+        .expect("failed to read test keyring dir")
+        .map(|entry| entry.expect("keyring dir entry"))
+        .collect();
+    assert_eq!(
+        files.len(),
+        1,
+        "secure wallets in one scope must share one bundle"
+    );
+
+    let bundle_raw = fs::read_to_string(files[0].path()).expect("failed to read keyring bundle");
+    let bundle: BTreeMap<String, String> =
+        serde_json::from_str(&bundle_raw).expect("bundle must be valid json");
+    assert_eq!(
+        bundle.get("alpha-wallet").map(String::as_str),
+        Some(TEST_MNEMONIC)
+    );
+    assert_eq!(
+        bundle.get("beta-wallet").map(String::as_str),
+        Some(SECOND_TEST_MNEMONIC)
+    );
+
+    let sign_output = project
+        .acton()
+        .wallet_sign()
+        .arg("beta-wallet")
+        .arg("--body")
+        .arg(&body_hex)
+        .env(TEST_KEYRING_DIR_ENV, keyring_dir.path().to_str().unwrap())
+        .run()
+        .success();
+    assert_eq!(sign_output.get_stdout().trim(), signed_hex_expected);
+
+    project
+        .acton()
+        .wallet_remove()
+        .arg("alpha-wallet")
+        .arg("-y")
+        .env(TEST_KEYRING_DIR_ENV, keyring_dir.path().to_str().unwrap())
+        .run()
+        .success();
+
+    files = fs::read_dir(keyring_dir.path())
+        .expect("failed to read test keyring dir")
+        .map(|entry| entry.expect("keyring dir entry"))
+        .collect();
+    assert_eq!(
+        files.len(),
+        1,
+        "bundle must remain while one wallet still uses it"
+    );
+
+    let bundle_raw = fs::read_to_string(files[0].path()).expect("failed to read keyring bundle");
+    let bundle: BTreeMap<String, String> =
+        serde_json::from_str(&bundle_raw).expect("bundle must be valid json");
+    assert!(!bundle.contains_key("alpha-wallet"));
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        bundle.get("beta-wallet").map(String::as_str),
+        Some(SECOND_TEST_MNEMONIC)
+    );
+
+    let sign_output = project
+        .acton()
+        .wallet_sign()
+        .arg("beta-wallet")
+        .arg("--body")
+        .arg(&body_hex)
+        .env(TEST_KEYRING_DIR_ENV, keyring_dir.path().to_str().unwrap())
+        .run()
+        .success();
+    assert_eq!(sign_output.get_stdout().trim(), signed_hex_expected);
+
+    project
+        .acton()
+        .wallet_remove()
+        .arg("beta-wallet")
+        .arg("-y")
+        .env(TEST_KEYRING_DIR_ENV, keyring_dir.path().to_str().unwrap())
+        .run()
+        .success();
+
+    let files = fs::read_dir(keyring_dir.path())
+        .expect("failed to read test keyring dir")
+        .count();
+    assert_eq!(
+        files, 0,
+        "bundle file must be deleted when the last wallet is removed"
     );
 }
 

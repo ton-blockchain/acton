@@ -7,6 +7,101 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const GET_METHOD_FAILURE_CONTRACT: &str = r"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounterFail(): int { throw 10 }
+";
+
+const GET_METHOD_FAILURE_TEST_PREPARE: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+
+struct Counter {
+    address: address
+    init: ContractState
+}
+
+fun Counter.fromStorage() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    return Counter { address, init }
+}
+
+fun setupTest() {
+    val counter = Counter.fromStorage();
+
+    val deployer = net.treasury("deployer");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: counter.init,
+        },
+    });
+
+    net.send(deployer.address, msg);
+    return counter
+}
+"#;
+
+const TEAMCITY_COMPLEX_COMPARISON_TESTS: &str = r#"
+import "../../lib/testing/expect"
+
+struct Point {
+    x: int,
+    y: int,
+}
+
+struct Segment {
+    start: Point,
+    end: Point,
+}
+
+fun balances(first: int32, second: int32): map<int32, int32> {
+    var value = createEmptyMap<int32, int32>();
+    value.set(1, first);
+    value.set(2, second);
+    return value;
+}
+
+get fun test_tuple_diff() {
+    expect((10, 20, 30)).toEqual((10, 20, 31));
+}
+
+get fun test_struct_diff() {
+    expect(Point { x: 1, y: 2 }).toEqual(Point { x: 1, y: 3 });
+}
+
+get fun test_nested_struct_diff() {
+    val actual = Segment {
+        start: Point { x: 1, y: 2 },
+        end: Point { x: 3, y: 4 },
+    };
+    val expected = Segment {
+        start: Point { x: 1, y: 9 },
+        end: Point { x: 3, y: 4 },
+    };
+
+    expect(actual).toEqual(expected);
+}
+
+get fun test_nullable_diff() {
+    val actual: int? = 10;
+    val expected: int? = null;
+
+    expect(actual).toEqual(expected);
+}
+
+get fun test_map_diff() {
+    expect(balances(10, 20)).toEqual(balances(10, 30));
+}
+"#;
+
 #[test]
 fn test_teamcity_reporter_basic_passing() {
     FixtureProject::load("basic")
@@ -39,6 +134,36 @@ fn test_teamcity_reporter_with_failing_test() {
         .assert_contains("exit_code=10")
         .assert_snapshot_matches(
             "integration/snapshots/test_teamcity_with_failing_test.stdout.txt",
+        );
+}
+
+#[test]
+fn test_teamcity_reporter_with_get_method_failure() {
+    ProjectBuilder::new("teamcity_get_method_failure")
+        .contract("simple", GET_METHOD_FAILURE_CONTRACT)
+        .test_file(
+            "test",
+            (GET_METHOD_FAILURE_TEST_PREPARE.to_string()
+                + r#"
+            get fun test_get_method_failure() {
+                val counter = setupTest();
+                val _res: int = net.runGetMethod(counter.address, "currentCounterFail");
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("##teamcity[testFailed")
+        .assert_contains("Cannot execute get method")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_with_get_method_failure.stdout.txt",
         );
 }
 
@@ -174,10 +299,10 @@ fn test_teamcity_reporter_escapes_location_hint_special_chars() {
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
             "escape",
-            r#"
+            r"
             get fun `test teamcity '|[]`() {
             }
-        "#,
+        ",
         )
         .build();
 
@@ -191,6 +316,22 @@ fn test_teamcity_reporter_escapes_location_hint_special_chars() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_teamcity_reporter_escapes_location_hint_special_chars.stdout.txt",
+        );
+}
+
+#[test]
+fn test_teamcity_reporter_comparison_failure_snapshots_complex_values() {
+    ProjectBuilder::new("teamcity_complex_comparison_failures")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("complex_diffs", TEAMCITY_COMPLEX_COMPARISON_TESTS)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("teamcity")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_comparison_failures_complex_values.stdout.txt",
         );
 }
 
@@ -254,17 +395,17 @@ fn test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs()
         .contract("simple", SIMPLE_CONTRACT)
         .raw_file(
             "tests/a/shared.test.tolk",
-            r#"
+            r"
             get fun `test-shared-a`() {
             }
-        "#,
+        ",
         )
         .raw_file(
             "tests/b/shared.test.tolk",
-            r#"
+            r"
             get fun `test-shared-b`() {
             }
-        "#,
+        ",
         )
         .build();
 

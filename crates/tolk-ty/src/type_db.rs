@@ -148,6 +148,7 @@ impl<'a> TypeDb<'a> {
         res
     }
 
+    #[must_use]
     pub fn is_struct_generic(&self, struct_id: SymbolId) -> bool {
         let symbol = self.project_index.resolve_symbol(struct_id);
         if let Some(symbol) = symbol
@@ -158,6 +159,7 @@ impl<'a> TypeDb<'a> {
         false
     }
 
+    #[must_use]
     pub fn find_struct(&self, struct_ty: TyId) -> Option<SymbolId> {
         let unwrapped = self.intrn.unwrap_alias(struct_ty);
         match self.intrn.data(unwrapped) {
@@ -173,6 +175,7 @@ impl<'a> TypeDb<'a> {
         }
     }
 
+    #[must_use]
     pub fn find_struct_field(&self, struct_id: SymbolId, field_name: &str) -> Option<StructField> {
         let symbol = self.project_index.resolve_symbol(struct_id)?;
         if let SymbolKind::Struct { fields, .. } = &symbol.kind {
@@ -181,7 +184,7 @@ impl<'a> TypeDb<'a> {
                     let declared_type = self
                         .top_level_types
                         .get(&field.id)
-                        .cloned()
+                        .copied()
                         .unwrap_or(self.intrn.ty_undefined);
                     return Some(StructField {
                         id: field.id,
@@ -196,6 +199,7 @@ impl<'a> TypeDb<'a> {
         None
     }
 
+    #[must_use]
     pub fn find_enum_member(&self, enum_id: SymbolId, member_name: &str) -> Option<EnumMember> {
         let symbol = self.project_index.resolve_symbol(enum_id)?;
         if let SymbolKind::Enum { members } = &symbol.kind {
@@ -224,8 +228,9 @@ impl<'a> TypeDb<'a> {
                         if name.as_ref() == "array" {
                             let element_ty = type_parameters
                                 .first()
-                                .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
-                                .unwrap_or(self.intrn.ty_undefined);
+                                .map_or(self.intrn.ty_undefined, |p| {
+                                    self.intrn.type_parameter(p.name.to_string(), None)
+                                });
                             Some(self.intrn.array(element_ty))
                         } else {
                             let base_ty = self.intrn.struct_ty(*id, name.clone());
@@ -326,7 +331,7 @@ impl<'a> TypeDb<'a> {
         // If it's a struct, we might need to lower its fields even if the struct type itself is already known
         if let SymbolKind::Struct { .. } = &symbol.kind {
             self.lower_struct_fields(file_id, symbol);
-            return self.top_level_types.get(&symbol_id).cloned(); // struct type already set by `symbol_to_type`
+            return self.top_level_types.get(&symbol_id).copied(); // struct type already set by `symbol_to_type`
         }
 
         // like `type int = builtin` from stdlib
@@ -351,7 +356,7 @@ impl<'a> TypeDb<'a> {
             && constant.value().is_some()
         {
             let _ = crate::type_inference::infer(self, file_id, symbol.id, &ast_decl);
-            return self.top_level_types.get(&symbol_id).cloned();
+            return self.top_level_types.get(&symbol_id).copied();
         }
         let ty = self.lower_top_level_decl(file_id, &ast_decl, symbol)?;
         self.top_level_types.insert(symbol_id, ty);
@@ -534,33 +539,32 @@ impl<'a> TypeDb<'a> {
     }
 
     fn convert_type_identifier(&mut self, type_ident: &TypeIdent, file_id: FileId) -> Option<TyId> {
-        match self.resolve_type_identifier(type_ident, file_id) {
-            Some(result) => Some(result),
-            None => {
-                let text = self.file_db.text_of(file_id, type_ident)?;
+        if let Some(result) = self.resolve_type_identifier(type_ident, file_id) {
+            Some(result)
+        } else {
+            let text = self.file_db.text_of(file_id, type_ident)?;
 
-                // for `self` we need to find receiver type of current method, if any
-                // fun Foo.bar(self): self {}
-                //     ^^^ this
-                if text == "self" {
-                    let syntax = type_ident.syntax();
-                    let method = match_parents!(syntax, Method(...));
-                    if let Some(method) = method {
-                        return self.lower_opt_type(file_id, method.receiver_type().as_ref());
-                    }
+            // for `self` we need to find receiver type of current method, if any
+            // fun Foo.bar(self): self {}
+            //     ^^^ this
+            if text == "self" {
+                let syntax = type_ident.syntax();
+                let method = match_parents!(syntax, Method(...));
+                if let Some(method) = method {
+                    return self.lower_opt_type(file_id, method.receiver_type().as_ref());
                 }
-
-                // fallback to text search for builtin types
-                if let Some(primitive) = self.as_primitive_type(&text) {
-                    return Some(primitive);
-                }
-
-                if self.treat_unresolved_as_type_parameter {
-                    return Some(self.intrn.type_parameter(text.to_string(), None));
-                }
-
-                None
             }
+
+            // fallback to text search for builtin types
+            if let Some(primitive) = self.as_primitive_type(&text) {
+                return Some(primitive);
+            }
+
+            if self.treat_unresolved_as_type_parameter {
+                return Some(self.intrn.type_parameter(text.to_string(), None));
+            }
+
+            None
         }
     }
 
@@ -763,7 +767,7 @@ impl<'a> TypeDb<'a> {
                         }
 
                         let mut substitutor = TypeSubstitutor::new(self.intrn);
-                        inner_ty = substitutor.substitute(inner_ty, &substitution.mapping)
+                        inner_ty = substitutor.substitute(inner_ty, &substitution.mapping);
                     }
 
                     return Some(
@@ -794,7 +798,7 @@ impl<'a> TypeDb<'a> {
                 }
                 let mut substitutor = TypeSubstitutor::new(self.intrn);
                 instantiated_inner =
-                    substitutor.substitute(instantiated_inner, &substitution.mapping)
+                    substitutor.substitute(instantiated_inner, &substitution.mapping);
             }
             return Some(
                 self.intrn

@@ -1,0 +1,37 @@
+  Installing standard library [ACTON_VERSION]
+map<int32, bool> {
+    1: true,
+}
+map<int32, address> {
+    2: [WALLET_ADDRESS_BASE],
+}
+map<int32, any_address> {
+    3: [WALLET_ADDRESS_BASE],
+}
+map<int32, cell> {
+    11: [BOC_HEX],
+}
+map<int32, string> {
+    12: "hello",
+}
+map<int32, int257> {
+    4: -123,
+}
+map<int32, uint32> {
+    5: 123,
+}
+map<int32, coins> {
+    6: 1500000000,
+}
+map<int32, varint16> {
+    7: -77,
+}
+map<int32, varint32> {
+    8: -888888888,
+}
+map<int32, varuint16> {
+    9: 65535,
+}
+map<int32, varuint32> {
+    10: 4294967296,
+}

@@ -12,13 +12,13 @@ fn wrap_expect_source(test_body: &str) -> String {
 #[test]
 fn expect_to_equal_decimal_accepts_zero_and_high_decimals_when_values_match() {
     let source = wrap_expect_source(
-        r#"
+        r"
 get fun `test-ef-decimal-equality-zero-and-high-precision`() {
     expect(123).toEqualDecimal(123, 0);
     expect(42).toEqualDecimal(42, 18);
     expect(-42).toEqualDecimal(-42, 18);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("ef-stdlib-decimal-equality-zero-high-precision")
@@ -37,7 +37,7 @@ get fun `test-ef-decimal-equality-zero-and-high-precision`() {
 #[test]
 fn expect_to_equal_decimal_formats_zero_and_high_decimal_failures() {
     let source = wrap_expect_source(
-        r#"
+        r"
 get fun `test-ef-decimal-failure-format-zero-decimals`() {
     expect(123).toEqualDecimal(124, 0);
 }
@@ -45,7 +45,7 @@ get fun `test-ef-decimal-failure-format-zero-decimals`() {
 get fun `test-ef-decimal-failure-format-high-decimals`() {
     expect(-15).toEqualDecimal(-16, 18);
 }
-"#,
+",
     );
 
     ProjectBuilder::new("ef-stdlib-decimal-failure-format-zero-high")

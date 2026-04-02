@@ -1,6 +1,15 @@
-use crate::integration::check::run_fix_test;
-use crate::integration::check::run_simple_test;
+use crate::integration::check::{run_rule_fix_test, run_rule_test};
 use function_name::named;
+
+const RULE_CODE: &str = "E020";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
+
+fn run_fix_test(before: &str, after: &str, name: &str) {
+    run_rule_fix_test(RULE_CODE, before, after, name);
+}
 
 #[test]
 #[named]
@@ -13,7 +22,7 @@ fn test_check_reserve_mode_literal_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -27,7 +36,7 @@ fn test_check_reserve_mode_literal_addition() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -41,7 +50,7 @@ fn test_check_reserve_mode_literal_unmappable_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -55,7 +64,7 @@ fn test_check_reserve_mode_literal_non_additive_expression() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -72,7 +81,7 @@ fn test_check_reserve_mode_literal_constants_only() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -86,7 +95,7 @@ fn test_check_reserve_mode_literal_reserve_extra_currencies() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -104,7 +113,7 @@ fn test_fix_reserve_mode_literal_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -122,7 +131,7 @@ fn test_fix_reserve_mode_literal_zero() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -140,7 +149,7 @@ fn test_fix_reserve_mode_literal_addition() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -158,7 +167,7 @@ fn test_fix_reserve_mode_literal_unmappable_single_number() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -176,7 +185,7 @@ fn test_fix_reserve_mode_literal_non_additive_expression() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -194,7 +203,7 @@ fn test_fix_reserve_mode_literal_mixed_constant_and_literal() {
             }
         "#,
         function_name!(),
-    )
+    );
 }
 
 #[test]
@@ -212,5 +221,5 @@ fn test_fix_reserve_mode_literal_reserve_extra_currencies() {
             }
         "#,
         function_name!(),
-    )
+    );
 }

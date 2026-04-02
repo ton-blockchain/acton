@@ -1,0 +1,216 @@
+'\" t
+.TH "ACTON\-RPC" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-rpc \[em] Inspect remote account state and decode contract storage
+.SH "SYNOPSIS"
+\fBacton rpc\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Query blockchain account state through a configured network endpoint.
+.sp
+\fBacton rpc\fR is intended for fast inspection workflows when you want to:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'check whether an account is active, frozen, or uninitialized
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'inspect balance, last transaction metadata, and state hashes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'match deployed code against a local Acton project by \fBcode_hash\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'decode account storage through local ABI metadata when a match is found
+.RE
+.sp
+The command works without a project manifest for raw remote inspection.
+.sp
+When Acton can resolve a local project and finds a contract with the same
+compiled \fBcode_hash\fR, it also prints the matched contract ID and decodes the
+account storage using the local compiler ABI.
+.SH "SUBCOMMANDS"
+.SS "acton rpc info"
+Show information about a single account.
+.SS "Synopsis"
+\fBacton rpc info\fR [\fIoptions\fR] \fIaddress\fR
+.SS "Options"
+.sp
+\fIaddress\fR
+.RS 4
+Contract address in friendly or raw format.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to query.
+.sp
+Defaults to \fBtestnet\fR\&.
+.sp
+Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
+\fBcustom:<name>\fR\&.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for blockchain queries.
+.RE
+.SS "Output"
+\fBacton rpc info\fR prints:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'remote account metadata such as status, balance, last transaction LT and
+hashes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'code and data hashes when the account has deployed state
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'local contract match information when a project contract has the same
+\fBcode_hash\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'decoded storage in a YAML\-like view when compiler ABI metadata is available
+.RE
+.sp
+If no local ABI match is found, Acton still prints the raw remote account
+information and reports that decoded storage is unavailable.
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "NETWORK RESOLUTION"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBmainnet\fR and \fBtestnet\fR use the built\-in TonCenter endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR uses the configured local LiteNode or its default URL
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcustom:<name>\fR resolves through \fB[networks.<name>]\fR in \fBActon.toml\fR
+.RE
+.sp
+For \fBcustom:<name>\fR, Acton needs access to the selected project or manifest so
+it can read the custom network configuration.
+.SH "ABI MATCHING"
+Storage decoding is best\-effort and depends on local project context.
+.sp
+Acton attempts to:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'fetch the remote account code cell
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'compute its \fBcode_hash\fR
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'compare that hash with locally configured contracts
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'decode storage with the matched contract\[cq]s compiler ABI
+.RE
+.sp
+This means decoding is robust for contracts you control in the current Acton
+project, but not guaranteed for arbitrary third\-party deployments.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected RPC query completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The address was invalid, the network could not be resolved, the remote
+request failed, or local ABI decoding encountered an unrecoverable error.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Inspect a testnet account quickly:
+.sp
+.RS 4
+.nf
+acton rpc info EQC...
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Inspect a mainnet account with an API key:
+.sp
+.RS 4
+.nf
+acton rpc info EQC... \-\-net mainnet \-\-api\-key $TONCENTER_API_KEY
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Inspect a localnet deployment and decode storage with the current project:
+.sp
+.RS 4
+.nf
+acton rpc info EQC... \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Use a custom network defined in another manifest:
+.sp
+.RS 4
+.nf
+acton \-\-manifest\-path ../incident/Acton.toml rpc info EQC... \-\-net custom:staging
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help disasm\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help retrace\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help script\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fICommand reference\fR <https://ton\-blockchain.github.io/acton/docs/commands>
+.RE

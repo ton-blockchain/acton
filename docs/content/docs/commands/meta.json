@@ -1,9 +1,15 @@
 {
   "pages": [
+    "init",
     "new",
+    "build",
+    "help",
+    "hooks",
     "compile",
     "wrapper",
     "disasm",
+    "fmt",
+    "retrace",
     "test",
     "check",
     "script",
@@ -11,8 +17,13 @@
     "verify",
     "library",
     "wallet",
+    "rpc",
     "litenode",
     "doc",
+    "ls",
+    "up",
+    "doctor",
+    "func2tolk",
     "shell-completions"
   ]
 }

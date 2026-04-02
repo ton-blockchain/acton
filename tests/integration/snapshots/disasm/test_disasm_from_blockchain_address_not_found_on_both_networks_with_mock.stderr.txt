@@ -1,0 +1,4 @@
+Error: Contract with address [WALLET_ADDRESS_BASE] not found on both mainnet and testnet
+
+Caused by:
+  TonCenter API returned status: 404 Not Found

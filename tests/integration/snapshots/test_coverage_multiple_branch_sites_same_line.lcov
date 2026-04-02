@@ -1,0 +1,9 @@
+SF:[ROOT]/code/multi_branch.tolk
+DA:3,2
+LF:1
+LH:1
+BRDA:3,0,0,0
+BRDA:3,0,1,1
+BRDA:3,1,0,1
+BRDA:3,1,1,0
+end_of_record

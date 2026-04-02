@@ -1,4 +1,5 @@
 use crate::common::{assertion, strip_ansi};
+use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use base64::Engine;
@@ -62,6 +63,31 @@ fun main() {
     net.send(wallet.address, deployDeployer);
 
     println1("DEPLOYER_CONTRACT={}", deployerAddress);
+}
+"#;
+
+const PRINT_SEND_RESULT_SCRIPT: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {
+    val wallet = net.wallet("deployer");
+
+    val childInit = ContractState {
+        code: build("child"),
+        data: createEmptyCell(),
+    };
+
+    val deployChild = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: childInit,
+        },
+    });
+
+    println(net.send(wallet.address, deployChild));
 }
 "#;
 
@@ -259,6 +285,27 @@ fun main() {
 "#;
 
 #[test]
+fn litenode_starts_and_serves_masterchain_info() {
+    let project = ProjectBuilder::new("litenode-smoke-masterchain-info").build();
+    let node = project.litenode().start();
+
+    let response = node.get_json("/api/v2/getMasterchainInfo");
+    assert_eq!(
+        response["ok"].as_bool(),
+        Some(true),
+        "Expected getMasterchainInfo to succeed:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert!(
+        response["result"]["last"]["seqno"].as_u64().is_some(),
+        "Expected getMasterchainInfo result.last.seqno to be present:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
 fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let project = ProjectBuilder::new("litenode-pre-start-commands")
         .contract("child", CHILD_CONTRACT)
@@ -271,7 +318,7 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -294,7 +341,7 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
         .acton()
         .script("scripts/deploy.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
         .expect("Failed to decode deploy script stdout");
@@ -363,6 +410,88 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
 }
 
 #[test]
+fn litenode_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
+    let project = ProjectBuilder::new("litenode-rate-limit").build();
+    let node = project.litenode().args(["--rate-limit", "1"]).start();
+
+    thread::sleep(Duration::from_millis(1100));
+
+    let first = node.get_json("/api/v2/getMasterchainInfo");
+    assert_eq!(
+        first["ok"].as_bool(),
+        Some(true),
+        "Expected first API request to succeed:\n{}",
+        serde_json::to_string_pretty(&first).unwrap_or_default()
+    );
+
+    let (status, rate_limited) = node.get_json_with_status("/api/v2/getMasterchainInfo");
+    assert_eq!(status, 429, "Expected second request to be rate-limited");
+    assert_eq!(rate_limited["ok"].as_bool(), Some(false));
+    assert_eq!(rate_limited["code"].as_i64(), Some(429));
+    assert!(
+        rate_limited["error"]
+            .as_str()
+            .is_some_and(|msg| msg.contains("Rate limit exceeded")),
+        "Expected rate-limit error message, got:\n{}",
+        serde_json::to_string_pretty(&rate_limited).unwrap_or_default()
+    );
+
+    let (admin_status, admin_response) = node.get_json_with_status("/admin/state-source");
+    assert_eq!(
+        admin_status, 200,
+        "Admin endpoints must stay available when API rate-limit is enabled"
+    );
+    assert_eq!(admin_response["ok"].as_bool(), Some(true));
+
+    thread::sleep(Duration::from_millis(1100));
+
+    let (status_after_window, api_after_window) =
+        node.get_json_with_status("/api/v2/getMasterchainInfo");
+    assert_eq!(
+        status_after_window, 200,
+        "Expected API requests to recover after rate-limit window"
+    );
+    assert_eq!(api_after_window["ok"].as_bool(), Some(true));
+
+    node.stop();
+}
+
+#[test]
+fn litenode_script_println_net_send_in_broadcast_shows_synthetic_hint() {
+    let project = ProjectBuilder::new("litenode-broadcast-println-net-send")
+        .contract("child", CHILD_CONTRACT)
+        .script_file("deploy", PRINT_SEND_RESULT_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Broadcast send (synthetic result)")
+        .assert_not_contains("compute phase skipped")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_litenode_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+        );
+
+    node.stop();
+}
+
+#[test]
 fn litenode_supports_try_locate_transaction_endpoints() {
     let project = ProjectBuilder::new("litenode-try-locate-endpoints")
         .contract("child", CHILD_CONTRACT)
@@ -375,7 +504,7 @@ fn litenode_supports_try_locate_transaction_endpoints() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -384,7 +513,7 @@ fn litenode_supports_try_locate_transaction_endpoints() {
         .acton()
         .script("scripts/deploy.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
         .expect("Failed to decode deploy script stdout");
@@ -489,7 +618,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -502,7 +631,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -659,7 +788,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
         .library()
         .fetch(&library_hash)
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--api-key")
         .arg("local-test-api-key")
         .arg("--output")
@@ -701,7 +830,7 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -714,7 +843,7 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -730,7 +859,7 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
         .acton()
         .script("scripts/deploy_manager_and_worker.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let deploy_stdout = String::from_utf8(deploy_result.output.get_output().stdout.clone())
         .expect("Failed to decode deploy script stdout");
@@ -797,7 +926,7 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
         .acton()
         .script("scripts/destroy_worker_via_manager.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let destroy_stdout = String::from_utf8(destroy_result.output.get_output().stdout.clone())
         .expect("Failed to decode destroy script stdout");
@@ -1000,19 +1129,19 @@ fn litenode_supports_v3_message_endpoint() {
         }),
     );
 
-    assert_eq!(
-        response["ok"].as_bool(),
-        Some(true),
+    assert!(
+        is_success_response(&response),
         "v3 message failed: {}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
+    let payload = response_payload(&response);
 
-    let message_hash = response["result"]["message_hash"]
+    let message_hash = payload["message_hash"]
         .as_str()
-        .expect("v3 message result.message_hash must be a string");
-    let message_hash_norm = response["result"]["message_hash_norm"]
+        .expect("v3 message message_hash must be a string");
+    let message_hash_norm = payload["message_hash_norm"]
         .as_str()
-        .expect("v3 message result.message_hash_norm must be a string");
+        .expect("v3 message message_hash_norm must be a string");
 
     assert!(
         !message_hash.is_empty(),
@@ -1021,14 +1150,19 @@ fn litenode_supports_v3_message_endpoint() {
     );
     assert_eq!(message_hash_norm, message_hash);
 
-    let invalid = node.post_json(
+    let (invalid_status, invalid) = node.post_json_with_status(
         "/api/v3/message",
         &json!({
             "boc": "not-base64"
         }),
     );
 
-    assert_eq!(invalid["ok"].as_bool(), Some(false));
+    assert_eq!(invalid_status, 500);
+    assert!(
+        !is_success_response(&invalid),
+        "Expected v3 message error for invalid boc, got:\n{}",
+        serde_json::to_string_pretty(&invalid).unwrap_or_default()
+    );
     assert!(
         invalid["error"]
             .as_str()
@@ -1173,24 +1307,37 @@ fn litenode_supports_emulate_v1_emulate_trace() {
         serde_json::to_string_pretty(&missing_boc).unwrap_or_default()
     );
 
-    let (unsupported_status, unsupported) = node.post_json_with_status(
+    let (with_extras_status, with_extras) = node.post_json_with_status(
         "/api/emulate/v1/emulateTrace",
         &json!({
             "boc": V3_MESSAGE_TEST_BOC,
-            "include_address_book": true
+            "include_address_book": true,
+            "include_metadata": true
         }),
     );
     assert_eq!(
-        unsupported_status, 400,
-        "include_address_book/include_metadata must return 400 when unavailable"
+        with_extras_status, 200,
+        "include_address_book/include_metadata emulateTrace request must succeed"
     );
     assert!(
-        unsupported["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("address book and metadata are not available"),
-        "Unexpected error for include_address_book/include_metadata:\n{}",
-        serde_json::to_string_pretty(&unsupported).unwrap_or_default()
+        with_extras.get("address_book").is_some(),
+        "include_address_book=true must include `address_book` in response:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras.get("metadata").is_some(),
+        "include_metadata=true must include `metadata` in response:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras["address_book"].is_object(),
+        "`address_book` must be an object:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras["metadata"].is_object(),
+        "`metadata` must be an object:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
     );
 
     node.stop();
@@ -1208,7 +1355,7 @@ fn litenode_supports_v3_address_information_endpoint() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -1217,7 +1364,7 @@ fn litenode_supports_v3_address_information_endpoint() {
         .acton()
         .script("scripts/deploy_getter.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
         .expect("Failed to decode deploy script stdout");
@@ -1238,36 +1385,37 @@ fn litenode_supports_v3_address_information_endpoint() {
 
     let v3_query = format!("/api/v3/addressInformation?address={getter_address}");
     let v3_response = wait_for_ok_response(&node, &v3_query, Duration::from_secs(12));
+    let v3_payload = response_payload(&v3_response);
 
     assert_eq!(
-        v3_response["result"]["balance"].as_str(),
+        v3_payload["balance"].as_str(),
         v2_response["result"]["balance"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["code"].as_str(),
+        v3_payload["code"].as_str(),
         v2_response["result"]["code"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["data"].as_str(),
+        v3_payload["data"].as_str(),
         v2_response["result"]["data"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["frozen_hash"].as_str(),
+        v3_payload["frozen_hash"].as_str(),
         v2_response["result"]["frozen_hash"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["last_transaction_hash"].as_str(),
+        v3_payload["last_transaction_hash"].as_str(),
         v2_response["result"]["last_transaction_id"]["hash"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["last_transaction_lt"].as_str(),
+        v3_payload["last_transaction_lt"].as_str(),
         v2_response["result"]["last_transaction_id"]["lt"].as_str()
     );
     assert_eq!(
-        v3_response["result"]["status"].as_str(),
+        v3_payload["status"].as_str(),
         v2_response["result"]["state"].as_str()
     );
-    assert_eq!(v3_response["result"]["status"].as_str(), Some("active"));
+    assert_eq!(v3_payload["status"].as_str(), Some("active"));
 
     let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
 
@@ -1286,22 +1434,24 @@ fn litenode_supports_v3_address_information_endpoint() {
         &format!("/api/v3/addressInformation?address={missing_address}&use_v2=false"),
         Duration::from_secs(12),
     );
+    let v3_missing_default_payload = response_payload(&v3_missing_default);
+    let v3_missing_use_v2_false_payload = response_payload(&v3_missing_use_v2_false);
 
     assert_eq!(
         v2_missing["result"]["state"].as_str(),
         Some("uninitialized")
     );
     assert_eq!(
-        v3_missing_default["result"]["status"].as_str(),
+        v3_missing_default_payload["status"].as_str(),
         Some("uninitialized")
     );
     assert_eq!(
-        v3_missing_use_v2_false["result"]["status"].as_str(),
+        v3_missing_use_v2_false_payload["status"].as_str(),
         Some("uninitialized")
     );
     assert_eq!(
-        v3_missing_default["result"]["status"].as_str(),
-        v3_missing_use_v2_false["result"]["status"].as_str()
+        v3_missing_default_payload["status"].as_str(),
+        v3_missing_use_v2_false_payload["status"].as_str()
     );
 
     node.stop();
@@ -1404,10 +1554,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let by_account = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?account={}&limit=50",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
-        ),
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=50"),
         Duration::from_secs(12),
     );
     for tx in v3_transactions_from_response(&by_account) {
@@ -1421,10 +1568,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let by_account_b = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?account={}&limit=100",
-            V3_TRANSACTIONS_TEST_ACCOUNT_B
-        ),
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_B}&limit=100"),
         Duration::from_secs(12),
     );
     assert!(
@@ -1437,10 +1581,7 @@ fn litenode_supports_v3_transactions_endpoints() {
 
     let excluded_account = wait_for_ok_response(
         &node,
-        &format!(
-            "/api/v3/transactions?exclude_account={}&limit=100",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
-        ),
+        &format!("/api/v3/transactions?exclude_account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=100"),
         Duration::from_secs(12),
     );
     assert!(
@@ -1656,7 +1797,7 @@ fn litenode_supports_v3_transactions_endpoints() {
             Duration::from_secs(12),
         );
         assert!(
-            by_opcode["ok"].as_bool() == Some(true),
+            is_success_response(&by_opcode),
             "transactionsByMessage with opcode filter must succeed:\n{}",
             serde_json::to_string_pretty(&by_opcode).unwrap_or_default()
         );
@@ -1678,13 +1819,14 @@ fn litenode_supports_v3_transactions_endpoints() {
         "/api/v3/pendingTransactions",
         Duration::from_secs(12),
     );
+    let pending_payload = response_payload(&pending);
     assert!(
-        pending["result"]["address_book"].is_object(),
+        pending_payload["address_book"].is_object(),
         "Expected address_book object in pendingTransactions:\n{}",
         serde_json::to_string_pretty(&pending).unwrap_or_default()
     );
     assert!(
-        pending["result"]["transactions"].is_array(),
+        pending_payload["transactions"].is_array(),
         "Expected transactions array in pendingTransactions:\n{}",
         serde_json::to_string_pretty(&pending).unwrap_or_default()
     );
@@ -1692,57 +1834,47 @@ fn litenode_supports_v3_transactions_endpoints() {
     let pending_with_filters = wait_for_ok_response(
         &node,
         &format!(
-            "/api/v3/pendingTransactions?account={}&trace_id={tx_hash_query}",
-            V3_TRANSACTIONS_TEST_ACCOUNT_A
+            "/api/v3/pendingTransactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&trace_id={tx_hash_query}"
         ),
         Duration::from_secs(12),
     );
+    let pending_with_filters_payload = response_payload(&pending_with_filters);
     assert!(
-        pending_with_filters["result"]["transactions"].is_array(),
+        pending_with_filters_payload["transactions"].is_array(),
         "pendingTransactions with filters must return transactions array:\n{}",
         serde_json::to_string_pretty(&pending_with_filters).unwrap_or_default()
     );
 
+    let (status, response) =
+        node.get_json_with_status("/api/v3/transactions?shard=8000000000000000");
+    assert_v3_bad_request(status, &response, "`shard` requires `workchain`");
+    let (status, response) = node.get_json_with_status("/api/v3/transactions?workchain=0&seqno=1");
     assert_v3_bad_request(
-        &node.get_json("/api/v3/transactions?shard=8000000000000000"),
-        "`shard` requires `workchain`",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactions?workchain=0&seqno=1"),
+        status,
+        &response,
         "`seqno` requires both `workchain` and `shard`",
     );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactions?sort=invalid"),
-        "Invalid `sort`",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactions?limit=0"),
-        "`limit` must be between 1 and 1000",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactions?account=not-an-address"),
-        "Invalid address format",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactionsByMessage?direction=sideways"),
-        "Invalid `direction`",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactionsByMessage?opcode=oops"),
-        "`opcode`",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/transactionsByMessage?msg_hash=bad-hash"),
-        "Invalid hash format",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/pendingTransactions?account=bad-account"),
-        "Invalid address format",
-    );
-    assert_v3_bad_request(
-        &node.get_json("/api/v3/pendingTransactions?trace_id=bad-hash"),
-        "Invalid hash format",
-    );
+    let (status, response) = node.get_json_with_status("/api/v3/transactions?sort=invalid");
+    assert_v3_bad_request(status, &response, "Invalid `sort`");
+    let (status, response) = node.get_json_with_status("/api/v3/transactions?limit=0");
+    assert_v3_bad_request(status, &response, "`limit` must be between 1 and 1000");
+    let (status, response) =
+        node.get_json_with_status("/api/v3/transactions?account=not-an-address");
+    assert_v3_bad_request(status, &response, "Invalid address format");
+    let (status, response) =
+        node.get_json_with_status("/api/v3/transactionsByMessage?direction=sideways");
+    assert_v3_bad_request(status, &response, "Invalid `direction`");
+    let (status, response) = node.get_json_with_status("/api/v3/transactionsByMessage?opcode=oops");
+    assert_v3_bad_request(status, &response, "`opcode`");
+    let (status, response) =
+        node.get_json_with_status("/api/v3/transactionsByMessage?msg_hash=bad-hash");
+    assert_v3_bad_request(status, &response, "Invalid hash format");
+    let (status, response) =
+        node.get_json_with_status("/api/v3/pendingTransactions?account=bad-account");
+    assert_v3_bad_request(status, &response, "Invalid address format");
+    let (status, response) =
+        node.get_json_with_status("/api/v3/pendingTransactions?trace_id=bad-hash");
+    assert_v3_bad_request(status, &response, "Invalid hash format");
 
     node.stop();
 }
@@ -1759,7 +1891,7 @@ fn litenode_supports_v3_run_get_method() {
 
     let node = project
         .litenode()
-        .before_start(|cmd| cmd.build())
+        .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
@@ -1768,7 +1900,7 @@ fn litenode_supports_v3_run_get_method() {
         .acton()
         .script("scripts/deploy_getter.tolk")
         .broadcast()
-        .verify_network("custom:localnet")
+        .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
         .expect("Failed to decode deploy script stdout");
@@ -1798,15 +1930,15 @@ fn litenode_supports_v3_run_get_method() {
         }),
     );
 
-    assert_eq!(
-        response["ok"].as_bool(),
-        Some(true),
+    assert!(
+        is_success_response(&response),
         "v3 runGetMethod failed: {}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
-    assert_eq!(response["result"]["exit_code"].as_i64(), Some(0));
-    assert_eq!(response["result"]["stack"][0]["type"].as_str(), Some("num"));
-    assert_eq!(response["result"]["stack"][0]["value"].as_str(), Some("17"));
+    let payload = response_payload(&response);
+    assert_eq!(payload["exit_code"].as_i64(), Some(0));
+    assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
+    assert_eq!(payload["stack"][0]["value"].as_str(), Some("17"));
 
     node.stop();
 }
@@ -1894,7 +2026,7 @@ fn append_localnet_network(project_path: &Path, base_url: &str) {
         r#"
 
 [networks.localnet]
-v2-url = "{base_url}/api/v2"
+api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
     ));
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
@@ -1909,6 +2041,31 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
         .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"))
 }
 
+fn is_success_response(response: &Value) -> bool {
+    match response.get("ok").and_then(Value::as_bool) {
+        Some(ok) => ok,
+        None => response.get("error").is_none(),
+    }
+}
+
+fn response_payload(response: &Value) -> &Value {
+    if response.get("ok").and_then(Value::as_bool) == Some(true) {
+        response.get("result").unwrap_or_else(|| {
+            panic!(
+                "Expected `result` for wrapped successful response:\n{}",
+                serde_json::to_string_pretty(response).unwrap_or_default()
+            )
+        })
+    } else if response.get("ok").is_none() && response.get("error").is_none() {
+        response
+    } else {
+        panic!(
+            "Expected successful response, got:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        )
+    }
+}
+
 fn wait_for_ok_response(
     node: &crate::support::litenode::LiteNodeHandle,
     query: &str,
@@ -1917,7 +2074,7 @@ fn wait_for_ok_response(
     let deadline = Instant::now() + timeout;
     loop {
         let response = node.get_json(query);
-        if response["ok"].as_bool() == Some(true) {
+        if is_success_response(&response) {
             return response;
         }
         assert!(
@@ -1986,13 +2143,13 @@ fn unpack_address(node: &crate::support::litenode::LiteNodeHandle, address: &str
 }
 
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
-    response
-        .pointer("/result/transactions")
+    response_payload(response)
+        .get("transactions")
         .and_then(Value::as_array)
         .map(Vec::as_slice)
         .unwrap_or_else(|| {
             panic!(
-                "Expected /result/transactions array in response:\n{}",
+                "Expected `transactions` array in response payload:\n{}",
                 serde_json::to_string_pretty(response).unwrap_or_default()
             )
         })
@@ -2035,7 +2192,7 @@ fn encode_query_component(value: &str) -> String {
     for byte in value.bytes() {
         match byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(char::from(byte))
+                encoded.push(char::from(byte));
             }
             _ => encoded.push_str(&format!("%{byte:02X}")),
         }
@@ -2089,13 +2246,26 @@ fn assert_transactions_sorted_by_lt_desc(transactions: &[Value]) {
     }
 }
 
-fn assert_v3_bad_request(response: &Value, expected_error_fragment: &str) {
+fn assert_v3_bad_request(status: u16, response: &Value, expected_error_fragment: &str) {
     assert_eq!(
-        response["ok"].as_bool(),
-        Some(false),
-        "Expected v3 bad request response:\n{}",
+        status,
+        400,
+        "Expected HTTP 400 for v3 bad request response:\n{}",
         serde_json::to_string_pretty(response).unwrap_or_default()
     );
+    if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
+        assert!(
+            !ok,
+            "Expected v3 bad request response:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        );
+    } else {
+        assert!(
+            response.get("error").is_some(),
+            "Expected v3 bad request response with `error` field:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        );
+    }
     assert_eq!(
         response["code"].as_i64(),
         Some(400),

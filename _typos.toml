@@ -1,0 +1,18 @@
+[files]
+extend-exclude = [
+  "dist-workspace.toml",
+  "docs/**",
+  "block.tlb",
+  "crates/tasm/spec/**",
+  "crates/tolkc/assets/**",
+  "tests/**/snapshots/**",
+]
+
+[default]
+extend-ignore-re = [
+  "\\bADDD\\b",
+  "\\bTrUe\\b",
+  "\\balse\\b",
+  "\\b(?:test-)?ba-stdlib-[A-Za-z0-9-]+\\b",
+  "[dD]arcula"
+]

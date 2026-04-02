@@ -35,6 +35,8 @@ pub fn disasm_cmd(
 
     let network = net.as_deref().map(Network::from_str).transpose()?;
 
+    let mut resolved_network = network.clone();
+
     let boc_data = if let Some(string) = boc_string {
         string
     } else if let Some(path) = boc_file {
@@ -59,7 +61,9 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
-        remote::fetch_contract_boc(network.clone(), &addr, api_key.as_deref())?
+        let fetched = remote::fetch_contract_boc(network, &addr, api_key.as_deref())?;
+        resolved_network = Some(fetched.network);
+        fetched.boc
     } else {
         anyhow::bail!(
             "Either {}, {}, {} or {} argument must be provided, run with {} for more information",
@@ -97,7 +101,7 @@ pub fn disasm_cmd(
             let config = acton_config::config::ActonConfig::load().unwrap_or_default();
             let custom_networks = config.custom_networks();
             let client = TonApiClient::new(
-                network.unwrap_or(Network::Testnet),
+                resolved_network.unwrap_or(Network::Testnet),
                 custom_networks,
                 api_key,
             )?;
@@ -106,7 +110,7 @@ pub fn disasm_cmd(
                     final_cell = lib_cell;
                 }
                 Err(err) => {
-                    eprintln!("Warning: Failed to load library {lib_hash}: {err}");
+                    eprintln!("Warning: Failed to load library 0x{lib_hash}: {err}");
                     eprintln!("Showing original code instead");
                 }
             }

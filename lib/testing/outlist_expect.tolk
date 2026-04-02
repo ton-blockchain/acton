@@ -22,12 +22,12 @@
 /// ```
 
 import "@stdlib/reflection"
-import "assert"
-import "expect"
 import "../fmt"
 import "../ffi/ffi"
 import "../types/message"
 import "../types/out_actions"
+import "assert"
+import "expect"
 
 /// Expect the out action at the given index to be a send message that can be loaded as `MessageRelaxed<Msg>`.
 ///
@@ -49,7 +49,7 @@ import "../types/out_actions"
 /// - if the action is not a send message, assertion fails with index information;
 /// - if typed load fails with opcode mismatch (exit code `63`), assertion includes expected type/prefix and actual opcode (plus known type name when available);
 /// - for other decode errors, assertion includes the decoder exit code.
-fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
+fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
     val action = self.value.at(index);
     if (action is OutActionSendMessage) {
         try {
@@ -70,11 +70,11 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                     format4(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
                         reflect.typeNameOf<Msg>(),
-                        reflect.serializationPrefixOf<Msg>(),
+                        reflect.serializationPrefixOf<Msg>().0,
                         opcode,
                         opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),
-                    self.location
+                    self.location,
                 );
                 return;
             }
@@ -83,21 +83,18 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
         return;
     }
 
-    Assert.fail(
-        format1("Out action at index {} is not a send message", index),
-        self.location
-    );
+    Assert.fail(format1("Out action at index {} is not a send message", index), self.location);
 }
 
 struct expectImpl
 
-fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string) {
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string): never {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
             reflect.typeNameOf<Msg>(),
-            exitCode
+            exitCode,
         ),
-        location
+        location,
     );
 }

@@ -1,0 +1,26 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ foo [TIME]
+    └─ Cannot execute get method currentCounterFail (83805)
+      ├─ exit_code=10
+      ├─ at contracts/simple[LINE]
+      ├─ Backtrace:
+      │     currentCounterFail   at contracts/simple[LINE]
+      ├─ Called from:
+      │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
+      │     net.runGetMethod<int,tuple>        at ../lib/emulation/network[LINE]
+      │     test-foo                           at tests/test.test[LINE]
+      ├─ Description: Dictionary error
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

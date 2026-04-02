@@ -1,0 +1,138 @@
+.container {
+  padding: var(--spacing-md);
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.nftItem {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    box-shadow var(--transition-duration-fast);
+  border: 1px solid var(--tonscan-border);
+  border-radius: var(--border-radius-md);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    var(--tonscan-card-bg);
+}
+
+.nftItem:hover {
+  border-color: var(--tonscan-accent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+}
+
+.imageFrame {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid var(--tonscan-border);
+  background-color: var(--tonscan-bg-secondary);
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.nftImage {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  background-color: var(--tonscan-bg-secondary);
+}
+
+.nftInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nftName {
+  font-weight: 600;
+  color: var(--tonscan-text-primary);
+  font-size: 1rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.nftIndex {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  color: var(--tonscan-accent);
+  border: 1px solid rgba(0, 136, 204, 0.35);
+  background: rgba(0, 136, 204, 0.1);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.nftDescription {
+  color: var(--tonscan-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.metaGrid {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metaRow {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  align-items: baseline;
+}
+
+.metaLabel {
+  font-size: 0.72rem;
+  color: var(--tonscan-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.metaValue {
+  color: var(--tonscan-text-primary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.addressValue {
+  color: var(--tonscan-accent);
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}

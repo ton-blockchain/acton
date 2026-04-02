@@ -3,7 +3,7 @@ import {useEffect, useMemo, useState} from "react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
-import type {FullAccountState, JettonMaster, JettonWallet, Transaction} from "../api/types"
+import type {FullAccountState, JettonMaster, JettonWallet, NftItem, Transaction} from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
@@ -24,6 +24,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWallets, setJettonWallets] = useState<JettonWallet[]>([])
+  const [nftItems, setNftItems] = useState<NftItem[]>([])
   const [holders, setHolders] = useState<JettonWallet[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
@@ -38,17 +39,23 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         setTransactions([])
         setJettonMaster(undefined)
         setJettonWallets([])
+        setNftItems([])
         setHolders([])
         return
       }
       setLoading(true)
       setError(undefined)
       try {
-        const [state, txs, masters, wallets, masterHolders] = await Promise.all([
+        const [state, txs, masters, wallets, nfts, masterHolders] = await Promise.all([
           client.getAddressInformation(formattedAddress),
           client.getTransactions(formattedAddress),
           client.getJettonMasters([formattedAddress]),
           client.getJettonWallets([formattedAddress]),
+          client.getNftItems({
+            owner_address: [formattedAddress],
+            limit: 100,
+            sortByLastTransactionLt: true,
+          }),
           client.getJettonWallets(undefined, [formattedAddress]),
         ])
         if (!isActive) return
@@ -56,6 +63,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         setTransactions(txs)
         setJettonMaster(masters[0])
         setJettonWallets(wallets)
+        setNftItems(nfts)
         setHolders(masterHolders)
       } catch (error) {
         if (!isActive) return
@@ -64,6 +72,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         setTransactions([])
         setJettonMaster(undefined)
         setJettonWallets([])
+        setNftItems([])
         setHolders([])
       } finally {
         if (isActive) setLoading(false)
@@ -176,6 +185,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
             accountState={accountState}
             ownerAddress={formattedAddress}
             jettonWallets={jettonWallets}
+            nftItems={nftItems}
             jettonMaster={jettonMaster}
             holders={holders}
             client={client}

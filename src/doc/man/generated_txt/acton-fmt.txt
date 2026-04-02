@@ -1,0 +1,132 @@
+ACTON-FMT(1)
+
+NAME
+       acton-fmt — Format Tolk source files
+
+SYNOPSIS
+       acton fmt [options] [paths…]
+
+DESCRIPTION
+       Format .tolk files using the built-in Tolk formatter.
+
+       The command can rewrite files in place or run in --check mode for CI and
+       pre-commit validation. If no _paths_ are provided, Acton scans the
+       resolved project root recursively.
+
+OPTIONS
+   Format Options
+       paths…
+           Files or directories to format.
+
+           If omitted, Acton scans the project root.
+
+       --check
+           Check formatting without rewriting files.
+
+           In this mode Acton prints diffs for mismatches and exits non-zero.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+BEHAVIOR
+       o  Only .tolk files are formatted
+
+       o  Directory traversal is recursive
+
+       o  Built-in ignore globs always apply, including node_modules, .git,
+          target, and .acton
+
+       o  explicit file arguments are formatted even if they would match
+          [fmt].ignore
+
+       o  directory traversal applies [fmt].ignore and built-in excludes to
+          relative and absolute paths
+
+       o  Syntax errors are reported as diagnostics and cause a non-zero exit
+
+       o  --check prints a unified diff with three lines of context for each
+          changed file
+
+CONFIGURATION
+       acton fmt reads defaults from [fmt] in Acton.toml:
+
+           [fmt]
+           width = 100
+           ignore = ["contracts/generated/*.tolk"]
+           separate-import-groups = true
+
+       Useful fields include:
+
+       o  width for maximum formatted line width
+
+       o  ignore for additional exclude globs
+
+       o  separate-import-groups for blank lines between import groups
+
+IMPORT SORTING
+       Imports are sorted by group in this order:
+
+       1. @stdlib
+
+       2. @acton
+
+       3. other @... imports
+
+       4. plain imports
+
+       5. ./...
+
+       6. ../...
+
+       Within each group, imports are sorted lexicographically.
+
+EXIT STATUS
+       o  0: All requested files were formatted successfully, or --check found
+          no formatting differences.
+
+       o  1: Files needed formatting in --check mode, syntax errors prevented
+          formatting, or path resolution failed.
+
+EXAMPLES
+       1. Format all Tolk files in the project:
+
+              acton fmt
+
+       2. Format selected paths:
+
+              acton fmt contracts scripts/deploy.tolk
+
+       3. Validate formatting without writing files:
+
+              acton fmt --check
+
+       4. Run against another project root:
+
+              acton --project-root ../my-project fmt --check
+
+       5. Check import grouping after enabling blank lines between groups:
+
+              acton fmt contracts/main.tolk --check
+
+SEE ALSO
+       o  acton help check
+
+       o  Formatting guide
+          <https://ton-blockchain.github.io/acton/docs/commands/fmt>
+

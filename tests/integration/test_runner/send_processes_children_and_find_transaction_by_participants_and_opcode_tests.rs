@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const NETWORK_MESSAGES: &str = r#"
+const NETWORK_MESSAGES: &str = r"
 struct (0x91000001) TriggerForward {
     queryId: uint64
     target: address
@@ -26,7 +26,7 @@ struct (0x91000005) TriggerExternal {
 struct (0x91000006) ExternalNotice {
     count: uint32
 }
-"#;
+";
 
 const FORWARDER_CONTRACT: &str = r#"
 import "messages"
@@ -159,6 +159,8 @@ import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/big_array"
+import "../../lib/types/message"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
 
@@ -352,7 +354,7 @@ get fun `test-ag-send-single-keeps-child-list-empty`() {
 fn send_external_runs_handler_and_collects_external_out_message() {
     run_network_success(
         "ag-stdlib-send-external-runs-handler",
-        r#"
+        r"
 get fun `test-ag-send-external-runs-handler`() {
     val (_, externalAddress) = deployExternalHarness();
 
@@ -368,7 +370,7 @@ get fun `test-ag-send-external-runs-handler`() {
     expect(externalLog.count).toEqual(1);
     expect(externalCount(externalAddress)).toEqual(1);
 }
-"#,
+",
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/send_external_runs_handler_and_collects_external_out_message.stdout.txt",
     );
 }
@@ -377,7 +379,7 @@ get fun `test-ag-send-external-runs-handler`() {
 fn send_external_is_repeatable_and_keeps_incrementing_state() {
     run_network_success(
         "ag-stdlib-send-external-repeatable",
-        r#"
+        r"
 get fun `test-ag-send-external-repeatable`() {
     val (_, externalAddress) = deployExternalHarness();
 
@@ -397,7 +399,7 @@ get fun `test-ag-send-external-repeatable`() {
     expect(secondLog.count).toEqual(2);
     expect(externalCount(externalAddress)).toEqual(2);
 }
-"#,
+",
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/send_external_is_repeatable_and_keeps_incrementing_state.stdout.txt",
     );
 }
@@ -536,14 +538,14 @@ get fun `test-ag-wait-in-emulation-mode`() {
 fn wait_returns_false_for_empty_list_in_broadcast_mode() {
     run_network_success(
         "ag-stdlib-wait-empty-broadcast-false",
-        r#"
+        r"
 get fun `test-ag-wait-empty-list-in-broadcast-mode`() {
     net.enableBroadcast();
     val empty: SendResultList = SendResultList.createEmpty();
     expect(empty.wait()).toEqual(false);
     net.disableBroadcast();
 }
-"#,
+",
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/wait_returns_false_for_empty_list_in_broadcast_mode.stdout.txt",
     );
 }

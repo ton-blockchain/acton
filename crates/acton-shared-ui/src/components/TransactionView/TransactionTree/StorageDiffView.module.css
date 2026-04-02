@@ -1,0 +1,127 @@
+.storageObject {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: max-content;
+}
+
+.storageTypeLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+  font-weight: var(--font-weight-medium);
+}
+
+.storageNested {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--spacing-sm);
+  grid-auto-rows: minmax(30px, auto);
+  row-gap: var(--spacing-xs);
+  padding-left: var(--spacing-mds);
+  border-left: 1px solid var(--border-color);
+}
+
+.storageEntryKey {
+  color: var(--text-muted);
+  align-self: center;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.storageEntryValue {
+  min-width: 0;
+  align-self: center;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.storageEntryChanged {
+  color: var(--text-primary);
+}
+
+.storageEntryAdded {
+  color: var(--color-passed-text);
+}
+
+.storageEntryRemoved {
+  color: var(--color-failed-text);
+}
+
+.storageLeafValue {
+  display: inline-block;
+  color: inherit;
+  font-family: var(--font-mono), monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.storagePlainValue {
+  display: inline-block;
+  color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.storageNullValue {
+  display: inline-block;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.storageLeafDiff {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.storageDiffPill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--border-radius-full);
+  border: 1px solid transparent;
+}
+
+.storageDiffPillBefore {
+  color: var(--color-failed-text);
+  background-color: var(--color-failed-bg);
+  border-color: color-mix(in srgb, var(--color-failed) 24%, transparent);
+}
+
+.storageDiffPillAfter {
+  color: var(--color-passed-text);
+  background-color: var(--color-passed-bg);
+  border-color: color-mix(in srgb, var(--color-passed) 24%, transparent);
+}
+
+.storageDiffPillNeutral {
+  color: var(--text-muted);
+  background-color: var(--bg-secondary-color);
+  border-color: var(--border-color);
+}
+
+.storageDiffArrow {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.storageDiffPlaceholder {
+  color: var(--text-muted);
+}
+
+.storageBooleanTrue {
+  color: var(--color-passed-text);
+}
+
+.storageBooleanFalse {
+  color: var(--color-failed-text);
+}

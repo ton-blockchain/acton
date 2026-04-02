@@ -4,10 +4,10 @@ import "@acton/io"
 
 import "@contracts/types"
 
-import "../a"
-import "../z"
-
 import "./a"
 import "./b"
+
+import "../a"
+import "../z"
 
 fun main() {}

@@ -308,10 +308,9 @@ pub(crate) fn choose_only_method_to_call(
         let method_name = type_db
             .project_index
             .resolve_symbol(candidate.method_id)
-            .map(|s| s.name.clone())
-            .unwrap_or_else(|| "unknown".into());
+            .map_or_else(|| "unknown".into(), |s| s.name.clone());
 
-        msg.push_str(&format!("candidate function: `{}`", method_name));
+        msg.push_str(&format!("candidate function: `{method_name}`"));
 
         if candidate.is_generic(type_db.intrn) {
             // TODO: format substitutions nicely

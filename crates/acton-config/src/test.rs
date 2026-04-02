@@ -1,7 +1,15 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::config::Network;
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
+/// Backtrace verbosity for failed tests
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum BacktraceMode {
+    /// Emit the full execution backtrace
     #[default]
     Full,
 }
@@ -14,20 +22,34 @@ impl std::fmt::Display for BacktraceMode {
     }
 }
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq, Default)]
+/// Output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
 #[clap(rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum ReportFormat {
+    /// Human-readable console output
     #[default]
     Console,
+    /// TeamCity service messages
     TeamCity,
+    /// JUnit XML report
     JUnit,
+    /// Compact dot-progress output
     Dot,
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
+/// Coverage output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum CoverageFormat {
+    /// LCOV coverage report
     #[default]
     Lcov,
+    /// Plain-text coverage summary
     Text,
 }
 
@@ -43,10 +65,14 @@ impl std::fmt::Display for CoverageFormat {
 #[derive(Debug, Clone, Default)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
+    pub show_bodies: bool,
     pub debug: bool,
     pub debug_port: u16,
     pub backtrace: Option<BacktraceMode>,
     pub coverage: bool,
+    pub coverage_minimum_percent: Option<f64>,
+    pub coverage_include_wrappers: bool,
+    pub coverage_include_tests: bool,
     pub filter: Option<String>,
     pub coverage_format: Option<CoverageFormat>,
     pub coverage_file: Option<String>,
@@ -57,6 +83,7 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,

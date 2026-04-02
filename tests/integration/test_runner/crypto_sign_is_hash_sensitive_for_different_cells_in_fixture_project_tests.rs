@@ -25,7 +25,7 @@ fn run_crypto_failure_case(project_name: &str, test_body: &str, snapshot_path: &
 fn crypto_sign_is_hash_sensitive_for_different_cells_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let source = format!(
-        r#"
+        r"
 {CRYPTO_IMPORTS}
 get fun `test-ba-stdlib-sign-hash-sensitive-for-different-cells`() {{
     val words = crypto.createMnemonic();
@@ -41,7 +41,7 @@ get fun `test-ba-stdlib-sign-hash-sensitive-for-different-cells`() {{
     expect(isSignatureValid(cellA.hash(), sigA, kp.publicKey)).toBeTrue();
     expect(isSignatureValid(cellB.hash(), sigA, kp.publicKey)).toBeFalse();
 }}
-"#
+"
     );
 
     fs::write(
@@ -68,7 +68,7 @@ get fun `test-ba-stdlib-sign-hash-sensitive-for-different-cells`() {{
 fn crypto_raw_sign_positive_and_negative_hash_values_do_not_collapse() {
     run_crypto_failure_case(
         "ba-stdlib-raw-sign-positive-negative-hash-values",
-        r#"
+        r"
 get fun `test-ba-stdlib-raw-sign-positive-negative-hash-values`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
@@ -82,7 +82,7 @@ get fun `test-ba-stdlib-raw-sign-positive-negative-hash-values`() {
     // BUG: rawSign should be hash-sensitive for distinct hash values; expected different signatures for 1 and -1, got equal signatures.
     expect(sigA).toNotEqual(sigB);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_sign_is_hash_sensitive_for_different_cells_in_fixture_project/crypto_raw_sign_positive_and_negative_hash_values_do_not_collapse.stdout.txt",
     );
 }
@@ -91,7 +91,7 @@ get fun `test-ba-stdlib-raw-sign-positive-negative-hash-values`() {
 fn crypto_raw_sign_positive_and_negative_private_keys_do_not_collapse() {
     run_crypto_failure_case(
         "ba-stdlib-raw-sign-positive-negative-private-keys",
-        r#"
+        r"
 get fun `test-ba-stdlib-raw-sign-positive-negative-private-keys`() {
     val hash = beginCell().storeUint(0xCAFE, 16).endCell().hash();
     val keyA = 1;
@@ -103,7 +103,7 @@ get fun `test-ba-stdlib-raw-sign-positive-negative-private-keys`() {
     // BUG: rawSign should remain key-sensitive for distinct private keys; expected different signatures for 1 and -1, got equal signatures.
     expect(sigA).toNotEqual(sigB);
 }
-"#,
+",
         "integration/snapshots/test-runner/crypto_sign_is_hash_sensitive_for_different_cells_in_fixture_project/crypto_raw_sign_positive_and_negative_private_keys_do_not_collapse.stdout.txt",
     );
 }

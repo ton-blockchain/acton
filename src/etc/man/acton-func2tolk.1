@@ -1,0 +1,166 @@
+'\" t
+.TH "ACTON\-FUNC2TOLK" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-func2tolk \[em] Convert FunC sources to Tolk through the upstream converter
+.SH "SYNOPSIS"
+\fBacton func2tolk\fR [\fIoptions\fR] \fIpath\fR
+.SH "DESCRIPTION"
+Convert a FunC source file or a directory of FunC files into Tolk.
+.sp
+Acton shells out to \fBnpx\fR and runs the upstream
+\fB@ton/convert\-func\-to\-tolk\fR package. Standard input, output, and error are
+forwarded directly to the converter process.
+.SH "OPTIONS"
+.SS "Conversion Options"
+.sp
+\fIpath\fR
+.RS 4
+Path to a \fB\&.fc\fR or \fB\&.func\fR file, or to a directory containing such files.
+.RE
+.sp
+\fB\-\-output\fR \fIpath\fR
+.RS 4
+Write converted output to the specified path.
+.RE
+.sp
+\fB\-\-warnings\-as\-comments\fR
+.RS 4
+Insert warning comments into the generated output instead of reporting warnings
+only on stderr.
+.RE
+.sp
+\fB\-\-no\-camel\-case\fR
+.RS 4
+Disable snake_case to camelCase renaming.
+.RE
+.sp
+\fB\-\-version\fR \fIversion\fR
+.RS 4
+Version of \fB@ton/convert\-func\-to\-tolk\fR to execute.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "REQUIREMENTS"
+This command requires:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Node.js
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'npm
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBnpx\fR available in \fBPATH\fR
+.RE
+.sp
+Acton uses a temporary npm cache directory for each invocation.
+.sp
+That means converter downloads are not reused across runs.
+.SH "PROCESS MODEL"
+Acton runs:
+.sp
+.RS 4
+.nf
+npx \-\-yes @ton/convert\-func\-to\-tolk@<version> ...
+.fi
+.RE
+.sp
+If the converter exits non\-zero, \fBacton func2tolk\fR fails with the same outcome
+reported as an Acton error.
+.sp
+If \fB_path_\fR is a directory, file naming and directory traversal are delegated
+to the upstream converter. \fB\-\-output\fR is forwarded directly to that tool.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Conversion completed successfully, including runs that produced warnings.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: \fBnpx\fR or the converter could not be started, conversion failed, or the
+requested output could not be written by the converter.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Convert all FunC files in a directory:
+.sp
+.RS 4
+.nf
+acton func2tolk contracts
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Convert a single file and keep warnings inline:
+.sp
+.RS 4
+.nf
+acton func2tolk jetton\-minter.fc \-\-warnings\-as\-comments
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Disable camelCase renaming:
+.sp
+.RS 4
+.nf
+acton func2tolk jetton\-minter.fc \-\-no\-camel\-case
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Use a specific converter version:
+.sp
+.RS 4
+.nf
+acton func2tolk jetton\-minter.fc \-\-version 1.0.0
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Convert into an explicit output file:
+.sp
+.RS 4
+.nf
+acton func2tolk jetton\-minter.fc \-\-output jetton\-minter.tolk
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIconvert\-func\-to\-tolk\fR <https://github.com/ton\-blockchain/convert\-func\-to\-tolk>
+.RE

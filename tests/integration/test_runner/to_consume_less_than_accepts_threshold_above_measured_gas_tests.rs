@@ -10,10 +10,10 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 "#;
 
-const CF_RECEIVER_CONTRACT: &str = r#"
+const CF_RECEIVER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{CF_IMPORTS}\n{test_body}\n");

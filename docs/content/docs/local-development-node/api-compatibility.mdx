@@ -40,7 +40,7 @@ This page tracks TonCenter v2 and v3 API coverage in Acton local development nod
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 9 TonCenter v3 endpoints:
+Acton local development node currently supports 10 TonCenter v3 endpoints:
 
 | Method | Endpoint                        | Available in local node | Purpose                                                              |
 |--------|---------------------------------|-------------------------|----------------------------------------------------------------------|
@@ -53,6 +53,7 @@ Acton local development node currently supports 9 TonCenter v3 endpoints:
 | `POST` | `/api/v3/runGetMethod`          | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
 | `GET`  | `/api/v3/jetton/masters`        | ✅                       | Returns jetton master metadata with optional filters and pagination. |
 | `GET`  | `/api/v3/jetton/wallets`        | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/nft/items`             | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
 
 `/api/v3/transactions`, `/api/v3/transactionsByMessage`, and `/api/v3/pendingTransactions` currently support only single-value query filters for `account`, `exclude_account`, and `trace_id` in local development node (no repeated multi-value form yet).
 

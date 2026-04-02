@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const CK_MESSAGES: &str = r#"
+const CK_MESSAGES: &str = r"
 struct (0xCC01CC01) CkPing {
     queryId: uint64
     amount: uint32
@@ -12,7 +12,7 @@ struct (0xCC01CC02) CkNotify {
     queryId: uint64
     amount: uint32
 }
-"#;
+";
 
 const CK_WORKER_CONTRACT: &str = r#"
 import "messages"
@@ -164,7 +164,7 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 fn transaction_get_action_fee_tick_and_tock_match_ord_action_fee() {
     run_success_case(
         "ck-stdlib-transaction-get-action-fee-tick-and-tock",
-        r#"
+        r"
 get fun `test-ck-transaction-get-action-fee-tick-and-tock`() {
     val (sender, workerAddress) = deployCkHarness();
     val txs = sendCkPing(sender, workerAddress, 201, 4);
@@ -185,7 +185,7 @@ get fun `test-ck-transaction-get-action-fee-tick-and-tock`() {
     expect(tickTx.getActionFee()).toEqual(expected);
     expect(tockTx.getActionFee()).toEqual(expected);
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_get_action_fee_tick_and_tock_match_ord_action_fee/transaction_get_action_fee_tick_and_tock_match_ord_action_fee.stdout.txt",
     );
 }
@@ -194,7 +194,7 @@ get fun `test-ck-transaction-get-action-fee-tick-and-tock`() {
 fn transaction_get_action_fee_tick_tock_without_action_returns_none() {
     run_success_case(
         "ck-stdlib-transaction-get-action-fee-tick-tock-none",
-        r#"
+        r"
 get fun `test-ck-transaction-get-action-fee-tick-tock-none`() {
     val (sender, workerAddress) = deployCkHarness();
     val txs = sendCkPing(sender, workerAddress, 202, 0);
@@ -209,7 +209,7 @@ get fun `test-ck-transaction-get-action-fee-tick-tock-none`() {
     expect(tickNoAction.getActionFee()).toBeNone();
     expect(tockNoAction.getActionFee()).toBeNone();
 }
-"#,
+",
         "integration/snapshots/test-runner/transaction_get_action_fee_tick_and_tock_match_ord_action_fee/transaction_get_action_fee_tick_tock_without_action_returns_none.stdout.txt",
     );
 }

@@ -1,12 +1,12 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
+use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, global_libraries_path};
+use acton_config::config::{ActonConfig, global_libraries_path, project_root};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
 use inquire::{Select, Text};
-use num_bigint::BigUint;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
@@ -17,17 +17,16 @@ use tasm::printer::FormatOptions;
 use tempfile::TempDir;
 use tolkc::CompilerResult;
 use toml_edit::{DocumentMut, Item, Table, value};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
-use tonlib_core::tlb_types::block::message::{CommonMsgInfo, IntMsgInfo, Message};
-use tonlib_core::tlb_types::block::state_init::StateInit;
-use tonlib_core::tlb_types::primitives::either::EitherRef;
-use tonlib_core::tlb_types::primitives::reference::Ref;
-use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{CellImpl, HashBytes};
+use tycho_types::boc::BocRepr;
+use tycho_types::cell::{Cell, CellBuilder, CellImpl, CellSliceParts, HashBytes};
+use tycho_types::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
+    OwnedMessage, StateInit, StdAddr, StdAddrFormat,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub fn publish_cmd(
@@ -69,7 +68,8 @@ pub fn publish_cmd(
         contract_id = Some(contract_key.clone());
 
         println!("  {} Compiling contract", "→".blue().bold());
-        let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings);
+        let mappings = config.mappings();
+        let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
         let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
         match compilation_result {
@@ -90,7 +90,7 @@ pub fn publish_cmd(
     println!(
         "  {} Library hash: {}",
         "→".blue().bold(),
-        hex::encode(library_hash).dimmed()
+        format!("0x{}", hex::encode(library_hash)).dimmed()
     );
 
     let duration_seconds = if let Some(d) = duration_arg {
@@ -111,25 +111,23 @@ pub fn publish_cmd(
     let librarian_code = compile_librarian_with_duration(duration_seconds)?;
 
     let workchain = -1;
-    let publisher_data = ArcCell::from_boc(&Boc::encode(&library_code_cell))?;
+    let publisher_data = library_code_cell.clone();
     let state_init = StateInit {
         split_depth: None,
-        tick_tock: None,
-        code: Some(Ref::new(librarian_code)),
-        data: Some(Ref::new(publisher_data)),
-        library: None,
+        special: None,
+        code: Some(librarian_code),
+        data: Some(publisher_data),
+        libraries: Default::default(),
     };
-    let state_init_cell = state_init.to_cell()?;
-    let state_init_hash = state_init_cell.cell_hash();
+    let state_init_cell = CellBuilder::build_from(&state_init)?;
+    let state_init_hash = state_init_cell.repr_hash();
 
-    let publisher_address = TonAddress::new(workchain, state_init_hash);
+    let publisher_address = StdAddr::new(workchain, HashBytes(*state_init_hash.as_array()));
 
     println!(
         "  {} Publisher address: {}",
         "→".blue().bold(),
-        publisher_address
-            .to_base64_url_flags(true, net == "testnet")
-            .dimmed()
+        format_std_address(&publisher_address, &network).dimmed()
     );
 
     let wallet_name = select_wallet(wallet_name, &config)?;
@@ -142,11 +140,7 @@ pub fn publish_cmd(
         "  {} Using wallet: {} {}",
         "→".blue().bold(),
         wallet_name.cyan(),
-        wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, net == "testnet")
-            .dimmed()
+        format_std_address(&wallet.address(), &network).dimmed()
     );
 
     let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
@@ -196,7 +190,7 @@ pub fn publish_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
@@ -208,51 +202,60 @@ pub fn publish_cmd(
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: wallet.wallet.address.to_msg_address(),
-        dest: publisher_address.to_msg_address(),
-        value: CurrencyCollection::new(BigUint::from(amount_to_send_nanoton)),
-        ihr_fee: Grams::new(BigUint::from(0u64)),
-        fwd_fee: Grams::new(BigUint::from(0u64)),
+        src: IntAddr::Std(wallet.address()),
+        dst: IntAddr::Std(publisher_address.clone()),
+        value: CurrencyCollection::new(amount_to_send_nanoton),
+        ihr_fee: Default::default(),
+        fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,
     };
 
-    let message = Message {
-        info: CommonMsgInfo::Int(message_info),
-        init: Some(EitherRef::new(state_init)),
-        body: EitherRef::new(ArcCell::default()),
+    let message = OwnedMessage {
+        info: MsgInfo::Int(message_info),
+        init: Some(state_init),
+        body: CellSliceParts::from(CellBuilder::new().build()?),
+        layout: None,
     };
 
-    let message_cell = message.to_cell()?;
-    let external = wallet.wallet.create_external_msg(
-        expire_at,
-        seqno,
-        need_state_init,
-        vec![message_cell.to_arc()],
-    )?;
+    let message_cell_boc = BocRepr::encode(message)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
+    let external =
+        wallet
+            .wallet
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
+    let boc = &external.to_boc_base64()?;
+    let network_name = network.to_string();
+    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(boc)
+        .map_err(|error| format_send_boc_error(error, context))
         .context("Failed to send publication transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
     println!(
         "  {} Library should be available soon at hash: {}",
         "→".blue().bold(),
-        hex::encode(library_hash).dimmed()
+        format!("0x{}", hex::encode(library_hash)).dimmed()
     );
 
     save_library(
         contract_id.as_deref().unwrap_or("unknown"),
         &hex::encode(library_hash),
         &Boc::encode_base64(&library_code_cell),
-        &publisher_address.to_base64_url_flags(true, net == "testnet"),
+        &format_std_address(&publisher_address, &network),
         duration_seconds,
-        net,
+        if network == Network::Localnet {
+            "localnet".to_string()
+        } else {
+            net
+        },
         bits,
         cells,
         local,
         global,
+        project_root(),
     )?;
 
     println!("  {} Library info saved", "✓".green().bold());
@@ -291,7 +294,7 @@ pub fn fetch_cmd(
     let client = TonApiClient::new(network, custom_networks, api_key)?;
 
     if !json {
-        println!("  {} Fetching library: {}", "→".blue().bold(), hash);
+        println!("  {} Fetching library: 0x{hash}", "→".blue().bold());
     }
 
     let hash = HashBytes::from_str(&hash).context("Invalid library hash format")?;
@@ -414,7 +417,11 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
     );
     println!("{:<w$} {}", "Contract:".dimmed(), lib.name);
     println!("{:<w$} {}", "Network:".dimmed(), lib.network);
-    println!("{:<w$} {}", "Hash:".dimmed(), lib.hash.yellow());
+    println!(
+        "{:<w$} {}",
+        "Hash:".dimmed(),
+        format!("0x{}", lib.hash).yellow()
+    );
     println!("{:<w$} {}", "Account:".dimmed(), lib.account.yellow());
     println!(
         "{:<w$} {} ({}s)",
@@ -497,11 +504,7 @@ pub fn topup_cmd(
         "  {} Using wallet: {} {}",
         "→".blue().bold(),
         wallet_name.cyan(),
-        wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, lib.network == Network::Testnet)
-            .dimmed()
+        format_std_address(&wallet.address(), &network).dimmed()
     );
 
     let amount_to_send_nanoton = if let Some(amount_str) = amount_arg {
@@ -552,6 +555,7 @@ pub fn topup_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
+    let network_name = network.to_string();
     let api_client = TonApiClient::new(network, custom_networks, api_key)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
@@ -560,37 +564,42 @@ pub fn topup_cmd(
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
 
-    let dest_address = TonAddress::from_str(&lib.account)?;
+    let dest_address = StdAddr::from_str_ext(&lib.account, StdAddrFormat::any())
+        .with_context(|| format!("Invalid account address {}", lib.account))?
+        .0;
     let message_info = IntMsgInfo {
         ihr_disabled: true,
         bounce: true,
         bounced: false,
-        src: wallet.wallet.address.to_msg_address(),
-        dest: dest_address.to_msg_address(),
-        value: CurrencyCollection::new(BigUint::from(amount_to_send_nanoton)),
-        ihr_fee: Grams::new(BigUint::from(0u64)),
-        fwd_fee: Grams::new(BigUint::from(0u64)),
+        src: IntAddr::Std(wallet.address()),
+        dst: IntAddr::Std(dest_address),
+        value: CurrencyCollection::new(amount_to_send_nanoton),
+        ihr_fee: Default::default(),
+        fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,
     };
 
-    let message = Message {
-        info: CommonMsgInfo::Int(message_info),
+    let message = OwnedMessage {
+        info: MsgInfo::Int(message_info),
         init: None,
-        body: EitherRef::new(ArcCell::default()),
+        body: Default::default(),
+        layout: None,
     };
 
-    let message_cell = message.to_cell()?;
-    let external = wallet.wallet.create_external_msg(
-        expire_at,
-        seqno,
-        need_state_init,
-        vec![message_cell.to_arc()],
-    )?;
+    let message_cell_boc = BocRepr::encode(message)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
+    let external =
+        wallet
+            .wallet
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     println!("  {} Sending transaction...", "→".blue().bold());
+    let boc = &external.to_boc_base64()?;
+    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(boc)
+        .map_err(|error| format_send_boc_error(error, context))
         .context("Failed to send top-up transaction")?;
 
     println!(
@@ -599,7 +608,7 @@ pub fn topup_cmd(
     );
 
     let last_topup_timestamp = Local::now().to_rfc3339();
-    update_library_last_topup_timestamp(&lib_name, &last_topup_timestamp)
+    update_library_last_topup_timestamp(project_root(), &lib_name, &last_topup_timestamp)
         .context("Top-up transaction was sent, but failed to update library metadata")?;
 
     Ok(())
@@ -746,6 +755,7 @@ fn save_library(
     cells: u64,
     local: bool,
     global: bool,
+    project_root: &Path,
 ) -> anyhow::Result<()> {
     let is_global = if global {
         true
@@ -770,7 +780,7 @@ fn save_library(
         fs::create_dir_all(&global_dir)?;
         global_dir.join("global.libraries.toml")
     } else {
-        PathBuf::from("libraries.toml")
+        project_root.join("libraries.toml")
     };
 
     let mut doc = if config_path.exists() {
@@ -826,8 +836,12 @@ fn save_library(
     Ok(())
 }
 
-fn update_library_last_topup_timestamp(lib_name: &str, timestamp: &str) -> anyhow::Result<()> {
-    let local_path = PathBuf::from("libraries.toml");
+fn update_library_last_topup_timestamp(
+    project_root: &Path,
+    lib_name: &str,
+    timestamp: &str,
+) -> anyhow::Result<()> {
+    let local_path = project_root.join("libraries.toml");
     if update_library_last_topup_timestamp_in_file(&local_path, lib_name, timestamp)? {
         return Ok(());
     }
@@ -903,7 +917,7 @@ fn parse_duration(s: &str) -> anyhow::Result<u64> {
     }
 }
 
-fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<ArcCell> {
+fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<Cell> {
     let content = include_str!("librarian/librarian.tolk");
     let content = content.replace(
         "3600 * 24 * 365 * 1 // 1 year, can top-up in any time",
@@ -917,22 +931,35 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<ArcCell> {
     let acton_config = ActonConfig::load();
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &acton_config {
-        compiler = compiler.with_mappings(&config.mappings);
+        let mappings = config.mappings();
+        compiler = compiler.with_mappings(&mappings);
     }
 
     let compilation_result = compiler.compile(tmp_file_path.as_ref(), true);
     match compilation_result {
-        CompilerResult::Success(result) => Ok(ArcCell::from_boc_b64(&result.code_boc64)?),
+        CompilerResult::Success(result) => Ok(Boc::decode_base64(&result.code_boc64)?),
         CompilerResult::Error(err) => {
             anyhow::bail!("Unable to compile librarian: {}", err.message);
         }
     }
 }
 
+fn format_std_address(address: &StdAddr, network: &Network) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet: network.uses_testnet_address_format(),
+            base64_url: true,
+            bounceable: false,
+        },
+    }
+    .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration as ChronoDuration;
+    use chrono::Duration;
     use std::path::PathBuf;
     use std::sync::{LazyLock, Mutex};
     use tempfile::tempdir;
@@ -1050,10 +1077,10 @@ mod tests {
     fn elapsed_seconds_since_handles_invalid_future_and_past_values() {
         assert_eq!(elapsed_seconds_since("not-a-timestamp"), None);
 
-        let future = (Local::now() + ChronoDuration::minutes(5)).to_rfc3339();
+        let future = (Local::now() + Duration::minutes(5)).to_rfc3339();
         assert_eq!(elapsed_seconds_since(&future), Some(0));
 
-        let past = (Local::now() - ChronoDuration::minutes(2)).to_rfc3339();
+        let past = (Local::now() - Duration::minutes(2)).to_rfc3339();
         let elapsed = elapsed_seconds_since(&past).expect("must parse and compute elapsed");
         assert!(
             elapsed >= 60,
@@ -1085,6 +1112,7 @@ mod tests {
             5,
             true,
             false,
+            dir.path(),
         )
         .expect("must save library metadata");
 
@@ -1145,6 +1173,7 @@ mod tests {
             1,
             true,
             false,
+            dir.path(),
         )
         .expect("must save first library entry");
 
@@ -1159,6 +1188,7 @@ mod tests {
             2,
             true,
             false,
+            dir.path(),
         )
         .expect("must save second library entry with suffix");
 

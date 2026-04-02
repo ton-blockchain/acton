@@ -1,0 +1,2 @@
+acton script scripts/deploy.tolk
+Deployed starter contract to [WALLET_ADDRESS_BASE] (Empty)

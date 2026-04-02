@@ -1,0 +1,13 @@
+error[C001]: syntax error: unexpected `{`. Expected: ;, ->, :, |, asm, const, enum, fun, ….
+  --> contracts/broken1[LINE]
+  |
+1 | fun broken1 {
+  |             ^
+
+error[C001]: syntax error: unexpected `+`. Expected: >, }, ;, |, assert, do, false, fun, ….
+  --> contracts/broken2[LINE]
+  |
+1 | fun broken2() { val x = 1 + }
+  |                           ^
+
+Error: Failed to format 2 files due to syntax errors

@@ -1,3 +1,7 @@
+const identifierPattern = "`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*"
+const genericCallPattern = String.raw`\s*(?:<[^>]+>)?\s*\(`
+const propertyNamePattern = `(${identifierPattern})(?=\\s*:)`
+
 export const tolkGrammar = {
   $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   name: "tolk",
@@ -6,6 +10,8 @@ export const tolkGrammar = {
   foldingStopMarker: String.raw`^\s*\}`,
   fileTypes: ["tolk"],
   patterns: [
+    {include: "#structBody"},
+    {include: "#objectLiteral"},
     {
       name: "comment.line.double-slash",
       match: "//(.*)",
@@ -88,8 +94,16 @@ export const tolkGrammar = {
       match: String.raw`@\w+`,
     },
     {
+      name: "entity.name.function.method",
+      match: `(?<=\\.)(${identifierPattern})(?=${genericCallPattern})`,
+    },
+    {
+      name: "property",
+      match: `(?<=\\.)(${identifierPattern})(?!${genericCallPattern})`,
+    },
+    {
       name: "entity.name.function",
-      match: "(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*(?:<[^>]+>)?\\s*\\()",
+      match: `(${identifierPattern})(?=${genericCallPattern})`,
     },
     {
       name: "entity.name.type",
@@ -100,5 +114,33 @@ export const tolkGrammar = {
       match: "`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*",
     },
   ],
-  repository: {},
+  repository: {
+    structBody: {
+      begin: String.raw`\bstruct\b[^{]*\{`,
+      end: String.raw`\}`,
+      patterns: [
+        {
+          match: `^\\s*${propertyNamePattern}`,
+          captures: {
+            "1": {name: "meta.property-name"},
+          },
+        },
+        {include: "#objectLiteral"},
+        {include: "$self"},
+      ],
+    },
+    objectLiteral: {
+      begin: String.raw`(?:(?:=|:|,)\s*|return\s+|\(\s*)(?:[A-Z][a-zA-Z0-9_]*\s*)?\{`,
+      end: String.raw`\}`,
+      patterns: [
+        {
+          match: `(?:^\\s*|(?<=[{,])\\s*)${propertyNamePattern}`,
+          captures: {
+            "1": {name: "meta.property-name"},
+          },
+        },
+        {include: "$self"},
+      ],
+    },
+  },
 }

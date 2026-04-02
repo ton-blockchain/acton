@@ -1,0 +1,4 @@
+Error: Address not-an-address is not a valid address. Enter valid address in user-friendly EQ... or raw format 0:abcd...
+
+Caused by:
+  Invalid address

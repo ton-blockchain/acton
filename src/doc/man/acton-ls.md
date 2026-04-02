@@ -1,0 +1,110 @@
+# acton-ls(1)
+
+## NAME
+
+acton-ls --- Run the Acton language server
+
+## SYNOPSIS
+
+`acton ls` [_options_]
+
+## DESCRIPTION
+
+Start the language server used for TON language tooling.
+
+The server boots with the resolved project root, loads path mappings from
+`Acton.toml` when available, initializes the bundled standard library from
+`.acton/tolk-stdlib`, and serves requests either over stdio or a local TCP
+socket.
+
+## OPTIONS
+
+### LSP Options
+
+{{#options}}
+
+{{#option "`--port` _port_" }}
+Listen on `127.0.0.1:<port>` and accept a TCP client.
+{{/option}}
+
+{{#option "`--stdio`" }}
+Use stdio transport.
+{{/option}}
+
+{{#option "`--log-file` _path_" }}
+Write language-server logs to a custom file.
+{{/option}}
+
+{{#option "`--no-log`" }}
+Disable language-server logging setup.
+{{/option}}
+
+{{/options}}
+
+### Display Options
+
+{{> options-display }}
+
+### Project Options
+
+{{> options-project-resolved }}
+
+## TRANSPORT
+
+- if `--port` is provided, Acton binds to `127.0.0.1:<port>` and serves the
+  first accepted TCP connection
+- if `--port` is omitted and `--stdio` is not passed, Acton defaults to stdio
+- if `--stdio` is used, the server reads from stdin and writes to stdout
+- the TCP mode is single-client; after that client disconnects, the server
+  exits
+
+## LOGGING
+
+Unless `--no-log` is passed, the server configures file logging.
+
+The default log path is:
+
+```text
+.acton/tolk-language-server.log
+```
+
+Parent directories for a custom `--log-file` are created automatically.
+
+## PROJECT CONTEXT
+
+Before starting the server, Acton:
+
+- resolves the project root and manifest path
+- loads `mappings` from `Acton.toml` when present
+- preloads `.acton/tolk-stdlib/common.tolk`
+
+## EXIT STATUS
+
+- `0`: The language server started successfully and served its session.
+- `1`: Startup failed because transport binding, stdlib loading, manifest
+  resolution, or log-file setup failed.
+
+## EXAMPLES
+
+1. Run the language server over stdio:
+
+   ```bash
+   acton ls --stdio
+   ```
+
+2. Listen on a TCP port:
+
+   ```bash
+   acton ls --port 9273
+   ```
+
+3. Use a custom log file:
+
+   ```bash
+   acton ls --port 9273 --log-file logs/tolk-ls.log
+   ```
+
+## SEE ALSO
+
+- `acton help doctor`
+- [Acton documentation](https://ton-blockchain.github.io/acton/docs/welcome)

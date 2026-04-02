@@ -32,12 +32,13 @@ name = "my-ton-project"
 version = "0.1.0"
 
 [test]
-# Enable code coverage by default
-coverage = true
-coverage-format = "lcov"
-
 # Enable detailed backtraces
 backtrace = "full"
+
+[test.coverage]
+# Enable code coverage by default
+enabled = true
+format = "lcov"
 ```
 
 ## Command Line Override
@@ -147,16 +148,40 @@ backtrace = "full"
 
 ### Coverage Options
 
-| Configuration     | CLI Flag     | Type    | Description                     |
-|-------------------|--------------|---------|---------------------------------|
-| `coverage`        | `--coverage` | Boolean | Enable code coverage            |
-| `coverage-format` | `--format`   | String  | Coverage output format ("lcov") |
+| Configuration                      | CLI Flag                      | Type    | Description                                                    |
+|------------------------------------|-------------------------------|---------|----------------------------------------------------------------|
+| `[test.coverage].enabled`          | `--coverage`                  | Boolean | Enable code coverage                                           |
+| `[test.coverage].format`           | `--coverage-format`           | String  | Coverage output format (`lcov`, `text`)                        |
+| `[test.coverage].output-file`      | `--coverage-file`             | String  | Path to save the coverage report                               |
+| `[test.coverage].include-wrappers` | `--coverage-include-wrappers` | Boolean | Include files from the `@wrappers` mapping in coverage reports |
+| `[test.coverage].include-tests`    | `--coverage-include-tests`    | Boolean | Include `.test.tolk` files in coverage reports                 |
+
+**Examples:**
+```toml
+[test.coverage]
+enabled = true
+format = "lcov"
+include-wrappers = true
+include-tests = true
+```
+
+### Profiling Options
+
+| Configuration  | CLI Flag         | Type    | Description                                                           |
+|----------------|------------------|---------|-----------------------------------------------------------------------|
+| `fail-on-diff` | `--fail-on-diff` | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+
+`fail-on-diff` is applied when running baseline comparison mode with
+`--baseline-snapshot <FILE>`.
 
 **Examples:**
 ```toml
 [test]
-coverage = true
-coverage-format = "lcov"
+fail-on-diff = true
+```
+
+```bash
+acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 ```
 
 ### JUnit Options
@@ -186,7 +211,7 @@ api-key = "YOUR_API_KEY"
 Using a custom network:
 ```toml
 [networks.my-local-node]
-v2-url = "http://localhost:8081/api/v2/jsonRPC"
+api = { v2 = "http://localhost:8081/api/v2/jsonRPC" }
 
 [test]
 fork-net = "my-local-node"

@@ -1,1 +1,1 @@
-Error: Failed to save Fift file readonly/output.fif: Permission denied (os error 13)
+Error: Failed to save Fift file readonly/output.fif: Permission denied ([OS_ERROR])

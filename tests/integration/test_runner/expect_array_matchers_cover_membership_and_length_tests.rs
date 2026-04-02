@@ -22,7 +22,7 @@ fn run_expect_array_suite(
 fn expect_array_matchers_accept_empty_and_non_empty_arrays() {
     run_expect_array_suite(
         "stdlib-expect-array-success",
-        r#"
+        r"
 get fun `test-stdlib-array-matchers-non-empty`() {
     val values = [1, 2, 3];
 
@@ -39,7 +39,7 @@ get fun `test-stdlib-array-matchers-empty`() {
     expect(values).toNotContain(1);
     expect(values).toHaveLength(0);
 }
-"#,
+",
     )
     .success()
     .assert_passed(2)
@@ -52,7 +52,7 @@ get fun `test-stdlib-array-matchers-empty`() {
 fn expect_array_matchers_report_membership_and_length_mismatches() {
     run_expect_array_suite(
         "stdlib-expect-array-failures",
-        r#"
+        r"
 get fun `test-stdlib-array-to-contain-missing`() {
     val values = [10, 20];
     expect(values).toContain(30);
@@ -77,7 +77,7 @@ get fun `test-stdlib-array-to-have-length-mismatch`() {
     val values = [1, 2, 3];
     expect(values).toHaveLength(4);
 }
-"#,
+",
     )
     .failure()
     .assert_failed(5)

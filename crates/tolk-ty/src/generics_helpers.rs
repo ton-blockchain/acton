@@ -50,8 +50,8 @@ impl GenericSubstitutionsDeducing {
     /// for every argument, `consider_next_condition()` is called
     /// example: `f<T1, T2>(a: int, b: T1, c: (T1, T2))` and call `f(6, 7, (8, cs))`
     /// - `a` does not affect, it doesn't depend on generic Ts
-    /// - next condition: param_type = `T1`, arg_type = `int`, deduce T1 = int
-    /// - next condition: param_type = `(T1, T2)` = `(int, T2)`, arg_type = `(int, slice)`, deduce T2 = slice
+    /// - next condition: `param_type` = `T1`, `arg_type` = `int`, deduce T1 = int
+    /// - next condition: `param_type` = `(T1, T2)` = `(int, T2)`, `arg_type` = `(int, slice)`, deduce T2 = slice
     pub(crate) fn consider_next_condition(
         &mut self,
         param_ty: TyId,
@@ -103,15 +103,14 @@ impl GenericSubstitutionsDeducing {
                 let mut is_sub_correct = true;
 
                 for &p_v in &p_variants {
-                    if !interner.has_generics(p_v) {
-                        if let Some(pos) = a_sub_p.iter().position(|&a_v| interner.equals(a_v, p_v))
-                        {
-                            a_sub_p.remove(pos);
-                        } else {
-                            is_sub_correct = false;
-                        }
-                    } else {
+                    if interner.has_generics(p_v) {
                         p_generic.push(p_v);
+                    } else if let Some(pos) =
+                        a_sub_p.iter().position(|&a_v| interner.equals(a_v, p_v))
+                    {
+                        a_sub_p.remove(pos);
+                    } else {
+                        is_sub_correct = false;
                     }
                 }
 

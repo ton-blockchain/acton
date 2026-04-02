@@ -3,13 +3,13 @@ use crossbeam_channel::{Receiver, Sender};
 use dap::events::Event;
 use dap::prelude::{Command, Request, Response, ResponseBody};
 use dap::requests::{
-    ContinueArguments, InitializeArguments, LaunchRequestArguments, NextArguments, ScopesArguments,
-    SetBreakpointsArguments, StackTraceArguments, StepInArguments, StepOutArguments,
-    TerminateArguments, VariablesArguments,
+    ContinueArguments, ExceptionInfoArguments, InitializeArguments, LaunchRequestArguments,
+    NextArguments, ScopesArguments, SetBreakpointsArguments, StackTraceArguments, StepInArguments,
+    StepOutArguments, TerminateArguments, VariablesArguments,
 };
 use dap::responses::{
-    ContinueResponse, ScopesResponse, SetBreakpointsResponse, StackTraceResponse, ThreadsResponse,
-    VariablesResponse,
+    ContinueResponse, ExceptionInfoResponse, ScopesResponse, SetBreakpointsResponse,
+    StackTraceResponse, ThreadsResponse, VariablesResponse,
 };
 use dap::types::{Capabilities, Source, SourceBreakpoint};
 use log::{debug, info};
@@ -174,8 +174,12 @@ impl DapClient {
 
     pub fn wait_for_response(&self, seq: u64, timeout: Duration) -> Result<Response> {
         let start = std::time::Instant::now();
+        let mut pending_events = Vec::new();
         loop {
             if start.elapsed() > timeout {
+                for event in pending_events.into_iter() {
+                    self.event_sender.send(event).unwrap_or(());
+                }
                 return Err(anyhow!("Timeout waiting for response seq={seq}"));
             }
 
@@ -184,15 +188,23 @@ impl DapClient {
                 .recv_timeout(Duration::from_millis(100))
                 && response_seq == seq
             {
+                for event in pending_events.into_iter() {
+                    self.event_sender.send(event).unwrap_or(());
+                }
                 return Ok(response);
             }
 
-            if let Ok(event) = self.event_receiver.recv_timeout(Duration::from_millis(100))
-                && matches!(event, Event::Terminated(_))
-            {
-                anyhow::bail!(
-                    "The debugger terminated, probably because you stepped too many times, check stacktrace"
-                );
+            if let Ok(event) = self.event_receiver.recv_timeout(Duration::from_millis(100)) {
+                if matches!(event, Event::Terminated(_)) {
+                    for event in pending_events.into_iter() {
+                        self.event_sender.send(event).unwrap_or(());
+                    }
+                    anyhow::bail!(
+                        "The debugger terminated, probably because you stepped too many times, check stacktrace"
+                    );
+                }
+
+                pending_events.push(event);
             }
         }
     }
@@ -224,7 +236,7 @@ impl DapClient {
             supports_start_debugging_request: Some(false),
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Initialize response: {response:?}");
 
         match response.body {
@@ -240,7 +252,7 @@ impl DapClient {
             additional_data: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Launch response: {response:?}");
         Ok(())
     }
@@ -258,7 +270,7 @@ impl DapClient {
             source_modified: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("SetBreakpoints response: {response:?}");
 
         match response.body {
@@ -272,7 +284,7 @@ impl DapClient {
     pub fn configuration_done(&mut self) -> Result<()> {
         let seq = self.send_request(Command::ConfigurationDone)?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("ConfigurationDone response: {response:?}");
         Ok(())
     }
@@ -283,7 +295,7 @@ impl DapClient {
             single_thread: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Continue response: {response:?}");
 
         match response.body {
@@ -297,7 +309,7 @@ impl DapClient {
     pub fn threads(&mut self) -> Result<ThreadsResponse> {
         let seq = self.send_request(Command::Threads)?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Threads response: {response:?}");
 
         match response.body {
@@ -316,7 +328,7 @@ impl DapClient {
             format: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("StackTrace response: {response:?}");
 
         match response.body {
@@ -331,7 +343,7 @@ impl DapClient {
     pub fn scopes(&mut self, frame_id: i64) -> Result<ScopesResponse> {
         let seq = self.send_request(Command::Scopes(ScopesArguments { frame_id }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Scopes response: {response:?}");
 
         match response.body {
@@ -349,13 +361,31 @@ impl DapClient {
             format: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Variables response: {response:?}");
 
         match response.body {
             Some(ResponseBody::Variables(result)) => Ok(result),
             _ => Ok(VariablesResponse {
                 variables: Vec::new(),
+            }),
+        }
+    }
+
+    pub fn exception_info(&mut self, thread_id: i64) -> Result<ExceptionInfoResponse> {
+        let seq =
+            self.send_request(Command::ExceptionInfo(ExceptionInfoArguments { thread_id }))?;
+
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
+        debug!("ExceptionInfo response: {response:?}");
+
+        match response.body {
+            Some(ResponseBody::ExceptionInfo(result)) => Ok(result),
+            _ => Ok(ExceptionInfoResponse {
+                exception_id: String::new(),
+                break_mode: dap::types::ExceptionBreakMode::Never,
+                description: None,
+                details: None,
             }),
         }
     }
@@ -368,7 +398,7 @@ impl DapClient {
             granularity: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("StepIn response: {response:?}");
         Ok(())
     }
@@ -380,7 +410,7 @@ impl DapClient {
             granularity: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("StepOver response: {response:?}");
         Ok(())
     }
@@ -392,7 +422,7 @@ impl DapClient {
             granularity: None,
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("StepOut response: {response:?}");
         Ok(())
     }
@@ -402,7 +432,7 @@ impl DapClient {
             restart: Some(false),
         }))?;
 
-        let response = self.wait_for_response(seq, Duration::from_secs(5))?;
+        let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Terminate response: {response:?}");
         Ok(())
     }

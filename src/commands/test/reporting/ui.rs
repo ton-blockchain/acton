@@ -1,5 +1,7 @@
+use crate::commands::common::error_fmt;
 use crate::commands::test::reporting::{TestReport, TestReporter};
 use acton_config::color::OwoColorize;
+use anyhow::Context;
 use axum::{
     Router,
     extract::{Path as AxumPath, Query, State},
@@ -10,9 +12,8 @@ use axum::{
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tower_http::cors::CorsLayer;
 #[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
 
@@ -28,8 +29,10 @@ static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
 
 pub(crate) struct UiServerState {
     pub reports: Arc<Vec<TestReport>>,
-    pub trace_dir: Option<String>,
+    pub trace_dir: Option<PathBuf>,
     pub project_root: String,
+    pub project_root_path: PathBuf,
+    pub coverage_lcov: Option<Arc<str>>,
 }
 
 pub(crate) struct UiReporter {
@@ -58,24 +61,33 @@ impl TestReporter for UiReporter {
     }
 }
 
+pub(crate) fn reserve_ui_listener(port: u16) -> anyhow::Result<std::net::TcpListener> {
+    let address = format!("127.0.0.1:{port}");
+    std::net::TcpListener::bind(&address)
+        .with_context(|| error_fmt::port_bind_failure("UI server", &address, "--ui-port"))
+}
+
 pub(crate) async fn start_ui_server(
     reports: Vec<TestReport>,
     trace_dir: Option<String>,
     project_root: String,
-    port: u16,
+    coverage_lcov: Option<String>,
+    listener: std::net::TcpListener,
 ) -> anyhow::Result<()> {
+    let project_root_path =
+        dunce::canonicalize(&project_root).unwrap_or_else(|_| PathBuf::from(&project_root));
+    let trace_dir = trace_dir
+        .map(PathBuf::from)
+        .map(|path| dunce::canonicalize(&path).unwrap_or(path));
     let state = Arc::new(UiServerState {
         reports: Arc::new(reports),
         trace_dir,
         project_root,
+        project_root_path,
+        coverage_lcov: coverage_lcov.map(Arc::<str>::from),
     });
 
-    let app = Router::new()
-        .route("/api/reports", get(handle_api_reports))
-        .route("/api/trace/{name}", get(handle_api_trace))
-        .route("/api/contract/{name}", get(handle_api_contract))
-        .route("/api/file", get(handle_api_file))
-        .route("/api/config", get(handle_api_config));
+    let app = build_ui_api_router(state);
 
     // In debug mode, serve UI assets directly from the filesystem for faster development.
     #[cfg(debug_assertions)]
@@ -93,16 +105,33 @@ pub(crate) async fn start_ui_server(
     #[cfg(not(debug_assertions))]
     let app = app.fallback(handle_embedded_ui);
 
-    let app = app.layer(CorsLayer::permissive()).with_state(state);
-
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
-    let url = format!("http://127.0.0.1:{port}");
+    let address = listener
+        .local_addr()
+        .context("Failed to inspect reserved UI server address")?;
+    listener
+        .set_nonblocking(true)
+        .with_context(|| format!("Failed to configure UI server socket on {address}"))?;
+    let listener = tokio::net::TcpListener::from_std(listener)
+        .with_context(|| format!("Failed to activate UI server on {address}"))?;
+    let url = format!("http://{address}");
     println!("     {} UI server at {}", "Starting".green().bold(), url);
 
     open_browser(&url);
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
+    Router::new()
+        .route("/api/reports", get(handle_api_reports))
+        .route("/api/test-logs", get(handle_api_test_logs))
+        .route("/api/trace/{name}", get(handle_api_trace))
+        .route("/api/contract/{name}", get(handle_api_contract))
+        .route("/api/file", get(handle_api_file))
+        .route("/api/coverage.lcov", get(handle_api_coverage_lcov))
+        .route("/api/config", get(handle_api_config))
+        .with_state(state)
 }
 
 fn open_browser(url: &str) {
@@ -196,12 +225,67 @@ async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl Int
 }
 
 #[derive(Deserialize)]
+struct TestLogsQuery {
+    file_path: String,
+    name: String,
+    row: usize,
+    column: usize,
+}
+
+#[derive(Default, Serialize)]
+struct TestExecutionLogsResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    stdout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    stderr: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vm_log_diff: Option<String>,
+}
+
+async fn handle_api_test_logs(
+    Query(query): Query<TestLogsQuery>,
+    State(state): State<Arc<UiServerState>>,
+) -> impl IntoResponse {
+    let file_path = Path::new(&query.file_path);
+    let Some(test) = state.reports.iter().find(|report| {
+        report.file_path == file_path
+            && report.name.as_ref() == query.name
+            && report.row == query.row
+            && report.column == query.column
+    }) else {
+        return (StatusCode::NOT_FOUND, "Test not found").into_response();
+    };
+
+    let response =
+        test.execution
+            .as_ref()
+            .map_or_else(TestExecutionLogsResponse::default, |execution| {
+                TestExecutionLogsResponse {
+                    stdout: non_empty_text(&execution.stdout),
+                    stderr: non_empty_text(&execution.stderr),
+                    vm_log_diff: execution.vm_log_diff.clone(),
+                }
+            });
+
+    Json(response).into_response()
+}
+
+#[derive(Deserialize)]
 struct FileQuery {
     path: String,
 }
 
-async fn handle_api_file(Query(query): Query<FileQuery>) -> impl IntoResponse {
-    match tokio::fs::read_to_string(&query.path).await {
+async fn handle_api_file(
+    Query(query): Query<FileQuery>,
+    State(state): State<Arc<UiServerState>>,
+) -> impl IntoResponse {
+    let requested_path = PathBuf::from(&query.path);
+    let Some(file_path) = resolve_path_within_root(&state.project_root_path, &requested_path)
+    else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
+
+    match tokio::fs::read_to_string(file_path).await {
         Ok(content) => content.into_response(),
         Err(_) => (StatusCode::NOT_FOUND, "File not found").into_response(),
     }
@@ -218,6 +302,18 @@ async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl Into
     })
 }
 
+async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
+    let Some(coverage_lcov) = &state.coverage_lcov else {
+        return (StatusCode::NOT_FOUND, "Coverage not enabled").into_response();
+    };
+
+    (
+        [("content-type", "text/plain; charset=utf-8")],
+        coverage_lcov.to_string(),
+    )
+        .into_response()
+}
+
 async fn handle_api_trace(
     AxumPath(name): AxumPath<String>,
     State(state): State<Arc<UiServerState>>,
@@ -226,7 +322,10 @@ async fn handle_api_trace(
         return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
     };
 
-    let trace_path = PathBuf::from(trace_dir).join(name);
+    let Some(trace_path) = resolve_path_within_root(trace_dir, Path::new(&name)) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
+
     match tokio::fs::read_to_string(trace_path).await {
         Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
             Ok(json) => Json(json).into_response(),
@@ -244,9 +343,12 @@ async fn handle_api_contract(
         return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
     };
 
-    let contract_path = PathBuf::from(trace_dir)
-        .join("contracts")
-        .join(format!("{name}.json"));
+    let contracts_dir = trace_dir.join("contracts");
+    let contract_name = format!("{name}.json");
+    let Some(contract_path) = resolve_path_within_root(&contracts_dir, Path::new(&contract_name))
+    else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
 
     match tokio::fs::read_to_string(contract_path).await {
         Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
@@ -255,4 +357,18 @@ async fn handle_api_contract(
         },
         Err(_) => (StatusCode::NOT_FOUND, "Contract not found").into_response(),
     }
+}
+
+fn resolve_path_within_root(root: &Path, requested: &Path) -> Option<PathBuf> {
+    let candidate = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        root.join(requested)
+    };
+    let candidate = dunce::canonicalize(candidate).ok()?;
+    candidate.starts_with(root).then_some(candidate)
+}
+
+fn non_empty_text(value: &str) -> Option<String> {
+    (!value.trim().is_empty()).then(|| value.to_owned())
 }

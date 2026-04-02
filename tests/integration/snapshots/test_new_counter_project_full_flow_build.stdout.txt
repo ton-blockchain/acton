@@ -1,4 +1,4 @@
    Compiling contracts
-   Compiling counter
+   Compiling Counter
     Finished in [TIME]
     Finished in [TIME]

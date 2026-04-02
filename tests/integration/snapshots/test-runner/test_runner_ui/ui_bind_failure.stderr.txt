@@ -1,0 +1,6 @@
+Error: Failed to start UI server on [LOCALHOST_ADDR]
+Choose another port with --ui-port
+Or stop the process currently listening on that port
+
+Caused by:
+  Address already in use ([OS_ERROR])

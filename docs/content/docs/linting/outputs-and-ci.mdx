@@ -1,6 +1,6 @@
 ---
 title: "Outputs and CI"
-description: "Use JSON, SARIF, GitHub annotations, and exit codes in automation"
+description: "Use JSON, SARIF, GitHub annotations and GitLab Code Quality in automation"
 ---
 
 ## Console Output
@@ -59,6 +59,16 @@ For GitHub Actions annotations, keep this output on `stdout` so the runner can p
 
 Like other non-plain formats, this mode never applies file edits.
 
+## GitLab Code Quality
+
+```bash
+acton check --output-format gitlab --output-file gl-code-quality-report.json
+```
+
+This format writes GitLab Code Quality JSON report entries (Code Climate style), so merge requests can show inline findings and the Code Quality widget.
+
+Like other non-plain formats, this mode never applies file edits.
+
 ## Exit Code Rules
 
 `acton check` exits with non-zero code when:
@@ -75,4 +85,4 @@ Example CI policy:
 max-warnings = 0
 ```
 
-These exit rules are the same for all output formats (`plain`, `json`, `sarif`, `github`).
+These exit rules are the same for all output formats (`plain`, `json`, `sarif`, `github`, `gitlab`).

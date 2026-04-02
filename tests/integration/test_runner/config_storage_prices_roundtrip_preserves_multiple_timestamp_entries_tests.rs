@@ -25,7 +25,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_storage_prices_roundtrip_preserves_multiple_timestamp_entries() {
     run_config_success_case(
         "dr-stdlib-config-storage-prices-multi-entry-roundtrip",
-        r#"
+        r"
 get fun `test-dr-stdlib-config-storage-prices-multi-entry-roundtrip`() {
     val tsA: uint32 = 1700000000;
     val tsB: uint32 = 1700003600;
@@ -85,7 +85,7 @@ get fun `test-dr-stdlib-config-storage-prices-multi-entry-roundtrip`() {
     expect(entryB.masterchainBitPrice).toEqual(707);
     expect(entryB.masterchainCellPrice).toEqual(808);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_roundtrip_preserves_multiple_timestamp_entries/config_storage_prices_roundtrip_preserves_multiple_timestamp_entries.stdout.txt",
     );
 }
@@ -94,7 +94,7 @@ get fun `test-dr-stdlib-config-storage-prices-multi-entry-roundtrip`() {
 fn config_storage_prices_roundtrip_replaces_old_dictionary_entries_on_second_write() {
     run_config_success_case(
         "dr-stdlib-config-storage-prices-second-write-replacement",
-        r#"
+        r"
 get fun `test-dr-stdlib-config-storage-prices-second-write-replacement`() {
     val oldTsA: uint32 = 1800000000;
     val oldTsB: uint32 = 1800003600;
@@ -168,7 +168,7 @@ get fun `test-dr-stdlib-config-storage-prices-second-write-replacement`() {
     expect(replacement.masterchainBitPrice).toEqual(1003);
     expect(replacement.masterchainCellPrice).toEqual(1004);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_roundtrip_preserves_multiple_timestamp_entries/config_storage_prices_roundtrip_replaces_old_dictionary_entries_on_second_write.stdout.txt",
     );
 }

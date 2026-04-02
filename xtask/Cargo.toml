@@ -1,0 +1,31 @@
+[package]
+name = "xtask"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lints]
+workspace = true
+
+[dependencies]
+acton-config = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml_edit = { workspace = true }
+owo-colors = { workspace = true }
+reqwest = { workspace = true }
+urlencoding = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+indicatif = { workspace = true }
+parse-changelog = { version = "0.6.15", default-features = false }

@@ -1,11 +1,12 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::anyhow;
 use std::process::{Command, Stdio};
 
 pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
+    let project_root = configured_project_root();
 
     let scripts = config
         .scripts
@@ -45,6 +46,7 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
         cmd.arg("-c")
             .arg(cmdline)
             .arg("--")
+            .current_dir(project_root)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
@@ -106,6 +108,7 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
             .arg("/S") // correctly process quotes
             .arg("/C")
             .arg(full_line)
+            .current_dir(project_root)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())

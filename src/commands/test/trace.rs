@@ -6,8 +6,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tolkc::TolkSourceMap;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
-use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,8 +32,9 @@ pub(super) struct TransactionList {
 pub(super) struct ContractInfo {
     pub name: String,
     pub code_boc64: String,
-    pub source_map: Arc<SourceMap>,
+    pub source_map: TolkSourceMap,
     pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,6 +62,8 @@ pub struct FailedMessageInfo {
     pub vm_exit_code: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor_logs: Option<Arc<str>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_libraries: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -181,8 +185,9 @@ pub(super) fn dump_test_transactions(
                     let contract_info = build.map(|(_, info)| ContractInfo {
                         name: info.name.clone(),
                         code_boc64: info.code_boc64.clone(),
-                        source_map: info.source_map.clone(),
+                        source_map: (*info.source_map).clone(),
                         abi: info.abi,
+                        compiler_abi: info.compiler_abi,
                     });
 
                     TransactionInfo {
@@ -238,9 +243,10 @@ pub(super) fn dump_test_transactions(
     for result in build_cache.built.values() {
         let info = ContractInfo {
             abi: result.abi.clone(),
+            compiler_abi: result.compiler_abi.clone(),
             name: result.name.clone(),
             code_boc64: result.code_boc64.clone(),
-            source_map: result.source_map.clone(),
+            source_map: (*result.source_map).clone(),
         };
 
         known_contracts.insert(result.name.clone(), info);
@@ -282,11 +288,19 @@ pub(super) fn dump_test_transactions(
 
 #[must_use]
 fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
+    let mut missing_libraries = message
+        .missing_libraries
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    missing_libraries.sort_unstable();
+
     FailedMessageInfo {
         error: message.error.clone(),
         vm_log_diff: message.vm_log.as_deref().map(vmlogs::convert_to_diff_logs),
         vm_exit_code: message.vm_exit_code,
         executor_logs: message.executor_logs.clone(),
+        missing_libraries,
     }
 }
 

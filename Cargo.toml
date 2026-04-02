@@ -1,36 +1,54 @@
 [package]
 name = "acton"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[package.metadata.dist]
+dist = true
 
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "xtask"]
 
 exclude = [
-    "crates/acton-test-ui",
-    "crates/acton-shared-ui",
-    "crates/acton-litenode-ui",
+  "crates/acton-test-ui",
+  "crates/acton-shared-ui",
+  "crates/acton-litenode-ui",
 ]
 
 [workspace.package]
-version = "0.0.8"
+version = "0.1.5"
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.90.0"
-homepage = "https://i582.github.io/acton"
-documentation = "https://i582.github.io/acton/docs/welcome"
-repository = "https://github.com/i582/acton"
-license = "MIT"
+rust-version = "1.93.0"
+homepage = "https://ton-blockchain.github.io/acton"
+documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
+repository = "https://github.com/ton-blockchain/acton"
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
+acton-debug = { path = "crates/acton-debug" }
+acton-mdman = { path = "crates/acton-mdman" }
+ton-objs = { path = "crates/ton-objs" }
 tolkc = { path = "crates/tolkc" }
 ton-abi = { path = "crates/ton-abi" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
+tasm-syntax = { path = "crates/tasm-syntax" }
+fift-syntax = { path = "crates/fift-syntax" }
+toml-syntax = { path = "crates/toml-syntax" }
+tlb-syntax = { path = "crates/tlb-syntax" }
+ton-json-schema = { path = "crates/ton-json-schema" }
+ton-syntax = { path = "crates/ton-syntax" }
 tolk-resolver = { path = "crates/tolk-resolver" }
 tolk-ty = { path = "crates/tolk-ty" }
 tolk-analysis = { path = "crates/tolk-analysis" }
@@ -50,11 +68,18 @@ ton-litenode = { path = "crates/ton-litenode" }
 ton-ls = { path = "crates/ton-ls" }
 ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
+tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
+tree-sitter-fift = { path = "crates/tree-sitter-fift" }
+tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
+tree-sitter-toml-ng = "0.7.0"
+handlebars = { version = "6.4.0", features = ["dir_source"] }
+pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
+url = "2.5.7"
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
-tonlib-core = "0.26.6"
+ton = "0.1.2"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
 
 num-bigint = "0.4.6"
@@ -76,7 +101,11 @@ globset = "0.4"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 serde-sarif = "0.8.0"
+schemars = { version = "0.8.22", features = ["derive"] }
 toml = "0.9.8"
+jsonschema = { version = "0.45.0", default-features = false }
+referencing = "0.45.0"
+jsonptr = "0.7.1"
 
 include_dir = "0.7" # include stdlib and Acton lib
 inquire = "0.9.1" # for interactive cli
@@ -103,6 +132,7 @@ pathdiff = "0.2.3"
 strsim = "0.11.1"
 clap_complete = { version = "4.5.61", features = ["unstable-dynamic"] }
 human-panic = "2.0.5" # better panic handling
+crash-handler = "0.7.0" # low-level fatal signal/exception handling
 
 # acton up
 semver = "1.0.27"
@@ -113,12 +143,13 @@ tar = "0.4.44"
 # axum for test ui
 axum = "0.8.1"
 tower-http = { version = "0.6.2", features = ["fs", "cors"] }
+tower_governor = "0.8.0"
 opener = "0.8.4"
 
 # acton wallet
 hmac = "0.12.1"
 ring = "0.17"
-nacl = "0.5.3"
+ed25519-dalek = "2.2.0"
 toml_edit = "0.24.0"
 
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "full"] }
@@ -133,13 +164,13 @@ codespan-reporting = "0.11.1"
 # acton ls
 tower-lsp = "0.20"
 lsp-types = "0.94.1"
+tree-sitter-language = "0.1"
 
 # other
 rustc-hash = "2.1.1"
 smol_str = "0.3.5"
 dashmap = "7.0.0-rc2"
 expect-test = "1.5.0"
-#tree-sitter-tolk = "0.0.5"
 memchr = "2.7.6"
 pkg-config = "0.3.32"
 thiserror = "2.0.18"
@@ -150,16 +181,20 @@ quote = "1.0.43"
 syn = { version = "2.0.114", features = ["derive", "parsing", "extra-traits", "full"] }
 itertools = "0.14.0"
 heck = "0.5.0"
-pretty = "0.12.5"
 winnow = "0.7.13"
 dunce = "1.0.5"
 path-absolutize = "3.1.1"
 tracing = "0.1"
 function_name = "0.3.0"
+parking_lot = "0.12.5"
+
+cc = "1.2"
 
 [dependencies]
-# local creates
+# local crates
 acton-config = { workspace = true }
+acton-debug = { workspace = true }
+acton-mdman = { workspace = true }
 tolkc = { workspace = true }
 ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
@@ -174,7 +209,6 @@ dashmap = { workspace = true }
 tvmffi = { workspace = true }
 vmlogs = { workspace = true }
 tasm = { workspace = true }
-dap-client = { workspace = true }
 ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
@@ -183,7 +217,7 @@ ton-litenode = { workspace = true }
 
 # remote crates
 # base TON libraries
-tonlib-core = { workspace = true }
+ton = { workspace = true }
 tycho-types = { workspace = true }
 
 num-bigint = { workspace = true }
@@ -191,7 +225,6 @@ num-traits = { workspace = true }
 
 hex = { workspace = true }
 crc = { workspace = true }
-owo-colors = { workspace = true } # overall coloring
 comfy-table = { workspace = true } # coverage table
 tree-sitter = { workspace = true } # tolk parser
 clap = { workspace = true } # CLI
@@ -211,8 +244,6 @@ toml = { workspace = true }
 
 include_dir = { workspace = true } # include stdlib and Acton lib
 inquire = { workspace = true } # for interactive cli
-crossbeam-channel = { workspace = true } # dap communication
-dap = { workspace = true }
 log = { workspace = true } # overall logging
 fern = { workspace = true } # overall logging
 chrono = { workspace = true }
@@ -233,6 +264,7 @@ pathdiff = { workspace = true }
 strsim = { workspace = true }
 clap_complete = { workspace = true }
 human-panic = { workspace = true } # better panic handling
+crash-handler = { workspace = true } # low-level fatal signal/exception handling
 
 # acton up
 semver = { workspace = true }
@@ -248,7 +280,7 @@ opener = { workspace = true }
 # acton wallet
 hmac = { workspace = true }
 ring = { workspace = true }
-nacl = { workspace = true }
+ed25519-dalek = { workspace = true }
 toml_edit = { workspace = true }
 
 tokio = { workspace = true }
@@ -260,7 +292,6 @@ similar = { workspace = true }
 # actin check
 codespan-reporting = { workspace = true }
 rustc-hash = { workspace = true }
-function_name = { workspace = true }
 path-absolutize = { workspace = true }
 
 [dev-dependencies]
@@ -269,15 +300,25 @@ strip-ansi-escapes = "0.2.1"
 fs_extra = "1.3.0"
 base64 = { workspace = true }
 expectrl = "0.5.2"
+dap-client = { workspace = true }
+function_name = { workspace = true }
+owo-colors = { workspace = true } # overall coloring
+dap = { workspace = true }
 
 [build-dependencies]
 chrono = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
 
 # save ~15% of size (29mb -> 23mb), but very slow to compile/link
 [profile.release-size]
 inherits = "release"
 lto = "fat"
 codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release-size"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -320,6 +361,9 @@ workspace = true
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
 profiling = ["ton-ls/profiling"]
 only_ci = []
+
+[lib]
+doctest = false
 
 #[profile.release]
 #debug = "full"

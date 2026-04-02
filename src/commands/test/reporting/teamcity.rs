@@ -2,15 +2,14 @@ use super::{TestReport, TestReporter, TestStatus, TestSuiteStats, extract_suite_
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
+use std::borrow::Cow;
 use std::path::Path;
 
-pub(crate) struct TeamCityReporter {
-    formatter: Option<FormatterContext<'static>>,
-}
+pub(crate) struct TeamCityReporter;
 
 impl TeamCityReporter {
     pub(crate) const fn new() -> Self {
-        Self { formatter: None }
+        Self
     }
 
     /// See <https://www.jetbrains.com/help/teamcity/service-messages.html#Escaped+Values>
@@ -23,6 +22,26 @@ impl TeamCityReporter {
             .replace('\'', "|'")
     }
 
+    fn formatter_for_test<'a>(&self, test: &'a TestReport) -> Option<FormatterContext<'a>> {
+        let failure = test.execution.as_ref()?.failure.as_ref()?;
+
+        Some(FormatterContext {
+            contract_abi: test.abi.clone(),
+            accounts: Cow::Borrowed(&failure.accounts),
+            build_cache: Cow::Borrowed(&failure.build_cache),
+            emulations: Cow::Borrowed(&failure.emulations),
+            known_addresses: Cow::Borrowed(&failure.known_addresses),
+            known_code_cells: Cow::Borrowed(&failure.known_code_cells),
+            show_bodies: test.show_bodies,
+            has_wallets_config: false,
+            available_wallets: vec![],
+            backtrace: test.backtrace,
+            fork_net: None,
+            network: None,
+            api_key: None,
+        })
+    }
+
     fn format_test_failure(
         &self,
         test: &TestReport,
@@ -31,6 +50,7 @@ impl TeamCityReporter {
         let mut details = String::new();
         let mut expected: Option<String> = None;
         let mut actual: Option<String> = None;
+        let formatter = self.formatter_for_test(test);
 
         if let Some(exec) = &test.execution
             && let Some(ref assert_failure) = exec.assert_failure
@@ -43,7 +63,22 @@ impl TeamCityReporter {
                 AssertFailure::Bin(bin_failure) => match bin_failure.operator.as_str() {
                     "==" => {
                         message = "Values are not equal".to_string();
-                        if let Some(formatter) = &self.formatter {
+                        if let Some(formatter) = &formatter {
+                            expected = Some(formatter.format_tuple_value(
+                                &bin_failure.right,
+                                &bin_failure.right_type,
+                                0,
+                            ));
+                            actual = Some(formatter.format_tuple_value(
+                                &bin_failure.left,
+                                &bin_failure.left_type,
+                                0,
+                            ));
+                        }
+                    }
+                    _ if bin_failure.is_ord() => {
+                        message = "Comparison failed".to_string();
+                        if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
                                 &bin_failure.right_type,
@@ -65,6 +100,11 @@ impl TeamCityReporter {
                 },
                 AssertFailure::Fail(_) => {
                     message = "Test assertion failed".to_string();
+                }
+                AssertFailure::GetMethod(failure) => {
+                    message = FormatterContext::strip_ansi_text(
+                        &FormatterContext::format_get_method_assert_failure_title(failure),
+                    );
                 }
                 AssertFailure::TransactionNotFound(_) => {
                     message = "Transaction not found".to_string();

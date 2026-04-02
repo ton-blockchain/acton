@@ -5,6 +5,7 @@ import {FiChevronRight} from "react-icons/fi"
 import type {TestReport, Trace} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
+import {Coverage} from "./components/Coverage/Coverage"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
 
@@ -20,6 +21,12 @@ export const App: React.FC = () => {
     )
   })
   const [loading, setLoading] = useState(true)
+  const [coverageLcov, setCoverageLcov] = useState<string | undefined>()
+  const [coverageLoaded, setCoverageLoaded] = useState(false)
+  const [activeView, setActiveView] = useState<"tests" | "coverage">(() => {
+    const saved = localStorage.getItem("activeMainView")
+    return saved === "coverage" ? "coverage" : "tests"
+  })
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark")
@@ -28,6 +35,10 @@ export const App: React.FC = () => {
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => (prev === "light" ? "dark" : "light"))
+  }, [])
+  const handleActiveViewChange = useCallback((view: "tests" | "coverage") => {
+    setActiveView(view)
+    localStorage.setItem("activeMainView", view)
   }, [])
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebarWidth")
@@ -92,38 +103,94 @@ export const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    void fetch("/api/config")
+    const coverageController = new AbortController()
+    const reportsController = new AbortController()
+    const configController = new AbortController()
+
+    void fetch("/api/config", {signal: configController.signal})
       .then(async res => (await res.json()) as {project_root: string})
       .then(data => {
         setProjectRoot(data.project_root)
       })
       .catch(error => {
+        if (error instanceof Error && error.name === "AbortError") {
+          return
+        }
+
         console.error("Failed to fetch config", error)
       })
 
-    void fetch("/api/reports")
+    void fetch("/api/reports", {signal: reportsController.signal})
       .then(async res => (await res.json()) as TestReport[])
       .then(data => {
         setReports(data)
-        if (data.length > 0 && !selectedTest) {
-          const savedTestId = localStorage.getItem("selectedTest")
-          let testToSelect = data[0]
-
-          if (savedTestId) {
-            const found = data.find(t => `${t.suite_name}::${t.name}` === savedTestId)
-            if (found) {
-              testToSelect = found
-            }
-          }
-          handleSelectTest(testToSelect)
-        }
         setLoading(false)
       })
       .catch(error => {
+        if (error instanceof Error && error.name === "AbortError") {
+          return
+        }
+
         console.error("Failed to fetch reports", error)
         setLoading(false)
       })
-  }, [handleSelectTest, selectedTest])
+
+    void fetch("/api/coverage.lcov", {signal: coverageController.signal})
+      .then(async response => {
+        if (response.status === 404) {
+          setCoverageLcov(undefined)
+          setCoverageLoaded(true)
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch coverage report: ${response.status}`)
+        }
+
+        const lcov = await response.text()
+        setCoverageLcov(lcov)
+        setCoverageLoaded(true)
+      })
+      .catch(error => {
+        if (error instanceof Error && error.name === "AbortError") {
+          return
+        }
+
+        console.error("Failed to fetch coverage report", error)
+        setCoverageLcov(undefined)
+        setCoverageLoaded(true)
+      })
+
+    return () => {
+      coverageController.abort()
+      reportsController.abort()
+      configController.abort()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (reports.length === 0) {
+      return
+    }
+
+    const selectedTestExists = reports.some(
+      report =>
+        report.name === selectedTest?.name && report.suite_name === selectedTest?.suite_name,
+    )
+    if (selectedTestExists) {
+      return
+    }
+
+    const savedTestId = localStorage.getItem("selectedTest")
+    const savedTest = reports.find(report => `${report.suite_name}::${report.name}` === savedTestId)
+    handleSelectTest(savedTest ?? reports[0])
+  }, [handleSelectTest, reports, selectedTest])
+
+  useEffect(() => {
+    if (coverageLoaded && coverageLcov === undefined && activeView === "coverage") {
+      handleActiveViewChange("tests")
+    }
+  }, [activeView, coverageLcov, coverageLoaded, handleActiveViewChange])
 
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>
@@ -170,11 +237,34 @@ export const App: React.FC = () => {
       />
 
       <div className={styles.mainContent}>
-        {selectedTest ? (
-          <TestDetails test={selectedTest} trace={currentTrace} projectRoot={projectRoot} />
-        ) : (
-          <div className={styles.noSelection}>Select a test to see details</div>
+        {coverageLcov !== undefined && (
+          <div className={styles.viewTabs}>
+            <button
+              type="button"
+              className={`${styles.viewTab} ${activeView === "tests" ? styles.viewTabActive : ""}`}
+              onClick={() => handleActiveViewChange("tests")}
+            >
+              Tests
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewTab} ${activeView === "coverage" ? styles.viewTabActive : ""}`}
+              onClick={() => handleActiveViewChange("coverage")}
+            >
+              Coverage
+            </button>
+          </div>
         )}
+
+        <div className={styles.mainPanel}>
+          {activeView === "coverage" && coverageLcov !== undefined ? (
+            <Coverage lcov={coverageLcov} projectRoot={projectRoot} />
+          ) : selectedTest ? (
+            <TestDetails test={selectedTest} trace={currentTrace} projectRoot={projectRoot} />
+          ) : (
+            <div className={styles.noSelection}>Select a test to see details</div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -8,7 +8,7 @@ fn test_check_does_not_hang_on_recursive_self_receiver_deduction() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract(
             "main",
-            r#"
+            r"
             struct BigArray<T> {
                 arr: [array<array<T>>, int] = [array<array<T>> [], 0]
             }
@@ -32,8 +32,9 @@ fn test_check_does_not_hang_on_recursive_self_receiver_deduction() {
 
                 self.arr = [topLevel, itemsCount];
             }
-        "#,
+        ",
         )
+        .with_lint_level("explicit-return-type", "allow")
         .build();
 
     project.acton().init().run().success();

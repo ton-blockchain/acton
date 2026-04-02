@@ -11,5 +11,5 @@ null
 null
 null
 null
-map<int32, int32>{}
-map<int32, int34>{}
+map<int32, int32> {}
+map<int32, int34> {}

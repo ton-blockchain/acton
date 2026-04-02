@@ -7,14 +7,24 @@ struct JettonWallet {
 
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0
+        return 0;
     }
 
     val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    return result.jettonBalance;
 }
 
-fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recipient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?) {
+fun JettonWallet.sendTransfer(
+    self,
+    from: address,
+    value: int,
+    jettonAmount: int,
+    recipient: address,
+    responseAddress: address,
+    customPayload: cell?,
+    forwardTonAmount: int,
+    forwardPayload: cell?,
+): SendResultList {
     val transferMsg = createMessage({
         bounce: true,
         value,
@@ -26,13 +36,23 @@ fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int
             sendExcessesTo: responseAddress,
             customPayload,
             forwardTonAmount,
-            forwardPayload: beginCell().storeMaybeRef(forwardPayload.toCell()).endCell().beginParse(),
+            forwardPayload: beginCell()
+                .storeMaybeRef(forwardPayload.toCell())
+                .endCell()
+                .beginParse(),
         },
     });
-    return net.send(from, transferMsg)
+    return net.send(from, transferMsg);
 }
 
-fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?) {
+fun JettonWallet.sendBurn(
+    self,
+    from: address,
+    value: int,
+    jettonAmount: int,
+    responseAddress: address,
+    customPayload: cell?,
+): SendResultList {
     val burnMsg = createMessage({
         bounce: false,
         value,
@@ -44,5 +64,5 @@ fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, re
             customPayload,
         },
     });
-    return net.send(from, burnMsg)
+    return net.send(from, burnMsg);
 }

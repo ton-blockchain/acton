@@ -2,12 +2,13 @@ use acton::context::{
     AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, EmulationsState,
     Env, IoContext, KnownAddresses,
 };
-use acton::debugger::any_executor::AnyExecutor;
-use acton::debugger::debug_context::DebugContext;
+use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
-use acton::{debugger, ffi};
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_debug::ReplayerDebugSession;
+use acton_debug::replayer::TolkReplayer;
+use acton_debug::{start_dap_server, start_dap_server_with_listener};
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -16,22 +17,22 @@ use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
+use std::net::TcpListener;
 use std::path::Path;
-use std::sync::Arc;
-use std::time::{Duration, UNIX_EPOCH};
-use std::{fs, thread};
-use tasm::printer::FormatOptions;
-use tolkc::CompilerResult;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::thread;
+use std::time::{Duration, Instant, UNIX_EPOCH};
+use tolkc::{CompilerResult, TolkSourceMap};
+use ton::block_tlb::StateInit;
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -40,6 +41,11 @@ mod debug_test;
 mod real_test;
 mod support;
 mod tests;
+
+// The shared Fift/Tolk compile path crashes under higher test concurrency,
+// so serialize setup while keeping the debug session itself parallel.
+static DEBUG_COMPILER_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) struct DebuggerClient {
     client: DapClient,
@@ -124,7 +130,14 @@ impl DebuggerClient {
 }
 
 fn wait_for_initialized(client: &DapClient) -> anyhow::Result<()> {
+    let deadline = Instant::now() + DEBUG_EVENT_TIMEOUT;
     loop {
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "Timed out waiting for DAP initialized event after {:?}",
+                DEBUG_EVENT_TIMEOUT
+            );
+        }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_secs(1))
             && matches!(event, Event::Initialized)
         {
@@ -135,7 +148,14 @@ fn wait_for_initialized(client: &DapClient) -> anyhow::Result<()> {
 }
 
 fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
+    let deadline = Instant::now() + DEBUG_EVENT_TIMEOUT;
     loop {
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "Timed out waiting for DAP stopped event after {:?}",
+                DEBUG_EVENT_TIMEOUT
+            );
+        }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_millis(100))
             && matches!(event, Event::Stopped(_))
         {
@@ -148,64 +168,66 @@ pub(crate) fn run_script_file(
     file_path: &str,
     content: &str,
     debug_port: u16,
+    debug_listener: Option<TcpListener>,
     stack: Tuple,
 ) -> anyhow::Result<String> {
-    let abi = contract_abi(content.into(), file_path, &None);
+    let script_path = Path::new(file_path);
 
-    let config = ActonConfig::load();
+    let (abi, code_cell, source_map) = {
+        let _compile_guard = DEBUG_COMPILER_LOCK
+            .lock()
+            .expect("debug compiler lock poisoned");
 
-    let mut compiler = tolkc::Compiler::new(2);
-    if let Ok(config) = &config {
-        compiler = compiler.with_mappings(&config.mappings)
-    }
+        let abi = contract_abi(content.into(), file_path, &None);
 
-    match compiler.compile(Path::new(file_path), true) {
-        CompilerResult::Success(result) => {
-            let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
-            let data_cell = ArcCell::default();
+        let config = ActonConfig::load();
 
-            fs::write(
-                "out.source_map.json",
-                serde_json::to_string(&result.source_map)?,
-            )?;
-
-            let disasm = tasm::decompile::Disassembler::new();
-            let code = disasm.decompile_cell(&Boc::decode_base64(&result.code_boc64)?)?;
-            fs::write(
-                "out.disasm.txt",
-                code.print(&FormatOptions {
-                    show_offsets: true,
-                    show_hashes: true,
-                    source_map: None,
-                }),
-            )?;
-            fs::write("out.disasm.fif", result.fift_code)?;
-            fs::write("out.boc", code_cell.to_boc(false)?)?;
-
-            let source_map = result.source_map.unwrap_or_default();
-            let (script_result, io, formatter) = execute_script(
-                &code_cell,
-                &data_cell,
-                abi.into(),
-                source_map.into(),
-                debug_port,
-                ExecutorVerbosity::FullLocationStackVerbose,
-                stack,
-            )?;
-            get_script_result(script_result, io, formatter)
+        let mut compiler = tolkc::Compiler::new(2);
+        if let Ok(config) = &config {
+            let mappings = config.mappings();
+            compiler = compiler.with_mappings(&mappings);
         }
-        CompilerResult::Error(error) => {
-            anyhow::bail!("Cannot compile script file {}", error.message)
+
+        match compiler.compile(script_path, true) {
+            CompilerResult::Success(result) => {
+                let code = Boc::decode_base64(&result.code_boc64)?;
+                let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
+                let source_map = Arc::new(TolkSourceMap::from_code_cell(
+                    result.new_source_map.unwrap_or_default(),
+                    &code,
+                    result.debug_mark_base64.as_deref(),
+                )?);
+
+                (abi, code_cell, source_map)
+            }
+            CompilerResult::Error(error) => {
+                anyhow::bail!("Cannot compile script file {}", error.message)
+            }
         }
-    }
+    };
+
+    let data_cell = TonCell::empty().clone();
+    let (script_result, io, formatter) = execute_script(
+        &code_cell,
+        &data_cell,
+        abi.into(),
+        source_map,
+        debug_port,
+        debug_listener,
+        ExecutorVerbosity::FullLocationStackVerbose,
+        stack,
+    )?;
+    get_script_result(script_result, io, formatter)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_script<'a>(
-    code_cell: &'a ArcCell,
-    data_cell: &'a ArcCell,
+    code_cell: &'a TonCell,
+    data_cell: &'a TonCell,
     abi: Arc<ContractAbi>,
-    source_map: Arc<SourceMap>,
+    source_map: Arc<TolkSourceMap>,
     debug_port: u16,
+    debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
 ) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
@@ -215,8 +237,8 @@ fn execute_script<'a>(
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
     let params = RunGetMethodArgs {
-        code: code_cell.to_boc_b64(false)?,
-        data: data_cell.to_boc_b64(false)?,
+        code: code_cell.to_boc_base64()?,
+        data: data_cell.to_boc_base64()?,
         verbosity,
         libs: String::new(),
         address: dest_address.to_string(),
@@ -250,7 +272,9 @@ fn execute_script<'a>(
     let mut ctx = Context {
         env: Env {
             config: &config,
+            project_root: configured_project_root().to_path_buf(),
             abi: abi.clone(),
+            show_bodies: false,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets: BTreeMap::new(),
@@ -274,6 +298,7 @@ fn execute_script<'a>(
             emulator: &mut emulator,
             emulations: &mut emulations,
         },
+        message_iters: Default::default(),
         build: BuildContext {
             build_cache: &mut build_cache,
             file_build_cache: &mut file_build_cache,
@@ -292,20 +317,17 @@ fn execute_script<'a>(
     let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
 
-    let transport = debugger::start_dap_server(debug_port);
-
-    let mut dbg_ctx = DebugContext::new(
-        transport,
-        AnyExecutor::Get(executor.clone()),
-        source_map,
-        "main".into(),
-    );
-
-    ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
+    let transport = if let Some(listener) = debug_listener {
+        start_dap_server_with_listener(listener)?
+    } else {
+        start_dap_server(debug_port)?
+    };
     executor.prepare(0, &stack)?;
+    let replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+    let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
+    ctx.debug = DebugCtx::new(&mut dbg_session);
 
-    ctx.debug.ctx().process_incoming_requests(true)?;
+    ctx.debug.process_incoming_requests(true)?;
 
     let result = executor.finish(&params.code)?;
     let Context { io, .. } = ctx;
@@ -317,6 +339,7 @@ fn execute_script<'a>(
         emulations: Cow::Owned(emulations.clone()),
         known_addresses: Cow::Owned(known_addresses.clone()),
         known_code_cells: Cow::Owned(known_code_cell.clone()),
+        show_bodies: false,
         has_wallets_config: false,
         available_wallets: vec![],
         backtrace: None,
@@ -352,15 +375,8 @@ fn get_script_result(
     }
 }
 
-fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
-    let state_init = CellBuilder::new()
-        .store_bit(false)?
-        .store_bit(false)?
-        .store_ref_cell_optional(Some(code))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))?
-        .store_bit(false)?
-        .build()?;
-
-    let dest_address = TonAddress::new(0, state_init.cell_hash());
-    Ok(dest_address)
+fn contract_address(code: &TonCell) -> anyhow::Result<TonAddress> {
+    StateInit::new(code.clone(), TonCell::empty().clone())
+        .derive_address(0)
+        .map_err(Into::into)
 }

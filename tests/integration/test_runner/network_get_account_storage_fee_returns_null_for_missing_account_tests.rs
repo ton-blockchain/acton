@@ -126,7 +126,7 @@ fn account_state_frozen_local_roundtrip_cell_works() {
     run_network_success_case_with_imports(
         NETWORK_IMPORTS_WITH_TRANSACTION,
         "bk-stdlib-account-state-frozen-local-roundtrip",
-        r#"
+        r"
 get fun `test-bk-stdlib-account-state-frozen-local-roundtrip`() {
     val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
     val frozen = AccountStateFrozen { stateHash: frozenHash };
@@ -137,7 +137,7 @@ get fun `test-bk-stdlib-account-state-frozen-local-roundtrip`() {
         expect(parsed.stateHash).toEqual(frozenHash);
     }
 }
-"#,
+",
         "integration/snapshots/test-runner/network_get_account_storage_fee_returns_null_for_missing_account/account_state_frozen_local_roundtrip_cell_works.stdout.txt",
     );
 }

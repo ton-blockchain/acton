@@ -147,6 +147,69 @@ fn test_fmt_syntax_error() {
 }
 
 #[test]
+fn test_fmt_syntax_errors_in_two_files() {
+    let project = ProjectBuilder::new("fmt-syntax-error-two-files")
+        .contract("broken1", "fun broken1 {")
+        .contract("broken2", "fun broken2() { val x = 1 + }")
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("contracts/broken1.tolk")
+        .arg("contracts/broken2.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_syntax_errors_in_two_files.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_nonexistent_path() {
+    let project = ProjectBuilder::new("fmt-nonexistent-path")
+        .contract("simple", UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("contracts/missing.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_nonexistent_path.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_mixed_paths_partial_failure_keeps_existing_file_unchanged() {
+    let project = ProjectBuilder::new("fmt-mixed-paths-partial-failure")
+        .contract("simple", UNFORMATTED_TOLK)
+        .build();
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("contracts/simple.tolk")).unwrap(),
+        UNFORMATTED_TOLK
+    );
+
+    project
+        .acton()
+        .fmt()
+        .arg("contracts/simple.tolk")
+        .arg("contracts/missing.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_mixed_paths_partial_failure.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            "contracts/simple.tolk",
+            "integration/snapshots/test_fmt_mixed_paths_partial_failure.result.txt",
+        );
+}
+
+#[test]
 fn test_fmt_custom_width() {
     let long_line = "val x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];\n";
     let code = format!("fun test() {{\n    {long_line}\n}}\n");

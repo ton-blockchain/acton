@@ -69,7 +69,7 @@ struct Storage {
     counter: uint32
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 
@@ -108,7 +108,7 @@ struct Counter {
     init: ContractState
 }
 
-fun Counter.fromStorage(storage: Storage) {
+fun Counter.fromStorage(storage: Storage): Counter {
     val init = ContractState {
         code: build("Counter", "counter.tolk"),
         data: storage.toCell(),
@@ -296,7 +296,7 @@ acton test counter.test.tolk --filter "test-should-increase-counter"
 
 And we will see that our test failed:
 
-```tolk
+```acton-cli
  TEST  /Users/dev/counter
 
  > counter.test.tolk (1 tests)

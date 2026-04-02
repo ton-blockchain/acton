@@ -1,7 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
-const FORWARD_MESSAGES: &str = r#"
+const FORWARD_MESSAGES: &str = r"
 struct (0x1000f001) TriggerForward {
     queryId: uint64
     target: address
@@ -10,7 +10,7 @@ struct (0x1000f001) TriggerForward {
 struct (0x1000f002) Notify {
     queryId: uint64
 }
-"#;
+";
 
 const FORWARDER_CONTRACT: &str = r#"
 import "messages"
@@ -49,7 +49,7 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const ECHO_MESSAGES: &str = r#"
+const ECHO_MESSAGES: &str = r"
 struct (0x2000f001) TriggerEcho {
     queryId: uint64
 }
@@ -57,7 +57,7 @@ struct (0x2000f001) TriggerEcho {
 struct (0x2000f002) EchoNotice {
     queryId: uint64
 }
-"#;
+";
 
 const ECHO_CONTRACT: &str = r#"
 import "messages"
@@ -124,6 +124,7 @@ fn send_single_keeps_out_messages_without_executing_children() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-single-keeps-out-messages`() {
@@ -206,6 +207,7 @@ fn send_executes_child_transactions_and_matches_notify_expectation() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-processes-child-transactions`() {
@@ -290,6 +292,7 @@ fn send_single_bounce_roundtrip_matches_bounced_notify_opcode() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             get fun `test-send-single-bounce-roundtrip-bounced-opcode`() {
@@ -375,6 +378,7 @@ fn send_single_bounce_roundtrip_matches_failed_tx_exit_code() {
             import "../../lib/emulation/network"
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
+            import "../../lib/types/message"
             import "../contracts/messages"
 
             const ERR_REJECT_BOUNCE = 777;

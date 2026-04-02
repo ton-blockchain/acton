@@ -1,9 +1,13 @@
+enum Errors {
+    InvalidMessage = 0xFFFF
+}
+
 struct Storage {
     id: uint32
     counter: uint32
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 

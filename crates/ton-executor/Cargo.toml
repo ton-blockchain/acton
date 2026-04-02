@@ -11,14 +11,16 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ton-objs = { workspace = true, features = ["emulator"] }
 serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 hex = { workspace = true }
 tycho-types = { workspace = true }
-
-[build-dependencies]
-pkg-config = { workspace = true }
+rustc-hash = { workspace = true }
+num-bigint = { workspace = true }
+tvmffi = { workspace = true }
+parking_lot = { workspace = true }
 
 [lints]
 workspace = true

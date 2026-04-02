@@ -1,0 +1,13 @@
+warning[E030]: non-literal cast to enum requires safety comment
+   --> [ROOT]/contracts/main[LINE]
+   |
+10 |                 return v as Op;
+   |                        ^^^^^^^ add `// SAFETY: ...` above this cast
+   |
+   = this cast can produce an invalid enum value; compiler optimizations may assume enum invariants.
+     Add a `// SAFETY: ...` comment and re-check that the incoming value is guaranteed to be one of enum variants.
+     Alternatively try to use `match` for a safer explicit conversion path, e.g. `match (v) { 0 => Op.Add, 1 => Op.Sub, else => throw 7 }`
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E030

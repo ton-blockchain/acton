@@ -1,0 +1,14 @@
+Lookup reference documentation
+
+Usage: acton doc [OPTIONS] <COMMAND>
+
+Commands:
+  tvm  Lookup an instruction in the TVM specification
+
+Options:
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --manifest-path <PATH>  Path to Acton.toml
+      --project-root <PATH>   Path to project root
+  -h, --help                  Print help
+
+Run 'acton help doc' for more detailed information.

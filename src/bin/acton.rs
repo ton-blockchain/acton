@@ -5,13 +5,18 @@ use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
+use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
+use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
+use acton::commands::help::print_command_manual;
+use acton::commands::hooks::{HooksCommand, hooks_cmd};
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
-use acton::commands::new::new_cmd;
+use acton::commands::new::{ProjectTemplate, new_cmd};
 use acton::commands::retrace::retrace_cmd;
+use acton::commands::rpc::{RpcCommand, rpc_cmd};
 use acton::commands::run::run_cmd;
 use acton::commands::script::script_cmd;
 use acton::commands::test::{mutation, test_cmd};
@@ -22,12 +27,14 @@ use acton::commands::wrapper::wrapper_cmd;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
-    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, init_manifest_path,
+    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
+    init_manifest_path_with_source, init_project_root_with_source,
+    project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
-use clap::builder::styling::Style;
+use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
-use clap::{ColorChoice, CommandFactory};
+use clap::{ColorChoice, CommandFactory, FromArgMatches};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
 use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
@@ -39,12 +46,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
-use ton_source_map::SourceMap;
+use tolkc::TolkSourceMap;
 
 #[derive(Parser)]
 #[command(
     name = "acton",
-    version = get_acton_version()
+    version = get_acton_version(),
+    disable_help_subcommand = true
 )]
 #[command(about = "TON blockchain development tool")]
 #[command(color = ColorChoice::Auto)]
@@ -61,6 +69,14 @@ struct Cli {
 
     #[arg(long, global = true, value_name = "PATH", help = "Path to Acton.toml")]
     manifest_path: Option<PathBuf>,
+    #[arg(
+        long = "project-root",
+        global = true,
+        value_name = "PATH",
+        help = "Path to project root",
+        conflicts_with = "manifest_path"
+    )]
+    project_root: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -71,13 +87,14 @@ struct Cli {
 enum Commands {
     #[command(
         about = "Initialize a new project in the current directory",
-        long_about = "Initialize a new project in the current directory. This is useful for adding Acton support to an existing project."
+        long_about = "Initialize a new project in the current directory. This is useful for adding Acton support to an existing project.",
+        after_help = detailed_help_pointer("init")
     )]
     Init,
     #[command(
         about = "Create a new project in a specified directory",
         long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template.",
-        after_help = example_new_usage()
+        after_help = detailed_help_pointer("new")
     )]
     New {
         #[arg(help = "Directory to create the project in (use '.' for the current directory)")]
@@ -86,25 +103,58 @@ enum Commands {
         name: Option<String>,
         #[arg(long, help = "Project description")]
         description: Option<String>,
-        #[arg(long, help = "Project template")]
-        template: Option<String>,
+        #[arg(long, value_enum, help = "Project template")]
+        template: Option<ProjectTemplate>,
         #[arg(long, help = "License")]
         license: Option<String>,
+        #[arg(
+            long,
+            help = "Include the template's TypeScript app scaffold when available"
+        )]
+        app: bool,
+        #[arg(long, help = "Create and install the default project-local Git hooks")]
+        hooks: bool,
+        #[arg(long, help = "Include an AGENTS.md file with coding-agent guidance")]
+        agents: bool,
+    },
+    #[command(
+        about = "Print this message or the help of a given top-level command",
+        after_help = detailed_help_pointer("help")
+    )]
+    Help {
+        #[arg(help = "Top-level command to get help for")]
+        command: Option<String>,
     },
     #[command(
         about = "Manage wallets",
-        after_help = example_wallet_usage()
+        after_help = detailed_help_pointer("wallet")
     )]
     Wallet {
         #[command(subcommand)]
         command: WalletCommand,
     },
     #[command(
+        about = "Manage git hooks for the current project",
+        after_help = detailed_help_pointer("hooks")
+    )]
+    Hooks {
+        #[command(subcommand)]
+        command: HooksCommand,
+    },
+    #[command(
+        about = "Inspect remote account and contract state",
+        after_help = detailed_help_pointer("rpc")
+    )]
+    Rpc {
+        #[command(subcommand)]
+        command: RpcCommand,
+    },
+    #[command(
         about = "Execute tests in file or directory",
-        after_help = example_test_usage()
+        after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: current directory)")]
+        #[arg(help = "Test file or directory containing test files (default: project root)")]
         path: Option<String>,
         // Filtering
         #[arg(
@@ -158,6 +208,26 @@ enum Commands {
             help_heading = "Coverage"
         )]
         coverage_file: Option<String>,
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            value_parser = parse_coverage_percent,
+            help = "Fail if total line coverage is below this percentage",
+            help_heading = "Coverage"
+        )]
+        coverage_minimum_percent: Option<f64>,
+        #[arg(
+            long,
+            help = "Include files from the @wrappers mapping in coverage reports",
+            help_heading = "Coverage"
+        )]
+        coverage_include_wrappers: bool,
+        #[arg(
+            long,
+            help = "Include .test.tolk files in coverage reports",
+            help_heading = "Coverage"
+        )]
+        coverage_include_tests: bool,
 
         // Profiling
         #[arg(
@@ -172,6 +242,13 @@ enum Commands {
             help_heading = "Profiling"
         )]
         baseline_snapshot: Option<String>,
+        #[arg(
+            long,
+            help = "Exit with non-zero code when profiling differs from baseline snapshot",
+            help_heading = "Profiling",
+            requires = "baseline_snapshot"
+        )]
+        fail_on_diff: bool,
 
         // Reporting
         #[arg(
@@ -181,6 +258,12 @@ enum Commands {
             help_heading = "Reporting"
         )]
         reporter: Vec<ReportFormat>,
+        #[arg(
+            long,
+            help = "Show decoded message bodies in printed transaction trees when ABI is known",
+            help_heading = "Reporting"
+        )]
+        show_bodies: bool,
         #[arg(
             long,
             default_value = "test-results",
@@ -280,13 +363,25 @@ enum Commands {
     },
     #[command(
         about = "Generate wrapper and optionally stub test file for a contract",
-        after_help = example_wrapper_usage()
+        after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
         #[arg(help = "Contract ID to generate wrapper", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
-        #[arg(long, short, help = "Output path for wrapper file")]
+        #[arg(
+            long,
+            short,
+            help = "Output path for generated wrapper file",
+            conflicts_with = "output_dir"
+        )]
         output: Option<String>,
+        #[arg(
+            long,
+            help = "Output directory for generated wrapper file",
+            value_name = "DIR",
+            conflicts_with = "output"
+        )]
+        output_dir: Option<String>,
 
         #[arg(
             long,
@@ -296,14 +391,33 @@ enum Commands {
             help_heading = "Tests"
         )]
         test: bool,
-        #[arg(long, help = "Output path for test file", help_heading = "Tests")]
+        #[arg(
+            long,
+            help = "Output path for test file",
+            help_heading = "Tests",
+            requires = "test"
+        )]
         test_output: Option<String>,
-        #[arg(long, help = "Storage struct name to use for wrapper generation")]
-        storage_struct: Option<String>,
+        #[arg(
+            long,
+            help = "Output directory for generated test file",
+            value_name = "DIR",
+            help_heading = "Tests",
+            conflicts_with = "test_output",
+            requires = "test"
+        )]
+        test_output_dir: Option<String>,
+        #[arg(
+            long,
+            help = "Generate a TypeScript wrapper via gen-typescript-from-tolk",
+            help_heading = "TypeScript",
+            conflicts_with_all = ["test", "test_output", "test_output_dir"]
+        )]
+        ts: bool,
     },
     #[command(
         about = "Execute a Tolk script file",
-        after_help = example_script_usage()
+        after_help = detailed_help_pointer("script")
     )]
     Script {
         #[arg(help = "Script file to execute")]
@@ -315,6 +429,8 @@ enum Commands {
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
+        #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
+        backtrace: Option<BacktraceMode>,
         #[arg(
             long,
             help = "Debug server port",
@@ -375,27 +491,36 @@ enum Commands {
             value_name = "NAME"
         )]
         explorer: Option<Explorer>,
+        #[arg(
+            long,
+            help = "Show decoded message bodies in printed transaction trees when ABI is known",
+            help_heading = "Output"
+        )]
+        show_bodies: bool,
     },
     #[command(
         about = "Build the specified contract or all contracts",
-        after_help = example_build_usage()
+        after_help = detailed_help_pointer("build")
     )]
     Build {
         #[arg(help = "Contract ID to build (defaults to all if not specified)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Clear compilation cache before building")]
         clear_cache: bool,
-        #[arg(
-            long,
-            help = "Generate dependency graph as SVG file (requires graphviz)"
-        )]
+        #[arg(long, help = "Generate dependency graph as DOT file")]
         graph: Option<String>,
         #[arg(
             long,
-            default_value = "build",
-            help = "Output directory for build artifacts"
+            value_name = "DIR",
+            help = "Output directory for build artifacts (default: build/)"
         )]
         out_dir: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Output directory for generated dependency files (default: gen/)"
+        )]
+        gen_dir: Option<String>,
         #[arg(
             long,
             value_name = "DIR",
@@ -407,7 +532,7 @@ enum Commands {
     },
     #[command(
         about = "Run a script defined in Acton.toml",
-        after_help = example_run_usage()
+        after_help = detailed_help_pointer("run")
     )]
     Run {
         #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
@@ -421,7 +546,7 @@ enum Commands {
     },
     #[command(
         about = "Compile a Tolk file",
-        after_help = example_compile_usage()
+        after_help = detailed_help_pointer("compile")
     )]
     Compile {
         #[arg(help = "Tolk file to compile")]
@@ -443,20 +568,26 @@ enum Commands {
     },
     #[command(
         about = "Disassemble TVM bitcode to human-readable TASM",
-        after_help = example_disasm_usage()
+        after_help = detailed_help_pointer("disasm")
     )]
     Disasm {
-        #[arg(help = "Binary/Hex/Base64 BoC file to disassemble (use -s flag to pass a string)")]
+        #[arg(
+            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)"
+        )]
         boc_file: Option<String>,
         #[arg(short, long, help = "BoC string in hex or base64 format")]
         string: Option<String>,
-        #[arg(short, long, help = "Output file (if not specified, output to stdout)")]
+        #[arg(
+            short,
+            long,
+            help = "Write output to file (creates parent dirs, overwrites existing file)"
+        )]
         output: Option<String>,
         #[arg(long, help = "Show cell hashes and offsets for each cell")]
         show_hashes: bool,
         #[arg(long, help = "Show instruction offsets in left column")]
         show_offsets: bool,
-        #[arg(long, help = "Source map file for showing Tolk source locations")]
+        #[arg(long, help = "Source map JSON from `acton compile --source-map`")]
         source_map: Option<String>,
         #[arg(
             long,
@@ -465,7 +596,7 @@ enum Commands {
         address: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
-        #[arg(long, help = "Network to use for fetching from blockchain")]
+        #[arg(long, help = "Network for `--address` and library lookups")]
         net: Option<String>,
         #[arg(
             long,
@@ -475,7 +606,7 @@ enum Commands {
     },
     #[command(
         about = "Verify contract source code on verifier.ton.org",
-        after_help = example_verify_usage()
+        after_help = detailed_help_pointer("verify")
     )]
     Verify {
         #[arg(help = "Contract ID to verify (prompts if not provided)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
@@ -496,7 +627,10 @@ enum Commands {
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
     },
-    #[command(about = "Check Tolk files in the project for errors")]
+    #[command(
+        about = "Check Tolk files in the project for errors",
+        after_help = detailed_help_pointer("check")
+    )]
     Check {
         #[arg(help = "Contract ID to check or path to a .tolk file")]
         target: Option<String>,
@@ -506,7 +640,7 @@ enum Commands {
             long = "output-format",
             value_enum,
             value_name = "FORMAT",
-            help = "Output format (plain, json, sarif, github)"
+            help = "Output format (plain, json, sarif, github, gitlab)"
         )]
         output_format: Option<CheckOutputFormat>,
         #[arg(
@@ -515,6 +649,13 @@ enum Commands {
             help = "Write output result to file (default: stdout)"
         )]
         output_file: Option<PathBuf>,
+        #[arg(
+            long = "enable-only",
+            value_delimiter = ',',
+            value_name = "CODE[,CODE...]",
+            help = "Enable only selected lint rules by code (e.g. E001,S001)"
+        )]
+        enable_only: Option<Vec<String>>,
         #[arg(long, help = "Explain a rule")]
         explain: Option<String>,
         #[arg(long, hide = true)]
@@ -522,7 +663,7 @@ enum Commands {
     },
     #[command(
         about = "Retrace a transaction by its hash",
-        after_help = example_retrace_usage()
+        after_help = detailed_help_pointer("retrace")
     )]
     Retrace {
         #[arg(help = "Transaction hash in hex format to retrace")]
@@ -539,10 +680,20 @@ enum Commands {
         verbose: bool,
         #[arg(long, help = "Directory to save VM and executor logs")]
         logs_dir: Option<String>,
+        #[arg(
+            long,
+            help = "Contract name from Acton.toml used to build a source-level trace for the transaction"
+        )]
+        contract: Option<String>,
+        #[arg(
+            long,
+            help = "Expose the retraced execution as a DAP server on the given TCP port; requires --contract"
+        )]
+        dap_port: Option<u16>,
     },
     #[command(
         about = "Manage TON libraries",
-        after_help = example_library_usage()
+        after_help = detailed_help_pointer("library")
     )]
     Library {
         #[command(subcommand)]
@@ -550,7 +701,7 @@ enum Commands {
     },
     #[command(
         about = "Manage lightweight TON node",
-        after_help = example_litenode_usage()
+        after_help = detailed_help_pointer("litenode")
     )]
     Litenode {
         #[command(subcommand)]
@@ -558,23 +709,26 @@ enum Commands {
     },
     #[command(
         about = "Format Tolk source files",
-        after_help = example_fmt_usage()
+        after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
-        #[arg(help = "Files or directories to format (defaults to current directory)")]
+        #[arg(help = "Files or directories to format (defaults to project root)")]
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
     },
     #[command(
         about = "Lookup reference documentation",
-        after_help = example_doc_usage()
+        after_help = detailed_help_pointer("doc")
     )]
     Doc {
         #[command(subcommand)]
         command: DocCommand,
     },
-    #[command(about = "LSP server for the TON languages and technologies")]
+    #[command(
+        about = "Run LSP server for the TON languages and technologies",
+        after_help = detailed_help_pointer("ls")
+    )]
     Ls {
         #[arg(long, help = "Port to listen on (TCP)")]
         port: Option<u16>,
@@ -587,25 +741,65 @@ enum Commands {
     },
     #[command(
         about = "Manage Acton versions",
-        after_help = example_up_usage()
+        after_help = detailed_help_pointer("up")
     )]
     Up {
-        #[arg(help = "Specific version to install")]
+        #[arg(
+            help = "Specific version to install",
+            conflicts_with_all = ["trunk", "stable", "list", "check"]
+        )]
         version: Option<String>,
-        #[arg(long, help = "Install the most recent canary release")]
-        canary: bool,
-        #[arg(long, help = "Install the latest stable release")]
+        #[arg(
+            long,
+            help = "Install the most recent trunk release",
+            conflicts_with_all = ["stable", "list", "check"]
+        )]
+        trunk: bool,
+        #[arg(
+            long,
+            help = "Install the latest stable release",
+            conflicts_with_all = ["list", "check"]
+        )]
         stable: bool,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
-        #[arg(long, help = "List available versions")]
+        #[arg(long, help = "List available versions", conflicts_with = "check")]
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
     },
     #[command(
+        name = "func2tolk",
+        about = "Convert FunC files to Tolk via @ton/convert-func-to-tolk",
+        after_help = detailed_help_pointer("func2tolk")
+    )]
+    Func2Tolk {
+        #[arg(help = "Path to a .fc/.func file or a directory containing them")]
+        path: String,
+        #[arg(long, help = "Output path")]
+        output: Option<String>,
+        #[arg(
+            long,
+            help = "Insert /* _WARNING_ */ comments in output instead of printing warnings only"
+        )]
+        warnings_as_comments: bool,
+        #[arg(long, help = "Don't transform snake_case to camelCase")]
+        no_camel_case: bool,
+        #[arg(
+            long,
+            default_value = default_func2tolk_version(),
+            help = "Version of @ton/convert-func-to-tolk to use"
+        )]
+        version: String,
+    },
+    #[command(
+        about = "Inspect resolved project environment",
+        after_help = detailed_help_pointer("doctor")
+    )]
+    Doctor,
+    #[command(
         about = "Generate shell completions for selected shell",
-        after_help = example_completions_usage()
+        after_help = detailed_help_pointer("completions")
     )]
     Completions {
         #[clap(value_enum)]
@@ -618,6 +812,11 @@ enum Commands {
     Docgen {
         #[arg(short, long, help = "Output directory path")]
         output: Option<String>,
+        #[arg(
+            long,
+            help = "Check if generated documentation is up to date without writing files"
+        )]
+        check: bool,
     },
     #[command(name = "internal-register-contract", hide = true)]
     InternalRegisterContract {
@@ -632,7 +831,7 @@ enum Commands {
 pub enum LitenodeCommand {
     #[command(about = "Start the lightweight TON node")]
     Start {
-        #[arg(long, help = "LiteNode server port (default: [litenode].port or 3000)")]
+        #[arg(long, help = "LiteNode server port (default: [litenode].port or 5411)")]
         port: Option<u16>,
         #[arg(
             long,
@@ -658,6 +857,13 @@ pub enum LitenodeCommand {
         db_path: Option<String>,
         #[arg(
             long,
+            value_name = "RPS",
+            value_parser = clap::value_parser!(u32).range(1..),
+            help = "Maximum API requests per second to simulate provider rate limits (default: [litenode].rate-limit)"
+        )]
+        rate_limit: Option<u32>,
+        #[arg(
+            long,
             help = "Load LiteNode state from JSON snapshot before startup",
             conflicts_with = "db_path", // for now
             value_name = "PATH"
@@ -679,7 +885,7 @@ pub enum LitenodeCommand {
         #[arg(
             long,
             short,
-            help = "LiteNode server port (default: [litenode].port or 3000)"
+            help = "LiteNode server port (default: [litenode].port or 5411)"
         )]
         port: Option<u16>,
     },
@@ -787,118 +993,7 @@ pub enum DocCommand {
 
 #[inline]
 const fn get_acton_version() -> &'static str {
-    concat!(
-        env!("CARGO_PKG_VERSION"),
-        " (",
-        env!("GIT_HASH"),
-        " ",
-        env!("BUILD_DATE"),
-        ")"
-    )
-}
-
-fn example_litenode_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Start the lightweight TON node (port from [litenode].port or 3000)",
-                "acton litenode start",
-            ),
-            (
-                "Start LiteNode with state forked from a network",
-                "acton litenode start --fork-net testnet",
-            ),
-            (
-                "Fork LiteNode from a specific historical block",
-                "acton litenode start --fork-net testnet --fork-block-number 55000000",
-            ),
-            (
-                "Auto-fund and deploy configured wallets",
-                "acton litenode start --accounts deployer,user",
-            ),
-            (
-                "Load network state from JSON snapshot",
-                "acton litenode start --load-state snapshots/localnet.json",
-            ),
-            (
-                "Dump network state to JSON snapshot on shutdown",
-                "acton litenode start --dump-state snapshots/localnet.json",
-            ),
-            (
-                "Request 100 TON from faucet to specified address",
-                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
-            ),
-            (
-                "Request specific amount of TON from faucet",
-                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50",
-            ),
-        ],
-        "",
-    )
-}
-
-fn example_test_usage() -> StyledStr {
-    use std::fmt::Write as _;
-
-    let mut writer = StyledStr::new();
-    let styled = Styles::styled();
-
-    let exampled_command = Vec::from([
-        ("Run all tests in current directory", "acton test"),
-        ("Run tests in specific file", "acton test my_test.tolk"),
-        (
-            "Run tests in directory with regex filter",
-            "acton test . --filter \"wallet.*\"",
-        ),
-        (
-            "Exclude tests",
-            "acton test . --exclude \"**/integration/**\"",
-        ),
-        (
-            "Exclude multiple patterns",
-            "acton test . --exclude \"**/e2e/**\" --exclude \"**/gas/**\"",
-        ),
-        (
-            "Include only specific directories",
-            "acton test . --include \"**/unit/**\" --include \"**/wallet/**\"",
-        ),
-        (
-            "Enable coverage collection",
-            "acton test . --coverage --coverage-format lcov",
-        ),
-        (
-            "Run with teamcity service messages",
-            "acton test . --reporter console,teamcity",
-        ),
-        (
-            "Generate JUnit XML report",
-            "acton test . --reporter junit --junit-path ./test-results",
-        ),
-        (
-            "Generate merged JUnit XML report",
-            "acton test . --reporter junit --junit-merge",
-        ),
-        ("Run in debug mode", "acton test my_test.tolk --debug"),
-    ]);
-
-    let header = styled.get_header();
-    let named = Style::new().dimmed();
-    let example = styled.get_literal();
-
-    let _ = write!(writer, "{header}Examples:{header:#}",);
-
-    const USAGE_SEP: &str = "\n     ";
-    for (name, value) in &exampled_command {
-        let _ = write!(writer, "{USAGE_SEP}{named}# {name}{named:#}");
-        let _ = writeln!(writer, "{USAGE_SEP}{example}{value}{example:#}");
-    }
-
-    let _ = write!(
-        writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/test-runner"
-    );
-
-    writer
+    acton::build_info::LONG_VERSION
 }
 
 fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
@@ -950,386 +1045,266 @@ fn load_config_for_completion() -> Option<ActonConfig> {
     None
 }
 
-fn example_build_usage() -> StyledStr {
+fn detailed_help_pointer(command: &str) -> StyledStr {
     use std::fmt::Write as _;
 
     let mut writer = StyledStr::new();
-    let styled = Styles::styled();
-
-    let dim = |text: &str| text.dimmed().to_string();
-    let green = |text: &str| text.green().to_string();
-
-    let config_example = [
-        format!("{}contracts.wallet{}", dim("["), dim("]")),
-        format!("     name{}{}", dim(" = "), green("\"Wallet Contract\"")),
-        format!(
-            "     src{}{}",
-            dim(" = "),
-            green("\"contracts/wallet.tolk\"")
-        ),
-        format!("     output{}{}", dim(" = "), green("\"wallet.boc\"")),
-        format!(
-            "     depends{}{}{}{}",
-            dim(" = "),
-            dim("["),
-            green("\"child\""),
-            dim("]")
-        ),
-        format!(
-            "     {}",
-            dim("# or as library with custom function name and output path")
-        ),
-        format!("     depends{}{}", dim(" = "), dim("[")),
-        format!(
-            "       {} name{}{}{} kind{}{}{} function{}{}{} path{}{} {}",
-            dim("{"),
-            dim(" = "),
-            green("\"child\""),
-            dim(","),
-            dim(" = "),
-            green("\"library_ref\""),
-            dim(","),
-            dim(" = "),
-            green("\"getChildCode\""),
-            dim(","),
-            dim(" = "),
-            green("\"child_dep.tolk\""),
-            dim("}")
-        ),
-        format!("     {}", dim("]")),
-    ]
-    .join("\n");
-
-    let build_config_example = [
-        format!("{}build{}", dim("["), dim("]")),
-        format!("     output-fift{}{}", dim(" = "), green("\"build/fift\"")),
-    ]
-    .join("\n");
-
-    let build_examples = Vec::from([
-        ("Build all contracts", "acton build"),
-        ("Build specific contract", "acton build wallet"),
-        (
-            "Build contracts with fresh cache",
-            "acton build --clear-cache",
-        ),
-        (
-            "Generate dependency graph as SVG file",
-            "acton build --graph deps.svg",
-        ),
-        (
-            "Save compiled Fift files to a custom directory",
-            "acton build --output-fift build/fift",
-        ),
-    ]);
-
-    let header = styled.get_header();
-    let named = Style::new().dimmed();
-    let literal = styled.get_literal();
-
-    let _ = write!(writer, "{header}Configuration:{header:#}");
+    let styles = Styles::styled();
+    let literal = styles.get_literal();
     let _ = write!(
         writer,
-        "\n     {named}# Configure contracts in Acton.toml{named:#}"
+        "Run '{literal}acton help {command}{literal:#}' for more detailed information."
     );
-    let _ = write!(writer, "\n     {config_example}");
+    writer
+}
+
+fn root_help(show_global_options: bool) -> StyledStr {
+    use std::collections::HashMap;
+    use std::fmt::Write as _;
+
+    let mut writer = StyledStr::new();
+    let header = Style::new().bold();
+    let usage_style = Style::new().bold();
+    let dimmed = Style::new().dimmed();
+    let purple = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
+        .bold();
+    let blue = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
+        .bold();
+    let yellow = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+        .bold();
+    let cyan = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        .bold();
+    let white = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
+        .bold();
+
+    let core_commands = vec![("new", "[PATH]"), ("init", "")];
+    let build_and_test_commands = vec![
+        ("test", "[PATH]"),
+        ("build", "[CONTRACT_ID]"),
+        ("check", "[TARGET]"),
+        ("script", "<PATH> [ARGS...]"),
+        ("fmt", "[PATHS...]"),
+    ];
+    let blockchain_commands = vec![
+        ("wallet", "<COMMAND>"),
+        ("rpc", "<COMMAND>"),
+        ("verify", "[CONTRACT_ID]"),
+        ("library", "<COMMAND>"),
+        ("litenode", "<COMMAND>"),
+        ("retrace", "<TX_HASH>"),
+    ];
+    let tooling_commands = vec![
+        ("run", "<SCRIPT> [ARGS...]"),
+        ("compile", "<PATH>"),
+        ("wrapper", "<CONTRACT_ID>"),
+        ("disasm", "[BOC_FILE]"),
+        ("doc", "tvm <QUERY...>"),
+    ];
+    let support_commands = vec![
+        ("ls", ""),
+        ("up", ""),
+        ("help", "[COMMAND]"),
+        ("hooks", "<COMMAND>"),
+        ("doctor", ""),
+        ("func2tolk", "<PATH>"),
+        ("completions", "<SHELL>"),
+    ];
+
+    let command_groups = [
+        (&purple, core_commands),
+        (&blue, build_and_test_commands),
+        (&yellow, blockchain_commands),
+        (&cyan, tooling_commands),
+        (&white, support_commands),
+    ];
+    let mut command_metadata = Cli::command();
+    command_metadata.build();
+
+    let command_descriptions = command_metadata
+        .get_subcommands()
+        .map(|subcommand| {
+            (
+                subcommand.get_name().to_owned(),
+                subcommand
+                    .get_about()
+                    .map(ToString::to_string)
+                    .unwrap_or_default(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
+    let all_entries = command_groups
+        .iter()
+        .flat_map(|(_, entries)| entries)
+        .collect::<Vec<_>>();
+
+    let max_name = all_entries
+        .iter()
+        .map(|(name, _)| name.len())
+        .max()
+        .unwrap_or(0);
+    let max_hint = all_entries
+        .iter()
+        .map(|(_, hint)| hint.len())
+        .max()
+        .unwrap_or(0);
+    let global_options = command_metadata
+        .get_arguments()
+        .filter(|arg| !arg.is_hide_set())
+        .filter(|arg| !arg.is_positional())
+        .filter(|arg| arg.is_global_set() || matches!(arg.get_long(), Some("help" | "version")))
+        .filter_map(|arg| {
+            let name = match (arg.get_short(), arg.get_long()) {
+                (Some(short), Some(long)) => format!("-{short}, --{long}"),
+                (Some(short), None) => format!("-{short}"),
+                (None, Some(long)) => format!("--{long}"),
+                (None, None) => return None,
+            };
+
+            let hint = arg
+                .get_value_names()
+                .and_then(|value_names| value_names.first())
+                .map(|value_name| format!("<{value_name}>"))
+                .unwrap_or_default();
+
+            let description = arg.get_help().map(ToString::to_string).unwrap_or_default();
+            if description.is_empty() {
+                return None;
+            }
+
+            Some((name, hint, description))
+        })
+        .collect::<Vec<_>>();
+    let max_option_name = global_options
+        .iter()
+        .map(|(name, _, _)| name.len())
+        .max()
+        .unwrap_or(0);
+    let max_option_hint = global_options
+        .iter()
+        .map(|(_, hint, _)| hint.len())
+        .max()
+        .unwrap_or(0);
+    let align_name = max_name.max(max_option_name);
+    let align_hint = max_hint.max(max_option_hint);
+
     let _ = write!(
         writer,
-        "\n\n     {named}# Optional build output settings{named:#}"
+        "{purple}Acton{purple:#} is all-in-one on-chain development tool for TON.",
     );
-    let _ = write!(writer, "\n     {build_config_example}");
-    let _ = write!(writer, "\n\n{header}Examples:{header:#}");
+    let _ = write!(
+        writer,
+        "\n\n{header}Usage:{header:#} {usage_style}acton <command> [...flags] [...args]{usage_style:#}"
+    );
 
-    const USAGE_SEP: &str = "\n     ";
-    for (name, value) in &build_examples {
-        let _ = write!(writer, "{USAGE_SEP}{named}# {name}{named:#}");
-        let _ = writeln!(writer, "{USAGE_SEP}{literal}{value}{literal:#}");
+    let _ = write!(writer, "\n\n{header}Commands:{header:#}");
+    for (group_idx, (command_style, entries)) in command_groups.iter().enumerate() {
+        if group_idx > 0 {
+            let _ = writeln!(writer);
+        }
+        for (name, hint) in entries {
+            let description = command_descriptions
+                .get(*name)
+                .map(String::as_str)
+                .unwrap_or_default();
+            let _ = write!(
+                writer,
+                "\n  {command_style}{name:<align_name$}{command_style:#}  "
+            );
+            if hint.is_empty() {
+                let _ = write!(writer, "{:align_hint$}  ", "", align_hint = align_hint);
+            } else {
+                let _ = write!(writer, "{dimmed}{hint:<align_hint$}{dimmed:#}  ");
+            }
+            let _ = write!(writer, "{description}");
+        }
+    }
+
+    if show_global_options {
+        let _ = write!(writer, "\n\n{header}Global options:{header:#}");
+        for (name, hint, description) in &global_options {
+            let _ = write!(writer, "\n  {cyan}{name:<align_name$}{cyan:#}  ",);
+            if hint.is_empty() {
+                let _ = write!(writer, "{:align_hint$}  ", "", align_hint = align_hint);
+            } else {
+                let _ = write!(writer, "{dimmed}{hint:<align_hint$}{dimmed:#}  ",);
+            }
+            let _ = write!(writer, "{description}");
+        }
     }
 
     let _ = write!(
         writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/build-system"
+        "\n\nUse {cyan}acton help <command>{cyan:#} for detailed manuals with behavior, config, and examples."
+    );
+
+    let _ = writeln!(
+        writer,
+        "\n\nLearn more about Acton:                {cyan}https://ton-blockchain.github.io/acton/docs/welcome{cyan:#}"
     );
 
     writer
 }
 
-fn example_disasm_usage() -> StyledStr {
-    use std::fmt::Write as _;
+fn cli_command(show_global_options: bool) -> clap::Command {
+    Cli::command().override_help(root_help(show_global_options))
+}
 
-    let mut writer = StyledStr::new();
-    let styled = Styles::styled();
+fn completion_command() -> clap::Command {
+    cli_command(true)
+}
 
-    let disasm_examples = Vec::from([
-        ("Disassemble from BoC file", "acton disasm contract.boc"),
-        (
-            "Disassemble from hex/base64 string",
-            "acton disasm -s \"b5ee9c72010104...0840f01c700f2f4\"",
-        ),
-        (
-            "Disassemble from blockchain address",
-            "acton disasm --address UQA...wwM",
-        ),
-        (
-            "Disassemble with output to file",
-            "acton disasm contract.boc -o output.tasm",
-        ),
-        (
-            "Disassemble with cell hashes and offsets",
-            "acton disasm contract.boc --show-hashes --show-offsets",
-        ),
-        (
-            "Disassemble from testnet address",
-            "acton disasm --address kQAl...g44 --net testnet",
-        ),
-    ]);
+fn root_help_has_explicit_help_flag() -> bool {
+    env::args_os()
+        .skip(1)
+        .any(|arg| arg == "-h" || arg == "--help")
+}
 
-    let header = styled.get_header();
-    let named = Style::new().dimmed();
-    let literal = styled.get_literal();
+fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
+    match command.as_deref() {
+        None => {
+            cli_command(true).print_help()?;
+            println!();
+            Ok(())
+        }
+        Some(command) => {
+            if print_command_manual(command)? {
+                return Ok(());
+            }
 
-    let _ = write!(writer, "{header}Examples:{header:#}");
+            let mut cli = Cli::command();
+            cli.build();
+            if let Some(subcommand) = cli.find_subcommand_mut(command) {
+                subcommand.print_long_help()?;
+                println!();
+                return Ok(());
+            }
 
-    const USAGE_SEP: &str = "\n     ";
-    for (name, value) in &disasm_examples {
-        let _ = write!(writer, "{USAGE_SEP}{named}# {name}{named:#}");
-        let _ = writeln!(writer, "{USAGE_SEP}{literal}{value}{literal:#}");
+            let mut message = format!("no such command: `{command}`");
+            if let Some((suggestion, _)) = cli
+                .get_subcommands()
+                .map(|subcommand| subcommand.get_name())
+                .filter(|name| *name != "help")
+                .map(|name| (name, strsim::jaro_winkler(command, name)))
+                .filter(|(_, score)| *score >= 0.80)
+                .max_by(|left, right| left.1.total_cmp(&right.1))
+            {
+                message.push_str(&format!(
+                    "\n\nhelp: a command with a similar name exists: `{suggestion}`"
+                ));
+            }
+            message.push_str("\n\nhelp: view all commands with `acton --help`");
+
+            Cli::command()
+                .error(clap::error::ErrorKind::InvalidSubcommand, message)
+                .exit();
+        }
     }
-
-    let _ = write!(
-        writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/commands/disasm"
-    );
-
-    writer
-}
-
-fn format_examples(examples: &[(&str, &str)], link: &str) -> StyledStr {
-    use std::fmt::Write as _;
-
-    let mut writer = StyledStr::new();
-    let styled = Styles::styled();
-
-    let header = styled.get_header();
-    let named = Style::new().dimmed();
-    let literal = styled.get_literal();
-
-    let _ = write!(writer, "{header}Examples:{header:#}");
-
-    const USAGE_SEP: &str = "\n     ";
-    for (name, value) in examples {
-        let _ = write!(writer, "{USAGE_SEP}{named}# {name}{named:#}");
-        let _ = writeln!(writer, "{USAGE_SEP}{literal}{value}{literal:#}");
-    }
-
-    if !link.is_empty() {
-        let _ = write!(writer, "\nFor more information, see {link}");
-    }
-
-    writer
-}
-
-fn example_new_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Create a new project named my-project",
-                "acton new my-project",
-            ),
-            (
-                "Create a project non-interactively with all metadata",
-                "acton new my-project --name \"My Project\" --description \"Cool description\" --template counter --license MIT",
-            ),
-        ],
-        "https://i582.github.io/acton/docs/commands/new",
-    )
-}
-
-fn example_wallet_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Create a new wallet named my-wallet",
-                "acton wallet new my-wallet",
-            ),
-            (
-                "List all configured wallets with balances",
-                "acton wallet list -b",
-            ),
-            (
-                "Request testnet TONs from faucet",
-                "acton wallet airdrop my-wallet",
-            ),
-            (
-                "Sign external wallet body BoC",
-                "acton wallet sign my-wallet --body \"B5EE9C72...\"",
-            ),
-            (
-                "Export wallet mnemonic (interactive only)",
-                "acton wallet export-mnemonic my-wallet",
-            ),
-        ],
-        "https://i582.github.io/acton/docs/commands/wallet",
-    )
-}
-
-fn example_wrapper_usage() -> StyledStr {
-    format_examples(
-        &[
-            ("Generate wrapper for minter", "acton wrapper minter"),
-            (
-                "Generate wrapper and stub test for minter",
-                "acton wrapper minter --test",
-            ),
-        ],
-        "https://i582.github.io/acton/docs/test-runner/generating-wrappers",
-    )
-}
-
-fn example_script_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Execute a deploy script in local emulator",
-                "acton script scripts/deploy.tolk",
-            ),
-            (
-                "Execute a deploy script and broadcast to testnet network",
-                "acton script scripts/deploy.tolk --broadcast",
-            ),
-            (
-                "Execute a deploy script and broadcast to mainnet network",
-                "acton script scripts/deploy.tolk --broadcast --net mainnet",
-            ),
-        ],
-        "https://i582.github.io/acton/docs/scripting",
-    )
-}
-
-fn example_run_usage() -> StyledStr {
-    format_examples(
-        &[(
-            "Run a custom script named 'deploy' with arguments",
-            "acton run deploy 1 2 3",
-        )],
-        "https://i582.github.io/acton/docs/commands/run",
-    )
-}
-
-fn example_compile_usage() -> StyledStr {
-    format_examples(
-        &[(
-            "Compile a Tolk contract and save as BOC",
-            "acton compile contracts/main.tolk --boc main.boc",
-        )],
-        "https://i582.github.io/acton/docs/commands/compile",
-    )
-}
-
-fn example_verify_usage() -> StyledStr {
-    format_examples(
-        &[(
-            "Verify a contract with a specific address",
-            "acton verify minter --address UQA...wwM",
-        )],
-        "https://i582.github.io/acton/docs/contract-verification",
-    )
-}
-
-fn example_retrace_usage() -> StyledStr {
-    format_examples(
-        &[(
-            "Retrace a transaction by its hash",
-            "acton retrace 287f...9e0",
-        )],
-        "",
-    )
-}
-
-fn example_library_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Publish a contract as a library",
-                "acton library publish minter",
-            ),
-            ("Fetch a library by its hash", "acton library fetch <HASH>"),
-            (
-                "Show information about a library",
-                "acton library info my-lib",
-            ),
-            (
-                "Top up a library for 1 year",
-                "acton library topup my-lib --duration 1y",
-            ),
-        ],
-        "https://i582.github.io/acton/docs/advanced/libraries",
-    )
-}
-
-fn example_up_usage() -> StyledStr {
-    format_examples(
-        &[
-            ("Upgrade Acton to the latest stable version", "acton up"),
-            ("List all available versions", "acton up --list"),
-        ],
-        "https://i582.github.io/acton/docs/installation",
-    )
-}
-
-fn example_fmt_usage() -> StyledStr {
-    format_examples(
-        &[
-            ("Format all Tolk files in the current project", "acton fmt"),
-            (
-                "Format specific files or directories",
-                "acton fmt contracts/ scripts/",
-            ),
-            ("Check if all files are formatted", "acton fmt --check"),
-        ],
-        "",
-    )
-}
-
-fn example_doc_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Show text documentation for TVM instruction ADD",
-                "acton doc tvm ADD",
-            ),
-            (
-                "Show text documentation for several instructions",
-                "acton doc tvm ADD SUB",
-            ),
-            (
-                "Show raw JSON entry for TVM instruction SENDRAWMSG",
-                "acton doc tvm SENDRAWMSG --json",
-            ),
-            (
-                "Find TVM instructions by fuzzy query",
-                "acton doc tvm SENRAWMSG --find",
-            ),
-            (
-                "Find by fuzzy query in names and descriptions",
-                "acton doc tvm outcomng --find --description",
-            ),
-        ],
-        "",
-    )
-}
-
-fn example_completions_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Generate dynamic Bash completions",
-                "source <(COMPLETE=bash acton)",
-            ),
-            ("Generate static Zsh completions", "acton completions zsh"),
-        ],
-        "https://i582.github.io/acton/docs/commands/shell-completions",
-    )
 }
 
 fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
@@ -1344,11 +1319,26 @@ fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
             Some(boundary) => dir.starts_with(boundary),
             None => true,
         })
-        .map(|dir| dir.join("Acton.toml"))
-        .find(|candidate| candidate.is_file())
+        .find_map(|dir| {
+            let candidate = dir.join("Acton.toml");
+            candidate.is_file().then_some(candidate)
+        })
 }
 
-fn resolve_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<(PathBuf, bool)> {
+struct ResolvedProjectRoot {
+    path: PathBuf,
+    source: ResolutionSource,
+}
+
+struct ResolvedManifestPath {
+    path: PathBuf,
+    source: ResolutionSource,
+}
+
+fn resolve_manifest_path(
+    manifest_path: Option<PathBuf>,
+    resolved_project_root: &ResolvedProjectRoot,
+) -> anyhow::Result<ResolvedManifestPath> {
     let cwd = env::current_dir()?;
 
     if let Some(manifest_path) = manifest_path {
@@ -1362,57 +1352,113 @@ fn resolve_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<(Path
             resolved = resolved.join("Acton.toml");
         }
 
-        return Ok((resolved, true));
+        return Ok(ResolvedManifestPath {
+            path: resolved,
+            source: ResolutionSource::ManifestPathFlag,
+        });
     }
 
-    if let Some(found_manifest_path) = find_manifest_in_ancestors(&cwd) {
-        return Ok((found_manifest_path, true));
-    }
+    let source = match resolved_project_root.source {
+        ResolutionSource::ProjectRootFlag => ResolutionSource::ProjectRootFlag,
+        ResolutionSource::AutoDetected => ResolutionSource::AutoDetected,
+        ResolutionSource::FallbackCwd => ResolutionSource::FallbackCwd,
+        ResolutionSource::ManifestPathFlag => ResolutionSource::FallbackCwd,
+    };
 
-    Ok((cwd.join("Acton.toml"), false))
+    Ok(ResolvedManifestPath {
+        path: resolved_project_root.path.join("Acton.toml"),
+        source,
+    })
 }
 
-fn configure_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<()> {
-    let (resolved_manifest_path, should_switch_to_project_root) =
-        resolve_manifest_path(manifest_path)?;
+fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<ResolvedProjectRoot> {
+    let cwd = env::current_dir()?;
 
-    init_manifest_path(&resolved_manifest_path)?;
+    if let Some(project_root) = project_root {
+        let resolved_project_root = if project_root.is_absolute() {
+            project_root
+        } else {
+            cwd.join(project_root)
+        };
 
-    // Keep relative paths in commands stable by working from the project directory.
-    if should_switch_to_project_root
-        && let Some(project_dir) = resolved_manifest_path.parent()
-        && project_dir.exists()
-    {
-        env::set_current_dir(project_dir)?;
+        if !resolved_project_root.is_dir() {
+            anyhow::bail!(
+                "Project root {} is not a directory",
+                resolved_project_root.display()
+            );
+        }
+
+        return Ok(ResolvedProjectRoot {
+            path: resolved_project_root,
+            source: ResolutionSource::ProjectRootFlag,
+        });
     }
+
+    if let Some(found_manifest_path) = find_manifest_in_ancestors(&cwd)
+        && let Some(parent) = found_manifest_path.parent()
+    {
+        return Ok(ResolvedProjectRoot {
+            path: parent.to_path_buf(),
+            source: ResolutionSource::AutoDetected,
+        });
+    }
+
+    Ok(ResolvedProjectRoot {
+        path: cwd,
+        source: ResolutionSource::FallbackCwd,
+    })
+}
+
+fn configure_project_roots(
+    manifest_path: Option<PathBuf>,
+    project_root: Option<PathBuf>,
+) -> anyhow::Result<()> {
+    let resolved_project_root = resolve_project_root(project_root)?;
+    let resolved_manifest_path = resolve_manifest_path(manifest_path, &resolved_project_root)?;
+
+    init_project_root_with_source(&resolved_project_root.path, resolved_project_root.source)?;
+    init_manifest_path_with_source(&resolved_manifest_path.path, resolved_manifest_path.source)?;
 
     Ok(())
 }
 
 fn main() {
-    CompleteEnv::with_factory(Cli::command).complete();
+    CompleteEnv::with_factory(completion_command).complete();
 
     setup_panic!(
-        Metadata::new("Acton", env!("CARGO_PKG_VERSION"))
+        Metadata::new("Acton", acton::build_info::SHORT_VERSION)
             .authors("TON Core")
-            .homepage("https://github.com/i582/acton")
+            .homepage("https://github.com/ton-blockchain/acton")
     );
+    let _crash_handler = acton::crash::install().map_err(|err| {
+        eprintln!(
+            "Warning: failed to install fatal signal handler ({err}). Continuing without fatal signal diagnostics."
+        );
+        err
+    }).ok();
+
     dotenv().ok();
     let Cli {
         color,
         manifest_path,
+        project_root,
         command,
-    } = Cli::parse();
+    } = {
+        let matches = cli_command(root_help_has_explicit_help_flag()).get_matches();
+        Cli::from_arg_matches(&matches).unwrap_or_else(|err| err.exit())
+    };
     init_color_mode(color);
 
-    if !matches!(command, Commands::Init | Commands::New { .. })
-        && let Err(err) = configure_manifest_path(manifest_path)
+    if !matches!(
+        command,
+        Commands::Init | Commands::New { .. } | Commands::Help { .. } | Commands::Rpc { .. }
+    ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. })
+    if !matches!(command, Commands::Ls { .. } | Commands::Help { .. })
         && let Err(err) = setup_logging()
     {
         eprintln!(
@@ -1423,24 +1469,51 @@ fn main() {
 
     let result = match command {
         Commands::Init => init_cmd(),
+        Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
+        Commands::Rpc { command } => {
+            if manifest_path.is_some() || project_root.is_some() {
+                match configure_project_roots(manifest_path, project_root) {
+                    Ok(()) => rpc_cmd(command),
+                    Err(err) => Err(err),
+                }
+            } else {
+                rpc_cmd(command)
+            }
+        }
         Commands::New {
             path,
             name,
             description,
             template,
             license,
-        } => new_cmd(&path, name, description, template, license),
+            app,
+            hooks,
+            agents,
+        } => new_cmd(
+            &path,
+            name,
+            description,
+            template,
+            license,
+            app,
+            hooks,
+            agents,
+        ),
         Commands::Test {
             path,
             filter,
             reporter,
+            show_bodies,
             debug,
             debug_port,
             backtrace,
             coverage,
             coverage_format,
             coverage_file,
+            coverage_minimum_percent,
+            coverage_include_wrappers,
+            coverage_include_tests,
             exclude,
             include,
             clear_cache,
@@ -1448,6 +1521,7 @@ fn main() {
             junit_merge,
             snapshot,
             baseline_snapshot,
+            fail_on_diff,
             fork_net,
             api_key,
             save_test_trace,
@@ -1463,12 +1537,16 @@ fn main() {
             Ok(fork_net) => {
                 let config = create_test_config(
                     filter,
+                    show_bodies,
                     debug,
                     debug_port,
                     backtrace,
                     coverage,
                     coverage_format,
                     coverage_file,
+                    coverage_minimum_percent,
+                    coverage_include_wrappers,
+                    coverage_include_tests,
                     exclude,
                     include,
                     clear_cache,
@@ -1477,6 +1555,7 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    fail_on_diff,
                     fork_net,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     fork_block_number,
@@ -1511,24 +1590,31 @@ fn main() {
             api_key,
             verbose,
             logs_dir,
-        } => retrace_cmd(hash, net, api_key, verbose, logs_dir),
+            contract,
+            dap_port,
+        } => retrace_cmd(hash, net, api_key, verbose, logs_dir, contract, dap_port),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
+            output_dir: wrapper_output_dir,
             test_output,
+            test_output_dir,
             test,
-            storage_struct,
+            ts,
         } => wrapper_cmd(
             &contract_id,
             wrapper_output,
+            wrapper_output_dir,
             test_output,
+            test_output_dir,
             test,
-            storage_struct,
+            ts,
         ),
         Commands::Script {
             path,
             args,
             debug,
+            backtrace,
             debug_port,
             clear_cache,
             fork_net,
@@ -1537,10 +1623,12 @@ fn main() {
             broadcast,
             net,
             explorer,
+            show_bodies,
         } => script_cmd(
             &path,
             args,
             debug,
+            backtrace,
             debug_port,
             clear_cache,
             fork_net,
@@ -1549,15 +1637,25 @@ fn main() {
             broadcast,
             net,
             explorer,
+            show_bodies,
         ),
         Commands::Build {
             contract_id,
             clear_cache,
             graph,
             out_dir,
+            gen_dir,
             output_fift,
             info,
-        } => build_cmd(contract_id, clear_cache, graph, out_dir, output_fift, info),
+        } => build_cmd(
+            contract_id,
+            clear_cache,
+            graph,
+            out_dir,
+            gen_dir,
+            output_fift,
+            info,
+        ),
         Commands::Compile {
             path,
             json,
@@ -1707,6 +1805,7 @@ fn main() {
             fix,
             output_format,
             output_file,
+            enable_only,
             explain,
             list_lint_rules,
             target,
@@ -1714,19 +1813,20 @@ fn main() {
             fix,
             output_format,
             output_file,
+            enable_only,
             explain,
             list_lint_rules,
             target,
         ),
         Commands::Up {
             version,
-            canary,
+            trunk,
             stable,
             yes,
             list,
             check,
         } => {
-            let result = up_cmd(version, canary, stable, yes, list, check);
+            let result = up_cmd(version, trunk, stable, yes, list, check);
             if check {
                 report_error_as_json(result);
                 return;
@@ -1742,11 +1842,20 @@ fn main() {
                 json,
             } => doc_tvm_cmd(&instruction, json, find, description),
         },
+        Commands::Func2Tolk {
+            path,
+            output,
+            warnings_as_comments,
+            no_camel_case,
+            version,
+        } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case, version),
+        Commands::Hooks { command } => hooks_cmd(command),
+        Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())
         }
-        Commands::Docgen { output } => docgen_cmd(output),
+        Commands::Docgen { output, check } => docgen_cmd(output, check),
         Commands::Ls {
             port,
             stdio,
@@ -1768,11 +1877,17 @@ fn main() {
                 accounts,
                 api_key,
                 db_path,
+                rate_limit,
                 load_state,
                 dump_state,
             } => {
-                let resolved_litenode =
-                    resolve_litenode_settings(port, fork_net, fork_block_number, accounts);
+                let resolved_litenode = resolve_litenode_settings(
+                    port,
+                    fork_net,
+                    fork_block_number,
+                    accounts,
+                    rate_limit,
+                );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -1784,6 +1899,7 @@ fn main() {
                         resolved_litenode.fork_net,
                         resolved_litenode.fork_block_number,
                         resolved_litenode.accounts,
+                        resolved_litenode.rate_limit,
                         load_state,
                         dump_state,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
@@ -1820,7 +1936,7 @@ fn print_error(err: &anyhow::Error) {
     for cause in err.chain().skip(1) {
         eprintln!("\nCaused by:");
         for line in cause.to_string().lines() {
-            eprintln!("  {}", line);
+            eprintln!("  {line}");
         }
     }
 }
@@ -1830,10 +1946,11 @@ struct ResolvedLitenodeSettings {
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
+    rate_limit: Option<u32>,
 }
 
 fn resolve_litenode_port(cli_port: Option<u16>) -> u16 {
-    resolve_litenode_settings(cli_port, None, None, None).port
+    resolve_litenode_settings(cli_port, None, None, None, None).port
 }
 
 fn resolve_litenode_settings(
@@ -1841,13 +1958,15 @@ fn resolve_litenode_settings(
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
+    cli_rate_limit: Option<u32>,
 ) -> ResolvedLitenodeSettings {
     let config = load_litenode_settings_from_config();
     ResolvedLitenodeSettings {
-        port: cli_port.or(config.port).unwrap_or(3000),
+        port: cli_port.or(config.port).unwrap_or(5411),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
+        rate_limit: cli_rate_limit.or(config.rate_limit),
     }
 }
 
@@ -1870,7 +1989,7 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -1881,9 +2000,11 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Sour
             anyhow::bail!("{} is not a file", path.yellow());
         }
 
-        let content = fs::read_to_string(path).expect("Failed to read source map file");
-        let result: SourceMap =
-            serde_json::from_str(content.as_str()).expect("Failed to parse source map JSON");
+        let content = fs::read_to_string(&path)
+            .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
+        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+            anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
+        })?;
         Some(Box::new(result))
     } else {
         None
@@ -1916,7 +2037,7 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return PathBuf::from(".acton").join("logs");
+        return configured_project_root().join(".acton").join("logs");
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -1924,11 +2045,11 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return PathBuf::from(".acton").join("logs");
+        return configured_project_root().join(".acton").join("logs");
     }
 
     #[allow(unreachable_code)]
-    PathBuf::from(".acton").join("logs")
+    configured_project_root().join(".acton").join("logs")
 }
 
 fn resolve_acton_log_dir() -> PathBuf {
@@ -1963,12 +2084,16 @@ fn setup_logging() -> anyhow::Result<()> {
 #[allow(clippy::too_many_arguments)]
 fn create_test_config(
     filter: Option<String>,
+    show_bodies: bool,
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
+    coverage_minimum_percent: Option<f64>,
+    coverage_include_wrappers: bool,
+    coverage_include_tests: bool,
     exclude: Vec<String>,
     include: Vec<String>,
     clear_cache: bool,
@@ -1977,6 +2102,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    fail_on_diff: bool,
     fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
@@ -1997,12 +2123,24 @@ fn create_test_config(
         return test_settings.to_test_config(
             filter,
             report_formats,
+            show_bodies,
             if debug { Some(true) } else { None },
             debug_port,
             backtrace,
             if coverage { Some(true) } else { None },
             coverage_format,
             coverage_file,
+            coverage_minimum_percent,
+            if coverage_include_wrappers {
+                Some(true)
+            } else {
+                None
+            },
+            if coverage_include_tests {
+                Some(true)
+            } else {
+                None
+            },
             if exclude.is_empty() {
                 None
             } else {
@@ -2026,6 +2164,7 @@ fn create_test_config(
             mutate_overrides,
             mutate_contract,
             disable_rules,
+            if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
             Some(ui_port),
@@ -2033,10 +2172,14 @@ fn create_test_config(
     }
 
     TestConfig {
+        show_bodies,
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
         coverage,
+        coverage_minimum_percent,
+        coverage_include_wrappers,
+        coverage_include_tests,
         filter,
         coverage_format,
         coverage_file,
@@ -2048,6 +2191,7 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        fail_on_diff,
         api_key,
         fork_block_number,
         save_test_trace,
@@ -2060,4 +2204,16 @@ fn create_test_config(
         ui_port,
         fork_net,
     }
+}
+
+fn parse_coverage_percent(raw: &str) -> Result<f64, String> {
+    let value = raw
+        .parse::<f64>()
+        .map_err(|err| format!("invalid coverage percentage '{raw}': {err}"))?;
+
+    if !value.is_finite() || !(0.0..=100.0).contains(&value) {
+        return Err("--coverage-minimum-percent must be between 0 and 100".to_string());
+    }
+
+    Ok(value)
 }

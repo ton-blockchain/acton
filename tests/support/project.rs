@@ -1,4 +1,4 @@
-use crate::common::{acton_exe, assert_ui};
+use crate::common::{acton_exe, acton_path_env, assert_ui};
 use crate::support::assertions::TestOutput;
 use crate::support::tempdir::create_tmp_dir;
 use acton_config::color::ColorMode;
@@ -23,6 +23,10 @@ pub(crate) struct ProjectBuilder {
     lint_max_warnings: Option<usize>,
     lint_output_format: Option<String>,
     test_config: Option<TestConfig>,
+    wrappers_tolk_output_dir: Option<String>,
+    wrappers_tolk_generate_test: Option<bool>,
+    wrappers_tolk_test_output_dir: Option<String>,
+    wrappers_typescript_output_dir: Option<String>,
     license: Option<String>,
     create_acton_toml: bool,
 }
@@ -60,8 +64,12 @@ pub(crate) struct TestConfig {
     pub coverage: Option<bool>,
     pub coverage_format: Option<String>,
     pub coverage_file: Option<String>,
+    pub coverage_minimum_percent: Option<f64>,
+    pub coverage_include_wrappers: Option<bool>,
+    pub coverage_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
 
@@ -71,6 +79,14 @@ fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+}
+
+#[allow(dead_code)]
+#[cfg(unix)]
+fn preserves_json_field_order(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| matches!(name, "package.json" | "package-lock.json"))
 }
 
 #[allow(dead_code)]
@@ -94,7 +110,7 @@ impl ProcessCommandBuilder {
         self
     }
 
-    fn env(mut self, key: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> Self {
+    pub(crate) fn env(mut self, key: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> Self {
         self.cmd.env(key, value);
         self
     }
@@ -218,6 +234,19 @@ impl PtySession {
         self
     }
 
+    /// Assert that a pattern does not appear before timeout or EOF.
+    pub(crate) fn expect_no_match<N>(&mut self, needle: N) -> &mut Self
+    where
+        N: expectrl::Needle + NeedleLabel,
+    {
+        let label = needle.needle_label();
+        match self.inner.expect(needle) {
+            Err(expectrl::Error::ExpectTimeout | expectrl::Error::Eof) => self,
+            Ok(_) => panic!("Expected PTY output to not match {label}"),
+            Err(err) => panic!("Expected PTY output to not match {label}, got error: {err}"),
+        }
+    }
+
     /// Expect a pattern and panic with a custom message on failure.
     #[allow(dead_code)]
     #[allow(non_snake_case)]
@@ -251,7 +280,9 @@ impl PtySession {
             panic!("Failed to read file '{}': {}", full_file_path.display(), e)
         });
 
-        let normalized = if is_json_like_snapshot_file(&full_file_path) {
+        let normalized = if is_json_like_snapshot_file(&full_file_path)
+            && !preserves_json_field_order(&full_file_path)
+        {
             crate::support::snapshots::normalize_output_preserve_escapes(
                 &file_content,
                 &self.project_path,
@@ -260,7 +291,9 @@ impl PtySession {
             crate::support::snapshots::normalize_output(&file_content, &self.project_path)
         };
 
-        let assertion = if is_json_like_snapshot_file(&full_file_path) {
+        let assertion = if is_json_like_snapshot_file(&full_file_path)
+            && !preserves_json_field_order(&full_file_path)
+        {
             crate::common::assertion().normalize_paths(false)
         } else {
             crate::common::assertion()
@@ -310,6 +343,10 @@ impl ProjectBuilder {
             lint_max_warnings: None,
             lint_output_format: None,
             test_config: None,
+            wrappers_tolk_output_dir: None,
+            wrappers_tolk_generate_test: None,
+            wrappers_tolk_test_output_dir: None,
+            wrappers_typescript_output_dir: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
         }
@@ -518,7 +555,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read test file from {}: {}", path, e));
+            .unwrap_or_else(|e| panic!("Failed to read test file from {path}: {e}"));
         self.tests.push((name.to_string(), code));
         self
     }
@@ -531,7 +568,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn contract_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read contract file from {}: {}", path, e));
+            .unwrap_or_else(|e| panic!("Failed to read contract file from {path}: {e}"));
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code),
@@ -550,7 +587,7 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn file_from_path(mut self, dest_path: &str, src_path: &str) -> Self {
         let code = fs::read_to_string(src_path)
-            .unwrap_or_else(|e| panic!("Failed to read file from {}: {}", src_path, e));
+            .unwrap_or_else(|e| panic!("Failed to read file from {src_path}: {e}"));
         self.files.push((dest_path.to_string(), code));
         self
     }
@@ -601,6 +638,26 @@ impl ProjectBuilder {
     /// ```
     pub(crate) fn with_test_config(mut self, config: TestConfig) -> Self {
         self.test_config = Some(config);
+        self
+    }
+
+    pub(crate) fn with_wrappers_typescript_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_typescript_output_dir = Some(path.to_string());
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_tolk_output_dir = Some(path.to_string());
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_generate_test(mut self, enabled: bool) -> Self {
+        self.wrappers_tolk_generate_test = Some(enabled);
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_test_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_tolk_test_output_dir = Some(path.to_string());
         self
     }
 
@@ -670,6 +727,10 @@ impl ProjectBuilder {
                 self.lint_max_warnings,
                 self.lint_output_format,
                 &self.test_config,
+                self.wrappers_tolk_output_dir.as_deref(),
+                self.wrappers_tolk_generate_test,
+                self.wrappers_tolk_test_output_dir.as_deref(),
+                self.wrappers_typescript_output_dir.as_deref(),
                 &self.license,
             );
         }
@@ -707,6 +768,10 @@ impl ProjectBuilder {
         lint_max_warnings: Option<usize>,
         lint_output_format: Option<String>,
         test_config: &Option<TestConfig>,
+        wrappers_tolk_output_dir: Option<&str>,
+        wrappers_tolk_generate_test: Option<bool>,
+        wrappers_tolk_test_output_dir: Option<&str>,
+        wrappers_typescript_output_dir: Option<&str>,
         license: &Option<String>,
     ) {
         use std::fmt::Write as _;
@@ -804,6 +869,29 @@ version = "0.1.0"
             toml_content.push('\n');
         }
 
+        if wrappers_tolk_output_dir.is_some()
+            || wrappers_tolk_generate_test.is_some()
+            || wrappers_tolk_test_output_dir.is_some()
+        {
+            toml_content.push_str("[wrappers.tolk]\n");
+            if let Some(path) = wrappers_tolk_output_dir {
+                toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            }
+            if let Some(enabled) = wrappers_tolk_generate_test {
+                toml_content.push_str(&format!("generate-test = {enabled}\n"));
+            }
+            if let Some(path) = wrappers_tolk_test_output_dir {
+                toml_content.push_str(&format!("test-output-dir = \"{path}\"\n"));
+            }
+            toml_content.push('\n');
+        }
+
+        if let Some(path) = wrappers_typescript_output_dir {
+            toml_content.push_str("[wrappers.typescript]\n");
+            toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            toml_content.push('\n');
+        }
+
         if !scripts.is_empty() {
             toml_content.push_str("[scripts]\n");
             for (name, cmd) in scripts {
@@ -898,18 +986,6 @@ version = "0.1.0"
                 toml_content.push_str(&format!("backtrace = \"{backtrace}\"\n"));
             }
 
-            if let Some(coverage) = config.coverage {
-                toml_content.push_str(&format!("coverage = {coverage}\n"));
-            }
-
-            if let Some(coverage_format) = &config.coverage_format {
-                toml_content.push_str(&format!("coverage-format = \"{coverage_format}\"\n"));
-            }
-
-            if let Some(coverage_file) = &config.coverage_file {
-                toml_content.push_str(&format!("coverage-file = \"{coverage_file}\"\n"));
-            }
-
             if let Some(junit_path) = &config.junit_path {
                 toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
             }
@@ -920,6 +996,46 @@ version = "0.1.0"
 
             if let Some(fail_fast) = config.fail_fast {
                 toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+            }
+
+            if let Some(fail_on_diff) = config.fail_on_diff {
+                toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+            }
+
+            if config.coverage.is_some()
+                || config.coverage_format.is_some()
+                || config.coverage_file.is_some()
+                || config.coverage_minimum_percent.is_some()
+                || config.coverage_include_wrappers.is_some()
+                || config.coverage_include_tests.is_some()
+            {
+                toml_content.push_str("\n[test.coverage]\n");
+
+                if let Some(coverage) = config.coverage {
+                    toml_content.push_str(&format!("enabled = {coverage}\n"));
+                }
+
+                if let Some(coverage_format) = &config.coverage_format {
+                    toml_content.push_str(&format!("format = \"{coverage_format}\"\n"));
+                }
+
+                if let Some(coverage_file) = &config.coverage_file {
+                    toml_content.push_str(&format!("output-file = \"{coverage_file}\"\n"));
+                }
+
+                if let Some(coverage_minimum_percent) = config.coverage_minimum_percent {
+                    toml_content
+                        .push_str(&format!("minimum-percent = {coverage_minimum_percent}\n"));
+                }
+
+                if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
+                    toml_content
+                        .push_str(&format!("include-wrappers = {coverage_include_wrappers}\n"));
+                }
+
+                if let Some(coverage_include_tests) = config.coverage_include_tests {
+                    toml_content.push_str(&format!("include-tests = {coverage_include_tests}\n"));
+                }
             }
 
             toml_content.push('\n');
@@ -938,7 +1054,9 @@ pub(crate) struct Project {
 impl Project {
     #[allow(dead_code)]
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = ProcessCommandBuilder::new(acton_exe());
+        let cmd = ProcessCommandBuilder::new(acton_exe())
+            .env("PATH", acton_path_env())
+            .env("ACTON_LOG_DIR", self.path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
             project: Arc::new(ProjectRef {
@@ -950,6 +1068,7 @@ impl Project {
             build_clear_cache: false,
             build_graph: None,
             build_out_dir: None,
+            build_gen_dir: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
@@ -957,6 +1076,8 @@ impl Project {
             disasm_api_key: None,
             disasm_net: None,
             disasm_follow_libraries: false,
+            disasm_show_hashes: false,
+            disasm_show_offsets: false,
             compile_json: false,
             compile_base64_only: false,
             compile_boc: None,
@@ -998,6 +1119,7 @@ pub(crate) struct ActonCommand {
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
     pub(crate) build_out_dir: Option<String>,
+    pub(crate) build_gen_dir: Option<String>,
     pub(crate) build_output_fift: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
@@ -1005,6 +1127,8 @@ pub(crate) struct ActonCommand {
     pub(crate) disasm_api_key: Option<String>,
     pub(crate) disasm_net: Option<String>,
     pub(crate) disasm_follow_libraries: bool,
+    pub(crate) disasm_show_hashes: bool,
+    pub(crate) disasm_show_offsets: bool,
     pub(crate) compile_json: bool,
     pub(crate) compile_base64_only: bool,
     pub(crate) compile_boc: Option<String>,
@@ -1056,13 +1180,13 @@ impl ActonCommand {
         self
     }
 
-    pub(crate) fn storage_struct(mut self, name: &str) -> Self {
-        self.cmd = self.cmd.arg("--storage-struct").arg(name);
+    pub(crate) fn generate_test_stub(mut self) -> Self {
+        self.cmd = self.cmd.arg("--test");
         self
     }
 
-    pub(crate) fn generate_test_stub(mut self) -> Self {
-        self.cmd = self.cmd.arg("--test");
+    pub(crate) fn generate_typescript_wrapper(mut self) -> Self {
+        self.cmd = self.cmd.arg("--ts");
         self
     }
 
@@ -1072,9 +1196,19 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn wrapper_output_dir(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--output-dir").arg(path);
+        self
+    }
+
     /// Specify output test file
     pub(crate) fn test_output(mut self, path: &str) -> Self {
         self.cmd = self.cmd.arg("--test-output").arg(path);
+        self
+    }
+
+    pub(crate) fn test_output_dir(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--test-output-dir").arg(path);
         self
     }
 
@@ -1240,6 +1374,16 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn show_hashes(mut self) -> Self {
+        self.disasm_show_hashes = true;
+        self
+    }
+
+    pub(crate) fn show_offsets(mut self) -> Self {
+        self.disasm_show_offsets = true;
+        self
+    }
+
     pub(crate) fn compile(mut self, file_path: &str) -> Self {
         self.cmd = self
             .cmd
@@ -1335,6 +1479,27 @@ impl ActonCommand {
     /// Enable coverage with custom output file
     pub(crate) fn with_coverage_file(mut self, file: &str) -> Self {
         self.cmd = self.cmd.arg("--coverage-file").arg(file);
+        self
+    }
+
+    /// Require a minimum total line coverage percentage.
+    pub(crate) fn with_coverage_minimum_percent(mut self, percent: f64) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("--coverage-minimum-percent")
+            .arg(percent.to_string());
+        self
+    }
+
+    /// Include files under the `@wrappers` mapping in coverage reports.
+    pub(crate) fn with_coverage_include_wrappers(mut self) -> Self {
+        self.cmd = self.cmd.arg("--coverage-include-wrappers");
+        self
+    }
+
+    /// Include `.test.tolk` files in coverage reports.
+    pub(crate) fn with_coverage_include_tests(mut self) -> Self {
+        self.cmd = self.cmd.arg("--coverage-include-tests");
         self
     }
 
@@ -1516,12 +1681,12 @@ impl ActonCommand {
         self
     }
 
-    /// Generate dependency graph SVG (only for build command)
+    /// Generate dependency graph DOT (only for build command)
     ///
     /// # Examples
     /// ```
-    /// .build().with_graph(None)           // Generate deps.svg (default)
-    /// .build().with_graph(Some("my.svg")) // Generate my.svg
+    /// .build().with_graph(None)           // Generate deps.dot (default)
+    /// .build().with_graph(Some("my.dot")) // Generate my.dot
     /// ```
     pub(crate) fn with_graph(mut self, path: Option<&str>) -> Self {
         self.build_graph = Some(path.map(ToString::to_string));
@@ -1537,6 +1702,12 @@ impl ActonCommand {
     /// ```
     pub(crate) fn with_out_dir(mut self, path: &str) -> Self {
         self.build_out_dir = Some(path.to_string());
+        self
+    }
+
+    /// Set output directory for generated dependency files (only for build command)
+    pub(crate) fn with_gen_dir(mut self, path: &str) -> Self {
+        self.build_gen_dir = Some(path.to_string());
         self
     }
 
@@ -1560,6 +1731,12 @@ impl ActonCommand {
     /// ```
     pub(crate) fn broadcast(mut self) -> Self {
         self.script_broadcast = true;
+        self
+    }
+
+    /// Show decoded message bodies in printed transaction trees.
+    pub(crate) fn show_bodies(mut self) -> Self {
+        self.cmd = self.cmd.arg("--show-bodies");
         self
     }
 
@@ -1639,6 +1816,10 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
         }
 
+        if let Some(gen_dir) = self.build_gen_dir {
+            self.cmd = self.cmd.arg("--gen-dir").arg(gen_dir);
+        }
+
         if let Some(output_fift_dir) = self.build_output_fift {
             self.cmd = self.cmd.arg("--output-fift").arg(output_fift_dir);
         }
@@ -1669,6 +1850,14 @@ impl ActonCommand {
 
         if self.disasm_follow_libraries {
             self.cmd = self.cmd.arg("--follow-libraries");
+        }
+
+        if self.disasm_show_hashes {
+            self.cmd = self.cmd.arg("--show-hashes");
+        }
+
+        if self.disasm_show_offsets {
+            self.cmd = self.cmd.arg("--show-offsets");
         }
 
         if self.compile_json {

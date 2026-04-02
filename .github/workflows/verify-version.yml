@@ -1,0 +1,68 @@
+name: Verify Version
+
+on:
+  workflow_call:
+
+concurrency:
+  group: verify-version-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  check-versions:
+    name: Check Release Versions
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check versions match tag
+        env:
+          RAW_TAG: ${{ github.ref_name }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          raw_tag="${RAW_TAG}"
+
+          if [[ "${raw_tag}" != v* ]]; then
+            echo "::error title=Invalid tag::Tag '${raw_tag}' must start with 'v'"
+            exit 1
+          fi
+
+          tag_version="${raw_tag:1}"
+
+          acton_version="$(yq -r '.package.version' Acton.toml)"
+          cargo_version="$(yq -r '.workspace.package.version' Cargo.toml)"
+          package_version="$(jq -r '.version' package.json)"
+
+          has_errors=0
+
+          if [[ "${acton_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::Acton.toml(version) '${acton_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${cargo_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::Cargo.toml(workspace.package.version) '${cargo_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${package_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::package.json(version) '${package_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${has_errors}" -ne 0 ]]; then
+            exit 1
+          fi
+
+          echo "All versions match ${tag_version}"
+          exit 0

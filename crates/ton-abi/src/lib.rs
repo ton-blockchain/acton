@@ -1,4 +1,5 @@
 pub mod abi_serde;
+pub mod compiler_abi_serde;
 
 use num_bigint::BigInt;
 use path_absolutize::Absolutize;
@@ -23,7 +24,7 @@ fn resolve_mapped_path<'a>(
 
     if let Some(rest) = import_path.strip_prefix('@') {
         let (prefix_without_at, path) = rest.split_once('/').unwrap_or((rest, ""));
-        let prefix_with_at = &import_path[..prefix_without_at.len() + 1];
+        let prefix_with_at = &import_path[..=prefix_without_at.len()];
 
         if let Some(mappings) = mappings {
             // Try both with and without @ prefix in the mappings keys

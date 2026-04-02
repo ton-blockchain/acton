@@ -24,7 +24,7 @@ fn run_config_success_case(project_name: &str, test_body: &str, snapshot_path: &
 fn config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries() {
     run_config_success_case(
         "bc-stdlib-config-storage-prices-multi-entry-roundtrip",
-        r#"
+        r"
 get fun `test-bc-stdlib-config-storage-prices-multi-entry-roundtrip`() {
     val extraTs: uint32 = 1000000;
     var config = net.getConfig();
@@ -68,7 +68,7 @@ get fun `test-bc-stdlib-config-storage-prices-multi-entry-roundtrip`() {
     expect(future.masterchainBitPrice).toEqual(77);
     expect(future.masterchainCellPrice).toEqual(88);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries/config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries.stdout.txt",
     );
 }
@@ -77,7 +77,7 @@ get fun `test-bc-stdlib-config-storage-prices-multi-entry-roundtrip`() {
 fn config_storage_prices_set_initial_overwrites_index_zero_only() {
     run_config_success_case(
         "bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero",
-        r#"
+        r"
 get fun `test-bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero`() {
     val extraTs: uint32 = 2000000;
     var config = net.getConfig();
@@ -130,7 +130,7 @@ get fun `test-bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero`
     expect(future.masterchainBitPrice).toEqual(707);
     expect(future.masterchainCellPrice).toEqual(808);
 }
-"#,
+",
         "integration/snapshots/test-runner/config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries/config_storage_prices_set_initial_overwrites_index_zero_only.stdout.txt",
     );
 }

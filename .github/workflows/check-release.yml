@@ -1,0 +1,109 @@
+name: Check Release
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: false
+        type: string
+
+permissions: { }
+
+jobs:
+  check-artifact:
+    name: Check release artifact (${{ matrix.target_name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            target_name: x86_64-unknown-linux-gnu
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            target_name: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target_name: x86_64-apple-darwin
+          - runner: macos-15
+            target_name: aarch64-apple-darwin
+    env:
+      TARGET_NAME: ${{ matrix.target_name }}
+      PROJECT_NAME: release-check-${{ matrix.target_name }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.10"
+
+      - name: Download Acton archive artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-${{ env.TARGET_NAME }}
+          path: ${{ runner.temp }}/release-artifact
+
+      - name: Unpack Acton archive
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p acton-bin
+          tar -C acton-bin -xzf "release-artifact/acton-${TARGET_NAME}.tar.gz"
+          chmod +x acton-bin/acton
+          echo "${PWD}/acton-bin" >> "$GITHUB_PATH"
+
+      - name: Check Acton target binary
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
+            --binary "${PWD}/acton-bin/acton" \
+            --target "${TARGET_NAME}"
+
+      - name: Verify Acton version
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          acton --version
+
+      - name: Create counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          acton new "${PROJECT_NAME}" \
+            --template counter \
+            --name "release-check" \
+            --description "Release artifact smoke test" \
+            --license MIT
+
+      - name: Build counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
+        run: |
+          acton build
+
+      - name: Test counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
+        run: |
+          acton test
+
+      - name: Check counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
+        run: |
+          acton check
+
+      - name: Format counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
+        run: |
+          acton fmt

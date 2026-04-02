@@ -48,6 +48,8 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use rustc_hash::FxHashSet;
+use std::ffi::{CStr, c_char};
 use std::sync::Arc;
 use std::time::SystemTime;
 use ton_executor::ExecutorVerbosity;
@@ -60,10 +62,43 @@ use tycho_types::dict::Dict;
 use tycho_types::models::config::BlockchainConfigParams;
 use tycho_types::models::{
     AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
-    RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
+    RelaxedMsgInfo, ShardAccount, StdAddr, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
+
+#[derive(Default)]
+struct MissingLibrariesContext {
+    hashes: FxHashSet<String>,
+}
+
+impl MissingLibrariesContext {
+    fn into_set(self) -> FxHashSet<String> {
+        self.hashes
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe extern "C" fn missing_library_callback(
+    ctx: *mut MissingLibrariesContext,
+    hash: *const c_char,
+) {
+    if ctx.is_null() || hash.is_null() {
+        return;
+    }
+
+    // SAFETY: `hash` is provided by the emulator callback contract and points to a valid C string
+    // for the duration of this callback.
+    let hash = unsafe { CStr::from_ptr(hash) }
+        .to_string_lossy()
+        .into_owned();
+
+    // SAFETY: `ctx` points to `MissingLibrariesContext` provided by `send_transaction`
+    // and lives until `run_transaction` returns.
+    if let Some(state) = unsafe { ctx.as_mut() } {
+        state.hashes.insert(hash);
+    }
+}
 
 /// A high-level emulator for TON transactions.
 ///
@@ -109,6 +144,12 @@ impl Emulator {
         libs: &Dict<HashBytes, LibDescr>,
         from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
+        let mut missing_libraries_ctx = MissingLibrariesContext::default();
+        self.executor.register_missing_library_callback(
+            &mut missing_libraries_ctx,
+            missing_library_callback,
+        )?;
+
         let msg_cell = Self::patch_message(state.get_config(), message, from)?;
         let msg_b64 = Boc::encode_base64(&msg_cell);
         let msg = msg_cell
@@ -144,15 +185,21 @@ impl Emulator {
         };
 
         let (result, executor_logs) = self.executor.run_transaction(&msg_b64, &args)?;
+        let mut missing_libraries = Some(missing_libraries_ctx.into_set());
 
         let result = match result {
-            EmulationResult::Success(result) => result,
-            EmulationResult::Error(err) => {
+            EmulationResult::Success(mut result) => {
+                result.missing_libraries = missing_libraries.take().unwrap_or_default();
+                result
+            }
+            EmulationResult::Error(mut err) => {
+                err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs: Some(executor_logs),
+                    missing_libraries: err.missing_libraries,
                 }));
             }
         };
@@ -187,6 +234,7 @@ impl Emulator {
             actions: result.actions,
             code,
             externals: vec![],
+            missing_libraries: result.missing_libraries,
         }))
     }
 
@@ -247,6 +295,125 @@ impl Emulator {
         }
 
         // 3. Finalize the main result with gathered information
+        if let Some(SendMessageResult::Success(res)) = results.get_mut(0) {
+            res.externals = externals;
+            res.child_transactions = child_lts;
+        }
+
+        Ok(results)
+    }
+
+    /// Emulates a tick-tock transaction on the given account, then recursively
+    /// processes all outgoing internal messages (reusing [`Self::send_message`]).
+    pub fn run_tick_tock(
+        &self,
+        state: &mut WorldState,
+        addr: &StdAddr,
+        is_tock: bool,
+        libs: &Dict<HashBytes, LibDescr>,
+    ) -> anyhow::Result<Vec<SendMessageResult>> {
+        let mut missing_libraries_ctx = MissingLibrariesContext::default();
+        self.executor.register_missing_library_callback(
+            &mut missing_libraries_ctx,
+            missing_library_callback,
+        )?;
+
+        let shard_account_before = state.get_account(addr);
+        let code = Self::get_address_code_cell(&shard_account_before);
+
+        let args = RunTransactionArgs {
+            libs: libs.clone().into_root().map(Boc::encode_base64),
+            shard_account: Boc::encode_base64(&to_cell(&shard_account_before)?),
+            now: state.get_now(),
+            lt: state.get_lt(),
+            random_seed: None,
+            ignore_chksig: false,
+            debug_enabled: true,
+            prev_blocks_info: None,
+            is_tick_tock: Some(true),
+            is_tock: Some(is_tock),
+        };
+
+        // Tick-tock has no incoming message; the C++ emulator ignores this parameter
+        // when is_tick_tock is set.
+        let (result, executor_logs) = self.executor.run_transaction("", &args)?;
+        let mut missing_libraries = Some(missing_libraries_ctx.into_set());
+
+        let result = match result {
+            EmulationResult::Success(mut result) => {
+                result.missing_libraries = missing_libraries.take().unwrap_or_default();
+                result
+            }
+            EmulationResult::Error(mut err) => {
+                err.missing_libraries = missing_libraries.take().unwrap_or_default();
+                return Ok(vec![SendMessageResult::Error(RunTransactionResultError {
+                    error: err.error,
+                    vm_log: err.vm_log,
+                    vm_exit_code: err.vm_exit_code,
+                    executor_logs: Some(executor_logs),
+                    missing_libraries: err.missing_libraries,
+                })]);
+            }
+        };
+
+        let shard_account_after = Boc::decode_base64(result.shard_account.as_ref())?
+            .parse::<ShardAccount>()
+            .context("Failed to parse shard account")?;
+
+        state.update_account(addr, &shard_account_after);
+
+        let transaction = Boc::decode_base64(result.transaction.as_ref())?
+            .parse::<Transaction>()
+            .context("Failed to parse transaction")?;
+
+        let out_messages = transaction
+            .iter_out_msgs()
+            .filter_map(Result::ok)
+            .map(|it| to_cell(&it))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let main_res = SendMessageResultSuccess {
+            raw_transaction: result.transaction,
+            transaction: transaction.clone(),
+            parent_transaction: None,
+            child_transactions: vec![],
+            shard_account_before,
+            shard_account: shard_account_after,
+            out_messages: out_messages.clone(),
+            vm_log: result.vm_log,
+            executor_logs,
+            actions: result.actions,
+            code,
+            externals: vec![],
+            missing_libraries: result.missing_libraries,
+        };
+
+        let mut results = vec![SendMessageResult::Success(main_res)];
+        let mut externals = Vec::new();
+        let mut child_lts = Vec::new();
+
+        // Recursively process outgoing internal messages via send_message
+        for out_msg_cell in out_messages {
+            let Ok(out_msg) = out_msg_cell.parse::<Message<'_>>() else {
+                continue;
+            };
+
+            match out_msg.info {
+                MsgInfo::ExtOut(_) => {
+                    externals.push(out_msg_cell);
+                }
+                MsgInfo::Int(_) => {
+                    let mut sub_results = self.send_message(state, out_msg_cell, libs, None)?;
+                    if let Some(SendMessageResult::Success(res)) = sub_results.get_mut(0) {
+                        res.parent_transaction = Some(transaction.lt);
+                        child_lts.push(res.transaction.lt);
+                    }
+                    results.extend(sub_results);
+                }
+                MsgInfo::ExtIn(_) => {}
+            }
+        }
+
         if let Some(SendMessageResult::Success(res)) = results.get_mut(0) {
             res.externals = externals;
             res.child_transactions = child_lts;
@@ -357,8 +524,8 @@ impl Emulator {
         let config_boc = Boc::encode_base64(&config);
 
         match self.executor.set_config(&config_boc) {
-            Ok(res) => match res {
-                true => {
+            Ok(res) => {
+                if res {
                     let mut config_slice = config.as_slice_allow_exotic();
 
                     let config_dict = Dict::<u32, Cell>::load_from_root_ext(
@@ -369,9 +536,10 @@ impl Emulator {
 
                     state.set_config(config_dict);
                     Ok(true)
+                } else {
+                    Ok(false)
                 }
-                false => Ok(false),
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -437,6 +605,8 @@ pub struct SendMessageResultSuccess {
     pub code: Option<Cell>,
     /// External outgoing messages produced by this transaction.
     pub externals: Vec<Cell>,
+    /// Hashes of missing libraries observed during this transaction emulation.
+    pub missing_libraries: FxHashSet<String>,
 }
 
 impl SendMessageResultSuccess {

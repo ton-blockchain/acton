@@ -11,7 +11,6 @@ fun onInternalMessage(in: InMessage) {
             var storage = lazy Storage.load();
             storage.counter += msg.increaseBy;
             storage.save();
-
             // SLOT_1: throw 10;
         }
 

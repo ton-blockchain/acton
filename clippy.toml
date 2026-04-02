@@ -1,6 +1,6 @@
 allow-unwrap-in-tests = true
 
 disallowed-methods = [
-    { path = "std::fs::canonicalize", reason = "use dunce::canonicalize" },
-    { path = "std::path::Path::canonicalize", reason = "use dunce::canonicalize" },
+  { path = "std::fs::canonicalize", reason = "use dunce::canonicalize" },
+  { path = "std::path::Path::canonicalize", reason = "use dunce::canonicalize" },
 ]

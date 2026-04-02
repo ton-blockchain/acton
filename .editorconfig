@@ -12,5 +12,9 @@ trim_trailing_whitespace = true
 indent_size = 4
 max_line_length = 100
 
+[*.tolk]
+indent_size = 4
+max_line_length = 100
+
 [docs/**]
 max_line_length = 100

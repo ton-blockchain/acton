@@ -1,16 +1,23 @@
-use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::color::{ColorMode, OwoColorize, color_mode};
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, Result};
+use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
+use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use globset::{Glob, GlobSetBuilder};
+use path_absolutize::Absolutize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::path::{Path, PathBuf};
+use tree_sitter::Point;
 use walkdir::WalkDir;
 
 pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let config = ActonConfig::load().ok();
     let fmt_settings = config.as_ref().and_then(|c| c.fmt.as_ref());
+    let project_root = configured_project_root();
+    let current_dir = std::env::current_dir().context("Failed to determine current directory")?;
 
     let width = fmt_settings.and_then(|s| s.width).unwrap_or(100);
     let ignore_patterns = fmt_settings.and_then(|s| s.ignore.as_ref());
@@ -19,9 +26,16 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         .unwrap_or(false);
 
     let mut ignore_builder = GlobSetBuilder::new();
-    ignore_builder.add(Glob::from_str("**/.git/**")?);
-    ignore_builder.add(Glob::from_str("**/node_modules/**")?);
-    ignore_builder.add(Glob::from_str("**/target/**")?);
+    for p in [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/target/**",
+        "**/.acton/**",
+        "**/.codex/**",
+        "**/.claude/**",
+    ] {
+        ignore_builder.add(Glob::new(p)?);
+    }
     if let Some(ignores) = ignore_patterns {
         for pattern in ignores {
             ignore_builder.add(Glob::new(pattern)?);
@@ -32,7 +46,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let mut files_to_format = Vec::new();
 
     let search_paths = if paths.is_empty() {
-        vec![PathBuf::from(".")]
+        vec![project_root.to_path_buf()]
     } else {
         paths.into_iter().map(PathBuf::from).collect()
     };
@@ -50,17 +64,17 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
                         return true;
                     }
                     let p = entry.path();
-                    !ignore_set.is_match(p)
+                    let relative = relative_to_project_root(p, project_root);
+                    !ignore_set.is_match(p) && !ignore_set.is_match(relative)
                 })
                 .filter_map(std::result::Result::ok);
 
             for entry in iter {
                 let path = entry.path();
                 if path.extension().is_some_and(|ext| ext == "tolk") && path.is_file() {
-                    let relative_path = path.strip_prefix("./").unwrap_or(path);
-
-                    if !ignore_set.is_match(relative_path) {
-                        files_to_format.push(relative_path.to_path_buf());
+                    let relative_path = relative_to_project_root(path, project_root);
+                    if !ignore_set.is_match(path) && !ignore_set.is_match(&relative_path) {
+                        files_to_format.push(path.to_path_buf());
                     }
                 }
             }
@@ -79,6 +93,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let mut error_count = 0;
 
     for file_path in files_to_format {
+        let display_path = path_for_display(&file_path, &current_dir);
         let content = fs::read_to_string(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
 
@@ -95,7 +110,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
                         unformatted_files.push(file_path.clone());
 
                         let diff = TextDiff::from_lines(&content, &formatted);
-                        println!("Diff in {}:", file_path.display().bold());
+                        println!("Diff in {}:", display_path.display().bold());
 
                         for hunk in diff.unified_diff().context_radius(3).iter_hunks() {
                             for change in hunk.iter_changes() {
@@ -120,12 +135,16 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
                         fs::write(&file_path, formatted)
                             .with_context(|| format!("Failed to write {}", file_path.display()))?;
                         formatted_count += 1;
-                        println!("{} {}", "Formatted".green(), file_path.display());
+                        println!("{} {}", "Formatted".green(), display_path.display());
                     }
                 }
             }
             Err(err) => {
-                eprintln!("{} {}: {}", "Error".red(), file_path.display(), err);
+                if emit_parse_errors_if_any(&display_path, &content)? {
+                    error_count += 1;
+                    continue;
+                }
+                eprintln!("{} {}: {}", "Error".red(), display_path.display(), err);
                 error_count += 1;
             }
         }
@@ -135,6 +154,9 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         if !unformatted_files.is_empty() {
             anyhow::bail!("Files are not formatted");
         } else if error_count > 0 {
+            if error_count == 1 {
+                anyhow::bail!("Formatting check failed due to syntax error in 1 file");
+            }
             anyhow::bail!("Formatting check failed due to syntax errors in {error_count} files");
         }
         println!("{}", "All files are properly formatted".green());
@@ -146,9 +168,96 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         }
 
         if error_count > 0 {
+            if error_count == 1 {
+                anyhow::bail!("Failed to format 1 file due to syntax error");
+            }
             anyhow::bail!("Failed to format {error_count} files due to syntax errors");
         }
     }
 
     Ok(())
+}
+
+fn emit_parse_errors_if_any(file_path: &Path, source: &str) -> Result<bool> {
+    let source_file = tolk_syntax::parse(source)
+        .with_context(|| format!("Failed to parse {}", file_path.display()))?;
+    if !source_file.has_errors() {
+        // another kind of error
+        return Ok(false);
+    }
+
+    let mut files = SimpleFiles::new();
+    let file_id = files.add(file_path.display().to_string(), source.to_owned());
+
+    let writer = StandardStream::stderr(match color_mode() {
+        ColorMode::Auto => ColorChoice::Auto,
+        ColorMode::Always => ColorChoice::Always,
+        ColorMode::Never => ColorChoice::Never,
+    });
+
+    let mut config = term::Config::default();
+    let mut styles = term::Styles::default();
+    styles.header_error.set_intense(false);
+    config.styles = styles;
+    config.chars = term::Chars::ascii();
+
+    for parse_error in source_file.errors() {
+        let start = byte_offset_from_point(&parse_error.span.start, source).min(source.len());
+        let mut end = byte_offset_from_point(&parse_error.span.end, source).min(source.len());
+        if end < start {
+            end = start;
+        }
+
+        let diagnostic = Diagnostic::new(Severity::Error)
+            .with_code("C001")
+            .with_message(parse_error.message)
+            .with_labels(vec![Label::primary(file_id, start..end)]);
+        term::emit(&mut writer.lock(), &config, &files, &diagnostic)?;
+    }
+
+    Ok(true)
+}
+
+fn byte_offset_from_point(point: &Point, source: &str) -> usize {
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut offset = 0;
+
+    for i in 0..point.row {
+        if i < lines.len() {
+            offset += lines[i].len() + 1; // +1 for newline
+        }
+    }
+
+    if point.row < lines.len() {
+        offset += point.column;
+    }
+
+    offset
+}
+
+fn relative_to_project_root(path: &Path, project_root: &Path) -> PathBuf {
+    if let Some(relative) = pathdiff::diff_paths(path, project_root) {
+        return relative;
+    }
+
+    if let Ok(canonical_path) = dunce::canonicalize(path)
+        && let Ok(canonical_project_root) = dunce::canonicalize(project_root)
+        && let Some(relative) = pathdiff::diff_paths(canonical_path, canonical_project_root)
+    {
+        return relative;
+    }
+
+    path.to_path_buf()
+}
+
+fn path_for_display(path: &Path, current_dir: &Path) -> PathBuf {
+    let normalized_current_dir = current_dir
+        .absolutize()
+        .map_or_else(|_| current_dir.to_path_buf(), std::borrow::Cow::into_owned);
+
+    let normalized_path = path
+        .absolutize_from(&normalized_current_dir)
+        .map_or_else(|_| path.to_path_buf(), std::borrow::Cow::into_owned);
+
+    pathdiff::diff_paths(&normalized_path, &normalized_current_dir).unwrap_or(normalized_path)
 }

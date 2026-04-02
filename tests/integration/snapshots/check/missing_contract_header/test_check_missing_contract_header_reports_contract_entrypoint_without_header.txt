@@ -1,0 +1,11 @@
+warning[E031]: contract defines entrypoints but is missing a `contract` header
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |             fun onInternalMessage(in: InMessage) {
+  |                 ^^^^^^^^^^^^^^^^^ contract entrypoint declared here
+  |
+  = Add `contract <Name> { ... }` near the top of the file so compiler ABI and wrappers can see `storage`, `incomingMessages`, and other contract metadata.
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E031
