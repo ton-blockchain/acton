@@ -22,7 +22,6 @@ jobs:
       VERSION_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
 
     permissions:
-      contents: read
       packages: write
 
     steps:
