@@ -84,7 +84,7 @@ jobs:
           docker run --rm "acton:${VERSION_TAG}-${{ matrix.image_tag_suffix }}" --help
 
       - name: Upload Docker archive
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: intermediate-docker-image-${{ matrix.arch }}
           path: ${{ matrix.docker_archive }}

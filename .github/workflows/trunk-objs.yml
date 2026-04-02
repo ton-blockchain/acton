@@ -171,7 +171,7 @@ jobs:
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -283,7 +283,7 @@ jobs:
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -339,7 +339,7 @@ jobs:
           cat dist/artifacts_manifest.toml
 
       - name: Upload TON artifacts manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ton-objs-manifest
           path: dist/artifacts_manifest.toml
