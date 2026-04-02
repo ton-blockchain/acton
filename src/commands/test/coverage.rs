@@ -29,7 +29,11 @@ pub(super) struct FileCoverage {
     pub branch_hits: HashMap<i64, BranchHits>,
 }
 
-pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) -> Coverage {
+pub(super) fn collect_coverage(
+    emulations: &EmulationsState,
+    build_cache: &BuildCache,
+    wrapper_roots: &[PathBuf],
+) -> Coverage {
     // To build coverage we need two things: source maps and virtual machine logs.
     //
     // The first provides us with the necessary information about which lines in the source code are
@@ -43,9 +47,9 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
     // Not all lines of code in source code can be executed, for example, struct definitions
     // or comments. We collect executable lines from the same stoppable debug marks the
     // replayer relies on, so the denominator matches the source-level lines we can actually hit.
-    let executable_lines_per_file = build_executable_lines_per_files(&data);
+    let executable_lines_per_file = build_executable_lines_per_files(&data, wrapper_roots);
     // Having source-level replay over VM logs, we can collect visited lines and branch hits.
-    let result = collect_executed_lines_per_files(&data);
+    let result = collect_executed_lines_per_files(&data, wrapper_roots);
     let (line_hits_per_file, branch_hits_per_file) = (result.lines, result.branches);
 
     // Now having all this information, we can trivially determine how many executable
@@ -145,7 +149,10 @@ pub(super) struct ExecutedLinesForFile {
 
 /// Collects all source code lines and branches that were executed in all execution traces
 /// that was collected in [`collect_source_data`].
-fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesForFile {
+fn collect_executed_lines_per_files(
+    data: &[SourceMapAndLogs],
+    wrapper_roots: &[PathBuf],
+) -> ExecutedLinesForFile {
     let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
     let mut branch_hits_per_file: HashMap<String, HashMap<i64, BranchHits>> = HashMap::new();
 
@@ -167,6 +174,7 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
                         &mut line_hits_per_file,
                         &mut last_recorded_loc,
                         replayer,
+                        wrapper_roots,
                     );
                 }
                 Tick::TvmStackValues { values } => {
@@ -177,6 +185,7 @@ fn collect_executed_lines_per_files(data: &[SourceMapAndLogs]) -> ExecutedLinesF
                         &mut branch_hits_per_file,
                         replayer,
                         &last_stack_values,
+                        wrapper_roots,
                     );
                 }
                 _ => {}
@@ -194,8 +203,9 @@ fn record_current_line_hit(
     line_hits_per_file: &mut HashMap<String, BTreeMap<i64, u64>>,
     last_recorded_loc: &mut Option<(String, i64)>,
     replayer: &TolkReplayer,
+    wrapper_roots: &[PathBuf],
 ) {
-    let Some((file, line)) = current_coverage_loc(replayer) else {
+    let Some((file, line)) = current_coverage_loc(replayer, wrapper_roots) else {
         return;
     };
 
@@ -209,7 +219,10 @@ fn record_current_line_hit(
     *entry.entry(line).or_insert(0) += 1;
 }
 
-fn current_coverage_loc(replayer: &TolkReplayer) -> Option<(String, i64)> {
+fn current_coverage_loc(
+    replayer: &TolkReplayer,
+    wrapper_roots: &[PathBuf],
+) -> Option<(String, i64)> {
     let line = replayer.current_line();
     if line == 0 {
         return None;
@@ -221,7 +234,7 @@ fn current_coverage_loc(replayer: &TolkReplayer) -> Option<(String, i64)> {
         .unwrap_or_else(|| replayer.current_file_name())
         .to_owned();
 
-    if is_ignored_coverage_file(&file) {
+    if is_ignored_coverage_file(&file, wrapper_roots) {
         return None;
     }
 
@@ -244,8 +257,9 @@ fn process_throw_instruction(
     branch_hits_per_file: &mut HashMap<String, HashMap<i64, BranchHits>>,
     replayer: &TolkReplayer,
     stack_values: &[VmStackValue],
+    wrapper_roots: &[PathBuf],
 ) {
-    let Some((file, line)) = current_coverage_loc(replayer) else {
+    let Some((file, line)) = current_coverage_loc(replayer, wrapper_roots) else {
         return;
     };
 
@@ -262,7 +276,10 @@ fn process_throw_instruction(
     }
 }
 
-fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String, BTreeSet<i64>> {
+fn build_executable_lines_per_files(
+    data: &[SourceMapAndLogs],
+    wrapper_roots: &[PathBuf],
+) -> HashMap<String, BTreeSet<i64>> {
     let mut seen_source_maps = HashSet::new();
     let mut executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
 
@@ -276,7 +293,7 @@ fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String
             continue;
         }
 
-        build_executable_lines_per_file(&mut executable_lines_per_file, source_map);
+        build_executable_lines_per_file(&mut executable_lines_per_file, source_map, wrapper_roots);
     }
 
     executable_lines_per_file
@@ -285,6 +302,7 @@ fn build_executable_lines_per_files(data: &[SourceMapAndLogs]) -> HashMap<String
 fn build_executable_lines_per_file(
     executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
     source_map: &TolkSourceMap,
+    wrapper_roots: &[PathBuf],
 ) {
     let source_map = &source_map.source_map;
 
@@ -305,7 +323,7 @@ fn build_executable_lines_per_file(
             continue;
         };
 
-        if is_ignored_coverage_file(&file) {
+        if is_ignored_coverage_file(&file, wrapper_roots) {
             continue;
         }
 
@@ -322,12 +340,18 @@ fn is_throw_branch_instruction(instr_name: &str) -> bool {
         || instr_name.contains("THROWIFNOT_SHORT")
 }
 
-fn is_ignored_coverage_file(file: &str) -> bool {
+fn is_ignored_coverage_file(file: &str, wrapper_roots: &[PathBuf]) -> bool {
+    let path = Path::new(file);
+
     file.is_empty()
         || file.contains("@stdlib/")
         || file.contains("/lib/")
         || file.contains("/.acton/")
         || file.contains(".test.tolk")
+        || wrapper_roots.iter().any(|root| path.starts_with(root))
+        || path
+            .components()
+            .any(|component| component.as_os_str() == "wrappers")
 }
 
 const fn zero_based_line(line: usize) -> i64 {

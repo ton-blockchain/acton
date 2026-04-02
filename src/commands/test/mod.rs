@@ -552,7 +552,14 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
     if config.coverage {
-        let coverage = collect_coverage(&runner.emulations, &runner.build_cache);
+        let wrapper_roots: Vec<_> = runner
+            .acton_config
+            .mappings()
+            .into_iter()
+            .flat_map(|mappings| mappings.into_iter())
+            .filter_map(|(key, path)| (key == "@wrappers").then(|| PathBuf::from(path)))
+            .collect();
+        let coverage = collect_coverage(&runner.emulations, &runner.build_cache, &wrapper_roots);
         print_coverage_summary(&coverage);
 
         if let Some(format_type) = &config.coverage_format {

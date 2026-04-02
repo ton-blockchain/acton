@@ -1,6 +1,6 @@
 Coverage Summary:
-Lines: 47/48 (97.92%)
-Total Hits: 184
+Lines: 18/19 (94.74%)
+Total Hits: 93
 
 File: [ROOT]/contracts/counter.tolk
 Annotated Code:
@@ -64,74 +64,4 @@ Annotated Code:
 20   | }                                                         |
 21   |                                                           |
 22   | struct (0x3a752f06) ResetCounter {}                       |
-
-File: [ROOT]/tests/wrappers/Counter.tolk
-Annotated Code:
- 1   | import "@acton/build/build"                                                                         |
- 2   | import "@acton/emulation/network"                                                                   |
- 3   | import "@contracts/types"                                                                           |
- 4   |                                                                                                     |
- 5   | struct Counter {                                                                                    |
- 6   |     address: address                                                                                |
- 7   |     init: ContractState                                                                             |
- 8   | }                                                                                                   |
- 9   |                                                                                                     |
-10   | /// Creates a contract wrapper instance from the storage data                                       |
-11   | fun Counter.fromStorage(storage: Storage): Counter {                                                |
-12 ✓ |     val init = ContractState {                                                                      | hits:5
-13 ✓ |         code: build("counter"),                                                                     | hits:5
-14 ✓ |         data: storage.toCell(),                                                                     | hits:5
-15   |     };                                                                                              |
-16 ✓ |     val address = AutoDeployAddress { stateInit: init }.calculateAddress();                         | hits:5
-17 ✓ |     return Counter { address, init };                                                               | hits:5
-18   | }                                                                                                   |
-19   |                                                                                                     |
-20   | /// Deploys the contract to the blockchain                                                          |
-21   | fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList {                  |
-22 ✓ |     val deployMsg = createMessage({                                                                 | hits:5
-23 ✓ |         bounce: config.bounce,                                                                      | hits:5
-24 ✓ |         value: config.value,                                                                        | hits:5
-25 ✓ |         dest: { stateInit: self.init },                                                             | hits:5
-26   |     });                                                                                             |
-27 ✓ |     return net.send(from, deployMsg);                                                               | hits:5
-28   | }                                                                                                   |
-29   |                                                                                                     |
-30   | fun Counter.sendIncreaseCounter(                                                                    |
-31   |     self,                                                                                           |
-32   |     from: address,                                                                                  |
-33   |     increaseBy: uint32,                                                                             |
-34   |     config: SendParams = {},                                                                        |
-35   | ): SendResultList {                                                                                 |
-36 ✓ |     val increaseMsg = createMessage({                                                               | hits:3
-37 ✓ |         bounce: config.bounce,                                                                      | hits:3
-38 ✓ |         value: config.value,                                                                        | hits:3
-39 ✓ |         dest: self.address,                                                                         | hits:3
-40 ✓ |         body: IncreaseCounter { increaseBy },                                                       | hits:3
-41   |     });                                                                                             |
-42 ✓ |     return net.send(from, increaseMsg);                                                             | hits:3
-43   | }                                                                                                   |
-44   |                                                                                                     |
-45   | fun Counter.sendResetCounter(self, from: address, config: SendParams = {}): SendResultList {        |
-46 ✓ |     val resetMsg = createMessage({                                                                  | hits:1
-47 ✓ |         bounce: config.bounce,                                                                      | hits:1
-48 ✓ |         value: config.value,                                                                        | hits:1
-49 ✓ |         dest: self.address,                                                                         | hits:1
-50 ✓ |         body: ResetCounter {},                                                                      | hits:1
-51   |     });                                                                                             |
-52 ✓ |     return net.send(from, resetMsg);                                                                | hits:1
-53   | }                                                                                                   |
-54   |                                                                                                     |
-55   | fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {     |
-56 ✓ |     val anyMsg = createMessage({                                                                    | hits:2
-57 ✓ |         bounce: config.bounce,                                                                      | hits:2
-58 ✓ |         value: config.value,                                                                        | hits:2
-59 ✓ |         dest: self.address,                                                                         | hits:2
-60 ✓ |         body,                                                                                       | hits:2
-61   |     });                                                                                             |
-62 ✓ |     return net.send(from, anyMsg);                                                                  | hits:2
-63   | }                                                                                                   |
-64   |                                                                                                     |
-65   | fun Counter.currentCounter(self): int {                                                             |
-66 ✓ |     return net.runGetMethod(self.address, "currentCounter");                                        | hits:5
-67   | }                                                                                                   |
 
