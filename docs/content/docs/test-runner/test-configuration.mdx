@@ -35,6 +35,10 @@ version = "0.1.0"
 # Enable detailed backtraces
 backtrace = "full"
 
+[test.fuzz]
+# Use 512 accepted inputs for fuzz tests marked with @test({ fuzz: true })
+runs = 512
+
 [test.coverage]
 # Enable code coverage by default
 enabled = true
@@ -163,6 +167,24 @@ enabled = true
 format = "lcov"
 include-wrappers = true
 include-tests = true
+```
+
+### Fuzz Options
+
+These defaults apply only to parameterized tests with an explicit fuzz
+annotation such as `@test({ fuzz: true })`.
+When `max-test-rejects` is omitted, Acton uses `runs * 256`.
+
+| Configuration                    | CLI Flag | Type    | Description                                                        |
+|----------------------------------|----------|---------|--------------------------------------------------------------------|
+| `[test.fuzz].runs`               | -        | Integer | Number of accepted fuzz cases to execute for each fuzz test        |
+| `[test.fuzz].max-test-rejects`   | -        | Integer | Maximum `assume(...)` rejections before the fuzz test fails        |
+
+**Examples:**
+```toml
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
 ```
 
 ### Profiling Options

@@ -1,6 +1,7 @@
 use super::{TestDescriptor, TestResult, TestRunner, evaluate_test_case};
 use crate::commands::test::reporting::{FuzzCaseContext, FuzzExecutionContext};
 use crate::context::{AssertFailure, FailAssertFailure, to_cell};
+use acton_config::test::TestConfig;
 use anyhow::anyhow;
 use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
@@ -15,19 +16,23 @@ use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use xxhash_rust::xxh3::xxh3_64;
 
 const DEFAULT_FUZZ_RUNS: usize = 256;
-const FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
+const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) struct FuzzConfig {
-    pub runs: usize,
+    pub runs: Option<usize>,
 }
 
 impl Default for FuzzConfig {
     fn default() -> Self {
-        Self {
-            runs: DEFAULT_FUZZ_RUNS,
-        }
+        Self { runs: None }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+struct ResolvedFuzzConfig {
+    runs: usize,
+    max_test_rejects: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -66,17 +71,17 @@ impl TestRunner<'_> {
         source_map: Arc<TolkSourceMap>,
         fuzz: FuzzConfig,
     ) -> anyhow::Result<TestResult> {
+        let fuzz = resolve_fuzz_config(fuzz, &self.config);
         let seed = fuzz_seed(test);
         let mut executed_get_methods = Vec::new();
         let mut last_result: Option<TestResult> = None;
         let mut last_rejected_result: Option<TestResult> = None;
         let mut accepted_runs = 0usize;
         let mut rejected_runs = 0usize;
-        let max_rejected_runs = fuzz.runs.saturating_mul(FUZZ_REJECT_BUDGET_MULTIPLIER);
         let mut attempt_idx = 0usize;
 
         while accepted_runs < fuzz.runs {
-            if rejected_runs >= max_rejected_runs {
+            if rejected_runs >= fuzz.max_test_rejects {
                 let Some(mut result) = last_rejected_result.take() else {
                     anyhow::bail!(
                         "Fuzz test '{}' exhausted assume(...) budget without executing any runs",
@@ -156,6 +161,17 @@ impl TestRunner<'_> {
             failed_case: None,
         });
         Ok(result)
+    }
+}
+
+fn resolve_fuzz_config(fuzz: FuzzConfig, config: &TestConfig) -> ResolvedFuzzConfig {
+    let runs = fuzz.runs.or(config.fuzz_runs).unwrap_or(DEFAULT_FUZZ_RUNS);
+
+    ResolvedFuzzConfig {
+        runs,
+        max_test_rejects: config
+            .fuzz_max_test_rejects
+            .unwrap_or_else(|| runs.saturating_mul(DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER)),
     }
 }
 
@@ -516,7 +532,10 @@ fn map_ton_abi_type(ty: &TypeInfo) -> FuzzParameterKind {
     }
 }
 
-pub(super) fn validate_test_configuration(test: &TestDescriptor) -> anyhow::Result<()> {
+pub(super) fn validate_test_configuration(
+    test: &TestDescriptor,
+    config: &TestConfig,
+) -> anyhow::Result<()> {
     if test.fuzz.is_some() && test.declared_parameter_count == 0 {
         anyhow::bail!(
             "Test '{}' uses @test({{ fuzz: ... }}) but has no parameters",
@@ -535,8 +554,17 @@ pub(super) fn validate_test_configuration(test: &TestDescriptor) -> anyhow::Resu
         return Ok(());
     };
 
+    let fuzz = resolve_fuzz_config(fuzz, config);
+
     if fuzz.runs == 0 {
         anyhow::bail!("Fuzz runs must be greater than 0 for test '{}'", test.name);
+    }
+
+    if fuzz.max_test_rejects == 0 {
+        anyhow::bail!(
+            "Fuzz max-test-rejects must be greater than 0 for test '{}'",
+            test.name
+        );
     }
 
     if test.parameters.len() != test.declared_parameter_count {

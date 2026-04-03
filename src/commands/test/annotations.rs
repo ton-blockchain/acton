@@ -155,7 +155,7 @@ fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig
             .text(content)
             .parse::<usize>()
             .ok()
-            .map(|runs| FuzzConfig { runs }),
+            .map(|runs| FuzzConfig { runs: Some(runs) }),
         Expr::ObjectLit(object) => parse_fuzz_object(content, object),
         _ => None,
     }
@@ -177,7 +177,7 @@ fn parse_fuzz_object(content: &str, object: ObjectLit<'_>) -> Option<FuzzConfig>
         if let Some(Expr::NumberLit(n)) = key_value.value()
             && let Ok(runs) = n.text(content).parse::<usize>()
         {
-            config.runs = runs;
+            config.runs = Some(runs);
             found_runs = true;
         }
     }

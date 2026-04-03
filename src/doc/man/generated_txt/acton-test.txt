@@ -192,6 +192,9 @@ REPORTING AND ARTIFACTS
        o  gas snapshot files are written only to the explicit paths passed to
           --snapshot or --baseline-snapshot
 
+       o  [test.fuzz] applies only to parameterized tests that explicitly opt
+          in with @test({ fuzz: true }) or @test({ fuzz: ... })
+
 CONFIGURATION
        Defaults can be configured in Acton.toml:
 
@@ -200,6 +203,10 @@ CONFIGURATION
            filter = "test-.*"
            junit-path = "reports"
            junit-merge = false
+           
+           [test.fuzz]
+           runs = 512
+           max-test-rejects = 4096
            
            [test.coverage]
            enabled = true
@@ -276,4 +283,3 @@ SEE ALSO
 
        o  Test runner guide
           <https://ton-blockchain.github.io/acton/docs/test-runner>
-

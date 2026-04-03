@@ -188,6 +188,7 @@ Configures the behavior of `acton test`.
 | `debug-port`                | `integer`  | `12345`       | Port for the debug server.                                             |
 | `backtrace`                 | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
 | `coverage`                  | `object`   | -             | Coverage settings subtree under `[test.coverage]` (see below).         |
+| `fuzz`                      | `object`   | -             | Default fuzz settings under `[test.fuzz]` for annotated tests.         |
 | `exclude`                   | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
 | `include`                   | `string[]` | -             | Glob patterns of files to include in testing.                          |
 | `junit-path`                | `string`   | -             | Directory for JUnit XML reports.                                       |
@@ -211,6 +212,16 @@ Configures default coverage behavior for `acton test`.
 | `include-wrappers` | `boolean` | `false` | Include files from the `@wrappers` mapping in coverage reports. |
 | `include-tests`    | `boolean` | `false` | Include `.test.tolk` files in coverage reports.                 |
 
+### `[test.fuzz]` Section
+
+Configures defaults for parameterized tests that explicitly opt into fuzzing
+with `@test({ fuzz: true })` or `@test({ fuzz: ... })`.
+
+| Field              | Type      | Default      | Description                                                            |
+|:-------------------|:----------|:-------------|:-----------------------------------------------------------------------|
+| `runs`             | `integer` | `256`        | Number of accepted fuzz cases to execute for each fuzz test.           |
+| `max-test-rejects` | `integer` | `runs * 256` | Maximum number of `assume(...)` rejections before the fuzz test fails. |
+
 ### Mutation Testing Configuration
 
 The `[test.mutation]` subsection allows disabling specific mutation rules.
@@ -231,6 +242,10 @@ enabled = true
 format = "lcov"
 include-wrappers = true
 include-tests = true
+
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
 
 [test.mutation]
 disable-rules = ["flip_plus"]

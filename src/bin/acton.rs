@@ -2199,6 +2199,8 @@ fn create_test_config(
         mutate_overrides,
         mutate_contract,
         disable_rules,
+        fuzz_runs: None,
+        fuzz_max_test_rejects: None,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,

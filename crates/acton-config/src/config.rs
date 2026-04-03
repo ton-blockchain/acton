@@ -245,6 +245,16 @@ pub struct TestCoverageSettings {
     pub include_tests: Option<bool>,
 }
 
+/// Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct TestFuzzSettings {
+    /// Number of accepted fuzz cases to execute for each fuzz test
+    pub runs: Option<usize>,
+    /// Maximum number of rejected inputs from `assume(...)` before the test fails
+    pub max_test_rejects: Option<usize>,
+}
+
 /// Default settings for the test runner
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -264,6 +274,8 @@ pub struct TestSettings {
     pub backtrace: Option<String>,
     /// Coverage settings for test runs
     pub coverage: Option<TestCoverageSettings>,
+    /// Default fuzz settings for parameterized tests
+    pub fuzz: Option<TestFuzzSettings>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
@@ -1127,6 +1139,14 @@ impl TestSettings {
             .and_then(|coverage| coverage.include_tests)
     }
 
+    fn fuzz_runs_value(&self) -> Option<usize> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.runs)
+    }
+
+    fn fuzz_max_test_rejects_value(&self) -> Option<usize> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.max_test_rejects)
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn to_test_config(
@@ -1253,6 +1273,8 @@ impl TestSettings {
             } else {
                 disable_rules_override
             },
+            fuzz_runs: self.fuzz_runs_value(),
+            fuzz_max_test_rejects: self.fuzz_max_test_rejects_value(),
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
@@ -1530,6 +1552,10 @@ output-file = "coverage.txt"
 minimum-percent = 85
 include-wrappers = true
 include-tests = true
+
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1553,6 +1579,12 @@ include-tests = true
         assert_eq!(coverage.minimum_percent, Some(85.0));
         assert_eq!(coverage.include_wrappers, Some(true));
         assert_eq!(coverage.include_tests, Some(true));
+        let fuzz = test_settings
+            .fuzz
+            .as_ref()
+            .expect("fuzz settings should be parsed");
+        assert_eq!(fuzz.runs, Some(512));
+        assert_eq!(fuzz.max_test_rejects, Some(4096));
         assert_eq!(
             test_settings.exclude,
             Some(vec!["**/integration/**".to_string()])

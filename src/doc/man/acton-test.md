@@ -255,6 +255,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - `--save-test-trace` without a value writes traces to `.acton/traces`
 - gas snapshot files are written only to the explicit paths passed to
   `--snapshot` or `--baseline-snapshot`
+- `[test.fuzz]` applies only to parameterized tests that explicitly opt in with
+  `@test({ fuzz: true })` or `@test({ fuzz: ... })`
 
 ## CONFIGURATION
 
@@ -266,6 +268,10 @@ reporter = ["console"]
 filter = "test-.*"
 junit-path = "reports"
 junit-merge = false
+
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
 
 [test.coverage]
 enabled = true

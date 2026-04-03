@@ -602,6 +602,24 @@
         }
       }
     },
+    "TestFuzzSettings": {
+      "description": "Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`",
+      "type": "object",
+      "properties": {
+        "max-test-rejects": {
+          "description": "Maximum number of rejected inputs from `assume(...)` before the test fails",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "runs": {
+          "description": "Number of accepted fuzz cases to execute for each fuzz test",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
     "TestSettings": {
       "description": "Default settings for the test runner",
       "type": "object",
@@ -668,6 +686,14 @@
           "allOf": [
             {
               "$ref": "#/definitions/Network"
+            }
+          ]
+        },
+        "fuzz": {
+          "description": "Default fuzz settings for parameterized tests",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TestFuzzSettings"
             }
           ]
         },

@@ -1090,7 +1090,7 @@ fn run_file_tests(
             continue;
         }
 
-        if let Err(err) = validate_test_configuration(test) {
+        if let Err(err) = validate_test_configuration(test, &runner.config) {
             test_report.status = TestStatus::Failed;
             test_report.message = Some(err.to_string());
             runner.reporter_manager.on_test_finished(&test_report)?;

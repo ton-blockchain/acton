@@ -1,5 +1,5 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{ProjectBuilder, TestConfig};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -356,6 +356,34 @@ fn test_fuzz_annotation_reports_failing_input() {
 }
 
 #[test]
+fn test_fuzz_annotation_true_uses_acton_toml_defaults() {
+    ProjectBuilder::new("fuzz-config-default-runs")
+        .contract("simple", SIMPLE_CONTRACT)
+        .with_test_config(TestConfig {
+            fuzz_runs: Some(4),
+            ..TestConfig::default()
+        })
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: true })
+            get fun `test-fuzz-config-runs`(value: int) {
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("(4 runs)");
+}
+
+#[test]
 fn test_parameterized_test_requires_explicit_fuzz_annotation() {
     ProjectBuilder::new("fuzz-required")
         .contract("simple", SIMPLE_CONTRACT)
@@ -450,6 +478,35 @@ fn test_fuzz_assume_budget_exhaustion_reports_clear_error() {
         .failure()
         .assert_failed(1)
         .assert_contains("assume(...) rejected 256 fuzz inputs before reaching 1 successful runs");
+}
+
+#[test]
+fn test_fuzz_assume_budget_uses_acton_toml_max_test_rejects() {
+    ProjectBuilder::new("fuzz-assume-config-exhaustion")
+        .contract("simple", SIMPLE_CONTRACT)
+        .with_test_config(TestConfig {
+            fuzz_max_test_rejects: Some(3),
+            ..TestConfig::default()
+        })
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: true })
+            get fun `test-fuzz-assume-config-exhaustion`(value: int) {
+                assume(false);
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("assume(...) rejected 3 fuzz inputs before reaching 256 successful runs");
 }
 
 #[test]

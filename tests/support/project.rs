@@ -69,6 +69,8 @@ pub(crate) struct TestConfig {
     pub coverage_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fuzz_runs: Option<usize>,
+    pub fuzz_max_test_rejects: Option<usize>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
@@ -1000,6 +1002,18 @@ version = "0.1.0"
 
             if let Some(fail_on_diff) = config.fail_on_diff {
                 toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+            }
+
+            if config.fuzz_runs.is_some() || config.fuzz_max_test_rejects.is_some() {
+                toml_content.push_str("\n[test.fuzz]\n");
+
+                if let Some(fuzz_runs) = config.fuzz_runs {
+                    toml_content.push_str(&format!("runs = {fuzz_runs}\n"));
+                }
+
+                if let Some(fuzz_max_test_rejects) = config.fuzz_max_test_rejects {
+                    toml_content.push_str(&format!("max-test-rejects = {fuzz_max_test_rejects}\n"));
+                }
             }
 
             if config.coverage.is_some()
