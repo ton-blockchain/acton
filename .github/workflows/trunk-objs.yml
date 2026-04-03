@@ -330,10 +330,11 @@ jobs:
           done
 
       - name: Generate TON artifacts manifest
+        # language=Bash
         run: |
-          node .github/scripts/generate-artifacts-manifest.mjs \
-            release-assets \
-            dist/artifacts_manifest.toml
+          python3 .github/scripts/generate-artifacts-manifest.py \
+            --input-path release-assets \
+            --output-path dist/artifacts_manifest.toml
 
           test -s dist/artifacts_manifest.toml
           cat dist/artifacts_manifest.toml
