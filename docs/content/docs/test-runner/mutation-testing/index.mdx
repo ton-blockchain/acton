@@ -72,14 +72,6 @@ Acton currently includes 49 built-in mutation rules for assertions, storage and
 upgrade calls, external-message handling, control flow, arithmetic,
 comparisons, booleans, logical operators, and bitwise or shift operators.
 
-### Available Rule IDs
-
-- Critical: `remove_assert`, `remove_throw`, `remove_storage_save_call`, `remove_set_data_call`, `remove_accept_external_message`, `remove_commit_contract_data_and_actions`, `remove_set_code_postponed`, `if_condition_true`, `if_condition_false`, `while_condition_false`, `remove_logical_not`
-- Arithmetic: `flip_plus`, `flip_minus`, `flip_mul_div`, `flip_div_mul`, `flip_mul_assign`, `flip_div_assign`, `flip_mul_assign_mod`, `flip_mod_assign`, `flip_plus_assign`, `flip_minus_assign`, `remove_unary_minus`
-- Comparison: `flip_eq_ne`, `flip_ne_eq`, `flip_lt_le`, `flip_gt_ge`, `flip_le_lt`, `flip_ge_gt`
-- Boolean and logical: `invert_bool_true`, `invert_bool_false`, `flip_logical_and`, `flip_logical_or`
-- Bitwise and shifts: `flip_bitwise_and`, `flip_bitwise_or`, `flip_bitwise_and_xor`, `flip_bitwise_or_xor`, `flip_bitwise_xor`, `flip_bitwise_xor_or`, `flip_bitwise_and_assign_or`, `flip_bitwise_and_assign_xor`, `flip_bitwise_or_assign_and`, `flip_bitwise_or_assign_xor`, `flip_bitwise_xor_assign_and`, `flip_bitwise_xor_assign_or`, `flip_lshift_assign`, `flip_rshift_assign`, `flip_lshift`, `flip_rshift`, `remove_bitwise_not`
-
 See [Mutation Rules](/docs/test-runner/mutation-testing/rules) for complete list.
 
 ## Interpreting Results
