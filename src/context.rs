@@ -100,6 +100,7 @@ pub struct WalletNotFoundFailure {
 pub enum AssertFailure {
     Bin(AssertBinFailure),
     Fail(FailAssertFailure),
+    Assume(FailAssertFailure),
     GetMethod(GetMethodAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
@@ -111,7 +112,7 @@ impl AssertFailure {
     pub fn message(&self) -> Option<String> {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
-            AssertFailure::Fail(arg) => arg.message.clone(),
+            AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
             AssertFailure::GetMethod(_) => None, // Formatted in FormatterContext
             AssertFailure::TransactionNotFound(arg) => arg.message.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.message.clone(),
@@ -123,7 +124,7 @@ impl AssertFailure {
     pub fn location(&self) -> Option<SourceLocation> {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
-            AssertFailure::Fail(arg) => arg.location.clone(),
+            AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.location.clone(),
             AssertFailure::GetMethod(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) => arg.location.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.location.clone(),

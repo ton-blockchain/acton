@@ -101,6 +101,9 @@ impl TeamCityReporter {
                 AssertFailure::Fail(_) => {
                     message = "Test assertion failed".to_string();
                 }
+                AssertFailure::Assume(_) => {
+                    message = "Test assumption failed".to_string();
+                }
                 AssertFailure::GetMethod(failure) => {
                     message = FormatterContext::strip_ansi_text(
                         &FormatterContext::format_get_method_assert_failure_title(failure),

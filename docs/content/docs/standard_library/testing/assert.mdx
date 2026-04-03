@@ -113,6 +113,18 @@ be printed in the error message.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L104" />
 
+## `Assert.assume`
+
+```tolk
+fun Assert.assume(condition: bool, message: string = "", location: string = ""): void
+```
+
+Rejects the current fuzz input when condition is false.
+
+Outside fuzz tests this is reported as a normal test failure.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L112" />
+
 ## `Assert.consumesLessThan`
 
 ```tolk
@@ -140,7 +152,7 @@ If you need to pass arguments to the function, you can use the `consumesLessThan
 `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 but accept arguments.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L129" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L141" />
 
 ## `Assert.consumesLessThan1`
 
@@ -167,7 +179,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L155" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L167" />
 
 ## `Assert.consumesLessThan2`
 
@@ -200,7 +212,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L182" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L194" />
 
 ## `Assert.consumesLessThan3`
 
@@ -235,7 +247,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L215" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L227" />
 
 ## `Assert.failWalletNotFound`
 
@@ -250,7 +262,7 @@ It provides detailed information about available wallets and instructions on how
 
 NOT FOR PUBLIC USE.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L235" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L247" />
 
 ## `Assert.equalDecimal`
 
@@ -273,5 +285,5 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L248" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L260" />
 

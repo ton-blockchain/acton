@@ -663,6 +663,10 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
     Assert.equal(length, mapLength, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 
+fun formatExpectLocation(loc: SourceLocation): string {
+    return format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
+}
+
 /// Creates a new expectation for the given value.
 ///
 /// After creation, the expectation can be used to assert the value.
@@ -676,8 +680,69 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
 fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()): Expectation<T> {
-    val locString = format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
-    return Expectation<T>.create(value, reflect.typeNameOfObject(value), locString);
+    return Expectation<T>.create(
+        value,
+        reflect.typeNameOfObject(value),
+        formatExpectLocation(loc),
+    );
+}
+
+/// Rejects the current fuzz input when condition is false.
+///
+/// Outside fuzz tests this is reported as a regular failure.
+fun assume(
+    condition: bool,
+    message: string = "",
+    loc: SourceLocation = reflect.sourceLocation(),
+): void {
+    Assert.assume(condition, message, formatExpectLocation(loc));
+}
+
+/// Maps an integer-like value into the inclusive range `[minValue, maxValue]`.
+///
+/// This mirrors Foundry-style `bound` behavior for fuzzed scalar inputs:
+/// values already in range stay unchanged, while out-of-range values wrap back
+/// into the target interval.
+fun bound<T>(
+    value: T,
+    minValue: T,
+    maxValue: T,
+    loc: SourceLocation = reflect.sourceLocation(),
+): T {
+    val minInt = minValue as int;
+    val maxInt = maxValue as int;
+    if (minInt > maxInt) {
+        Assert.fail(
+            format2(
+                "bound(<value>, <min>, <max>): min {} must be less than or equal to max {}",
+                minInt,
+                maxInt,
+            ),
+            formatExpectLocation(loc),
+        );
+    }
+
+    val valueInt = value as int;
+    if (valueInt >= minInt && valueInt <= maxInt) {
+        return value;
+    }
+
+    val size = maxInt - minInt + 1;
+    if (valueInt < minInt) {
+        val diff = minInt - valueInt;
+        val rem = diff % size;
+        if (rem == 0) {
+            return minValue;
+        }
+        return (maxInt - rem + 1) as T;
+    }
+
+    val diff = valueInt - maxInt;
+    val rem = diff % size;
+    if (rem == 0) {
+        return maxValue;
+    }
+    return (minInt + rem - 1) as T;
 }
 
 /// Sets the expected exit code for the test.

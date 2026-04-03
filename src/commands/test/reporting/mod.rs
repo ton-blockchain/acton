@@ -29,7 +29,20 @@ pub struct TestExecutionContext {
     pub vm_log_diff: Option<String>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
+    pub fuzz: Option<FuzzExecutionContext>,
     pub failure: Option<TestFailureExecutionContext>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FuzzCaseContext {
+    pub run: usize,
+    pub inputs: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FuzzExecutionContext {
+    pub total_runs: usize,
+    pub failed_case: Option<FuzzCaseContext>,
 }
 
 #[derive(Debug, Clone)]

@@ -106,6 +106,18 @@ fun Assert.fail(message: string = "", location: string = ""): never {
     throw ASSERTION_FAILED;
 }
 
+/// Rejects the current fuzz input when condition is false.
+///
+/// Outside fuzz tests this is reported as a normal test failure.
+fun Assert.assume(condition: bool, message: string = "", location: string = ""): void {
+    if (condition) {
+        return;
+    }
+
+    ffi.assumeReject(message, location);
+    throw ASSERTION_FAILED;
+}
+
 /// Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
 /// Returns the callback result.
 ///
@@ -302,6 +314,9 @@ fun ffi.failWalletNotFound(walletName: string, location: string = ""): bool
 
 fun ffi.assertDecimal<T>(location: string, message: string, decimals: int, right: T, left: T): bool
     asm "106 EXTCALL"
+
+fun ffi.assumeReject(message: string = "", location: string = ""): bool
+    asm "107 EXTCALL"
 
 fun ffi.typeNameByOpcode(id: int): string?
     asm "14 EXTCALL"

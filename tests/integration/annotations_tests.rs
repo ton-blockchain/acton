@@ -305,3 +305,177 @@ fn test_annotations_with_filter() {
         .success()
         .assert_passed(1);
 }
+
+#[test]
+fn test_fuzz_annotation_runs_parameterized_test_multiple_times() {
+    ProjectBuilder::new("fuzz-parameterized")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: 4 })
+            get fun `test-fuzz-int`(value: int) {
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("(4 runs)");
+}
+
+#[test]
+fn test_fuzz_annotation_reports_failing_input() {
+    ProjectBuilder::new("fuzz-failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: true })
+            get fun `test-fuzz-bool`(flag: bool) {
+                expect(flag).toBeFalse();
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("Fuzz case 2/256")
+        .assert_contains("Inputs: flag=true");
+}
+
+#[test]
+fn test_parameterized_test_requires_explicit_fuzz_annotation() {
+    ProjectBuilder::new("fuzz-required")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-missing-fuzz`(value: int) {
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("requires @test({ fuzz: true }) or @test({ fuzz: <runs> })");
+}
+
+#[test]
+fn test_fuzz_annotation_requires_parameters() {
+    ProjectBuilder::new("fuzz-no-params")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: true })
+            get fun `test-no-params`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("uses @test({ fuzz: ... }) but has no parameters");
+}
+
+#[test]
+fn test_fuzz_assume_retries_rejected_inputs() {
+    ProjectBuilder::new("fuzz-assume-retry")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: 2 })
+            get fun `test-fuzz-assume`(flag: bool) {
+                assume(flag);
+                expect(flag).toBeTrue();
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("(2 runs)");
+}
+
+#[test]
+fn test_fuzz_assume_budget_exhaustion_reports_clear_error() {
+    ProjectBuilder::new("fuzz-assume-exhaustion")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: 1 })
+            get fun `test-fuzz-assume-exhaustion`(value: int) {
+                assume(false);
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("assume(...) rejected 256 fuzz inputs before reaching 1 successful runs");
+}
+
+#[test]
+fn test_bound_helper_wraps_values_into_range() {
+    ProjectBuilder::new("fuzz-bound-helper")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-bound-helper`() {
+                expect(bound(2, 1, 3)).toEqual(2);
+                expect(bound(0, 1, 3)).toEqual(3);
+                expect(bound(4, 1, 3)).toEqual(1);
+                expect(bound(5, 1, 3)).toEqual(2);
+
+                val boundedUint = bound(0 as uint32, 1 as uint32, 3 as uint32);
+                expect(boundedUint as int).toEqual(3);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+}
