@@ -2,7 +2,6 @@ use super::{TestDescriptor, TestResult, TestRunner, evaluate_test_case};
 use crate::commands::test::reporting::{FuzzCaseContext, FuzzExecutionContext};
 use crate::context::{AssertFailure, FailAssertFailure, to_cell};
 use acton_config::test::TestConfig;
-use anyhow::anyhow;
 use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
@@ -11,22 +10,16 @@ use tolkc::TolkSourceMap;
 use tolkc::abi::{ABIFunctionParameter, ABIType, ContractABI as CompilerContractABI};
 use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
 use tvmffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::{Cell, CellBuilder, HashBytes};
+use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use xxhash_rust::xxh3::xxh3_64;
 
 const DEFAULT_FUZZ_RUNS: usize = 256;
 const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) struct FuzzConfig {
     pub runs: Option<usize>,
-}
-
-impl Default for FuzzConfig {
-    fn default() -> Self {
-        Self { runs: None }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -49,7 +42,6 @@ enum FuzzParameterKind {
     String,
     Address,
     AnyAddress,
-    Bits { bits: usize },
     Nullable(Box<FuzzParameterKind>),
     Unsupported,
 }
@@ -260,24 +252,6 @@ fn generate_fuzz_value(
                 format_std_address(&address),
             ))
         }
-        FuzzParameterKind::Bits { bits } => {
-            let mut raw = vec![0u8; bits.div_ceil(8)];
-            match run_idx {
-                0 => {}
-                1 => raw.fill(0xFF),
-                2 => raw.fill(0xAA),
-                3 => raw.fill(0x55),
-                _ => rng.fill_bytes(&mut raw),
-            }
-            mask_high_bits(&mut raw, *bits);
-
-            let mut builder = CellBuilder::new();
-            let bits_width = u16::try_from(*bits)
-                .map_err(|_| anyhow!("Cannot fuzz bitstring wider than {} bits", u16::MAX))?;
-            builder.store_raw(&raw, bits_width)?;
-            let cell = builder.build()?;
-            Ok((TupleItem::Slice(cell), format_bits_value(&raw, *bits)))
-        }
         FuzzParameterKind::Nullable(inner) => {
             if run_idx.is_multiple_of(4) {
                 return Ok((TupleItem::Null, "null".to_owned()));
@@ -385,25 +359,6 @@ fn format_std_address(address: &StdAddr) -> String {
     .to_string()
 }
 
-fn format_bits_value(raw: &[u8], bits: usize) -> String {
-    if bits == 0 {
-        return "0b".to_owned();
-    }
-
-    if bits.is_multiple_of(8) {
-        return format!("0x{}", hex::encode(raw));
-    }
-
-    let mut out = String::from("0b");
-    for bit_idx in 0..bits {
-        let byte_idx = bit_idx / 8;
-        let shift = 7 - (bit_idx % 8);
-        let bit = (raw[byte_idx] >> shift) & 1;
-        out.push(if bit == 1 { '1' } else { '0' });
-    }
-    out
-}
-
 pub(super) fn attach_test_parameter_metadata(
     mut tests: Vec<TestDescriptor>,
     abi: &ContractAbi,
@@ -470,7 +425,6 @@ fn map_compiler_type(ty: &ABIType) -> FuzzParameterKind {
         ABIType::Address => FuzzParameterKind::Address,
         ABIType::AddressAny => FuzzParameterKind::AnyAddress,
         ABIType::AddressOpt => FuzzParameterKind::Nullable(Box::new(FuzzParameterKind::Address)),
-        ABIType::BitsN { n } => FuzzParameterKind::Bits { bits: *n },
         ABIType::Nullable { inner } => match map_compiler_type(inner) {
             FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
             inner => FuzzParameterKind::Nullable(Box::new(inner)),
@@ -504,10 +458,6 @@ fn map_ton_abi_type(ty: &TypeInfo) -> FuzzParameterKind {
         BaseTypeInfo::Bool => FuzzParameterKind::Bool,
         BaseTypeInfo::Address => FuzzParameterKind::Address,
         BaseTypeInfo::AnyAddress => FuzzParameterKind::AnyAddress,
-        BaseTypeInfo::Bits { width } => FuzzParameterKind::Bits { bits: *width },
-        BaseTypeInfo::Bytes { width } => FuzzParameterKind::Bits {
-            bits: width.saturating_mul(8),
-        },
         BaseTypeInfo::VarInt16 => FuzzParameterKind::Int {
             signed: true,
             bits: Some(16),

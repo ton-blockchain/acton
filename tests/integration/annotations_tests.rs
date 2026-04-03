@@ -438,10 +438,11 @@ fn test_fuzz_assume_retries_rejected_inputs() {
             "test",
             r#"
             import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
 
             @test({ fuzz: 2 })
             get fun `test-fuzz-assume`(flag: bool) {
-                assume(flag);
+                fuzz.assume(flag);
                 expect(flag).toBeTrue();
             }
         "#,
@@ -463,10 +464,11 @@ fn test_fuzz_assume_budget_exhaustion_reports_clear_error() {
             "test",
             r#"
             import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
 
             @test({ fuzz: 1 })
             get fun `test-fuzz-assume-exhaustion`(value: int) {
-                assume(false);
+                fuzz.assume(false);
                 expect(value).toEqual(value);
             }
         "#,
@@ -492,10 +494,11 @@ fn test_fuzz_assume_budget_uses_acton_toml_max_test_rejects() {
             "test",
             r#"
             import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
 
             @test({ fuzz: true })
             get fun `test-fuzz-assume-config-exhaustion`(value: int) {
-                assume(false);
+                fuzz.assume(false);
                 expect(value).toEqual(value);
             }
         "#,
@@ -510,6 +513,30 @@ fn test_fuzz_assume_budget_uses_acton_toml_max_test_rejects() {
 }
 
 #[test]
+fn test_fuzz_bits_parameter_is_not_supported() {
+    ProjectBuilder::new("fuzz-bits-unsupported")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: true })
+            get fun `test-fuzz-bits`(value: bits12) {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("Fuzzing parameter 'value' of type 'bits12' is not supported yet");
+}
+
+#[test]
 fn test_bound_helper_wraps_values_into_range() {
     ProjectBuilder::new("fuzz-bound-helper")
         .contract("simple", SIMPLE_CONTRACT)
@@ -517,14 +544,15 @@ fn test_bound_helper_wraps_values_into_range() {
             "test",
             r#"
             import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
 
             get fun `test-bound-helper`() {
-                expect(bound(2, 1, 3)).toEqual(2);
-                expect(bound(0, 1, 3)).toEqual(3);
-                expect(bound(4, 1, 3)).toEqual(1);
-                expect(bound(5, 1, 3)).toEqual(2);
+                expect(fuzz.bound(2, 1, 3)).toEqual(2);
+                expect(fuzz.bound(0, 1, 3)).toEqual(3);
+                expect(fuzz.bound(4, 1, 3)).toEqual(1);
+                expect(fuzz.bound(5, 1, 3)).toEqual(2);
 
-                val boundedUint = bound(0 as uint32, 1 as uint32, 3 as uint32);
+                val boundedUint = fuzz.bound(0 as uint32, 1 as uint32, 3 as uint32);
                 expect(boundedUint as int).toEqual(3);
             }
         "#,

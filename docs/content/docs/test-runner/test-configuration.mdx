@@ -175,6 +175,9 @@ These defaults apply only to parameterized tests with an explicit fuzz
 annotation such as `@test({ fuzz: true })`.
 When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
+See [Fuzz Testing](/docs/test-runner/fuzz-testing) for annotation syntax,
+helper APIs, supported parameter types, and failure reporting.
+
 | Configuration                    | CLI Flag | Type    | Description                                                        |
 |----------------------------------|----------|---------|--------------------------------------------------------------------|
 | `[test.fuzz].runs`               | -        | Integer | Number of accepted fuzz cases to execute for each fuzz test        |

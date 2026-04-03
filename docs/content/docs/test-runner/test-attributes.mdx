@@ -160,9 +160,45 @@ get fun `test-efficient-algorithm`() {
 - Ensuring algorithms stay within gas bounds
 - Preventing gas-related regressions
 
+### fuzz
+
+Enables fuzzing for a parameterized test. The runner generates input values from
+the test ABI and executes the same test multiple times.
+
+**Syntax:**
+```tolk
+@test({ fuzz: true })
+// or
+@test({ fuzz: <runs> })
+```
+
+**Examples:**
+```tolk
+@test({ fuzz: true })
+get fun `test-default-fuzz-runs`(value: int) {
+    expect(value).toEqual(value);
+}
+
+@test({ fuzz: 64 })
+get fun `test-custom-fuzz-runs`(flag: bool) {
+    expect(flag).toEqual(flag);
+}
+```
+
+**Notes:**
+- `fuzz` is valid only for tests with parameters
+- parameterized tests require explicit fuzz opt-in
+- `@test({ fuzz: true })` uses defaults from `[test.fuzz]` in `Acton.toml`
+- for assumptions and bounds, import `@acton/testing/fuzz` and use
+  `fuzz.assume(...)` / `fuzz.bound(...)`
+
+See [Fuzz Testing](/docs/test-runner/fuzz-testing) for the execution model,
+supported types, helper APIs, and configuration details.
+
 ## Best Practices
 
 1. Use `skip` for temporarily disabled tests — Better than commenting out the entire test function
 2. Use `todo` with descriptions — Makes it clear what needs to be implemented
 3. Set `fail_with` for error testing — Ensures your error handling works correctly
 4. Use `gas_limit` for performance-critical code — Prevents performance regressions
+5. Use `fuzz` only with explicit intent — Keep the annotation on tests that are meant to explore input space

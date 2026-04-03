@@ -696,41 +696,6 @@ as the location will be automatically set by the test framework.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L682" />
 
-## `assume`
-
-```tolk
-fun assume(
-    condition: bool,
-    message: string = "",
-    loc: SourceLocation = reflect.sourceLocation(),
-): void
-```
-
-Rejects the current fuzz input when condition is false.
-
-Outside fuzz tests this is reported as a regular failure.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L693" />
-
-## `bound`
-
-```tolk
-fun bound<T>(
-    value: T,
-    minValue: T,
-    maxValue: T,
-    loc: SourceLocation = reflect.sourceLocation(),
-): T
-```
-
-Maps an integer-like value into the inclusive range `[minValue, maxValue]`.
-
-This mirrors Foundry-style `bound` behavior for fuzzed scalar inputs:
-values already in range stay unchanged, while out-of-range values wrap back
-into the target interval.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L706" />
-
 ## `expectToEndWithExitCode`
 
 ```tolk
@@ -757,5 +722,5 @@ get fun test_fail_with() {
 
 This function is more flexible and can be used conditionally in the test.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L767" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L709" />
 
