@@ -423,13 +423,27 @@ fn map_compiler_type(ty: &ABIType) -> FuzzParameterKind {
             signed: false,
             bits: Some(120),
         },
-        ABIType::UintN { n } | ABIType::VarUintN { n } => FuzzParameterKind::Int {
+        ABIType::UintN { n } => FuzzParameterKind::Int {
             signed: false,
             bits: Some(*n),
         },
-        ABIType::IntN { n } | ABIType::VarIntN { n } => FuzzParameterKind::Int {
+        ABIType::VarUintN { n } => match variadic_integer_payload_bits(*n) {
+            Some(bits) => FuzzParameterKind::Int {
+                signed: false,
+                bits: Some(bits),
+            },
+            None => FuzzParameterKind::Unsupported,
+        },
+        ABIType::IntN { n } => FuzzParameterKind::Int {
             signed: true,
             bits: Some(*n),
+        },
+        ABIType::VarIntN { n } => match variadic_integer_payload_bits(*n) {
+            Some(bits) => FuzzParameterKind::Int {
+                signed: true,
+                bits: Some(bits),
+            },
+            None => FuzzParameterKind::Unsupported,
         },
         ABIType::Bool => FuzzParameterKind::Bool,
         ABIType::String => FuzzParameterKind::String,
@@ -471,19 +485,19 @@ fn map_ton_abi_type(ty: &TypeInfo) -> FuzzParameterKind {
         BaseTypeInfo::AnyAddress => FuzzParameterKind::AnyAddress,
         BaseTypeInfo::VarInt16 => FuzzParameterKind::Int {
             signed: true,
-            bits: Some(16),
+            bits: Some(120),
         },
         BaseTypeInfo::VarInt32 => FuzzParameterKind::Int {
             signed: true,
-            bits: Some(32),
+            bits: Some(248),
         },
         BaseTypeInfo::VarUInt16 => FuzzParameterKind::Int {
             signed: false,
-            bits: Some(16),
+            bits: Some(120),
         },
         BaseTypeInfo::VarUInt32 => FuzzParameterKind::Int {
             signed: false,
-            bits: Some(32),
+            bits: Some(248),
         },
         BaseTypeInfo::Nullable { inner } => match map_ton_abi_type(inner) {
             FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
@@ -491,6 +505,14 @@ fn map_ton_abi_type(ty: &TypeInfo) -> FuzzParameterKind {
         },
         _ => FuzzParameterKind::Unsupported,
     }
+}
+
+fn variadic_integer_payload_bits(size: usize) -> Option<usize> {
+    if size == 0 || !size.is_power_of_two() {
+        return None;
+    }
+
+    size.checked_sub(1)?.checked_mul(8)
 }
 
 pub(super) fn validate_test_configuration(
