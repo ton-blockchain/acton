@@ -173,6 +173,8 @@ include-tests = true
 
 These defaults apply only to parameterized tests with an explicit fuzz
 annotation such as `@test({ fuzz: true })`.
+Per-test annotations can override them with
+`@test({ fuzz: { runs: ..., max_test_rejects: ... } })`.
 When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
 See [Fuzz Testing](/docs/test-runner/fuzz-testing) for annotation syntax,

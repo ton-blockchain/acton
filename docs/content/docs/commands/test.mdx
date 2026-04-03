@@ -566,6 +566,7 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   `--snapshot` or `--baseline-snapshot`
 - `[test.fuzz]` applies only to parameterized tests that explicitly opt in with
   `@test({ fuzz: true })` or `@test({ fuzz: ... })`
+- per-test `@test({ fuzz: { ... } })` settings override `[test.fuzz]` for that test
 
 ## CONFIGURATION
 

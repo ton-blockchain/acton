@@ -20,6 +20,7 @@ const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) struct FuzzConfig {
     pub runs: Option<usize>,
+    pub max_test_rejects: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -110,7 +111,11 @@ impl TestRunner<'_> {
                 source_map.clone(),
                 &generated.stack,
             )?;
-            executed_get_methods.extend(result.executed_get_methods.clone());
+            if self.config.coverage {
+                executed_get_methods.append(&mut result.executed_get_methods);
+            } else {
+                result.executed_get_methods.clear();
+            }
 
             if matches!(
                 result.assert_failure.as_ref(),
@@ -158,12 +163,14 @@ impl TestRunner<'_> {
 
 fn resolve_fuzz_config(fuzz: FuzzConfig, config: &TestConfig) -> ResolvedFuzzConfig {
     let runs = fuzz.runs.or(config.fuzz_runs).unwrap_or(DEFAULT_FUZZ_RUNS);
+    let max_test_rejects = fuzz
+        .max_test_rejects
+        .or(config.fuzz_max_test_rejects)
+        .unwrap_or_else(|| runs.saturating_mul(DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER));
 
     ResolvedFuzzConfig {
         runs,
-        max_test_rejects: config
-            .fuzz_max_test_rejects
-            .unwrap_or_else(|| runs.saturating_mul(DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER)),
+        max_test_rejects,
     }
 }
 
@@ -297,7 +304,13 @@ fn generate_signed_integer(run_idx: usize, bits: Option<usize>, rng: &mut StdRng
 
     match run_idx {
         0 => BigInt::ZERO,
-        1 => BigInt::from(1u8),
+        1 => {
+            if magnitude_bits == 0 {
+                BigInt::ZERO
+            } else {
+                BigInt::from(1u8)
+            }
+        }
         2 => BigInt::from(-1),
         3 => max,
         4 => min,
@@ -495,7 +508,7 @@ pub(super) fn validate_test_configuration(
 
     if test.declared_parameter_count > 0 && test.fuzz.is_none() {
         anyhow::bail!(
-            "Parameterized test '{}' requires @test({{ fuzz: true }}) or @test({{ fuzz: <runs> }})",
+            "Parameterized test '{}' requires @test({{ fuzz: true }}), @test({{ fuzz: <runs> }}), or @test({{ fuzz: {{ ... }} }})",
             test.name
         );
     }

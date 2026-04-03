@@ -331,6 +331,31 @@ fn test_fuzz_annotation_runs_parameterized_test_multiple_times() {
 }
 
 #[test]
+fn test_fuzz_annotation_supports_int1_without_out_of_range_seed() {
+    ProjectBuilder::new("fuzz-int1")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test({ fuzz: 4 })
+            get fun `test-fuzz-int1`(value: int1) {
+                val raw = value as int;
+                expect(raw == 0 || raw == -1).toBeTrue();
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("(4 runs)");
+}
+
+#[test]
 fn test_fuzz_annotation_reports_failing_input() {
     ProjectBuilder::new("fuzz-failure")
         .contract("simple", SIMPLE_CONTRACT)
@@ -403,7 +428,9 @@ fn test_parameterized_test_requires_explicit_fuzz_annotation() {
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("requires @test({ fuzz: true }) or @test({ fuzz: <runs> })");
+        .assert_contains(
+            "requires @test({ fuzz: true }), @test({ fuzz: <runs> }), or @test({ fuzz: { ... } })",
+        );
 }
 
 #[test]
@@ -510,6 +537,37 @@ fn test_fuzz_assume_budget_uses_acton_toml_max_test_rejects() {
         .failure()
         .assert_failed(1)
         .assert_contains("assume(...) rejected 3 fuzz inputs before reaching 256 successful runs");
+}
+
+#[test]
+fn test_fuzz_assume_budget_can_be_overridden_per_test() {
+    ProjectBuilder::new("fuzz-assume-annotation-exhaustion")
+        .contract("simple", SIMPLE_CONTRACT)
+        .with_test_config(TestConfig {
+            fuzz_runs: Some(128),
+            fuzz_max_test_rejects: Some(99),
+            ..TestConfig::default()
+        })
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
+
+            @test({ fuzz: { runs: 2, max_test_rejects: 3 } })
+            get fun `test-fuzz-assume-annotation-exhaustion`(value: int) {
+                fuzz.assume(false);
+                expect(value).toEqual(value);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("assume(...) rejected 3 fuzz inputs before reaching 2 successful runs");
 }
 
 #[test]

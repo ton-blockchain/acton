@@ -28,8 +28,9 @@ input.
 
 ## Opt In Per Test
 
-Use `@test({ fuzz: true })` to enable fuzzing with defaults, or
-`@test({ fuzz: <runs> })` to override the number of runs for a single test.
+Use `@test({ fuzz: true })` to enable fuzzing with defaults,
+`@test({ fuzz: <runs> })` to override the number of runs for a single test,
+or `@test({ fuzz: { ... } })` to override individual fuzz settings.
 
 ```tolk
 import "@acton/testing/expect"
@@ -45,6 +46,12 @@ get fun `test-counter-never-goes-negative`(value: int) {
 get fun `test-bool-roundtrip`(flag: bool) {
     expect(flag).toEqual(flag);
 }
+
+@test({ fuzz: { runs: 64, max_test_rejects: 1024 } })
+get fun `test-only-even-values`(value: int) {
+    fuzz.assume(value % 2 == 0);
+    expect(value % 2).toEqual(0);
+}
 ```
 
 Rules:
@@ -52,7 +59,8 @@ Rules:
 - Parameterized tests require an explicit fuzz annotation.
 - Tests without parameters cannot use `fuzz`.
 - `@test({ fuzz: true })` uses defaults from `[test.fuzz]` in `Acton.toml`.
-- `@test({ fuzz: N })` overrides only `runs` for that test.
+- `@test({ fuzz: N })` overrides `runs` for that test.
+- `@test({ fuzz: { ... } })` can override `runs` and `max_test_rejects` for that test.
 - `runs` means how many generated cases Acton should execute for that test.
 
 ## Supported Parameter Types
@@ -121,6 +129,7 @@ max-test-rejects = 4096
 - `runs` is the number of generated cases that must actually execute.
 - `max-test-rejects` is the maximum number of cases that may be rejected by
   `fuzz.assume(...)` before the test fails.
+- `@test({ fuzz: { max_test_rejects: ... } })` overrides the reject limit for one test.
 - When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
 ## Failure Reporting

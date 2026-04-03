@@ -155,7 +155,10 @@ fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig
             .text(content)
             .parse::<usize>()
             .ok()
-            .map(|runs| FuzzConfig { runs: Some(runs) }),
+            .map(|runs| FuzzConfig {
+                runs: Some(runs),
+                max_test_rejects: None,
+            }),
         Expr::ObjectLit(object) => parse_fuzz_object(content, object),
         _ => None,
     }
@@ -163,24 +166,33 @@ fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig
 
 fn parse_fuzz_object(content: &str, object: ObjectLit<'_>) -> Option<FuzzConfig> {
     let mut config = FuzzConfig::default();
-    let mut found_runs = false;
+    let mut found_field = false;
 
     for key_value in object.arguments() {
         let Some(name_node) = key_value.name() else {
             continue;
         };
 
-        if name_node.text(content) != "runs" {
-            continue;
-        }
-
-        if let Some(Expr::NumberLit(n)) = key_value.value()
-            && let Ok(runs) = n.text(content).parse::<usize>()
-        {
-            config.runs = Some(runs);
-            found_runs = true;
+        match name_node.text(content) {
+            "runs" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(runs) = n.text(content).parse::<usize>()
+                {
+                    config.runs = Some(runs);
+                    found_field = true;
+                }
+            }
+            "max_test_rejects" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(max_test_rejects) = n.text(content).parse::<usize>()
+                {
+                    config.max_test_rejects = Some(max_test_rejects);
+                    found_field = true;
+                }
+            }
+            _ => {}
         }
     }
 
-    found_runs.then_some(config)
+    found_field.then_some(config)
 }

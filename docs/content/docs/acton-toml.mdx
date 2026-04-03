@@ -216,6 +216,8 @@ Configures default coverage behavior for `acton test`.
 
 Configures defaults for parameterized tests that explicitly opt into fuzzing
 with `@test({ fuzz: true })` or `@test({ fuzz: ... })`.
+Per-test annotations can override individual values with
+`@test({ fuzz: { runs: ..., max_test_rejects: ... } })`.
 
 | Field              | Type      | Default      | Description                                                            |
 |:-------------------|:----------|:-------------|:-----------------------------------------------------------------------|
