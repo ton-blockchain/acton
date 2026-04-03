@@ -25,6 +25,11 @@ jobs:
       packages: write
 
     steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
       - name: Download Docker archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -48,9 +53,23 @@ jobs:
           docker load -i docker-artifacts/acton-linux-amd64.docker.tar
           docker load -i docker-artifacts/acton-linux-arm64.docker.tar
 
-      - name: Push platform images and manifest
+      - name: Compare image labels and write shared annotations
         # language=Bash
         run: |
+          python3 .github/scripts/compare-image-labels.py \
+            --image "acton:${VERSION_TAG}-linux-amd64" \
+            --image "acton:${VERSION_TAG}-linux-arm64" \
+            --output docker-artifacts/index-annotations.txt
+
+      - name: Push platform images and manifest
+        shell: bash
+        # language=Bash
+        run: |
+          index_annotations=()
+          while IFS= read -r annotation; do
+            index_annotations+=("--annotation" "index:${annotation}")
+          done < docker-artifacts/index-annotations.txt
+
           docker tag "acton:${VERSION_TAG}-linux-amd64" "${ACTON_NAME}:${VERSION_TAG}-amd64"
           docker tag "acton:${VERSION_TAG}-linux-arm64" "${ACTON_NAME}:${VERSION_TAG}-arm64"
 
@@ -58,6 +77,7 @@ jobs:
           docker push "${ACTON_NAME}:${VERSION_TAG}-arm64"
 
           docker buildx imagetools create \
+            "${index_annotations[@]}" \
             --tag "${ACTON_NAME}:${VERSION_TAG}" \
             "${ACTON_NAME}:${VERSION_TAG}-amd64" \
             "${ACTON_NAME}:${VERSION_TAG}-arm64"
@@ -65,4 +85,4 @@ jobs:
       - name: Inspect published manifest
         # language=Bash
         run: |
-          docker buildx imagetools inspect "${ACTON_NAME}:${VERSION_TAG}"
+          docker buildx imagetools inspect --raw "${ACTON_NAME}:${VERSION_TAG}"
