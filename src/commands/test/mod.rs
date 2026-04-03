@@ -418,6 +418,7 @@ impl<'a> TestRunner<'a> {
 
         let mut captured_stdout = captured_stdout;
         Self::append_debug_output(&mut captured_stdout, &result);
+
         let executed_get_methods = if self.config.coverage {
             // save results for coverage only in coverage mode since cloning is expensive due to logs
             match &result {

@@ -102,6 +102,15 @@ get fun test_map_diff() {
 }
 "#;
 
+const FUZZ_FAILURE_TESTS: &str = r#"
+import "../../lib/testing/expect"
+
+@test({ fuzz: { runs: 2, seed: 17 } })
+get fun `test-fuzz-fails-with-inputs`(value: int) {
+    expect(value).toEqual(1);
+}
+"#;
+
 #[test]
 fn test_teamcity_reporter_basic_passing() {
     FixtureProject::load("basic")
@@ -168,6 +177,27 @@ fn test_teamcity_reporter_with_get_method_failure() {
 }
 
 #[test]
+fn test_teamcity_reporter_with_fuzz_failure_includes_seed_and_inputs() {
+    ProjectBuilder::new("teamcity_fuzz_failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("test", FUZZ_FAILURE_TESTS)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("##teamcity[testFailed")
+        .assert_contains("Fuzz seed: 17")
+        .assert_contains("Inputs: value=0")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_with_fuzz_failure.stdout.txt",
+        );
+}
+
+#[test]
 fn test_teamcity_reporter_with_skipped_test() {
     FixtureProject::load("basic")
         .acton()
@@ -228,6 +258,27 @@ fn test_junit_reporter_with_failing_test() {
             "integration/snapshots/test_junit_reporter_with_failing_test.xml.gen",
         )
         .assert_snapshot_matches("integration/snapshots/test_junit_with_failing_test.stdout.txt");
+}
+
+#[test]
+fn test_junit_reporter_with_fuzz_failure_includes_seed_and_inputs() {
+    ProjectBuilder::new("junit_fuzz_failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("test", FUZZ_FAILURE_TESTS)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("junit")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("Fuzz case 1/2")
+        .assert_file_snapshot_matches(
+            "test-results/TEST-test.test.tolk.xml",
+            "integration/snapshots/test_junit_reporter_with_fuzz_failure.xml.gen",
+        )
+        .assert_snapshot_matches("integration/snapshots/test_junit_with_fuzz_failure.stdout.txt");
 }
 
 #[test]
@@ -490,6 +541,23 @@ fn test_dot_reporter_with_failures() {
         .assert_contains("xx")
         .assert_contains("FAIL")
         .assert_snapshot_matches("integration/snapshots/test_dot_with_failures.stdout.txt");
+}
+
+#[test]
+fn test_dot_reporter_with_fuzz_failure_includes_seed_and_inputs() {
+    ProjectBuilder::new("dot_fuzz_failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("test", FUZZ_FAILURE_TESTS)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("dot")
+        .run()
+        .failure()
+        .assert_contains("FAIL test-fuzz-fails-with-inputs")
+        .assert_contains("Fuzz seed: 17")
+        .assert_contains("Inputs: value=0")
+        .assert_snapshot_matches("integration/snapshots/test_dot_with_fuzz_failure.stdout.txt");
 }
 
 #[test]

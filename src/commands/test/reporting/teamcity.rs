@@ -1,4 +1,7 @@
-use super::{TestReport, TestReporter, TestStatus, TestSuiteStats, extract_suite_name};
+use super::{
+    TestReport, TestReporter, TestStatus, TestSuiteStats, extract_suite_name,
+    format_fuzz_failure_context,
+};
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
@@ -129,6 +132,18 @@ impl TeamCityReporter {
 
         if let Some(ref test_message) = test.message {
             message = test_message.clone();
+        }
+
+        if let Some(exec) = &test.execution
+            && let Some(fuzz) = &exec.fuzz
+        {
+            let fuzz_details = format_fuzz_failure_context(fuzz);
+            if !fuzz_details.is_empty() {
+                if !details.is_empty() {
+                    details.push('\n');
+                }
+                details.push_str(&fuzz_details);
+            }
         }
 
         (message, details, expected, actual)

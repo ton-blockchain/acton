@@ -1,4 +1,4 @@
-use super::{TestReport, TestReporter, TestStatus};
+use super::{TestReport, TestReporter, TestStatus, format_fuzz_failure_context};
 use acton_config::color::OwoColorize;
 use std::io::{Write, stdout};
 
@@ -80,6 +80,14 @@ impl DotReporter {
 
                 if let Some(location) = &test.location {
                     println!("  {}", location.format().dimmed());
+                }
+
+                if let Some(execution) = &test.execution
+                    && let Some(fuzz) = &execution.fuzz
+                {
+                    for line in format_fuzz_failure_context(fuzz).lines() {
+                        println!("  {}", line.dimmed());
+                    }
                 }
             }
 

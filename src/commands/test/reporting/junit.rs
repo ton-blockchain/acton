@@ -1,4 +1,7 @@
-use super::{TestReport, TestReporter, TestStatus, TestSuiteStats, escape_xml, extract_suite_name};
+use super::{
+    TestReport, TestReporter, TestStatus, TestSuiteStats, escape_xml, extract_suite_name,
+    format_fuzz_failure_context,
+};
 use crate::commands::test::TestDescriptor;
 use acton_config::config::project_root as configured_project_root;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
@@ -60,8 +63,17 @@ impl JUnitReporter {
                     status.set_message(escape_xml(message).as_str());
                 }
                 status.set_type("AssertionError");
+                let mut description_lines = Vec::new();
                 if let Some(ref location) = test.location {
-                    status.set_description(format!("at {}", location.format_full().as_str()));
+                    description_lines.push(format!("at {}", location.format_full().as_str()));
+                }
+                if let Some(execution) = &test.execution
+                    && let Some(fuzz) = &execution.fuzz
+                {
+                    description_lines.push(format_fuzz_failure_context(fuzz));
+                }
+                if !description_lines.is_empty() {
+                    status.set_description(description_lines.join("\n"));
                 }
                 status
             }
