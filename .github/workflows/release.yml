@@ -69,6 +69,8 @@ jobs:
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/dist
+          retention-days: 1
+          if-no-files-found: error
       # sure would be cool if github gave us proper conditionals...
       # so here's a doubly-nested ternary-via-truthiness to try to provide the best possible
       # functionality based on whether this is a pull_request, and whether it's from a fork.
@@ -85,6 +87,8 @@ jobs:
         with:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
+          retention-days: 1
+          if-no-files-found: error
 
   custom-verify-version:
     uses: ./.github/workflows/verify-version.yml
@@ -157,6 +161,8 @@ jobs:
           path: |
             ${{ steps.cargo-dist.outputs.paths }}
             ${{ env.BUILD_MANIFEST_NAME }}
+          retention-days: 1
+          if-no-files-found: error
 
   custom-build-docker-image:
     needs:
@@ -214,6 +220,8 @@ jobs:
           # Overwrite the previous copy
           name: artifacts-dist-manifest
           path: dist-manifest.json
+          retention-days: 1
+          if-no-files-found: error
 
   custom-check-release:
     needs:
