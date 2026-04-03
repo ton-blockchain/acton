@@ -107,9 +107,17 @@ fn retag_workflow() -> Workflow<'static, ReleaseContext> {
 }
 
 fn check_release_workflow_failed_for_current_tag(context: &ReleaseContext) -> Result<()> {
+    let run = context
+        .github
+        .latest_release_workflow_run_for_tag(&context.tag)?;
+
     context
         .github
-        .ensure_latest_release_workflow_failed(&context.tag)
+        .ensure_workflow_run_completed_with_conclusion(
+            &run,
+            &context.tag,
+            &["failure", "startup_failure"],
+        )
 }
 
 fn check_project_versions_match_tag(context: &ReleaseContext) -> Result<()> {
