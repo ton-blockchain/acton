@@ -184,6 +184,13 @@ enum Commands {
             help_heading = "Execution"
         )]
         fail_fast: bool,
+        #[arg(
+            long,
+            value_name = "SEED",
+            help = "Seed for reproducible fuzz runs",
+            help_heading = "Execution"
+        )]
+        fuzz_seed: Option<u64>,
 
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
@@ -1530,6 +1537,7 @@ fn main() {
             mutate_contract,
             disable_rule,
             fail_fast,
+            fuzz_seed,
             fork_block_number,
             ui,
             ui_port,
@@ -1570,6 +1578,7 @@ fn main() {
                     mutate_overrides,
                     mutate_contract,
                     disable_rule,
+                    fuzz_seed,
                     Some(fail_fast),
                     ui,
                     ui_port,
@@ -2111,6 +2120,7 @@ fn create_test_config(
     mutate_overrides: Option<String>,
     mutate_contract: Option<String>,
     disable_rules: Vec<String>,
+    fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
     ui: bool,
     ui_port: u16,
@@ -2164,6 +2174,7 @@ fn create_test_config(
             mutate_overrides,
             mutate_contract,
             disable_rules,
+            fuzz_seed,
             if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
@@ -2201,6 +2212,7 @@ fn create_test_config(
         disable_rules,
         fuzz_runs: None,
         fuzz_max_test_rejects: None,
+        fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,

@@ -617,6 +617,12 @@
           "type": "integer",
           "format": "uint",
           "minimum": 0.0
+        },
+        "seed": {
+          "description": "Seed used for reproducible fuzz input generation",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         }
       }
     },

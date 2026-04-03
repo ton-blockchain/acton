@@ -12,7 +12,6 @@ use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
-use xxhash_rust::xxh3::xxh3_64;
 
 const DEFAULT_FUZZ_RUNS: usize = 256;
 const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
@@ -21,12 +20,14 @@ const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;
 pub(crate) struct FuzzConfig {
     pub runs: Option<usize>,
     pub max_test_rejects: Option<usize>,
+    pub seed: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct ResolvedFuzzConfig {
     runs: usize,
     max_test_rejects: usize,
+    seed: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +66,7 @@ impl TestRunner<'_> {
         fuzz: FuzzConfig,
     ) -> anyhow::Result<TestResult> {
         let fuzz = resolve_fuzz_config(fuzz, &self.config);
-        let seed = fuzz_seed(test);
+        let seed = fuzz.seed.unwrap_or(self.fuzz_seed);
         let mut executed_get_methods = Vec::new();
         let mut last_result: Option<TestResult> = None;
         let mut last_rejected_result: Option<TestResult> = None;
@@ -96,6 +97,7 @@ impl TestRunner<'_> {
                 result.executed_get_methods = executed_get_methods;
                 result.fuzz = Some(FuzzExecutionContext {
                     total_runs: fuzz.runs,
+                    seed,
                     failed_case: None,
                 });
                 return Ok(result);
@@ -138,6 +140,7 @@ impl TestRunner<'_> {
                 result.executed_get_methods = executed_get_methods;
                 result.fuzz = Some(FuzzExecutionContext {
                     total_runs: fuzz.runs,
+                    seed,
                     failed_case: Some(FuzzCaseContext {
                         run: accepted_runs,
                         inputs: generated.inputs,
@@ -155,6 +158,7 @@ impl TestRunner<'_> {
         result.executed_get_methods = executed_get_methods;
         result.fuzz = Some(FuzzExecutionContext {
             total_runs: fuzz.runs,
+            seed,
             failed_case: None,
         });
         Ok(result)
@@ -171,12 +175,8 @@ fn resolve_fuzz_config(fuzz: FuzzConfig, config: &TestConfig) -> ResolvedFuzzCon
     ResolvedFuzzConfig {
         runs,
         max_test_rejects,
+        seed: fuzz.seed,
     }
-}
-
-fn fuzz_seed(test: &TestDescriptor) -> u64 {
-    let key = format!("{}::{}", test.pos.uri, test.name);
-    xxh3_64(key.as_bytes())
 }
 
 fn generate_fuzz_input(

@@ -94,6 +94,7 @@ pub struct TestConfig {
     pub disable_rules: Vec<String>,
     pub fuzz_runs: Option<usize>,
     pub fuzz_max_test_rejects: Option<usize>,
+    pub fuzz_seed: Option<u64>,
     pub fail_fast: bool,
     pub ui: bool,
     pub ui_port: u16,

@@ -1,3 +1,4 @@
+use crate::common::strip_ansi;
 use crate::support::TestOutputExt;
 use crate::support::project::{ProjectBuilder, TestConfig};
 
@@ -327,7 +328,7 @@ fn test_fuzz_annotation_runs_parameterized_test_multiple_times() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("(4 runs)");
+        .assert_contains("4 runs, seed ");
 }
 
 #[test]
@@ -352,7 +353,7 @@ fn test_fuzz_annotation_supports_int1_without_out_of_range_seed() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("(4 runs)");
+        .assert_contains("4 runs, seed ");
 }
 
 #[test]
@@ -405,7 +406,7 @@ fn test_fuzz_annotation_true_uses_acton_toml_defaults() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("(4 runs)");
+        .assert_contains("4 runs, seed ");
 }
 
 #[test]
@@ -480,7 +481,7 @@ fn test_fuzz_assume_retries_rejected_inputs() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("(2 runs)");
+        .assert_contains("2 runs, seed ");
 }
 
 #[test]
@@ -568,6 +569,62 @@ fn test_fuzz_assume_budget_can_be_overridden_per_test() {
         .failure()
         .assert_failed(1)
         .assert_contains("assume(...) rejected 3 fuzz inputs before reaching 2 successful runs");
+}
+
+#[test]
+fn test_fuzz_same_seed_produces_same_values() {
+    let output = ProjectBuilder::new("fuzz-same-seed")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/testing/fuzz"
+
+            @test({ fuzz: { runs: 1, max_test_rejects: 32 } })
+            get fun `test-fuzz-seed-a`(value: int8) {
+                fuzz.assume(value != 0);
+                fuzz.assume(value != 1);
+                fuzz.assume(value != -1);
+                fuzz.assume(value != 127);
+                fuzz.assume(value != -128);
+                expect(false).toBeTrue();
+            }
+
+            @test({ fuzz: { runs: 1, max_test_rejects: 32 } })
+            get fun `test-fuzz-seed-b`(value: int8) {
+                fuzz.assume(value != 0);
+                fuzz.assume(value != 1);
+                fuzz.assume(value != -1);
+                fuzz.assume(value != 127);
+                fuzz.assume(value != -128);
+                expect(false).toBeTrue();
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .arg("--fuzz-seed")
+        .arg("777")
+        .run()
+        .failure();
+
+    output.assert_failed(2).assert_contains("seed 777");
+
+    let stdout = strip_ansi(&output.get_stdout());
+    let inputs = stdout
+        .lines()
+        .filter(|line| line.contains("Inputs: value="))
+        .map(|line| line.trim().to_owned())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        inputs.len(),
+        2,
+        "expected two fuzz input lines, got:\n{stdout}"
+    );
+    assert_eq!(inputs[0], inputs[1], "same seed should produce same values");
 }
 
 #[test]

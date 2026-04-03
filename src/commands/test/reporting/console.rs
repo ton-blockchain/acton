@@ -52,7 +52,10 @@ impl ConsoleReporter {
         };
 
         let label = if fuzz.total_runs == 1 { "run" } else { "runs" };
-        format!(" {}", format!("({} {label})", fuzz.total_runs).dimmed())
+        format!(
+            " {}",
+            format!("({} {label}, seed {})", fuzz.total_runs, fuzz.seed).dimmed()
+        )
     }
 }
 

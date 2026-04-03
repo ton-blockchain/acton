@@ -217,12 +217,13 @@ Configures default coverage behavior for `acton test`.
 Configures defaults for parameterized tests that explicitly opt into fuzzing
 with `@test({ fuzz: true })` or `@test({ fuzz: ... })`.
 Per-test annotations can override individual values with
-`@test({ fuzz: { runs: ..., max_test_rejects: ... } })`.
+`@test({ fuzz: { runs: ..., max_test_rejects: ..., seed: ... } })`.
 
 | Field              | Type      | Default      | Description                                                            |
 |:-------------------|:----------|:-------------|:-----------------------------------------------------------------------|
 | `runs`             | `integer` | `256`        | Number of accepted fuzz cases to execute for each fuzz test.           |
 | `max-test-rejects` | `integer` | `runs * 256` | Maximum number of `assume(...)` rejections before the fuzz test fails. |
+| `seed`             | `integer` | -            | Seed for reproducible fuzz input generation.                           |
 
 ### Mutation Testing Configuration
 
@@ -248,6 +249,7 @@ include-tests = true
 [test.fuzz]
 runs = 512
 max-test-rejects = 4096
+seed = 42
 
 [test.mutation]
 disable-rules = ["flip_plus"]

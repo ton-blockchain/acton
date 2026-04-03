@@ -42,6 +42,7 @@ pub struct FuzzCaseContext {
 #[derive(Debug, Clone, Serialize)]
 pub struct FuzzExecutionContext {
     pub total_runs: usize,
+    pub seed: u64,
     pub failed_case: Option<FuzzCaseContext>,
 }
 

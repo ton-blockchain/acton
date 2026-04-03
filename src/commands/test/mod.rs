@@ -109,6 +109,7 @@ pub struct TestRunner<'a> {
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
     abi_parse_cache: ContractAbiParseCache,
+    fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
     ref_contracts: BTreeMap<String, Cell>,
@@ -129,6 +130,7 @@ impl<'a> TestRunner<'a> {
             DapTransport::dummy()
         };
         let project_root = configured_project_root().to_path_buf();
+        let fuzz_seed = config.fuzz_seed.unwrap_or_else(rand::random);
 
         let mut ref_contracts = BTreeMap::new();
         if let Some(contracts) = acton_config.contracts() {
@@ -185,6 +187,7 @@ impl<'a> TestRunner<'a> {
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
             abi_parse_cache: ContractAbiParseCache::new(),
+            fuzz_seed,
         })
     }
 

@@ -71,6 +71,7 @@ pub(crate) struct TestConfig {
     pub junit_merge: Option<bool>,
     pub fuzz_runs: Option<usize>,
     pub fuzz_max_test_rejects: Option<usize>,
+    pub fuzz_seed: Option<u64>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
@@ -1004,7 +1005,10 @@ version = "0.1.0"
                 toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
             }
 
-            if config.fuzz_runs.is_some() || config.fuzz_max_test_rejects.is_some() {
+            if config.fuzz_runs.is_some()
+                || config.fuzz_max_test_rejects.is_some()
+                || config.fuzz_seed.is_some()
+            {
                 toml_content.push_str("\n[test.fuzz]\n");
 
                 if let Some(fuzz_runs) = config.fuzz_runs {
@@ -1013,6 +1017,10 @@ version = "0.1.0"
 
                 if let Some(fuzz_max_test_rejects) = config.fuzz_max_test_rejects {
                     toml_content.push_str(&format!("max-test-rejects = {fuzz_max_test_rejects}\n"));
+                }
+
+                if let Some(fuzz_seed) = config.fuzz_seed {
+                    toml_content.push_str(&format!("seed = {fuzz_seed}\n"));
                 }
             }
 

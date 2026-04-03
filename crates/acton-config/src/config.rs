@@ -253,6 +253,8 @@ pub struct TestFuzzSettings {
     pub runs: Option<usize>,
     /// Maximum number of rejected inputs from `assume(...)` before the test fails
     pub max_test_rejects: Option<usize>,
+    /// Seed used for reproducible fuzz input generation
+    pub seed: Option<u64>,
 }
 
 /// Default settings for the test runner
@@ -1147,6 +1149,10 @@ impl TestSettings {
         self.fuzz.as_ref().and_then(|fuzz| fuzz.max_test_rejects)
     }
 
+    fn fuzz_seed_value(&self) -> Option<u64> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.seed)
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn to_test_config(
@@ -1178,6 +1184,7 @@ impl TestSettings {
         mutate_overrides_override: Option<String>,
         mutate_contract_override: Option<String>,
         disable_rules_override: Vec<String>,
+        fuzz_seed_override: Option<u64>,
         fail_on_diff_override: Option<bool>,
         fail_fast_override: Option<bool>,
         ui_override: bool,
@@ -1275,6 +1282,7 @@ impl TestSettings {
             },
             fuzz_runs: self.fuzz_runs_value(),
             fuzz_max_test_rejects: self.fuzz_max_test_rejects_value(),
+            fuzz_seed: fuzz_seed_override.or_else(|| self.fuzz_seed_value()),
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
@@ -1556,6 +1564,7 @@ include-tests = true
 [test.fuzz]
 runs = 512
 max-test-rejects = 4096
+seed = 42
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1585,6 +1594,7 @@ max-test-rejects = 4096
             .expect("fuzz settings should be parsed");
         assert_eq!(fuzz.runs, Some(512));
         assert_eq!(fuzz.max_test_rejects, Some(4096));
+        assert_eq!(fuzz.seed, Some(42));
         assert_eq!(
             test_settings.exclude,
             Some(vec!["**/integration/**".to_string()])

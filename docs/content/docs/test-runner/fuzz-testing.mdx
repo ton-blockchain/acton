@@ -47,7 +47,7 @@ get fun `test-bool-roundtrip`(flag: bool) {
     expect(flag).toEqual(flag);
 }
 
-@test({ fuzz: { runs: 64, max_test_rejects: 1024 } })
+@test({ fuzz: { runs: 64, max_test_rejects: 1024, seed: 42 } })
 get fun `test-only-even-values`(value: int) {
     fuzz.assume(value % 2 == 0);
     expect(value % 2).toEqual(0);
@@ -60,7 +60,7 @@ Rules:
 - Tests without parameters cannot use `fuzz`.
 - `@test({ fuzz: true })` uses defaults from `[test.fuzz]` in `Acton.toml`.
 - `@test({ fuzz: N })` overrides `runs` for that test.
-- `@test({ fuzz: { ... } })` can override `runs` and `max_test_rejects` for that test.
+- `@test({ fuzz: { ... } })` can override `runs`, `max_test_rejects`, and `seed` for that test.
 - `runs` means how many generated cases Acton should execute for that test.
 
 ## Supported Parameter Types
@@ -124,12 +124,17 @@ Store project-wide defaults in `Acton.toml`:
 [test.fuzz]
 runs = 512
 max-test-rejects = 4096
+seed = 42
 ```
 
 - `runs` is the number of generated cases that must actually execute.
 - `max-test-rejects` is the maximum number of cases that may be rejected by
   `fuzz.assume(...)` before the test fails.
+- `seed` makes generated values reproducible across runs.
+- `acton test --fuzz-seed <SEED>` overrides `[test.fuzz].seed` for one run.
 - `@test({ fuzz: { max_test_rejects: ... } })` overrides the reject limit for one test.
+- `@test({ fuzz: { seed: ... } })` overrides the seed for one test.
+- When `seed` is omitted, Acton picks a new seed for each `acton test` run and shows it in console output.
 - When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
 ## Failure Reporting
@@ -137,6 +142,7 @@ max-test-rejects = 4096
 Acton stops at the first failing generated case and reports:
 
 - the total configured run count
+- the seed used for that fuzz test
 - the first failing run number
 - the generated input values for that failing case
 

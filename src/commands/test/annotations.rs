@@ -158,6 +158,7 @@ fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig
             .map(|runs| FuzzConfig {
                 runs: Some(runs),
                 max_test_rejects: None,
+                seed: None,
             }),
         Expr::ObjectLit(object) => parse_fuzz_object(content, object),
         _ => None,
@@ -187,6 +188,14 @@ fn parse_fuzz_object(content: &str, object: ObjectLit<'_>) -> Option<FuzzConfig>
                     && let Ok(max_test_rejects) = n.text(content).parse::<usize>()
                 {
                     config.max_test_rejects = Some(max_test_rejects);
+                    found_field = true;
+                }
+            }
+            "seed" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(seed) = n.text(content).parse::<u64>()
+                {
+                    config.seed = Some(seed);
                     found_field = true;
                 }
             }

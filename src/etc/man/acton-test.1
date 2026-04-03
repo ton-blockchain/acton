@@ -47,6 +47,11 @@ May be passed multiple times.
 .RS 4
 Stop after the first failing test.
 .RE
+.sp
+\fB\-\-fuzz\-seed\fR \fIseed\fR
+.RS 4
+Seed for reproducible fuzz runs.
+.RE
 .SS "Debugging Options"
 .sp
 \fB\-\-debug\fR
@@ -283,6 +288,15 @@ use \fB\-\-coverage\-include\-tests\fR or \fB\-\-coverage\-include\-wrappers\fR 
 \h'-04'\(bu\h'+03'\fB[test.fuzz]\fR applies only to parameterized tests that explicitly opt in with
 \fB@test({ fuzz: true })\fR or \fB@test({ fuzz: ... })\fR
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fuzz\-seed\fR overrides \fB[test.fuzz].seed\fR for the current run
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'fuzz tests show the seed in console output; if \fB[test.fuzz].seed\fR is omitted,
+Acton picks a new seed for each \fBacton test\fR run
+.RE
 .SH "CONFIGURATION"
 Defaults can be configured in \fBActon.toml\fR:
 .sp
@@ -297,6 +311,7 @@ junit\-merge = false
 [test.fuzz]
 runs = 512
 max\-test\-rejects = 4096
+seed = 42
 
 [test.coverage]
 enabled = true

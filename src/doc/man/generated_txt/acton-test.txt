@@ -37,6 +37,9 @@ OPTIONS
        --fail-fast
            Stop after the first failing test.
 
+       --fuzz-seed seed
+           Seed for reproducible fuzz runs.
+
    Debugging Options
        --debug
            Enable debug mode.
@@ -195,6 +198,11 @@ REPORTING AND ARTIFACTS
        o  [test.fuzz] applies only to parameterized tests that explicitly opt
           in with @test({ fuzz: true }) or @test({ fuzz: ... })
 
+       o  --fuzz-seed overrides [test.fuzz].seed for the current run
+
+       o  fuzz tests show the seed in console output; if [test.fuzz].seed is
+          omitted, Acton picks a new seed for each acton test run
+
 CONFIGURATION
        Defaults can be configured in Acton.toml:
 
@@ -207,6 +215,7 @@ CONFIGURATION
            [test.fuzz]
            runs = 512
            max-test-rejects = 4096
+           seed = 42
            
            [test.coverage]
            enabled = true
