@@ -1,10 +1,42 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{Project, ProjectBuilder};
+use crate::support::verifier::{VerifierMockResponse, spawn_verifier_mock};
+use std::path::Path;
+use std::sync::{LazyLock, Mutex};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+
+const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
+
+const VERIFY_TEST_ADDRESS: &str = "EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot";
+
+static VERIFY_BACKEND_MOCK_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+fn write_deployer_wallets(project_path: &Path) {
+    std::fs::write(project_path.join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("failed to write wallets.toml");
+}
+
+fn build_verify_backend_project(name: &str) -> Project {
+    let project = ProjectBuilder::new(name)
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    write_deployer_wallets(project.path());
+    project
+}
+
+fn verify_backend_mock_guard() -> std::sync::MutexGuard<'static, ()> {
+    VERIFY_BACKEND_MOCK_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 #[test]
 fn test_verify_contract_not_found() {
@@ -257,4 +289,213 @@ version = "0.1.0"
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_verify_empty_contracts_section.stderr.txt",
         );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_backend_client_error_reports_response_body() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-backend-client-error");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 400,
+        body: serde_json::json!({
+            "error": "mock backend rejected sources"
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+    let backend_url = format!("{mock_url}/");
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &backend_url)
+        .verify()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/test_verify_backend_client_error_reports_response_body.stderr.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured[0].method, "POST");
+    assert_eq!(captured[0].path, "/source");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_backend_retries_after_server_error() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-backend-retry");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        VerifierMockResponse {
+            status: 500,
+            body: "temporary verifier outage".to_string(),
+            headers: vec![("cf-ray".to_string(), "retry-please".to_string())],
+        },
+        VerifierMockResponse {
+            status: 400,
+            body: "backend rejected after retry".to_string(),
+            headers: vec![],
+        },
+    ]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_verify_backend_retries_after_server_error.stdout.txt",
+    );
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/test_verify_backend_retries_after_server_error.stderr.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected retry to hit verifier twice");
+    assert!(captured.iter().all(|request| request.path == "/source"));
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_backend_retries_then_proof_already_deployed_returns_success() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-backend-retry-proof-already-deployed");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        VerifierMockResponse {
+            status: 500,
+            body: "temporary verifier outage".to_string(),
+            headers: vec![("cf-ray".to_string(), "retry-please".to_string())],
+        },
+        VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "compileResult": {
+                    "result": "different",
+                    "error": "Proof has already been deployed"
+                }
+            })
+            .to_string(),
+            headers: vec![],
+        },
+    ]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_verify_backend_retries_then_proof_already_deployed_returns_success.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected retry to hit verifier twice");
+    assert!(captured.iter().all(|request| request.path == "/source"));
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_backend_invalid_json_response_reports_parse_error() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-backend-invalid-json");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: "not valid json".to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/test_verify_backend_invalid_json_response_reports_parse_error.stderr.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured[0].path, "/source");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_backend_proof_already_deployed_returns_success() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-backend-proof-already-deployed");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "compileResult": {
+                "result": "different",
+                "error": "Proof has already been deployed"
+            }
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_verify_backend_proof_already_deployed_returns_success.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured[0].path, "/source");
 }
