@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ no-params [TIME]
+    └─ Test 'test-no-params' uses @test({ fuzz: ... }) but has no parameters
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

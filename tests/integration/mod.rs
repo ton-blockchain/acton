@@ -15,6 +15,7 @@ mod fixture_tests;
 mod flags_tests;
 mod fmt_tests;
 mod formatter;
+mod fuzz_tests;
 mod hooks_tests;
 mod incremental_tests;
 mod init_tests;

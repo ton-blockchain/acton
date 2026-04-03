@@ -1,0 +1,32 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (2 tests)
+  ✗ fuzz-seed-a [TIME] (1 run, seed 777)
+    ├─ Fuzz case 1/1
+    ├─ Inputs: value=98
+    └─ Error: expect(actual).toBeTrue()
+        (
+            false,
+            true
+        )
+      └─ at tests/test.test[LINE]
+  ✗ fuzz-seed-b [TIME] (1 run, seed 777)
+    ├─ Fuzz case 1/1
+    ├─ Inputs: value=98
+    └─ Error: expect(actual).toBeTrue()
+        (
+            false,
+            true
+        )
+      └─ at tests/test.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

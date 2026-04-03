@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ fuzz-assume-exhaustion [TIME] (1 run, seed 42)
+    └─ Error: assume(...) rejected 256 fuzz inputs before reaching 1 successful runs (completed 0)
+      └─ at tests/test.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
