@@ -166,6 +166,23 @@ fn fuzz_true_uses_acton_toml_defaults() {
 }
 
 #[test]
+fn fuzz_object_runs_path_uses_runs_override() {
+    run_seeded_success_snapshot(
+        "fuzz-object-runs",
+        &with_imports(
+            EXPECT_IMPORT,
+            r#"
+            @test({ fuzz: { runs: 3 } })
+            get fun `test-fuzz-object-runs`(value: int) {
+                expect(value).toEqual(value);
+            }
+        "#,
+        ),
+        "object_runs_path_uses_runs_override",
+    );
+}
+
+#[test]
 fn parameterized_test_requires_explicit_fuzz_annotation() {
     run_failure_snapshot(
         "fuzz-required",
@@ -178,6 +195,23 @@ fn parameterized_test_requires_explicit_fuzz_annotation() {
         "#,
         ),
         "parameterized_test_requires_explicit_fuzz_annotation",
+    );
+}
+
+#[test]
+fn fuzz_false_does_not_enable_fuzzing() {
+    run_failure_snapshot(
+        "fuzz-false-does-not-enable",
+        &with_imports(
+            EXPECT_IMPORT,
+            r#"
+            @test({ fuzz: false })
+            get fun `test-fuzz-false-does-not-enable`(value: int) {
+                expect(value).toEqual(value);
+            }
+        "#,
+        ),
+        "false_does_not_enable_fuzzing",
     );
 }
 
@@ -252,6 +286,36 @@ fn fuzz_assume_budget_uses_acton_toml_max_test_rejects() {
     )
     .with_test_config(TestConfig {
         fuzz_max_test_rejects: Some(3),
+        fuzz_seed: Some(17),
+        ..TestConfig::default()
+    })
+    .build()
+    .acton()
+    .test()
+    .run()
+    .failure()
+    .assert_failed(1)
+    .assert_snapshot_matches(&snapshot_path);
+}
+
+#[test]
+fn fuzz_max_test_rejects_without_runs_uses_config_runs() {
+    let snapshot_path = snapshot_path("max_test_rejects_without_runs_uses_config_runs");
+    fuzz_project(
+        "fuzz-max-test-rejects-without-runs",
+        &with_imports(
+            FUZZ_IMPORTS,
+            r#"
+            @test({ fuzz: { max_test_rejects: 3 } })
+            get fun `test-fuzz-max-test-rejects-without-runs`(value: int) {
+                fuzz.assume(false);
+                expect(value).toEqual(value);
+            }
+        "#,
+        ),
+    )
+    .with_test_config(TestConfig {
+        fuzz_runs: Some(5),
         fuzz_seed: Some(17),
         ..TestConfig::default()
     })
