@@ -115,8 +115,6 @@ impl TestRunner<'_> {
             )?;
             if self.config.coverage {
                 executed_get_methods.append(&mut result.executed_get_methods);
-            } else {
-                result.executed_get_methods.clear();
             }
 
             if matches!(
