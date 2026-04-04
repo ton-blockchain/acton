@@ -11,6 +11,7 @@ permissions: { }
 
 env:
   TON_REPOSITORY: i582/ton
+  TON_BRANCH: pmakhnev/acton
 
   ENABLE_MIRRORING_RELEASE: 'true'
   PUBLIC_ACTON_REPOSITORY: i582/acton-public
@@ -30,10 +31,23 @@ jobs:
       - name: Get TON commit hash
         id: ton-commit
         run: |
-          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" "repos/${TON_REPOSITORY}/commits/pmakhnev/acton")
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" "repos/${TON_REPOSITORY}/commits/${TON_BRANCH}")
           echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Show TON commit hash
+        run: |
+          echo "Resolved ${TON_REPOSITORY}@${TON_BRANCH} to ${TON_COMMIT}"
+          {
+            echo "## TON source"
+            echo
+            echo "- Repository: \`${TON_REPOSITORY}\`"
+            echo "- Branch: \`${TON_BRANCH}\`"
+            echo "- Commit: \`${TON_COMMIT}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          TON_COMMIT: ${{ steps.ton-commit.outputs.commit }}
 
   build-objs-linux:
     name: Prepare TON objects (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
@@ -82,13 +96,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
-
-      - name: Maximize Build Space
-        if: steps.archive-cache.outputs.cache-hit != 'true'
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -306,6 +313,118 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  check-objs:
+    name: Check TON objects (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
+    needs: [ build-objs-linux ]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            arch: x86_64
+            vendor: unknown
+            sys: linux
+            abi: gnu
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install LLVM and Clang
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libssl-dev \
+            qemu-user
+
+      - name: Download TON objects artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ton-objs-${{ env.TARGET_NAME }}
+          path: ${{ runner.temp }}/ton-objs
+
+      - name: Unpack TON objects archive
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p objs
+          tar -C objs -xzf "${RUNNER_TEMP}/ton-objs/ton-objs-${TARGET_NAME}.tar.gz"
+
+          ls -lh objs
+
+      - name: Create acton-mock source file
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          cat > acton-mock.c <<'EOF'
+          #include <stdio.h>
+
+          const char *emulator_version(void);
+          const char *tolk_version(void);
+
+          int main(void) {
+            const char *emulator = emulator_version();
+            const char *tolk = tolk_version();
+
+            printf("emulator_version=%s\n", emulator != NULL ? emulator : "<null>");
+            printf("tolk_version=%s\n", tolk != NULL ? tolk : "<null>");
+            return 0;
+          }
+          EOF
+
+      - name: Build acton-mock object file
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          clang-16 \
+            -O2 \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -c acton-mock.c \
+            -o acton-mock.o
+
+      - name: Link acton-mock binary
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          clang-16 \
+            acton-mock.o \
+            objs/libemulator.a \
+            objs/libtolk.a \
+            -lstdc++ \
+            -lm \
+            -lcrypto \
+            -o acton-mock
+
+      - name: Check acton-mock works without AVX in QEMU
+        shell: bash
+        run: |
+          qemu-x86_64 -cpu qemu64,avx=off,avx2=off ./acton-mock
+
 
   generate-trunk-objs-manifest:
     name: Generate Trunk Objs Manifest
@@ -362,7 +481,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, generate-trunk-objs-manifest ]
+    needs: [ prepare, check-objs, generate-trunk-objs-manifest ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 

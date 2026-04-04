@@ -84,6 +84,14 @@ jobs:
             --description "Release artifact smoke test" \
             --license MIT
 
+      - name: Inspect counter project environment
+        shell: bash
+        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
+        env:
+          ACTON_DOCTOR_API_TARGETS_JSON: "[]"
+        run: |
+          acton doctor
+
       - name: Build counter project
         shell: bash
         working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
