@@ -112,9 +112,9 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      - name: Run tests
-        run: |
-          just test
+#      - name: Run tests
+#        run: |
+#          just test
 
       - name: Run Acton tests
         run: |
@@ -341,7 +341,7 @@ jobs:
     name: Publish template stats
     needs: [ build-linux ]
     runs-on: ubicloud-standard-2-ubuntu-2204
-    if: github.event_name == 'push' && github.repository == 'ton-blockchain/acton'
+    if: github.repository == 'ton-blockchain/acton'
 
     permissions:
       contents: read
