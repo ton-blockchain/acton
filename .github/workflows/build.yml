@@ -97,14 +97,6 @@ jobs:
         run: |
           acton --help
 
-      - name: Run tests
-        run: |
-          just test
-
-      - name: Run Acton tests
-        run: |
-          acton test
-
       - name: Collect jetton template stats
         run: |
           cargo xtask template-stats \
@@ -119,6 +111,14 @@ jobs:
           path: ${{ runner.temp }}/jetton-template-stats-${{ env.TARGET_NAME }}.jsonl
           retention-days: 7
           if-no-files-found: error
+
+      - name: Run tests
+        run: |
+          just test
+
+      - name: Run Acton tests
+        run: |
+          acton test
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
