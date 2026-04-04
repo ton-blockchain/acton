@@ -24,9 +24,6 @@ jobs:
             target_name: x86_64-apple-darwin
           - runner: macos-15
             target_name: aarch64-apple-darwin
-    env:
-      TARGET_NAME: ${{ matrix.target_name }}
-      PROJECT_NAME: release-check-${{ matrix.target_name }}
 
     permissions:
       contents: read
@@ -37,15 +34,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: "3.10"
-
       - name: Download Acton archive artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: artifacts-${{ env.TARGET_NAME }}
+          name: artifacts-${{ matrix.target_name }}
           path: ${{ runner.temp }}/release-artifact
 
       - name: Unpack Acton archive
@@ -56,7 +48,7 @@ jobs:
           set -euo pipefail
 
           mkdir -p acton-bin
-          tar -C acton-bin -xzf "release-artifact/acton-${TARGET_NAME}.tar.gz"
+          tar -C acton-bin -xzf "release-artifact/acton-${{ matrix.target_name }}.tar.gz"
           chmod +x acton-bin/acton
           echo "${PWD}/acton-bin" >> "$GITHUB_PATH"
 
@@ -66,52 +58,78 @@ jobs:
         run: |
           python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
             --binary "${PWD}/acton-bin/acton" \
-            --target "${TARGET_NAME}"
+            --target "${{ matrix.target_name }}"
 
-      - name: Verify Acton version
+      - name: Run release artifact checks
+        uses: ./.github/actions/check-release-artifact
+
+  check-artifact-with-qemu:
+    name: Check release artifact with QEMU (${{ matrix.target_name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            target_name: x86_64-unknown-linux-gnu
+            qemu_binary: qemu-x86_64
+            qemu_flag: "-cpu qemu64,avx=off,avx2=off"
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download Acton archive artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-${{ matrix.target_name }}
+          path: ${{ runner.temp }}/release-artifact
+
+      - name: Unpack Acton archive
         shell: bash
         working-directory: ${{ runner.temp }}
+        # language=Bash
         run: |
-          acton --version
+          set -euo pipefail
 
-      - name: Create counter project
+          mkdir -p acton-bin
+          tar -C acton-bin -xzf "release-artifact/acton-${{ matrix.target_name }}.tar.gz"
+          chmod +x acton-bin/acton
+          echo "${PWD}/acton-bin" >> "$GITHUB_PATH"
+
+      - name: Install QEMU user emulation
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            qemu-user
+
+      - name: Wrap Acton release artifact with QEMU
         shell: bash
         working-directory: ${{ runner.temp }}
-        run: |
-          acton new "${PROJECT_NAME}" \
-            --template counter \
-            --name "release-check" \
-            --description "Release artifact smoke test" \
-            --license MIT
-
-      - name: Inspect counter project environment
-        shell: bash
-        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
         env:
-          ACTON_DOCTOR_API_TARGETS_JSON: "[]"
+          QEMU_BINARY: ${{ matrix.qemu_binary }}
+          QEMU_FLAG: ${{ matrix.qemu_flag }}
+        # language=Bash
         run: |
-          acton doctor
+          set -euo pipefail
 
-      - name: Build counter project
-        shell: bash
-        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
-        run: |
-          acton build
+          mv acton-bin/acton acton-bin/acton-real
+          {
+            echo '#!/usr/bin/env bash'
+            echo 'set -euo pipefail'
+            echo
+            echo 'script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
+            printf 'exec "%s" %s "${script_dir}/acton-real" "$@"\n' "${QEMU_BINARY}" "${QEMU_FLAG}"
+          } > acton-bin/acton
+          chmod +x acton-bin/acton
 
-      - name: Test counter project
-        shell: bash
-        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
-        run: |
-          acton test
-
-      - name: Check counter project
-        shell: bash
-        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
-        run: |
-          acton check
-
-      - name: Format counter project
-        shell: bash
-        working-directory: ${{ runner.temp }}/${{ env.PROJECT_NAME }}
-        run: |
-          acton fmt
+      - name: Run release artifact checks with QEMU
+        uses: ./.github/actions/check-release-artifact
