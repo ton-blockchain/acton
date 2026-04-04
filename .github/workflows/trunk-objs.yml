@@ -437,6 +437,7 @@ jobs:
             --prerelease
 
       - name: Delete previous trunk-objs release and tag (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
@@ -447,6 +448,7 @@ jobs:
             -X DELETE || true
 
       - name: Create trunk-objs release (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
