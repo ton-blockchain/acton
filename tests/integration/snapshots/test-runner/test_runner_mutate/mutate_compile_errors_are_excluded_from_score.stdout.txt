@@ -1,5 +1,6 @@
 Mutation Testing
 ────────────────────────────────────────────────────────────
+Session:  [MUTATION_SESSION_ID]
 Contract: main
 Source:   contracts/main.tolk
 Files:    1

@@ -1,5 +1,6 @@
 Mutation Testing
 ────────────────────────────────────────────────────────────
+Session:  [MUTATION_SESSION_ID]
 Contract: simple
 Source:   contracts/simple.tolk
 IDs:      2

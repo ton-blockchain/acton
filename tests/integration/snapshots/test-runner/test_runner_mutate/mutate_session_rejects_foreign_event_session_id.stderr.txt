@@ -1,0 +1,1 @@
+Error: Mutation session file '[ROOT]/.acton/mutation-sessions/session-foreign-event.jsonl' contains an event for a different session ID

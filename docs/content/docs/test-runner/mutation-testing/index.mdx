@@ -46,16 +46,17 @@ acton test --mutate --mutate-contract wallet
 
 ### Options
 
-| Option                            | Description                                                                       |
-|-----------------------------------|-----------------------------------------------------------------------------------|
-| `--mutate`                        | Enables mutation testing mode.                                                    |
-| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.                             |
-| `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope. |
-| `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.              |
-| `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                      |
-| `--mutation-id <ID>`              | Re-runs only specific mutation IDs from a previous mutation report.               |
-| `--mutation-minimum-percent <P>`  | Fails the run when the mutation score drops below the required percentage.        |
-| `--disable-rule <RULE>`           | Disables specific mutation rules (can be used multiple times).                    |
+| Option                            | Description                                                                        |
+|-----------------------------------|------------------------------------------------------------------------------------|
+| `--mutate`                        | Enables mutation testing mode.                                                     |
+| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.                              |
+| `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope.  |
+| `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.               |
+| `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                       |
+| `--mutation-session-id <ID>`      | Reuses a session ID and appends progress to `.acton/mutation-sessions/<ID>.jsonl`. |
+| `--mutation-id <ID>`              | Re-runs only specific mutation IDs from a previous mutation report.                |
+| `--mutation-minimum-percent <P>`  | Fails the run when the mutation score drops below the required percentage.         |
+| `--disable-rule <RULE>`           | Disables specific mutation rules (can be used multiple times).                     |
 
 ### Scoping Mutation Runs
 
@@ -115,6 +116,26 @@ acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation
 The reported mutation score always reflects only the mutants that remain after
 all filters are applied.
 
+#### Session logs and resume
+
+Each mutation run gets a session ID. If you do not pass one explicitly, Acton
+generates a hash-like ID and starts writing append-only JSON Lines progress to
+`.acton/mutation-sessions/<SESSION_ID>.jsonl`.
+
+Use `--mutation-session-id` when you want to keep that ID stable and continue
+the same run later:
+
+```bash
+# Start or resume a session for the current worktree changes
+acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation-session-id wallet-worktree
+```
+
+To resume successfully, keep the same contract and the same mutation filters.
+Acton validates the stored session metadata before reusing the file.
+
+If you interrupt the run with `Ctrl+C`, Acton stops without marking the session
+as finished and prints the exact resume command for that session.
+
 #### Re-running specific mutants
 
 Use `--mutation-id` when you want to focus on one or more mutants from a previous run.
@@ -133,6 +154,8 @@ acton test --mutate --mutate-contract wallet --mutation-id 1,3
 
 If you also use filters such as `--mutation-diff`, `--mutation-levels`, or
 `--disable-rule`, the IDs must still exist after those filters are applied.
+When you combine this with `--mutation-session-id`, the session must be created
+with the same filtered mutation set.
 
 #### Minimum mutation score
 
@@ -190,6 +213,7 @@ After running mutation tests, you will see a summary of the results:
 ```text
 Mutation Testing
 ────────────────────────────────────────────────────────────
+Session:  4949ed3b0ae13461
 Contract: Wallet
 Source:   .jetton/contracts/jetton-wallet-contract.tolk
 Files:    6
@@ -209,6 +233,8 @@ Mutants:  51
 
 - **KILLED**: Your tests successfully detected the bug.
 - **SURVIVED**: Your tests failed to detect the bug. You should add a test case to cover this scenario.
+- **Session log**: Progress is written incrementally to
+  `.acton/mutation-sessions/<SESSION_ID>.jsonl`, which makes interrupted runs resumable.
 - **Mutation IDs**: The number in `Mutation 2/51` or `Mutation #2` can be used
   later with `--mutation-id 2` to re-run that specific mutant.
 

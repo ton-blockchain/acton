@@ -1292,6 +1292,7 @@ impl TestSettings {
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
             mutate_contract: mutate_contract_override,
+            mutation_session_id: None,
             mutation_levels: if mutation_levels_override.is_empty() {
                 self.mutation
                     .as_ref()

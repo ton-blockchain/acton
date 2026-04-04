@@ -2,35 +2,38 @@ use crate::commands::common::error_fmt;
 use crate::commands::test::TestConfig;
 use crate::commands::test::mutation::diff::collect_mutation_diff_scope;
 use crate::commands::test::mutation::rules::{MutationEdit, MutationMatcher, MutationRule, rules};
+use crate::commands::test::mutation::session::{
+    MutationRecord, MutationSessionEvent, MutationStatus, append_mutation_session_event,
+    load_or_create_mutation_session, mutation_summary,
+};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::anyhow;
 use path_absolutize::Absolutize;
 use serde_json::Value;
 use std::collections::BTreeSet;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, Instant};
 use std::{fs, process};
 use tempfile::TempDir;
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
 mod diff;
 mod rules;
+mod session;
+
+static MUTATION_INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static MUTATION_INTERRUPT_HANDLER: OnceLock<Result<(), String>> = OnceLock::new();
 
 #[derive(Clone)]
 struct MutationCandidate<'a> {
     rule: MutationRule,
     node: Node<'a>,
-}
-
-struct MutationResult<'a> {
-    id: usize,
-    rule: MutationRule,
-    node: Node<'a>,
-    line: usize,
-    column: usize,
-    survived: bool,
-    compile_failed: bool,
-    source_path: String,
 }
 
 struct MutationSource {
@@ -82,8 +85,12 @@ fn replace_node_in_source(source: &str, target: &Node, replacement: &str) -> Str
     new_content
 }
 
-fn get_code_context(source: &str, result: &MutationResult, context_lines: usize) -> String {
-    let node = &result.node;
+fn get_code_context(
+    source: &str,
+    node: &Node,
+    rule: &MutationRule,
+    context_lines: usize,
+) -> String {
     let start_line = node.start_position().row;
     let end_line = node.end_position().row;
 
@@ -97,7 +104,7 @@ fn get_code_context(source: &str, result: &MutationResult, context_lines: usize)
         let line_num = line_idx + 1;
 
         if line_idx >= start_line && line_idx <= end_line {
-            match &result.rule.edit {
+            match &rule.edit {
                 MutationEdit::Remove => {
                     output.push_str(&format!(
                         "  {} {} {}\n",
@@ -233,6 +240,227 @@ fn apply_mutation(source: &str, candidate: &MutationCandidate) -> String {
     }
 }
 
+fn format_rule_level(level: &str) -> String {
+    match level {
+        "critical" => level.red().bold().to_string(),
+        "major" => level.yellow().bold().to_string(),
+        "minor" => level.blue().bold().to_string(),
+        _ => level.to_owned(),
+    }
+}
+
+enum InterruptibleOutput {
+    Completed(process::Output),
+    Interrupted,
+}
+
+fn install_mutation_interrupt_handler() -> anyhow::Result<()> {
+    let result = MUTATION_INTERRUPT_HANDLER.get_or_init(|| {
+        ctrlc::set_handler(|| {
+            MUTATION_INTERRUPTED.store(true, Ordering::SeqCst);
+        })
+        .map_err(|err| err.to_string())
+    });
+
+    if let Err(err) = result {
+        anyhow::bail!("Failed to install Ctrl+C handler: {err}");
+    }
+
+    MUTATION_INTERRUPTED.store(false, Ordering::SeqCst);
+    Ok(())
+}
+
+fn mutation_interrupted() -> bool {
+    MUTATION_INTERRUPTED.load(Ordering::SeqCst)
+}
+
+#[cfg(unix)]
+fn send_interrupt(child: &process::Child) {
+    let _ = process::Command::new("kill")
+        .arg("-INT")
+        .arg(child.id().to_string())
+        .status();
+}
+
+#[cfg(not(unix))]
+fn send_interrupt(child: &mut process::Child) {
+    let _ = child.kill();
+}
+
+fn run_command_output_interruptible(
+    cmd: &mut process::Command,
+) -> anyhow::Result<InterruptibleOutput> {
+    if mutation_interrupted() {
+        return Ok(InterruptibleOutput::Interrupted);
+    }
+
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = cmd.spawn()?;
+    loop {
+        if mutation_interrupted() {
+            send_interrupt(&child);
+
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                match child.try_wait()? {
+                    Some(_) => break,
+                    None if Instant::now() < deadline => thread::sleep(Duration::from_millis(25)),
+                    None => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        break;
+                    }
+                }
+            }
+
+            return Ok(InterruptibleOutput::Interrupted);
+        }
+
+        if let Some(status) = child.try_wait()? {
+            let mut stdout = Vec::new();
+            if let Some(mut pipe) = child.stdout.take() {
+                let _ = pipe.read_to_end(&mut stdout);
+            }
+
+            let mut stderr = Vec::new();
+            if let Some(mut pipe) = child.stderr.take() {
+                let _ = pipe.read_to_end(&mut stderr);
+            }
+
+            return Ok(InterruptibleOutput::Completed(process::Output {
+                status,
+                stdout,
+                stderr,
+            }));
+        }
+
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn shell_quote(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | ','))
+    {
+        value.to_owned()
+    } else {
+        format!("'{}'", value.replace('\'', "'\"'\"'"))
+    }
+}
+
+fn mutation_resume_command(path: &Option<String>, config: &TestConfig, session_id: &str) -> String {
+    let mut args = vec!["acton".to_owned(), "test".to_owned()];
+
+    if let Some(path) = path {
+        args.push(shell_quote(path));
+    }
+
+    args.push("--mutate".to_owned());
+
+    if let Some(contract) = &config.mutate_contract {
+        args.push("--mutate-contract".to_owned());
+        args.push(shell_quote(contract));
+    }
+
+    args.push("--mutation-session-id".to_owned());
+    args.push(shell_quote(session_id));
+
+    if let Some(diff) = config.mutation_diff {
+        args.push("--mutation-diff".to_owned());
+        args.push(diff.to_string());
+    }
+
+    if let Some(diff_ref) = &config.mutation_diff_ref {
+        args.push("--mutation-diff-ref".to_owned());
+        args.push(shell_quote(diff_ref));
+    }
+
+    if !config.mutation_levels.is_empty() {
+        args.push("--mutation-levels".to_owned());
+        args.push(
+            config
+                .mutation_levels
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+
+    if !config.mutation_ids.is_empty() {
+        let mut ids = config.mutation_ids.clone();
+        ids.sort_unstable();
+        ids.dedup();
+        args.push("--mutation-id".to_owned());
+        args.push(
+            ids.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+
+    if let Some(minimum_percent) = config.mutation_minimum_percent {
+        args.push("--mutation-minimum-percent".to_owned());
+        args.push(minimum_percent.to_string());
+    }
+
+    for rule in &config.disable_rules {
+        args.push("--disable-rule".to_owned());
+        args.push(shell_quote(rule));
+    }
+
+    if let Some(filter) = &config.filter {
+        args.push("--filter".to_owned());
+        args.push(shell_quote(filter));
+    }
+
+    for include in &config.include_patterns {
+        args.push("--include".to_owned());
+        args.push(shell_quote(include));
+    }
+
+    for exclude in &config.exclude_patterns {
+        args.push("--exclude".to_owned());
+        args.push(shell_quote(exclude));
+    }
+
+    if config.clear_cache {
+        args.push("--clear-cache".to_owned());
+    }
+
+    args.join(" ")
+}
+
+fn exit_mutation_interrupted(
+    path: &Option<String>,
+    config: &TestConfig,
+    session_id: Option<&str>,
+) -> ! {
+    println!();
+    println!();
+    println!("{}", "Interrupted by Ctrl+C.".yellow().bold());
+    if let Some(session_id) = session_id {
+        println!(
+            "Mutation session {} was left unfinished and can be resumed.",
+            session_id.bright_cyan()
+        );
+        println!("Resume with:");
+        println!(
+            "  {}",
+            mutation_resume_command(path, config, session_id).bright_white()
+        );
+    } else {
+        println!(
+            "Mutation session has not been initialized yet. Re-run the mutation command to start a new session."
+        );
+    }
+    process::exit(130);
+}
+
 fn prepare_project_for_mutation(config: &TestConfig) -> anyhow::Result<()> {
     // Ensure generated dependency files (e.g. gen/*_code.tolk) exist before collecting
     // file dependencies and compiling mutants.
@@ -243,7 +471,10 @@ fn prepare_project_for_mutation(config: &TestConfig) -> anyhow::Result<()> {
         cmd.arg("--clear-cache");
     }
 
-    let output = cmd.output()?;
+    let output = match run_command_output_interruptible(&mut cmd)? {
+        InterruptibleOutput::Completed(output) => output,
+        InterruptibleOutput::Interrupted => return Ok(()),
+    };
     if output.status.success() {
         return Ok(());
     }
@@ -262,6 +493,8 @@ fn prepare_project_for_mutation(config: &TestConfig) -> anyhow::Result<()> {
 }
 
 pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+    install_mutation_interrupt_handler()?;
+
     let Some(mutate_contract) = &config.mutate_contract else {
         anyhow::bail!(
             "Provide {} {} to choose which contract to mutate",
@@ -287,6 +520,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     let mutation_diff_scope = collect_mutation_diff_scope(&project_root, config)?;
 
     prepare_project_for_mutation(config)?;
+    if mutation_interrupted() {
+        exit_mutation_interrupted(path, config, None);
+    }
 
     let all_disable_rules = &config.disable_rules;
     let selected_mutation_levels = &config.mutation_levels;
@@ -413,15 +649,45 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
                 .collect::<Vec<_>>()
                 .join(", ");
             anyhow::bail!(
-                "Unknown mutation ID(s): {missing}. Run the same mutation command without --id to list available IDs"
+                "Unknown mutation ID(s): {missing}. Run the same mutation command without --mutation-id to list available IDs"
             );
         }
 
         global_mutations.retain(|mutation| requested_ids.contains(&mutation.id));
     }
 
+    let selected_ids = global_mutations
+        .iter()
+        .map(|mutation| mutation.id)
+        .collect::<BTreeSet<_>>();
+    let session_source_path = sources[0].relative_path.to_string_lossy().to_string();
+    let session = load_or_create_mutation_session(
+        &project_root,
+        mutate_contract,
+        &session_source_path,
+        &selected_ids,
+        config.mutation_session_id.as_deref(),
+    )?;
+
+    let completed_ids = session
+        .completed_records
+        .iter()
+        .map(|record| record.id)
+        .collect::<BTreeSet<_>>();
+    global_mutations.retain(|mutation| !completed_ids.contains(&mutation.id));
+
+    if session.resumed {
+        eprintln!(
+            "Resuming mutation session {}: {} completed, {} remaining",
+            session.session_id,
+            session.completed_records.len(),
+            global_mutations.len()
+        );
+    }
+
     println!("{}", "Mutation Testing".bold());
     println!("{}", "─".repeat(60).dimmed());
+    println!("Session:  {}", session.session_id.bright_cyan());
     println!("Contract: {}", contract.name.bright_white());
     println!("Source:   {}", contract.src.dimmed());
     if let Some(diff_scope) = &mutation_diff_scope {
@@ -456,7 +722,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     println!("Files:    {}", sources.len().to_string().bright_cyan());
     println!(
         "Mutants:  {}\n",
-        global_mutations.len().to_string().bright_cyan()
+        session.selected_ids.len().to_string().bright_cyan()
     );
 
     // Default behavior in mutation child test runs is to skip per-mutant rebuilds.
@@ -465,9 +731,13 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         .map(|value| value.trim() == "1")
         .unwrap_or(true);
 
-    let mut results = Vec::new();
+    let mut current_records = Vec::new();
 
     for global_mutation in &global_mutations {
+        if mutation_interrupted() {
+            exit_mutation_interrupted(path, config, Some(&session.session_id));
+        }
+
         let mutation = &global_mutation.candidate;
         let source_idx = global_mutation.source_index;
         let mutation_id = global_mutation.id;
@@ -501,20 +771,38 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         let main_contract_relative_path = &sources[0].relative_path;
         let main_contract_dest_path = mutation_dir.path().join(main_contract_relative_path);
 
-        let code_b64 = compile_file(&main_contract_dest_path.to_string_lossy())?;
+        let code_b64 = match compile_file(&main_contract_dest_path.to_string_lossy())? {
+            Some(code_b64) => code_b64,
+            None => {
+                fs::write(&dest_path, &source.content)?;
+                exit_mutation_interrupted(path, config, Some(&session.session_id));
+            }
+        };
         if code_b64.is_empty() {
             println!("{}", "COMPILE ERROR".yellow().bold());
 
-            results.push(MutationResult {
+            let record = MutationRecord {
                 id: mutation_id,
-                rule: mutation.rule.clone(),
-                node: mutation.node,
+                rule_name: mutation.rule.name.to_string(),
+                rule_description: mutation.rule.description.to_owned(),
+                rule_level: mutation.rule.level.label().to_owned(),
+                rule_group: mutation.rule.group.to_owned(),
+                rule_explanation: mutation.rule.explanation.to_owned(),
                 line: pos.row + 1,
                 column: pos.column + 1,
-                survived: false,
-                compile_failed: true,
                 source_path: source.relative_path.to_string_lossy().to_string(),
-            });
+                code_context: get_code_context(&source.content, &mutation.node, &mutation.rule, 2),
+                status: MutationStatus::CompileError,
+            };
+            append_mutation_session_event(
+                &session.progress_path,
+                &MutationSessionEvent::MutationCompleted {
+                    session_id: session.session_id.clone(),
+                    record: record.clone(),
+                    completed_at: session::now_rfc3339(),
+                },
+            )?;
+            current_records.push(record);
 
             fs::write(&dest_path, &source.content)?;
             continue;
@@ -543,9 +831,20 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             cmd.arg("--include").arg(include);
         }
 
-        let output = cmd.output()?;
+        let output = match run_command_output_interruptible(&mut cmd)? {
+            InterruptibleOutput::Completed(output) => output,
+            InterruptibleOutput::Interrupted => {
+                fs::write(&dest_path, &source.content)?;
+                exit_mutation_interrupted(path, config, Some(&session.session_id));
+            }
+        };
 
         let survived = output.status.success();
+        let status = if survived {
+            MutationStatus::Survived
+        } else {
+            MutationStatus::Killed
+        };
 
         if survived {
             println!("{}", "SURVIVED".red().bold());
@@ -553,33 +852,35 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             println!("{}", "KILLED".green());
         }
 
-        results.push(MutationResult {
+        let record = MutationRecord {
             id: mutation_id,
-            rule: mutation.rule.clone(),
-            node: mutation.node,
+            rule_name: mutation.rule.name.to_string(),
+            rule_description: mutation.rule.description.to_owned(),
+            rule_level: mutation.rule.level.label().to_owned(),
+            rule_group: mutation.rule.group.to_owned(),
+            rule_explanation: mutation.rule.explanation.to_owned(),
             line: pos.row + 1,
             column: pos.column + 1,
-            survived,
-            compile_failed: false,
             source_path: source.relative_path.to_string_lossy().to_string(),
-        });
+            code_context: get_code_context(&source.content, &mutation.node, &mutation.rule, 2),
+            status,
+        };
+        append_mutation_session_event(
+            &session.progress_path,
+            &MutationSessionEvent::MutationCompleted {
+                session_id: session.session_id.clone(),
+                record: record.clone(),
+                completed_at: session::now_rfc3339(),
+            },
+        )?;
+        current_records.push(record);
 
         fs::write(&dest_path, &source.content)?;
     }
 
-    let compile_failed_count = results.iter().filter(|r| r.compile_failed).count();
-    let killed_count = results
-        .iter()
-        .filter(|r| !r.survived && !r.compile_failed)
-        .count();
-    let survived_count = results.iter().filter(|r| r.survived).count();
-    // Compilation failures are reported separately and excluded from score.
-    let scored_total = killed_count + survived_count;
-    let mutation_score = if scored_total > 0 {
-        (killed_count as f64 / scored_total as f64) * 100.0
-    } else {
-        0.0
-    };
+    let mut all_records = session.completed_records.clone();
+    all_records.extend(current_records);
+    let summary = mutation_summary(&all_records);
     let mut mutation_threshold_failed = false;
 
     println!();
@@ -588,32 +889,32 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         "  {} {:<20} {}",
         " ".dimmed(),
         "Total mutants",
-        results.len()
+        summary.total_mutants
     );
 
     println!(
         "  {} {:<20} {}",
         "✓".green(),
         "Killed".green(),
-        killed_count.to_string().green()
+        summary.killed.to_string().green()
     );
 
     println!(
         "  {} {:<20} {}",
         "✗".red(),
         "Survived".red(),
-        survived_count.to_string().red()
+        summary.survived.to_string().red()
     );
 
     println!(
         "  {} {:<20} {}",
         "!".yellow(),
         "Compile errors".yellow(),
-        compile_failed_count.to_string().yellow()
+        summary.compile_errors.to_string().yellow()
     );
 
-    let score_str = format!("{mutation_score:.1}%");
-    let (score_icon, score_label) = match mutation_score as u32 {
+    let score_str = format!("{:.1}%", summary.mutation_score);
+    let (score_icon, score_label) = match summary.mutation_score as u32 {
         0..=50 => (
             "◆".red().bold().to_string(),
             "Mutation Score".red().bold().to_string(),
@@ -632,9 +933,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         "\n  {} {:<20} {}",
         score_icon,
         score_label,
-        if mutation_score <= 50.0 {
+        if summary.mutation_score <= 50.0 {
             score_str.red().bold().to_string()
-        } else if mutation_score <= 80.0 {
+        } else if summary.mutation_score <= 80.0 {
             score_str.yellow().bold().to_string()
         } else {
             score_str.green().bold().to_string()
@@ -642,37 +943,37 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     );
 
     if let Some(minimum_percent) = config.mutation_minimum_percent
-        && mutation_score < minimum_percent
+        && summary.mutation_score < minimum_percent
     {
         mutation_threshold_failed = true;
         println!(
             "\n{}: mutation score {:.2}% is below the required minimum of {:.2}%.",
             "Error".red(),
-            mutation_score,
+            summary.mutation_score,
             minimum_percent
         );
     }
 
-    if results.is_empty() {
+    if all_records.is_empty() {
         println!("\n{} No mutation points found.\n", "○".dimmed());
-    } else if survived_count > 0 {
+    } else if summary.survived > 0 {
         println!("\n{}", "Survived Mutants".yellow());
         println!("{}", "─".repeat(60).dimmed());
 
-        for result in results.iter().filter(|r| r.survived) {
+        for result in all_records.iter().filter(|r| r.status.is_survived()) {
             println!("\n  {} Mutation #{}", "✗".red().bold(), result.id);
             println!(
                 "  {}  {} {}",
                 "Rule:".dimmed(),
-                result.rule.description,
-                format!("[{}]", result.rule.name).dimmed()
+                result.rule_description,
+                format!("[{}]", result.rule_name).dimmed()
             );
             println!(
                 "  {} {}",
                 "Level:".dimmed(),
-                result.rule.level.colorize(result.rule.level.label())
+                format_rule_level(&result.rule_level)
             );
-            println!("  {} {}", "Group:".dimmed(), result.rule.group);
+            println!("  {} {}", "Group:".dimmed(), result.rule_group);
             println!(
                 "  {} {}:{}:{}",
                 "at".dimmed(),
@@ -681,16 +982,11 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
                 result.column
             );
 
-            let content = sources
-                .iter()
-                .find(|s| s.relative_path.to_string_lossy() == result.source_path)
-                .map_or("", |s| s.content.as_str());
-
-            println!("{}", get_code_context(content, result, 2));
+            println!("{}", result.code_context);
             println!(
                 "  {} {}",
                 "Why it's bad:".dimmed(),
-                result.rule.explanation.dimmed()
+                result.rule_explanation.dimmed()
             );
         }
 
@@ -705,19 +1001,41 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         );
     }
 
-    if mutation_threshold_failed {
-        process::exit(1);
+    if !session.finished {
+        append_mutation_session_event(
+            &session.progress_path,
+            &MutationSessionEvent::SessionFinished {
+                session_id: session.session_id.clone(),
+                total_mutants: summary.total_mutants,
+                killed: summary.killed,
+                survived: summary.survived,
+                compile_errors: summary.compile_errors,
+                mutation_score: summary.mutation_score,
+                minimum_percent: config.mutation_minimum_percent,
+                threshold_failed: mutation_threshold_failed,
+                exit_code: i32::from(mutation_threshold_failed),
+                finished_at: session::now_rfc3339(),
+            },
+        )?;
+    }
+
+    let exit_code = i32::from(mutation_threshold_failed);
+    if exit_code != 0 {
+        process::exit(exit_code);
     }
 
     Ok(())
 }
 
-fn compile_file(path: &str) -> anyhow::Result<String> {
+fn compile_file(path: &str) -> anyhow::Result<Option<String>> {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
     let mut cmd = process::Command::new(exe);
     let cmd = cmd.arg("compile").arg("--json").arg(path);
 
-    let compilation_result = cmd.output()?;
+    let compilation_result = match run_command_output_interruptible(cmd)? {
+        InterruptibleOutput::Completed(output) => output,
+        InterruptibleOutput::Interrupted => return Ok(None),
+    };
     let compilation_result = String::from_utf8_lossy(&compilation_result.stdout);
     let compilation_result: Value = serde_json::from_str(compilation_result.as_ref())?;
     let Some(success) = compilation_result.get("success") else {
@@ -725,7 +1043,7 @@ fn compile_file(path: &str) -> anyhow::Result<String> {
     };
     let success = success.as_bool().unwrap_or(false);
     if !success {
-        return Ok(String::new());
+        return Ok(Some(String::new()));
     }
     let Some(code_b64) = compilation_result.get("code_boc64") else {
         anyhow::bail!("No code boc64 found in compilation result")
@@ -733,5 +1051,5 @@ fn compile_file(path: &str) -> anyhow::Result<String> {
     let Value::String(code_b64) = code_b64 else {
         anyhow::bail!("No code boc64 found in compilation result")
     };
-    Ok(code_b64.clone())
+    Ok(Some(code_b64.clone()))
 }

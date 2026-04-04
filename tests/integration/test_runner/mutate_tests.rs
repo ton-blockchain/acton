@@ -1,8 +1,12 @@
+use crate::common::{acton_exe, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Child, Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const MUTATION_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {
@@ -141,6 +145,93 @@ fn set_upstream(project_root: &Path, target: &str) {
 fn write_simple_contract(project: &Project, source: &str) {
     fs::write(project.path().join("contracts/simple.tolk"), source)
         .expect("failed to update simple contract");
+}
+
+fn mutation_session_path(project: &Project, session_id: &str) -> std::path::PathBuf {
+    project
+        .path()
+        .join(".acton")
+        .join("mutation-sessions")
+        .join(format!("{session_id}.jsonl"))
+}
+
+fn read_jsonl_events(path: &Path) -> Vec<Value> {
+    fs::read_to_string(path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()))
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<Value>(line)
+                .unwrap_or_else(|err| panic!("failed to parse jsonl line '{line}': {err}"))
+        })
+        .collect()
+}
+
+fn many_asserts_contract(assert_count: usize) -> String {
+    let mut asserts = String::new();
+    for _ in 0..assert_count {
+        asserts.push_str("    assert (in.valueCoins > 0) throw 5;\n");
+    }
+
+    format!(
+        r"
+fun onInternalMessage(in: InMessage) {{
+{asserts}
+}}
+
+fun onBouncedMessage(_: InMessageBounced) {{}}
+"
+    )
+}
+
+fn spawn_mutation_process(project: &Project, args: &[&str]) -> Child {
+    Command::new(acton_exe())
+        .current_dir(project.path())
+        .arg("test")
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|err| panic!("failed to spawn mutation process: {err}"))
+}
+
+fn wait_for_event_count(progress_path: &Path, minimum_lines: usize) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let line_count = fs::read_to_string(progress_path)
+            .ok()
+            .map(|content| {
+                content
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .count()
+            })
+            .unwrap_or(0);
+        if line_count >= minimum_lines {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for {} lines in {}",
+            minimum_lines,
+            progress_path.display()
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(unix)]
+fn send_interrupt(child: &Child) {
+    let status = Command::new("kill")
+        .arg("-INT")
+        .arg(child.id().to_string())
+        .status()
+        .expect("failed to send SIGINT to child");
+    assert!(status.success(), "kill -INT failed with status {status}");
+}
+
+#[cfg(not(unix))]
+fn send_interrupt(child: &mut Child) {
+    child.kill().expect("failed to kill child process");
 }
 
 #[test]
@@ -484,6 +575,478 @@ fn mutate_id_must_match_current_filters() {
 }
 
 #[test]
+fn mutate_session_writes_progress_jsonl() {
+    let project = mutation_project("j-mutate-session-jsonl");
+    let session_id = "session-jsonl";
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1,2")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_mutate/mutate_session_writes_progress_jsonl.stdout.txt",
+    );
+
+    let progress_path = mutation_session_path(&project, session_id);
+    assert!(
+        progress_path.is_file(),
+        "expected mutation session progress file at {}",
+        progress_path.display()
+    );
+
+    let events = read_jsonl_events(&progress_path);
+    assert_eq!(
+        events
+            .first()
+            .and_then(|event| event.get("event"))
+            .and_then(Value::as_str),
+        Some("session_started")
+    );
+    assert_eq!(
+        events
+            .first()
+            .and_then(|event| event.get("session_id"))
+            .and_then(Value::as_str),
+        Some(session_id)
+    );
+    assert_eq!(
+        events
+            .last()
+            .and_then(|event| event.get("event"))
+            .and_then(Value::as_str),
+        Some("session_finished")
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("mutation_completed"))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn mutate_session_resume_skips_completed_mutants() {
+    let project = mutation_project("j-mutate-session-resume");
+    let session_id = "session-resume";
+    let progress_path = mutation_session_path(&project, session_id);
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1,2")
+        .run()
+        .success();
+
+    let original_lines = fs::read_to_string(&progress_path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", progress_path.display()))
+        .lines()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let session_started_line = original_lines
+        .iter()
+        .find(|line| line.contains("\"event\":\"session_started\""))
+        .expect("missing session_started line");
+    let first_completed_line = original_lines
+        .iter()
+        .find(|line| line.contains("\"event\":\"mutation_completed\""))
+        .expect("missing mutation_completed line");
+    fs::write(
+        &progress_path,
+        format!("{session_started_line}\n{first_completed_line}\n"),
+    )
+    .unwrap_or_else(|err| panic!("failed to rewrite {}: {err}", progress_path.display()));
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1,2")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_resume_skips_completed_mutants.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_resume_skips_completed_mutants.stderr.txt",
+        );
+
+    let resumed_events = read_jsonl_events(&progress_path);
+    assert_eq!(
+        resumed_events
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("session_started"))
+            .count(),
+        1
+    );
+    assert_eq!(
+        resumed_events
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("mutation_completed"))
+            .count(),
+        2
+    );
+    assert_eq!(
+        resumed_events
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("session_finished"))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn mutate_session_rejects_selection_mismatch() {
+    let project = mutation_project("j-mutate-session-mismatch");
+    let session_id = "session-mismatch";
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .success();
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("2")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_rejects_selection_mismatch.stderr.txt",
+        );
+}
+
+#[test]
+fn mutate_session_header_shows_id_without_progress_path() {
+    mutation_project("j-mutate-session-header")
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg("session-header")
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_header_shows_id_without_progress_path.stdout.txt",
+        );
+}
+
+#[test]
+fn mutate_finished_session_is_idempotent() {
+    let project = mutation_project("j-mutate-session-idempotent");
+    let session_id = "session-idempotent";
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1,2")
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1,2")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_finished_session_is_idempotent.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_finished_session_is_idempotent.stderr.txt",
+        );
+
+    let events = read_jsonl_events(&mutation_session_path(&project, session_id));
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("session_finished"))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn mutate_session_rejects_contract_mismatch() {
+    let project = ProjectBuilder::new("j-mutate-session-contract-mismatch")
+        .contract("simple", MUTATION_CONTRACT)
+        .contract("other", MUTATION_CONTRACT)
+        .test_file("mutation", PASSING_TEST)
+        .build();
+    let session_id = "session-contract-mismatch";
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .success();
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("other")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_rejects_contract_mismatch.stderr.txt",
+        );
+}
+
+#[test]
+fn mutate_session_rejects_duplicate_completed_entries() {
+    let project = mutation_project("j-mutate-session-duplicate-completed");
+    let session_id = "session-duplicate-completed";
+    let progress_path = mutation_session_path(&project, session_id);
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .success();
+
+    let original = fs::read_to_string(&progress_path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", progress_path.display()));
+    let duplicate_line = original
+        .lines()
+        .find(|line| line.contains("\"event\":\"mutation_completed\""))
+        .expect("missing mutation_completed line");
+    fs::write(&progress_path, format!("{original}{duplicate_line}\n"))
+        .unwrap_or_else(|err| panic!("failed to write {}: {err}", progress_path.display()));
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_rejects_duplicate_completed_entries.stderr.txt",
+        );
+}
+
+#[test]
+fn mutate_session_rejects_foreign_event_session_id() {
+    let project = mutation_project("j-mutate-session-foreign-event");
+    let session_id = "session-foreign-event";
+    let progress_path = mutation_session_path(&project, session_id);
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .success();
+
+    let corrupted = fs::read_to_string(&progress_path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", progress_path.display()))
+        .replacen(session_id, "foreign-session", 1);
+    fs::write(&progress_path, corrupted)
+        .unwrap_or_else(|err| panic!("failed to write {}: {err}", progress_path.display()));
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .arg("--mutation-id")
+        .arg("1")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_session_rejects_foreign_event_session_id.stderr.txt",
+        );
+}
+
+#[test]
+#[cfg(unix)]
+fn mutate_session_resume_after_ctrl_c() {
+    let contract = many_asserts_contract(80);
+    let project = ProjectBuilder::new("j-mutate-session-interrupt-resume")
+        .contract("main", &contract)
+        .test_file("mutation", PASSING_TEST)
+        .build();
+    let session_id = "session-interrupt-resume";
+    let progress_path = mutation_session_path(&project, session_id);
+
+    let child = spawn_mutation_process(
+        &project,
+        &[
+            "--mutate",
+            "--mutate-contract",
+            "main",
+            "--mutation-session-id",
+            session_id,
+        ],
+    );
+
+    wait_for_event_count(&progress_path, 2);
+    send_interrupt(&child);
+    let output = child
+        .wait_with_output()
+        .expect("failed to wait for interrupted mutation process");
+
+    assert!(
+        !output.status.success(),
+        "expected interrupted mutation process to fail"
+    );
+
+    let stdout = strip_ansi(&String::from_utf8_lossy(&output.stdout));
+    assert!(
+        stdout.contains("Interrupted by Ctrl+C."),
+        "expected interrupt message in stdout, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "Mutation session session-interrupt-resume was left unfinished and can be resumed."
+        ),
+        "expected session resume hint in stdout, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "acton test --mutate --mutate-contract main --mutation-session-id session-interrupt-resume"
+        ),
+        "expected resume command in stdout, got:\n{stdout}"
+    );
+
+    let before_resume = read_jsonl_events(&progress_path);
+    let completed_before_resume = before_resume
+        .iter()
+        .filter(|event| event.get("event").and_then(Value::as_str) == Some("mutation_completed"))
+        .count();
+    assert!(
+        completed_before_resume >= 1,
+        "expected at least one completed mutation before interruption"
+    );
+    assert_eq!(
+        before_resume
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("session_finished"))
+            .count(),
+        0
+    );
+
+    project
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("main")
+        .arg("--mutation-session-id")
+        .arg(session_id)
+        .run()
+        .success();
+
+    let after_resume = read_jsonl_events(&progress_path);
+    let selected_ids_len = after_resume
+        .iter()
+        .find(|event| event.get("event").and_then(Value::as_str) == Some("session_started"))
+        .and_then(|event| event.get("selected_ids"))
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .expect("missing selected_ids in session_started event");
+    let completed_after_resume = after_resume
+        .iter()
+        .filter(|event| event.get("event").and_then(Value::as_str) == Some("mutation_completed"))
+        .count();
+    assert_eq!(completed_after_resume, selected_ids_len);
+    assert_eq!(
+        after_resume
+            .iter()
+            .filter(|event| event.get("event").and_then(Value::as_str) == Some("session_finished"))
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn mutate_minimum_percent_via_cli_fails_when_score_is_too_low() {
     mutation_project("j-mutate-minimum-percent-cli")
         .acton()
@@ -795,24 +1358,8 @@ fn mutate_reports_no_mutation_points() {
 #[test]
 #[ignore = "benchmark scenario for local perf tracking"]
 fn mutate_benchmark_large_mutant_set() {
-    use std::fmt::Write as _;
     use std::time::Instant;
-
-    let mut asserts = String::new();
-    for _ in 0..120 {
-        writeln!(&mut asserts, "    assert (in.valueCoins > 0) throw 5;")
-            .expect("write benchmark contract");
-    }
-
-    let contract = format!(
-        r"
-fun onInternalMessage(in: InMessage) {{
-{asserts}
-}}
-
-fun onBouncedMessage(_: InMessageBounced) {{}}
-"
-    );
+    let contract = many_asserts_contract(120);
 
     let start = Instant::now();
     let output = ProjectBuilder::new("j-mutate-benchmark-large-mutant-set")

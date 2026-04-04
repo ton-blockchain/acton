@@ -247,6 +247,16 @@ Accepted values: `critical`, `major`, `minor`.
 Useful for faster local runs such as `critical,major`.
 {{/option}}
 
+{{#option "`--mutation-session-id` _id_" }}
+Use a specific mutation session ID for progress logging and resume.
+
+Acton writes append-only JSON Lines progress to
+`.acton/mutation-sessions/<ID>.jsonl`. Re-run with the same session ID and the
+same mutation filters to continue an unfinished session.
+If you stop the run with `Ctrl+C`, Acton prints a resume command that includes
+the same session ID.
+{{/option}}
+
 {{#option "`--mutation-id` _id_" }}
 Run only specific mutation IDs from a previous mutation report.
 
@@ -354,8 +364,12 @@ CLI flags override config values for the current invocation.
 - `--mutation-diff worktree` is intended for uncommitted local changes
 - `--mutation-diff ref` requires `--mutation-diff-ref`
 - `--mutation-diff branch` uses the upstream branch merge-base by default
+- `--mutation-session-id` writes append-only JSONL progress to
+  `.acton/mutation-sessions/<ID>.jsonl`
+- pressing `Ctrl+C` during mutation testing stops the run without finalizing the
+  session and prints a resume command for the same session ID
 - `--mutation-id` expects mutation numbers from a previous run with the same mutation
-  filters
+  filters and session selection
 - mutation scores in filtered runs only cover the selected mutants
 - `--mutation-minimum-percent` and `[test.mutation].minimum-percent` apply to
   that filtered mutation score after compile errors are excluded
@@ -426,19 +440,25 @@ CLI flags override config values for the current invocation.
    acton test --mutate --mutate-contract wallet --mutation-id 2
    ```
 
-10. Fail the run when mutation score drops below 85%:
+10. Resume an unfinished mutation session:
+
+   ```bash
+   acton test --mutate --mutate-contract wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
+   ```
+
+11. Fail the run when mutation score drops below 85%:
 
    ```bash
    acton test --mutate --mutate-contract wallet --mutation-minimum-percent 85
    ```
 
-11. Debug a forked-state failure with traces and the UI:
+12. Debug a forked-state failure with traces and the UI:
 
    ```bash
    acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
    ```
 
-12. Enforce a gas baseline in CI:
+13. Enforce a gas baseline in CI:
 
    ```bash
    acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff --reporter console,junit

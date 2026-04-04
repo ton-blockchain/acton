@@ -51,7 +51,13 @@ fn normalize_output_internal(
 
     let redactions = build_redactions(project_path);
 
-    redactions.redact(&content)
+    normalize_dynamic_mutation_output(redactions.redact(&content))
+}
+
+fn normalize_dynamic_mutation_output(content: String) -> String {
+    regex!(r"(?m)^Session:\s+[0-9a-f]{16}$")
+        .replace_all(&content, "Session:  [MUTATION_SESSION_ID]")
+        .into_owned()
 }
 
 fn build_redactions(project_path: &Path) -> snapbox::Redactions {

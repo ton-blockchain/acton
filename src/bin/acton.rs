@@ -350,6 +350,13 @@ enum Commands {
         mutate_contract: Option<String>,
         #[arg(
             long,
+            help = "Session ID used for mutation progress logging and resume",
+            help_heading = "Mutation Testing",
+            value_name = "ID"
+        )]
+        mutation_session_id: Option<String>,
+        #[arg(
+            long,
             value_enum,
             help = "Limit mutation testing to changed lines in the selected diff scope",
             help_heading = "Mutation Testing",
@@ -1578,6 +1585,7 @@ fn main() {
             mutate,
             mutate_overrides,
             mutate_contract,
+            mutation_session_id,
             mutation_diff,
             mutation_diff_ref,
             mutation_levels,
@@ -1625,6 +1633,7 @@ fn main() {
                     mutate,
                     mutate_overrides,
                     mutate_contract,
+                    mutation_session_id,
                     mutation_diff,
                     mutation_diff_ref,
                     mutation_levels,
@@ -2172,6 +2181,7 @@ fn create_test_config(
     mutate: bool,
     mutate_overrides: Option<String>,
     mutate_contract: Option<String>,
+    mutation_session_id: Option<String>,
     mutation_diff: Option<MutationDiffMode>,
     mutation_diff_ref: Option<String>,
     mutation_levels: Vec<MutationLevel>,
@@ -2243,6 +2253,7 @@ fn create_test_config(
             Some(ui_port),
         );
         config.mutation_ids = mutation_ids;
+        config.mutation_session_id = mutation_session_id;
         return config;
     }
 
@@ -2273,6 +2284,7 @@ fn create_test_config(
         mutate,
         mutate_overrides,
         mutate_contract,
+        mutation_session_id,
         mutation_diff,
         mutation_diff_ref,
         mutation_levels,

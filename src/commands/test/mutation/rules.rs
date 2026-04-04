@@ -1,4 +1,3 @@
-use acton_config::color::OwoColorize;
 use tree_sitter::Node;
 
 pub(super) fn rules() -> Vec<MutationRule> {
@@ -611,14 +610,6 @@ impl MutationLevel {
             MutationLevel::Critical => "critical",
             MutationLevel::Major => "major",
             MutationLevel::Minor => "minor",
-        }
-    }
-
-    pub(crate) fn colorize(&self, text: &str) -> String {
-        match self {
-            MutationLevel::Critical => text.red().bold().to_string(),
-            MutationLevel::Major => text.yellow().bold().to_string(),
-            MutationLevel::Minor => text.dimmed().to_string(),
         }
     }
 }

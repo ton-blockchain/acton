@@ -238,6 +238,17 @@ Accepted values: \fBcritical\fR, \fBmajor\fR, \fBminor\fR\&.
 Useful for faster local runs such as \fBcritical,major\fR\&.
 .RE
 .sp
+\fB\-\-mutation\-session\-id\fR \fIid\fR
+.RS 4
+Use a specific mutation session ID for progress logging and resume.
+.sp
+Acton writes append\-only JSON Lines progress to
+\fB\&.acton/mutation\-sessions/<ID>.jsonl\fR\&. Re\-run with the same session ID and the
+same mutation filters to continue an unfinished session.
+If you stop the run with \fBCtrl+C\fR, Acton prints a resume command that includes
+the same session ID.
+.RE
+.sp
 \fB\-\-mutation\-id\fR \fIid\fR
 .RS 4
 Run only specific mutation IDs from a previous mutation report.
@@ -427,8 +438,18 @@ when \fB\-\-ui\fR is enabled
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-mutation\-session\-id\fR writes append\-only JSONL progress to
+\fB\&.acton/mutation\-sessions/<ID>.jsonl\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'pressing \fBCtrl+C\fR during mutation testing stops the run without finalizing the
+session and prints a resume command for the same session ID
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-mutation\-id\fR expects mutation numbers from a previous run with the same mutation
-filters
+filters and session selection
 .RE
 .sp
 .RS 4
@@ -546,7 +567,17 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-id 2
 .RE
 .sp
 .RS 4
-\h'-04' 10.\h'+01'Fail the run when mutation score drops below 85%:
+\h'-04' 10.\h'+01'Resume an unfinished mutation session:
+.RE
+.sp
+.RS 4
+.nf
+acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-session\-id wallet\-pr\-42 \-\-mutation\-diff worktree
+.fi
+.RE
+.sp
+.RS 4
+\h'-04' 11.\h'+01'Fail the run when mutation score drops below 85%:
 .RE
 .sp
 .RS 4
@@ -556,7 +587,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-minimum\-percent
 .RE
 .sp
 .RS 4
-\h'-04' 11.\h'+01'Debug a forked\-state failure with traces and the UI:
+\h'-04' 12.\h'+01'Debug a forked\-state failure with traces and the UI:
 .RE
 .sp
 .RS 4
@@ -566,7 +597,7 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \-\-fork\-block\-number 
 .RE
 .sp
 .RS 4
-\h'-04' 12.\h'+01'Enforce a gas baseline in CI:
+\h'-04' 13.\h'+01'Enforce a gas baseline in CI:
 .RE
 .sp
 .RS 4
