@@ -14,7 +14,8 @@ import {SiApple, SiLinux} from "react-icons/si";
 ## Overview
 
 Acton ships as a single, dependency-free executable. You can install it via the
-public installer or by downloading a release asset directly.
+public installer, by downloading a release asset directly, or by using the
+published Docker image.
 
 <Callout type="info" title="Support policy">
     First-class support is currently limited to versioned releases on macOS
@@ -138,9 +139,34 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     </Card>
 </Cards>
 
+## Docker image
+
+Acton is also published as a Docker image at `ghcr.io/ton-blockchain/acton`.
+This is useful for CI pipelines, ephemeral environments, or local workflows
+where you do not want to install the binary on the host machine.
+
+To verify that the image is available and print the Acton version:
+
+```bash
+docker run --rm ghcr.io/ton-blockchain/acton:<version> --version
+```
+
+To run Acton against the current project from a container:
+
+```bash
+docker run --rm \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/ton-blockchain/acton:<version> \
+  build
+```
+
+Because the image uses `acton` as its entrypoint, replace `build` with any
+other Acton subcommand such as `test`, `check`, or `fmt --check`.
+
 ## CI/CD
 
-See the [CI integration guide](/docs/ci-setup/) for GitHub Actions.
+See the [CI integration guide](/docs/ci-setup/) for GitHub Actions and GitLab CI examples.
 
 ## Updating
 

@@ -44,6 +44,22 @@ the installation:
 acton --version
 ```
 
+If you prefer a containerized workflow, use the published Docker image:
+
+```bash
+docker run --rm ghcr.io/ton-blockchain/acton:<version> --version
+```
+
+To run Acton against the current project from Docker:
+
+```bash
+docker run --rm \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/ton-blockchain/acton:<version> \
+  build
+```
+
 For more installation details, see the
 [installation guide](https://ton-blockchain.github.io/acton/docs/installation).
 
