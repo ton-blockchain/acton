@@ -156,7 +156,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         # language=Bash
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
@@ -275,7 +275,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         # language=Bash
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
