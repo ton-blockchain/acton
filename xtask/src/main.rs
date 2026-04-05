@@ -14,25 +14,27 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
-    Hello,
+    Dist(tasks::dist::DistArgs),
     GithubCleanup(tasks::github_cleanup::GithubCleanupArgs),
-    UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
-    Retag(tasks::retag::RetagArgs),
+    Hello,
     Release(tasks::release::ReleaseArgs),
+    Retag(tasks::retag::RetagArgs),
     Schema(tasks::schema::SchemaArgs),
     SyncArtifacts(tasks::sync_artifacts::SyncArtifactsArgs),
+    UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
 }
 
 fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
-        CliCommand::Hello => tasks::hello::run(),
+        CliCommand::Dist(args) => tasks::dist::run(args),
         CliCommand::GithubCleanup(args) => tasks::github_cleanup::run(args),
-        CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
-        CliCommand::Retag(args) => tasks::retag::run(args),
+        CliCommand::Hello => tasks::hello::run(),
         CliCommand::Release(args) => tasks::release::run(args),
+        CliCommand::Retag(args) => tasks::retag::run(args),
         CliCommand::Schema(args) => tasks::schema::run(args),
         CliCommand::SyncArtifacts(args) => tasks::sync_artifacts::run(args),
+        CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
     }
 }
