@@ -7,6 +7,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: publish-mirror-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
