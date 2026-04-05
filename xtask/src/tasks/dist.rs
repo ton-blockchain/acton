@@ -170,6 +170,10 @@ fn ensure_output_dir_exists(output_dir: &Path) -> Result<()> {
     })
 }
 
+// At the moment, it is not possible to switch to building the archive using Rust, due to
+// backward compatibility issues with the cargo-dist installer.
+// If you do not create the `./` directory, the archive will fail to unpack due to
+// the `--strip-components 1` option.
 fn write_archive(binary_path: &Path, output_dir: &Path, archive_name: &str) -> Result<PathBuf> {
     let archive_path = output_dir.join(archive_name);
     let binary_dir = binary_path.parent().with_context(|| {
