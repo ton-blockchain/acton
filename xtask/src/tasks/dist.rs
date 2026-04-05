@@ -11,6 +11,7 @@ pub(crate) fn run(args: DistArgs) -> Result<()> {
     match args.command {
         DistCommand::Announcement => run_announcement(),
         DistCommand::Build(args) => run_build(args),
+        DistCommand::Check => run_check(),
         DistCommand::Installers => run_installers(),
     }
 }
@@ -19,6 +20,7 @@ pub(crate) fn run(args: DistArgs) -> Result<()> {
 enum DistCommand {
     Announcement,
     Build(BuildArgs),
+    Check,
     Installers,
 }
 
@@ -26,6 +28,13 @@ enum DistCommand {
 struct BuildArgs {
     #[arg(long, value_name = "TARGET")]
     target: String,
+}
+
+fn run_announcement() -> Result<()> {
+    println!(
+        "mock dist announcement: TODO: replace print with real release announcement generation",
+    );
+    Ok(())
 }
 
 fn run_build(args: BuildArgs) -> Result<()> {
@@ -36,7 +45,7 @@ fn run_build(args: BuildArgs) -> Result<()> {
     Ok(())
 }
 
-fn run_announcement() -> Result<()> {
+fn run_check() -> Result<()> {
     println!(
         "mock dist announcement: TODO: replace print with real release announcement generation",
     );
