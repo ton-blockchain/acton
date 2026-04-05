@@ -6406,6 +6406,7 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
+ "sha2",
  "tar",
  "toml_edit 0.24.0+spec-1.1.0",
  "urlencoding",

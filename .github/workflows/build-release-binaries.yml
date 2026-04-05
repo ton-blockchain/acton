@@ -94,18 +94,8 @@ jobs:
           "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
-        shell: bash
-        # language=Bash
         run: |
-          set -euo pipefail
-
-          ARTIFACTS_DIR="acton-${TARGET_NAME}"
-          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
-
-          mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
-          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
-          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          cargo xtask dist archive --target "${TARGET_NAME}" --profile release-size
 
       - name: Upload Acton archive as artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -185,18 +175,8 @@ jobs:
           "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
-        shell: bash
-        # language=Bash
         run: |
-          set -euo pipefail
-
-          ARTIFACTS_DIR="acton-${TARGET_NAME}"
-          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
-
-          mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
-          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
-          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          cargo xtask dist archive --target "${TARGET_NAME}" --profile release-size
 
       - name: Upload Acton archive as artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

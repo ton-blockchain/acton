@@ -106,18 +106,8 @@ jobs:
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
-        shell: bash
-        # language=Bash
         run: |
-          set -euo pipefail
-
-          ARTIFACTS_DIR="acton-${TARGET_NAME}"
-          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
-
-          mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/${TARGET_NAME}/release/acton" "${ARTIFACTS_DIR}/acton"
-          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
-          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          cargo xtask dist archive --target "${TARGET_NAME}" --profile release
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -290,18 +280,8 @@ jobs:
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
-        shell: bash
-        # language=Bash
         run: |
-          set -euo pipefail
-
-          ARTIFACTS_DIR="acton-${TARGET_NAME}"
-          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
-
-          mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/${TARGET_NAME}/release/acton" "${ARTIFACTS_DIR}/acton"
-          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
-          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          cargo xtask dist archive --target "${TARGET_NAME}" --profile release
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
