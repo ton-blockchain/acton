@@ -1,11 +1,10 @@
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
-use flate2::Compression;
-use flate2::write::GzEncoder;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Args)]
 pub(crate) struct DistArgs {
@@ -173,26 +172,37 @@ fn ensure_output_dir_exists(output_dir: &Path) -> Result<()> {
 
 fn write_archive(binary_path: &Path, output_dir: &Path, archive_name: &str) -> Result<PathBuf> {
     let archive_path = output_dir.join(archive_name);
+    let binary_dir = binary_path.parent().with_context(|| {
+        format!(
+            "failed to get parent directory of `{}`",
+            binary_path.display()
+        )
+    })?;
 
-    let archive_file = File::create(&archive_path)
-        .with_context(|| format!("failed to create archive `{}`", archive_path.display()))?;
-    let encoder = GzEncoder::new(archive_file, Compression::default());
-
-    let mut builder = tar::Builder::new(encoder);
-    let archive_entry_name = binary_path
+    let binary_name = binary_path
         .file_name()
         .with_context(|| format!("failed to get file name from `{}`", binary_path.display()))?;
+    let archive_entry_name = format!("./{}", binary_name.to_string_lossy());
 
-    builder
-        .append_path_with_name(binary_path, archive_entry_name)
-        .with_context(|| format!("failed to archive binary `{}`", binary_path.display()))?;
+    let output = Command::new("tar")
+        .arg("-C")
+        .arg(binary_dir)
+        .arg("--no-recursion")
+        .arg("-czf")
+        .arg(&archive_path)
+        .arg("./")
+        .arg(&archive_entry_name)
+        .output()
+        .context("failed to spawn `tar` command")?;
 
-    let encoder = builder
-        .into_inner()
-        .context("failed to finish writing tar archive")?;
-    encoder
-        .finish()
-        .context("failed to finish writing gzip stream")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "`tar` failed to create archive `{}`: {}",
+            archive_path.display(),
+            stderr.trim()
+        );
+    }
 
     Ok(archive_path)
 }
