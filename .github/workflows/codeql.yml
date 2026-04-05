@@ -8,7 +8,8 @@ on:
     branches:
       - master
   schedule:
-    - cron: "23 4 * * 1"
+    # 00:00 Europe/Moscow every Monday (21:00 UTC)
+    - cron: "0 21 * * 0"
   workflow_dispatch:
 
 concurrency:
