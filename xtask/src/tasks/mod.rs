@@ -1,3 +1,4 @@
+pub(crate) mod dist;
 pub(crate) mod github_cleanup;
 pub(crate) mod hello;
 pub(crate) mod release;
