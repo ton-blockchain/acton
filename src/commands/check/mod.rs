@@ -19,6 +19,7 @@ use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::symbol_resolver::resolve;
+use tolk_syntax::HasName;
 use tolk_ty::TypeDb;
 use tolk_ty::TypeInterner;
 use tolk_ty::infer;
@@ -204,6 +205,7 @@ pub fn check_cmd(
             all_diagnostics.extend(contract_diagnostics);
         }
     } else {
+        let contract_roots = configured_contract_roots(&config, &project_root)?;
         let contracts = config.contracts().cloned().unwrap_or_default();
         for (contract_id, contract) in contracts {
             if excludes.is_match(Path::new(&contract.src)) {
@@ -215,12 +217,28 @@ pub fn check_cmd(
         }
 
         for file in files {
+            if excludes.is_match(&file) {
+                continue;
+            }
+
+            let canonical_file = dunce::canonicalize(&file).unwrap_or_else(|_| file.clone());
+            if contract_roots.contains(&canonical_file) {
+                continue;
+            }
+
             let Some(name) = file.file_name() else {
                 continue;
             };
-            if name.to_string_lossy().ends_with(".test.tolk") && !excludes.is_match(&file) {
+
+            if name.to_string_lossy().ends_with(".test.tolk") {
                 let contract_diagnostics = check_test_file(&file, &file_db, &run_options)?;
                 all_diagnostics.extend(contract_diagnostics);
+                continue;
+            }
+
+            if is_script_root_file(&file, &file_db)? {
+                let script_diagnostics = check_test_file(&file, &file_db, &run_options)?;
+                all_diagnostics.extend(script_diagnostics);
             }
         }
     }
@@ -446,6 +464,48 @@ fn find_acton_stdlib(project_root: &Path) -> anyhow::Result<PathBuf> {
     }
 
     Ok(dunce::canonicalize(path_to_acton)?)
+}
+
+fn configured_contract_roots(
+    config: &ActonConfig,
+    project_root: &Path,
+) -> anyhow::Result<HashSet<PathBuf>> {
+    let mut roots = HashSet::new();
+
+    for contract in config
+        .contracts()
+        .into_iter()
+        .flat_map(|contracts| contracts.values())
+    {
+        if !contract.src.ends_with(".tolk") {
+            continue;
+        }
+
+        let source_path = Path::new(&contract.src);
+        let source_path = if source_path.is_absolute() {
+            source_path.to_path_buf()
+        } else {
+            project_root.join(source_path)
+        };
+
+        roots.insert(dunce::canonicalize(source_path)?);
+    }
+
+    Ok(roots)
+}
+
+fn is_script_root_file(file: &Path, file_db: &FileDb) -> anyhow::Result<bool> {
+    let file_info = file_db.process(file)?;
+
+    if file_info.is_contract_entry() {
+        return Ok(false);
+    }
+
+    Ok(file_info
+        .source()
+        .functions()
+        .filter_map(|func| func.name())
+        .any(|name| file_db.text_matches(file_info.id(), &name, "main")))
 }
 
 fn check_contract(

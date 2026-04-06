@@ -12,8 +12,8 @@ Run the Tolk linter on the whole project, a specific contract ID from
 \fBActon.toml\fR, or a single \fB\&.tolk\fR file.
 .sp
 By default, Acton checks contracts from \fBActon.toml\fR together with workspace
-test files. The command also supports machine\-readable output formats and rule
-explanations.
+test files and standalone script roots that define \fBmain()\fR\&. The command also
+supports machine\-readable output formats and rule explanations.
 .SH "OPTIONS"
 .SS "Check Options"
 .sp
@@ -96,6 +96,11 @@ default \fBplain\fR
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-output\-file\fR is not valid with \fBplain\fR format
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'project\-wide mode includes workspace \fB*.test.tolk\fR files and standalone
+script roots that define \fBmain()\fR
 .RE
 .sp
 .RS 4

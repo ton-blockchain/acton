@@ -1,2 +1,3 @@
     Checking Empty
+    Checking ../generated-project/scripts/deploy.tolk
     Checking ../generated-project/tests/contract.test.tolk

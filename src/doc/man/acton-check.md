@@ -14,8 +14,8 @@ Run the Tolk linter on the whole project, a specific contract ID from
 `Acton.toml`, or a single `.tolk` file.
 
 By default, Acton checks contracts from `Acton.toml` together with workspace
-test files. The command also supports machine-readable output formats and rule
-explanations.
+test files and standalone script roots that define `main()`. The command also
+supports machine-readable output formats and rule explanations.
 
 ## OPTIONS
 
@@ -69,6 +69,8 @@ Print an explanation for a lint rule.
 - output format resolution is: CLI flag, then `[lint].output-format`, then
   default `plain`
 - `--output-file` is not valid with `plain` format
+- project-wide mode includes workspace `*.test.tolk` files and standalone
+  script roots that define `main()`
 - single-file mode relaxes `E014 (acton-import-in-contract)`
 - targets ending with `.tolk` are treated as file paths; other targets are
   resolved as contract IDs from `Acton.toml`

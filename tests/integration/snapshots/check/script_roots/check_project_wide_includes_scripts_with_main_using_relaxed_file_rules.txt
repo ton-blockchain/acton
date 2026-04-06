@@ -1,0 +1,17 @@
+warning[E002]: variable is unused
+  --> [ROOT]/scripts/deploy[LINE]
+  |
+7 |                     val unused = 1;
+  |                         ^^^^^^ unused variable `unused`
+
+help: prefix with underscore: `_unused`
+  --> [ROOT]/scripts/deploy[LINE]
+  |
+7 |                     val unused = 1;
+  |                         ^^^^^^ _unused
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E002

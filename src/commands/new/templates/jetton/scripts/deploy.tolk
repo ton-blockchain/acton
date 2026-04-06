@@ -23,7 +23,7 @@ fun string.toSnakeString(self): cell {
 fun buildOnchainMetadata(info: JettonInfo): cell {
     println1("Deploying Jetton with {}", info);
 
-    var dict = createEmptyMap<uint256, cell>();
+    var dict: map<uint256, cell> = [];
 
     dict.set("name".sha256(), info.name.toSnakeString());
     dict.set("description".sha256(), info.description.toSnakeString());

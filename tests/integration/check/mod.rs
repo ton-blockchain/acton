@@ -35,6 +35,7 @@ mod no_global_variables_tests;
 mod pure_function_call_unused_tests;
 mod random_requires_initialization_tests;
 mod reserve_mode_literal_tests;
+mod script_roots_tests;
 mod send_mode_literal_tests;
 mod several_not_null_assertions_tests;
 mod type_inference_regressions_tests;
