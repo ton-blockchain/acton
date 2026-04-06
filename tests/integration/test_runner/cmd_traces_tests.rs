@@ -267,16 +267,16 @@ fn save_test_trace_without_path_uses_default_directory() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_without_path_uses_default_directory.stdout.txt",
         )
-        .assert_file_exists(".acton/traces/test-default-trace_trace.json")
-        .assert_file_exists(".acton/traces/contracts/simple.json")
+        .assert_file_exists("build/traces/test-default-trace_trace.json")
+        .assert_file_exists("build/traces/contracts/simple.json")
         .assert_file_snapshot_matches(
-            ".acton/traces/contracts/simple.json",
+            "build/traces/contracts/simple.json",
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_without_path_uses_default_directory.contract.txt",
         );
 
     assert_trace_json_contract(
         &project,
-        ".acton/traces/test-default-trace_trace.json",
+        "build/traces/test-default-trace_trace.json",
         "test-default-trace",
     );
 }
@@ -315,7 +315,7 @@ fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
         "test-custom-trace",
     );
 
-    let default_trace_dir = project.path().join(".acton/traces");
+    let default_trace_dir = project.path().join("build/traces");
     assert!(
         !default_trace_dir.exists(),
         "Default trace dir should not be created for custom trace path: {}",
@@ -750,7 +750,7 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
             "integration/snapshots/test-runner/cmd_agent_h/regular_run_without_trace_flag_does_not_create_trace_artifacts.stdout.txt",
         );
 
-    let trace_dir = project.path().join(".acton/traces");
+    let trace_dir = project.path().join("build/traces");
     assert!(
         !trace_dir.exists(),
         "Trace dir should not exist without --save-test-trace: {}",
@@ -776,7 +776,7 @@ fn save_test_trace_can_be_enabled_after_regular_run() {
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_can_be_enabled_after_regular_run.regular.stdout.txt",
         );
 
-    let default_trace_dir = project.path().join(".acton/traces");
+    let default_trace_dir = project.path().join("build/traces");
     assert!(
         !default_trace_dir.exists(),
         "Trace dir should not exist after regular run: {}",

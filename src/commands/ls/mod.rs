@@ -1,3 +1,4 @@
+use crate::paths;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use dashmap::DashMap;
 use std::collections::BTreeMap;
@@ -97,7 +98,11 @@ async fn ls_cmd_internal(
 }
 
 fn setup_ls_logging(log_file: Option<String>) -> anyhow::Result<()> {
-    let log_path = log_file.unwrap_or_else(|| ".acton/tolk-language-server.log".to_string());
+    let log_path = log_file.unwrap_or_else(|| {
+        paths::language_server_log_path(configured_project_root())
+            .to_string_lossy()
+            .to_string()
+    });
 
     if let Some(parent) = std::path::Path::new(&log_path).parent() {
         std::fs::create_dir_all(parent)?;

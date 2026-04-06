@@ -5,6 +5,7 @@ use crate::context::{
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::ffi::assert::parse_search_params;
+use crate::paths;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
@@ -151,7 +152,10 @@ fn build_impl(
     {
         let mappings = ctx.env.config.mappings();
         let elapsed = start_time.elapsed();
-        info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
+        info!(
+            "Build {path} from file cache ({}) in {elapsed:?}",
+            paths::DEFAULT_BUILD_CACHE_DIR
+        );
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
             .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;

@@ -1,4 +1,5 @@
 use crate::build_info;
+use crate::paths;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -633,7 +634,7 @@ fn resolve_acton_log_dir(project_root: &Path) -> (PathBuf, &'static str) {
         if let Some(path) = env_path("HOME") {
             return (path.join(".acton").join("logs"), "HOME");
         }
-        return (project_root.join(".acton").join("logs"), "project_root");
+        return (paths::build_logs_dir(project_root), "project_root");
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -641,7 +642,7 @@ fn resolve_acton_log_dir(project_root: &Path) -> (PathBuf, &'static str) {
         if let Some(path) = env_path("HOME") {
             return (path.join(".acton").join("logs"), "HOME");
         }
-        (project_root.join(".acton").join("logs"), "project_root")
+        (paths::build_logs_dir(project_root), "project_root")
     }
 }
 
@@ -661,7 +662,7 @@ fn collect_doctor_report() -> Result<DoctorReport> {
     let manifest_source = resolved_paths.manifest_path_source.as_str();
 
     let acton_dir = project_root.join(".acton");
-    let cache_dir = project_root.join(".acton").join("cache");
+    let cache_dir = paths::build_cache_dir(&project_root);
     let local_wallets = project_root.join("wallets.toml");
     let local_libraries = project_root.join("libraries.toml");
     let global_wallets = global_wallets_path();

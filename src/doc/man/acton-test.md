@@ -203,7 +203,7 @@ TonCenter API key for blockchain queries.
 {{#option "`--save-test-trace` [_dir_]" }}
 Save transaction traces to a directory.
 
-If passed without a value, Acton uses `.acton/traces`.
+If passed without a value, Acton uses `build/traces`.
 {{/option}}
 
 {{/options}}
@@ -259,7 +259,7 @@ project root.
 Use a specific mutation session ID for progress logging and resume.
 
 Acton writes append-only JSON Lines progress to
-`.acton/mutation-sessions/<ID>.jsonl`. Re-run with the same session ID and the
+`build/mutation-sessions/<ID>.jsonl`. Re-run with the same session ID and the
 same mutation filters to continue an unfinished session.
 If you stop the run with `Ctrl+C`, Acton prints a resume command that includes
 the same session ID.
@@ -322,7 +322,7 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   Acton writes `lcov.info` for `lcov` and `coverage.txt` for `text`
 - coverage excludes `.test.tolk` files and `@wrappers` sources by default;
   use `--coverage-include-tests` or `--coverage-include-wrappers` to opt in
-- `--save-test-trace` without a value writes traces to `.acton/traces`
+- `--save-test-trace` without a value writes traces to `build/traces`
 - gas snapshot files are written only to the explicit paths passed to
   `--snapshot` or `--baseline-snapshot`
 - `[test.fuzz]` applies only to parameterized tests that explicitly opt in with
@@ -382,7 +382,7 @@ CLI flags override config values for the current invocation.
 - `--mutation-rules-file` loads custom query-based rules from JSON and custom
   rules override built-in rules with the same ID
 - `--mutation-session-id` writes append-only JSONL progress to
-  `.acton/mutation-sessions/<ID>.jsonl`
+  `build/mutation-sessions/<ID>.jsonl`
 - `--mutation-workers` defaults to the host's available parallelism; each
   worker reuses its own isolated mutation workspace
 - pressing `Ctrl+C` during mutation testing stops the run without finalizing the
@@ -432,7 +432,7 @@ CLI flags override config values for the current invocation.
 5. Compare gas usage against a baseline:
 
    ```bash
-   acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff
+   acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff
    ```
 
 6. Run mutation testing for one contract:
@@ -486,7 +486,7 @@ CLI flags override config values for the current invocation.
 14. Enforce a gas baseline in CI:
 
    ```bash
-   acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff --reporter console,junit
+   acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff --reporter console,junit
    ```
 
 ## SEE ALSO

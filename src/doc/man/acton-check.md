@@ -110,7 +110,7 @@ Print an explanation for a lint rule.
 4. Emit SARIF to a file:
 
    ```bash
-   acton check --output-format sarif --output-file .acton/reports/lint.sarif
+   acton check --output-format sarif --output-file build/reports/lint.sarif
    ```
 
 5. Run only selected rules:

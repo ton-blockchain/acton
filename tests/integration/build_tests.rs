@@ -1259,7 +1259,7 @@ fn test_build_corrupted_cache_file() {
     project.acton().build().run().success();
 
     // Manually corrupt the cache file by writing invalid base64
-    let cache_dir = project.path().join(".acton/cache");
+    let cache_dir = project.path().join("build/cache");
     if cache_dir.exists() {
         let cache_file = first_cache_json_file(&cache_dir);
         fs::write(&cache_file, "invalid base64 data!!!").unwrap();
@@ -1281,7 +1281,7 @@ fn test_build_ignores_unrelated_corrupted_cache_file_and_keeps_it() {
         .contract("simple", SIMPLE_CONTRACT)
         .build();
 
-    let cache_dir = project.path().join(".acton/cache");
+    let cache_dir = project.path().join("build/cache");
     fs::create_dir_all(&cache_dir).unwrap();
     let broken_path = cache_dir.join("broken.json");
     fs::write(&broken_path, "not-json").unwrap();
@@ -1309,7 +1309,7 @@ fn test_build_clear_cache_removes_nested_cache_subdirectories() {
 
     project.acton().build().run().success();
 
-    let cache_dir = project.path().join(".acton/cache");
+    let cache_dir = project.path().join("build/cache");
     let debug_dir = cache_dir.join("debug");
     let nested_dir = cache_dir.join("nested");
     fs::create_dir_all(&debug_dir).unwrap();

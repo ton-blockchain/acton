@@ -64,7 +64,7 @@ LOGGING
 
        The default log path is:
 
-           .acton/tolk-language-server.log
+           build/logs/tolk-language-server.log
 
        Parent directories for a custom --log-file are created automatically.
 

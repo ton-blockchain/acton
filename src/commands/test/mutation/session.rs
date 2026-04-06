@@ -1,3 +1,4 @@
+use crate::paths;
 use anyhow::anyhow;
 use chrono::Utc;
 use rand::random;
@@ -113,10 +114,7 @@ fn generate_mutation_session_id(
 }
 
 fn mutation_session_progress_path(project_root: &Path, session_id: &str) -> PathBuf {
-    project_root
-        .join(".acton")
-        .join("mutation-sessions")
-        .join(format!("{session_id}.jsonl"))
+    paths::build_mutation_sessions_dir(project_root).join(format!("{session_id}.jsonl"))
 }
 
 pub(crate) fn append_mutation_session_event(

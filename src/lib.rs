@@ -6,6 +6,7 @@ pub mod external_send;
 pub mod ffi;
 pub mod file_build_cache;
 pub mod formatter;
+pub mod paths;
 pub mod retrace;
 pub mod stdlib;
 pub mod wallets;

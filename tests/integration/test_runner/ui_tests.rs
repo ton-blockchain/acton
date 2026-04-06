@@ -85,7 +85,7 @@ fn ui_bind_failure_is_reported_before_tests_run_and_skips_default_traces() {
         );
     }
 
-    let trace_dir = project.path().join(".acton/traces");
+    let trace_dir = project.path().join("build/traces");
     assert!(
         !trace_dir.exists(),
         "UI bind failure must happen before default trace creation: {}",
@@ -124,7 +124,7 @@ fn ui_bind_failure_skips_custom_trace_output() {
         );
     }
 
-    let default_trace = project.path().join(".acton/traces");
+    let default_trace = project.path().join("build/traces");
     assert!(
         !default_trace.exists(),
         "Default UI trace directory must not be created when bind fails: {}",

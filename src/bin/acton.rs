@@ -24,6 +24,7 @@ use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
+use acton::paths;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
@@ -322,7 +323,7 @@ enum Commands {
             help = "Save transaction traces to directory",
             help_heading = "Tracing",
             value_name = "DIR",
-            default_missing_value = ".acton/traces",
+            default_missing_value = "build/traces",
             num_args = 0..=1,
         )]
         save_test_trace: Option<String>,
@@ -1642,7 +1643,7 @@ fn main() {
                     fork_block_number,
                     save_test_trace.or_else(|| {
                         if ui {
-                            Some(".acton/traces".to_owned())
+                            Some(paths::DEFAULT_BUILD_TRACES_DIR.to_owned())
                         } else {
                             None
                         }
@@ -2127,7 +2128,7 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return configured_project_root().join(".acton").join("logs");
+        return paths::build_logs_dir(configured_project_root());
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2135,11 +2136,11 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return configured_project_root().join(".acton").join("logs");
+        return paths::build_logs_dir(configured_project_root());
     }
 
     #[allow(unreachable_code)]
-    configured_project_root().join(".acton").join("logs")
+    paths::build_logs_dir(configured_project_root())
 }
 
 fn resolve_acton_log_dir() -> PathBuf {

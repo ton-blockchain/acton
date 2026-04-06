@@ -19,6 +19,8 @@ use tolkc::compiler::CompilerResultSuccess;
 use ton_abi;
 use xxhash_rust::xxh3::Xxh3;
 
+use crate::paths;
+
 const CACHE_SCHEMA_VERSION: u32 = 6;
 const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
 const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
@@ -79,7 +81,7 @@ pub struct FileBuildCache {
 impl FileBuildCache {
     pub fn new(cache_dir: Option<PathBuf>) -> Result<Self> {
         let project_root = configured_project_root().to_path_buf();
-        let cache_dir = cache_dir.unwrap_or_else(|| project_root.join(".acton").join("cache"));
+        let cache_dir = cache_dir.unwrap_or_else(|| paths::build_cache_dir(&project_root));
 
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;

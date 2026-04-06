@@ -188,7 +188,7 @@ fn write_simple_contract(project: &Project, source: &str) {
 fn mutation_session_path(project: &Project, session_id: &str) -> std::path::PathBuf {
     project
         .path()
-        .join(".acton")
+        .join("build")
         .join("mutation-sessions")
         .join(format!("{session_id}.jsonl"))
 }

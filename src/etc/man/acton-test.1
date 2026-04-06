@@ -186,7 +186,7 @@ TonCenter API key for blockchain queries.
 .RS 4
 Save transaction traces to a directory.
 .sp
-If passed without a value, Acton uses \fB\&.acton/traces\fR\&.
+If passed without a value, Acton uses \fBbuild/traces\fR\&.
 .RE
 .SS "Mutation Testing Options"
 .sp
@@ -252,7 +252,7 @@ project root.
 Use a specific mutation session ID for progress logging and resume.
 .sp
 Acton writes append\-only JSON Lines progress to
-\fB\&.acton/mutation\-sessions/<ID>.jsonl\fR\&. Re\-run with the same session ID and the
+\fBbuild/mutation\-sessions/<ID>.jsonl\fR\&. Re\-run with the same session ID and the
 same mutation filters to continue an unfinished session.
 If you stop the run with \fBCtrl+C\fR, Acton prints a resume command that includes
 the same session ID.
@@ -358,7 +358,7 @@ use \fB\-\-coverage\-include\-tests\fR or \fB\-\-coverage\-include\-wrappers\fR 
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-save\-test\-trace\fR without a value writes traces to \fB\&.acton/traces\fR
+\h'-04'\(bu\h'+03'\fB\-\-save\-test\-trace\fR without a value writes traces to \fBbuild/traces\fR
 .RE
 .sp
 .RS 4
@@ -461,7 +461,7 @@ rules override built\-in rules with the same ID
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-mutation\-session\-id\fR writes append\-only JSONL progress to
-\fB\&.acton/mutation\-sessions/<ID>.jsonl\fR
+\fBbuild/mutation\-sessions/<ID>.jsonl\fR
 .RE
 .sp
 .RS 4
@@ -548,7 +548,7 @@ acton test \-\-coverage \-\-coverage\-minimum\-percent 85
 .sp
 .RS 4
 .nf
-acton test \-\-baseline\-snapshot .acton/gas\-baseline.json \-\-fail\-on\-diff
+acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff
 .fi
 .RE
 .RE
@@ -639,7 +639,7 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \-\-fork\-block\-number 
 .sp
 .RS 4
 .nf
-acton test \-\-baseline\-snapshot .acton/gas\-baseline.json \-\-fail\-on\-diff \-\-reporter console,junit
+acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff \-\-reporter console,junit
 .fi
 .RE
 .SH "SEE ALSO"
