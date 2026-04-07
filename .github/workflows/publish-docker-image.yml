@@ -25,7 +25,7 @@ jobs:
       packages: write
 
     steps:
-      - name: Download Docker archives and shared annotations
+      - name: Download Docker archives
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: intermediate-docker-image-*
@@ -52,11 +52,6 @@ jobs:
         shell: bash
         # language=Bash
         run: |
-          index_annotations=()
-          while IFS= read -r annotation; do
-            index_annotations+=("--annotation" "index:${annotation}")
-          done < docker-artifacts/index-annotations.txt
-
           docker tag "acton:${VERSION_TAG}-linux-amd64" "${ACTON_NAME}:${VERSION_TAG}-amd64"
           docker tag "acton:${VERSION_TAG}-linux-arm64" "${ACTON_NAME}:${VERSION_TAG}-arm64"
 
@@ -64,7 +59,6 @@ jobs:
           docker push "${ACTON_NAME}:${VERSION_TAG}-arm64"
 
           docker buildx imagetools create \
-            "${index_annotations[@]}" \
             --tag "${ACTON_NAME}:${VERSION_TAG}" \
             "${ACTON_NAME}:${VERSION_TAG}-amd64" \
             "${ACTON_NAME}:${VERSION_TAG}-arm64"
