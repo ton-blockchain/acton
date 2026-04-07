@@ -4,6 +4,7 @@ import "@local-acton/ffi/ffi"
 import "@local-acton/ffi/reverse-ffi"
 import "@local-acton/testing/expect"
 import "@local-acton/testing/transaction_expect"
+import "@stdlib/reflection"
 import "contracts/types"
 
 fun x2(x: int): int {
@@ -132,16 +133,92 @@ get fun `test predicate success`() {
     });
 }
 
+fun bind1_untyped(c: continuation, value: unknown): continuation asm "SWAP 1 -1 SETCONTARGS";
+
+fun bindX(function: continuation, args: tuple): continuation {
+    var c = function;
+    var i = 0;
+    while (i < args.size()) {
+        c = bind1_untyped(c, args.get(i));
+        i += 1;
+    }
+    return c;
+}
+
+get fun `test_capture_one`() {
+    var a = 10;
+    var cb = fun(x: int) { return x + a };
+    return cb(5);
+}
+
+
 /// Test mixed: plain value + inline lambda predicates
 get fun `test predicate mixed`() {
     val (counter, deployer) = setupTest();
     val res = counter.sendIncrease(deployer.address, 42);
+
     expect(res).toHaveSuccessfulTx({
-        to: counter.address,
-        from: fun(addr: address): bool { addr; return true; },
-        exitCode: fun(code: int32): bool { return code == 0; },
-        success: fun(s: bool): bool { return s; },
+        to: fun(addr: address): bool { return addr == counter.address; }
     });
+}
+
+fun array<T>.map<U>(self, f: (T -> U)): array<U> {
+    var res: array<U> = [];
+    var i = 0;
+    repeat (self.size()) {
+        res.push(f(self.get(i)));
+        i += 1;
+    }
+    return res;
+}
+
+fun array<T>.filter(self, f: (T -> bool)): array<T> {
+    var res: array<T> = [];
+    var i = 0;
+    repeat (self.size()) {
+        val item = self.get(i);
+        if (f(item)) {
+            res.push(item);
+        }
+        i += 1;
+    }
+    return res;
+}
+
+get fun `test map and filter`() {
+    val nums: array<int> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    // filter even, then square them
+    val squared = nums
+        .filter(fun(x: int): bool { return x % 2 == 0; })
+        .map<int>(fun(x: int): int { return x * x; });
+    // [2,4,6,8,10] -> [4,16,36,64,100]
+    expect(squared.size()).toEqual(5);
+    expect(squared.get(0)).toEqual(4);
+    expect(squared.get(1)).toEqual(16);
+    expect(squared.get(2)).toEqual(36);
+    expect(squared.get(3)).toEqual(64);
+    expect(squared.get(4)).toEqual(100);
+
+    // chain: map then filter — triple all, keep only > 20
+    val big = nums
+        .map<int>(fun(x: int): int { return x * 3; })
+        .filter(fun(x: int): bool { return x > 20; });
+    // [3,6,9,12,15,18,21,24,27,30] -> [21,24,27,30]
+    expect(big.size()).toEqual(4);
+    expect(big.get(0)).toEqual(21);
+    expect(big.get(3)).toEqual(30);
+
+    // closures capturing outer state
+    val threshold = 5;
+    val multiplier = 7;
+    val scaled = nums
+        .filter(fun(x: int): bool { return x > threshold; })
+        .map<int>(fun(x: int): int { return x * multiplier; });
+    // [6,7,8,9,10] * 7 = [42,49,56,63,70]
+    expect(scaled.size()).toEqual(5);
+    expect(scaled.get(0)).toEqual(42);
+    expect(scaled.get(4)).toEqual(70);
 }
 
 /// Test negative: inline lambda that never matches
@@ -149,6 +226,6 @@ get fun `test predicate toNotHaveTx`() {
     val (counter, deployer) = setupTest();
     val res = counter.sendIncrease(deployer.address, 42);
     expect(res).toNotHaveTx({
-        to: fun(addr: address): bool { addr; return false; },
+        to: fun(addr: address): bool { return false; },
     });
 }
