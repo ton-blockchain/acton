@@ -29,8 +29,8 @@ use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
-    init_manifest_path_with_source, init_project_root_with_source,
-    project_root as configured_project_root,
+    WalletsFile, global_wallets_path, init_manifest_path_with_source,
+    init_project_root_with_source, project_root as configured_project_root,
 };
 use acton_config::test::{
     BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
@@ -125,7 +125,7 @@ enum Commands {
         after_help = detailed_help_pointer("help")
     )]
     Help {
-        #[arg(help = "Top-level command to get help for")]
+        #[arg(help = "Top-level command to get help for", add = ArgValueCompleter::new(complete_commands))]
         command: Option<String>,
     },
     #[command(
@@ -157,7 +157,7 @@ enum Commands {
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)")]
+        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         path: Option<String>,
         // Filtering
         #[arg(
@@ -622,7 +622,7 @@ enum Commands {
         after_help = detailed_help_pointer("compile")
     )]
     Compile {
-        #[arg(help = "Tolk file to compile")]
+        #[arg(help = "Tolk file to compile", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
@@ -690,7 +690,8 @@ enum Commands {
         net: String,
         #[arg(
             long,
-            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)"
+            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)",
+            add = ArgValueCompleter::new(complete_wallets)
         )]
         wallet: Option<String>,
         #[arg(long, help = "Tolk compiler version to use on verifier side")]
@@ -705,7 +706,7 @@ enum Commands {
         after_help = detailed_help_pointer("check")
     )]
     Check {
-        #[arg(help = "Contract ID to check or path to a .tolk file")]
+        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts))]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
@@ -755,7 +756,8 @@ enum Commands {
         logs_dir: Option<String>,
         #[arg(
             long,
-            help = "Contract name from Acton.toml used to build a source-level trace for the transaction"
+            help = "Contract name from Acton.toml used to build a source-level trace for the transaction",
+            add = ArgValueCompleter::new(complete_contracts)
         )]
         contract: Option<String>,
         #[arg(
@@ -785,7 +787,7 @@ enum Commands {
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
-        #[arg(help = "Files or directories to format (defaults to project root)")]
+        #[arg(help = "Files or directories to format (defaults to project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
@@ -977,7 +979,7 @@ pub enum LibraryCommand {
             help = "Duration to publish the library for (e.g. 100d, 1y); prompts if not provided"
         )]
         duration: Option<String>,
-        #[arg(long, help = "Wallet to use for publishing (prompts if not provided)")]
+        #[arg(long, help = "Wallet to use for publishing (prompts if not provided)", add = ArgValueCompleter::new(complete_wallets))]
         wallet: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
@@ -1100,22 +1102,66 @@ fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .collect()
 }
 
-fn load_config_for_completion() -> Option<ActonConfig> {
-    let mut current = env::current_dir().ok()?;
+fn complete_wallets(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy();
+    let mut wallets = std::collections::BTreeMap::new();
 
-    loop {
-        let config_path = current.join("Acton.toml");
-        if config_path.is_file() {
-            let content = fs::read_to_string(config_path).ok()?;
-            return toml::from_str::<ActonConfig>(&content).ok();
-        }
-
-        if !current.pop() {
-            break;
+    // 1. Global wallets
+    if let Some(global_path) = global_wallets_path() {
+        if global_path.exists() {
+            if let Ok(content) = fs::read_to_string(&global_path) {
+                if let Ok(file) = toml::from_str::<WalletsFile>(&content) {
+                    if let Some(w) = file.wallets {
+                        wallets.extend(w.wallets);
+                    }
+                }
+            }
         }
     }
 
-    None
+    // 2. Local wallets.toml (overrides global)
+    if let Some(project_root) = find_project_root_for_completion() {
+        let local_path = project_root.join("wallets.toml");
+        if local_path.exists() {
+            if let Ok(content) = fs::read_to_string(local_path) {
+                if let Ok(file) = toml::from_str::<WalletsFile>(&content) {
+                    if let Some(w) = file.wallets {
+                        wallets.extend(w.wallets);
+                    }
+                }
+            }
+        }
+    }
+
+    wallets
+        .keys()
+        .filter(|name| name.starts_with(current.as_ref()))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn complete_commands(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy();
+    Cli::command()
+        .get_subcommands()
+        .filter(|cmd| !cmd.is_hide_set())
+        .map(|cmd| cmd.get_name().to_string())
+        .filter(|name| name.starts_with(current.as_ref()))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn find_project_root_for_completion() -> Option<PathBuf> {
+    let cwd = env::current_dir().ok()?;
+    let manifest = find_manifest_in_ancestors(&cwd)?;
+    manifest.parent().map(Path::to_path_buf)
+}
+
+fn load_config_for_completion() -> Option<ActonConfig> {
+    let cwd = env::current_dir().ok()?;
+    let manifest = find_manifest_in_ancestors(&cwd)?;
+    let content = fs::read_to_string(manifest).ok()?;
+    toml::from_str::<ActonConfig>(&content).ok()
 }
 
 fn detailed_help_pointer(command: &str) -> StyledStr {
