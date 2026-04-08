@@ -155,6 +155,41 @@ fun format5<T1, T2, T3, T4, T5>(
     );
 }
 
+/// Stores the decimal string representation of an integer into a builder.
+///
+/// Example:
+/// ```tolk
+/// var b = beginCell();
+/// b.storeIntAsString(42); // stores "42" as ASCII bytes
+/// ```
+fun builder.storeIntAsString(mutate self, x: int): void asm """
+    ZERO SWAP
+
+    UNTIL:<{
+        10 PUSHINT DIVMOD
+        48 ADDCONST
+        s2 XCHG0
+        s2 s3 XCHG
+        INC SWAP
+        DUP ISZERO
+    }> DROP
+
+    REPEAT:<{ 8 STU }>
+""";
+
+/// Converts an integer to its decimal string representation.
+///
+/// Example:
+/// ```tolk
+/// val s = 42.toString(); // "42"
+/// val zero = 0.toString(); // "0"
+/// ```
+fun int.toString(self): string {
+    var b = beginCell();
+    b.storeIntAsString(self);
+    return b.toSlice();
+}
+
 fun ffi.format1(fmt: string, type1: string, arg1: tuple): string
     asm "200 EXTCALL"
 fun ffi.format2(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple): string
