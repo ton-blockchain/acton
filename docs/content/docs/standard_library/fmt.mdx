@@ -69,7 +69,7 @@ format1("{:x}", "abc");   // "abc"
 format1("{:ton}", true);  // "true"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L59" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L60" />
 
 ## `format2`
 
@@ -87,7 +87,7 @@ val msg = format2("{}: {}", "name", "John");
 println(msg);  // prints "name: John"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L72" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L73" />
 
 ## `format3`
 
@@ -105,7 +105,7 @@ val msg = format3("{} + {} = {}", 2, 3, 5);
 println(msg);  // prints "2 + 3 = 5"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L91" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L92" />
 
 ## `format4`
 
@@ -123,7 +123,7 @@ val msg = format4("{} {} {} {}", "a", "b", "c", "d");
 println(msg);  // prints "a b c d"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L112" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L113" />
 
 ## `format5`
 
@@ -148,23 +148,7 @@ val msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
 println(msg);  // prints "1 2 3 4 5"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L135" />
-
-## `builder.storeIntAsString`
-
-```tolk
-fun builder.storeIntAsString(mutate self, x: int): void
-```
-
-Stores the decimal string representation of an integer into a builder.
-
-Example:
-```tolk
-var b = beginCell();
-b.storeIntAsString(42); // stores "42" as ASCII bytes
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L165" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L136" />
 
 ## `int.toString`
 
@@ -180,5 +164,21 @@ val s = 42.toString(); // "42"
 val zero = 0.toString(); // "0"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L187" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L166" />
+
+## `builder.storeIntAsString`
+
+```tolk
+fun builder.storeIntAsString(mutate self, x: int): void
+```
+
+Stores the decimal string representation of an integer into a builder as inline bytes.
+
+Example:
+```tolk
+var b = beginCell();
+b.storeIntAsString(42); // stores "42" as ASCII bytes
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L177" />
 
