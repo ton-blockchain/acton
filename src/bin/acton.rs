@@ -40,7 +40,7 @@ use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
-use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
+use clap_complete::engine::{ArgValueCompleter, CompletionCandidate, PathCompleter};
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
@@ -493,7 +493,7 @@ enum Commands {
         after_help = detailed_help_pointer("script")
     )]
     Script {
-        #[arg(help = "Script file to execute")]
+        #[arg(help = "Script file to execute", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
 
         #[arg(help = "Arguments to pass to the script")]
