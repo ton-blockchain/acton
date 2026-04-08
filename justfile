@@ -71,7 +71,7 @@ check-deny:
 
 check-ci: fmt-check check-docgen check-deps clippy typos check-schema
 
-check: check-ci check-deny check-schema test
+check: check-ci check-deny test
 
 coverage-setup:
     cargo install cargo-llvm-cov --locked
