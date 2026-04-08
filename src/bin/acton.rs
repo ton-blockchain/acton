@@ -40,7 +40,9 @@ use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
-use clap_complete::engine::{ArgValueCompleter, CompletionCandidate, PathCompleter};
+use clap_complete::engine::{
+    ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
+};
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
@@ -706,7 +708,7 @@ enum Commands {
         after_help = detailed_help_pointer("check")
     )]
     Check {
-        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
@@ -1085,6 +1087,12 @@ fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .filter(|contract| contract.starts_with(current.as_ref()))
         .map(CompletionCandidate::new)
         .collect()
+}
+
+fn complete_contracts_or_paths(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let mut candidates = complete_contracts(current);
+    candidates.extend(PathCompleter::any().complete(current));
+    candidates
 }
 
 fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
