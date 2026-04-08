@@ -1106,31 +1106,24 @@ fn complete_wallets(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
     let current = current.to_string_lossy();
     let mut wallets = std::collections::BTreeMap::new();
 
+    let load_wallets = |path: &Path| -> Option<std::collections::BTreeMap<String, _>> {
+        let content = fs::read_to_string(path).ok()?;
+        let file: WalletsFile = toml::from_str(&content).ok()?;
+        Some(file.wallets?.wallets)
+    };
+
     // 1. Global wallets
-    if let Some(global_path) = global_wallets_path() {
-        if global_path.exists() {
-            if let Ok(content) = fs::read_to_string(&global_path) {
-                if let Ok(file) = toml::from_str::<WalletsFile>(&content) {
-                    if let Some(w) = file.wallets {
-                        wallets.extend(w.wallets);
-                    }
-                }
-            }
-        }
+    if let Some(global_path) = global_wallets_path()
+        && let Some(w) = load_wallets(&global_path)
+    {
+        wallets.extend(w);
     }
 
     // 2. Local wallets.toml (overrides global)
-    if let Some(project_root) = find_project_root_for_completion() {
-        let local_path = project_root.join("wallets.toml");
-        if local_path.exists() {
-            if let Ok(content) = fs::read_to_string(local_path) {
-                if let Ok(file) = toml::from_str::<WalletsFile>(&content) {
-                    if let Some(w) = file.wallets {
-                        wallets.extend(w.wallets);
-                    }
-                }
-            }
-        }
+    if let Some(project_root) = find_project_root_for_completion()
+        && let Some(w) = load_wallets(&project_root.join("wallets.toml"))
+    {
+        wallets.extend(w);
     }
 
     wallets
