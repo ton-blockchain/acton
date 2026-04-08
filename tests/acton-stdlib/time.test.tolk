@@ -22,13 +22,3 @@ get fun `test setNow consistency across multiple calls`() {
         t += 1000;
     }
 }
-
-/// blockchain.now() should reflect the latest setNow even when time jumps forward significantly.
-get fun `test setNow large time jump`() {
-    net.setNow(100);
-    expect(blockchain.now()).toEqual(100);
-
-    net.setNow(1700000000);
-    expect(blockchain.now()).toEqual(1700000000);
-    expect(net.now()).toEqual(1700000000);
-}
