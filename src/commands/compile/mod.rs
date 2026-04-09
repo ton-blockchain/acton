@@ -47,7 +47,14 @@ pub fn compile_cmd(
 
     let mut file_cache = FileBuildCache::new(None)?;
 
-    let acton_config = config::ActonConfig::load().ok();
+    let acton_config = config::ActonConfig::load()
+        .map_err(|e| {
+            eprintln!(
+                "  {} Failed to load Acton.toml: {e:#}",
+                "⚠".yellow().bold()
+            );
+        })
+        .ok();
 
     let need_debug_info = source_map.is_some();
     if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.3") {

@@ -91,9 +91,16 @@ pub fn script_cmd(
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
-    let mappings = ActonConfig::load()
-        .ok()
-        .and_then(|config| config.mappings());
+    let mappings = match ActonConfig::load() {
+        Ok(config) => config.mappings(),
+        Err(e) => {
+            eprintln!(
+                "  {} Failed to load Acton.toml: {e:#}",
+                "⚠".yellow().bold()
+            );
+            None
+        }
+    };
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;

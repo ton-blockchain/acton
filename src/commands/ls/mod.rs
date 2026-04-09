@@ -31,9 +31,13 @@ pub async fn ls_cmd(
     }
     let project_root = dunce::canonicalize(configured_project_root())
         .unwrap_or_else(|_| configured_project_root().to_path_buf());
-    let mappings = ActonConfig::load()
-        .ok()
-        .and_then(|config| config.mappings());
+    let mappings = match ActonConfig::load() {
+        Ok(config) => config.mappings(),
+        Err(e) => {
+            eprintln!("  ⚠ Failed to load Acton.toml: {e:#}");
+            None
+        }
+    };
 
     if port.is_none() && !stdio {
         // default to stdio if no port is provided and stdio is not explicitly set
