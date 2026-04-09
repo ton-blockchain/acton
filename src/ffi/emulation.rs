@@ -2267,4 +2267,37 @@ mod tests {
         assert_eq!(pending.message, second_child);
         assert!(!message_iters.is_done(cursor_id));
     }
+
+    #[test]
+    fn parse_int_rejects_non_numeric_string() {
+        let input = "abc";
+        let result: Result<BigInt, _> = input.parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_int_rejects_empty_string() {
+        let input = "";
+        let result: Result<BigInt, _> = input.trim().parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_int_rejects_float() {
+        let input = "3.14";
+        let result: Result<BigInt, _> = input.trim().parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn convert_address_rejects_invalid_address() {
+        let result = StdAddr::from_str_ext("not-an-address", StdAddrFormat::any());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn convert_address_rejects_empty_string() {
+        let result = StdAddr::from_str_ext("", StdAddrFormat::any());
+        assert!(result.is_err());
+    }
 }
