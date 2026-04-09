@@ -35,7 +35,7 @@ import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/build/build"
 
-import "@tests/wrappers/Counter" // Import your contract wrapper
+import "@wrappers/Counter"       // Import your contract wrapper
 import "@contracts/types"        // Import types if needed
 
 fun main() {
@@ -56,9 +56,12 @@ fun main() {
     val result = counter.deploy(deployer.address, { value: ton("0.05") });
 
     // Wait for the transaction to be confirmed on the blockchain
-    result.wait();
+    if (!result.wait()) {
+        return;
+    }
 
-    println("Deployment complete!");
+    println1("Deployment complete: {}", counter.address);
+    println1("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
@@ -105,6 +108,10 @@ By default, Acton targets the testnet when broadcasting.
 ```bash
 acton script scripts/deploy.tolk --broadcast
 ```
+
+In `--broadcast` mode, read-only calls such as `counter.currentCounter()` use
+the same network by default, so deploy scripts can verify on-chain state
+without an extra `--fork-net`.
 
 To deploy to testnet, your wallet must have testnet TONs. You can get them for free with `acton wallet airdrop` command or from the [Testnet Faucet](https://t.me/testgiver_ton_bot).
 
@@ -153,3 +160,5 @@ acton script scripts/deploy.tolk
 ```
 
 In this mode, `net.wallet("deployer")` creates a virtual wallet, and the deployment happens in the local emulator. This allows you to verify that your state initialization and logic are correct before spending any money.
+The same script can still call wrapper getters after deploy: in emulation they
+read emulator state, and in `--broadcast` they read the selected real network.

@@ -8,6 +8,153 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.2.0] - 06.04.2026
+
+Acton 0.2.0 rolls up all user-facing work shipped after 0.1.0 into a much more
+complete beta release. It expands installation and distribution options, adds
+built-in manuals and remote inspection, makes wallet and network workflows
+safer, upgrades the test runner with snapshots, source-level debugging,
+coverage, fuzzing, and mutation testing, and substantially hardens
+verification and release tooling.
+
+### Distribution and Installation
+
+- Bundled TON objs files in releases, added an official Docker image workflow,
+  published Docker installation docs, and included a simple GitLab CI example
+  for containerized usage.
+- Added contributor helpers for native artifacts via `cargo xtask objs` and
+  `just sync-artifacts`, simplifying local TON objs bootstrap and refresh
+  workflows.
+- TON objs archive validation now uses the checked-in
+  `artifacts_manifest.toml`, with `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY=1`
+  available as an escape hatch for local archive refresh workflows.
+- Linux TON objs builds no longer use `-march=native`, improving compatibility
+  on older CPUs, and the checked-in TON objs plus artifact manifests were
+  refreshed.
+- Release and distribution workflows were hardened around published artifacts,
+  attached TON objs files, binary compatibility checks, cross-architecture
+  validation, and QEMU-based artifact verification.
+
+### Docs, Templates, and CLI UX
+
+- Added long-form built-in manuals via `acton help <command>`, plus bundled
+  plain-text manual artifacts and generated manpages.
+- Expanded and corrected user documentation across Docker, debugging,
+  quickstart, wallet examples, and the test runner, including a dedicated
+  step-by-step execution guide.
+- Added `acton new --agents` with template-specific `AGENTS.md` files, a
+  direct `Acton.toml` documentation link in generated templates, and updated
+  the `jetton` starter template for the latest Tolk 1.3 syntax with a
+  corrected generated `deploy.tolk` script.
+- Starter `deploy.tolk` scripts now read back deployed state after deploy or
+  mint flows, so generated projects verify post-deploy state immediately.
+- Added richer CLI and script diagnostics, including better busy-port errors,
+  explicit descriptions for exit code `0xFFFF`, script failure phases, and
+  source backtraces when re-run with `--backtrace full`.
+- Added `acton doctor` checks for common backend API availability, native `.a`
+  library versions, embedded TON commit metadata, and cache-directory
+  reporting; reachability checks now also degrade gracefully in restricted
+  sandboxed environments instead of failing with opaque proxy-discovery
+  panics.
+- `acton up` now detects Unicode dashes pasted into flags, reducing copy-paste
+  failures from Telegram and similar sources.
+- Build, compile, and test commands now treat artifact write failures as hard
+  errors instead of warnings.
+- `acton check` now lints standalone script roots that define `main()`.
+- Fixed `acton check --output-format json` to report the `success` field
+  correctly.
+
+### Wallets, RPC, and Network Workflows
+
+- Added `acton rpc info` for remote account inspection, status and hash
+  reporting, `code_hash` matching against local contracts, and decoded on-chain
+  storage when local ABI metadata is available.
+- Secure wallet storage now keeps per-scope mnemonic bundles in the native
+  keychain, allowing multiple secure wallets in one scope to share a single
+  keychain entry and be updated or removed independently.
+- Interactive testnet airdrops in `acton wallet new` and
+  `acton wallet airdrop` now wait briefly for balance confirmation by default,
+  with `--no-wait-airdrop` available to skip the wait, and wallet creation and
+  import output now includes clearer balance-check follow-ups.
+- Broadcast and real-network send flows now poll more aggressively after
+  submission, surface clearer failure diagnostics for missing wallet state,
+  insufficient balance, stale `seqno`, expired messages, and Toncenter
+  `send_boc` failures, and reject `net.treasury` in broadcast mode.
+- `acton script --broadcast` now defaults remote state reads to the selected
+  broadcast network when `--fork-net` is omitted, and rejects conflicting
+  `--net` / `--fork-net` combinations.
+
+### Testing, Coverage, and Mutation
+
+- Added test-runner APIs `net.sendIter()` and `TxCursor` for stepwise
+  execution, plus `net.saveSnapshot()` and `net.loadSnapshot()` for JSON
+  world-state snapshots.
+- Added opt-in fuzz testing for parameterized `.test.tolk` tests via
+  `@test({ fuzz: ... })`, project defaults in `[test.fuzz]`,
+  `acton test --fuzz-seed`, and `fuzz.assume(...)` / `fuzz.bound(...)`
+  helpers.
+- Added stronger coverage controls and reporting: a Test UI coverage view,
+  project-level `[test.coverage]` settings, `--coverage-include-tests`,
+  `--coverage-include-wrappers`, and `--coverage-minimum-percent` for CI
+  gating.
+- Added mutation-rule filtering, severity gating, and extensibility via
+  `--mutation-levels`, `--mutation-minimum-percent`, custom JSON rules with
+  `--mutation-rules-file`, additional built-in rules, changed-line scoping via
+  `--mutation-diff` / `--mutation-diff-ref`, resumable sessions with
+  `--mutation-session-id`, and targeted reruns with `--mutation-id`.
+- Coverage collection is now much more precise, with better branch accounting,
+  zero-hit files retained in reports, synthetic end-of-function lines excluded
+  from executable counts, and wrappers excluded by default unless explicitly
+  requested.
+- Build caching now avoids long locks and eager data loading, improving
+  repeated build and test workflows.
+- Mutation testing now runs in parallel by default with isolated worker
+  workspaces, substantially reducing runtime on larger suites;
+  `--mutation-workers` can still cap concurrency.
+- The mutation-rule disable flag was renamed from `--disable-rule` to
+  `--mutation-disable-rules` for consistency with the rest of the mutation CLI
+  surface.
+- Fixed test-runner `isContractDeployed()` detection for missing and
+  explicit-null account states.
+
+### Debugging, Compiler, and Language Tooling
+
+- Added a first-class source-level debugger built on a new debug engine and DAP
+  server, with richer value rendering for strings, cells, slices, builders,
+  maps, and addresses, runtime exception reporting, and JetBrains
+  compatibility fixes.
+- Added retrace-driven debugging and improved disassembly on top of new
+  compiler source maps, refreshed Tolk 1.3 support, annotation names with
+  dots, and Tolk file formatting support across the toolchain.
+- Added standard-library improvements including `println2` through `println5`,
+  `env()` support for `coins`, and automatic stdlib refreshes on trunk
+  updates.
+
+### Verification, Reliability, and Security
+
+- Verification flows now retry transient backend failures, honor
+  signer-backend overrides during signature collection, surface backend
+  response bodies and parse errors, produce clearer dry-run and send output,
+  print clearer success output when the verification proof is already
+  deployed, and link more consistently to mainnet and testnet verifiers.
+- Fixed verification edge cases around unsupported networks, backend error
+  handling, and transaction-send failures, reducing opaque failures during
+  real-network verification workflows.
+
+### Upgrade Notes
+
+- If you use secure wallets backed by the native keychain, re-import or
+  recreate them after upgrading so Acton can rewrite the stored mnemonic data
+  in the bundled format.
+- If you store coverage settings in `Acton.toml`, move them under
+  `[test.coverage]`.
+- If you use mutation scripts or CI jobs, rename `--disable-rule` to
+  `--mutation-disable-rules`.
+- If you want reproducible fuzz runs in CI, set `[test.fuzz].seed` in
+  `Acton.toml` or pass `acton test --fuzz-seed <SEED>` explicitly.
+- If your CI uses the GitHub Action, update workflow references to
+  `ton-blockchain/setup-acton`.
+
 ## [0.1.4] - 29.03.2026
 
 Acton 0.1.4 adds remote account inspection and deeper test-runner control,

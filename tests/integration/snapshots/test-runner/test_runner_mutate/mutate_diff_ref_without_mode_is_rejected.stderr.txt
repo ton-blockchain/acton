@@ -1,0 +1,1 @@
+Error: Use --mutation-diff <worktree|ref|branch> when passing --mutation-diff-ref

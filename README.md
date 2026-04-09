@@ -4,8 +4,8 @@
 
 Acton is an all-in-one TON smart contract development toolkit written in Rust.
 It combines project scaffolding, build, testing, scripting, wallet and network
-operations, verification, linting, formatting, and low-level VM tooling in one
-CLI.
+operations, verification, linting, formatting, debugging, and low-level VM
+tooling in one CLI.
 
 Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 
@@ -13,10 +13,12 @@ Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 
 ## Why Acton
 
-- Single CLI for the full contract lifecycle: create, build, test, deploy,
-  verify.
+- Single CLI for the full contract lifecycle: create, build, test, debug,
+  deploy, verify.
 - Native speed (Rust-based toolchain and test runtime).
 - Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
+- Fast test runner with fork mode, gas snapshots, coverage, mutation and fuzzing testing and nice UI.
+- Browser test UI for failed tests, traces, logs, and coverage inspection.
 - Local development node with faucet, forking, snapshots, and persistence.
 
 ## Install
@@ -43,6 +45,22 @@ the installation:
 acton --version
 ```
 
+If you prefer a containerized workflow, use the published Docker image:
+
+```bash
+docker run --rm ghcr.io/ton-blockchain/acton:<version> --version
+```
+
+To run Acton against the current project from Docker:
+
+```bash
+docker run --rm \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  ghcr.io/ton-blockchain/acton:<version> \
+  build
+```
+
 For more installation details, see the
 [installation guide](https://ton-blockchain.github.io/acton/docs/installation).
 
@@ -50,9 +68,12 @@ For more installation details, see the
 
 Acton is currently distributed as a public beta. The stable release channel is
 the latest numbered GitHub release, and the first-class platform matrix is
-macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). `trunk` builds installed
-via `acton up --trunk`, native Windows usage, and other source-built targets
-are beta / best-effort surfaces for now. The full policy is documented at
+macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
+documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
+today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
+follow the Linux installation path there. `trunk` builds installed via
+`acton up --trunk`, WSL installs, and other source-built targets are beta /
+best-effort surfaces for now. The full policy is documented at
 [Support policy](https://ton-blockchain.github.io/acton/docs/miscellaneous/support-policy).
 
 ## From zero to testnet

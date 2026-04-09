@@ -48,7 +48,8 @@ pub(crate) fn poll_request<R: BufRead>(
     let mut content = vec![0; content_length];
     input_buffer.read_exact(&mut content)?;
 
-    let value: Value = serde_json::from_slice(&content)?;
+    let mut value: Value = serde_json::from_slice(&content)?;
+    normalize_request_value(&mut value);
     match serde_json::from_value::<Request>(value.clone()) {
         Ok(request) => Ok(Some(IncomingRequest::Known(request))),
         Err(err) => {
@@ -65,5 +66,29 @@ pub(crate) fn poll_request<R: BufRead>(
 
             Err(anyhow!("Error while deserializing DAP request: {err}"))
         }
+    }
+}
+
+/// Normalize requests.
+///
+/// `JetBrains` sends custom empty `configurationDone`.
+fn normalize_request_value(value: &mut Value) {
+    if value.get("type").and_then(Value::as_str) != Some("request") {
+        return;
+    }
+    if value.get("command").and_then(Value::as_str) != Some("configurationDone") {
+        return;
+    }
+
+    let has_empty_arguments = value
+        .get("arguments")
+        .and_then(Value::as_object)
+        .is_some_and(serde_json::Map::is_empty);
+    if !has_empty_arguments {
+        return;
+    }
+
+    if let Some(object) = value.as_object_mut() {
+        object.remove("arguments");
     }
 }

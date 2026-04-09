@@ -14,7 +14,7 @@ script that deploys the minter and mints the initial supply.
 - `tests/wallet.test.tolk` covers minting, admin updates, content updates, and
   transfers.
 - `scripts/deploy.tolk` builds on-chain metadata, deploys the minter, and mints
-  the configured supply.
+  the configured supply, then reads total supply back from the network.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
   GitHub Actions.
 
@@ -71,6 +71,10 @@ acton wallet new --name deployer --local --airdrop
 ```bash
 acton script scripts/deploy.tolk --broadcast --net testnet
 ```
+
+The starter script waits for deploy and mint transactions, then reads total
+supply back from testnet. You do not need a separate `--fork-net` for that
+verification step.
 
 You can also use the generated script aliases:
 

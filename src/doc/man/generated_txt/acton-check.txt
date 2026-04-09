@@ -11,8 +11,9 @@ DESCRIPTION
        Acton.toml, or a single .tolk file.
 
        By default, Acton checks contracts from Acton.toml together with
-       workspace test files. The command also supports machine-readable output
-       formats and rule explanations.
+       workspace test files and standalone script roots that define main(). The
+       command also supports machine-readable output formats and rule
+       explanations.
 
 OPTIONS
    Check Options
@@ -70,6 +71,9 @@ BEHAVIOR
 
        o  --output-file is not valid with plain format
 
+       o  project-wide mode includes workspace *.test.tolk files and standalone
+          script roots that define main()
+
        o  single-file mode relaxes E014 (acton-import-in-contract)
 
        o  targets ending with .tolk are treated as file paths; other targets
@@ -105,7 +109,7 @@ EXAMPLES
 
        4. Emit SARIF to a file:
 
-              acton check --output-format sarif --output-file .acton/reports/lint.sarif
+              acton check --output-format sarif --output-file build/reports/lint.sarif
 
        5. Run only selected rules:
 

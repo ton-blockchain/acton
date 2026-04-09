@@ -29,7 +29,44 @@ pub struct TestExecutionContext {
     pub vm_log_diff: Option<String>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
+    pub fuzz: Option<FuzzExecutionContext>,
     pub failure: Option<TestFailureExecutionContext>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FuzzCaseContext {
+    pub run: usize,
+    pub inputs: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FuzzExecutionContext {
+    pub total_runs: usize,
+    pub seed: u64,
+    pub failed_case: Option<FuzzCaseContext>,
+}
+
+#[must_use]
+pub(crate) fn format_fuzz_failure_context(fuzz: &FuzzExecutionContext) -> String {
+    let mut lines = vec![
+        format!("Fuzz seed: {}", fuzz.seed),
+        format!("Fuzz runs: {}", fuzz.total_runs),
+    ];
+
+    if let Some(case) = &fuzz.failed_case {
+        lines.push(format!("Fuzz case: {}/{}", case.run, fuzz.total_runs));
+        if !case.inputs.is_empty() {
+            let inputs = case
+                .inputs
+                .iter()
+                .map(|(name, value)| format!("{name}={value}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            lines.push(format!("Inputs: {inputs}"));
+        }
+    }
+
+    lines.join("\n")
 }
 
 #[derive(Debug, Clone)]

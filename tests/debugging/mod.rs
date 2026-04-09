@@ -134,8 +134,7 @@ fn wait_for_initialized(client: &DapClient) -> anyhow::Result<()> {
     loop {
         if Instant::now() >= deadline {
             anyhow::bail!(
-                "Timed out waiting for DAP initialized event after {:?}",
-                DEBUG_EVENT_TIMEOUT
+                "Timed out waiting for DAP initialized event after {DEBUG_EVENT_TIMEOUT:?}"
             );
         }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_secs(1))
@@ -151,10 +150,7 @@ fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
     let deadline = Instant::now() + DEBUG_EVENT_TIMEOUT;
     loop {
         if Instant::now() >= deadline {
-            anyhow::bail!(
-                "Timed out waiting for DAP stopped event after {:?}",
-                DEBUG_EVENT_TIMEOUT
-            );
+            anyhow::bail!("Timed out waiting for DAP stopped event after {DEBUG_EVENT_TIMEOUT:?}");
         }
         if let Ok(Some(event)) = client.try_receive_event(Duration::from_millis(100))
             && matches!(event, Event::Stopped(_))

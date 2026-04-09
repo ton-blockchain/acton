@@ -1,0 +1,12 @@
+Coverage Summary:
+Lines: 1/1 (100.00%)
+Total Hits: 2
+
+File: [ROOT]/code/multi_branch.tolk
+Annotated Code:
+1   |                                                          |
+2   |             fun coalesce(foo: int?): int {               |
+3 ✓ |                 return foo != null ? foo : 100;          | hits:2 branches:site0 true=0 false=1; site1 true=1 false=0
+4   |             }                                            |
+5   |                                                          |
+

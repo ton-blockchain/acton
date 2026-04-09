@@ -10,7 +10,7 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
-const STEP_TRACE_MESSAGES: &str = r#"
+const STEP_TRACE_MESSAGES: &str = r"
 struct (0x3101f001) TriggerForward {
     queryId: uint64
     target: address
@@ -19,7 +19,7 @@ struct (0x3101f001) TriggerForward {
 struct (0x3101f002) Notify {
     queryId: uint64
 }
-"#;
+";
 
 const STEP_TRACE_FORWARDER_CONTRACT: &str = r#"
 import "messages"
@@ -267,16 +267,16 @@ fn save_test_trace_without_path_uses_default_directory() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_without_path_uses_default_directory.stdout.txt",
         )
-        .assert_file_exists(".acton/traces/test-default-trace_trace.json")
-        .assert_file_exists(".acton/traces/contracts/simple.json")
+        .assert_file_exists("build/traces/test-default-trace_trace.json")
+        .assert_file_exists("build/traces/contracts/simple.json")
         .assert_file_snapshot_matches(
-            ".acton/traces/contracts/simple.json",
+            "build/traces/contracts/simple.json",
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_without_path_uses_default_directory.contract.txt",
         );
 
     assert_trace_json_contract(
         &project,
-        ".acton/traces/test-default-trace_trace.json",
+        "build/traces/test-default-trace_trace.json",
         "test-default-trace",
     );
 }
@@ -315,7 +315,7 @@ fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
         "test-custom-trace",
     );
 
-    let default_trace_dir = project.path().join(".acton/traces");
+    let default_trace_dir = project.path().join("build/traces");
     assert!(
         !default_trace_dir.exists(),
         "Default trace dir should not be created for custom trace path: {}",
@@ -610,7 +610,7 @@ fn save_test_trace_merges_step_execution_batches_into_single_named_trace() {
 
     let failed_messages = merged_trace["failed_messages"]
         .as_array()
-        .map_or_else(Vec::new, |failed_messages| failed_messages.to_vec());
+        .map_or_else(Vec::new, |failed_messages| failed_messages.clone());
     assert!(
         failed_messages.is_empty(),
         "step trace should not fragment failures into extra chains"
@@ -750,7 +750,7 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
             "integration/snapshots/test-runner/cmd_agent_h/regular_run_without_trace_flag_does_not_create_trace_artifacts.stdout.txt",
         );
 
-    let trace_dir = project.path().join(".acton/traces");
+    let trace_dir = project.path().join("build/traces");
     assert!(
         !trace_dir.exists(),
         "Trace dir should not exist without --save-test-trace: {}",
@@ -776,7 +776,7 @@ fn save_test_trace_can_be_enabled_after_regular_run() {
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_can_be_enabled_after_regular_run.regular.stdout.txt",
         );
 
-    let default_trace_dir = project.path().join(".acton/traces");
+    let default_trace_dir = project.path().join("build/traces");
     assert!(
         !default_trace_dir.exists(),
         "Trace dir should not exist after regular run: {}",

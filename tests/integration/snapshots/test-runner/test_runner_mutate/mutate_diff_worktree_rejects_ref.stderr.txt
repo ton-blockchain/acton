@@ -1,0 +1,1 @@
+Error: Do not pass --mutation-diff-ref <REF> with --mutation-diff worktree

@@ -172,7 +172,7 @@ CLI flags override config values for the current invocation.
 5. Start a local integration node with pre-funded accounts:
 
    ```bash
-   acton litenode start --accounts deployer,user --db-path .acton/localnet.db
+   acton litenode start --accounts deployer,user --db-path build/localnet.db
    ```
 
 ## SEE ALSO

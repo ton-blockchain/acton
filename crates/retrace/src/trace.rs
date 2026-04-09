@@ -377,7 +377,7 @@ impl Trace {
                 }
                 VmLine::VmFinalC5 { value } => {
                     let cell = match value {
-                        CellLike::Builder(h) | CellLike::Cell(h) => h.to_owned(),
+                        CellLike::Builder(h) | CellLike::Cell(h) => h.clone(),
                     };
                     steps.push(TraceStep::FinalC5 { cell });
                 }

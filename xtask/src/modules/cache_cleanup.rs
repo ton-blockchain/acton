@@ -221,9 +221,7 @@ fn format_timestamp(timestamp: &DateTime<Utc>) -> String {
 }
 
 fn format_optional_timestamp(timestamp: Option<&DateTime<Utc>>) -> String {
-    timestamp
-        .map(format_timestamp)
-        .unwrap_or_else(|| "never".to_owned())
+    timestamp.map_or_else(|| "never".to_owned(), format_timestamp)
 }
 
 fn should_delete(entry: &ActionsCacheEntry, now: &DateTime<Utc>, policy: &CleanupPolicy) -> bool {

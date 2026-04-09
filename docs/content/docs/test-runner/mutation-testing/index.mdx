@@ -32,9 +32,9 @@ Beyond testing gaps, mutation testing can also reveal implementation issues. For
 2.  **Compilation**: Each mutant is compiled. If a mutant doesn't compile (e.g., syntax error), it's discarded.
 3.  **Testing**: Acton runs your test suite against each valid mutant.
 4.  **Reporting**:
-    - **Killed**: The tests failed (good!).
-    - **Survived**: The tests passed (bad!). This indicates a gap in testing.
-    - **Compile errors**: Mutants that fail to compile are reported separately and excluded from the mutation score.
+- **Killed**: The tests failed (good!).
+- **Survived**: The tests passed (bad!). This indicates a gap in testing.
+- **Compile errors**: Mutants that fail to compile are reported separately and excluded from the mutation score.
 
 ## Running Mutation Tests
 
@@ -46,11 +46,202 @@ acton test --mutate --mutate-contract wallet
 
 ### Options
 
-| Option                            | Description                                                    |
-|-----------------------------------|----------------------------------------------------------------|
-| `--mutate`                        | Enables mutation testing mode.                                 |
-| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.          |
-| `--disable-rule <RULE>`           | Disables specific mutation rules (can be used multiple times). |
+| Option                            | Description                                                                        |
+|-----------------------------------|------------------------------------------------------------------------------------|
+| `--mutate`                        | Enables mutation testing mode.                                                     |
+| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.                              |
+| `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope.  |
+| `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.               |
+| `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                       |
+| `--mutation-rules-file <PATH>`    | Loads custom query-based mutation rules from a JSON file.                          |
+| `--mutation-session-id <ID>`      | Reuses a session ID and appends progress to `.acton/mutation-sessions/<ID>.jsonl`. |
+| `--mutation-workers <N>`          | Overrides mutation parallelism. Defaults to the host's available parallelism.      |
+| `--mutation-id <ID>`              | Re-runs only specific mutation IDs from a previous mutation report.                |
+| `--mutation-minimum-percent <P>`  | Fails the run when the mutation score drops below the required percentage.         |
+| `--mutation-disable-rules <RULE>` | Disables specific mutation rules (can be used multiple times).                     |
+
+### Parallel Workers
+
+Mutation testing can spawn a lot of compile and test workers. By default, Acton
+uses the host's available parallelism and keeps one isolated mutation
+workspace per worker.
+
+Use `--mutation-workers <N>` when you want to cap or raise concurrency for a
+specific run:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-workers 4
+```
+
+This is useful when you want to reduce CPU, disk, or process pressure on a
+laptop or CI machine. Results are still reported incrementally as workers
+finish, while output stays ordered by mutation ID.
+
+### Scoping Mutation Runs
+
+Mutation testing can be expensive because each valid mutant is compiled and
+tested separately. In practice, most local runs should use one or more filters
+to keep the scope small and the feedback fast.
+
+#### Changed-line modes
+
+Use `--mutation-diff` to mutate only code that intersects changed lines.
+
+- `worktree`: compares the current worktree with `HEAD`. This is the best mode
+  for uncommitted local changes. Untracked files are treated as fully changed.
+- `ref`: compares the current checkout against an explicit ref, tag, or commit.
+  This mode requires `--mutation-diff-ref <REF>`.
+- `branch`: compares the current branch against the merge-base with its upstream
+  branch. If the branch has no upstream, pass `--mutation-diff-ref <REF>` to
+  choose the base explicitly, for example `origin/main`.
+
+Examples:
+
+```bash
+# Only mutate lines changed in the current worktree
+acton test --mutate --mutate-contract wallet --mutation-diff worktree
+
+# Compare against an explicit ref or commit
+acton test --mutate --mutate-contract wallet --mutation-diff ref --mutation-diff-ref HEAD~1
+
+# Compare the current branch against its upstream merge-base
+acton test --mutate --mutate-contract wallet --mutation-diff branch
+
+# Compare the current branch against a specific branch instead of upstream
+acton test --mutate --mutate-contract wallet --mutation-diff branch --mutation-diff-ref origin/main
+```
+
+#### Level and rule filters
+
+Use `--mutation-levels` to restrict the run to selected rule levels:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-levels critical,major
+```
+
+Use `--mutation-disable-rules` to exclude noisy or intentionally ignored rules:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-disable-rules flip_plus --mutation-disable-rules flip_minus
+```
+
+All mutation filters compose. For example, this command runs only `critical`
+mutations on lines changed in the current worktree and skips one specific rule:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation-levels critical --mutation-disable-rules remove_logical_not
+```
+
+The reported mutation score always reflects only the mutants that remain after
+all filters are applied.
+
+#### Custom JSON rules
+
+Use `--mutation-rules-file` when you want to add project-specific query-based
+mutations without recompiling Acton.
+
+Custom rules are merged with the built-in set. If a custom rule uses the same
+rule ID as a built-in rule, the custom rule overrides it.
+
+Example:
+
+```json
+[
+  {
+    "name": "flip_plus_custom",
+    "description": "Replace + with *",
+    "explanation": "Custom arithmetic mutation loaded from JSON.",
+    "level": "major",
+    "group": "arithmetic",
+    "matcher": {
+      "type": "query",
+      "query": "(binary_operator operator_name: \"+\" @op)",
+      "capture": "op"
+    },
+    "edit": {
+      "type": "replace",
+      "replacement": "*"
+    }
+  }
+]
+```
+
+Then run:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-rules-file mutation-rules.json
+```
+
+Currently, JSON rules support only the serializable `query` matcher and `remove`
+or `replace` edits.
+
+#### Session logs and resume
+
+Each mutation run gets a session ID. If you do not pass one explicitly, Acton
+generates a hash-like ID and starts writing append-only JSON Lines progress to
+`.acton/mutation-sessions/<SESSION_ID>.jsonl`.
+
+Use `--mutation-session-id` when you want to keep that ID stable and continue
+the same run later:
+
+```bash
+# Start or resume a session for the current worktree changes
+acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation-session-id wallet-worktree
+```
+
+To resume successfully, keep the same contract and the same mutation filters.
+Acton validates the stored session metadata before reusing the file.
+
+If you interrupt the run with `Ctrl+C`, Acton stops without marking the session
+as finished and prints the exact resume command for that session.
+
+#### Re-running specific mutants
+
+Use `--mutation-id` when you want to focus on one or more mutants from a previous run.
+Pass the mutation numbers shown in the report and keep the same mutation
+filters you used when those IDs were produced.
+
+Examples:
+
+```bash
+# Re-run one specific mutant
+acton test --mutate --mutate-contract wallet --mutation-id 2
+
+# Re-run several mutants from the same filtered run
+acton test --mutate --mutate-contract wallet --mutation-id 1,3
+```
+
+If you also use filters such as `--mutation-diff`, `--mutation-levels`, or
+`--mutation-disable-rules`, the IDs must still exist after those filters are applied.
+When you combine this with `--mutation-session-id`, the session must be created
+with the same filtered mutation set.
+
+#### Minimum mutation score
+
+Use `--mutation-minimum-percent` to turn mutation testing into a CI quality
+gate:
+
+```bash
+acton test --mutate --mutate-contract wallet --mutation-minimum-percent 85
+```
+
+The threshold is applied to the final mutation score after filters are applied.
+Compile errors are reported separately and excluded from that score.
+
+#### Config defaults
+
+You can store the same filters in `Acton.toml`:
+
+```toml
+[test.mutation]
+diff = "branch"
+diff-ref = "origin/main"
+mutation-levels = ["critical", "major"]
+minimum-percent = 85
+disable-rules = ["flip_plus"]
+```
+
+CLI flags override `[test.mutation]` for the current run.
 
 ### Requirements
 
@@ -68,7 +259,10 @@ Mutation testing analyzes the contract specified by `--mutate-contract` and its 
 
 ## Mutation Rules
 
-Acton includes several built-in mutation rules categorized by their impact level.
+Acton currently includes 49 built-in mutation rules for assertions, storage and
+upgrade calls, external-message handling, control flow, arithmetic,
+comparisons, booleans, logical operators, and bitwise or shift operators.
+
 See [Mutation Rules](/docs/test-runner/mutation-testing/rules) for complete list.
 
 ## Interpreting Results
@@ -78,8 +272,9 @@ After running mutation tests, you will see a summary of the results:
 ```text
 Mutation Testing
 ────────────────────────────────────────────────────────────
+Session:  4949ed3b0ae13461
 Contract: Wallet
-Main Source: .jetton/contracts/jetton-wallet-contract.tolk
+Source:   .jetton/contracts/jetton-wallet-contract.tolk
 Files:    6
 Mutants:  51
 
@@ -97,6 +292,10 @@ Mutants:  51
 
 - **KILLED**: Your tests successfully detected the bug.
 - **SURVIVED**: Your tests failed to detect the bug. You should add a test case to cover this scenario.
+- **Session log**: Progress is written incrementally to
+  `.acton/mutation-sessions/<SESSION_ID>.jsonl`, which makes interrupted runs resumable.
+- **Mutation IDs**: The number in `Mutation 2/51` or `Mutation #2` can be used
+  later with `--mutation-id 2` to re-run that specific mutant.
 
 For survived mutants, Acton provides a diff showing exactly what was changed and explains why it's an issue:
 
@@ -106,12 +305,12 @@ For survived mutants, Acton provides a diff showing exactly what was changed and
   Level: critical
   Group: assertion
   at contracts/jetton-minter.tolk:46:13
-    44 │ 
+    44 │
     45 │         RequestWalletAddress => {
     46 │             assert (
     47 │                 in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND
     48 │             ) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
-    49 │ 
+    49 │
     50 │             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
 
   Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.

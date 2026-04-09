@@ -827,6 +827,11 @@ fn save_gas_snapshot(
 ) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(snapshot)?;
     let path = resolve_snapshot_path(project_root, filename);
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(path, json)?;
     println!("Gas snapshot saved to {filename}");
     Ok(())

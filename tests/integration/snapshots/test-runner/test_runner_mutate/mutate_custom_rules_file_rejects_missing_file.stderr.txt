@@ -1,0 +1,4 @@
+Error: Failed to read custom mutation rules file '[ROOT]/missing-rules.json'
+
+Caused by:
+  [NOT_FOUND]

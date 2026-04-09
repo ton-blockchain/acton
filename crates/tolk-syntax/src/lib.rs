@@ -249,7 +249,7 @@ mod tests {
         }
 
         impl AnnotationNameCollector {
-            fn visit_with_source<'tree>(&mut self, source: &str, strukt: &Struct<'tree>) {
+            fn visit_with_source(&mut self, source: &str, strukt: &Struct<'_>) {
                 self.source = source.to_string();
                 self.walk_struct(strukt);
             }

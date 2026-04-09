@@ -1,6 +1,6 @@
 Coverage Summary:
-Lines: 2/3 (66.67%)
-Total Hits: 2
+Lines: 3/3 (100.00%)
+Total Hits: 3
 
 File: [ROOT]/code/calculator.tolk
 Annotated Code:
@@ -10,7 +10,7 @@ Annotated Code:
  4   |             }                                            |
  5   |                                                          |
  6   |             fun divide(a: int, b: int): int {            |
- 7 ✗ |                 if (b == 0) {                            | hits:0
+ 7 ✓ |                 if (b == 0) {                            | hits:1
  8   |                     throw 100;                           |
  9   |                 }                                        |
 10 ✓ |                 return a / b;                            | hits:1

@@ -69,9 +69,12 @@ fun main() {
     });
 
     val result = counter.deploy(deployer.address, ton("0.05"));
-    result.wait(); // optional wait for deployment when broadcasting
+    if (!result.wait()) {
+        return;
+    }
 
     println1("Deployed counter to {}", counter.address);
+    println1("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
@@ -136,6 +139,11 @@ Deploy to mainnet:
 ```bash
 acton script deploy.tolk --broadcast --net mainnet
 ```
+
+In `--broadcast` mode, post-deploy getter calls such as
+`counter.currentCounter()` automatically read from the selected broadcast
+network. You do not need a separate `--fork-net` for the common deploy-and-check
+flow.
 
 ## Using Wallets in Scripts
 
@@ -252,7 +260,9 @@ fun main() {
 
 ### Local vs Remote State
 
-By default, `net.runGetMethod()` queries the **local emulator state**. To query **real deployed contracts**, use the `--fork-net` flag:
+By default, `net.runGetMethod()` queries the **local emulator state** when the
+script runs without `--broadcast`. To query **real deployed contracts** without
+broadcasting, use the `--fork-net` flag:
 
 ```bash
 # Query a contract on testnet
@@ -265,10 +275,17 @@ acton script query.tolk --fork-net mainnet
 acton script query.tolk --fork-net testnet --api-key YOUR_API_KEY
 ```
 
-When `--fork-net` is enabled, Acton automatically fetches account state from the real blockchain and caches it locally for the script execution. This allows you to:
+When `--fork-net` is enabled, Acton automatically fetches account state from
+the real blockchain and caches it locally for the script execution. This allows
+you to:
 - Query real contract state
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
+
+When the script runs with `--broadcast`, the selected `--net` already becomes
+the default remote read network. This means deploy scripts can send a
+transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper
+getters against the same chain without passing `--fork-net`.
 
 <Callout type="info">
 Learn more about fork testing in the [Fork Testing](/docs/test-runner/fork-testing/) article.
@@ -276,14 +293,19 @@ Learn more about fork testing in the [Fork Testing](/docs/test-runner/fork-testi
 
 ### Combining with --broadcast
 
-The `--fork-net` and `--broadcast` flags serve different purposes and can be used together:
+`--fork-net` and `--broadcast` can still be combined, but in broadcast mode
+they must point to the same network.
 
-| Flags                            | Blockchain State   | Wallets      | Use Case                                    |
-|----------------------------------|--------------------|--------------|---------------------------------------------|
-| None                             | Local emulator     | Test wallets | Local development                           |
-| `--fork-net testnet`             | Real testnet state | Test wallets | Query real contracts locally                |
-| `--broadcast`                    | Local emulator     | Real wallets | Deploy to blockchain                        |
-| `--broadcast --fork-net testnet` | Real testnet state | Real wallets | Deploy and interact with existing contracts |
+| Flags                                          | Blockchain State           | Wallets      | Use Case                                                        |
+|------------------------------------------------|----------------------------|--------------|-----------------------------------------------------------------|
+| None                                           | Local emulator             | Test wallets | Local development                                               |
+| `--fork-net testnet`                           | Real testnet state         | Test wallets | Query real contracts locally                                    |
+| `--broadcast`                                  | Selected broadcast network | Real wallets | Deploy and read back live state on testnet                      |
+| `--broadcast --net mainnet`                    | Real mainnet state         | Real wallets | Mainnet deployment and post-deploy verification                 |
+| `--broadcast --net testnet --fork-net testnet` | Real testnet state         | Real wallets | Explicit same-network fork setup, optionally with block pinning |
+
+Passing different `--net` and `--fork-net` values in `--broadcast` mode is
+rejected to avoid reading from one network while sending to another.
 
 ## Network Selection
 

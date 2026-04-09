@@ -54,8 +54,7 @@ impl DebugTestOutputExt for DebugTestOutput {
 
         assert_eq!(
             actual_value, expected_value,
-            "Variable '{}' value mismatch at step {}: expected '{}', got '{}'",
-            var_name, step_index, expected_value, actual_value
+            "Variable '{var_name}' value mismatch at step {step_index}: expected '{expected_value}', got '{actual_value}'"
         );
         self
     }

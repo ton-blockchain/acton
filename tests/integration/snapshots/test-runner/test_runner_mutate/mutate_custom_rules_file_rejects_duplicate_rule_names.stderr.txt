@@ -1,0 +1,1 @@
+Error: Custom mutation rules file '[ROOT]/mutation-rules.json' contains duplicate rule name 'dup_rule'

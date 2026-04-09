@@ -975,6 +975,14 @@ impl<'tree> InstanceArg<'tree> {
     pub fn value(&self) -> Option<Expr<'tree>> {
         self.0.field("value")
     }
+
+    #[must_use]
+    pub fn has_value_separator(&self) -> bool {
+        let mut cursor = self.0.walk();
+        self.0
+            .children(&mut cursor)
+            .any(|child| child.kind() == ":")
+    }
 }
 
 impl<'tree> HasName<'tree> for InstanceArg<'tree> {

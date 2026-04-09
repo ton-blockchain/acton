@@ -152,7 +152,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         import "@acton/emulation/network"
         import "@acton/build/build"
 
-        import "@tests/wrappers/Counter"
+        import "@wrappers/Counter"
         import "@contracts/types"
 
         fun main() {
@@ -160,9 +160,12 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
             val counter = Counter.fromStorage(Storage { id: 0, counter: 0 });
             val res = counter.deploy(deployer.address, { value: ton("0.005") });
-            res.wait();
+            if (!res.wait()) {
+                return;
+            }
 
             println1("Deployed counter to {}", counter.address);
+            println1("On-chain counter is {}", counter.currentCounter());
         }
         ```
 
@@ -172,7 +175,10 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         acton script scripts/deploy.tolk --broadcast --net testnet
         ```
 
-        If successful, you'll see the deployment transaction hash and the contract address.
+        If successful, you'll see the deployment transaction hash, the contract
+        address, and the freshly read on-chain counter value. The getter call
+        works without a separate `--fork-net` because `--broadcast --net
+        testnet` now uses testnet for reads by default.
     </Step>
 
     <Step title="Verify contract">

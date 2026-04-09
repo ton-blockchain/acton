@@ -64,8 +64,14 @@ pub(crate) struct TestConfig {
     pub coverage: Option<bool>,
     pub coverage_format: Option<String>,
     pub coverage_file: Option<String>,
+    pub coverage_minimum_percent: Option<f64>,
+    pub coverage_include_wrappers: Option<bool>,
+    pub coverage_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fuzz_runs: Option<usize>,
+    pub fuzz_max_test_rejects: Option<usize>,
+    pub fuzz_seed: Option<u64>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
@@ -983,18 +989,6 @@ version = "0.1.0"
                 toml_content.push_str(&format!("backtrace = \"{backtrace}\"\n"));
             }
 
-            if let Some(coverage) = config.coverage {
-                toml_content.push_str(&format!("coverage = {coverage}\n"));
-            }
-
-            if let Some(coverage_format) = &config.coverage_format {
-                toml_content.push_str(&format!("coverage-format = \"{coverage_format}\"\n"));
-            }
-
-            if let Some(coverage_file) = &config.coverage_file {
-                toml_content.push_str(&format!("coverage-file = \"{coverage_file}\"\n"));
-            }
-
             if let Some(junit_path) = &config.junit_path {
                 toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
             }
@@ -1009,6 +1003,61 @@ version = "0.1.0"
 
             if let Some(fail_on_diff) = config.fail_on_diff {
                 toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+            }
+
+            if config.fuzz_runs.is_some()
+                || config.fuzz_max_test_rejects.is_some()
+                || config.fuzz_seed.is_some()
+            {
+                toml_content.push_str("\n[test.fuzz]\n");
+
+                if let Some(fuzz_runs) = config.fuzz_runs {
+                    toml_content.push_str(&format!("runs = {fuzz_runs}\n"));
+                }
+
+                if let Some(fuzz_max_test_rejects) = config.fuzz_max_test_rejects {
+                    toml_content.push_str(&format!("max-test-rejects = {fuzz_max_test_rejects}\n"));
+                }
+
+                if let Some(fuzz_seed) = config.fuzz_seed {
+                    toml_content.push_str(&format!("seed = {fuzz_seed}\n"));
+                }
+            }
+
+            if config.coverage.is_some()
+                || config.coverage_format.is_some()
+                || config.coverage_file.is_some()
+                || config.coverage_minimum_percent.is_some()
+                || config.coverage_include_wrappers.is_some()
+                || config.coverage_include_tests.is_some()
+            {
+                toml_content.push_str("\n[test.coverage]\n");
+
+                if let Some(coverage) = config.coverage {
+                    toml_content.push_str(&format!("enabled = {coverage}\n"));
+                }
+
+                if let Some(coverage_format) = &config.coverage_format {
+                    toml_content.push_str(&format!("format = \"{coverage_format}\"\n"));
+                }
+
+                if let Some(coverage_file) = &config.coverage_file {
+                    toml_content.push_str(&format!("output-file = \"{coverage_file}\"\n"));
+                }
+
+                if let Some(coverage_minimum_percent) = config.coverage_minimum_percent {
+                    toml_content
+                        .push_str(&format!("minimum-percent = {coverage_minimum_percent}\n"));
+                }
+
+                if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
+                    toml_content
+                        .push_str(&format!("include-wrappers = {coverage_include_wrappers}\n"));
+                }
+
+                if let Some(coverage_include_tests) = config.coverage_include_tests {
+                    toml_content.push_str(&format!("include-tests = {coverage_include_tests}\n"));
+                }
             }
 
             toml_content.push('\n');
@@ -1452,6 +1501,27 @@ impl ActonCommand {
     /// Enable coverage with custom output file
     pub(crate) fn with_coverage_file(mut self, file: &str) -> Self {
         self.cmd = self.cmd.arg("--coverage-file").arg(file);
+        self
+    }
+
+    /// Require a minimum total line coverage percentage.
+    pub(crate) fn with_coverage_minimum_percent(mut self, percent: f64) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("--coverage-minimum-percent")
+            .arg(percent.to_string());
+        self
+    }
+
+    /// Include files under the `@wrappers` mapping in coverage reports.
+    pub(crate) fn with_coverage_include_wrappers(mut self) -> Self {
+        self.cmd = self.cmd.arg("--coverage-include-wrappers");
+        self
+    }
+
+    /// Include `.test.tolk` files in coverage reports.
+    pub(crate) fn with_coverage_include_tests(mut self) -> Self {
+        self.cmd = self.cmd.arg("--coverage-include-tests");
         self
     }
 

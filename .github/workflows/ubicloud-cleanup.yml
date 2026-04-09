@@ -33,6 +33,7 @@ jobs:
     name: Delete caches
     if: github.repository == 'ton-blockchain/acton'
     runs-on: ubicloud-standard-2-ubuntu-2204
+    environment: ubicloud
 
     permissions:
       contents: read
@@ -44,7 +45,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 

@@ -779,11 +779,11 @@ fn test_project_root_build_from_nested_directory_snapshot_and_cache() {
         );
 
     assert!(
-        project.path().join(".acton/cache").exists(),
+        project.path().join("build/cache").exists(),
         "build cache should be created under project root"
     );
     assert!(
-        !nested_dir.join(".acton/cache").exists(),
+        !nested_dir.join("build/cache").exists(),
         "build cache must not be created under nested working directory"
     );
 }
@@ -952,7 +952,7 @@ fn test_project_root_full_flow_from_sibling_directory_on_new_project() {
     );
 
     assert!(
-        project_dir.join(".acton/cache").exists(),
+        project_dir.join("build/cache").exists(),
         "cache should be created under project root"
     );
     assert!(
@@ -1021,8 +1021,8 @@ fn test_manifest_path_test_save_test_trace_default_writes_to_project_root() {
 
     let root_trace = project
         .path()
-        .join(".acton/traces/test-profiled-transaction_trace.json");
-    let nested_trace = nested_dir.join(".acton/traces/test-profiled-transaction_trace.json");
+        .join("build/traces/test-profiled-transaction_trace.json");
+    let nested_trace = nested_dir.join("build/traces/test-profiled-transaction_trace.json");
 
     project
         .acton()
@@ -1033,7 +1033,7 @@ fn test_manifest_path_test_save_test_trace_default_writes_to_project_root() {
         .current_dir(&nested_dir)
         .run()
         .success()
-        .assert_file_exists(".acton/traces/test-profiled-transaction_trace.json");
+        .assert_file_exists("build/traces/test-profiled-transaction_trace.json");
 
     assert!(
         root_trace.exists(),
@@ -1139,6 +1139,31 @@ fn test_manifest_path_test_profiling_snapshots_use_project_root() {
     assert!(
         !stderr.contains("Warning: Failed to load baseline gas snapshot"),
         "baseline snapshot must be loaded from project root, stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn test_snapshot_nested_output_creates_parent_directories() {
+    let project = ProjectBuilder::new("profiling-snapshot-nested-output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let snapshot_path = "build/profiles/profile-baseline.json";
+
+    project
+        .acton()
+        .test()
+        .arg("--snapshot")
+        .arg(snapshot_path)
+        .run()
+        .success()
+        .assert_contains("Gas snapshot saved to build/profiles/profile-baseline.json");
+
+    assert!(
+        project.path().join(snapshot_path).exists(),
+        "snapshot file should be created with missing parent dirs"
     );
 }
 

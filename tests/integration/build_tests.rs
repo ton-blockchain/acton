@@ -4,6 +4,7 @@ use crate::support::compilation::{CompilationOrder, extract_compiled_contracts};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
 use std::fs;
+use std::path::{Path, PathBuf};
 use tycho_types::boc::Boc;
 
 const SIMPLE_CONTRACT: &str = r"
@@ -1258,27 +1259,88 @@ fn test_build_corrupted_cache_file() {
     project.acton().build().run().success();
 
     // Manually corrupt the cache file by writing invalid base64
-    let cache_dir = project.path().join(".acton/cache");
+    let cache_dir = project.path().join("build/cache");
     if cache_dir.exists() {
-        for entry in fs::read_dir(&cache_dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().unwrap_or_default() == "cache" {
-                fs::write(&path, "invalid base64 data!!!").unwrap();
-                break;
-            }
-        }
+        let cache_file = first_cache_json_file(&cache_dir);
+        fs::write(&cache_file, "invalid base64 data!!!").unwrap();
     }
 
-    // Second build should fail due to corrupted cache
-    project
-        .acton()
-        .build()
-        .run()
-        .success()
-        .assert_snapshot_matches(
-            "integration/snapshots/test_build_corrupted_cache_file.stdout.txt",
-        );
+    // Second build should recompile from source instead of using the broken cache entry
+    let output = project.acton().build().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_eq!(
+        compiled,
+        vec!["simple"],
+        "Should recompile after cache corruption"
+    );
+}
+
+#[test]
+fn test_build_ignores_unrelated_corrupted_cache_file_and_keeps_it() {
+    let project = ProjectBuilder::new("build-unrelated-corrupted-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let cache_dir = project.path().join("build/cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    let broken_path = cache_dir.join("broken.json");
+    fs::write(&broken_path, "not-json").unwrap();
+
+    project.acton().build().run().success();
+
+    assert!(
+        broken_path.exists(),
+        "Unrelated corrupted cache entry should not be eagerly removed"
+    );
+
+    let output = project.acton().build().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert!(
+        compiled.is_empty(),
+        "Existing valid cache entries should still be reused with unrelated junk present"
+    );
+}
+
+#[test]
+fn test_build_clear_cache_removes_nested_cache_subdirectories() {
+    let project = ProjectBuilder::new("build-clear-cache-removes-subdirs")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    let cache_dir = project.path().join("build/cache");
+    let debug_dir = cache_dir.join("debug");
+    let nested_dir = cache_dir.join("nested");
+    fs::create_dir_all(&debug_dir).unwrap();
+    fs::create_dir_all(&nested_dir).unwrap();
+    fs::write(debug_dir.join("junk.json"), "junk").unwrap();
+    fs::write(nested_dir.join("junk.txt"), "junk").unwrap();
+
+    let output = project.acton().build().clear_cache().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_eq!(
+        compiled,
+        vec!["simple"],
+        "clear-cache should force recompilation after removing nested cache dirs"
+    );
+    assert!(
+        !debug_dir.exists(),
+        "clear-cache should remove nested debug cache directory"
+    );
+    assert!(
+        !nested_dir.exists(),
+        "clear-cache should remove arbitrary nested cache directory"
+    );
+}
+
+fn first_cache_json_file(cache_dir: &Path) -> PathBuf {
+    fs::read_dir(cache_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().and_then(|s| s.to_str()) == Some("json"))
+        .unwrap_or_else(|| panic!("No cache json file found in {}", cache_dir.display()))
 }
 
 #[test]

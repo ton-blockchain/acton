@@ -7,6 +7,7 @@
 //! - convenience re-exports at the crate root for the common entry points
 
 mod core;
+pub mod exit_codes;
 pub mod multi;
 pub mod single;
 mod transport;

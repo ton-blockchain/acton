@@ -4,7 +4,8 @@ use crate::context::{
     ParsedSearchParams, PendingMessageStep, SearchField, Wallet, to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
-
+use crate::ffi::assert::parse_search_params;
+use crate::paths;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
@@ -151,7 +152,10 @@ fn build_impl(
     {
         let mappings = ctx.env.config.mappings();
         let elapsed = start_time.elapsed();
-        info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
+        info!(
+            "Build {path} from file cache ({}) in {elapsed:?}",
+            paths::DEFAULT_BUILD_CACHE_DIR
+        );
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
             .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
@@ -501,12 +505,11 @@ fn save_message_iter_results(ctx: &mut Context, cursor_id: u64, emulations: &[Se
         return;
     }
 
-    let trace_index = match ctx.message_iters.trace_index(cursor_id) {
-        Some(trace_index) => trace_index,
-        None => {
-            save_send_results(ctx, emulations);
-            return;
-        }
+    let trace_index = if let Some(trace_index) = ctx.message_iters.trace_index(cursor_id) {
+        trace_index
+    } else {
+        save_send_results(ctx, emulations);
+        return;
     };
 
     let saved_trace_index = match trace_index {
@@ -1418,10 +1421,10 @@ fn run_get_method_impl(
         .build_cache
         .result_for_code(&Some(code))
         .map(|(_, result)| result);
-    let source_map = compilation_result
-        .as_ref()
-        .map(|result| result.source_map.clone())
-        .unwrap_or_else(|| Arc::new(TolkSourceMap::without_debug_info()));
+    let source_map = compilation_result.as_ref().map_or_else(
+        || Arc::new(TolkSourceMap::without_debug_info()),
+        |result| result.source_map.clone(),
+    );
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)

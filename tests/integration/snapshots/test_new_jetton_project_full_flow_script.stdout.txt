@@ -8,3 +8,4 @@ Deploying Jetton contract...
 Deployed Jetton minter to [WALLET_ADDRESS_BASE] (JettonMinter)
 Minting tokens: 1000000000
 Successfully minted and transferred 1000000000 tokens to [WALLET_ADDRESS_BASE] (deployer)
+Total supply is 1000000000

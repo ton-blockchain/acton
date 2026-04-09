@@ -1,0 +1,40 @@
+Coverage Summary:
+Lines: 10/10 (100.00%)
+Total Hits: 16
+
+File: [ROOT]/code/branches.tolk
+Annotated Code:
+ 1   |                                                            |
+ 2   |             fun choose(x: int): int {                      |
+ 3 ✓ |                 if (x > 0) {                               | hits:2 branches:true=1 false=1
+ 4 ✓ |                     return 1;                              | hits:1
+ 5   |                 } else {                                   |
+ 6 ✓ |                     return 2;                              | hits:1
+ 7   |                 }                                          |
+ 8   |             }                                              |
+ 9   |                                                            |
+10   |             fun loopToTwo(x: int): int {                   |
+11 ✓ |                 var value = x;                             | hits:2
+12 ✓ |                 while (value < 2) {                        | hits:4
+13 ✓ |                     value += 1;                            | hits:2
+14   |                 }                                          |
+15   |                 return value;                              |
+16   |             }                                              |
+17   |                                                            |
+18   |             fun both(a: bool, b: bool): bool {             |
+19 ✓ |                 return a && b;                             | hits:1 branches:true=1 false=0
+20   |             }                                              |
+21   |                                                            |
+22   |             fun either(a: bool, b: bool): bool {           |
+23 ✓ |                 return a || b;                             | hits:1 branches:true=1 false=0
+24   |             }                                              |
+25   |                                                            |
+26   |             fun ternary(flag: bool): int {                 |
+27 ✓ |                 return flag ? 1 : 2;                       | hits:1 branches:true=1 false=0
+28   |             }                                              |
+29   |                                                            |
+30   |             fun nullableTernary(foo: int?): int {          |
+31 ✓ |                 return foo != null ? foo : 100;            | hits:1 branches:site0 true=0 false=1; site1 true=1 false=0; site2 true=1 false=0
+32   |             }                                              |
+33   |                                                            |
+

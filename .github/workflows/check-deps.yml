@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: check-deps-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
@@ -38,12 +38,12 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -52,9 +52,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
+        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
         with:
-          tool: cargo-deny
+          tool: cargo-deny@0.19.0
 
       - name: Run cargo-deny
         run: cargo deny check

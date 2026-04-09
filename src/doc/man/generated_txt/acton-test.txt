@@ -37,6 +37,9 @@ OPTIONS
        --fail-fast
            Stop after the first failing test.
 
+       --fuzz-seed seed
+           Seed for reproducible fuzz runs.
+
    Debugging Options
        --debug
            Enable debug mode.
@@ -60,6 +63,19 @@ OPTIONS
 
        --coverage-file path
            Output file for the coverage report.
+
+       --coverage-minimum-percent percent
+           Fail when total line coverage is below this percentage.
+
+           Valid range: 0 to 100.
+
+           Ignored with --ui.
+
+       --coverage-include-wrappers
+           Include files from the @wrappers mapping in coverage reports.
+
+       --coverage-include-tests
+           Include .test.tolk files in coverage reports.
 
    Profiling Options
        --snapshot path
@@ -114,7 +130,7 @@ OPTIONS
        --save-test-trace [dir]
            Save transaction traces to a directory.
 
-           If passed without a value, Acton uses .acton/traces.
+           If passed without a value, Acton uses build/traces.
 
    Mutation Testing Options
        --mutate
@@ -123,7 +139,70 @@ OPTIONS
        --mutate-contract contract-id
            Contract ID to mutate during mutation testing.
 
-       --disable-rule rule
+       --mutation-diff mode
+           Limit mutation testing to changed lines in the selected diff scope.
+
+           Accepted values: worktree, ref, branch.
+
+           o  worktree compares the current worktree with HEAD and includes
+              untracked files
+
+           o  ref compares against the explicit ref passed with
+              --mutation-diff-ref
+
+           o  branch compares against the merge-base with the current branch
+              upstream, or against --mutation-diff-ref when provided
+
+       --mutation-diff-ref ref
+           Base ref used by diff-based mutation testing modes.
+
+           Required with --mutation-diff ref. Optional with --mutation-diff
+           branch. Use it with branch when the current branch has no upstream
+           or when you want a different comparison base such as origin/main.
+
+       --mutation-levels level[,level…]
+           Run only selected mutation levels.
+
+           Accepted values: critical, major, minor. Useful for faster local
+           runs such as critical,major.
+
+       --mutation-rules-file path
+           Load custom query-based mutation rules from a JSON file.
+
+           Custom rules are merged with built-in rules. If a custom rule uses
+           the same rule ID, it overrides the built-in one. Relative paths are
+           resolved from the project root.
+
+       --mutation-session-id id
+           Use a specific mutation session ID for progress logging and resume.
+
+           Acton writes append-only JSON Lines progress to
+           build/mutation-sessions/<ID>.jsonl. Re-run with the same session ID
+           and the same mutation filters to continue an unfinished session. If
+           you stop the run with Ctrl+C, Acton prints a resume command that
+           includes the same session ID.
+
+       --mutation-workers count
+           Override the number of mutation workers.
+
+           By default, Acton uses the host’s available parallelism. Each
+           worker keeps its own isolated mutation workspace and reuses it
+           across multiple mutants.
+
+       --mutation-id id
+           Run only specific mutation IDs from a previous mutation report.
+
+           Pass the mutation number shown in the report, and use the same
+           mutation filters such as --mutation-diff, --mutation-levels, and
+           --mutation-disable-rules as the original run. May be passed multiple
+           times or as a comma-separated list.
+
+       --mutation-minimum-percent percent
+           Fail if mutation score is below this percentage.
+
+           Valid range: 0..=100.
+
+       --mutation-disable-rules rule
            Disable a specific mutation rule.
 
            May be passed multiple times.
@@ -162,26 +241,58 @@ REPORTING AND ARTIFACTS
 
        o  --ui adds the browser UI in addition to text reporters
 
+       o  --coverage --ui adds a Coverage tab to the browser UI for browsing
+          coverage summaries, files, and annotated source
+
        o  --junit-path matters when the JUnit reporter is enabled; the default
           output directory is test-results
 
        o  --coverage-file matters only with --coverage; without an explicit
           path, Acton writes lcov.info for lcov and coverage.txt for text
 
-       o  --save-test-trace without a value writes traces to .acton/traces
+       o  coverage excludes .test.tolk files and @wrappers sources by default;
+          use --coverage-include-tests or --coverage-include-wrappers to opt in
+
+       o  --save-test-trace without a value writes traces to build/traces
 
        o  gas snapshot files are written only to the explicit paths passed to
           --snapshot or --baseline-snapshot
+
+       o  [test.fuzz] applies only to parameterized tests that explicitly opt
+          in with @test({ fuzz: true }) or @test({ fuzz: ... })
+
+       o  --fuzz-seed overrides [test.fuzz].seed for the current run
+
+       o  fuzz tests show the seed in console output; if [test.fuzz].seed is
+          omitted, Acton picks a new seed for each acton test run
 
 CONFIGURATION
        Defaults can be configured in Acton.toml:
 
            [test]
            reporter = ["console"]
-           coverage = true
            filter = "test-.*"
            junit-path = "reports"
            junit-merge = false
+           
+           [test.fuzz]
+           runs = 512
+           max-test-rejects = 4096
+           seed = 42
+           
+           [test.coverage]
+           enabled = true
+           # valid range: 0..=100
+           minimum-percent = 85
+           include-tests = true
+           include-wrappers = true
+           
+           [test.mutation]
+           diff = "branch"
+           diff-ref = "origin/main"
+           mutation-levels = ["critical", "major"]
+           minimum-percent = 85
+           disable-rules = ["flip_plus"]
 
        CLI flags override config values for the current invocation.
 
@@ -194,15 +305,50 @@ NOTES
        o  The UI and trace export features are useful for debugging failing
           tests and inspecting transaction trees
 
+       o  You can combine --coverage and --ui to inspect the current run’s
+          coverage directly in the browser UI
+
+       o  --coverage-minimum-percent and [test.coverage].minimum-percent are
+          ignored when --ui is enabled
+
        o  --fork-net keeps execution local while resolving blockchain state
           remotely
+
+       o  --mutation-diff worktree is intended for uncommitted local changes
+
+       o  --mutation-diff ref requires --mutation-diff-ref
+
+       o  --mutation-diff branch uses the upstream branch merge-base by default
+
+       o  --mutation-rules-file loads custom query-based rules from JSON and
+          custom rules override built-in rules with the same ID
+
+       o  --mutation-session-id writes append-only JSONL progress to
+          build/mutation-sessions/<ID>.jsonl
+
+       o  --mutation-workers defaults to the host’s available parallelism;
+          each worker reuses its own isolated mutation workspace
+
+       o  pressing Ctrl+C during mutation testing stops the run without
+          finalizing the session and prints a resume command for the same
+          session ID
+
+       o  --mutation-id expects mutation numbers from a previous run with the
+          same mutation filters and session selection
+
+       o  mutation scores in filtered runs only cover the selected mutants
+
+       o  --mutation-minimum-percent and [test.mutation].minimum-percent apply
+          to that filtered mutation score after compile errors are excluded
 
 EXIT STATUS
        o  0: All selected tests passed, or a non-mutating reporting mode
           completed successfully.
 
        o  1: At least one test failed, profiling drift was detected with
-          --fail-on-diff, no tests matched after filtering, or infrastructure
+          --fail-on-diff, line coverage was below the configured minimum in
+          non-UI coverage mode, mutation score was below the configured minimum
+          in mutation mode, no tests matched after filtering, or infrastructure
           such as compilation, trace export, UI startup, or remote-state
           resolution failed.
 
@@ -219,21 +365,49 @@ EXAMPLES
 
               acton test --coverage --coverage-format lcov --reporter junit --junit-path test-results
 
-       4. Compare gas usage against a baseline:
+       4. Fail the run when line coverage drops below 85%:
 
-              acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff
+              acton test --coverage --coverage-minimum-percent 85
 
-       5. Run mutation testing for one contract:
+       5. Compare gas usage against a baseline:
+
+              acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff
+
+       6. Run mutation testing for one contract:
 
               acton test --mutate --mutate-contract wallet
 
-       6. Debug a forked-state failure with traces and the UI:
+       7. Run mutation testing only for changed lines in the current worktree:
 
-              acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
+              acton test --mutate --mutate-contract wallet --mutation-diff worktree
 
-       7. Enforce a gas baseline in CI:
+       8. Run mutation testing for selected levels on the current branch:
 
-              acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff --reporter console,junit
+              acton test --mutate --mutate-contract wallet --mutation-diff branch --mutation-levels critical,major
+
+       9. Re-run one specific mutant from a previous report:
+
+              acton test --mutate --mutate-contract wallet --mutation-id 2
+
+       10. Resume an unfinished mutation session:
+
+           acton test --mutate --mutate-contract wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
+
+       11. Fail the run when mutation score drops below 85%:
+
+           acton test --mutate --mutate-contract wallet --mutation-minimum-percent 85
+
+       12. Limit mutation testing to four workers:
+
+           acton test --mutate --mutate-contract wallet --mutation-workers 4
+
+       13. Debug a forked-state failure with traces and the UI:
+
+           acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
+
+       14. Enforce a gas baseline in CI:
+
+           acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff --reporter console,junit
 
 SEE ALSO
        o  acton help wrapper

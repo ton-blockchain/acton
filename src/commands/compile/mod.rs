@@ -1,5 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
+use crate::paths;
 use acton_config::color::OwoColorize;
 use acton_config::config;
 use anyhow::anyhow;
@@ -51,7 +52,10 @@ pub fn compile_cmd(
     let need_debug_info = source_map.is_some();
     if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.3") {
         let elapsed = start_time.elapsed();
-        info!("Compile {path} from file cache (.acton/cache) in {elapsed:?}");
+        info!(
+            "Compile {path} from file cache ({}) in {elapsed:?}",
+            paths::DEFAULT_BUILD_CACHE_DIR
+        );
 
         handle_compilation_result(
             cached_entry.code_boc64,

@@ -4,6 +4,9 @@ use crate::replayer::{
     self, CallFrameInfo, ExceptionInfo, LocalVarRendered, StepMode, TolkReplayer,
 };
 use crate::types_render::RenderedValue;
+use crate::{
+    core::exception_format::build_exception_details, core::exception_format::exception_overview,
+};
 use anyhow::anyhow;
 use dap::events::{Event, ExitedEventBody, StoppedEventBody, TerminatedEventBody};
 use dap::prelude::{Command, Request, Response, ResponseBody};
@@ -116,6 +119,7 @@ impl ReplayerDebugSession {
         ) || function_name.contains("runGetMethod")
     }
 
+    #[must_use]
     pub fn new(transport: DapTransport, replayer: TolkReplayer, root_name: Arc<str>) -> Self {
         Self {
             transport,
@@ -124,7 +128,7 @@ impl ReplayerDebugSession {
             )))],
             breakpoints: HashMap::new(),
             next_breakpoint_id: 1,
-            exception_mode: replayer::ExceptionBreakMode::Never,
+            exception_mode: replayer::ExceptionBreakMode::Uncaught,
             performing_step: None,
             cached_visible_frames: RefCell::new(Vec::new()),
             frame_to_depth: HashMap::new(),
@@ -167,12 +171,13 @@ impl ReplayerDebugSession {
     }
 
     fn send_exception_stop(&self, exc: &ExceptionInfo) -> anyhow::Result<()> {
+        let overview = exception_overview(exc);
         self.send_event(Event::Stopped(StoppedEventBody {
             reason: StoppedEventReason::Exception,
-            description: Some("Paused on exception".to_string()),
+            description: Some(overview.stop_description),
             thread_id: Some(THREAD_ID),
             preserve_focus_hint: None,
-            text: Some(format!("Exit code {}", exc.errno)),
+            text: Some(overview.stop_text),
             all_threads_stopped: Some(true),
             hit_breakpoint_ids: None,
         }))
@@ -382,11 +387,10 @@ impl ReplayerDebugSession {
         let Some(top_frame) = call_stack.last() else {
             return false;
         };
-        let file_id = top_frame
-            .definition_loc
-            .as_ref()
-            .map(|loc| loc.file_id())
-            .unwrap_or_else(|| ctx.replayer.current_file_id());
+        let file_id = top_frame.definition_loc.as_ref().map_or_else(
+            || ctx.replayer.current_file_id(),
+            tolkc::source_map::SrcRange::file_id,
+        );
         let Some(path) = ctx.replayer.file_full_path(file_id) else {
             return true;
         };
@@ -462,7 +466,7 @@ impl ReplayerDebugSession {
         });
         let top_name =
             Self::format_frame_name(context_label, top_frame, replayer.current_file_name());
-        let top_is_builtin = top_frame.map(|f| f.is_builtin).unwrap_or(false);
+        let top_is_builtin = top_frame.is_some_and(|f| f.is_builtin);
         let stopped_on_exception = replayer.last_exception().is_some();
 
         let mut frames = Vec::new();
@@ -765,14 +769,20 @@ impl ReplayerDebugSession {
             return Ok(true);
         }
 
-        if let Some(ids) = self.current_breakpoint_ids() {
-            self.send_stopped(
-                StoppedEventReason::Breakpoint,
-                Some("Breakpoint hit".to_string()),
-                Some(ids),
-            )?;
-        } else {
-            self.send_stopped(StoppedEventReason::Entry, None, None)?;
+        match self.stop_reason_for_active_context() {
+            StopReason::Breakpoint(ids) => {
+                self.send_stopped(
+                    StoppedEventReason::Breakpoint,
+                    Some("Breakpoint hit".to_string()),
+                    Some(ids),
+                )?;
+            }
+            StopReason::Exception(exc) => {
+                self.send_exception_stop(&exc)?;
+            }
+            StopReason::Step => {
+                self.send_stopped(StoppedEventReason::Entry, None, None)?;
+            }
         }
 
         Ok(false)
@@ -859,12 +869,14 @@ impl ReplayerDebugSession {
         } else {
             ExceptionBreakMode::Always
         };
+        let overview = exception_overview(&exc);
+        let details = build_exception_details(&exc);
 
         Ok(ResponseBody::ExceptionInfo(ExceptionInfoResponse {
-            exception_id: exc.errno.clone(),
-            description: Some(format!("TVM exit code {}", exc.errno)),
+            exception_id: exc.errno,
+            description: Some(overview.info_description),
             break_mode,
-            details: None,
+            details: Some(details),
         }))
     }
 

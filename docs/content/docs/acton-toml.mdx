@@ -180,46 +180,117 @@ rate-limit = 1
 
 Configures the behavior of `acton test`.
 
-| Field               | Type       | Default       | Description                                                            |
-|:--------------------|:-----------|:--------------|:-----------------------------------------------------------------------|
-| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                                 |
-| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`.              |
-| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                                |
-| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                             |
-| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
-| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                                       |
-| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).                           |
-| `coverage-file`     | `string`   | -             | Path to save the coverage report.                                      |
-| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
-| `include`           | `string[]` | -             | Glob patterns of files to include in testing.                          |
-| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                                       |
-| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.                       |
-| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).                |
-| `api-key`           | `string`   | -             | API key for the network provider when forking.                         |
-| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                                    |
-| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.                           |
-| `fail-on-diff`      | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
-| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).                        |
+| Field                       | Type       | Default       | Description                                                            |
+|:----------------------------|:-----------|:--------------|:-----------------------------------------------------------------------|
+| `filter`                    | `string`   | -             | Regex pattern to filter tests by name.                                 |
+| `reporter`                  | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`.              |
+| `debug`                     | `boolean`  | `false`       | Enable debug mode (activates debugger).                                |
+| `debug-port`                | `integer`  | `12345`       | Port for the debug server.                                             |
+| `backtrace`                 | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
+| `coverage`                  | `object`   | -             | Coverage settings subtree under `[test.coverage]` (see below).         |
+| `fuzz`                      | `object`   | -             | Default fuzz settings under `[test.fuzz]` for annotated tests.         |
+| `exclude`                   | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
+| `include`                   | `string[]` | -             | Glob patterns of files to include in testing.                          |
+| `junit-path`                | `string`   | -             | Directory for JUnit XML reports.                                       |
+| `junit-merge`               | `boolean`  | `false`       | Merge all test results into a single JUnit file.                       |
+| `fork-net`                  | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).                |
+| `api-key`                   | `string`   | -             | API key for the network provider when forking.                         |
+| `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
+| `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
+| `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+### `[test.coverage]` Section
+
+Configures default coverage behavior for `acton test`.
+
+| Field              | Type      | Default | Description                                                     |
+|:-------------------|:----------|:--------|:----------------------------------------------------------------|
+| `enabled`          | `boolean` | `false` | Enable code coverage collection.                                |
+| `format`           | `string`  | `lcov`  | Format for coverage report (`lcov`, `text`).                    |
+| `output-file`      | `string`  | -       | Path to save the coverage report.                               |
+| `include-wrappers` | `boolean` | `false` | Include files from the `@wrappers` mapping in coverage reports. |
+| `include-tests`    | `boolean` | `false` | Include `.test.tolk` files in coverage reports.                 |
+
+### `[test.fuzz]` Section
+
+Configures defaults for parameterized tests that explicitly opt into fuzzing
+with `@test({ fuzz: true })` or `@test({ fuzz: ... })`.
+Per-test annotations can override individual values with
+`@test({ fuzz: { runs: ..., max_test_rejects: ..., seed: ... } })`.
+
+| Field              | Type      | Default      | Description                                                            |
+|:-------------------|:----------|:-------------|:-----------------------------------------------------------------------|
+| `runs`             | `integer` | `256`        | Number of accepted fuzz cases to execute for each fuzz test.           |
+| `max-test-rejects` | `integer` | `runs * 256` | Maximum number of `assume(...)` rejections before the fuzz test fails. |
+| `seed`             | `integer` | -            | Seed for reproducible fuzz input generation.                           |
 
 ### Mutation Testing Configuration
 
-The `[test.mutation]` subsection allows disabling specific mutation rules.
+The `[test.mutation]` subsection configures default filters for
+`acton test --mutate`. Available rule IDs are documented in
+[Mutation Rules](/docs/test-runner/mutation-testing/rules).
 
-| Field           | Type       | Description                                          |
-|:----------------|:-----------|:-----------------------------------------------------|
-| `disable-rules` | `string[]` | List of rule IDs to disable during mutation testing. |
+| Field             | Type       | Description                                                       |
+|:------------------|:-----------|:------------------------------------------------------------------|
+| `diff`            | `string`   | Changed-line scope: `worktree`, `ref`, or `branch`.               |
+| `diff-ref`        | `string`   | Base ref used by `ref` mode and optional override for `branch`.   |
+| `mutation-levels` | `string[]` | List of mutation levels to run: `critical`, `major`, `minor`.     |
+| `minimum-percent` | `float`    | Minimum mutation score required for the run to succeed.           |
+| `disable-rules`   | `string[]` | List of rule IDs to disable during mutation testing.              |
+| `rules-file`      | `string`   | Path to a JSON file with custom query-based mutation rules.       |
+
+- `diff = "worktree"` compares the current worktree with `HEAD`. Use it for
+  uncommitted local changes. Untracked files are treated as fully changed.
+- `diff = "ref"` compares against an explicit ref, tag, or commit and requires
+  `diff-ref`.
+- `diff = "branch"` compares the current branch against the merge-base with its
+  upstream branch. Use `diff-ref` to override the base branch explicitly, or
+  when the current branch has no upstream.
+- `mutation-levels` keeps only selected rule levels. For example,
+  `["critical", "major"]` skips `minor` mutations.
+- `minimum-percent` fails the run when the resulting mutation score drops below
+  the threshold. Valid range: `0..=100`.
+- `disable-rules` excludes individual rule IDs after diff and level filters are
+  applied.
+- `rules-file` adds custom query-based rules from JSON. If a custom rule uses
+  the same ID as a built-in rule, it overrides the built-in one.
+
+All filters compose, and the reported mutation score reflects only the mutants
+that remain after filtering. Compile errors are excluded from the score, and
+`minimum-percent` applies to that final mutation score.
 
 Example:
 ```toml
 [test]
 reporter = ["console", "junit"]
-coverage = true
 fail-fast = true
 fail-on-diff = true
 
+[test.coverage]
+enabled = true
+format = "lcov"
+include-wrappers = true
+include-tests = true
+
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
+seed = 42
+
 [test.mutation]
+diff = "branch"
+diff-ref = "origin/main"
+mutation-levels = ["critical", "major"]
+minimum-percent = 85
 disable-rules = ["flip_plus"]
+rules-file = "mutation-rules.json"
 ```
+
+CLI flags such as `--mutation-diff`, `--mutation-diff-ref`,
+`--mutation-levels`, `--mutation-minimum-percent`, `--mutation-disable-rules`, and
+`--mutation-rules-file`
+override these defaults for the current run.
 
 `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
 

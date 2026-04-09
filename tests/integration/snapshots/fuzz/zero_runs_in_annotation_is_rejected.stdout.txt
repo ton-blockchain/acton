@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ fuzz-zero-runs-annotation [TIME]
+    └─ Fuzz runs must be greater than 0 for test 'test-fuzz-zero-runs-annotation'
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

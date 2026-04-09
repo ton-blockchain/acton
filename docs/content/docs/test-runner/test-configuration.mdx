@@ -32,12 +32,19 @@ name = "my-ton-project"
 version = "0.1.0"
 
 [test]
-# Enable code coverage by default
-coverage = true
-coverage-format = "lcov"
-
 # Enable detailed backtraces
 backtrace = "full"
+
+[test.fuzz]
+# Use 512 accepted inputs for fuzz tests marked with @test({ fuzz: true })
+runs = 512
+# Fix the seed for reproducible fuzz runs
+seed = 42
+
+[test.coverage]
+# Enable code coverage by default
+enabled = true
+format = "lcov"
 ```
 
 ## Command Line Override
@@ -147,16 +154,46 @@ backtrace = "full"
 
 ### Coverage Options
 
-| Configuration     | CLI Flag            | Type    | Description                     |
-|-------------------|---------------------|---------|---------------------------------|
-| `coverage`        | `--coverage`        | Boolean | Enable code coverage            |
-| `coverage-format` | `--coverage-format` | String  | Coverage output format ("lcov") |
+| Configuration                      | CLI Flag                      | Type    | Description                                                    |
+|------------------------------------|-------------------------------|---------|----------------------------------------------------------------|
+| `[test.coverage].enabled`          | `--coverage`                  | Boolean | Enable code coverage                                           |
+| `[test.coverage].format`           | `--coverage-format`           | String  | Coverage output format (`lcov`, `text`)                        |
+| `[test.coverage].output-file`      | `--coverage-file`             | String  | Path to save the coverage report                               |
+| `[test.coverage].include-wrappers` | `--coverage-include-wrappers` | Boolean | Include files from the `@wrappers` mapping in coverage reports |
+| `[test.coverage].include-tests`    | `--coverage-include-tests`    | Boolean | Include `.test.tolk` files in coverage reports                 |
 
 **Examples:**
 ```toml
-[test]
-coverage = true
-coverage-format = "lcov"
+[test.coverage]
+enabled = true
+format = "lcov"
+include-wrappers = true
+include-tests = true
+```
+
+### Fuzz Options
+
+These defaults apply only to parameterized tests with an explicit fuzz
+annotation such as `@test({ fuzz: true })`.
+Per-test annotations can override them with
+`@test({ fuzz: { runs: ..., max_test_rejects: ..., seed: ... } })`.
+When `max-test-rejects` is omitted, Acton uses `runs * 256`.
+
+See [Fuzz Testing](/docs/test-runner/fuzz-testing) for annotation syntax,
+helper APIs, supported parameter types, and failure reporting.
+
+| Configuration                    | CLI Flag | Type    | Description                                                        |
+|----------------------------------|----------|---------|--------------------------------------------------------------------|
+| `[test.fuzz].runs`               | -        | Integer | Number of accepted fuzz cases to execute for each fuzz test        |
+| `[test.fuzz].max-test-rejects`   | -        | Integer | Maximum `assume(...)` rejections before the fuzz test fails        |
+| `[test.fuzz].seed`               | `--fuzz-seed` | Integer | Seed for reproducible fuzz input generation                    |
+
+**Examples:**
+```toml
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
+seed = 42
 ```
 
 ### Profiling Options

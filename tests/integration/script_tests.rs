@@ -6,6 +6,8 @@ use crate::support::toncenter::{
 };
 
 use std::fs;
+use std::thread;
+use std::time::{Duration, Instant};
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
@@ -116,6 +118,51 @@ fun main() {
 }
 "#,
         )
+}
+
+fn write_localnet_wallet_config(project: &Project, wallet_name: &str) {
+    fs::write(project.path().join("mnemonic.txt"), DEPLOYER_MNEMONIC)
+        .expect("failed to write mnemonic");
+    fs::write(
+        project.path().join("wallets.toml"),
+        format!(
+            r#"[wallets.{wallet_name}]
+kind = "v4r2"
+workchain = 0
+keys = {{ mnemonic-file = "mnemonic.txt" }}
+"#
+        ),
+    )
+    .expect("failed to write wallets.toml");
+}
+
+fn extract_marker_value(output: &str, marker: &str) -> String {
+    output
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix(marker).map(ToOwned::to_owned))
+        .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{output}"))
+}
+
+fn wait_until_address_state_active(
+    node: &crate::support::litenode::LiteNodeHandle,
+    address: &str,
+    timeout: Duration,
+) {
+    let query = format!("/api/v2/getAddressState?address={address}");
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json(&query);
+        if response["ok"].as_bool() == Some(true) && response["result"].as_str() == Some("active") {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for address `{address}` to become active:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
 }
 
 #[test]
@@ -1475,6 +1522,180 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_defaults_fork_net_to_broadcast_network() {
+    let project = ProjectBuilder::new("script-broadcast-defaults-fork-net")
+        .file(
+            "contracts/types",
+            r"
+enum Errors {
+    InvalidMessage = 0xFFFF
+}
+
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+
+struct (0x3a752f06) ResetCounter {}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: AllowedMessage
+}
+
+type AllowedMessage = IncreaseCounter | ResetCounter
+
+fun onInternalMessage(in: InMessage) {
+    val msg = lazy AllowedMessage.fromSlice(in.body);
+
+    match (msg) {
+        IncreaseCounter => {
+            var storage = lazy Storage.load();
+            storage.counter += msg.increaseBy;
+            storage.save();
+        }
+        ResetCounter => {
+            var storage = lazy Storage.load();
+            storage.counter = 0;
+            storage.save();
+        }
+        else => {
+            assert (in.body.isEmpty()) throw Errors.InvalidMessage;
+        }
+    }
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+
+get fun currentCounter(): int {
+    val storage = lazy Storage.load();
+    return storage.counter;
+}
+"#,
+        )
+        .script_file(
+            "deploy_counter",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../contracts/types"
+
+fun main() {
+    val deployer = net.wallet("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage {
+            id: 0,
+            counter: 7,
+        }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val res = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.05"),
+        dest: { stateInit: init },
+    }));
+    if (!res.wait()) {
+        return;
+    }
+
+    println1("COUNTER_ADDRESS={}", counterAddress);
+}
+"#,
+        )
+        .build();
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.litenode().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_counter.tolk")
+        .broadcast()
+        .verify_network("localnet")
+        .run()
+        .success();
+    let counter_address = extract_marker_value(&deploy_output.get_stdout(), "COUNTER_ADDRESS=");
+    wait_until_address_state_active(&node, &counter_address, Duration::from_secs(12));
+
+    fs::write(
+        project.path().join("scripts/query_counter.tolk"),
+        format!(
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {{
+    val counter: int = net.runGetMethod(address("{counter_address}"), "currentCounter");
+    println1("On-chain counter: {{}}", counter);
+}}
+"#
+        ),
+    )
+    .expect("failed to write query script");
+
+    project
+        .acton()
+        .script("scripts/query_counter.tolk")
+        .broadcast()
+        .verify_network("localnet")
+        .run()
+        .success()
+        .assert_contains("On-chain counter: 7");
+
+    node.stop();
+}
+
+#[test]
+fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
+    let project = ProjectBuilder::new("script-broadcast-net-conflict")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("hello");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .broadcast()
+        .with_net("testnet")
+        .fork_net("mainnet")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+        );
 }
 
 #[test]

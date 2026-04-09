@@ -5,17 +5,11 @@ use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::fs;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
-use std::ptr::null_mut;
-
-thread_local! {
-    static CURRENT_MAPPINGS: RefCell<FxHashMap<String, String>> = RefCell::new(FxHashMap::default());
-}
 
 /// Compiles passed file with Tolk compiler.
 ///
@@ -151,9 +145,9 @@ impl Compiler {
         with_debug_info: bool,
         check_only: bool,
     ) -> anyhow::Result<TBody> {
-        CURRENT_MAPPINGS.with(|m| {
-            *m.borrow_mut() = self.mappings.clone();
-        });
+        let mut callback_context = FsCallbackContext {
+            mappings: self.mappings.clone(),
+        };
 
         let config = serde_json::to_string(&CompilerConfig {
             entrypoint_file_name: path.to_string_lossy().to_string(),
@@ -174,55 +168,15 @@ impl Compiler {
                 data_ptr: *const c_char,
                 dest_contents: *mut *mut c_char,
                 dest_error: *mut *mut c_char,
-                _callback_payload: *mut c_void,
+                callback_payload: *mut c_void,
             ) {
-                fn fail_if_symlink(path: &Path) -> Result<(), String> {
-                    match fs::symlink_metadata(path) {
-                        Ok(metadata) if metadata.file_type().is_symlink() => {
-                            Err("Cannot import symlink file".to_string())
-                        }
-                        _ => Ok(()),
-                    }
-                }
-
-                fn realpath(path_str: &str) -> Result<PathBuf, String> {
-                    if Path::new(path_str).is_absolute() {
-                        fail_if_symlink(Path::new(path_str))?;
-                        return dunce::canonicalize(path_str).map_err(|e| e.to_string());
-                    }
-
-                    if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
-                        return Ok(PathBuf::from(path_str));
-                    }
-
-                    if path_str.starts_with('@') {
-                        let (prefix, suffix) = match path_str.find('/') {
-                            Some(pos) => (&path_str[..pos], &path_str[pos + 1..]),
-                            None => (path_str, ""),
-                        };
-
-                        let mut resolved = None;
-                        CURRENT_MAPPINGS.with(|mappings| {
-                            let mappings = mappings.borrow();
-                            if let Some(target) = mappings.get(prefix) {
-                                let cur_mapped_path = Path::new(target).join(suffix);
-
-                                resolved = Some(fail_if_symlink(&cur_mapped_path).and_then(|()| {
-                                    dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string())
-                                }));
-                            }
-                        });
-
-                        if let Some(res) = resolved {
-                            return res;
-                        }
-
-                        return Err(format!("Unknown path mapping '{prefix}'"));
-                    }
-
-                    fail_if_symlink(Path::new(path_str))?;
-                    dunce::canonicalize(path_str).map_err(|e| e.to_string())
-                }
+                // SAFETY: callback_payload always safe FsCallbackContext object
+                let callback_context = unsafe {
+                    callback_payload
+                        .cast::<FsCallbackContext>()
+                        .as_ref()
+                        .expect("Missing compiler callback context")
+                };
 
                 match FsReadCallbackKind::from(kind) {
                     FsReadCallbackKind::Realpath => {
@@ -234,12 +188,12 @@ impl Compiler {
                         };
 
                         let result = if relative_path_raw.ends_with(".tolk") {
-                            realpath(relative_path_raw)
+                            callback_context.realpath(relative_path_raw)
                         } else {
                             let mut path = String::with_capacity(relative_path_raw.len() + 5);
                             path.push_str(relative_path_raw);
                             path.push_str(".tolk");
-                            realpath(&path)
+                            callback_context.realpath(&path)
                         };
 
                         let abs_path = match result {
@@ -320,7 +274,8 @@ impl Compiler {
 
             let config_cstr =
                 CString::new(config).expect("Cannot convert JSON to CString, should not happen");
-            tolk_compile(config_cstr.as_ptr(), Some(read_callback), null_mut())
+            let callback_payload = (&raw mut callback_context).cast::<c_void>();
+            tolk_compile(config_cstr.as_ptr(), Some(read_callback), callback_payload)
         };
 
         // SAFETY: we assume that `compilation_result` is valid C string
@@ -333,6 +288,51 @@ impl Compiler {
         let result = serde_json::from_str::<TBody>(&compilation_result_str)
             .map_err(|error| anyhow::anyhow!("cannot parse JSON result from compiler: {error}"))?;
         Ok(result)
+    }
+}
+
+struct FsCallbackContext {
+    mappings: FxHashMap<String, String>,
+}
+
+impl FsCallbackContext {
+    fn fail_if_symlink(path: &Path) -> Result<(), String> {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                Err("Cannot import symlink file".to_string())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn realpath(&self, path_str: &str) -> Result<PathBuf, String> {
+        if Path::new(path_str).is_absolute() {
+            Self::fail_if_symlink(Path::new(path_str))?;
+            return dunce::canonicalize(path_str).map_err(|e| e.to_string());
+        }
+
+        if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
+            return Ok(PathBuf::from(path_str));
+        }
+
+        if path_str.starts_with('@') {
+            let (prefix, suffix) = match path_str.find('/') {
+                Some(pos) => (&path_str[..pos], &path_str[pos + 1..]),
+                None => (path_str, ""),
+            };
+
+            let target = self
+                .mappings
+                .get(prefix)
+                .ok_or_else(|| format!("Unknown path mapping '{prefix}'"))?;
+            let cur_mapped_path = Path::new(target).join(suffix);
+
+            Self::fail_if_symlink(&cur_mapped_path)?;
+            return dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string());
+        }
+
+        Self::fail_if_symlink(Path::new(path_str))?;
+        dunce::canonicalize(path_str).map_err(|e| e.to_string())
     }
 }
 
@@ -389,7 +389,7 @@ pub struct CompilerInternalResultSuccess {
     pub code_boc64: String,
     #[serde(rename = "codeHashHex")]
     pub code_hash_hex: String,
-    #[serde(rename = "debugMarkBase64", default)]
+    #[serde(rename = "debugMarksBase64", default)]
     pub debug_mark_base64: Option<String>,
     #[serde(rename = "sourceMapsJson")]
     pub source_maps_json: Option<crate::source_map::SourceMap>,

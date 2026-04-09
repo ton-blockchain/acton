@@ -148,8 +148,7 @@ fn dap_legacy_value_enabled() -> bool {
     *ENABLED.get_or_init(|| {
         std::env::var(DAP_LEGACY_VALUE_ENV)
             .ok()
-            .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"))
-            .unwrap_or(false)
+            .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"))
     })
 }
 
@@ -233,7 +232,7 @@ pub(crate) enum SlotValue<'a> {
     OptimizedOut,
 }
 
-impl<'a> SlotValue<'a> {
+impl SlotValue<'_> {
     pub(crate) const fn is_optimized_out(&self) -> bool {
         matches!(self, SlotValue::OptimizedOut)
     }
@@ -318,10 +317,10 @@ fn get_bits_u8(nibbles: &[u8], start: usize, count: usize) -> u8 {
     v
 }
 
-/// Try to parse addr_std from a CellSlice.
+/// Try to parse `addr_std` from a `CellSlice`.
 /// Cell{hex} starts with 2 descriptor bytes (4 hex chars); cell data follows.
 /// `bits: start..end` are positions within cell data.
-/// addr_std = `10` (2b) + `0` (1b anycast) + workchain (8b) + hash (256b) = 267 bits.
+/// `addr_std` = `10` (2b) + `0` (1b anycast) + workchain (8b) + hash (256b) = 267 bits.
 fn try_parse_address(cs: &CellSlice) -> Option<String> {
     if cs.bits.is_none() && cs.refs.is_none() {
         return try_parse_full_address_hex(&cs.value);
@@ -352,7 +351,7 @@ fn try_parse_address(cs: &CellSlice) -> Option<String> {
     for i in 0..32 {
         write!(hash, "{:02x}", get_bits_u8(&nibbles, start + 11 + i * 8, 8)).ok()?;
     }
-    Some(format!("{}:{}", wc, hash))
+    Some(format!("{wc}:{hash}"))
 }
 
 fn try_parse_full_address_hex(hex: &str) -> Option<String> {
@@ -455,11 +454,11 @@ fn parse_map_key_type(ty: &Ty) -> Option<MapScalarType> {
             bits: 256,
             signed: false,
         }),
-        Ty::UintN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+        Ty::UintN { n } => u16::try_from(*n).is_ok().then_some(MapScalarType::Int {
             bits: *n as u16,
             signed: false,
         }),
-        Ty::IntN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+        Ty::IntN { n } => u16::try_from(*n).is_ok().then_some(MapScalarType::Int {
             bits: *n as u16,
             signed: true,
         }),
@@ -486,11 +485,11 @@ fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
             bits: 256,
             signed: false,
         }),
-        Ty::UintN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+        Ty::UintN { n } => u16::try_from(*n).is_ok().then_some(MapScalarType::Int {
             bits: *n as u16,
             signed: false,
         }),
-        Ty::IntN { n } => (*n <= u16::MAX as u32).then_some(MapScalarType::Int {
+        Ty::IntN { n } => u16::try_from(*n).is_ok().then_some(MapScalarType::Int {
             bits: *n as u16,
             signed: true,
         }),
@@ -614,7 +613,7 @@ fn bits_to_hex(nibbles: &[u8], start: usize, end: usize) -> String {
 
     for i in 0..full_nibbles {
         let n = get_bits_u8(nibbles, start + i * 4, 4);
-        write!(hex, "{:x}", n).ok();
+        write!(hex, "{n:x}").ok();
     }
 
     if remaining_bits > 0 {
@@ -624,7 +623,7 @@ fn bits_to_hex(nibbles: &[u8], start: usize, end: usize) -> String {
         }
         last = (last << 1) | 1;
         last <<= 4 - remaining_bits - 1;
-        write!(hex, "{:x}_", last).ok();
+        write!(hex, "{last:x}_").ok();
     }
 
     hex
@@ -644,7 +643,7 @@ fn refs_suffix(ref_count: usize) -> String {
     }
 }
 
-/// Render a CellSlice as `slice{HEX}`, extracting only the bits in `start..end`.
+/// Render a `CellSlice` as `slice{HEX}`, extracting only the bits in `start..end`.
 /// Appends `+ N refs` when the slice carries cell references.
 fn render_slice(cs: &CellSlice) -> String {
     let ref_count = cs
@@ -789,7 +788,7 @@ fn debug_format(
         | Ty::VarintN { .. }
         | Ty::VaruintN { .. }
         | Ty::Coins => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Integer(s)) => typed_leaf_for_ty(ty, s.to_string()),
+            SlotValue::Live(VmStackValue::Integer(s)) => typed_leaf_for_ty(ty, s.clone()),
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM int"),
         },
@@ -827,14 +826,12 @@ fn debug_format(
             SlotValue::Live(VmStackValue::Cell(cell)) => typed_leaf_for_ty(
                 ty,
                 try_parse_string_cell_like(cell)
-                    .map(|string| format!("\"{string}\""))
-                    .unwrap_or_else(|| render_cell_like(cell)),
+                    .map_or_else(|| render_cell_like(cell), |string| format!("\"{string}\"")),
             ),
             SlotValue::Live(VmStackValue::CellSlice(cs)) => typed_leaf_for_ty(
                 ty,
                 try_parse_string_slice(cs)
-                    .map(|string| format!("\"{string}\""))
-                    .unwrap_or_else(|| render_slice(cs)),
+                    .map_or_else(|| render_slice(cs), |string| format!("\"{string}\"")),
             ),
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM cell"),
@@ -985,7 +982,7 @@ fn debug_format(
                     struct_name,
                     type_args
                         .iter()
-                        .map(|ty| ty.to_string())
+                        .map(ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),
@@ -1032,12 +1029,10 @@ fn debug_format(
         Ty::EnumRef { enum_name } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Integer(s)) => {
                 let enum_ref = symbols.get_enum(enum_name);
-                let text = enum_ref
-                    .members
-                    .iter()
-                    .find(|m| &m.value == s)
-                    .map(|m| format!("{}.{}", enum_ref.name, m.name))
-                    .unwrap_or_else(|| format!("{}({})", enum_ref.name, s));
+                let text = enum_ref.members.iter().find(|m| &m.value == s).map_or_else(
+                    || format!("{}({})", enum_ref.name, s),
+                    |m| format!("{}.{}", enum_ref.name, m.name),
+                );
                 typed_leaf_for_ty(ty, text)
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),

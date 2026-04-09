@@ -82,6 +82,11 @@ indent_size = 4
 max_line_length = 100
 ";
 
+const ACTON_TOML_REFERENCE_FOOTER: &str = "
+# Check full Acton.toml reference and all available keys:
+# https://ton-blockchain.github.io/acton/docs/acton-toml
+";
+
 #[derive(Clone, Copy)]
 struct TemplateSelectItem(ProjectTemplate);
 
@@ -237,7 +242,9 @@ pub fn new_cmd(
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
 
-    config.save()?;
+    let mut acton_toml = toml::to_string_pretty(&config)?;
+    acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
+    fs::write("Acton.toml", acton_toml)?;
 
     if scaffold.layout().includes_typescript_app() {
         update_npm_package_metadata(&project_name)?;
@@ -442,21 +449,18 @@ fn update_package_json_name(normalized_name: &str) -> anyhow::Result<bool> {
         return Ok(has_workspaces);
     }
 
-    match &mut package_json {
-        JsonValue::Object(object) => {
-            object.insert(
-                "name".to_owned(),
-                JsonValue::String(normalized_name.to_owned()),
-            );
-        }
-        _ => {
-            let mut object = JsonMap::new();
-            object.insert(
-                "name".to_owned(),
-                JsonValue::String(normalized_name.to_owned()),
-            );
-            package_json = JsonValue::Object(object);
-        }
+    if let JsonValue::Object(object) = &mut package_json {
+        object.insert(
+            "name".to_owned(),
+            JsonValue::String(normalized_name.to_owned()),
+        );
+    } else {
+        let mut object = JsonMap::new();
+        object.insert(
+            "name".to_owned(),
+            JsonValue::String(normalized_name.to_owned()),
+        );
+        package_json = JsonValue::Object(object);
     }
 
     let formatted =

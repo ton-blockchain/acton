@@ -1,0 +1,4 @@
+Error: Backend compilation failed: HTTP 400 Bad Request (HTTP/1.1) at [LOCALHOST_URL]/source
+Hint: run with ACTON_VERIFY_DEBUG=1 to print request details.
+Response body:
+{"error":"debug backend failure"}

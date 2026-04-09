@@ -25,6 +25,24 @@ fn assert_fail_impl(
     Ok(())
 }
 
+extension!(assume_reject in (Context) with (location: String, message: String) using assume_reject_impl);
+fn assume_reject_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    location: String,
+    message: String,
+) -> anyhow::Result<()> {
+    *ctx.asserts.assert_failure = Some(AssertFailure::Assume(FailAssertFailure {
+        message: Some(if message.is_empty() {
+            "assume(...) rejected this input".to_owned()
+        } else {
+            message
+        }),
+        location: SourceLocation::parse(&location)?,
+    }));
+    Ok(())
+}
+
 extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_name: String, left: Tuple, left_name: String, operator: String) using assert_bin_impl);
 #[allow(clippy::too_many_arguments)]
 fn assert_bin_impl(
@@ -460,5 +478,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         104 => fail_to_not_find_transaction_by_params : 4,
         105 => fail_wallet_not_found : 2,
         106 => assert_decimal : 5,
+        107 => assume_reject : 2,
     });
 }

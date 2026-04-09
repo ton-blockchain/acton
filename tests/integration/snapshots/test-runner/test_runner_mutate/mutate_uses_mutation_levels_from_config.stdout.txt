@@ -1,0 +1,37 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Session:  [MUTATION_SESSION_ID]
+Contract: simple
+Source:   contracts/simple.tolk
+Levels:   critical
+Files:    1
+Mutants:  1
+
+  ◉ Mutation 1/1 contracts/simple[LINE] Remove assert statements SURVIVED
+
+    Total mutants        1
+  ✓ Killed               0
+  ✗ Survived             1
+  ! Compile errors       0
+
+  ◆ Mutation Score       0.0%
+
+Survived Mutants
+────────────────────────────────────────────────────────────
+
+  ✗ Mutation #1
+  Rule:  Remove assert statements [remove_assert]
+  Level: critical
+  Group: assertion
+  at contracts/simple[LINE]
+     1 │ 
+     2 │ fun onInternalMessage(in: InMessage) {
+     3 │     assert (in.valueCoins > 0) throw 5;
+     4 │ }
+     5 │ 
+
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
+────────────────────────────────────────────────────────────
+These mutants were not caught by your tests!
+Consider adding more test cases to improve mutation coverage.
+

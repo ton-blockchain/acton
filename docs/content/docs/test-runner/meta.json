@@ -4,6 +4,7 @@
     "your-first-integration-test-in-tolk",
     "generating-wrappers",
     "test-attributes",
+    "fuzz-testing",
     "test-configuration",
     "world-state-snapshots",
     "step-by-step-execution",

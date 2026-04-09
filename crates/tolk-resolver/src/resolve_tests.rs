@@ -1112,12 +1112,12 @@ mod tests {
                     val d: <caret>bytes32? = null;
                 }
             ",
-            expect![[r#"
+            expect![[r"
                 uint128 -> Global(uintN at common.tolk:3633-3638)
                 int32 -> Global(intN at common.tolk:3357-3361)
                 bits256 -> Global(bitsN at common.tolk:5235-5240)
                 bytes32 -> Global(bytesN at common.tolk:5325-5331)
-            "#]],
+            "]],
         );
     }
 

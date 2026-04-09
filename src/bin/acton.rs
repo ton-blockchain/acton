@@ -24,20 +24,25 @@ use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
+use acton::paths;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
-    init_manifest_path_with_source, init_project_root_with_source,
-    project_root as configured_project_root,
+    WalletsFile, global_wallets_path, init_manifest_path_with_source,
+    init_project_root_with_source, project_root as configured_project_root,
 };
-use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
+use acton_config::test::{
+    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+};
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
-use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
+use clap_complete::engine::{
+    ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
+};
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
@@ -122,7 +127,7 @@ enum Commands {
         after_help = detailed_help_pointer("help")
     )]
     Help {
-        #[arg(help = "Top-level command to get help for")]
+        #[arg(help = "Top-level command to get help for", add = ArgValueCompleter::new(complete_commands))]
         command: Option<String>,
     },
     #[command(
@@ -154,7 +159,7 @@ enum Commands {
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)")]
+        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         path: Option<String>,
         // Filtering
         #[arg(
@@ -184,6 +189,13 @@ enum Commands {
             help_heading = "Execution"
         )]
         fail_fast: bool,
+        #[arg(
+            long,
+            value_name = "SEED",
+            help = "Seed for reproducible fuzz runs",
+            help_heading = "Execution"
+        )]
+        fuzz_seed: Option<u64>,
 
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
@@ -208,6 +220,26 @@ enum Commands {
             help_heading = "Coverage"
         )]
         coverage_file: Option<String>,
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            value_parser = parse_coverage_percent,
+            help = "Fail if total line coverage is below this percentage",
+            help_heading = "Coverage"
+        )]
+        coverage_minimum_percent: Option<f64>,
+        #[arg(
+            long,
+            help = "Include files from the @wrappers mapping in coverage reports",
+            help_heading = "Coverage"
+        )]
+        coverage_include_wrappers: bool,
+        #[arg(
+            long,
+            help = "Include .test.tolk files in coverage reports",
+            help_heading = "Coverage"
+        )]
+        coverage_include_tests: bool,
 
         // Profiling
         #[arg(
@@ -293,7 +325,7 @@ enum Commands {
             help = "Save transaction traces to directory",
             help_heading = "Tracing",
             value_name = "DIR",
-            default_missing_value = ".acton/traces",
+            default_missing_value = "build/traces",
             num_args = 0..=1,
         )]
         save_test_trace: Option<String>,
@@ -321,11 +353,74 @@ enum Commands {
         mutate_contract: Option<String>,
         #[arg(
             long,
+            help = "Path to a JSON file with custom query-based mutation rules",
+            help_heading = "Mutation Testing",
+            value_name = "PATH"
+        )]
+        mutation_rules_file: Option<String>,
+        #[arg(
+            long,
+            help = "Session ID used for mutation progress logging and resume",
+            help_heading = "Mutation Testing",
+            value_name = "ID"
+        )]
+        mutation_session_id: Option<String>,
+        #[arg(
+            long,
+            value_parser = parse_mutation_workers,
+            help = "Number of worker threads used for mutation testing (defaults to available parallelism)",
+            help_heading = "Mutation Testing",
+            value_name = "N"
+        )]
+        mutation_workers: Option<usize>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Limit mutation testing to changed lines in the selected diff scope",
+            help_heading = "Mutation Testing",
+            value_name = "MODE"
+        )]
+        mutation_diff: Option<MutationDiffMode>,
+        #[arg(
+            long,
+            help = "Base ref used by diff-based mutation testing modes",
+            help_heading = "Mutation Testing",
+            value_name = "REF"
+        )]
+        mutation_diff_ref: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            value_delimiter = ',',
+            help = "Run only selected mutation levels (comma-separated)",
+            help_heading = "Mutation Testing",
+            value_name = "LEVEL[,LEVEL...]"
+        )]
+        mutation_levels: Vec<MutationLevel>,
+        #[arg(
+            long = "mutation-id",
+            value_delimiter = ',',
+            value_parser = parse_mutation_id,
+            help = "Run only specific mutation IDs from a previous mutation report",
+            help_heading = "Mutation Testing",
+            value_name = "ID"
+        )]
+        id: Vec<usize>,
+        #[arg(
+            long,
+            value_name = "PERCENT",
+            value_parser = parse_mutation_percent,
+            help = "Fail if mutation score is below this percentage",
+            help_heading = "Mutation Testing"
+        )]
+        mutation_minimum_percent: Option<f64>,
+        #[arg(
+            long,
             help = "Disable specific mutation rules",
             help_heading = "Mutation Testing",
             value_name = "RULE"
         )]
-        disable_rule: Vec<String>,
+        mutation_disable_rules: Vec<String>,
         #[arg(
             long,
             help = "Open test results in a browser",
@@ -400,7 +495,7 @@ enum Commands {
         after_help = detailed_help_pointer("script")
     )]
     Script {
-        #[arg(help = "Script file to execute")]
+        #[arg(help = "Script file to execute", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
 
         #[arg(help = "Arguments to pass to the script")]
@@ -529,7 +624,7 @@ enum Commands {
         after_help = detailed_help_pointer("compile")
     )]
     Compile {
-        #[arg(help = "Tolk file to compile")]
+        #[arg(help = "Tolk file to compile", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
@@ -597,7 +692,8 @@ enum Commands {
         net: String,
         #[arg(
             long,
-            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)"
+            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)",
+            add = ArgValueCompleter::new(complete_wallets)
         )]
         wallet: Option<String>,
         #[arg(long, help = "Tolk compiler version to use on verifier side")]
@@ -612,7 +708,7 @@ enum Commands {
         after_help = detailed_help_pointer("check")
     )]
     Check {
-        #[arg(help = "Contract ID to check or path to a .tolk file")]
+        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
@@ -662,7 +758,8 @@ enum Commands {
         logs_dir: Option<String>,
         #[arg(
             long,
-            help = "Contract name from Acton.toml used to build a source-level trace for the transaction"
+            help = "Contract name from Acton.toml used to build a source-level trace for the transaction",
+            add = ArgValueCompleter::new(complete_contracts)
         )]
         contract: Option<String>,
         #[arg(
@@ -692,7 +789,7 @@ enum Commands {
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
-        #[arg(help = "Files or directories to format (defaults to project root)")]
+        #[arg(help = "Files or directories to format (defaults to project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
@@ -884,7 +981,7 @@ pub enum LibraryCommand {
             help = "Duration to publish the library for (e.g. 100d, 1y); prompts if not provided"
         )]
         duration: Option<String>,
-        #[arg(long, help = "Wallet to use for publishing (prompts if not provided)")]
+        #[arg(long, help = "Wallet to use for publishing (prompts if not provided)", add = ArgValueCompleter::new(complete_wallets))]
         wallet: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
@@ -992,6 +1089,12 @@ fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .collect()
 }
 
+fn complete_contracts_or_paths(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let mut candidates = complete_contracts(current);
+    candidates.extend(PathCompleter::any().complete(current));
+    candidates
+}
+
 fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
     let Some(config) = load_config_for_completion() else {
         return vec![];
@@ -1007,22 +1110,59 @@ fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .collect()
 }
 
-fn load_config_for_completion() -> Option<ActonConfig> {
-    let mut current = env::current_dir().ok()?;
+fn complete_wallets(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy();
+    let mut wallets = std::collections::BTreeMap::new();
 
-    loop {
-        let config_path = current.join("Acton.toml");
-        if config_path.is_file() {
-            let content = fs::read_to_string(config_path).ok()?;
-            return toml::from_str::<ActonConfig>(&content).ok();
-        }
+    let load_wallets = |path: &Path| -> Option<std::collections::BTreeMap<String, _>> {
+        let content = fs::read_to_string(path).ok()?;
+        let file: WalletsFile = toml::from_str(&content).ok()?;
+        Some(file.wallets?.wallets)
+    };
 
-        if !current.pop() {
-            break;
-        }
+    // 1. Global wallets
+    if let Some(global_path) = global_wallets_path()
+        && let Some(w) = load_wallets(&global_path)
+    {
+        wallets.extend(w);
     }
 
-    None
+    // 2. Local wallets.toml (overrides global)
+    if let Some(project_root) = find_project_root_for_completion()
+        && let Some(w) = load_wallets(&project_root.join("wallets.toml"))
+    {
+        wallets.extend(w);
+    }
+
+    wallets
+        .keys()
+        .filter(|name| name.starts_with(current.as_ref()))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn complete_commands(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy();
+    Cli::command()
+        .get_subcommands()
+        .filter(|cmd| !cmd.is_hide_set())
+        .map(|cmd| cmd.get_name().to_string())
+        .filter(|name| name.starts_with(current.as_ref()))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn find_project_root_for_completion() -> Option<PathBuf> {
+    let cwd = env::current_dir().ok()?;
+    let manifest = find_manifest_in_ancestors(&cwd)?;
+    manifest.parent().map(Path::to_path_buf)
+}
+
+fn load_config_for_completion() -> Option<ActonConfig> {
+    let cwd = env::current_dir().ok()?;
+    let manifest = find_manifest_in_ancestors(&cwd)?;
+    let content = fs::read_to_string(manifest).ok()?;
+    toml::from_str::<ActonConfig>(&content).ok()
 }
 
 fn detailed_help_pointer(command: &str) -> StyledStr {
@@ -1268,7 +1408,7 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
             let mut message = format!("no such command: `{command}`");
             if let Some((suggestion, _)) = cli
                 .get_subcommands()
-                .map(|subcommand| subcommand.get_name())
+                .map(clap::Command::get_name)
                 .filter(|name| *name != "help")
                 .map(|name| (name, strsim::jaro_winkler(command, name)))
                 .filter(|(_, score)| *score >= 0.80)
@@ -1491,6 +1631,9 @@ fn main() {
             coverage,
             coverage_format,
             coverage_file,
+            coverage_minimum_percent,
+            coverage_include_wrappers,
+            coverage_include_tests,
             exclude,
             include,
             clear_cache,
@@ -1505,8 +1648,17 @@ fn main() {
             mutate,
             mutate_overrides,
             mutate_contract,
-            disable_rule,
+            mutation_rules_file,
+            mutation_session_id,
+            mutation_workers,
+            mutation_diff,
+            mutation_diff_ref,
+            mutation_levels,
+            id,
+            mutation_minimum_percent,
+            mutation_disable_rules,
             fail_fast,
+            fuzz_seed,
             fork_block_number,
             ui,
             ui_port,
@@ -1521,6 +1673,9 @@ fn main() {
                     coverage,
                     coverage_format,
                     coverage_file,
+                    coverage_minimum_percent,
+                    coverage_include_wrappers,
+                    coverage_include_tests,
                     exclude,
                     include,
                     clear_cache,
@@ -1535,7 +1690,7 @@ fn main() {
                     fork_block_number,
                     save_test_trace.or_else(|| {
                         if ui {
-                            Some(".acton/traces".to_owned())
+                            Some(paths::DEFAULT_BUILD_TRACES_DIR.to_owned())
                         } else {
                             None
                         }
@@ -1543,7 +1698,16 @@ fn main() {
                     mutate,
                     mutate_overrides,
                     mutate_contract,
-                    disable_rule,
+                    mutation_rules_file,
+                    mutation_session_id,
+                    mutation_workers,
+                    mutation_diff,
+                    mutation_diff_ref,
+                    mutation_levels,
+                    id,
+                    mutation_minimum_percent,
+                    mutation_disable_rules,
+                    fuzz_seed,
                     Some(fail_fast),
                     ui,
                     ui_port,
@@ -2011,7 +2175,7 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return configured_project_root().join(".acton").join("logs");
+        return paths::build_logs_dir(configured_project_root());
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2019,11 +2183,11 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return configured_project_root().join(".acton").join("logs");
+        return paths::build_logs_dir(configured_project_root());
     }
 
     #[allow(unreachable_code)]
-    configured_project_root().join(".acton").join("logs")
+    paths::build_logs_dir(configured_project_root())
 }
 
 fn resolve_acton_log_dir() -> PathBuf {
@@ -2065,6 +2229,9 @@ fn create_test_config(
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
+    coverage_minimum_percent: Option<f64>,
+    coverage_include_wrappers: bool,
+    coverage_include_tests: bool,
     exclude: Vec<String>,
     include: Vec<String>,
     clear_cache: bool,
@@ -2081,7 +2248,16 @@ fn create_test_config(
     mutate: bool,
     mutate_overrides: Option<String>,
     mutate_contract: Option<String>,
+    mutation_rules_file: Option<String>,
+    mutation_session_id: Option<String>,
+    mutation_workers: Option<usize>,
+    mutation_diff: Option<MutationDiffMode>,
+    mutation_diff_ref: Option<String>,
+    mutation_levels: Vec<MutationLevel>,
+    mutation_ids: Vec<usize>,
+    mutation_minimum_percent: Option<f64>,
     disable_rules: Vec<String>,
+    fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
     ui: bool,
     ui_port: u16,
@@ -2091,7 +2267,7 @@ fn create_test_config(
     if let Ok(acton_config) = acton_config
         && let Some(test_settings) = &acton_config.test
     {
-        return test_settings.to_test_config(
+        let mut config = test_settings.to_test_config(
             filter,
             report_formats,
             show_bodies,
@@ -2101,6 +2277,17 @@ fn create_test_config(
             if coverage { Some(true) } else { None },
             coverage_format,
             coverage_file,
+            coverage_minimum_percent,
+            if coverage_include_wrappers {
+                Some(true)
+            } else {
+                None
+            },
+            if coverage_include_tests {
+                Some(true)
+            } else {
+                None
+            },
             if exclude.is_empty() {
                 None
             } else {
@@ -2123,12 +2310,24 @@ fn create_test_config(
             mutate,
             mutate_overrides,
             mutate_contract,
+            mutation_diff,
+            mutation_diff_ref,
+            mutation_levels,
+            mutation_minimum_percent,
             disable_rules,
+            fuzz_seed,
             if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
             Some(ui_port),
         );
+        config.mutation_ids = mutation_ids;
+        if mutation_rules_file.is_some() {
+            config.mutation_rules_file = mutation_rules_file;
+        }
+        config.mutation_session_id = mutation_session_id;
+        config.mutation_workers = mutation_workers;
+        return config;
     }
 
     TestConfig {
@@ -2137,6 +2336,9 @@ fn create_test_config(
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
         coverage,
+        coverage_minimum_percent,
+        coverage_include_wrappers,
+        coverage_include_tests,
         filter,
         coverage_format,
         coverage_file,
@@ -2155,10 +2357,65 @@ fn create_test_config(
         mutate,
         mutate_overrides,
         mutate_contract,
+        mutation_rules_file,
+        mutation_session_id,
+        mutation_workers,
+        mutation_diff,
+        mutation_diff_ref,
+        mutation_levels,
+        mutation_ids,
+        mutation_minimum_percent,
         disable_rules,
+        fuzz_runs: None,
+        fuzz_max_test_rejects: None,
+        fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,
         fork_net,
     }
+}
+
+fn parse_coverage_percent(raw: &str) -> Result<f64, String> {
+    parse_minimum_percent(raw, "coverage percentage", "--coverage-minimum-percent")
+}
+
+fn parse_mutation_percent(raw: &str) -> Result<f64, String> {
+    parse_minimum_percent(raw, "mutation percentage", "--mutation-minimum-percent")
+}
+
+fn parse_mutation_id(raw: &str) -> Result<usize, String> {
+    let value = raw
+        .parse::<usize>()
+        .map_err(|err| format!("invalid mutation ID '{raw}': {err}"))?;
+
+    if value == 0 {
+        return Err("--mutation-id must be 1 or greater".to_string());
+    }
+
+    Ok(value)
+}
+
+fn parse_mutation_workers(raw: &str) -> Result<usize, String> {
+    let value = raw
+        .parse::<usize>()
+        .map_err(|err| format!("invalid mutation worker count '{raw}': {err}"))?;
+
+    if value == 0 {
+        return Err("--mutation-workers must be 1 or greater".to_string());
+    }
+
+    Ok(value)
+}
+
+fn parse_minimum_percent(raw: &str, kind: &str, flag: &str) -> Result<f64, String> {
+    let value = raw
+        .parse::<f64>()
+        .map_err(|err| format!("invalid {kind} '{raw}': {err}"))?;
+
+    if !value.is_finite() || !(0.0..=100.0).contains(&value) {
+        return Err(format!("{flag} must be between 0 and 100"));
+    }
+
+    Ok(value)
 }

@@ -38,7 +38,7 @@ impl Github {
         let failures = runs
             .iter()
             .filter_map(|run| {
-                self.ensure_workflow_run_completed_with_conclusion(run, branch, "success")
+                self.ensure_workflow_run_completed_with_conclusion(run, branch, &["success"])
                     .err()
                     .map(|error| error.to_string())
             })
@@ -115,7 +115,7 @@ impl Github {
         );
     }
 
-    pub(crate) fn ensure_latest_release_workflow_failed(&self, tag: &str) -> Result<()> {
+    pub(crate) fn latest_release_workflow_run_for_tag(&self, tag: &str) -> Result<WorkflowRun> {
         let runs = self.json_output::<Vec<WorkflowRun>>(&[
             "run",
             "list",
@@ -133,14 +133,14 @@ impl Github {
             bail!("no GitHub Actions `Release` run found for tag `{tag}`");
         };
 
-        self.ensure_workflow_run_completed_with_conclusion(run, tag, "failure")
+        Ok(run.clone())
     }
 
-    fn ensure_workflow_run_completed_with_conclusion(
+    pub(crate) fn ensure_workflow_run_completed_with_conclusion(
         &self,
         run: &WorkflowRun,
         ref_name: &str,
-        expected_conclusion: &str,
+        expected_conclusions: &[&str],
     ) -> Result<()> {
         let workflow_name = run.workflow_name.as_deref().unwrap_or("<unnamed workflow>");
 
@@ -149,9 +149,14 @@ impl Github {
         }
 
         let actual_conclusion = run.conclusion.as_deref().unwrap_or("<none>");
-        if actual_conclusion != expected_conclusion {
+        if !expected_conclusions.contains(&actual_conclusion) {
+            let expected = expected_conclusions
+                .iter()
+                .map(|conclusion| format!("`{conclusion}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
             bail!(
-                "workflow `{workflow_name}` for ref `{ref_name}` concluded with `{actual_conclusion}` instead of `{expected_conclusion}`"
+                "workflow `{workflow_name}` for ref `{ref_name}` concluded with `{actual_conclusion}` instead of one of {expected}"
             );
         }
 
@@ -189,9 +194,9 @@ impl Github {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct WorkflowRun {
+pub(crate) struct WorkflowRun {
     head_branch: Option<String>,
     started_at: Option<String>,
     workflow_name: Option<String>,

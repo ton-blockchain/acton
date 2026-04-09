@@ -52,6 +52,45 @@
   flex: 1;
   position: relative;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-color);
+}
+
+.viewTabs {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary-color);
+}
+
+.viewTab {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.viewTab:hover {
+  color: var(--text-primary);
+}
+
+.viewTabActive {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+
+.mainPanel {
+  flex: 1;
+  min-height: 0;
 }
 
 .noSelection {

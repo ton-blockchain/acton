@@ -3,7 +3,7 @@ title: "Code Coverage"
 description: "Learn how to measure and analyze code coverage in your Tolk smart contract tests"
 ---
 
-Code coverage is a metric that measures how much of your code is executed during testing. It helps you identify untested parts of your codebase and ensure comprehensive test suites. Acton's test runner provides built-in code coverage support with detailed reporting and LCOV export capabilities.
+Code coverage is a metric that measures how much of your code is executed during testing. It helps you identify untested parts of your codebase and ensure comprehensive test suites. Acton's test runner provides built-in code coverage support with detailed reporting, LCOV export, and a browser UI coverage view.
 
 ## What is Code Coverage?
 
@@ -28,6 +28,24 @@ acton test --coverage
 
 This will run all tests and collect coverage data, then display a summary report.
 
+### Coverage in Test UI
+
+To inspect coverage in the browser UI, run tests with both `--coverage` and
+`--ui`:
+
+```bash
+acton test --coverage --ui
+```
+
+When both flags are enabled, Test UI shows a `Coverage` tab with:
+
+- overall coverage summary
+- sortable file list
+- per-file source view with annotated lines
+
+You do not need to pass `--coverage-format lcov` for the browser view. The UI
+receives coverage data automatically for the current run.
+
 ### Coverage for Specific Tests
 
 You can combine coverage with other flags:
@@ -38,6 +56,18 @@ acton test counter.test.tolk --coverage
 
 # Run tests matching a pattern with coverage
 acton test --filter "test-increase" --coverage
+```
+
+By default, Acton excludes:
+
+- `.test.tolk` files
+- files under the `@wrappers` mapping
+
+Use these flags when you want them in the report:
+
+```bash
+acton test --coverage --coverage-include-tests
+acton test --coverage --coverage-include-wrappers
 ```
 
 ## Understanding Coverage Reports
@@ -80,6 +110,13 @@ acton test --coverage --coverage-format lcov
 ```
 
 This creates a `lcov.info` file in your project root.
+
+If you want both browser inspection and an exported LCOV artifact, combine all
+three flags:
+
+```bash
+acton test --coverage --ui --coverage-format lcov
+```
 
 ### Using LCOV with External Tools
 

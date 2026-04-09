@@ -258,15 +258,15 @@
       ]
     },
     "CustomNetworkApiConfig": {
-      "description": "TonCenter API endpoints for a custom network",
+      "description": "`TonCenter` API endpoints for a custom network",
       "type": "object",
       "properties": {
         "v2": {
-          "description": "The URL for the TonCenter API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port",
           "type": "string"
         },
         "v3": {
-          "description": "The URL for the TonCenter API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port",
           "type": "string"
         }
       },
@@ -277,7 +277,7 @@
       "type": "object",
       "properties": {
         "api": {
-          "description": "TonCenter API endpoints for this network",
+          "description": "`TonCenter` API endpoints for this network",
           "allOf": [
             {
               "$ref": "#/definitions/CustomNetworkApiConfig"
@@ -458,7 +458,7 @@
           "minimum": 0.0
         },
         "rate-limit": {
-          "description": "Maximum number of API requests per second served by LiteNode `/api` endpoints",
+          "description": "Maximum number of API requests per second served by `LiteNode` `/api` endpoints",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -469,14 +469,94 @@
       "description": "Configuration for mutation testing",
       "type": "object",
       "properties": {
+        "diff": {
+          "description": "Diff scope used to limit mutation testing to changed lines",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MutationDiffMode"
+            }
+          ]
+        },
+        "diff-ref": {
+          "description": "Base ref used by diff-based mutation testing modes",
+          "type": "string"
+        },
         "disable-rules": {
           "description": "List of mutation rules to disable",
           "type": "array",
           "items": {
             "type": "string"
           }
+        },
+        "minimum-percent": {
+          "description": "Minimum mutation score percentage required for the run to succeed",
+          "type": "number",
+          "format": "double"
+        },
+        "mutation-levels": {
+          "description": "List of mutation levels to run",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MutationLevel"
+          }
+        },
+        "rules-file": {
+          "description": "Path to a JSON file with custom query-based mutation rules",
+          "type": "string"
         }
       }
+    },
+    "MutationDiffMode": {
+      "description": "Diff scopes supported by mutation testing filters",
+      "oneOf": [
+        {
+          "description": "Mutate only lines changed in the current worktree compared to HEAD",
+          "type": "string",
+          "enum": [
+            "worktree"
+          ]
+        },
+        {
+          "description": "Mutate only lines changed compared to a specific ref or commit",
+          "type": "string",
+          "enum": [
+            "ref"
+          ]
+        },
+        {
+          "description": "Mutate only lines changed on the current branch since its merge-base",
+          "type": "string",
+          "enum": [
+            "branch"
+          ]
+        }
+      ]
+    },
+    "MutationLevel": {
+      "description": "Mutation levels supported by mutation testing filters",
+      "oneOf": [
+        {
+          "description": "Security-sensitive control-flow, persistence, and upgrade mutations",
+          "type": "string",
+          "enum": [
+            "critical"
+          ]
+        },
+        {
+          "description": "High-signal behavioral mutations such as arithmetic and comparisons",
+          "type": "string",
+          "enum": [
+            "major"
+          ]
+        },
+        {
+          "description": "Broader low-priority mutations such as bitwise variants",
+          "type": "string",
+          "enum": [
+            "minor"
+          ]
+        }
+      ]
     },
     "Network": {
       "oneOf": [
@@ -544,14 +624,14 @@
           ]
         },
         {
-          "description": "TeamCity service messages",
+          "description": "`TeamCity` service messages",
           "type": "string",
           "enum": [
             "teamcity"
           ]
         },
         {
-          "description": "JUnit XML report",
+          "description": "`JUnit` XML report",
           "type": "string",
           "enum": [
             "junit"
@@ -565,6 +645,66 @@
           ]
         }
       ]
+    },
+    "TestCoverageSettings": {
+      "description": "Coverage settings for the test runner",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable code coverage reporting",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Format for coverage reports",
+          "default": "lcov",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CoverageFormat"
+            }
+          ]
+        },
+        "include-tests": {
+          "description": "Include `.test.tolk` files in coverage reports",
+          "type": "boolean"
+        },
+        "include-wrappers": {
+          "description": "Include files from the `@wrappers` mapping in coverage reports",
+          "type": "boolean"
+        },
+        "minimum-percent": {
+          "description": "Minimum total line coverage percentage required for a non-UI coverage run",
+          "type": "number",
+          "format": "double"
+        },
+        "output-file": {
+          "description": "Path to save the coverage report",
+          "type": "string"
+        }
+      }
+    },
+    "TestFuzzSettings": {
+      "description": "Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`",
+      "type": "object",
+      "properties": {
+        "max-test-rejects": {
+          "description": "Maximum number of rejected inputs from `assume(...)` before the test fails",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "runs": {
+          "description": "Number of accepted fuzz cases to execute for each fuzz test",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "seed": {
+          "description": "Seed used for reproducible fuzz input generation",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     },
     "TestSettings": {
       "description": "Default settings for the test runner",
@@ -583,19 +723,10 @@
           ]
         },
         "coverage": {
-          "description": "Enable code coverage reporting",
-          "type": "boolean"
-        },
-        "coverage-file": {
-          "description": "Path to save the coverage report",
-          "type": "string"
-        },
-        "coverage-format": {
-          "description": "Format for coverage reports",
-          "default": "lcov",
+          "description": "Coverage settings for test runs",
           "allOf": [
             {
-              "$ref": "#/definitions/CoverageFormat"
+              "$ref": "#/definitions/TestCoverageSettings"
             }
           ]
         },
@@ -644,6 +775,14 @@
             }
           ]
         },
+        "fuzz": {
+          "description": "Default fuzz settings for parameterized tests",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TestFuzzSettings"
+            }
+          ]
+        },
         "include": {
           "description": "Glob patterns to include in testing",
           "type": "array",
@@ -652,11 +791,11 @@
           }
         },
         "junit-merge": {
-          "description": "Merge all test suites into a single JUnit file",
+          "description": "Merge all test suites into a single `JUnit` file",
           "type": "boolean"
         },
         "junit-path": {
-          "description": "Directory for JUnit XML reports",
+          "description": "Directory for `JUnit` XML reports",
           "type": "string"
         },
         "mutation": {

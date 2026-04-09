@@ -60,10 +60,12 @@ impl SourceMap {
         }
     }
 
+    #[must_use]
     pub fn get_function_by_idx(&self, f_idx: usize) -> Option<&FunctionInfo> {
         self.functions.get(f_idx)
     }
 
+    #[must_use]
     pub fn get_function_name_by_idx(&self, f_idx: usize) -> String {
         if let Some(f_info) = self.functions.get(f_idx) {
             f_info.name.clone()
@@ -72,6 +74,7 @@ impl SourceMap {
         }
     }
 
+    #[must_use]
     pub fn innermost_function_at(&self, file_id: usize, line: usize) -> Option<&FunctionInfo> {
         self.functions
             .iter()
@@ -88,24 +91,28 @@ impl SourceMap {
             })
     }
 
+    #[must_use]
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
         self.structs
             .get(name)
             .unwrap_or_else(|| panic!("struct `{name}` not found"))
     }
 
+    #[must_use]
     pub fn get_alias(&self, name: &str) -> &AbiAlias {
         self.aliases
             .get(name)
             .unwrap_or_else(|| panic!("alias `{name}` not found"))
     }
 
+    #[must_use]
     pub fn get_enum(&self, name: &str) -> &AbiEnum {
         self.enums
             .get(name)
             .unwrap_or_else(|| panic!("enum `{name}` not found"))
     }
 
+    #[must_use]
     pub fn resolve_file_name(&self, file_id: usize) -> &str {
         for f in &self.files {
             if f.file_id == file_id {
@@ -115,6 +122,7 @@ impl SourceMap {
         "unknown-file"
     }
 
+    #[must_use]
     pub fn resolve_file_full_path(&self, file_id: usize) -> Option<&str> {
         self.files
             .iter()
@@ -122,6 +130,7 @@ impl SourceMap {
             .map(|f| f.file_name.as_str())
     }
 
+    #[must_use]
     pub fn path_to_file_id(&self, path: &str) -> Option<usize> {
         let path_normalized = path
             .trim_start_matches("file://")
@@ -136,6 +145,7 @@ impl SourceMap {
         None
     }
 
+    #[must_use]
     pub fn resolve_ty(&self, ty_idx: usize) -> Option<&Ty> {
         self.unique_ty
             .iter()
@@ -144,7 +154,8 @@ impl SourceMap {
     }
 
     /// Collect all source lines that have a stoppable debug mark (LOC,
-    /// inlined ENTER_FUN, or LEAVE_FUN) for a given file, sorted and deduped.
+    /// inlined `ENTER_FUN`, or `LEAVE_FUN`) for a given file, sorted and deduped.
+    #[must_use]
     pub fn stoppable_lines_for_file(&self, file_id: usize) -> Vec<usize> {
         let mut lines: Vec<usize> = self
             .debug_marks
@@ -164,19 +175,22 @@ impl SourceMap {
                 _ => None,
             })
             .collect();
-        lines.sort();
+        lines.sort_unstable();
         lines.dedup();
         lines
     }
 
+    #[must_use]
     pub const fn debug_marks_count(&self) -> usize {
         self.debug_marks.len()
     }
 
+    #[must_use]
     pub fn get_debug_mark(&self, mark_id: usize) -> &DebugMark {
         &self.debug_marks[mark_id]
     }
 
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.debug_marks.is_empty()
     }
@@ -184,15 +198,10 @@ impl SourceMap {
 
 #[derive(Deserialize)]
 struct SourceMapDe {
-    #[serde(default)]
     files: Vec<SrcFileInfo>,
-    #[serde(default)]
     declarations: Vec<Declaration>,
-    #[serde(default)]
     unique_ty: Vec<UniqueTy>,
-    #[serde(default)]
     functions: Vec<FunctionInfo>,
-    #[serde(default)]
     debug_marks: Vec<DebugMark>,
 }
 
@@ -225,18 +234,23 @@ impl<'de> Deserialize<'de> for SourceMap {
 pub struct SrcRange(pub Vec<usize>);
 
 impl SrcRange {
+    #[must_use]
     pub fn file_id(&self) -> usize {
         self.0[0]
     }
+    #[must_use]
     pub fn start_line(&self) -> usize {
         self.0[1]
     }
+    #[must_use]
     pub fn start_col(&self) -> usize {
         self.0[2]
     }
+    #[must_use]
     pub fn end_line(&self) -> usize {
         self.0[3]
     }
+    #[must_use]
     pub fn end_col(&self) -> usize {
         self.0[4]
     }
@@ -311,9 +325,7 @@ pub enum Declaration {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PrefixInfo {
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-    #[serde(rename = "prefixLen")]
     pub prefix_len: usize,
 }
 

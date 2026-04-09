@@ -1,0 +1,1 @@
+Error: Failed to collect enough signatures (1/2)

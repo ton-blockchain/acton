@@ -1,5 +1,5 @@
 use crate::commands::common::error_fmt;
-use crate::commands::test::reporting::{TestReport, TestReporter};
+use crate::commands::test::reporting::{FuzzExecutionContext, TestReport, TestReporter};
 use acton_config::color::OwoColorize;
 use anyhow::Context;
 use axum::{
@@ -32,10 +32,71 @@ pub(crate) struct UiServerState {
     pub trace_dir: Option<PathBuf>,
     pub project_root: String,
     pub project_root_path: PathBuf,
+    pub coverage_lcov: Option<Arc<str>>,
 }
 
 pub(crate) struct UiReporter {
     reports: Arc<Mutex<Vec<TestReport>>>,
+}
+
+#[derive(Serialize)]
+struct UiExecutionSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fuzz: Option<FuzzExecutionContext>,
+}
+
+#[derive(Serialize)]
+struct UiTestReport {
+    name: Arc<str>,
+    suite_name: Arc<str>,
+    file_path: PathBuf,
+    row: usize,
+    column: usize,
+    duration: std::time::Duration,
+    status: crate::commands::test::reporting::TestStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    detailed_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    failed_transactions: Option<Vec<crate::commands::test::trace::TransactionInfo>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    failed_transaction_context: Option<crate::commands::test::reporting::FailedTransactionContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    location: Option<ton_source_map::SourceLocation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    execution: Option<UiExecutionSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    trace_path: Option<String>,
+}
+
+impl From<&TestReport> for UiTestReport {
+    fn from(test: &TestReport) -> Self {
+        Self {
+            name: test.name.clone(),
+            suite_name: test.suite_name.clone(),
+            file_path: test.file_path.clone(),
+            row: test.row,
+            column: test.column,
+            duration: test.duration,
+            status: test.status.clone(),
+            message: test.message.clone(),
+            detailed_message: test.detailed_message.clone(),
+            failed_transactions: test.failed_transactions.clone(),
+            failed_transaction_context: test.failed_transaction_context.clone(),
+            details: test.details.clone(),
+            location: test.location.clone(),
+            execution: test.execution.as_ref().and_then(|execution| {
+                execution
+                    .fuzz
+                    .clone()
+                    .map(|fuzz| UiExecutionSummary { fuzz: Some(fuzz) })
+            }),
+            trace_path: test.trace_path.clone(),
+        }
+    }
 }
 
 impl UiReporter {
@@ -70,6 +131,7 @@ pub(crate) async fn start_ui_server(
     reports: Vec<TestReport>,
     trace_dir: Option<String>,
     project_root: String,
+    coverage_lcov: Option<String>,
     listener: std::net::TcpListener,
 ) -> anyhow::Result<()> {
     let project_root_path =
@@ -82,6 +144,7 @@ pub(crate) async fn start_ui_server(
         trace_dir,
         project_root,
         project_root_path,
+        coverage_lcov: coverage_lcov.map(Arc::<str>::from),
     });
 
     let app = build_ui_api_router(state);
@@ -126,6 +189,7 @@ fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
         .route("/api/trace/{name}", get(handle_api_trace))
         .route("/api/contract/{name}", get(handle_api_contract))
         .route("/api/file", get(handle_api_file))
+        .route("/api/coverage.lcov", get(handle_api_coverage_lcov))
         .route("/api/config", get(handle_api_config))
         .with_state(state)
 }
@@ -217,7 +281,12 @@ async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
 }
 
 async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
-    Json(state.reports.as_ref().clone())
+    let reports = state
+        .reports
+        .iter()
+        .map(UiTestReport::from)
+        .collect::<Vec<_>>();
+    Json(reports)
 }
 
 #[derive(Deserialize)]
@@ -296,6 +365,18 @@ async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl Into
     Json(ConfigResponse {
         project_root: state.project_root.clone(),
     })
+}
+
+async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
+    let Some(coverage_lcov) = &state.coverage_lcov else {
+        return (StatusCode::NOT_FOUND, "Coverage not enabled").into_response();
+    };
+
+    (
+        [("content-type", "text/plain; charset=utf-8")],
+        coverage_lcov.to_string(),
+    )
+        .into_response()
 }
 
 async fn handle_api_trace(

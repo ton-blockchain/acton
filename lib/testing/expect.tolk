@@ -663,6 +663,10 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
     Assert.equal(length, mapLength, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 
+fun formatExpectLocation(loc: SourceLocation): string {
+    return format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
+}
+
 /// Creates a new expectation for the given value.
 ///
 /// After creation, the expectation can be used to assert the value.
@@ -676,8 +680,11 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
 fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()): Expectation<T> {
-    val locString = format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
-    return Expectation<T>.create(value, reflect.typeNameOfObject(value), locString);
+    return Expectation<T>.create(
+        value,
+        reflect.typeNameOfObject(value),
+        formatExpectLocation(loc),
+    );
 }
 
 /// Sets the expected exit code for the test.

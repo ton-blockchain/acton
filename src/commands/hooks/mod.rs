@@ -97,8 +97,7 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
 
     if hooks_dir_at(configured_project_root()).exists() {
         anyhow::bail!(
-            "Hooks directory {} already exists. Delete it before running `acton hooks new`.",
-            DEFAULT_HOOKS_PATH
+            "Hooks directory {DEFAULT_HOOKS_PATH} already exists. Delete it before running `acton hooks new`."
         );
     }
 
@@ -119,10 +118,7 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
 
     create_hooks_scaffold_at(configured_project_root(), template)?;
 
-    println!(
-        "Created {} hooks scaffold in {}",
-        template, DEFAULT_HOOKS_PATH
-    );
+    println!("Created {template} hooks scaffold in {DEFAULT_HOOKS_PATH}");
     println!("Run `acton hooks install` to enable it.");
     Ok(())
 }
@@ -243,10 +239,7 @@ fn hooks_install_cmd() -> anyhow::Result<()> {
     ensure_local_git_repository_at(configured_project_root(), HOOKS_REPO_REQUIRED_MESSAGE)?;
 
     if !hooks_dir_at(configured_project_root()).is_dir() {
-        anyhow::bail!(
-            "Hooks directory {} does not exist. {HOOKS_NEW_HINT}",
-            DEFAULT_HOOKS_PATH
-        );
+        anyhow::bail!("Hooks directory {DEFAULT_HOOKS_PATH} does not exist. {HOOKS_NEW_HINT}");
     }
 
     if let Some(hooks_path) = local_hooks_path_at(configured_project_root())? {
@@ -274,16 +267,10 @@ fn hooks_install_cmd() -> anyhow::Result<()> {
             );
         }
 
-        anyhow::bail!(
-            "Failed to set git hooks path to {}: {stderr}",
-            DEFAULT_HOOKS_PATH
-        );
+        anyhow::bail!("Failed to set git hooks path to {DEFAULT_HOOKS_PATH}: {stderr}");
     }
 
-    println!(
-        "Git hooks installed successfully from {}",
-        DEFAULT_HOOKS_PATH
-    );
+    println!("Git hooks installed successfully from {DEFAULT_HOOKS_PATH}");
 
     Ok(())
 }
@@ -358,8 +345,7 @@ pub fn scaffold_and_install_default_hooks(project_root: &Path) -> anyhow::Result
 
     if hooks_dir_at(project_root).exists() {
         anyhow::bail!(
-            "Hooks directory {} already exists. Delete it before enabling default hooks.",
-            DEFAULT_HOOKS_PATH
+            "Hooks directory {DEFAULT_HOOKS_PATH} already exists. Delete it before enabling default hooks."
         );
     }
 
@@ -377,10 +363,7 @@ pub fn scaffold_and_install_default_hooks(project_root: &Path) -> anyhow::Result
             );
         }
 
-        anyhow::bail!(
-            "Failed to set git hooks path to {}: {stderr}",
-            DEFAULT_HOOKS_PATH
-        );
+        anyhow::bail!("Failed to set git hooks path to {DEFAULT_HOOKS_PATH}: {stderr}");
     }
 
     Ok(())

@@ -101,7 +101,7 @@ struct Wrapper<T> { item: T; }
 fun Wrapper<T>.createFrom<U>(item: U): Wrapper<T> { return {item}; }
 
 fun test18() {
-    Wrapper<int?>.<caret>createFrom<int8>; // TODO
+    Wrapper<int?>.<caret>createFrom<int8>;
 }
 ------------------------------------------------------------------------
-9:18 unresolved
+9:18 -> 6:15 resolved

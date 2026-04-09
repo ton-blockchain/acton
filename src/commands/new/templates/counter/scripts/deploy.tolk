@@ -1,5 +1,4 @@
 import "@acton/io"
-import "@acton/build/build"
 import "@acton/emulation/network"
 import "@contracts/types"
 
@@ -18,4 +17,5 @@ fun main() {
     }
 
     println1("Deployed counter to {}", counter.address);
+    println1("Counter value is {}", counter.currentCounter());
 }

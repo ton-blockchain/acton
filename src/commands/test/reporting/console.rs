@@ -1,10 +1,10 @@
 use super::{TestExecutionContext, TestReport, TestReporter, TestStatus, TestSuiteStats};
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
-use crate::exit_codes;
 use crate::formatter::FormatterContext;
 use crate::retrace;
 use acton_config::color::OwoColorize;
+use acton_debug::exit_codes;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
@@ -41,6 +41,21 @@ impl ConsoleReporter {
             .trim_start_matches("test-")
             .trim_start_matches("test_")
             .to_string()
+    }
+
+    fn format_fuzz_suffix(&self, test: &TestReport) -> String {
+        let Some(exec) = &test.execution else {
+            return String::new();
+        };
+        let Some(fuzz) = &exec.fuzz else {
+            return String::new();
+        };
+
+        let label = if fuzz.total_runs == 1 { "run" } else { "runs" };
+        format!(
+            " {}",
+            format!("({} {label}, seed {})", fuzz.total_runs, fuzz.seed).dimmed()
+        )
     }
 }
 
@@ -158,14 +173,16 @@ impl TestReporter for ConsoleReporter {
         } else {
             (test.duration.as_micros().to_string(), "μs")
         };
+        let fuzz_suffix = self.format_fuzz_suffix(test);
 
         if test.status == TestStatus::Passed {
             println!(
-                "  {} {} {}{}",
+                "  {} {} {}{}{}",
                 "✓".green(),
                 beautified_name,
                 time_value.green(),
-                time_unit.green().dimmed()
+                time_unit.green().dimmed(),
+                fuzz_suffix
             );
         }
 
@@ -192,18 +209,50 @@ impl TestReporter for ConsoleReporter {
 
         if test.status == TestStatus::Failed {
             println!(
-                "  {} {} {}{}",
+                "  {} {} {}{}{}",
                 "✗".red(),
                 beautified_name,
                 time_value.red(),
-                time_unit.red().dimmed()
+                time_unit.red().dimmed(),
+                fuzz_suffix
             );
 
             let Some(exec) = &test.execution else {
-                anyhow::bail!("Test execution context is missing for failed test")
+                if let Some(message) = &test.message {
+                    println!("    {} {}", "└─".dimmed(), message.bright_red());
+                } else {
+                    println!("    {} {}", "└─".dimmed(), "Test failed".bright_red());
+                }
+                return Ok(());
             };
+
+            if let Some(fuzz) = &exec.fuzz
+                && let Some(case) = &fuzz.failed_case
+            {
+                println!(
+                    "    {} Fuzz case {}/{}",
+                    "├─".dimmed(),
+                    case.run.to_string().yellow(),
+                    fuzz.total_runs.to_string().yellow()
+                );
+                if !case.inputs.is_empty() {
+                    let inputs = case
+                        .inputs
+                        .iter()
+                        .map(|(name, value)| format!("{name}={value}"))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    println!("    {} Inputs: {}", "├─".dimmed(), inputs);
+                }
+            }
+
             let Some(failure_context) = &exec.failure else {
-                anyhow::bail!("Failure execution context is missing for failed test")
+                if let Some(message) = &test.message {
+                    println!("    {} {}", "└─".dimmed(), message.bright_red());
+                } else {
+                    println!("    {} {}", "└─".dimmed(), "Test failed".bright_red());
+                }
+                return Ok(());
             };
 
             let formatter = FormatterContext {

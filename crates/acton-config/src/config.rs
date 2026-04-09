@@ -1,4 +1,6 @@
-use crate::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
+use crate::test::{
+    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+};
 use anyhow::{Result, anyhow};
 use path_absolutize::Absolutize;
 use schemars::JsonSchema;
@@ -108,14 +110,14 @@ pub enum ContractDependency {
     },
 }
 
-/// TonCenter API endpoints for a custom network
+/// `TonCenter` API endpoints for a custom network
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CustomNetworkApiConfig {
-    /// The URL for the TonCenter API v2. For localnet this defaults to
+    /// The URL for the `TonCenter` API v2. For localnet this defaults to
     /// `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port
     pub v2: Option<String>,
-    /// The URL for the TonCenter API v3. For localnet this defaults to
+    /// The URL for the `TonCenter` API v3. For localnet this defaults to
     /// `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port
     pub v3: Option<String>,
 }
@@ -127,7 +129,7 @@ pub struct CustomNetworkConfig {
     /// Base URL used to build transaction links for this network. Acton appends
     /// `/tx/<hash>` automatically and derives links from `api.v2` when omitted
     pub explorer: Option<String>,
-    /// TonCenter API endpoints for this network
+    /// `TonCenter` API endpoints for this network
     pub api: Option<CustomNetworkApiConfig>,
 }
 
@@ -225,6 +227,38 @@ pub struct PackageConfig {
     pub license: Option<String>,
 }
 
+/// Coverage settings for the test runner
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct TestCoverageSettings {
+    /// Enable code coverage reporting
+    pub enabled: Option<bool>,
+    /// Format for coverage reports
+    #[schemars(with = "Option<CoverageFormat>")]
+    #[schemars(default = "default_test_coverage_format")]
+    pub format: Option<String>,
+    /// Path to save the coverage report
+    pub output_file: Option<String>,
+    /// Minimum total line coverage percentage required for a non-UI coverage run
+    pub minimum_percent: Option<f64>,
+    /// Include files from the `@wrappers` mapping in coverage reports
+    pub include_wrappers: Option<bool>,
+    /// Include `.test.tolk` files in coverage reports
+    pub include_tests: Option<bool>,
+}
+
+/// Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct TestFuzzSettings {
+    /// Number of accepted fuzz cases to execute for each fuzz test
+    pub runs: Option<usize>,
+    /// Maximum number of rejected inputs from `assume(...)` before the test fails
+    pub max_test_rejects: Option<usize>,
+    /// Seed used for reproducible fuzz input generation
+    pub seed: Option<u64>,
+}
+
 /// Default settings for the test runner
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -242,21 +276,17 @@ pub struct TestSettings {
     /// Enable stack traces for failed tests
     #[schemars(with = "Option<BacktraceMode>")]
     pub backtrace: Option<String>,
-    /// Enable code coverage reporting
-    pub coverage: Option<bool>,
-    /// Format for coverage reports
-    #[schemars(with = "Option<CoverageFormat>")]
-    #[schemars(default = "default_test_coverage_format")]
-    pub coverage_format: Option<String>,
-    /// Path to save the coverage report
-    pub coverage_file: Option<String>,
+    /// Coverage settings for test runs
+    pub coverage: Option<TestCoverageSettings>,
+    /// Default fuzz settings for parameterized tests
+    pub fuzz: Option<TestFuzzSettings>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
     pub include: Option<Vec<String>>,
-    /// Directory for JUnit XML reports
+    /// Directory for `JUnit` XML reports
     pub junit_path: Option<String>,
-    /// Merge all test suites into a single JUnit file
+    /// Merge all test suites into a single `JUnit` file
     pub junit_merge: Option<bool>,
     /// Network to fork for testing
     #[schemars(with = "Option<Network>")]
@@ -439,7 +469,7 @@ pub struct LitenodeSettings {
     /// Wallet names from `[wallets]` that are automatically funded and deployed on
     /// `acton litenode start`
     pub accounts: Option<Vec<String>>,
-    /// Maximum number of API requests per second served by LiteNode `/api` endpoints
+    /// Maximum number of API requests per second served by `LiteNode` `/api` endpoints
     pub rate_limit: Option<u32>,
 }
 
@@ -453,6 +483,16 @@ const fn default_litenode_port() -> Option<u16> {
 pub struct MutationConfig {
     /// List of mutation rules to disable
     pub disable_rules: Option<Vec<String>>,
+    /// Path to a JSON file with custom query-based mutation rules
+    pub rules_file: Option<String>,
+    /// List of mutation levels to run
+    pub mutation_levels: Option<Vec<MutationLevel>>,
+    /// Minimum mutation score percentage required for the run to succeed
+    pub minimum_percent: Option<f64>,
+    /// Diff scope used to limit mutation testing to changed lines
+    pub diff: Option<MutationDiffMode>,
+    /// Base ref used by diff-based mutation testing modes
+    pub diff_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -1079,6 +1119,58 @@ pub fn global_libraries_path() -> Option<PathBuf> {
 }
 
 impl TestSettings {
+    fn coverage_enabled(&self) -> Option<bool> {
+        self.coverage.as_ref().and_then(|coverage| coverage.enabled)
+    }
+
+    fn coverage_format_value(&self) -> Option<&str> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.format.as_deref())
+    }
+
+    fn coverage_file_value(&self) -> Option<String> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.output_file.clone())
+    }
+
+    fn coverage_minimum_percent_value(&self) -> Option<f64> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.minimum_percent)
+    }
+
+    fn coverage_include_wrappers_value(&self) -> Option<bool> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.include_wrappers)
+    }
+
+    fn coverage_include_tests_value(&self) -> Option<bool> {
+        self.coverage
+            .as_ref()
+            .and_then(|coverage| coverage.include_tests)
+    }
+
+    fn mutation_minimum_percent_value(&self) -> Option<f64> {
+        self.mutation
+            .as_ref()
+            .and_then(|mutation| mutation.minimum_percent)
+    }
+
+    fn fuzz_runs_value(&self) -> Option<usize> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.runs)
+    }
+
+    fn fuzz_max_test_rejects_value(&self) -> Option<usize> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.max_test_rejects)
+    }
+
+    fn fuzz_seed_value(&self) -> Option<u64> {
+        self.fuzz.as_ref().and_then(|fuzz| fuzz.seed)
+    }
+
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn to_test_config(
@@ -1092,6 +1184,9 @@ impl TestSettings {
         coverage_override: Option<bool>,
         coverage_format_override: Option<CoverageFormat>,
         coverage_file_override: Option<String>,
+        coverage_minimum_percent_override: Option<f64>,
+        coverage_include_wrappers_override: Option<bool>,
+        coverage_include_tests_override: Option<bool>,
         exclude_override: Option<Vec<String>>,
         include_override: Option<Vec<String>>,
         clear_cache_override: Option<bool>,
@@ -1106,7 +1201,12 @@ impl TestSettings {
         mutate_override: bool,
         mutate_overrides_override: Option<String>,
         mutate_contract_override: Option<String>,
+        mutation_diff_override: Option<MutationDiffMode>,
+        mutation_diff_ref_override: Option<String>,
+        mutation_levels_override: Vec<MutationLevel>,
+        mutation_minimum_percent_override: Option<f64>,
         disable_rules_override: Vec<String>,
+        fuzz_seed_override: Option<u64>,
         fail_on_diff_override: Option<bool>,
         fail_fast_override: Option<bool>,
         ui_override: bool,
@@ -1145,17 +1245,22 @@ impl TestSettings {
                         _ => None,
                     })
             }),
-            coverage: coverage_override.unwrap_or_else(|| self.coverage.unwrap_or(false)),
+            coverage: coverage_override.unwrap_or_else(|| self.coverage_enabled().unwrap_or(false)),
             coverage_format: coverage_format_override.or_else(|| {
-                self.coverage_format
-                    .as_ref()
+                self.coverage_format_value()
                     .and_then(|f| match f.to_lowercase().as_str() {
                         "lcov" => Some(CoverageFormat::Lcov),
                         "text" => Some(CoverageFormat::Text),
                         _ => None,
                     })
             }),
-            coverage_file: coverage_file_override.or_else(|| self.coverage_file.clone()),
+            coverage_file: coverage_file_override.or_else(|| self.coverage_file_value()),
+            coverage_minimum_percent: coverage_minimum_percent_override
+                .or_else(|| self.coverage_minimum_percent_value()),
+            coverage_include_wrappers: coverage_include_wrappers_override
+                .unwrap_or_else(|| self.coverage_include_wrappers_value().unwrap_or(false)),
+            coverage_include_tests: coverage_include_tests_override
+                .unwrap_or_else(|| self.coverage_include_tests_value().unwrap_or(false)),
             exclude_patterns: exclude_override
                 .unwrap_or_else(|| self.exclude.clone().unwrap_or_default()),
             include_patterns: include_override
@@ -1189,6 +1294,30 @@ impl TestSettings {
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
             mutate_contract: mutate_contract_override,
+            mutation_rules_file: self
+                .mutation
+                .as_ref()
+                .and_then(|mutation| mutation.rules_file.clone()),
+            mutation_session_id: None,
+            mutation_workers: None,
+            mutation_levels: if mutation_levels_override.is_empty() {
+                self.mutation
+                    .as_ref()
+                    .and_then(|m| m.mutation_levels.clone())
+                    .unwrap_or_default()
+            } else {
+                mutation_levels_override
+            },
+            mutation_minimum_percent: mutation_minimum_percent_override
+                .or_else(|| self.mutation_minimum_percent_value()),
+            mutation_ids: Vec::new(),
+            mutation_diff: mutation_diff_override
+                .or_else(|| self.mutation.as_ref().and_then(|mutation| mutation.diff)),
+            mutation_diff_ref: mutation_diff_ref_override.or_else(|| {
+                self.mutation
+                    .as_ref()
+                    .and_then(|mutation| mutation.diff_ref.clone())
+            }),
             disable_rules: if disable_rules_override.is_empty() {
                 self.mutation
                     .as_ref()
@@ -1197,6 +1326,9 @@ impl TestSettings {
             } else {
                 disable_rules_override
             },
+            fuzz_runs: self.fuzz_runs_value(),
+            fuzz_max_test_rejects: self.fuzz_max_test_rejects_value(),
+            fuzz_seed: fuzz_seed_override.or_else(|| self.fuzz_seed_value()),
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
@@ -1244,6 +1376,104 @@ depends = []
         assert_eq!(wallet.name, "Wallet V5");
         assert_eq!(wallet.src, "wallet-v5.tolk");
         assert_eq!(wallet.depends, Some(vec![]));
+    }
+
+    #[test]
+    fn test_mutation_levels_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[test.mutation]
+mutation-levels = ["critical", "major"]
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mutation = config
+            .test
+            .as_ref()
+            .and_then(|test| test.mutation.as_ref())
+            .expect("mutation config should be present");
+
+        assert_eq!(
+            mutation.mutation_levels,
+            Some(vec![MutationLevel::Critical, MutationLevel::Major])
+        );
+    }
+
+    #[test]
+    fn test_mutation_minimum_percent_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[test.mutation]
+minimum-percent = 85
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mutation = config
+            .test
+            .as_ref()
+            .and_then(|test| test.mutation.as_ref())
+            .expect("mutation config should be present");
+
+        assert_eq!(mutation.minimum_percent, Some(85.0));
+    }
+
+    #[test]
+    fn test_mutation_diff_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[test.mutation]
+diff = "branch"
+diff-ref = "origin/main"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mutation = config
+            .test
+            .as_ref()
+            .and_then(|test| test.mutation.as_ref())
+            .expect("mutation config should be present");
+
+        assert_eq!(mutation.diff, Some(MutationDiffMode::Branch));
+        assert_eq!(mutation.diff_ref.as_deref(), Some("origin/main"));
+    }
+
+    #[test]
+    fn test_mutation_rules_file_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[contracts.counter]
+name = "Counter Contract"
+src = "counter.tolk"
+depends = []
+
+[test.mutation]
+rules-file = "mutation-rules.json"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mutation = config
+            .test
+            .as_ref()
+            .and_then(|test| test.mutation.as_ref())
+            .expect("mutation settings should be present");
+
+        assert_eq!(mutation.rules_file.as_deref(), Some("mutation-rules.json"));
     }
 
     #[test]
@@ -1462,12 +1692,23 @@ reporter = ["console", "junit"]
 debug = true
 debug-port = 9999
 backtrace = "full"
-coverage = true
-coverage-format = "lcov"
 exclude = ["**/integration/**"]
 include = ["**/unit/**"]
 junit-path = "custom-reports"
 junit-merge = true
+
+[test.coverage]
+enabled = true
+format = "lcov"
+output-file = "coverage.txt"
+minimum-percent = 85
+include-wrappers = true
+include-tests = true
+
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
+seed = 42
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1481,8 +1722,23 @@ junit-merge = true
         assert_eq!(test_settings.debug, Some(true));
         assert_eq!(test_settings.debug_port, Some(9999));
         assert_eq!(test_settings.backtrace, Some("full".to_string()));
-        assert_eq!(test_settings.coverage, Some(true));
-        assert_eq!(test_settings.coverage_format, Some("lcov".to_string()));
+        let coverage = test_settings
+            .coverage
+            .as_ref()
+            .expect("coverage settings should be parsed");
+        assert_eq!(coverage.enabled, Some(true));
+        assert_eq!(coverage.format, Some("lcov".to_string()));
+        assert_eq!(coverage.output_file, Some("coverage.txt".to_string()));
+        assert_eq!(coverage.minimum_percent, Some(85.0));
+        assert_eq!(coverage.include_wrappers, Some(true));
+        assert_eq!(coverage.include_tests, Some(true));
+        let fuzz = test_settings
+            .fuzz
+            .as_ref()
+            .expect("fuzz settings should be parsed");
+        assert_eq!(fuzz.runs, Some(512));
+        assert_eq!(fuzz.max_test_rejects, Some(4096));
+        assert_eq!(fuzz.seed, Some(42));
         assert_eq!(
             test_settings.exclude,
             Some(vec!["**/integration/**".to_string()])

@@ -9,7 +9,8 @@ counter contract, wrapper helpers, tests, and a ready-to-run deployment script.
 - `contracts/types.tolk` defines storage, message types, and starter errors.
 - `tests/wrappers/Counter.tolk` is the wrapper used by tests and scripts.
 - `tests/counter.test.tolk` covers increment, reset, and invalid-message flows.
-- `scripts/deploy.tolk` deploys the contract with initial counter state.
+- `scripts/deploy.tolk` deploys the contract with initial counter state and
+  reads the counter back after deployment.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
   GitHub Actions.
 
@@ -55,6 +56,10 @@ acton wallet new --name deployer --local --airdrop
 ```bash
 acton script scripts/deploy.tolk --broadcast --net testnet
 ```
+
+The starter script waits for the transaction and then reads the deployed
+counter value back from testnet. You do not need a separate `--fork-net` for
+that check.
 
 You can also use the generated script aliases:
 

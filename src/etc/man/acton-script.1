@@ -54,6 +54,8 @@ Clear the compilation cache before running.
 \fB\-\-fork\-net\fR \fInetwork\fR
 .RS 4
 Fork blockchain state from a remote network for local execution.
+With \fB\-\-broadcast\fR, omitted \fB\-\-fork\-net\fR defaults to the selected broadcast
+network.
 .RE
 .sp
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
@@ -70,6 +72,7 @@ TonCenter API key for blockchain queries.
 \fB\-\-broadcast\fR
 .RS 4
 Send transactions to the selected blockchain network instead of emulating them.
+Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
 .RE
 .sp
 \fB\-\-net\fR \fInetwork\fR

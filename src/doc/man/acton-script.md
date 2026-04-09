@@ -68,6 +68,8 @@ Clear the compilation cache before running.
 
 {{#option "`--fork-net` _network_" }}
 Fork blockchain state from a remote network for local execution.
+With `--broadcast`, omitted `--fork-net` defaults to the selected broadcast
+network.
 {{/option}}
 
 {{#option "`--fork-block-number` _seqno_" }}
@@ -86,6 +88,7 @@ TonCenter API key for blockchain queries.
 
 {{#option "`--broadcast`" }}
 Send transactions to the selected blockchain network instead of emulating them.
+Conflicting `--net` and `--fork-net` values are rejected.
 {{/option}}
 
 {{#option "`--net` _network_" }}

@@ -22,16 +22,19 @@ pub struct VmStack<'a> {
 }
 
 impl<'a> VmStack<'a> {
+    #[must_use]
     pub const fn new(content: &'a str) -> Self {
         Self {
             raw_content: content,
         }
     }
 
+    #[must_use]
     pub const fn raw(&self) -> &'a str {
         self.raw_content
     }
 
+    #[must_use]
     pub fn parsed(&self) -> Vec<VmStackValue> {
         parse_stack_content(self.raw_content)
     }
@@ -204,7 +207,7 @@ fn tag(i: &mut I, mut s: &'static str) -> PResult<()> {
 }
 
 // Null / NaN / Integer
-fn null_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn null_val(i: &mut I<'_>) -> PResult<VmStackValue> {
     alt((
         delimited("(", ws0, delimited("", ws0, ")")).value(VmStackValue::Null), // "()" with spaces
         "(null)".value(VmStackValue::Null),
@@ -214,13 +217,13 @@ fn null_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     .or_else(|_| "NaN".value(VmStackValue::NaN).parse_next(i))
 }
 
-fn integer_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn integer_val(i: &mut I<'_>) -> PResult<VmStackValue> {
     number
         .map(|s: &str| VmStackValue::Integer(s.to_string()))
         .parse_next(i)
 }
 
-fn tuple_brackets<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn tuple_brackets(i: &mut I<'_>) -> PResult<VmStackValue> {
     delimited(
         "[",
         preceded(ws0, repeat(0.., terminated(vm_stack_value, ws0))),
@@ -230,7 +233,7 @@ fn tuple_brackets<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     .parse_next(i)
 }
 
-fn tuple_paren<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn tuple_paren(i: &mut I<'_>) -> PResult<VmStackValue> {
     delimited(
         "(",
         preceded(ws0, repeat(0.., terminated(vm_stack_value, ws0))),
@@ -240,19 +243,19 @@ fn tuple_paren<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     .parse_next(i)
 }
 
-fn cell<'a>(i: &mut I<'a>) -> PResult<CellLike> {
+fn cell(i: &mut I<'_>) -> PResult<CellLike> {
     delimited("C{", hex, "}")
         .map(|h: &str| CellLike::Cell(h.to_string()))
         .parse_next(i)
 }
 
-fn builder<'a>(i: &mut I<'a>) -> PResult<CellLike> {
+fn builder(i: &mut I<'_>) -> PResult<CellLike> {
     delimited("BC{", hex, "}")
         .map(|h: &str| CellLike::Builder(h.to_string()))
         .parse_next(i)
 }
 
-fn continuation<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn continuation(i: &mut I<'_>) -> PResult<VmStackValue> {
     delimited(
         "Cont{",
         take_while(0.., |c: char| c.is_ascii_alphanumeric() || c == '_'),
@@ -270,7 +273,7 @@ fn cell_slice_refs<'a>(i: &mut I<'a>) -> PResult<(&'a str, &'a str)> {
     preceded(("refs:", ws0), separated_pair(number, "..", number)).parse_next(i)
 }
 
-fn cell_slice_body_long<'a>(i: &mut I<'a>) -> PResult<CellSlice> {
+fn cell_slice_body_long(i: &mut I<'_>) -> PResult<CellSlice> {
     let value = delimited("Cell{", hex, "}").parse_next(i)?;
     ws1(i)?;
     let bits = cell_slice_bits.parse_next(i)?;
@@ -285,7 +288,7 @@ fn cell_slice_body_long<'a>(i: &mut I<'a>) -> PResult<CellSlice> {
     })
 }
 
-fn cell_slice_body_short<'a>(i: &mut I<'a>) -> PResult<CellSlice> {
+fn cell_slice_body_short(i: &mut I<'_>) -> PResult<CellSlice> {
     let h = hex.parse_next(i)?;
     Ok(CellSlice {
         value: h.to_string(),
@@ -294,7 +297,7 @@ fn cell_slice_body_short<'a>(i: &mut I<'a>) -> PResult<CellSlice> {
     })
 }
 
-fn cell_slice<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn cell_slice(i: &mut I<'_>) -> PResult<VmStackValue> {
     delimited(
         "CS{",
         alt((cell_slice_body_long, cell_slice_body_short)),
@@ -304,17 +307,17 @@ fn cell_slice<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
     .parse_next(i)
 }
 
-fn string_literal<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn string_literal(i: &mut I<'_>) -> PResult<VmStackValue> {
     delimited("\"", take_while(0.., |c: char| c != '"'), "\"")
         .map(|s: &str| VmStackValue::String(s.to_string()))
         .parse_next(i)
 }
 
-fn unknown_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+fn unknown_val(i: &mut I<'_>) -> PResult<VmStackValue> {
     "???".value(VmStackValue::Unknown).parse_next(i)
 }
 
-pub fn vm_stack_value<'a>(i: &mut I<'a>) -> PResult<VmStackValue> {
+pub fn vm_stack_value(i: &mut I<'_>) -> PResult<VmStackValue> {
     preceded(
         ws0,
         alt((
@@ -433,6 +436,7 @@ pub fn vm_line<'a>(i: &mut I<'a>) -> PResult<VmLine<'a>> {
     .parse_next(i)
 }
 
+#[must_use]
 pub fn parse_lines(input: &str) -> Vec<Result<VmLine<'_>, String>> {
     input
         .split_inclusive('\n')
@@ -440,7 +444,7 @@ pub fn parse_lines(input: &str) -> Vec<Result<VmLine<'_>, String>> {
             let s = line.trim_end_matches(['\r', '\n', ' '].as_ref());
             match terminated(vm_line, opt(eof)).parse(s.as_ref()) {
                 Ok(v) => Ok(v),
-                Err(e) => Err(format!("{e:?} @ {:?}", line)),
+                Err(e) => Err(format!("{e:?} @ {line:?}")),
             }
         })
         .collect()

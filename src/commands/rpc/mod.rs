@@ -62,12 +62,7 @@ fn rpc_info_cmd(address: &str, net: Option<String>, api_key: Option<String>) -> 
 
     let remote = client
         .get_account_info(None, &address.to_string())
-        .with_context(|| {
-            format!(
-                "Failed to fetch account info for {} from {network}",
-                address
-            )
-        })?;
+        .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
 
     let balance = remote.balance.to_bigint()?;
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
@@ -415,7 +410,7 @@ fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!(
         "  {} {}",
-        format!("{key:<width$}", width = LABEL_WIDTH).dimmed(),
+        format!("{key:<LABEL_WIDTH$}").dimmed(),
         value.as_ref()
     );
 }

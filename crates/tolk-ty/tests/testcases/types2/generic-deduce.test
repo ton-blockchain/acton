@@ -299,8 +299,7 @@ fun main() {
 //!           ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 74: expected Foo<int>, got Foo<T>
-type inference error at offset 113: expected int, got T
+ok
 
 ========================================================================
 Generic struct with never default type
@@ -316,7 +315,7 @@ fun main() {
         Foo {}
 }
 ------------------------------------------------------------------------
-type inference error at offset 80: expected Foo<never>, got Foo<T>
+ok
 
 ========================================================================
 Generic struct with several never default types and single type deduced
@@ -337,8 +336,7 @@ fun main() {
         Foo { other: 10 };
 }
 ------------------------------------------------------------------------
-type inference error at offset 103: expected Foo<never, never>, got Foo<T, U>
-type inference error at offset 162: expected Foo<never, int>, got Foo<T, int>
+ok
 
 ========================================================================
 Generic struct with other struct default type

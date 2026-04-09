@@ -55,6 +55,15 @@ impl DebugExecutorHandle {
     }
 
     #[must_use]
+    pub fn uncaught_exception_code(&self) -> Option<String> {
+        let code = match self {
+            DebugExecutorHandle::Get(get) => get.get_uncaught_exception_code(),
+            DebugExecutorHandle::Message(msg) => msg.get_uncaught_exception_code(),
+        }?;
+        Some(code.to_string())
+    }
+
+    #[must_use]
     fn code_pos_text(&self) -> String {
         match self {
             DebugExecutorHandle::Get(get) => get.get_code_pos(),

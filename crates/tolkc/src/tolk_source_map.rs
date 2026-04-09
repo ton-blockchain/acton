@@ -77,6 +77,7 @@ impl TolkSourceMap {
         Self::new(crate::SourceMap::default())
     }
 
+    #[must_use]
     pub fn find_source_loc(&self, hash: &str, offset: u16) -> Option<SourceLocation> {
         let marks = self.marks_dict.as_ref()?.get(hash)?;
         let target_offset = i32::from(offset);

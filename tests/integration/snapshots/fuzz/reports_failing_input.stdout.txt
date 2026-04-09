@@ -1,0 +1,23 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ fuzz-bool [TIME] (256 runs, seed 42)
+    ├─ Fuzz case 2/256
+    ├─ Inputs: flag=true
+    └─ Error: expect(actual).toBeFalse()
+        (
+            true,
+            false
+        )
+      └─ at tests/test.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -1,0 +1,4 @@
+Error: Failed to parse custom mutation rules file '[ROOT]/mutation-rules.json' as JSON
+
+Caused by:
+  key must be a string at line 1 column 3

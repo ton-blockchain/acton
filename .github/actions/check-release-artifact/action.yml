@@ -1,0 +1,72 @@
+name: Check Release Artifact
+description: Run smoke tests against a prepared release artifact.
+
+inputs:
+  project_name:
+    description: Temporary project name for release checks
+    required: false
+    default: release-check
+
+runs:
+  using: composite
+  steps:
+    - name: Show Acton path info
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      # language=Bash
+      run: |
+        set -euo pipefail
+
+        acton_path="$(command -v acton)"
+        printf 'Using acton at %s\n' "${acton_path}"
+        file "${acton_path}"
+
+    - name: Verify Acton version
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: |
+        acton --version
+
+    - name: Create counter project
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        PROJECT_NAME: ${{ inputs.project_name }}
+      run: |
+        acton new "${PROJECT_NAME}" \
+          --template counter \
+          --name "release-check" \
+          --description "Release artifact smoke test" \
+          --license MIT
+
+    - name: Inspect counter project environment
+      shell: bash
+      working-directory: ${{ runner.temp }}/${{ inputs.project_name }}
+      env:
+        ACTON_DOCTOR_API_TARGETS_JSON: "[]"
+      run: |
+        acton doctor
+
+    - name: Build counter project
+      shell: bash
+      working-directory: ${{ runner.temp }}/${{ inputs.project_name }}
+      run: |
+        acton build
+
+    - name: Test counter project
+      shell: bash
+      working-directory: ${{ runner.temp }}/${{ inputs.project_name }}
+      run: |
+        acton test
+
+    - name: Check counter project
+      shell: bash
+      working-directory: ${{ runner.temp }}/${{ inputs.project_name }}
+      run: |
+        acton check
+
+    - name: Format counter project
+      shell: bash
+      working-directory: ${{ runner.temp }}/${{ inputs.project_name }}
+      run: |
+        acton fmt

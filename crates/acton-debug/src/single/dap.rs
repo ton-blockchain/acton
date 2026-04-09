@@ -18,6 +18,7 @@ use dap::types::{
     Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
 
+use crate::core::exception_format::{build_exception_details, exception_overview};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::transport::{DapConnection, IncomingRequest};
 use crate::types_render::RenderedValue;
@@ -74,11 +75,11 @@ struct DapState {
     resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
 
     next_req_id: i64,
-    /// Maps frame ref_id (returned in StackTrace) → depth_from_top (0 = innermost).
-    /// Rebuilt on every StackTrace request.
+    /// Maps frame `ref_id` (returned in `StackTrace`) → `depth_from_top` (0 = innermost).
+    /// Rebuilt on every `StackTrace` request.
     frame_to_depth: HashMap<i64, usize>,
-    /// Maps variable req_id → RenderedValue for structured drill-down.
-    /// Rebuilt on every StackTrace request (old values are stale after stepping).
+    /// Maps variable `req_id` → `RenderedValue` for structured drill-down.
+    /// Rebuilt on every `StackTrace` request (old values are stale after stepping).
     vars_debug_values: HashMap<i64, RenderedValue>,
 }
 
@@ -87,7 +88,7 @@ impl DapState {
         Self {
             replayer: None,
             pending_breakpoints: HashMap::new(),
-            pending_exception_mode: replayer::ExceptionBreakMode::Never,
+            pending_exception_mode: replayer::ExceptionBreakMode::Uncaught,
             config_done: false,
             next_breakpoint_id: 1,
             resolved_breakpoints: HashMap::new(),
@@ -139,7 +140,7 @@ impl DapState {
         id
     }
 
-    /// Store a RenderedValue and return its req_id for DAP drill-down.
+    /// Store a `RenderedValue` and return its `req_id` for DAP drill-down.
     fn store_debug_value(&mut self, dv: RenderedValue) -> i64 {
         let id = self.alloc_req_id();
         self.vars_debug_values.insert(id, dv);
@@ -182,7 +183,7 @@ fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
     let short_name = replayer.file_display_name(file_id);
     Source {
         name: Some(short_name.to_string()),
-        path: full_path.map(|s| s.to_string()),
+        path: full_path.map(ToString::to_string),
         source_reference: None,
         presentation_hint: None,
         origin: None,
@@ -227,8 +228,8 @@ fn step_and_notify(
     if finished {
         send_terminated(server)?;
     } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
-        let text = format!("Exit code {}", exc.errno);
-        send_stopped_exception(server, &text)?;
+        let overview = exception_overview(exc);
+        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
     } else if let Some(ids) = state.current_breakpoint_ids() {
         send_stopped(
             server,
@@ -244,11 +245,12 @@ fn step_and_notify(
 
 fn send_stopped_exception(
     server: &mut DapConnection<impl BufRead, impl Write>,
+    description: &str,
     text: &str,
 ) -> anyhow::Result<()> {
     server.send_event(Event::Stopped(events::StoppedEventBody {
         reason: StoppedEventReason::Exception,
-        description: Some("Paused on exception".to_string()),
+        description: Some(description.to_string()),
         thread_id: Some(THREAD_ID),
         preserve_focus_hint: None,
         text: Some(text.to_string()),
@@ -483,7 +485,8 @@ fn handle_set_exception_breakpoints(
 }
 
 fn handle_exception_info(state: &DapState, req: Request) -> Response {
-    let exc = state.replayer.as_ref().and_then(|r| r.last_exception());
+    let replayer = state.replayer.as_ref();
+    let exc = replayer.and_then(|r| r.last_exception());
     match exc {
         Some(info) => {
             let break_mode = if info.is_uncaught {
@@ -491,14 +494,15 @@ fn handle_exception_info(state: &DapState, req: Request) -> Response {
             } else {
                 ExceptionBreakMode::Always
             };
+            let overview = exception_overview(info);
             req.success(ResponseBody::ExceptionInfo(ExceptionInfoResponse {
                 exception_id: info.errno.clone(),
-                description: Some(format!("TVM exit code {}", info.errno)),
+                description: Some(overview.info_description),
                 break_mode,
-                details: None,
+                details: Some(build_exception_details(info)),
             }))
         }
-        None => req.error("No exception"),
+        _ => req.error("No exception"),
     }
 }
 
@@ -521,6 +525,9 @@ fn handle_configuration_done(
 
     if finished {
         send_terminated(server)?;
+    } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
+        let overview = exception_overview(exc);
+        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
     } else if let Some(ids) = state.current_breakpoint_ids() {
         send_stopped(
             server,
@@ -547,9 +554,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
         let top_source = build_source(r, file_id);
         let top_name = call_stack
             .last()
-            .map(format_frame_name)
-            .unwrap_or_else(|| r.current_file_name().to_string());
-        let top_is_builtin = call_stack.last().map(|f| f.is_builtin).unwrap_or(false);
+            .map_or_else(|| r.current_file_name().to_string(), format_frame_name);
+        let top_is_builtin = call_stack.last().is_some_and(|f| f.is_builtin);
         let stopped_on_exception = r.last_exception().is_some();
 
         struct ParentData {

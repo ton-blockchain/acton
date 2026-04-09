@@ -1,5 +1,4 @@
 import "@acton/env"
-import "@acton/fmt"
 import "@acton/io"
 import "@acton/build/build"
 import "@acton/emulation/network"
@@ -23,7 +22,7 @@ fun string.toSnakeString(self): cell {
 fun buildOnchainMetadata(info: JettonInfo): cell {
     println1("Deploying Jetton with {}", info);
 
-    var dict = createEmptyMap<uint256, cell>();
+    var dict: map<uint256, cell> = [];
 
     dict.set("name".sha256(), info.name.toSnakeString());
     dict.set("description".sha256(), info.description.toSnakeString());
@@ -74,7 +73,6 @@ fun main() {
         return;
     }
 
-    println(
-        format2("Successfully minted and transferred {} tokens to {}", supply, deployer.address),
-    );
+    println2("Successfully minted and transferred {} tokens to {}", supply, deployer.address);
+    println1("Total supply is {}", minter.getTotalSupply());
 }

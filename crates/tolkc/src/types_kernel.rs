@@ -55,9 +55,7 @@ pub enum Ty {
     #[serde(rename = "nullable")]
     Nullable {
         inner: Box<Ty>,
-        #[serde(rename = "stackTypeId")]
         stack_type_id: Option<usize>,
-        #[serde(rename = "stackWidth")]
         stack_width: Option<usize>,
     },
     #[serde(rename = "cellOf")]
@@ -75,33 +73,22 @@ pub enum Ty {
 
     // references to user-defined types
     #[serde(rename = "EnumRef")]
-    EnumRef {
-        #[serde(rename = "enumName")]
-        enum_name: String,
-    },
+    EnumRef { enum_name: String },
     #[serde(rename = "StructRef")]
     StructRef {
-        #[serde(rename = "structName")]
         struct_name: String,
-        #[serde(rename = "typeArgs")]
         type_args: Option<Vec<Ty>>,
     },
     #[serde(rename = "AliasRef")]
     AliasRef {
-        #[serde(rename = "aliasName")]
         alias_name: String,
-        #[serde(rename = "typeArgs")]
         type_args: Option<Vec<Ty>>,
     },
     #[serde(rename = "genericT")]
-    GenericT {
-        #[serde(rename = "nameT")]
-        name_t: String,
-    },
+    GenericT { name_t: String },
     #[serde(rename = "union")]
     Union {
         variants: Vec<UnionVariant>,
-        #[serde(rename = "stackWidth")]
         stack_width: Option<usize>,
     },
 }
@@ -205,28 +192,23 @@ impl fmt::Display for Ty {
     }
 }
 
-/// UnionVariant exists for every `T_i` in a union type `T1 | T2 | ...`.
+/// `UnionVariant` exists for every `T_i` in a union type `T1 | T2 | ...`.
 ///
 /// For binary serialization, a union should have a prefix tree,
 /// which is either defined explicitly with struct prefixes: `struct (0x12345678) CounterIncrement`,
 /// or auto-generated (implicit), e.g. `int8 | int16 | int32` is serialized as '00'+int8 / '01'+int16 / '10'+int32.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnionVariant {
-    #[serde(rename = "variantTy")]
     pub variant_ty: Ty,
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-    #[serde(rename = "prefixLen")]
     pub prefix_len: usize,
-    #[serde(rename = "isPrefixImplicit")]
     pub is_prefix_implicit: Option<bool>,
-    #[serde(rename = "stackTypeId")]
     pub stack_type_id: Option<usize>,
-    #[serde(rename = "stackWidth")]
     pub stack_width: Option<usize>,
 }
 
 /// Calculate how many stack slots a type occupies.
+#[must_use]
 pub fn calc_width_on_stack(symbols: &SourceMap, ty: &Ty) -> usize {
     match ty {
         Ty::Void => {
@@ -293,7 +275,7 @@ pub fn calc_width_on_stack(symbols: &SourceMap, ty: &Ty) -> usize {
             stack_width.unwrap_or(1)
         }
         Ty::GenericT { name_t } => {
-            panic!("unexpected genericT={} in calc_width_on_stack", name_t)
+            panic!("unexpected genericT={name_t} in calc_width_on_stack")
         }
 
         _ => {
@@ -309,6 +291,7 @@ pub fn calc_width_on_stack(symbols: &SourceMap, ty: &Ty) -> usize {
 
 /// Replace all generic Ts (typeParams) with instantiation (typeArgs) recursively.
 /// Example: `(int, T, Wrapper<T?>)` and T=coins → `(int, coins, Wrapper<coins?>)`
+#[must_use]
 pub fn instantiate_generics(ty: &Ty, type_params: &[String], type_args: &[Ty]) -> Ty {
     match ty {
         Ty::Nullable {
@@ -386,10 +369,7 @@ pub fn instantiate_generics(ty: &Ty, type_params: &[String], type_args: &[Ty]) -
             type_args
                 .get(idx)
                 .unwrap_or_else(|| {
-                    panic!(
-                        "inconsistent generics: could not find type argument for {}",
-                        name_t
-                    )
+                    panic!("inconsistent generics: could not find type argument for {name_t}")
                 })
                 .clone()
         }

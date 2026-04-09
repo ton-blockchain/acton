@@ -1,5 +1,6 @@
 use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
+use crate::context;
 use crate::context::{
     AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
     KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
@@ -7,9 +8,9 @@ use crate::context::{
 use crate::retrace::{
     self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
 };
-use crate::{context, exit_codes};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
+use acton_debug::exit_codes;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashMap;

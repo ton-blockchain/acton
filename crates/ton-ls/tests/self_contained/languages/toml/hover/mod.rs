@@ -82,6 +82,8 @@ fn test_hover_networks_dynamic_tables() {
             networks.mainnet
             ```
 
+            Custom network configuration
+
             - Type: `object`
 
             ---
@@ -90,7 +92,7 @@ fn test_hover_networks_dynamic_tables() {
             networks.mainnet.api.v2
             ```
 
-            The URL for the TonCenter API v2
+            The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port
 
             - Type: `string`
 
@@ -100,7 +102,7 @@ fn test_hover_networks_dynamic_tables() {
             networks.mainnet.api.v3
             ```
 
-            The URL for the TonCenter API v3
+            The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port
 
             - Type: `string`"#]],
     );
@@ -135,6 +137,12 @@ fn test_hover_contracts_depends_nested_objects() {
             contracts.wallet.depends[0].kind
             ```
 
+            Embed dependency code directly into the output
+
+            Reference the dependency as an on-chain library
+
+            How a compiled dependency is linked into a contract
+
             Dependency type
 
             - Type: `string`
@@ -167,9 +175,11 @@ fn test_hover_contracts_depends_nested_objects() {
             contracts.wallet.depends[1]
             ```
 
-            Name of the contract to depend on (simple format)
+            Name of the contract to depend on in the simple form
 
             Detailed dependency configuration
+
+            Dependency declaration for a contract
 
             - Type: `string`"#]],
     );
@@ -192,9 +202,19 @@ fn test_hover_lint_rules_additional_properties() {
             lint.rules.unused-imports
             ```
 
+            Disable the rule
+
+            Emit warnings for the rule
+
+            Treat the rule as an error
+
+            Lint severity level
+
             Global lint level for a rule
 
             Contract-specific lint overrides
+
+            Lint rule configuration, either a global level or contract-specific overrides
 
             - Type: `string`
             - Enum: `"allow" | "warn" | "deny"`
@@ -204,6 +224,14 @@ fn test_hover_lint_rules_additional_properties() {
             ```toml
             lint.rules.shadowing.Wallet
             ```
+
+            Disable the rule
+
+            Emit warnings for the rule
+
+            Treat the rule as an error
+
+            Lint severity level
 
             - Type: `string`
             - Enum: `"allow" | "warn" | "deny"`"#]],
@@ -218,8 +246,10 @@ fn test_hover_defaults_and_enums() {
         r#"
             [test]
             <caret>debug-port = 12345
-            <caret>coverage-format = "<caret>lcov"
             reporter = ["<caret>console"]
+
+            [test.coverage]
+            <caret>format = "<caret>lcov"
         "#,
         expect![[r#"
             ```toml
@@ -234,32 +264,56 @@ fn test_hover_defaults_and_enums() {
             ---
 
             ```toml
-            test.coverage-format
-            ```
-
-            Format for coverage reports (e.g., 'lcov')
-
-            - Type: `string`
-            - Default: `"lcov"`
-
-            ---
-
-            ```toml
-            test.coverage-format
-            ```
-
-            Format for coverage reports (e.g., 'lcov')
-
-            - Type: `string`
-            - Default: `"lcov"`
-
-            ---
-
-            ```toml
             test.reporter[0]
             ```
 
+            Human-readable console output
+
+            `TeamCity` service messages
+
+            `JUnit` XML report
+
+            Compact dot-progress output
+
+            Output formats supported by `acton test`
+
             - Type: `string`
-            - Enum: `"console" | "teamcity" | "junit" | "dot"`"#]],
+            - Enum: `"console" | "teamcity" | "junit" | "dot"`
+
+            ---
+
+            ```toml
+            test.coverage.format
+            ```
+
+            LCOV coverage report
+
+            Plain-text coverage summary
+
+            Coverage output formats supported by `acton test`
+
+            Format for coverage reports
+
+            - Type: `string`
+            - Default: `"lcov"`
+            - Enum: `"lcov" | "text"`
+
+            ---
+
+            ```toml
+            test.coverage.format
+            ```
+
+            LCOV coverage report
+
+            Plain-text coverage summary
+
+            Coverage output formats supported by `acton test`
+
+            Format for coverage reports
+
+            - Type: `string`
+            - Default: `"lcov"`
+            - Enum: `"lcov" | "text"`"#]],
     );
 }

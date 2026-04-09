@@ -83,19 +83,11 @@ pub enum ABIType {
 
     // TypeDataTensor
     #[serde(rename = "tensor")]
-    Tensor {
-        // C++: {"kind":"tensor","items":[...]}
-        #[serde(rename = "items", default)]
-        items: Vec<ABIType>,
-    },
+    Tensor { items: Vec<ABIType> },
 
     // TypeDataShapedTuple (TYPE)
     #[serde(rename = "shapedTuple")]
-    ShapedTuple {
-        // C++: {"kind":"shapedTuple","items":[...]}
-        #[serde(rename = "items", default)]
-        items: Vec<ABIType>,
-    },
+    ShapedTuple { items: Vec<ABIType> },
 
     // TypeDataNullLiteral (TYPE)
     #[serde(rename = "nullLiteral")]
@@ -104,36 +96,28 @@ pub enum ABIType {
     // ---- generics ----
     // TypeDataGenericT
     #[serde(rename = "genericT")]
-    GenericT {
-        #[serde(rename = "nameT")]
-        name_t: String,
-    },
+    GenericT { name_t: String },
 
     // ---- references to declarations ----
     // TypeDataStruct
     #[serde(rename = "StructRef")]
     StructRef {
-        #[serde(rename = "structName")]
         struct_name: String,
 
-        #[serde(rename = "typeArgs", default, skip_serializing_if = "Vec::is_empty")]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         type_args: Vec<ABIType>,
     },
 
     // TypeDataEnum
     #[serde(rename = "EnumRef")]
-    EnumRef {
-        #[serde(rename = "enumName")]
-        enum_name: String,
-    },
+    EnumRef { enum_name: String },
 
     // TypeDataAlias / GenericTypeWithTs (alias_ref)
     #[serde(rename = "AliasRef")]
     AliasRef {
-        #[serde(rename = "aliasName")]
         alias_name: String,
 
-        #[serde(rename = "typeArgs", default, skip_serializing_if = "Vec::is_empty")]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         type_args: Vec<ABIType>,
     },
 
@@ -144,23 +128,14 @@ pub enum ABIType {
 
     // TypeDataGenericTypeWithTs / TypeDataStruct special-case Cell / LispList
     #[serde(rename = "cellOf")]
-    CellOf {
-        #[serde(rename = "inner")]
-        inner: OneOrMany<ABIType>,
-    },
+    CellOf { inner: OneOrMany<ABIType> },
 
     #[serde(rename = "lispListOf")]
-    LispListOf {
-        #[serde(rename = "inner")]
-        inner: OneOrMany<ABIType>,
-    },
+    LispListOf { inner: OneOrMany<ABIType> },
 
     // TypeDataUnion
     #[serde(rename = "union")]
-    Union {
-        #[serde(rename = "variants", default)]
-        variants: Vec<ABIUnionVariant>,
-    },
+    Union { variants: Vec<ABIUnionVariant> },
 
     // TypeDataUnion (or_null != null) -> nullable
     #[serde(rename = "nullable")]
@@ -168,12 +143,7 @@ pub enum ABIType {
 
     // TypeDataMapKV
     #[serde(rename = "mapKV")]
-    MapKV {
-        #[serde(rename = "k")]
-        k: Box<ABIType>,
-        #[serde(rename = "v")]
-        v: Box<ABIType>,
-    },
+    MapKV { k: Box<ABIType>, v: Box<ABIType> },
 
     // TypeDataUnknown
     #[serde(rename = "unknown")]
@@ -182,23 +152,18 @@ pub enum ABIType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIUnionVariant {
-    // C++: {"variantTy": <TYPE>, ...}
-    #[serde(rename = "variantTy")]
     pub variant_ty: ABIType,
-
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-
-    #[serde(rename = "prefixLen")]
     pub prefix_len: i32,
 
-    // C++ пишет только если tree_auto_generated
-    #[serde(rename = "isPrefixImplicit", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_prefix_implicit: Option<bool>,
 
-    // C++ пишет только если !has_genericT_inside()
-    #[serde(rename = "stackTypeId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stack_type_id: Option<i32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stack_width: Option<i32>,
 }
 
 /// =======================
@@ -207,8 +172,6 @@ pub struct ABIUnionVariant {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ABIConstValue {
-    // C++: {"kind":"int","v": <bigint>}
-    // У тебя уже String — ок (безопасно для больших).
     #[serde(rename = "int")]
     Int { v: String },
 
@@ -232,16 +195,13 @@ pub enum ABIConstValue {
 
     #[serde(rename = "object")]
     Object {
-        #[serde(rename = "structName")]
         struct_name: String,
         fields: Vec<ABIConstValue>,
     },
 
-    // C++: {"kind":"castTo","inner": <ConstVal>, "castTo": <TypeJSON>}
     #[serde(rename = "castTo")]
     CastTo {
         inner: Box<ABIConstValue>,
-        #[serde(rename = "castTo")]
         cast_to: ABIType,
     },
 
@@ -254,17 +214,15 @@ pub enum ABIConstValue {
 /// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIOpcode {
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-    #[serde(rename = "prefixLen")]
     pub prefix_len: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABICustomPackUnpack {
-    #[serde(rename = "packToBuilder", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pack_to_builder: Option<bool>,
-    #[serde(rename = "unpackFromSlice", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub unpack_from_slice: Option<bool>,
 }
 
@@ -273,7 +231,7 @@ pub struct ABIStructField {
     pub name: String,
     pub ty: ABIType,
 
-    #[serde(rename = "defaultValue", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<ABIConstValue>,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -291,11 +249,11 @@ pub struct ABIEnumMember {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ABIDeclaration {
-    #[serde(rename = "Struct")]
+    #[serde(rename = "struct")]
     Struct {
         name: String,
 
-        #[serde(rename = "typeParams", skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         type_params: Option<Vec<String>>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -303,34 +261,29 @@ pub enum ABIDeclaration {
 
         fields: Vec<ABIStructField>,
 
-        #[serde(rename = "customPackUnpack", skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
     },
 
-    #[serde(rename = "Alias")]
+    #[serde(rename = "alias")]
     Alias {
         name: String,
 
-        #[serde(rename = "targetTy")]
         target_ty: ABIType,
 
-        #[serde(rename = "typeParams", skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         type_params: Option<Vec<String>>,
 
-        #[serde(rename = "customPackUnpack", skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
     },
 
-    #[serde(rename = "Enum")]
+    #[serde(rename = "enum")]
     Enum {
         name: String,
-
-        #[serde(rename = "encodedAs")]
         encoded_as: ABIType,
-
         members: Vec<ABIEnumMember>,
-
-        #[serde(rename = "customPackUnpack", skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
     },
 }
@@ -342,7 +295,7 @@ pub enum ABIDeclaration {
 pub struct ABIFunctionParameter {
     pub name: String,
     pub ty: ABIType,
-    #[serde(rename = "defaultValue", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<ABIConstValue>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
@@ -350,11 +303,9 @@ pub struct ABIFunctionParameter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIGetMethod {
-    #[serde(rename = "tvmMethodId")]
     pub tvm_method_id: i32,
     pub name: String,
     pub parameters: Vec<ABIFunctionParameter>,
-    #[serde(rename = "returnTy")]
     pub return_ty: ABIType,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
@@ -362,22 +313,20 @@ pub struct ABIGetMethod {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIInternalMessage {
-    #[serde(rename = "bodyTy")]
     pub body_ty: ABIType,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
 
-    #[serde(rename = "minimalMsgValue", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub minimal_msg_value: Option<i64>,
 
-    #[serde(rename = "preferredSendMode", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub preferred_send_mode: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIExternalMessage {
-    #[serde(rename = "bodyTy")]
     pub body_ty: ABIType,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
@@ -385,7 +334,6 @@ pub struct ABIExternalMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIOutgoingMessage {
-    #[serde(rename = "bodyTy")]
     pub body_ty: ABIType,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
@@ -393,23 +341,18 @@ pub struct ABIOutgoingMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIStorage {
-    #[serde(rename = "storageTy", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_ty: Option<ABIType>,
 
-    #[serde(
-        rename = "storageAtDeploymentTy",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_at_deployment_ty: Option<ABIType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ABIThrownErrorKind {
-    #[serde(rename = "plainInt")]
     PlainInt,
-    #[serde(rename = "constant")]
     Constant,
-    #[serde(rename = "enumMember")]
     EnumMember,
 }
 
@@ -417,14 +360,8 @@ pub enum ABIThrownErrorKind {
 pub struct ABIThrownError {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<ABIThrownErrorKind>,
-    #[serde(
-        rename = "name",
-        alias = "constName",
-        default,
-        skip_serializing_if = "String::is_empty"
-    )]
-    pub const_name: String,
-    #[serde(rename = "errCode")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
     pub err_code: i32,
 }
 
@@ -436,17 +373,11 @@ pub struct ABIConstant {
     pub description: String,
 }
 
-/// =======================
-/// Root: `ContractABI` (то, что лежит в abiJson)
-/// =======================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractABI {
-    #[serde(rename = "abiSchemaVersion")]
     pub abi_schema_version: String,
 
-    #[serde(rename = "contractName")]
     pub contract_name: String,
-
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub author: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -456,27 +387,18 @@ pub struct ContractABI {
 
     pub declarations: Vec<ABIDeclaration>,
 
-    #[serde(rename = "incomingMessages", default)]
     pub incoming_messages: Vec<ABIInternalMessage>,
-    #[serde(rename = "incomingExternal", default)]
     pub incoming_external: Vec<ABIExternalMessage>,
-    #[serde(rename = "outgoingMessages", default)]
     pub outgoing_messages: Vec<ABIOutgoingMessage>,
-    #[serde(rename = "emittedEvents", default)]
     pub emitted_events: Vec<ABIOutgoingMessage>,
 
     pub storage: ABIStorage,
 
-    #[serde(rename = "getMethods", default)]
     pub get_methods: Vec<ABIGetMethod>,
-    #[serde(rename = "thrownErrors", default)]
     pub thrown_errors: Vec<ABIThrownError>,
-    #[serde(rename = "constants", default)]
     pub constants: Vec<ABIConstant>,
 
-    #[serde(rename = "compilerName")]
     pub compiler_name: String,
-    #[serde(rename = "compilerVersion")]
     pub compiler_version: String,
 }
 
@@ -1147,23 +1069,23 @@ mod tests {
     #[test]
     fn thrown_error_deserializes_abi_1_3_format() {
         let error: ABIThrownError = serde_json::from_str(
-            r#"{"kind":"enumMember","name":"Errors.NotEnoughTon","errCode":57}"#,
+            r#"{"kind":"enum_member","name":"Errors.NotEnoughTon","err_code":57}"#,
         )
         .expect("failed to deserialize ABI 1.3 thrown error");
 
         assert_eq!(error.kind, Some(ABIThrownErrorKind::EnumMember));
-        assert_eq!(error.const_name, "Errors.NotEnoughTon");
+        assert_eq!(error.name, "Errors.NotEnoughTon");
         assert_eq!(error.err_code, 57);
     }
 
     #[test]
-    fn thrown_error_deserializes_legacy_format() {
+    fn thrown_error_deserializes_without_kind() {
         let error: ABIThrownError =
-            serde_json::from_str(r#"{"constName":"ERR_NOT_ENOUGH_TON","errCode":57}"#)
-                .expect("failed to deserialize legacy thrown error");
+            serde_json::from_str(r#"{"name":"ERR_NOT_ENOUGH_TON","err_code":57}"#)
+                .expect("failed to deserialize thrown error without kind");
 
         assert_eq!(error.kind, None);
-        assert_eq!(error.const_name, "ERR_NOT_ENOUGH_TON");
+        assert_eq!(error.name, "ERR_NOT_ENOUGH_TON");
         assert_eq!(error.err_code, 57);
     }
 
@@ -1171,14 +1093,14 @@ mod tests {
     fn get_method_parameter_deserializes_default_value() {
         let method: ABIGetMethod = serde_json::from_str(
             r#"{
-                "tvmMethodId": 1,
+                "tvm_method_id": 1,
                 "name": "foo",
                 "parameters": [{
                     "name": "arg",
                     "ty": {"kind":"int"},
-                    "defaultValue": {"kind":"int","v":"10"}
+                    "default_value": {"kind":"int","v":"10"}
                 }],
-                "returnTy": {"kind":"int"}
+                "return_ty": {"kind":"int"}
             }"#,
         )
         .expect("failed to deserialize get method with parameter default value");
@@ -1232,6 +1154,7 @@ mod tests {
                             prefix_len: 32,
                             is_prefix_implicit: None,
                             stack_type_id: None,
+                            stack_width: None,
                         },
                         ABIUnionVariant {
                             variant_ty: ABIType::StructRef {
@@ -1242,6 +1165,7 @@ mod tests {
                             prefix_len: 32,
                             is_prefix_implicit: None,
                             stack_type_id: None,
+                            stack_width: None,
                         },
                     ],
                 },
@@ -1362,6 +1286,7 @@ mod tests {
                     prefix_len: 0,
                     is_prefix_implicit: None,
                     stack_type_id: None,
+                    stack_width: None,
                 },
                 ABIUnionVariant {
                     variant_ty: ABIType::Callable,
@@ -1369,6 +1294,7 @@ mod tests {
                     prefix_len: 0,
                     is_prefix_implicit: None,
                     stack_type_id: None,
+                    stack_width: None,
                 },
             ],
         };
@@ -1391,6 +1317,7 @@ mod tests {
                         prefix_len: 0,
                         is_prefix_implicit: None,
                         stack_type_id: None,
+                        stack_width: None,
                     },
                     ABIUnionVariant {
                         variant_ty: ABIType::Bool,
@@ -1398,6 +1325,7 @@ mod tests {
                         prefix_len: 0,
                         is_prefix_implicit: None,
                         stack_type_id: None,
+                        stack_width: None,
                     },
                 ],
             }

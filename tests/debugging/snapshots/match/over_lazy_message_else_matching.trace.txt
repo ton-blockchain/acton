@@ -34,3 +34,16 @@ Step 3 (step_over):
      25| 
   Variables:
     msg = Msg (lazy, unresolved)
+
+Step 4 (step_over):
+  Code:
+     19|             return 20
+     20|         }
+     21|         else => {
+     22|             throw 0xFFFF
+                     ^^^^^^^^^^^^
+     23|         }
+     24|     }
+     25| 
+  Variables:
+    msg = Msg (lazy, unresolved)

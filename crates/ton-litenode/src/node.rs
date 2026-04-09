@@ -70,6 +70,12 @@ impl Node {
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
         let conn_obj = if let Some(path) = db_path {
+            let path = path.as_ref();
+            if let Some(parent) = path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                std::fs::create_dir_all(parent)?;
+            }
             let conn = rusqlite::Connection::open(path)?;
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS cas (hash BLOB PRIMARY KEY, boc BLOB)",
@@ -1738,6 +1744,7 @@ mod tests {
     use crate::node::StateSource;
     use base64::Engine;
     use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
     use ton_executor::DEFAULT_CONFIG;
     use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
     use tycho_types::dict::Dict;
@@ -1787,6 +1794,40 @@ mod tests {
             .decode(DEFAULT_CONFIG)
             .expect("must decode default config");
         Node::new(executor, config_bytes.into(), StateSource::Local).expect("must create test node")
+    }
+
+    #[test]
+    fn with_db_path_creates_missing_parent_directories() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::env::temp_dir().join(format!(
+            "ton-litenode-db-parent-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("build/data/localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create test node with nested db path");
+
+        assert!(db_path.exists(), "db file must be created");
+        assert!(
+            db_path.parent().is_some_and(|parent| parent.exists()),
+            "db parent directories must be created"
+        );
+        assert!(node.conn.is_some(), "sqlite connection must be initialized");
+
+        drop(node);
+        let _ = std::fs::remove_dir_all(temp_root);
     }
 
     fn test_addr(byte: u8) -> Addr {

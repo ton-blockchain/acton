@@ -135,6 +135,9 @@ acton script deploy.tolk --broadcast
 ```
 
 Without `--broadcast`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
+When you do run with `--broadcast`, script-side getters and account reads also
+default to the selected broadcast network, so deploy scripts can send a
+transaction and immediately verify live state without adding `--fork-net`.
 
 ## Wallet Storage
 

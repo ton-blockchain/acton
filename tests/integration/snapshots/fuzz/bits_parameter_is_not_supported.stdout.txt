@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ fuzz-bits [TIME]
+    └─ Fuzzing parameter 'value' of type 'bits12' is not supported yet in test 'test-fuzz-bits'
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

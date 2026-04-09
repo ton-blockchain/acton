@@ -1095,6 +1095,9 @@ fun net.fetchAndRegisterLibrary(hash: string): bool {
 /// net.setNow(future_time);
 /// ```
 fun net.setNow(now: uint32): void {
+    // Update C7[0][3] (unixtime) FIRST so blockchain.now() stays in sync
+    vm.setConfigParam(now, 3);
+    // Then update the WorldState time for tick-tock transactions
     ffi.setNow(now);
 }
 

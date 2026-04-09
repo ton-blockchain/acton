@@ -410,7 +410,7 @@ struct Out5<TBody> {
 
 fun wrap5<TBody>(body: TBody): Out5<TBody> {
     val wrapped = Either5<TBody, Cell5<TBody>>.right(body.toCell());
-//!     ^ EitherRight5<TBody>
+//!     ^ EitherRight5<Cell5<TBody>>
     return Out5<TBody> {
         body: wrapped,
     };

@@ -9,7 +9,7 @@ fn git(project_root: &Path, args: &[&str]) -> Output {
         .args(args)
         .current_dir(project_root)
         .output()
-        .unwrap_or_else(|err| panic!("failed to run git {:?}: {err}", args))
+        .unwrap_or_else(|err| panic!("failed to run git {args:?}: {err}"))
 }
 
 fn init_git_repo(project_root: &Path) {
@@ -64,7 +64,7 @@ fn git_config_set_file(config_path: &Path, key: &str, value: &str) {
         .arg(key)
         .arg(value)
         .output()
-        .unwrap_or_else(|err| panic!("failed to run git config --file {:?}: {err}", config_path));
+        .unwrap_or_else(|err| panic!("failed to run git config --file {config_path:?}: {err}"));
     assert!(
         output.status.success(),
         "git config --file failed: {}",

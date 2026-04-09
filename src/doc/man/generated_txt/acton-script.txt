@@ -41,6 +41,8 @@ OPTIONS
    Remote Options
        --fork-net network
            Fork blockchain state from a remote network for local execution.
+           With --broadcast, omitted --fork-net defaults to the selected
+           broadcast network.
 
        --fork-block-number seqno
            Historical block sequence number to fork from.
@@ -51,7 +53,8 @@ OPTIONS
    Broadcasting Options
        --broadcast
            Send transactions to the selected blockchain network instead of
-           emulating them.
+           emulating them. Conflicting --net and --fork-net values are
+           rejected.
 
        --net network
            Network to use for broadcasting.

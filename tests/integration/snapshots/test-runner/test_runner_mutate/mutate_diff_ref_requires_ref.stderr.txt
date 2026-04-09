@@ -1,0 +1,1 @@
+Error: Use --mutation-diff-ref <REF> with --mutation-diff ref

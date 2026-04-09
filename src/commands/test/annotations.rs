@@ -1,9 +1,10 @@
-use crate::commands::test::TestAnnotation;
+use crate::commands::test::{FuzzConfig, TestAnnotation};
 use tolk_syntax::{AstNode, Expr, GetMethod, HasAnnotations, HasName, ObjectLit};
 
 #[derive(Debug, Default)]
 pub(super) struct TestAnnotations {
     pub annotations: Vec<TestAnnotation>,
+    pub fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,
@@ -16,6 +17,7 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
     };
 
     let mut annotations = Vec::new();
+    let mut fuzz = None;
     let mut expected_exit_code = None;
     let mut gas_limit = None;
     let mut todo_description = None;
@@ -48,6 +50,9 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
                     let values = parse_annotation_object(content, arg);
 
                     annotations.extend(values.annotations);
+                    if values.fuzz.is_some() {
+                        fuzz = values.fuzz;
+                    }
                     if values.expected_exit_code.is_some() {
                         expected_exit_code = values.expected_exit_code;
                     }
@@ -64,6 +69,7 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
     }
     TestAnnotations {
         annotations,
+        fuzz,
         expected_exit_code,
         gas_limit,
         todo_description,
@@ -72,6 +78,7 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
 
 fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotations {
     let mut annotations = Vec::new();
+    let mut fuzz = None;
     let mut expected_exit_code = None;
     let mut gas_limit = None;
     let mut todo_description = None;
@@ -118,6 +125,9 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
                     expected_exit_code = Some(code);
                 }
             }
+            "fuzz" => {
+                fuzz = parse_fuzz_value(content, key_value.value());
+            }
             "gas_limit" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
                     && let Ok(limit) = n.text(content).parse::<u64>()
@@ -131,8 +141,67 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
 
     TestAnnotations {
         annotations,
+        fuzz,
         expected_exit_code,
         gas_limit,
         todo_description,
     }
+}
+
+fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig> {
+    match value? {
+        Expr::BoolLit(b) if b.value() => Some(FuzzConfig::default()),
+        Expr::NumberLit(n) => n
+            .text(content)
+            .parse::<usize>()
+            .ok()
+            .map(|runs| FuzzConfig {
+                runs: Some(runs),
+                max_test_rejects: None,
+                seed: None,
+            }),
+        Expr::ObjectLit(object) => parse_fuzz_object(content, object),
+        _ => None,
+    }
+}
+
+fn parse_fuzz_object(content: &str, object: ObjectLit<'_>) -> Option<FuzzConfig> {
+    let mut config = FuzzConfig::default();
+    let mut found_field = false;
+
+    for key_value in object.arguments() {
+        let Some(name_node) = key_value.name() else {
+            continue;
+        };
+
+        match name_node.text(content) {
+            "runs" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(runs) = n.text(content).parse::<usize>()
+                {
+                    config.runs = Some(runs);
+                    found_field = true;
+                }
+            }
+            "max_test_rejects" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(max_test_rejects) = n.text(content).parse::<usize>()
+                {
+                    config.max_test_rejects = Some(max_test_rejects);
+                    found_field = true;
+                }
+            }
+            "seed" => {
+                if let Some(Expr::NumberLit(n)) = key_value.value()
+                    && let Ok(seed) = n.text(content).parse::<u64>()
+                {
+                    config.seed = Some(seed);
+                    found_field = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    found_field.then_some(config)
 }

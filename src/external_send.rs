@@ -31,6 +31,7 @@ impl<'a> SendBocContext<'a> {
     }
 }
 
+#[must_use]
 pub fn format_send_boc_error(error: SendBocError, context: SendBocContext<'_>) -> anyhow::Error {
     anyhow!(render_send_boc_error(error.kind(), error.raw(), context,))
 }
@@ -47,10 +48,10 @@ fn wallet_airdrop_fix_hint(wallet_name: &str, network_name: &str) -> String {
     wallet_airdrop_command(wallet_name, network_name)
         .map(|airdrop_command| {
             format!(
-                r#"
+                r"
 
 Possible fix:
-- request funds to the wallet with {}"#,
+- request funds to the wallet with {}",
                 airdrop_command.yellow()
             )
         })
@@ -71,9 +72,9 @@ fn render_send_boc_error(kind: SendBocErrorKind, raw: &str, context: SendBocCont
             let wallet_name = wallet_name.yellow();
             let network_name = network_name.cyan();
             format!(
-                r#"wallet {wallet_name} has no active state on network {network_name} and the deployment message was not accepted; likely causes:
+                r"wallet {wallet_name} has no active state on network {network_name} and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on {network_name}
-- wallet configuration/address does not match {network_name}{fix_hint}"#
+- wallet configuration/address does not match {network_name}{fix_hint}"
             )
         },
         (
@@ -99,22 +100,22 @@ fn render_send_boc_error(kind: SendBocErrorKind, raw: &str, context: SendBocCont
             };
 
             format!(
-                r#"wallet {wallet_name} rejected the external message before contract execution; likely causes:
+                r"wallet {wallet_name} rejected the external message before contract execution; likely causes:
 - not enough balance to cover the transfer and fees
 {deployment_hint}
 - seqno is stale (message used seqno {seqno})
-- message expired{fix_hint}"#
+- message expired{fix_hint}"
             )
         }
         (SendBocContext::Generic, SendBocErrorKind::MissingAccountState) => {
             "external message was not accepted because the destination account has no active state or the supplied StateInit is invalid".to_string()
         }
         (SendBocContext::Generic, SendBocErrorKind::RejectedBeforeExecution) => {
-            r#"external message was rejected before contract execution; likely causes:
+            r"external message was rejected before contract execution; likely causes:
 - not enough balance to cover the transfer and fees
 - destination account is not deployed
 - seqno is stale
-- message expired"#
+- message expired"
                 .to_string()
         }
         (_, SendBocErrorKind::Other) => raw.to_string(),
@@ -141,12 +142,12 @@ mod tests {
 
         assert_eq!(
             rendered,
-            r#"wallet deployer has no active state on network testnet and the deployment message was not accepted; likely causes:
+            r"wallet deployer has no active state on network testnet and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on testnet
 - wallet configuration/address does not match testnet
 
 Possible fix:
-- request funds to the wallet with acton wallet airdrop deployer"#,
+- request funds to the wallet with acton wallet airdrop deployer",
         );
     }
 
@@ -165,14 +166,14 @@ Possible fix:
 
         assert_eq!(
             rendered,
-            r#"wallet deployer rejected the external message before contract execution; likely causes:
+            r"wallet deployer rejected the external message before contract execution; likely causes:
 - not enough balance to cover the transfer and fees
 - wallet is not deployed on testnet
 - seqno is stale (message used seqno 7)
 - message expired
 
 Possible fix:
-- request funds to the wallet with acton wallet airdrop deployer"#,
+- request funds to the wallet with acton wallet airdrop deployer",
         );
     }
 
@@ -202,12 +203,12 @@ Possible fix:
 
         assert_eq!(
             rendered,
-            r#"wallet deployer has no active state on network localnet and the deployment message was not accepted; likely causes:
+            r"wallet deployer has no active state on network localnet and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on localnet
 - wallet configuration/address does not match localnet
 
 Possible fix:
-- request funds to the wallet with acton wallet airdrop deployer --net localnet"#,
+- request funds to the wallet with acton wallet airdrop deployer --net localnet",
         );
     }
 
@@ -226,9 +227,9 @@ Possible fix:
 
         assert_eq!(
             rendered,
-            r#"wallet deployer has no active state on network mock-v2 and the deployment message was not accepted; likely causes:
+            r"wallet deployer has no active state on network mock-v2 and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on mock-v2
-- wallet configuration/address does not match mock-v2"#,
+- wallet configuration/address does not match mock-v2",
         );
     }
 }

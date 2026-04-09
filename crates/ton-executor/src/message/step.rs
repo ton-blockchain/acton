@@ -163,6 +163,15 @@ impl StepExecutor {
         unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
     }
 
+    /// Gets the terminal uncaught exception code, if the SBS execution ended with one.
+    #[must_use]
+    pub fn get_uncaught_exception_code(&self) -> Option<i32> {
+        // SAFETY: `transaction_emulator_sbs_get_uncaught_exception_code` is safe function
+        let code =
+            unsafe { transaction_emulator_sbs_get_uncaught_exception_code(self.inner.as_ptr()) };
+        (code >= 0).then_some(code)
+    }
+
     /// Gets the current stack (Base64 `BoC`).
     #[must_use]
     pub fn get_stack(&self) -> String {
@@ -294,5 +303,6 @@ unsafe extern "C" {
     fn em_sbs_stack(em: *mut c_void) -> *mut c_char;
     fn em_sbs_c7(em: *mut c_void) -> *mut c_char;
     fn transaction_emulator_sbs_get_control_register(em: *mut c_void, idx: c_int) -> *mut c_char;
+    fn transaction_emulator_sbs_get_uncaught_exception_code(em: *mut c_void) -> c_int;
     fn em_sbs_result(em: *mut c_void) -> *mut c_char;
 }

@@ -113,6 +113,7 @@ fn apply_stack_diff(prev: &[String], diffs: &[StackDiff]) -> Vec<String> {
     result
 }
 
+#[must_use]
 pub fn convert_to_diff_logs(input: &str) -> String {
     let mut output = String::new();
     let mut prev_stack: Option<Vec<VmStackValue>> = None;
@@ -131,7 +132,7 @@ pub fn convert_to_diff_logs(input: &str) -> String {
                     output.push_str(
                         &diffs
                             .iter()
-                            .map(|d| d.to_string())
+                            .map(ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(" "),
                     );
@@ -156,6 +157,7 @@ pub fn convert_to_diff_logs(input: &str) -> String {
     output
 }
 
+#[must_use]
 pub fn convert_from_diff_logs(input: &str) -> String {
     let mut output = String::new();
     let mut current_stack: Vec<String> = Vec::new();
@@ -178,7 +180,7 @@ pub fn convert_from_diff_logs(input: &str) -> String {
             {
                 let content = stack_content.trim();
                 let stack = VmStack::new(content);
-                current_stack = stack.parsed().iter().map(|v| v.to_string()).collect();
+                current_stack = stack.parsed().iter().map(ToString::to_string).collect();
             }
         }
     }

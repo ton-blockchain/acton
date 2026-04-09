@@ -23,7 +23,8 @@ fn test_completion_root_keys() {
             6: label=networks kind=Field detail=object format=snippet
             7: label=package kind=Field detail=Required, object format=snippet
             8: label=scripts kind=Field detail=object format=snippet
-            9: label=test kind=Field detail=object format=snippet"#]],
+            9: label=test kind=Field detail=object format=snippet
+            10: label=wrappers kind=Field detail=object format=snippet"#]],
     );
 }
 
@@ -45,7 +46,8 @@ fn test_completion_table_header_keys() {
             6: label=networks kind=Field detail=object format=plain
             7: label=package kind=Field detail=Required, object format=plain
             8: label=scripts kind=Field detail=object format=plain
-            9: label=test kind=Field detail=object format=plain"#]],
+            9: label=test kind=Field detail=object format=plain
+            10: label=wrappers kind=Field detail=object format=plain"#]],
     );
 }
 
@@ -56,7 +58,7 @@ fn test_completion_test_boolean_values() {
         function_name!(),
         r#"
             [test]
-            coverage = <caret>false
+            debug = <caret>false
         "#,
         expect![[r#"
             0: label=true kind=Value detail= format=plain
@@ -100,7 +102,8 @@ fn test_completion_filters_existing_root_keys() {
             6: label=networks kind=Field detail=object format=snippet
             7: label=package kind=Field detail=Required, object format=snippet
             8: label=scripts kind=Field detail=object format=snippet
-            9: label=test kind=Field detail=object format=snippet"#]],
+            9: label=test kind=Field detail=object format=snippet
+            10: label=wrappers kind=Field detail=object format=snippet"#]],
     );
 }
 
@@ -154,7 +157,8 @@ fn test_completion_lint_output_format_enum_values() {
             6: label=networks kind=Field detail=object format=snippet
             7: label=package kind=Field detail=Required, object format=snippet
             8: label=scripts kind=Field detail=object format=snippet
-            9: label=test kind=Field detail=object format=snippet"#]],
+            9: label=test kind=Field detail=object format=snippet
+            10: label=wrappers kind=Field detail=object format=snippet"#]],
     );
 }
 
@@ -164,10 +168,12 @@ fn test_completion_test_coverage_format_default_value_in_string() {
     case_toml_completion(
         function_name!(),
         r#"
-            [test]
-            coverage-format = "<caret>foo"
+            [test.coverage]
+            format = "<caret>foo"
         "#,
-        expect![[r#"0: label="lcov" kind=Value detail=Default value format=plain"#]],
+        expect![[r#"
+            0: label="lcov" kind=EnumMember detail=Enum value format=plain
+            1: label="text" kind=EnumMember detail=Enum value format=plain"#]],
     );
 }
 
@@ -190,6 +196,7 @@ fn test_apply_completion_root_string_key() {
             "package",
             "scripts",
             "test",
+            "wrappers",
         ],
         0,
         r#"
@@ -218,6 +225,7 @@ fn test_apply_completion_root_object_table() {
             "package",
             "scripts",
             "test",
+            "wrappers",
         ],
         7,
         r#"
@@ -246,6 +254,7 @@ fn test_apply_completion_table_header_name_only() {
             "package",
             "scripts",
             "test",
+            "wrappers",
         ],
         0,
         r#"
@@ -273,6 +282,7 @@ fn test_apply_completion_table_header_partial_replace() {
             "package",
             "scripts",
             "test",
+            "wrappers",
         ],
         7,
         r#"
@@ -287,14 +297,14 @@ fn test_apply_completion_value_in_string_literal() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage = <caret>false
+            [test.coverage]
+            enabled = <caret>false
         "#,
         &["true", "false"],
         0,
         r#"
-            [test]
-            coverage = true<caret>
+            [test.coverage]
+            enabled = true<caret>
         "#,
     );
 }
@@ -305,14 +315,14 @@ fn test_apply_completion_boolean_partial_replace() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage = f<caret>alse
+            [test.coverage]
+            enabled = f<caret>alse
         "#,
         &["true", "false"],
         0,
         r#"
-            [test]
-            coverage = true<caret>
+            [test.coverage]
+            enabled = true<caret>
         "#,
     );
 }
@@ -359,14 +369,14 @@ fn test_apply_completion_default_string_value_in_string_literal() {
     case_toml_completion_apply(
         function_name!(),
         r#"
-            [test]
-            coverage-format = "<caret>foo"
+            [test.coverage]
+            format = "<caret>foo"
         "#,
-        &["\"lcov\""],
+        &["\"lcov\"", "\"text\""],
         0,
         r#"
-            [test]
-            coverage-format = "lcov<caret>"
+            [test.coverage]
+            format = "lcov<caret>"
         "#,
     );
 }

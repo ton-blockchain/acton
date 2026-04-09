@@ -4,9 +4,17 @@ use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use ton::ton_core::types::TonAddress;
+use tvmffi::json_stack::legacy_stack_to_json;
+use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::cell::HashBytes;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::dict::{Dict, RawDict};
+use tycho_types::models::{IntAddr, StdAddr};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
@@ -25,6 +33,7 @@ pub(crate) struct CapturedToncenterRequest {
     pub(crate) method: String,
     pub(crate) path: String,
     pub(crate) headers: Vec<(String, String)>,
+    pub(crate) body: Vec<u8>,
 }
 
 pub(crate) fn spawn_toncenter_v2_mock(
@@ -160,8 +169,9 @@ pub(crate) fn spawn_toncenter_mock_with_capture(
                 }
             }
 
+            let mut request_body = Vec::new();
             if content_length > 0 {
-                let mut request_body = vec![0_u8; content_length];
+                request_body.resize(content_length, 0);
                 reader
                     .read_exact(&mut request_body)
                     .expect("failed to read toncenter v2 request body");
@@ -174,6 +184,7 @@ pub(crate) fn spawn_toncenter_mock_with_capture(
                     method,
                     path,
                     headers,
+                    body: request_body,
                 });
 
             let raw_response = format!(
@@ -258,9 +269,80 @@ pub(crate) fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
     }
 }
 
+pub(crate) fn toncenter_v2_run_get_method_ok_response(
+    stack: Vec<TupleItem>,
+    exit_code: i32,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "stack": legacy_stack_to_json(&Tuple(stack)).expect("stack must serialize to legacy json"),
+                "exit_code": exit_code
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_verify_registry_address_response(
+    registry_address: &str,
+) -> ToncenterV2MockResponse {
+    toncenter_v2_run_get_method_ok_response(
+        vec![TupleItem::Cell(to_cell(&ton_address_to_std_addr(
+            &TonAddress::from_str(registry_address).expect("registry address must parse"),
+        )))],
+        0,
+    )
+}
+
+pub(crate) fn toncenter_v2_verify_quorum_response(
+    verifier_id: &str,
+    quorum: u8,
+) -> ToncenterV2MockResponse {
+    let verifier_entry = build_verifier_registry_entry_cell(verifier_id, quorum);
+    let mut dict = Dict::<HashBytes, tycho_types::cell::CellSlice>::new();
+    let value = verifier_entry
+        .as_slice()
+        .expect("verifier entry cell must convert to slice");
+    dict.add(HashBytes([0x11; 32]), value)
+        .expect("verifier dict entry must be added");
+
+    toncenter_v2_run_get_method_ok_response(vec![TupleItem::Cell(to_cell(&dict))], 0)
+}
+
 pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status,
+        body: serde_json::json!({
+            "ok": false,
+            "error": error
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: "{}".to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_send_boc_error_response(error: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 500,
+        body: serde_json::json!({
+            "ok": false,
+            "error": error
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_send_boc_client_error_response(error: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 400,
         body: serde_json::json!({
             "ok": false,
             "error": error
@@ -323,4 +405,50 @@ fn status_text(status: u16) -> &'static str {
         500 => "Internal Server Error",
         _ => "Unknown",
     }
+}
+
+fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
+    let mut builder = CellBuilder::new();
+    obj.store_into(&mut builder, Cell::empty_context())
+        .expect("failed to store object into cell");
+    builder.build().expect("failed to build cell")
+}
+
+fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
+    StdAddr {
+        anycast: None,
+        address: HashBytes(
+            <[u8; 32]>::try_from(address.hash.as_slice())
+                .expect("TonAddress hash must be exactly 32 bytes"),
+        ),
+        workchain: address.workchain as i8,
+    }
+}
+
+fn build_verifier_registry_entry_cell(verifier_id: &str, quorum: u8) -> Cell {
+    let mut builder = CellBuilder::new();
+    IntAddr::Std(StdAddr::new(0, HashBytes([0; 32])))
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("admin address must store");
+    builder.store_u8(quorum).expect("quorum must store");
+    RawDict::<256>::from(None)
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("empty endpoint dict must store");
+    builder
+        .store_reference(build_snake_string_cell(verifier_id))
+        .expect("verifier id must store");
+    builder
+        .store_reference(build_snake_string_cell("https://verifier.invalid"))
+        .expect("verifier url must store");
+    builder.build().expect("verifier entry cell must build")
+}
+
+fn build_snake_string_cell(text: &str) -> Cell {
+    let bytes = text.as_bytes();
+    let total_bits = bytes.len() * 8;
+    let mut builder = CellBuilder::new();
+    builder
+        .store_raw(bytes, total_bits as u16)
+        .expect("snake string bytes must store");
+    builder.build().expect("snake string cell must build")
 }

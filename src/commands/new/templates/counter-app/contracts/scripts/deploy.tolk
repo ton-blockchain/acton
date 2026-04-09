@@ -11,7 +11,10 @@ fun main() {
         counter: 0,
     });
     val res = counter.deploy(deployer.address, { value: ton("0.005") });
-    res.wait();
+    if (!res.wait()) {
+        return;
+    }
 
     println1("Deployed counter to {}", counter.address);
+    println1("Counter value is {}", counter.currentCounter());
 }

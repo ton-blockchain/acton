@@ -11,7 +11,7 @@ tests, and a deployment script you can extend.
 - `tests/wrappers/Empty.tolk` is the wrapper used by tests and scripts.
 - `tests/contract.test.tolk` covers deployment and ownership transfer.
 - `scripts/deploy.tolk` deploys the contract with `deployer` as the initial
-  owner.
+  owner and reads the owner back after deployment.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
   GitHub Actions.
 
@@ -56,6 +56,9 @@ acton wallet new --name deployer --local --airdrop
 ```bash
 acton script scripts/deploy.tolk --broadcast --net testnet
 ```
+
+The starter script waits for the transaction and then reads the deployed owner
+back from testnet. You do not need a separate `--fork-net` for that check.
 
 The generated `Acton.toml` also includes shortcut scripts:
 

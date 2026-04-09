@@ -27,14 +27,15 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
 use tycho_types::prelude::DynCell;
 
-/// A single debug mark position: (bit_offset_in_cell, mark_id).
+/// A single debug mark position: (`bit_offset_in_cell`, `mark_id`).
 pub type MarkEntry = (i32, i32);
 
-/// cell_hash (uppercase hex, 64 chars) -> sorted list of mark entries.
+/// `cell_hash` (uppercase hex, 64 chars) -> sorted list of mark entries.
 pub type DebugMarksDict = HashMap<String, Vec<MarkEntry>>;
 
 /// Parse debug marks and code BOCs (base64-encoded) and produce a mapping
 /// from TVM-visible cell hashes to debug mark positions.
+#[must_use]
 pub fn parse_debug_marks(marks_boc: &[u8], code_boc: &[u8]) -> DebugMarksDict {
     let code_cell = Boc::decode(code_boc).unwrap();
     let marks_cell = Boc::decode(marks_boc).unwrap();
@@ -82,12 +83,13 @@ pub fn parse_debug_marks(marks_boc: &[u8], code_boc: &[u8]) -> DebugMarksDict {
     }
 
     for entries in result.values_mut() {
-        entries.sort();
+        entries.sort_unstable();
     }
     result
 }
 
 /// Load base64 content from a file, trimming whitespace.
+#[must_use]
 pub fn read_base64_file(path: &Path) -> String {
     fs::read_to_string(path).unwrap().trim().to_string()
 }
@@ -122,7 +124,7 @@ fn build_hash_remap(code_cell: &Cell) -> HashMap<String, (String, i32)> {
         let leaf_hash = cell_hash_string(&leaf_cell);
         let leaf_bits = leaf_cell.as_slice().unwrap().size_bits();
 
-        let adjustment = leaf_bits as i32 - value_bits as i32;
+        let adjustment = i32::from(leaf_bits) - i32::from(value_bits);
         remap.insert(value_hash, (leaf_hash, adjustment));
     }
     remap

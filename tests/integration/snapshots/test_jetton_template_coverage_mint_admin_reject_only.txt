@@ -1,0 +1,204 @@
+Coverage Summary:
+Lines: 24/77 (31.17%)
+Total Hits: 38
+
+File: [ROOT]/contracts/jetton-utils.tolk
+Annotated Code:
+ 1   | import "storage"                                                                                    |
+ 2   |                                                                                                     |
+ 3   | fun calcDeployedJettonWallet(                                                                       |
+ 4   |     ownerAddress: address,                                                                          |
+ 5   |     minterAddress: address,                                                                         |
+ 6   |     jettonWalletCode: cell,                                                                         |
+ 7   | ): AutoDeployAddress {                                                                              |
+ 8 ✓ |     val emptyWalletStorage: WalletStorage = {                                                       | hits:1
+ 9 ✓ |         jettonBalance: 0,                                                                           | hits:1
+10 ✓ |         ownerAddress,                                                                               | hits:1
+11 ✓ |         minterAddress,                                                                              | hits:1
+12   |     };                                                                                              |
+13   |                                                                                                     |
+14 ✓ |     return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };            | hits:1
+15   | }                                                                                                   |
+16   |                                                                                                     |
+17   | fun calcAddressOfJettonWallet(                                                                      |
+18   |     ownerAddress: address,                                                                          |
+19   |     minterAddress: address,                                                                         |
+20   |     jettonWalletCode: cell,                                                                         |
+21   | ): address {                                                                                        |
+22 ✓ |     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);       | hits:2
+23 ✓ |     return jwDeployed.calculateAddress();                                                           | hits:1
+24   | }                                                                                                   |
+
+File: [ROOT]/contracts/jetton_minter.tolk
+Annotated Code:
+  1   | import "errors"                                                                                     |
+  2   | import "fees-management"                                                                            |
+  3   | import "jetton-utils"                                                                               |
+  4   | import "messages"                                                                                   |
+  5   | import "storage"                                                                                    |
+  6   |                                                                                                     |
+  7   | contract JettonMinter {                                                                             |
+  8   |     storage: MinterStorage                                                                          |
+  9   |     incomingMessages: AllowedMessageToMinter                                                        |
+ 10   | }                                                                                                   |
+ 11   |                                                                                                     |
+ 12   | type AllowedMessageToMinter =                                                                       |
+ 13   |     | BurnNotificationForMinter                                                                     |
+ 14   |     | RequestWalletAddress                                                                          |
+ 15   |     | MintNewJettons                                                                                |
+ 16   |     | ChangeMinterAdmin                                                                             |
+ 17   |     | ChangeMinterContent                                                                           |
+ 18   |                                                                                                     |
+ 19 ✓ | fun onInternalMessage(in: InMessage) {                                                              | hits:2 branches:throw=0 continue=2
+ 20 ✓ |     val msg = lazy AllowedMessageToMinter.fromSlice(in.body);                                       | hits:2
+ 21   |                                                                                                     |
+ 22 ✓ |     match (msg) {                                                                                   | hits:2 branches:site0 true=0 false=1; site1 true=0 false=1; site2 true=0 false=2; site3 true=0 false=2; site4 true=1 false=1
+ 23 ✗ |         BurnNotificationForMinter => {                                                              | hits:0
+ 24 ✗ |             var storage = lazy MinterStorage.load();                                                | hits:0
+ 25 ✗ |             assert (                                                                                | hits:0
+ 26 ✗ |                 in.senderAddress ==                                                                 | hits:0
+ 27 ✗ |                 calcAddressOfJettonWallet(                                                          | hits:0
+ 28   |                     msg.burnInitiator,                                                              |
+ 29 ✗ |                     contract.getAddress(),                                                          | hits:0
+ 30   |                     storage.jettonWalletCode,                                                       |
+ 31   |                 )                                                                                   |
+ 32   |             ) throw Errors.UnauthorizedBurn;                                                        |
+ 33   |                                                                                                     |
+ 34 ✗ |             storage.totalSupply -= msg.jettonAmount;                                                | hits:0
+ 35 ✗ |             storage.save();                                                                         | hits:0
+ 36   |                                                                                                     |
+ 37 ✗ |             if (msg.sendExcessesTo == null) {                                                       | hits:0
+ 38   |                 return;                                                                             |
+ 39   |             }                                                                                       |
+ 40   |                                                                                                     |
+ 41 ✗ |             val excessesMsg = createMessage({                                                       | hits:0
+ 42 ✗ |                 bounce: BounceMode.NoBounce,                                                        | hits:0
+ 43 ✗ |                 dest: msg.sendExcessesTo,                                                           | hits:0
+ 44 ✗ |                 value: 0,                                                                           | hits:0
+ 45 ✗ |                 body: ReturnExcessesBack { queryId: msg.queryId },                                  | hits:0
+ 46   |             });                                                                                     |
+ 47 ✗ |             excessesMsg.send(SEND_MODE_IGNORE_ERRORS + SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);| hits:0
+ 48   |         }                                                                                           |
+ 49   |                                                                                                     |
+ 50 ✗ |         RequestWalletAddress => {                                                                   | hits:0
+ 51 ✗ |             assert (                                                                                | hits:0
+ 52 ✗ |                 in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND                 | hits:0
+ 53   |             ) throw Errors.NotEnoughAmountToRespond;                                                |
+ 54   |                                                                                                     |
+ 55 ✗ |             val respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress                       | hits:0
+ 56 ✗ |                 ? msg.ownerAddress.toCell()                                                         | hits:0
+ 57 ✗ |                 : null;                                                                             | hits:0
+ 58   |                                                                                                     |
+ 59 ✗ |             var walletAddress: address? = null;                                                     | hits:0
+ 60 ✗ |             if (msg.ownerAddress.getWorkchain() == BASECHAIN) {                                     | hits:0
+ 61 ✗ |                 val storage = lazy MinterStorage.load();                                            | hits:0
+ 62 ✗ |                 walletAddress = calcAddressOfJettonWallet(                                          | hits:0
+ 63   |                     msg.ownerAddress,                                                               |
+ 64 ✗ |                     contract.getAddress(),                                                          | hits:0
+ 65   |                     storage.jettonWalletCode,                                                       |
+ 66   |                 );                                                                                  |
+ 67   |             }                                                                                       |
+ 68   |                                                                                                     |
+ 69 ✗ |             val respondMsg = createMessage({                                                        | hits:0
+ 70 ✗ |                 bounce: BounceMode.Only256BitsOfBody,                                               | hits:0
+ 71 ✗ |                 dest: in.senderAddress,                                                             | hits:0
+ 72 ✗ |                 value: 0,                                                                           | hits:0
+ 73 ✗ |                 body: ResponseWalletAddress {                                                       | hits:0
+ 74 ✗ |                     queryId: msg.queryId,                                                           | hits:0
+ 75 ✗ |                     jettonWalletAddress: walletAddress,                                             | hits:0
+ 76 ✗ |                     ownerAddress: respondOwnerAddress,                                              | hits:0
+ 77   |                 },                                                                                  |
+ 78   |             });                                                                                     |
+ 79 ✗ |             respondMsg.send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);                           | hits:0
+ 80   |         }                                                                                           |
+ 81   |                                                                                                     |
+ 82 ✓ |         MintNewJettons => {                                                                         | hits:1
+ 83 ✓ |             var storage = lazy MinterStorage.load();                                                | hits:1
+ 84 ✓ |             assert (in.senderAddress == storage.adminAddress) throw Errors.NotFromAdmin;            | hits:1 branches:throw=1 continue=0
+ 85   |                                                                                                     |
+ 86 ✗ |             val internalTransferMsg = lazy msg.internalTransferMsg.load();                          | hits:0
+ 87 ✗ |             storage.totalSupply += internalTransferMsg.jettonAmount;                                | hits:0
+ 88 ✗ |             storage.save();                                                                         | hits:0
+ 89   |                                                                                                     |
+ 90 ✗ |             val deployMsg = createMessage({                                                         | hits:0
+ 91   |                 bounce: BounceMode.Only256BitsOfBody,                                               |
+ 92 ✗ |                 dest: calcDeployedJettonWallet(                                                     | hits:0
+ 93   |                     msg.mintRecipient,                                                              |
+ 94 ✗ |                     contract.getAddress(),                                                          | hits:0
+ 95   |                     storage.jettonWalletCode,                                                       |
+ 96   |                 ),                                                                                  |
+ 97   |                 value: msg.tonAmount,                                                               |
+ 98   |                 body: msg.internalTransferMsg, // a newly-deployed wallet contract will immediately handle it|
+ 99   |             });                                                                                     |
+100 ✗ |             deployMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);                                          | hits:0
+101   |         }                                                                                           |
+102   |                                                                                                     |
+103 ✗ |         ChangeMinterAdmin => {                                                                      | hits:0
+104 ✗ |             var storage = lazy MinterStorage.load();                                                | hits:0
+105 ✗ |             assert (in.senderAddress == storage.adminAddress) throw Errors.NotFromAdmin;            | hits:0
+106 ✗ |             storage.adminAddress = msg.newAdminAddress;                                             | hits:0
+107 ✗ |             storage.save();                                                                         | hits:0
+108   |         }                                                                                           |
+109   |                                                                                                     |
+110 ✗ |         ChangeMinterContent => {                                                                    | hits:0
+111 ✗ |             var storage = lazy MinterStorage.load();                                                | hits:0
+112 ✗ |             assert (in.senderAddress == storage.adminAddress) throw Errors.NotFromAdmin;            | hits:0
+113 ✗ |             storage.content = msg.newContent;                                                       | hits:0
+114 ✗ |             storage.save();                                                                         | hits:0
+115   |         }                                                                                           |
+116   |                                                                                                     |
+117   |         else => {                                                                                   |
+118   |             // ignore empty messages, "wrong opcode" for others                                     |
+119 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;                                 | hits:1 branches:throw=0 continue=1
+120   |         }                                                                                           |
+121   |     }                                                                                               |
+122   | }                                                                                                   |
+123   |                                                                                                     |
+124   | get fun get_jetton_data(): JettonDataReply {                                                        |
+125 ✓ |     val storage = lazy MinterStorage.load();                                                        | hits:2
+126   |                                                                                                     |
+127 ✓ |     return {                                                                                        | hits:2
+128 ✓ |         totalSupply: storage.totalSupply,                                                           | hits:2
+129 ✓ |         mintable: true,                                                                             | hits:2
+130 ✓ |         adminAddress: storage.adminAddress,                                                         | hits:2
+131 ✓ |         jettonContent: storage.content,                                                             | hits:2
+132 ✓ |         jettonWalletCode: storage.jettonWalletCode,                                                 | hits:2
+133   |     };                                                                                              |
+134   | }                                                                                                   |
+135   |                                                                                                     |
+136   | get fun get_wallet_address(ownerAddress: address): address {                                        |
+137 ✓ |     val storage = lazy MinterStorage.load();                                                        | hits:1
+138 ✓ |     return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);| hits:1
+139   | }                                                                                                   |
+
+File: [ROOT]/contracts/storage.tolk
+Annotated Code:
+ 1   | struct WalletStorage {                                          |
+ 2   |     jettonBalance: coins                                        |
+ 3   |     ownerAddress: address                                       |
+ 4   |     minterAddress: address                                      |
+ 5   | }                                                               |
+ 6   |                                                                 |
+ 7   | struct MinterStorage {                                          |
+ 8   |     totalSupply: coins                                          |
+ 9   |     adminAddress: address                                       |
+10   |     content: cell                                               |
+11   |     jettonWalletCode: cell                                      |
+12   | }                                                               |
+13   |                                                                 |
+14   | fun MinterStorage.load(): MinterStorage {                       |
+15 ✓ |     return MinterStorage.fromCell(contract.getData());          | hits:4
+16   | }                                                               |
+17   |                                                                 |
+18   | fun MinterStorage.save(self) {                                  |
+19 ✗ |     contract.setData(self.toCell());                            | hits:0
+20   | }                                                               |
+21   |                                                                 |
+22   | fun WalletStorage.load(): WalletStorage {                       |
+23   |     return WalletStorage.fromCell(contract.getData());          |
+24   | }                                                               |
+25   |                                                                 |
+26   | fun WalletStorage.save(self) {                                  |
+27   |     contract.setData(self.toCell());                            |
+28   | }                                                               |
+

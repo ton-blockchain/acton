@@ -3,7 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const SNAPSHOT_DIR: &str = "integration/snapshots/test-runner/api_send_iter";
 
-const ITER_MESSAGES: &str = r#"
+const ITER_MESSAGES: &str = r"
 struct (0x3100f001) TriggerForward {
     queryId: uint64
     target: address
@@ -43,7 +43,7 @@ struct (0x3100f008) Attack {
 struct (0x3100f009) ExternalNotice {
     queryId: uint64
 }
-"#;
+";
 
 const FORWARDER_CONTRACT: &str = r#"
 import "messages"
@@ -135,10 +135,10 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const LIBRARY_CHILD_CONTRACT: &str = r#"
+const LIBRARY_CHILD_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const LIBRARY_SPAWNER_CONTRACT: &str = r#"
 import "../gen/lib_code.tolk"

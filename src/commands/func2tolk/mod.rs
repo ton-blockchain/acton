@@ -6,6 +6,7 @@ const CONVERT_FUNC_TO_TOLK_NPM_PACKAGE_NAME: &str = "@ton/convert-func-to-tolk";
 const DEFAULT_CONVERT_FUNC_TO_TOLK_VERSION: &str = "1.0.0";
 
 #[inline]
+#[must_use]
 pub const fn default_func2tolk_version() -> &'static str {
     DEFAULT_CONVERT_FUNC_TO_TOLK_VERSION
 }

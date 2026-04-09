@@ -132,6 +132,14 @@ impl StepGetExecutor {
         unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
     }
 
+    /// Gets the terminal uncaught exception code, if the SBS execution ended with one.
+    #[must_use]
+    pub fn get_uncaught_exception_code(&self) -> Option<i32> {
+        // SAFETY: `tvm_emulator_sbs_get_uncaught_exception_code` is safe function
+        let code = unsafe { tvm_emulator_sbs_get_uncaught_exception_code(self.inner.as_ptr()) };
+        (code >= 0).then_some(code)
+    }
+
     /// Gets the current stack (Base64 `BoC`).
     #[must_use]
     pub fn get_stack(&self) -> String {
@@ -273,5 +281,6 @@ unsafe extern "C" {
     fn tvm_emulator_sbs_get_control_register(tvm: *mut c_void, idx: c_int) -> *mut c_char;
     fn sbs_get_code_pos(tvm: *mut c_void) -> *mut c_char;
     fn sbs_get_current_instr(tvm: *mut c_void) -> *mut c_char;
+    fn tvm_emulator_sbs_get_uncaught_exception_code(tvm: *mut c_void) -> c_int;
     fn sbs_get_method_result(tvm: *mut c_void) -> *mut c_char;
 }

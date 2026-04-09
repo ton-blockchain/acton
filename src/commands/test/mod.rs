@@ -1,7 +1,8 @@
 use crate::commands::build::build_cmd;
 use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
-    collect_coverage, generate_lcov_file, generate_text_file, print_coverage_summary,
+    collect_coverage, generate_lcov_file, generate_lcov_report, generate_text_file,
+    print_coverage_summary, total_line_coverage_percentage,
 };
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
@@ -9,8 +10,8 @@ use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
 use crate::commands::test::reporting::ui::{UiReporter, reserve_ui_listener, start_ui_server};
 use crate::commands::test::reporting::{
-    ReporterManager, TestExecutionContext, TestFailureExecutionContext, TestReport, TestStatus,
-    TestSuiteStats, extract_suite_name,
+    FuzzExecutionContext, ReporterManager, TestExecutionContext, TestFailureExecutionContext,
+    TestReport, TestStatus, TestSuiteStats, extract_suite_name,
 };
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
@@ -52,7 +53,7 @@ use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
 };
 use ton_executor::get::step::StepGetExecutor;
-use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
@@ -63,12 +64,23 @@ use walkdir::WalkDir;
 
 mod annotations;
 mod coverage;
+mod fuzz;
 pub mod mutation;
 mod profiling;
 pub mod reporting;
 pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
+pub(crate) use self::fuzz::FuzzConfig;
+use self::fuzz::{FuzzParameter, attach_test_parameter_metadata, validate_test_configuration};
+
+#[derive(Debug, Clone, Copy)]
+struct EvaluatedTestCase {
+    passed: bool,
+    actual_exit_code: i32,
+    gas_used: u64,
+    expected_exit_code: i32,
+}
 
 #[derive(Debug)]
 pub struct TestResult {
@@ -78,6 +90,8 @@ pub struct TestResult {
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: Option<i32>,
     pub accounts: FxHashMap<StdAddr, ShardAccount>,
+    pub executed_get_methods: Vec<GetMethodResultSuccess>,
+    pub fuzz: Option<FuzzExecutionContext>,
 }
 
 #[derive(Debug)]
@@ -95,6 +109,7 @@ pub struct TestRunner<'a> {
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
     abi_parse_cache: ContractAbiParseCache,
+    fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
     ref_contracts: BTreeMap<String, Cell>,
@@ -115,6 +130,7 @@ impl<'a> TestRunner<'a> {
             DapTransport::dummy()
         };
         let project_root = configured_project_root().to_path_buf();
+        let fuzz_seed = config.fuzz_seed.unwrap_or_else(rand::random);
 
         let mut ref_contracts = BTreeMap::new();
         if let Some(contracts) = acton_config.contracts() {
@@ -171,6 +187,7 @@ impl<'a> TestRunner<'a> {
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
             abi_parse_cache: ContractAbiParseCache::new(),
+            fuzz_seed,
         })
     }
 
@@ -229,6 +246,24 @@ impl<'a> TestRunner<'a> {
         dest_address: &str,
         abi: Arc<ContractAbi>,
         source_map: Arc<TolkSourceMap>,
+    ) -> anyhow::Result<TestResult> {
+        if let Some(fuzz) = test.fuzz {
+            return self.execute_fuzz_test(test, code_cell, dest_address, abi, source_map, fuzz);
+        }
+
+        let stack = &Tuple::empty();
+        self.execute_test_case(test, code_cell, dest_address, abi, source_map, stack)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_test_case(
+        &mut self,
+        test: &TestDescriptor,
+        code_cell: &Cell,
+        dest_address: &str,
+        abi: Arc<ContractAbi>,
+        source_map: Arc<TolkSourceMap>,
+        stack: &Tuple,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.minimal_log_verbosity();
 
@@ -319,9 +354,10 @@ impl<'a> TestRunner<'a> {
             network: self.config.fork_net.clone(),
         };
 
+        let stack = Boc::encode_base64(serialize_tuple(stack)?);
+
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
@@ -358,7 +394,6 @@ impl<'a> TestRunner<'a> {
                 let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let get_result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
 
                 if let Some(trace_dir) = &self.config.save_test_trace
@@ -385,6 +420,16 @@ impl<'a> TestRunner<'a> {
         let mut captured_stdout = captured_stdout;
         Self::append_debug_output(&mut captured_stdout, &result);
 
+        let executed_get_methods = if self.config.coverage {
+            // save results for coverage only in coverage mode since cloning is expensive due to logs
+            match &result {
+                GetMethodResult::Success(success) => vec![success.clone()],
+                GetMethodResult::Error(_) => Vec::new(),
+            }
+        } else {
+            Vec::new()
+        };
+
         Ok(TestResult {
             get_result: result,
             captured_stdout,
@@ -392,6 +437,8 @@ impl<'a> TestRunner<'a> {
             assert_failure,
             expected_exit_code,
             accounts: world_state.take_accounts(),
+            executed_get_methods,
+            fuzz: None,
         })
     }
 
@@ -417,6 +464,42 @@ impl<'a> TestRunner<'a> {
         }
         stdout.push_str(&debug_output);
         stdout.push('\n');
+    }
+}
+
+fn evaluate_test_case(
+    test: &TestDescriptor,
+    get_result: &GetMethodResult,
+    assert_failure: Option<&AssertFailure>,
+    dynamic_expected_exit_code: Option<i32>,
+) -> EvaluatedTestCase {
+    let (exit_code, gas_used) = match get_result {
+        GetMethodResult::Success(result) => {
+            let gas_used = result.gas_used.parse::<u64>().unwrap_or(0);
+            (result.vm_exit_code, gas_used)
+        }
+        GetMethodResult::Error(_) => (999, 0),
+    };
+
+    let expected_exit_code = dynamic_expected_exit_code
+        .or(test.expected_exit_code)
+        .unwrap_or(0);
+
+    let gas_limit_exceeded = if let Some(limit) = test.gas_limit {
+        gas_used > limit
+    } else {
+        false
+    };
+    let failed = exit_code != expected_exit_code
+        || gas_limit_exceeded
+        || matches!(assert_failure, Some(AssertFailure::Assume(_)))
+        || (exit_code == 0 && assert_failure.is_some());
+
+    EvaluatedTestCase {
+        passed: !failed,
+        actual_exit_code: exit_code,
+        gas_used,
+        expected_exit_code,
     }
 }
 
@@ -552,9 +635,38 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     };
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
+    let mut coverage_lcov = None;
+    let mut coverage_threshold_failed = false;
+
     if config.coverage {
-        let coverage = collect_coverage(&runner.emulations, &runner.build_cache);
+        let project_root = configured_project_root().to_path_buf();
+        let wrapper_roots: Vec<_> = runner
+            .acton_config
+            .mappings()
+            .into_iter()
+            .flat_map(IntoIterator::into_iter)
+            .filter_map(|(key, path)| (key == "@wrappers").then_some(path))
+            .map(PathBuf::from)
+            .map(|path| {
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    project_root.join(path)
+                };
+                dunce::canonicalize(&path).unwrap_or(path)
+            })
+            .collect();
+        let coverage = collect_coverage(
+            &runner.emulations,
+            &runner.build_cache,
+            &wrapper_roots,
+            config.coverage_include_wrappers,
+            config.coverage_include_tests,
+        );
         print_coverage_summary(&coverage);
+        if config.ui {
+            coverage_lcov = Some(generate_lcov_report(&coverage));
+        }
 
         if let Some(format_type) = &config.coverage_format {
             println!();
@@ -573,6 +685,26 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     })?;
                     println!("Text coverage file saved in {text_path}");
                 }
+            }
+        }
+
+        if !config.ui
+            && let Some(minimum_percent) = config.coverage_minimum_percent
+        {
+            if !minimum_percent.is_finite() || !(0.0..=100.0).contains(&minimum_percent) {
+                anyhow::bail!(
+                    "coverage minimum percent must be between 0 and 100, got {minimum_percent}"
+                );
+            }
+            let actual_percent = total_line_coverage_percentage(&coverage);
+            if actual_percent < minimum_percent {
+                coverage_threshold_failed = true;
+                println!(
+                    "\n{}: total line coverage {:.2}% is below the required minimum of {:.2}%.",
+                    "Error".red(),
+                    actual_percent,
+                    minimum_percent
+                );
             }
         }
     }
@@ -614,7 +746,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async { start_ui_server(reports, trace_dir, project_root, listener).await })?;
+        rt.block_on(async {
+            start_ui_server(reports, trace_dir, project_root, coverage_lcov, listener).await
+        })?;
     }
 
     if let Some(filter) = &config.filter
@@ -628,7 +762,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         process::exit(1);
     }
 
-    if total_failed > 0 {
+    if total_failed > 0 || coverage_threshold_failed {
         process::exit(1)
     }
     Ok(())
@@ -868,6 +1002,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         result.debug_mark_base64.as_deref(),
     )?);
     let compiler_abi = result.abi.map(Arc::new);
+    let tests = attach_test_parameter_metadata(tests, &abi, compiler_abi.as_deref());
     let stats = run_file_tests(
         runner,
         filepath,
@@ -965,21 +1100,32 @@ fn run_file_tests(
             continue;
         }
 
+        if let Err(err) = validate_test_configuration(test, &runner.config) {
+            test_report.status = TestStatus::Failed;
+            test_report.message = Some(err.to_string());
+            runner.reporter_manager.on_test_finished(&test_report)?;
+            failed += 1;
+
+            if runner.config.fail_fast {
+                break;
+            }
+            continue;
+        }
+
         let start_time = Instant::now();
         let result =
             runner.execute_test(test, code, &dest_address, abi.clone(), source_map.clone());
         let result = match result {
             Ok(result) => result,
             Err(err) => {
-                eprintln!(
-                    "{}: Cannot execute test '{}': {}",
-                    "Error".red(),
-                    test.name,
-                    err
-                );
-                failed += 1;
                 test_report.status = TestStatus::Failed;
+                test_report.message = Some(format!("Cannot execute test '{}': {err}", test.name));
                 runner.reporter_manager.on_test_finished(&test_report)?;
+                failed += 1;
+
+                if runner.config.fail_fast {
+                    break;
+                }
                 continue;
             }
         };
@@ -991,6 +1137,8 @@ fn run_file_tests(
             expected_exit_code: dyn_expected_exit_code,
             accounts,
             get_result,
+            executed_get_methods,
+            fuzz,
             ..
         } = result;
         let mut assert_failure = assert_failure;
@@ -1001,19 +1149,15 @@ fn run_file_tests(
             failure.caller_trace = retrace::find_execution_trace(&result.vm_log, &source_map);
         }
 
-        let (exit_code, gas_used) = match &get_result {
-            GetMethodResult::Success(result) => {
-                let gas_used = result.gas_used.parse::<u64>().unwrap_or(0);
-                (result.vm_exit_code, gas_used)
-            }
-            GetMethodResult::Error(_) => (999, 0),
-        };
-
-        let mut test_passed: bool = true; // assume that test is passed
-
-        let expected_exit_code = dyn_expected_exit_code
-            .or(test.expected_exit_code)
-            .unwrap_or(0);
+        let outcome = evaluate_test_case(
+            test,
+            &get_result,
+            assert_failure.as_ref(),
+            dyn_expected_exit_code,
+        );
+        let exit_code = outcome.actual_exit_code;
+        let expected_exit_code = outcome.expected_exit_code;
+        let gas_used = outcome.gas_used;
         let vm_log_diff = match &get_result {
             GetMethodResult::Success(result) => {
                 let logs = vmlogs::convert_to_diff_logs(&result.vm_log);
@@ -1021,20 +1165,7 @@ fn run_file_tests(
             }
             GetMethodResult::Error(_) => None,
         };
-
-        if exit_code != expected_exit_code {
-            test_passed = false;
-        }
-
-        if let Some(limit) = test.gas_limit
-            && gas_used > limit
-        {
-            test_passed = false;
-        }
-
-        if exit_code == 0 && assert_failure.is_some() {
-            test_passed = false;
-        }
+        let test_passed = outcome.passed;
 
         test_report.duration = duration;
         let failure_execution = if test_passed {
@@ -1056,6 +1187,7 @@ fn run_file_tests(
             vm_log_diff,
             assert_failure: assert_failure.clone(),
             expected_exit_code,
+            fuzz: fuzz.clone(),
             failure: failure_execution,
         });
 
@@ -1129,8 +1261,11 @@ fn run_file_tests(
         if runner.config.coverage {
             // For coverage, we need to process test logs as well for unit tests coverage,
             // so register it here manually
-            if let GetMethodResult::Success(get_result) = get_result {
-                runner.emulations.save_get_method(&test.name, get_result);
+            if !executed_get_methods.is_empty() {
+                for get_result in executed_get_methods {
+                    runner.emulations.save_get_method(&test.name, get_result);
+                }
+
                 // TODO: remove this memoize somehow
                 let content: Arc<str> = fs::read_to_string(&file_path).unwrap_or_default().into();
                 let code_boc64 = Boc::encode_base64(code);
@@ -1210,9 +1345,12 @@ pub struct TestDescriptor {
     pub id: i32,
     pub name: Arc<str>,
     pub annotations: Vec<TestAnnotation>,
+    fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,
+    pub declared_parameter_count: usize,
+    parameters: Vec<FuzzParameter>,
     pub pos: Pos,
 }
 
@@ -1234,14 +1372,18 @@ fn find_all_test(
             if name.starts_with("test-") || name.starts_with("test_") || name.starts_with("test ") {
                 let id = i32::from(CRC16.checksum(name.as_bytes())) | 0x1_00_00;
                 let test_annotations = annotations::find_test_annotations(content, method);
+                let declared_parameter_count = method.parameters().count();
 
                 return Some(TestDescriptor {
                     id,
                     name: name.into(),
                     annotations: test_annotations.annotations,
+                    fuzz: test_annotations.fuzz,
                     expected_exit_code: test_annotations.expected_exit_code,
                     gas_limit: test_annotations.gas_limit,
                     todo_description: test_annotations.todo_description,
+                    declared_parameter_count,
+                    parameters: Vec::new(),
                     pos: Pos {
                         row: name_node.syntax().start_position().row,
                         column: name_node.syntax().start_position().column,

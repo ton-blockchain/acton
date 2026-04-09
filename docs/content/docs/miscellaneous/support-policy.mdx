@@ -26,14 +26,15 @@ Acton's release language.
 
 ## Platform tiers
 
-| Platform / environment                        | Tier               | Notes                                                                                                                        |
-|-----------------------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------|
-| macOS ARM64 (`aarch64-apple-darwin`)          | First-class        | Official release artifact, documented install path, and release automation coverage.                                         |
-| macOS x86_64 (`x86_64-apple-darwin`)          | First-class        | Official release artifact, documented install path, and release automation coverage.                                         |
-| Linux x86_64 GNU (`x86_64-unknown-linux-gnu`) | First-class        | Official release artifact, documented install path, regular PR CI coverage, and release automation coverage.                 |
-| Linux ARM64 GNU (`aarch64-unknown-linux-gnu`) | First-class        | Official release artifact, documented install path, and release automation coverage.                                         |
-| Native Windows                                | Beta               | Some workflows may work, but there are no Windows release artifacts in the public release matrix and no Windows CI lane yet. |
-| Other source-built targets                    | Beta / best-effort | Not part of the published binary matrix; validation is lighter and regressions can surface later.                            |
+| Platform / environment                        | Tier               | Notes                                                                                                                                                                |
+|-----------------------------------------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS ARM64 (`aarch64-apple-darwin`)          | First-class        | Official release artifact, documented install path, and release automation coverage.                                                                                 |
+| macOS x86_64 (`x86_64-apple-darwin`)          | First-class        | Official release artifact, documented install path, and release automation coverage.                                                                                 |
+| Linux x86_64 GNU (`x86_64-unknown-linux-gnu`) | First-class        | Official release artifact, documented install path, regular PR CI coverage, and release automation coverage.                                                         |
+| Linux ARM64 GNU (`aarch64-unknown-linux-gnu`) | First-class        | Official release artifact, documented install path, and release automation coverage.                                                                                 |
+| Native Windows                                | Unsupported        | Native Windows shells and workflows are not supported. Use WSL instead.                                                                                              |
+| Windows via WSL                               | Beta / best-effort | Recommended way to use Acton on Windows today. Use Ubuntu 20.04 or newer inside WSL and follow the Linux install path; there is still no dedicated Windows artifact. |
+| Other source-built targets                    | Beta / best-effort | Not part of the published binary matrix; validation is lighter and regressions can surface later.                                                                    |
 
 ## What first-class means
 

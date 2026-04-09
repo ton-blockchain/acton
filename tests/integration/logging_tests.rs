@@ -111,10 +111,10 @@ fn test_debug_log_falls_back_to_project_root_when_home_missing() {
         .run()
         .success();
 
-    let fallback_log = project.path().join(".acton").join("logs").join("debug.log");
+    let fallback_log = project.path().join("build").join("logs").join("debug.log");
     assert!(
         fallback_log.exists(),
-        "debug.log should be created in PROJECT_ROOT/.acton/logs when HOME is unavailable"
+        "debug.log should be created in PROJECT_ROOT/build/logs when HOME is unavailable"
     );
 }
 

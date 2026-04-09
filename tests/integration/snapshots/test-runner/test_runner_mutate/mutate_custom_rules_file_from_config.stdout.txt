@@ -1,0 +1,51 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Session:  [MUTATION_SESSION_ID]
+Contract: simple
+Source:   contracts/simple.tolk
+Files:    1
+Mutants:  2
+
+  ◉ Mutation 1/2 contracts/simple[LINE] Replace > with >= SURVIVED
+  ◉ Mutation 2/2 contracts/simple[LINE] Replace + with * SURVIVED
+
+    Total mutants        2
+  ✓ Killed               0
+  ✗ Survived             2
+  ! Compile errors       0
+
+  ◆ Mutation Score       0.0%
+
+Survived Mutants
+────────────────────────────────────────────────────────────
+
+  ✗ Mutation #1
+  Rule:  Replace > with >= [flip_gt_ge]
+  Level: major
+  Group: comparison
+  at contracts/simple[LINE]
+     1 │ 
+     2 │ fun onInternalMessage(in: InMessage) {
+     3 │     assert (in.valueCoins > 0) throw 5;
+       │                           >=
+     4 │ }
+     5 │ 
+
+  Why it's bad: This comparison boundary is not strictly checked. Changing > to >= did not affect test results.
+
+  ✗ Mutation #2
+  Rule:  Replace + with * [flip_plus_custom]
+  Level: major
+  Group: arithmetic
+  at contracts/simple[LINE]
+     7 │ 
+     8 │ get fun addOne(x: int): int {
+     9 │     return x + 1;
+       │              *
+    10 │ }
+
+  Why it's bad: Custom arithmetic mutation loaded from JSON.
+────────────────────────────────────────────────────────────
+These mutants were not caught by your tests!
+Consider adding more test cases to improve mutation coverage.
+

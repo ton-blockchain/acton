@@ -115,15 +115,15 @@ fn verify_archive_sha(objs_dir: &Path, manifest_path: &Path, lib_name: &str) {
     let archive_path = objs_dir.join(lib_filename);
     let actual_sha256 = sha256_hex(&archive_path);
 
-    if actual_sha256 != expected_sha256 {
-        panic!(
-            "SHA-256 mismatch for {}: expected {}, got {}. Refresh {} if the archive update was intentional.",
-            archive_path.display(),
-            expected_sha256,
-            actual_sha256,
-            manifest_path.display()
-        );
-    }
+    assert_eq!(
+        actual_sha256,
+        expected_sha256,
+        "SHA-256 mismatch for {}: expected {}, got {}. Refresh {} if the archive update was intentional.",
+        archive_path.display(),
+        expected_sha256,
+        actual_sha256,
+        manifest_path.display()
+    )
 }
 
 fn load_lib_sha256_from_manifest(manifest_path: &Path, lib_name: &str) -> String {

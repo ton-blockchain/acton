@@ -667,6 +667,14 @@ expect(map).toHaveLength(2);
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L655" />
 
+## `formatExpectLocation`
+
+```tolk
+fun formatExpectLocation(loc: SourceLocation): string
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L666" />
+
 ## `expect`
 
 ```tolk
@@ -686,7 +694,7 @@ Optional location can be provided to specify the location of the expectation to
 be printed in the error message. You likely don't want to set this manually,
 as the location will be automatically set by the test framework.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L678" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L682" />
 
 ## `expectToEndWithExitCode`
 
@@ -714,5 +722,5 @@ get fun test_fail_with() {
 
 This function is more flexible and can be used conditionally in the test.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L702" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L709" />
 

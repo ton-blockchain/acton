@@ -68,8 +68,7 @@ fn resolve_output_paths(output: Option<String>) -> DocgenOutputPaths {
         let stdlib_out_dir = PathBuf::from(output);
         let base_dir = stdlib_out_dir
             .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| PathBuf::from("."));
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
         (
             base_dir.join("commands"),
             stdlib_out_dir,

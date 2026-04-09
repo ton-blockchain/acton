@@ -16,5 +16,9 @@ max_line_length = 100
 indent_size = 4
 max_line_length = 100
 
+[*.py]
+indent_size = 4
+max_line_length = 120
+
 [docs/**]
 max_line_length = 100

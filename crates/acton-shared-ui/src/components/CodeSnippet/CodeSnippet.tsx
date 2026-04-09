@@ -1,12 +1,8 @@
 import type React from "react"
 import {useEffect, useState} from "react"
-import {createHighlighterCore} from "shiki/core"
-import {createOnigurumaEngine} from "shiki/engine/oniguruma"
-import vitesseDark from "shiki/themes/vitesse-dark.mjs"
-import vitesseLight from "shiki/themes/vitesse-light.mjs"
 
 import styles from "./CodeSnippet.module.css"
-import {tolkGrammar} from "./tolk-grammar"
+import {highlightTolkToHtml} from "./tolk-highlighter"
 
 interface CodeSnippetProps {
   readonly filePath: string
@@ -49,18 +45,8 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
 
         setSnippet(snippetText)
 
-        const highlighter = await createHighlighterCore({
-          themes: [vitesseLight, vitesseDark],
-          langs: [tolkGrammar],
-          engine: createOnigurumaEngine(() => import("shiki/wasm")),
-        })
-
         const isDark = document.documentElement.classList.contains("dark-theme")
-        // noinspection TypeScriptValidateTypes
-        const html = highlighter.codeToHtml(snippetText, {
-          lang: "tolk",
-          theme: isDark ? "vitesse-dark" : "vitesse-light",
-        })
+        const html = await highlightTolkToHtml(snippetText, isDark)
 
         setHighlightedHtml(html)
         setLoading(false)
