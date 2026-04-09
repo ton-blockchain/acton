@@ -366,6 +366,37 @@ fn confirm_impl(
     Ok(())
 }
 
+extension!(prompt_wallet in (Context) with (message: String) using prompt_wallet_impl);
+fn prompt_wallet_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    message: String,
+) -> anyhow::Result<()> {
+    let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
+
+    if wallet_names.is_empty() {
+        stack.push_string("");
+        return Ok(());
+    }
+
+    if wallet_names.len() == 1 {
+        stack.push_string(&wallet_names[0]);
+        return Ok(());
+    }
+
+    let result = if stdin().is_terminal() {
+        Select::new(&message, wallet_names)
+            .with_starting_cursor(0)
+            .prompt()
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    stack.push_string(&result);
+    Ok(())
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         1 => println : 2,
@@ -378,5 +409,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         205 => prompt : 2,
         206 => select : 2,
         207 => confirm : 3,
+        208 => prompt_wallet : 1,
     });
 }
