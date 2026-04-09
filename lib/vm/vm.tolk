@@ -170,6 +170,35 @@ fun vm.cellFromHex(cellHex: string): cell {
     return ffi.cellFromHex(cellHex);
 }
 
+/// Parse a string representation of address into an internal [address] value.
+///
+/// Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+/// (base64/base64url with flags).
+/// Invalid input fails with an error.
+///
+/// Example:
+/// ```tolk
+/// val addr = vm.parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+/// ```
+fun vm.parseAddress(s: string): address {
+    val cell = ffi.convertAddress(s);
+    return cell.beginParse() as address;
+}
+
+/// Parse a decimal string into an [int] value.
+///
+/// Accepts optional leading `-` sign followed by decimal digits.
+/// Invalid input (non-numeric characters, empty string) fails with an error.
+///
+/// Example:
+/// ```tolk
+/// val n = vm.parseInt("12345");
+/// val negative = vm.parseInt("-42");
+/// ```
+fun vm.parseInt(x: string): int {
+    return ffi.parseInt(x);
+}
+
 fun ffi.registerLibrary(cell: cell): void
     asm "18 EXTCALL"
 
@@ -178,3 +207,6 @@ fun ffi.convertAddress(addr: string): cell
 
 fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"
+
+fun ffi.parseInt(x: string): int
+    asm "45 EXTCALL"

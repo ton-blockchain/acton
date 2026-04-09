@@ -1639,6 +1639,16 @@ fn cell_from_hex_impl(_: &mut Context, stack: &mut Tuple, cell_hex: String) -> a
     Ok(())
 }
 
+extension!(parse_int in (Context) with (x: String) using parse_int_impl);
+fn parse_int_impl(_: &mut Context, stack: &mut Tuple, x: String) -> anyhow::Result<()> {
+    let value: BigInt = x
+        .trim()
+        .parse()
+        .with_context(|| format!("Failed to parse integer from '{x}'"))?;
+    stack.push(TupleItem::Int(value));
+    Ok(())
+}
+
 extension!(load_library_by_hash in (Context) with (hash: String) using load_library_by_hash_impl);
 fn load_library_by_hash_impl(
     ctx: &mut Context,
@@ -2038,6 +2048,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         42 => execute_message_iter_from : 1,
         43 => is_message_iter_done : 1,
         44 => close_message_iter : 1,
+        45 => parse_int : 1,
     });
 }
 

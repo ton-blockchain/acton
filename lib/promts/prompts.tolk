@@ -73,6 +73,23 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
     return ffi.confirm(message, default, helpMessage);
 }
 
+/// Prompts the user to select a wallet from the configured wallets.
+///
+/// Behavior:
+/// - If no wallets are configured, returns `""`.
+/// - If only one wallet is configured, returns its name automatically.
+/// - If multiple wallets are configured, shows an interactive selection.
+/// - In non-interactive mode, returns `""`.
+///
+/// Example:
+/// ```tolk
+/// val walletName = promptWallet("Select a wallet:");
+/// ```
+fun promptWallet(message: string): string {
+    return ffi.promptWallet(message);
+}
+
 fun ffi.prompt(message: string, placeholder: string = ""): string asm "205 EXTCALL"
 fun ffi.select(message: string, variants: tuple): string asm "206 EXTCALL"
 fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
+fun ffi.promptWallet(message: string): string asm "208 EXTCALL"
