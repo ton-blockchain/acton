@@ -323,7 +323,11 @@ fun T.__eq(self, other: T): bool {
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
-fun __bind1<T1, T2, R>(f: (T1, T2) -> R, arg: T1): (T2 -> R) asm "SWAP 1 -1 SETCONTARGS";
+fun createEqFun<T, R>(arg: T): (T -> R) {
+    return fun(snd: T) {
+        return arg.__eq(snd);
+    }
+}
 
 /// Convert a union field to a tagged tuple for FFI:
 ///   [0, null] = absent
@@ -335,7 +339,7 @@ fun toPredicate<T>(field: (T -> bool) | T | null): tuple {
             return [1, field];
         }
         T => {
-            return [2, __bind1(field.__eq, field), field];
+            return [2, createEqFun(field), field];
         }
         null => {
             return [0, null];

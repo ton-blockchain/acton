@@ -19,7 +19,7 @@ fun ffi.__executeInSeparateLibemulator<Ret, Args = array<unknown>>(
 ): Ret {
     val res = ffi.__executeInSeparateLibemulatorInternal(
         functionToCall as unknown as continuation,
-        args.toTuple(),
+        args == null ? [] : args.toTuple(),
         contract.getAddress(),
     );
     if (res == null) {

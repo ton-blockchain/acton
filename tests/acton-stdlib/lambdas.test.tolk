@@ -133,17 +133,6 @@ get fun `test predicate success`() {
     });
 }
 
-fun bind1_untyped(c: continuation, value: unknown): continuation asm "SWAP 1 -1 SETCONTARGS";
-
-fun bindX(function: continuation, args: tuple): continuation {
-    var c = function;
-    var i = 0;
-    while (i < args.size()) {
-        c = bind1_untyped(c, args.get(i));
-        i += 1;
-    }
-    return c;
-}
 
 get fun `test_capture_one`() {
     var a = 10;

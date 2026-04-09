@@ -2,7 +2,8 @@ use crate::stack::{ContData, Tuple, TupleItem};
 use anyhow::anyhow;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice};
+use tycho_types::dict::RawDict;
 
 impl Tuple {
     /// Serialize a tuple to a cell.
@@ -250,10 +251,35 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
             let next = parser.load_reference_cloned()?;
             let mut next_parser = next.as_slice_allow_exotic();
             let inner = parse_vm_cont(&mut next_parser)?;
+
+            let merged_stack = match (cdata.stack, inner.stack) {
+                (Some(outer), Some(inner)) => {
+                    let mut combined = inner;
+                    combined.0.extend(outer.0);
+                    Some(combined)
+                }
+                (s @ Some(_), None) | (None, s @ Some(_)) => s,
+                (None, None) => None,
+            };
+
+            let merged_savelist = match (cdata.savelist, inner.savelist) {
+                (Some(outer), Some(inner_sl)) => {
+                    let mut merged: RawDict<4> = Some(inner_sl).into();
+                    let outer_dict: RawDict<4> = Some(outer).into();
+                    for entry in outer_dict.iter() {
+                        let (key, value): (_, CellSlice<'_>) = entry?;
+                        merged.set_ext(key.as_data_slice(), &value, Cell::empty_context())?;
+                    }
+                    merged.into_root()
+                }
+                (s @ Some(_), None) | (None, s @ Some(_)) => s,
+                (None, None) => None,
+            };
+
             Ok(ContData {
                 code: inner.code,
-                stack: cdata.stack.or(inner.stack),
-                savelist: cdata.savelist.or(inner.savelist),
+                stack: merged_stack,
+                savelist: merged_savelist,
             })
         }
     } else {
