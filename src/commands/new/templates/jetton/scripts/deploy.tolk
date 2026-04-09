@@ -20,7 +20,7 @@ fun string.toSnakeString(self): cell {
 }
 
 fun buildOnchainMetadata(info: JettonInfo): cell {
-    println1("Deploying Jetton with {}", info);
+    println("Deploying Jetton with {}", info);
 
     var dict: map<uint256, cell> = [];
 
@@ -59,9 +59,9 @@ fun main() {
         return;
     }
 
-    println1("Deployed Jetton minter to {}", minter.address);
+    println("Deployed Jetton minter to {}", minter.address);
 
-    println1("Minting tokens: {}", supply);
+    println("Minting tokens: {}", supply);
     val mintRes = minter.sendMint(
         deployer.address,
         deployer.address,
@@ -73,6 +73,6 @@ fun main() {
         return;
     }
 
-    println2("Successfully minted and transferred {} tokens to {}", supply, deployer.address);
-    println1("Total supply is {}", minter.getTotalSupply());
+    println("Successfully minted and transferred {} tokens to {}", supply, deployer.address);
+    println("Total supply is {}", minter.getTotalSupply());
 }

@@ -24,7 +24,7 @@
 ///
 /// // Access storage prices
 /// val storagePrices = config.getStoragePrices();
-/// println1("Bit price: {}", storagePrices);
+/// println("Bit price: {}", storagePrices);
 /// ```
 
 import "../testing/assert"
@@ -130,7 +130,7 @@ fun Config.setGlobalVersion(mutate self, version: GlobalVersion): void {
 /// Example:
 /// ```tolk
 /// val version = config.getGlobalVersion();
-/// println(format2("Network version: {}, capabilities: {}", version.version, version.capabilities));
+/// println("Network version: {}, capabilities: {}", version.version, version.capabilities);
 /// ```
 fun Config.getGlobalVersion(self): GlobalVersion {
     return GlobalVersion.fromCell(self.get(GLOBAL_VERSION_INDEX).loadValue());
@@ -183,7 +183,7 @@ const INITIAL_UNIXTIME_STORAGE_INDEX = 0
 /// ```tolk
 /// val storagePrices = config.getStoragePrices();
 /// val initialPrices = storagePrices.getInitial();
-/// println1("Initial bit price: {}", initialPrices.bitPrice);
+/// println("Initial bit price: {}", initialPrices.bitPrice);
 /// ```
 fun StoragePricesDict.getInitial(self): StoragePrices {
     val entry = self.get(INITIAL_UNIXTIME_STORAGE_INDEX);
@@ -265,8 +265,8 @@ fun Config.setStoragePrices(mutate self, prices: StoragePricesDict): void {
 /// ```tolk
 /// val storagePrices = config.getStoragePrices();
 /// val prices = storagePrices.get(1000000);
-/// println(format3("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
-///     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice));
+/// println("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
+///     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice);
 /// ```
 fun Config.getStoragePrices(self): StoragePricesDict {
     val rawDict = self.get(STORAGE_PRICES_INDEX).loadValue();
@@ -343,7 +343,7 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void {
 /// Example:
 /// ```tolk
 /// val gasPrices = config.getGasPrices(BASECHAIN);
-/// println1("Gas limit basechain: {}", gasPrices);
+/// println("Gas limit basechain: {}", gasPrices);
 /// ```
 fun Config.getGasPrices(self, chainType: int): GasPrices {
     val index = chainType == MASTERCHAIN
@@ -423,8 +423,8 @@ fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType:
 /// Example:
 /// ```tolk
 /// val msgPrices = config.getMsgForwardPrices(BASECHAIN);
-/// println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
-///     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
+/// println("Lump price: {}, Bit price: {}, Cell price: {}",
+///     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice);
 /// ```
 fun Config.getMsgForwardPrices(self, chainType: int): MsgForwardPrices {
     val index = chainType == MASTERCHAIN

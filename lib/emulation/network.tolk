@@ -131,7 +131,7 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
             val opcodeTypeName = ffi.typeNameByOpcode(opcode);
 
             Assert.fail(
-                format4(
+                format(
                     "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
                     reflect.typeNameOf<Msg>(),
                     reflect.serializationPrefixOf<Msg>().0,
@@ -671,7 +671,7 @@ struct Wallet {
 ///    val result = counter.deploy(deployer.address, ton("0.05"));
 ///    result.wait();
 ///
-///    println1("Deployed counter to {}", counter.address);
+///    println("Deployed counter to {}", counter.address);
 /// }
 /// ```
 fun net.wallet(name: string): Wallet {
@@ -967,7 +967,7 @@ fun net.registerCodeCell(code: cell, name: string): void {
 /// ```tolk
 /// val state = net.getAccountState(contract.address);
 /// if (state != null) {
-///     println1("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:ton}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -989,7 +989,7 @@ fun net.getAccountState(addr: address): AccountInfo? {
 /// ```tolk
 /// val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
 /// if (storage_fee != null) {
-///     println1("Daily storage fee: {:ton}", storage_fee);
+///     println("Daily storage fee: {:ton}", storage_fee);
 /// }
 /// ```
 fun net.getAccountStorageFee(addr: address, seconds: int): coins? {
@@ -1043,7 +1043,7 @@ fun net.setNow(now: uint32): void {
 /// Example:
 /// ```tolk
 /// val current_time = net.now();
-/// println1("Current emulation time: {}", current_time);
+/// println("Current emulation time: {}", current_time);
 /// ```
 fun net.now(): uint32 {
     return ffi.getNow();
@@ -1075,7 +1075,7 @@ fun net.topUp(to: address, amount: coins): void {
 /// Example:
 /// ```tolk
 /// val balance = net.balance(address);
-/// println1("{:ton}", balance);
+/// println("{:ton}", balance);
 /// ```
 fun net.balance(of: address): coins {
     val state = net.getAccountState(of);
@@ -1136,7 +1136,7 @@ fun net.setAccount(addr: address, acc: Account): void {
 /// ```tolk
 /// val shard = net.getShardAccount(addr);
 /// if (shard != null) {
-///     println1("Last LT: {}", shard.lastTransLt);
+///     println("Last LT: {}", shard.lastTransLt);
 /// }
 /// ```
 fun net.getShardAccount(addr: address): ShardAccount? {
@@ -1277,7 +1277,7 @@ fun net.setConfig(config: Config): bool {
 /// val storagePrices = config.getStoragePrices();
 /// val globalVersion = config.getGlobalVersion();
 ///
-/// println(format1("Network version: {}", globalVersion.version));
+/// println("Network version: {}", globalVersion.version);
 /// ```
 fun net.getConfig(): Config {
     return createMapFromLowLevelDict(ffi.getConfig());
@@ -1354,7 +1354,7 @@ fun impl.runGetMethodById<Ret, Args = tuple>(
     } catch (e) {
         if (e == 7) {
             Assert.fail(
-                format3(
+                format(
                     "Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.",
                     name,
                     res,

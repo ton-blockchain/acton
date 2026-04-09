@@ -413,9 +413,9 @@ fn test_script_with_tensor_args_and_struct() {
             }
 
             fun main(a: Abc) {
-                println1("a: {}", a.a);
-                println1("b: {}", a.b);
-                println1("c: {}", a.c);
+                println("a: {}", a.a);
+                println("b: {}", a.b);
+                println("c: {}", a.c);
             }
 
         "#,
@@ -448,9 +448,9 @@ fn test_script_with_args_and_struct() {
             }
 
             fun main(a: Abc) {
-                println1("a: {}", a.a);
-                println1("b: {}", a.b);
-                println1("c: {}", a.c);
+                println("a: {}", a.a);
+                println("b: {}", a.b);
+                println("c: {}", a.c);
             }
 
         "#,
@@ -479,7 +479,7 @@ fn test_script_with_null_arg() {
             import "../../lib/io"
 
             fun main(a: int?) {
-                println1("a: {}", a);
+                println("a: {}", a);
             }
 
         "#,
@@ -513,7 +513,7 @@ fn test_script_with_cell_arg() {
 
             fun main(a: cell) {
                 var slice = a.beginParse();
-                println1("a: {}", slice.loadUint(32));
+                println("a: {}", slice.loadUint(32));
             }
 
         "#,
@@ -543,7 +543,7 @@ fn test_script_with_slice_arg() {
             import "../../lib/io"
 
             fun main(a: slice) {
-                println1("a: {}", a.loadUint(32));
+                println("a: {}", a.loadUint(32));
             }
 
         "#,
@@ -574,7 +574,7 @@ fn test_script_with_string_arg() {
             import "../../lib/io"
 
             fun main(a: slice) {
-                println1("a: {}", a);
+                println("a: {}", a);
             }
 
         "#,
@@ -600,7 +600,7 @@ fn test_script_with_long_string_arg() {
             import "../../lib/io"
 
             fun main(a: slice) {
-                println1("a: {}", a);
+                println("a: {}", a);
             }
 
         "#,
@@ -626,7 +626,7 @@ fn test_script_with_invalid_arg() {
             import "../../lib/io"
 
             fun main(a: int) {
-                println1("a: {}", a);
+                println("a: {}", a);
             }
 
         "#,
@@ -661,7 +661,7 @@ fn test_script_to_calculate_storage_fee() {
 
                 val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation)
                     + calculateStorageFee(MASTERCHAIN, duration, libraryBits, libraryRefs);
-                println1("{:ton}", toReserve);
+                println("{:ton}", toReserve);
             }
         "#,
         )
@@ -1122,10 +1122,10 @@ fn test_script_multi_arg_println_helpers_snapshot() {
             import "../../lib/io"
 
             fun main() {
-                println2("{} + {}", "left", "right");
-                println3("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
-                println4("{} {} {} {}", "a", "b", "c", "d");
-                println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+                println("{} + {}", "left", "right");
+                println("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+                println("{} {} {} {}", "a", "b", "c", "d");
+                println("{} {} {} {} {}", 1, 2, 3, 4, 5);
             }
         "#,
         )
@@ -1272,7 +1272,7 @@ fn test_script_broadcast_with_nonexistent_wallet_with_wallets() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
                 val wallet = net.wallet("nonexistent");
-                println1("Wallet found: {}", wallet.address);
+                println("Wallet found: {}", wallet.address);
             }
         "#,
         )
@@ -1326,7 +1326,7 @@ fn test_script_broadcast_with_nonexistent_wallet_no_config() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
                 val wallet = net.wallet("nonexistent");
-                println1("Wallet found: {}", wallet.address);
+                println("Wallet found: {}", wallet.address);
             }
         "#,
         )
@@ -1370,7 +1370,7 @@ fn test_script_broadcast_with_nonexistent_wallet_empty_config() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
                 val wallet = net.wallet("nonexistent");
-                println1("Wallet found: {}", wallet.address);
+                println("Wallet found: {}", wallet.address);
             }
         "#,
         )
@@ -1621,7 +1621,7 @@ fun main() {
         return;
     }
 
-    println1("COUNTER_ADDRESS={}", counterAddress);
+    println("COUNTER_ADDRESS={}", counterAddress);
 }
 "#,
         )
@@ -1651,7 +1651,7 @@ import "../../lib/io"
 
 fun main() {{
     val counter: int = net.runGetMethod(address("{counter_address}"), "currentCounter");
-    println1("On-chain counter: {{}}", counter);
+    println("On-chain counter: {{}}", counter);
 }}
 "#
         ),
@@ -1902,28 +1902,28 @@ fn test_script_env_vars() {
             fun main() {
                 val i = env<int>("TEST_INT");
                 if (i != null) {
-                    println1("int: {}", i);
+                    println("int: {}", i);
                 }
 
                 val b = env<bool>("TEST_BOOL");
                 if (b != null) {
-                    println1("bool: {}", b);
+                    println("bool: {}", b);
                 }
 
                 val s = env<string>("TEST_SLICE");
                 if (s != null) {
-                    println1("slice: {}", s);
+                    println("slice: {}", s);
                 }
 
                 val a = env<address>("TEST_ADDRESS");
                 if (a != null) {
-                    println1("address: {}", a);
+                    println("address: {}", a);
                 }
 
                 val c = env<cell>("TEST_CELL");
                 if (c != null) {
                     var slice = c.beginParse();
-                    println1("cell: {}", slice.loadUint(32));
+                    println("cell: {}", slice.loadUint(32));
                 }
             }
         "#,
@@ -1967,33 +1967,33 @@ fn test_script_env_vars_extended() {
             fun main() {
                 val i_hex = env<int>("TEST_INT_HEX");
                 if (i_hex != null) {
-                    println1("int_hex: {}", i_hex);
+                    println("int_hex: {}", i_hex);
                 }
 
                 val b_1 = env<bool>("TEST_BOOL_1");
                 if (b_1 != null) {
-                    println1("bool_1: {}", b_1);
+                    println("bool_1: {}", b_1);
                 }
 
                 val b_false = env<bool>("TEST_BOOL_FALSE");
                 if (b_false != null) {
-                    println1("bool_false: {}", b_false);
+                    println("bool_false: {}", b_false);
                 }
 
                 val b_0 = env<bool>("TEST_BOOL_0");
                 if (b_0 != null) {
-                    println1("bool_0: {}", b_0);
+                    println("bool_0: {}", b_0);
                 }
 
                 val a_raw = env<address>("TEST_ADDRESS_RAW");
                 if (a_raw != null) {
-                    println1("address_raw: {}", a_raw);
+                    println("address_raw: {}", a_raw);
                 }
 
                 val c_b64 = env<cell>("TEST_CELL_B64");
                 if (c_b64 != null) {
                     var slice = c_b64.beginParse();
-                    println1("cell_b64: {}", slice.loadUint(32));
+                    println("cell_b64: {}", slice.loadUint(32));
                 }
             }
         "#,
@@ -2039,11 +2039,11 @@ fn test_script_env_vars_support_coins() {
             fun main() {
                 val amount = env<coins>("TEST_COINS");
                 if (amount != null) {
-                    println1("coins: {:ton}", amount);
+                    println("coins: {:ton}", amount);
                 }
 
                 val fallback = envOr<coins>("TEST_COINS_MISSING", ton("0.75"));
-                println1("coins_default: {:ton}", fallback);
+                println("coins_default: {:ton}", fallback);
             }
         "#,
         )
@@ -2071,16 +2071,16 @@ fn test_script_env_or_vars() {
 
             fun main() {
                 val i = envOr<int>("TEST_INT", 42);
-                println1("int: {}", i);
+                println("int: {}", i);
 
                 val b = envOr<bool>("TEST_BOOL", false);
-                println1("bool: {}", b);
+                println("bool: {}", b);
 
                 val s = envOr<string>("TEST_SLICE", "default");
-                println1("string: {}", s);
+                println("string: {}", s);
 
                 val a = envOr<address>("TEST_ADDRESS", address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
-                println1("address: {}", a);
+                println("address: {}", a);
             }
         "#,
         )

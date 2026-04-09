@@ -67,7 +67,7 @@ fn test_unknown_get_method_call() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -93,7 +93,7 @@ fn test_unknown_get_method_call_with_backtrace_full() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -123,7 +123,7 @@ fn test_get_method_call_return_type_mismatch() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<address, tuple>(counter.address, "getCell");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -151,7 +151,7 @@ fn test_no_arg_get_method_call() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter2");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -177,7 +177,7 @@ fn test_no_arg_get_method_call_2() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -203,7 +203,7 @@ fn test_no_arg_get_method_call_2_with_backtrace_full() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -232,7 +232,7 @@ fn test_get_method_call_shows_exit_code_variant() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -260,7 +260,7 @@ fn test_get_method_call_shows_backtrace_with_full_mode() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
                 .as_str(),
@@ -293,7 +293,7 @@ fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
                 .as_str(),

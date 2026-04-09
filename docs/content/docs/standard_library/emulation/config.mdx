@@ -31,7 +31,7 @@ config.setGasPrices(simplePrices, MASTERCHAIN);
 
 // Access storage prices
 val storagePrices = config.getStoragePrices();
-println1("Bit price: {}", storagePrices);
+println("Bit price: {}", storagePrices);
 ```
 
 ## Definitions
@@ -179,7 +179,7 @@ Returns: [GlobalVersion](#globalversion) struct containing version number and ca
 Example:
 ```tolk
 val version = config.getGlobalVersion();
-println(format2("Network version: {}, capabilities: {}", version.version, version.capabilities));
+println("Network version: {}, capabilities: {}", version.version, version.capabilities);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L135" />
@@ -265,7 +265,7 @@ Example:
 ```tolk
 val storagePrices = config.getStoragePrices();
 val initialPrices = storagePrices.getInitial();
-println1("Initial bit price: {}", initialPrices.bitPrice);
+println("Initial bit price: {}", initialPrices.bitPrice);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L188" />
@@ -354,8 +354,8 @@ Example:
 ```tolk
 val storagePrices = config.getStoragePrices();
 val prices = storagePrices.get(1000000);
-println(format3("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
-    prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice));
+println("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
+    prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L271" />
@@ -465,7 +465,7 @@ Returns: [GasPrices](#gasprices) configuration union containing the gas pricing 
 Example:
 ```tolk
 val gasPrices = config.getGasPrices(BASECHAIN);
-println1("Gas limit basechain: {}", gasPrices);
+println("Gas limit basechain: {}", gasPrices);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L348" />
@@ -569,8 +569,8 @@ Returns: [MsgForwardPrices](#msgforwardprices) configuration containing message 
 Example:
 ```tolk
 val msgPrices = config.getMsgForwardPrices(BASECHAIN);
-println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
-    msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
+println("Lump price: {}, Bit price: {}, Cell price: {}",
+    msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L429" />

@@ -181,8 +181,8 @@ get fun `test-aj-stdlib-vm-convert-address-valid`() {
     val fromRaw = vm.convertAddress(raw);
     val fromFriendly = vm.convertAddress(friendly);
 
-    val renderedRaw = format1("{}", fromRaw);
-    val renderedFriendly = format1("{}", fromFriendly);
+    val renderedRaw = format("{}", fromRaw);
+    val renderedFriendly = format("{}", fromFriendly);
 
     expect(renderedRaw).toEqual(renderedFriendly);
     expect(renderedRaw).toEqual("kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHTW");

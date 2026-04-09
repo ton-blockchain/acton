@@ -26,7 +26,7 @@ import "../../lib/io"
 
 fun main() {
     val wallet = net.wallet("deployer");
-    println1("DEPLOYER_ADDRESS={}", wallet.address);
+    println("DEPLOYER_ADDRESS={}", wallet.address);
 }
 "#;
 const DEPLOY_COUNTER_SCRIPT: &str = r#"
@@ -58,7 +58,7 @@ fun main() {
     });
     net.send(wallet.address, deployCounter);
 
-    println1("COUNTER_ADDRESS={}", counterAddress);
+    println("COUNTER_ADDRESS={}", counterAddress);
 }
 "#;
 

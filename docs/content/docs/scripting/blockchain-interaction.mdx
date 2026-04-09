@@ -73,8 +73,8 @@ fun main() {
         return;
     }
 
-    println1("Deployed counter to {}", counter.address);
-    println1("On-chain counter is {}", counter.currentCounter());
+    println("Deployed counter to {}", counter.address);
+    println("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
@@ -152,7 +152,7 @@ The `net.wallet()` function returns a wallet struct with an `address` field:
 ```tolk
 fun main() {
     val deployer = net.wallet("deployer");
-    println1("Wallet address: {}", deployer.address);
+    println("Wallet address: {}", deployer.address);
 }
 ```
 
@@ -201,7 +201,7 @@ fun main() {
     val deployResult = counter.deploy(deployer.address, ton("0.05"));
     deployResult.wait(); // Wait for deployment
 
-    println1("Counter deployed at {}", counter.address);
+    println("Counter deployed at {}", counter.address);
 
     // Send increase message
     val increaseResult = counter.sendIncrease(deployer.address, 5);
@@ -254,7 +254,7 @@ Scripts can read contract state using `net.runGetMethod()`:
 fun main() {
     val counterAddress = address("EQDt7LL...");
     val currentValue: int = net.runGetMethod(counterAddress, "currentCounter");
-    println1("Counter value: {}", currentValue);
+    println("Counter value: {}", currentValue);
 }
 ```
 

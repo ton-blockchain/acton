@@ -62,7 +62,7 @@ fun main() {
     });
     net.send(wallet.address, deployDeployer);
 
-    println1("DEPLOYER_CONTRACT={}", deployerAddress);
+    println("DEPLOYER_CONTRACT={}", deployerAddress);
 }
 "#;
 
@@ -131,7 +131,7 @@ fun main() {
     });
     net.send(wallet.address, deployGetter);
 
-    println1("GETTER_CONTRACT={}", getterAddress);
+    println("GETTER_CONTRACT={}", getterAddress);
 }
 "#;
 
@@ -243,8 +243,8 @@ fun main() {
     });
     net.send(wallet.address, deployWorkerViaManagerMsg);
 
-    println1("MANAGER_CONTRACT={}", managerAddress);
-    println1("WORKER_CONTRACT={}", workerAddress);
+    println("MANAGER_CONTRACT={}", managerAddress);
+    println("WORKER_CONTRACT={}", workerAddress);
 }
 "#;
 
@@ -279,8 +279,8 @@ fun main() {
     });
     net.send(wallet.address, triggerDestroyMsg);
 
-    println1("MANAGER_CONTRACT={}", managerAddress);
-    println1("WORKER_CONTRACT={}", workerAddress);
+    println("MANAGER_CONTRACT={}", managerAddress);
+    println("WORKER_CONTRACT={}", workerAddress);
 }
 "#;
 

@@ -16,14 +16,14 @@ val tx = results.at(0).tx.load();
 
 // Check gas usage
 val gas = tx.getUsedGas();
-println1("Gas used: {}", gas);
+println("Gas used: {}", gas);
 
 // Inspect account status change
 val description = tx.description.load();
 if (description is TransOrd) {
     val compute = description.computePh;
     if (compute is TrComputeVm) {
-        println1("VM exit code: {}", compute.exitCode);
+        println("VM exit code: {}", compute.exitCode);
     }
 }
 ```

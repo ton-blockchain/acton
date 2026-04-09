@@ -59,7 +59,7 @@ You can pass null values to work with optional types:
 import "@acton/io"
 
 fun main(value: int?) {
-    println1("Value: {}", value);
+    println("Value: {}", value);
 }
 ```
 
@@ -87,8 +87,8 @@ import "@acton/io"
 fun main(data: tuple) {
     val a: int = data.get(0)
     val b: int = data.get(1)
-    println1("First element: {}", a)
-    println1("Second element: {}", b)
+    println("First element: {}", a)
+    println("Second element: {}", b)
 }
 ```
 
@@ -118,8 +118,8 @@ struct Point {
 }
 
 fun main(p: Point) {
-    println1("Point x: {}", p.x)
-    println1("Point y: {}", p.y)
+    println("Point x: {}", p.x)
+    println("Point y: {}", p.y)
 }
 ```
 
@@ -138,7 +138,7 @@ To pass a string, you need to wrap it in double quotes both for the shell and fo
 import "@acton/io"
 
 fun main(name: slice) {
-    println1("Hello, {}", name.beginParse())
+    println("Hello, {}", name.beginParse())
 }
 ```
 
@@ -171,7 +171,7 @@ import "@acton/io"
 fun main(data: cell) {
     val s = data.beginParse()
     val value = s.loadUint(32)
-    println1("Value from cell: {}", value)
+    println("Value from cell: {}", value)
 }
 ```
 

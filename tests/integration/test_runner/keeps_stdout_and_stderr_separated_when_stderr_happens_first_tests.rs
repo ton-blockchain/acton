@@ -52,7 +52,7 @@ get fun `test-at-stdlib-interleaved-stdout-order`() {
     eprintln("stderr-1");
     println("stdout-2");
     eprintln("stderr-2");
-    println1("stdout-3={}", 333);
+    println("stdout-3={}", 333);
     eprintln("stderr-3");
     println("stdout-4");
 }

@@ -29,13 +29,13 @@ fn format1_and_format2_support_plain_hex_and_ton_specifiers() {
         "y-stdlib-format1-format2-specifiers",
         r#"
 get fun `test-y-stdlib-format1-format2-specifiers`() {
-    val plain = format1("hello {}", "world");
+    val plain = format("hello {}", "world");
     expect(plain).toEqual("hello world");
 
-    val hex = format1("0x{:x}", 255);
+    val hex = format("0x{:x}", 255);
     expect(hex).toEqual("0xff");
 
-    val ton = format2("{} {:ton}", "balance", 1500000000);
+    val ton = format("{} {:ton}", "balance", 1500000000);
     expect(ton).toEqual("balance 1.5 TON");
 }
 "#,
@@ -49,10 +49,10 @@ fn format3_and_format4_support_mixed_plain_hex_and_ton() {
         "y-stdlib-format3-format4-mixed-specifiers",
         r#"
 get fun `test-y-stdlib-format3-format4-mixed-specifiers`() {
-    val formatted3 = format3("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+    val formatted3 = format("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
     expect(formatted3).toEqual("hex=ff ton=2.5 TON label=ok");
 
-    val formatted4 = format4("a={} b={:x} c={:ton} d={}", "left", 16, 1230000000, "right");
+    val formatted4 = format("a={} b={:x} c={:ton} d={}", "left", 16, 1230000000, "right");
     expect(formatted4).toEqual("a=left b=10 c=1.23 TON d=right");
 }
 "#,
@@ -66,7 +66,7 @@ fn format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug() {
         "y-stdlib-format5-placeholder-order-bug",
         r#"
 get fun `test-y-stdlib-format5-placeholder-order-bug`() {
-    val rendered = format5("{} | {:x} | {:ton} | {} | {}", 255, 16, 1500000000, "left", "right");
+    val rendered = format("{} | {:x} | {:ton} | {} | {}", 255, 16, 1500000000, "left", "right");
     expect(rendered).toEqual("255 | 10 | 1.5 TON | left | right");
 }
 "#,

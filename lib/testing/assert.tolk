@@ -277,7 +277,7 @@ fun ffi.assertConsumedLess(start: int, end: int, expected: int): void {
     val consumed = end - start - 26; // 26 gas cost of GASCONSUMED
     if (consumed > expected) {
         Assert.fail(
-            format2(
+            format(
                 "Gas consumption was expected to be less than or equal to {}, but {} was consumed",
                 expected,
                 consumed,

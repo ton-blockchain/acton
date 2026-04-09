@@ -18,13 +18,13 @@ val actions = vm.outActions();
 // Check the first action
 val firstAction = actions.at(0);
 if (firstAction is OutActionSendMessage) {
-    println1("Sending message with mode: {}", firstAction.mode);
+    println("Sending message with mode: {}", firstAction.mode);
 }
 
 // Get specific message body
 val transfer = actions.getSendMessageBodyAt<Transfer>(0);
 if (transfer != null) {
-    println1("Transferred: {:ton}", transfer.amount);
+    println("Transferred: {:ton}", transfer.amount);
 }
 ```
 

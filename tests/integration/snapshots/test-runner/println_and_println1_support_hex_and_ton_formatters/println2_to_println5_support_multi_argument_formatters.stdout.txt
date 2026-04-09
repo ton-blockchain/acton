@@ -20,5 +20,10 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
        hex=ff ton=2.5 TON label=ok
        a b c d
        1 2 3 4 5
+       hello world
+       str 1 2
+       value 42! 100
+       1 2
+       broken { 1 2
 
  ✓ 1 passed in 1 file

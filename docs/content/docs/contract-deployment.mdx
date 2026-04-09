@@ -49,7 +49,7 @@ fun main() {
         counter: 0,    // Initial counter value
     });
 
-    println1("Deploying counter to {}", counter.address);
+    println("Deploying counter to {}", counter.address);
 
     // 3. Deploy the contract
     // This sends a transaction from the deployer wallet with the stateInit
@@ -60,8 +60,8 @@ fun main() {
         return;
     }
 
-    println1("Deployment complete: {}", counter.address);
-    println1("On-chain counter is {}", counter.currentCounter());
+    println("Deployment complete: {}", counter.address);
+    println("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
@@ -93,7 +93,7 @@ fun main() {
     // Deploy
     minter.deploy(deployer.address, { value: ton("0.05") }).wait();
 
-    println1("Jetton deployed at {}", minter.address);
+    println("Jetton deployed at {}", minter.address);
 }
 ```
 

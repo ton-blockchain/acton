@@ -10,7 +10,7 @@
 /// if (action != null) {
 ///     val msg = action.loadMessage<Transfer>();
 ///     val body = msg.loadBody();
-///     println1("Transfer amount: {:ton}", body.amount);
+///     println("Transfer amount: {:ton}", body.amount);
 /// }
 ///
 /// // Parsing a generic message to check opcode

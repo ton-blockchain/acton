@@ -38,7 +38,7 @@ get fun `test-bz-literal-store-string-works`() {
 }
 
 get fun `test-bz-format1-store-string-not-a-cell`() {
-    val dynamic = format1("hello {}", "world");
+    val dynamic = format("hello {}", "world");
     val stored = beginCell().storeString(dynamic).endCell();
     println(stored);
 }
@@ -58,7 +58,7 @@ get fun `test-bz-static-treasury-name-works`() {
 }
 
 get fun `test-bz-format1-treasury-name-not-a-cell`() {
-    val treasuryName = format1("bz_dynamic_{}", 1);
+    val treasuryName = format("bz_dynamic_{}", 1);
     val treasury = net.treasury(treasuryName);
     println(treasury.address);
 }

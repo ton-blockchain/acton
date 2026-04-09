@@ -11,13 +11,13 @@
 /// // Check the first action
 /// val firstAction = actions.at(0);
 /// if (firstAction is OutActionSendMessage) {
-///     println1("Sending message with mode: {}", firstAction.mode);
+///     println("Sending message with mode: {}", firstAction.mode);
 /// }
 ///
 /// // Get specific message body
 /// val transfer = actions.getSendMessageBodyAt<Transfer>(0);
 /// if (transfer != null) {
-///     println1("Transferred: {:ton}", transfer.amount);
+///     println("Transferred: {:ton}", transfer.amount);
 /// }
 /// ```
 
@@ -194,7 +194,7 @@ fun OutActionList.at(self, i: int): OutAction {
     try {
         return rawAction.load();
     } catch (e) {
-        Assert.fail(format2("Unknown out action at index {} (decode error code {})", i, e));
+        Assert.fail(format("Unknown out action at index {} (decode error code {})", i, e));
     }
 }
 

@@ -46,7 +46,7 @@ fn format4_ignores_extra_arguments_when_template_has_only_two_placeholders() {
         "eb-stdlib-format4-extra-args-ignored",
         r#"
 get fun `test-eb-stdlib-format4-extra-args-ignored`() {
-    val rendered = format4("{}: {:ton}", "alpha", 2500000000, "unused", 255);
+    val rendered = format("{}: {:ton}", "alpha", 2500000000, "unused", 255);
     expect(rendered).toEqual("alpha: 2.5 TON");
 }
 "#,
@@ -60,7 +60,7 @@ fn format4_leaves_unmatched_placeholder_when_template_has_five_slots() {
         "eb-stdlib-format4-missing-placeholder-slot",
         r#"
 get fun `test-eb-stdlib-format4-missing-placeholder-slot`() {
-    val rendered = format4("a={} b={} c={} d={} e={}", 1, 2, 3, 4);
+    val rendered = format("a={} b={} c={} d={} e={}", 1, 2, 3, 4);
     expect(rendered).toEqual("a=1 b=2 c=3 d=4 e={}");
 }
 "#,
@@ -74,7 +74,7 @@ fn format1_rejects_unknown_modifier_in_placeholder() {
         "eb-stdlib-format1-unknown-modifier",
         r#"
 get fun `test-eb-stdlib-format1-unknown-modifier`() {
-    format1("value={:hex}", 255);
+    format("value={:hex}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_unknown_modifier_in_placeholder.stdout.txt",
@@ -88,7 +88,7 @@ fn format1_rejects_empty_modifier_in_placeholder() {
         "eb-stdlib-format1-empty-modifier",
         r#"
 get fun `test-eb-stdlib-format1-empty-modifier`() {
-    format1("value={:}", 255);
+    format("value={:}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_empty_modifier_in_placeholder.stdout.txt",
@@ -102,7 +102,7 @@ fn format1_rejects_unsupported_placeholder_payload() {
         "eb-stdlib-format1-unsupported-placeholder-payload",
         r#"
 get fun `test-eb-stdlib-format1-unsupported-placeholder-payload`() {
-    format1("value={name}", 255);
+    format("value={name}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_unsupported_placeholder_payload.stdout.txt",
@@ -116,7 +116,7 @@ fn format1_rejects_unclosed_open_brace() {
         "eb-stdlib-format1-unclosed-open-brace",
         r#"
 get fun `test-eb-stdlib-format1-unclosed-open-brace`() {
-    format1("value={", 255);
+    format("value={", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_unclosed_open_brace.stdout.txt",
@@ -130,7 +130,7 @@ fn format1_rejects_unmatched_closing_brace() {
         "eb-stdlib-format1-unmatched-closing-brace",
         r#"
 get fun `test-eb-stdlib-format1-unmatched-closing-brace`() {
-    format1("value=}", 255);
+    format("value=}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_unmatched_closing_brace.stdout.txt",
@@ -144,7 +144,7 @@ fn format2_escaped_braces_are_treated_as_literals() {
         "eb-stdlib-format2-escaped-braces-literals",
         r#"
 get fun `test-eb-stdlib-format2-escaped-braces-literals`() {
-    val rendered = format2("literal={{}} value={}", 42, 999);
+    val rendered = format("literal={{}} value={}", 42, 999);
     expect(rendered).toEqual("literal={} value=42");
 }
 "#,
@@ -158,7 +158,7 @@ fn format1_supports_utf8_literals_with_plain_placeholder() {
         "eb-stdlib-format1-utf8-literal-placeholder",
         r#"
 get fun `test-eb-stdlib-format1-utf8-literal-placeholder`() {
-    val rendered = format1("привет🙂 {}", 7);
+    val rendered = format("привет🙂 {}", 7);
     expect(rendered).toEqual("привет🙂 7");
 }
 "#,
@@ -172,7 +172,7 @@ fn format1_escaped_braces_without_placeholders_render_as_literals() {
         "eb-stdlib-format1-escaped-only-literals",
         r#"
 get fun `test-eb-stdlib-format1-escaped-only-literals`() {
-    val rendered = format1("{{}} and }}{{", 42);
+    val rendered = format("{{}} and }}{{", 42);
     expect(rendered).toEqual("{} and }{");
 }
 "#,
@@ -186,7 +186,7 @@ fn format1_rejects_invalid_modifier_payload() {
         "eb-stdlib-format1-invalid-modifier-payload",
         r#"
 get fun `test-eb-stdlib-format1-invalid-modifier-payload`() {
-    format1("value={:x:}", 255);
+    format("value={:x:}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_invalid_modifier_payload.stdout.txt",

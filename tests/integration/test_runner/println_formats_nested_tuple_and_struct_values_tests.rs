@@ -94,7 +94,7 @@ get fun `test-ar-stdlib-println1-nested-tuple-and-struct-values`() {
         ([29, 31], Point { x: 37, y: 41 }),
     );
 
-    println1("nested={}", nested);
+    println("nested={}", nested);
 }
 "#,
         "integration/snapshots/test-runner/println_formats_nested_tuple_and_struct_values/println1_formats_nested_tuple_and_struct_values_via_placeholder_pipeline.stdout.txt",

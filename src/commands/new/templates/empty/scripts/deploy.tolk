@@ -13,6 +13,6 @@ fun main() {
         return;
     }
 
-    println1("Deployed starter contract to {}", contract.address);
-    println1("Owner is {}", contract.owner());
+    println("Deployed starter contract to {}", contract.address);
+    println("Owner is {}", contract.owner());
 }
