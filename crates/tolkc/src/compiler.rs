@@ -389,7 +389,7 @@ pub struct CompilerInternalResultSuccess {
     pub code_boc64: String,
     #[serde(rename = "codeHashHex")]
     pub code_hash_hex: String,
-    #[serde(rename = "debugMarkBase64", default)]
+    #[serde(rename = "debugMarksBase64", default)]
     pub debug_mark_base64: Option<String>,
     #[serde(rename = "sourceMapsJson")]
     pub source_maps_json: Option<crate::source_map::SourceMap>,
