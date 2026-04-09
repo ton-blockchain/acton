@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: trunk-objs-${{ github.ref }}
+  group: release-objs-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
@@ -426,8 +426,8 @@ jobs:
           qemu-x86_64 -cpu qemu64,avx=off,avx2=off ./acton-mock
 
 
-  generate-trunk-objs-manifest:
-    name: Generate Trunk Objs Manifest
+  generate-release-objs-manifest:
+    name: Generate Release Objs Manifest
     needs: [ build-objs-linux, build-objs-macos ]
     runs-on: ubicloud-standard-2-ubuntu-2204
 
@@ -479,9 +479,9 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  create-trunk-objs-release:
-    name: Create Trunk Objs Release
-    needs: [ prepare, check-objs, generate-trunk-objs-manifest ]
+  create-release-objs-release:
+    name: Create Release Objs Release
+    needs: [ prepare, check-objs, generate-release-objs-manifest ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 
@@ -497,17 +497,17 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Delete previous trunk-objs release and tag
+      - name: Delete previous release-objs release and tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete trunk-objs --repo "${GITHUB_REPOSITORY}" -y || true
+          gh release delete release-objs --repo "${GITHUB_REPOSITORY}" -y || true
 
           gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk-objs \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/release-objs \
             -X DELETE || true
 
-      - name: Create trunk-objs release
+      - name: Create release-objs release
         env:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
@@ -517,26 +517,26 @@ jobs:
           EOF
           )
 
-          gh release create trunk-objs \
+          gh release create release-objs \
             --repo "${GITHUB_REPOSITORY}" \
             dist/* \
-            --title "Trunk Objs" \
+            --title "Release Objs" \
             --notes "${release_notes}" \
             --target "${GITHUB_SHA}" \
             --prerelease
 
-      - name: Delete previous trunk-objs release and tag (mirror)
+      - name: Delete previous release-objs release and tag (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
-          gh release delete trunk-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+          gh release delete release-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
 
           gh api \
-            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk-objs \
+            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/release-objs \
             -X DELETE || true
 
-      - name: Create trunk-objs release (mirror)
+      - name: Create release-objs release (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
@@ -548,9 +548,9 @@ jobs:
           EOF
           )
 
-          gh release create trunk-objs \
+          gh release create release-objs \
             --repo "${PUBLIC_ACTON_REPOSITORY}" \
             dist/* \
-            --title "Trunk Objs" \
+            --title "Release Objs" \
             --notes "${release_notes}" \
             --prerelease

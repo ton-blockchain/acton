@@ -64,7 +64,7 @@ jobs:
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
-          gh release download trunk-objs \
+          gh release download release-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "${ARCHIVE_NAME}" \
             --dir "${RUNNER_TEMP}"
@@ -164,7 +164,7 @@ jobs:
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
-          gh release download trunk-objs \
+          gh release download release-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "${ARCHIVE_NAME}" \
             --dir "${RUNNER_TEMP}"
@@ -247,7 +247,7 @@ jobs:
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
-          gh release download trunk-objs \
+          gh release download release-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "${ARCHIVE_NAME}" \
             --dir "${RUNNER_TEMP}"

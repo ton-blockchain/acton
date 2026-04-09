@@ -102,7 +102,7 @@ cargo build
 What this does:
 
 1. `just sync-artifacts` syncs `crates/ton-objs/artifacts_manifest.toml`
-   from the `trunk-objs` release and, on a fresh checkout, downloads the
+   from the `release-objs` release and, on a fresh checkout, downloads the
    matching prebuilt `objs/` archive for your current platform.
 2. `just build-ui` installs UI dependencies and builds the bundled UI assets.
 3. `cargo build` builds the CLI against the synced TON archives.
@@ -130,7 +130,7 @@ cargo build
 
 This command:
 
-- downloads the current `artifacts_manifest.toml` from the `trunk-objs` release;
+- downloads the current `artifacts_manifest.toml` from the `release-objs` release;
 - updates `crates/ton-objs/artifacts_manifest.toml` when needed;
 - downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
   `objs/` on a fresh checkout;
