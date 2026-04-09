@@ -297,6 +297,7 @@ fn instantiate_type(ty: &ABIType, bindings: &BTreeMap<String, ABIType>) -> anyho
                         prefix_len: variant.prefix_len,
                         is_prefix_implicit: variant.is_prefix_implicit,
                         stack_type_id: variant.stack_type_id,
+                        stack_width: variant.stack_width,
                     })
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?,
@@ -838,6 +839,7 @@ mod tests {
                         prefix_len: 1,
                         is_prefix_implicit: Some(true),
                         stack_type_id: None,
+                        stack_width: None,
                     },
                     ABIUnionVariant {
                         variant_ty: ABIType::UintN { n: 16 },
@@ -845,6 +847,7 @@ mod tests {
                         prefix_len: 1,
                         is_prefix_implicit: Some(true),
                         stack_type_id: None,
+                        stack_width: None,
                     },
                 ],
             },

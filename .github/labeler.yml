@@ -3,6 +3,11 @@
       - any-glob-to-any-file:
           - "crates/acton-config/**"
 
+"tolk":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/tolkc/**"
+
 "CI":
   - changed-files:
       - any-glob-to-any-file:
