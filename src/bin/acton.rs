@@ -730,6 +730,15 @@ enum Commands {
         #[arg(long, hide = true)]
         list_lint_rules: bool,
     },
+    #[command(hide = true, disable_help_flag = true, disable_help_subcommand = true)]
+    Lint {
+        #[arg(
+            value_name = "ARG",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
+        args: Vec<String>,
+    },
     #[command(
         about = "Retrace a transaction by its hash",
         after_help = detailed_help_pointer("retrace")
@@ -1564,15 +1573,21 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Init | Commands::New { .. } | Commands::Help { .. } | Commands::Rpc { .. }
+        Commands::Init
+            | Commands::New { .. }
+            | Commands::Help { .. }
+            | Commands::Rpc { .. }
+            | Commands::Lint { .. }
     ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. } | Commands::Help { .. })
-        && let Err(err) = setup_logging()
+    if !matches!(
+        command,
+        Commands::Ls { .. } | Commands::Help { .. } | Commands::Lint { .. }
+    ) && let Err(err) = setup_logging()
     {
         eprintln!(
             "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
@@ -1947,6 +1962,7 @@ fn main() {
             list_lint_rules,
             target,
         ),
+        Commands::Lint { args } => Err(lint_command_error(&args)),
         Commands::Up {
             version,
             trunk,
@@ -2068,6 +2084,16 @@ fn print_error(err: &anyhow::Error) {
             eprintln!("  {line}");
         }
     }
+}
+
+fn lint_command_error(args: &[String]) -> anyhow::Error {
+    let suffix = if args.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", args.join(" "))
+    };
+
+    anyhow::anyhow!("`acton lint` is not supported. Use `acton check{suffix}` instead.")
 }
 
 struct ResolvedLitenodeSettings {
