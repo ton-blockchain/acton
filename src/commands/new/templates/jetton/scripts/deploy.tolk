@@ -50,7 +50,7 @@ fun main() {
         totalSupply: 0,
         adminAddress: deployer.address,
         content,
-        jettonWalletCode: build("jetton_wallet"),
+        jettonWalletCode: build("JettonWallet"),
     });
 
     println("Deploying Jetton contract...");

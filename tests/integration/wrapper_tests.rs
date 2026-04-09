@@ -375,7 +375,7 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
         .acton()
         .arg("--project-root")
         .arg(&generated_project_path_str)
-        .wrapper("jetton_minter")
+        .wrapper("JettonMinter")
         .generate_test_stub()
         .current_dir(workspace.path())
         .run()
@@ -386,7 +386,7 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
         .acton()
         .arg("--project-root")
         .arg(&generated_project_path_str)
-        .wrapper("jetton_wallet")
+        .wrapper("JettonWallet")
         .generate_test_stub()
         .current_dir(workspace.path())
         .run()
@@ -395,36 +395,36 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
 
     assert!(
         generated_project_path
-            .join("wrappers/JettonMinterContract.tolk")
+            .join("wrappers/JettonMinter.tolk")
             .exists()
     );
     assert!(
         generated_project_path
-            .join("wrappers/JettonWalletContract.tolk")
+            .join("wrappers/JettonWallet.tolk")
             .exists()
     );
     assert!(
         generated_project_path
-            .join("tests/jetton_minter.test.tolk")
+            .join("tests/JettonMinter.test.tolk")
             .exists()
     );
     assert!(
         generated_project_path
-            .join("tests/jetton_wallet.test.tolk")
+            .join("tests/JettonWallet.test.tolk")
             .exists()
     );
 
     wallet_output
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("wrappers/JettonMinterContract.tolk")
+                .join("wrappers/JettonMinter.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_minter_wrapper.tolk.txt",
         )
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("wrappers/JettonWalletContract.tolk")
+                .join("wrappers/JettonWallet.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_wallet_wrapper.tolk.txt",
@@ -1174,7 +1174,7 @@ fn test_generated_wrapper_test_runs_with_contract_local_types() {
         .expect("Failed to recreate wrappers directory");
 
     fs::write(
-        generated_project_path.join("contracts/counter.tolk"),
+        generated_project_path.join("contracts/Counter.tolk"),
         r"
                 struct Storage {
                     counter: uint32
@@ -1199,7 +1199,7 @@ fn test_generated_wrapper_test_runs_with_contract_local_types() {
         .acton()
         .arg("--project-root")
         .arg(&generated_project_path_str)
-        .wrapper("counter")
+        .wrapper("Counter")
         .generate_test_stub()
         .env("ACTON_LOG_DIR", ".acton/logs")
         .current_dir(workspace.path())

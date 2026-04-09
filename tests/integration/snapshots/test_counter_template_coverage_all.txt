@@ -2,7 +2,7 @@ Coverage Summary:
 Lines: 16/16 (100.00%)
 Total Hits: 79
 
-File: [ROOT]/contracts/counter.tolk
+File: [ROOT]/contracts/Counter.tolk
 Annotated Code:
  1   | import "types"                                                               |
  2   |                                                                              |

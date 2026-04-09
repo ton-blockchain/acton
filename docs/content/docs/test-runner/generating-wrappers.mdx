@@ -10,7 +10,7 @@ When working on integration tests, you'll often need wrappers to send messages a
 To generate a wrapper for a contract defined in your `Acton.toml`, use the `wrapper` command:
 
 ```bash
-acton wrapper counter
+acton wrapper Counter
 ```
 
 This will:
@@ -22,7 +22,7 @@ This will:
 Often when you start testing a contract, you need the same setup boilerplate: imports, deploying the contract, and basic checks. The `--test` flag can generate a ready-to-run test file for you.
 
 ```bash
-acton wrapper counter --test
+acton wrapper Counter --test
 ```
 
 This generates `tests/counter.test.tolk` with a `setupTest()` helper and an example test case:
@@ -70,7 +70,7 @@ Wrapper generation uses the ABI emitted by the Tolk compiler. The contract heade
 
 If `incomingMessages` is not declared in the `contract` header, `send{MessageName}` methods will not be generated. If `storage` is missing, the wrapper falls back to an empty `fromStorage()` initializer instead of a typed storage-based one.
 
-```tolk title="contracts/counter.tolk"
+```tolk title="contracts/Counter.tolk"
 contract Counter {
     storage: Storage
     incomingMessages: AllowedMessage
@@ -106,7 +106,7 @@ struct (0x7e8764ef) Increase {
 type AllowedMessage = Increase
 ```
 
-```tolk title="contracts/counter.tolk"
+```tolk title="contracts/Counter.tolk"
 import "types"
 
 contract Counter {
@@ -131,9 +131,9 @@ fun onInternalMessage(in: InMessage) {
 The command takes a **contract ID**, not a file path. Ensure your contract is defined in the configuration:
 
 ```toml title="Acton.toml"
-[contracts.counter]
+[contracts.Counter]
 display-name = "Counter"
-src = "contracts/counter.tolk"
+src = "contracts/Counter.tolk"
 ```
 
 ## Using the Generated Wrapper
@@ -200,16 +200,16 @@ You can customize the output paths:
 
 ```bash
 # Generate wrapper in a specific file
-acton wrapper counter --output tests/my_wrapper.tolk
+acton wrapper Counter --output tests/my_wrapper.tolk
 
 # Generate wrapper into a specific directory
-acton wrapper counter --output-dir tests/generated
+acton wrapper Counter --output-dir tests/generated
 
 # Generate a test file alongside the wrapper
-acton wrapper counter --test --test-output tests/my.test.tolk
+acton wrapper Counter --test --test-output tests/my.test.tolk
 
 # Generate a test file into a specific directory
-acton wrapper counter --test --test-output-dir tests/generated
+acton wrapper Counter --test --test-output-dir tests/generated
 ```
 
 You can also configure project-wide defaults in `Acton.toml`:
@@ -225,7 +225,7 @@ output-dir = "./wrappers"
 ```
 
 Then:
-- `acton wrapper counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/counter.test.tolk`
-- `acton wrapper counter --ts` writes `wrappers/Counter.ts` by default
+- `acton wrapper Counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/counter.test.tolk`
+- `acton wrapper Counter --ts` writes `wrappers/Counter.ts` by default
 
 See the [wrapper command reference](/docs/commands/wrapper) for more details about CLI options.

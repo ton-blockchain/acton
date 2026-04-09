@@ -126,7 +126,7 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .build();
     let log_dir = prepare_log_dir(project.path());
@@ -189,7 +189,7 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .build();
     let log_dir = prepare_log_dir(project.path());
@@ -337,7 +337,7 @@ fn test_rpc_info_decodes_storage_from_litenode() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .script_file("deploy_counter", DEPLOY_COUNTER_SCRIPT)
         .build();

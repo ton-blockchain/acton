@@ -44,7 +44,7 @@ fun JettonMinter.sendChangeContent(self, from: address, newContent: cell): SendR
 
 fun JettonMinter.fromStorage(storage: MinterStorage): JettonMinter {
     val init = ContractState {
-        code: build("jetton_minter"),
+        code: build("JettonMinter"),
         data: storage.toCell(),
     };
     val addr = AutoDeployAddress { stateInit: init }.calculateAddress();

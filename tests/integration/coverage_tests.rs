@@ -10,7 +10,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const COUNTER_TEMPLATE_CONTRACT: &str =
-    include_str!("../../src/commands/new/templates/counter/contracts/counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/contracts/Counter.tolk");
 const COUNTER_TEMPLATE_TYPES: &str =
     include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
 const COUNTER_TEMPLATE_WRAPPER: &str =
@@ -58,13 +58,11 @@ fun setupTest(): (Counter, Treasury, Treasury) {
 
 fn build_counter_template_project(name: &str, test_source: &str) -> Project {
     let project = ProjectBuilder::new(name)
-        .contract("counter", COUNTER_TEMPLATE_CONTRACT)
+        .without_acton_toml()
+        .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
         .file("wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
-        .mapping("acton", "./.acton")
-        .mapping("contracts", "contracts")
-        .mapping("wrappers", "wrappers")
         .build();
     project.acton().init().run().success();
     project
@@ -72,13 +70,14 @@ fn build_counter_template_project(name: &str, test_source: &str) -> Project {
 
 fn build_jetton_template_project(name: &str) -> Project {
     let project = ProjectBuilder::new(name)
-        .contract_from_path(
-            "jetton_minter",
-            "src/commands/new/templates/jetton/contracts/jetton-minter-contract.tolk",
+        .without_acton_toml()
+        .file_from_path(
+            "contracts/JettonMinter",
+            "src/commands/new/templates/jetton/contracts/JettonMinter.tolk",
         )
-        .contract_from_path(
-            "jetton_wallet",
-            "src/commands/new/templates/jetton/contracts/jetton-wallet-contract.tolk",
+        .file_from_path(
+            "contracts/JettonWallet",
+            "src/commands/new/templates/jetton/contracts/JettonWallet.tolk",
         )
         .file_from_path(
             "contracts/errors",
@@ -112,9 +111,6 @@ fn build_jetton_template_project(name: &str) -> Project {
             "wallet",
             "src/commands/new/templates/jetton/tests/wallet.test.tolk",
         )
-        .mapping("acton", "./.acton")
-        .mapping("contracts", "contracts")
-        .mapping("wrappers", "wrappers")
         .build();
     project.acton().init().run().success();
     project

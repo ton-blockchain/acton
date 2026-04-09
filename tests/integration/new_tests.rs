@@ -402,12 +402,12 @@ fn test_new_counter_project_non_interactive() {
     assert!(
         project
             .path()
-            .join("foobar/contracts/counter.tolk")
+            .join("foobar/contracts/Counter.tolk")
             .exists()
     );
     assert!(!project.path().join("foobar/package.json").exists());
     assert!(!project.path().join("foobar/app").exists());
-    assert!(content.contains(r"[contracts.counter]"));
+    assert!(content.contains(r"[contracts.Counter]"));
 }
 
 #[test]
@@ -448,7 +448,7 @@ fn test_new_counter_project_with_app_flag() {
     let project_dir = project.path().join("foobar");
     assert!(project_dir.join("app/src/App.tsx").exists());
     assert!(project_dir.join("wrappers/Counter.ts").exists());
-    assert!(project_dir.join("contracts/src/counter.tolk").exists());
+    assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir
             .join("contracts/tests/counter.test.tolk")
@@ -866,7 +866,7 @@ fn test_new_counter_project_can_be_selected_interactively() {
     );
 
     let project_dir = project.path().join("foobar");
-    assert!(project_dir.join("contracts/counter.tolk").exists());
+    assert!(project_dir.join("contracts/Counter.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());
@@ -972,7 +972,7 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     );
 
     let project_dir = project.path().join("foobar");
-    assert!(project_dir.join("contracts/counter.tolk").exists());
+    assert!(project_dir.join("contracts/Counter.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());

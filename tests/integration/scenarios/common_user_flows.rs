@@ -96,7 +96,7 @@ fn create_project_and_run_tests() {
             "integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
         )
         .assert_file_exists("foobar/Acton.toml")
-        .assert_file_exists("foobar/contracts/contract.tolk")
+        .assert_file_exists("foobar/contracts/Empty.tolk")
         .assert_file_exists("foobar/contracts/types.tolk")
         .assert_file_exists("foobar/tests/contract.test.tolk")
         .assert_file_exists("foobar/wrappers/Empty.tolk")

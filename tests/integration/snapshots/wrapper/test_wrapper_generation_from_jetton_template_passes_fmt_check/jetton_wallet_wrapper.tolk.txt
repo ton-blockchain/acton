@@ -7,33 +7,30 @@ import "@acton/types/message"
 import "@contracts/messages"
 import "@contracts/storage"
 
-struct JettonWalletContract {
+struct JettonWallet {
     address: address
     stateInit: ContractState? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun JettonWalletContract.fromStorage(
-    storage: WalletStorage,
-    toShard: AddressShardingOptions? = null,
-) {
+fun JettonWallet.fromStorage(storage: WalletStorage, toShard: AddressShardingOptions? = null) {
     val stateInit = ContractState {
-        code: build("jetton_wallet"),
+        code: build("JettonWallet"),
         data: storage.toCell(),
     };
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
         : AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return JettonWalletContract { address, stateInit };
+    return JettonWallet { address, stateInit };
 }
 
 /// Creates a contract wrapper instance from the address
-fun JettonWalletContract.fromAddress(address: address) {
-    return JettonWalletContract { address };
+fun JettonWallet.fromAddress(address: address) {
+    return JettonWallet { address };
 }
 
 /// Deploys the contract to the blockchain
-fun JettonWalletContract.deploy(self, from: address, config: SendParams = {}): SendResultList {
+fun JettonWallet.deploy(self, from: address, config: SendParams = {}): SendResultList {
     if (self.stateInit == null) {
         Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
     }
@@ -45,7 +42,7 @@ fun JettonWalletContract.deploy(self, from: address, config: SendParams = {}): S
     return net.send(from, genericMsg);
 }
 
-fun JettonWalletContract.sendInternalTransferStep(
+fun JettonWallet.sendInternalTransferStep(
     self,
     from: address,
     queryId: uint64,
@@ -72,7 +69,7 @@ fun JettonWalletContract.sendInternalTransferStep(
     return net.send(from, genericMsg);
 }
 
-fun JettonWalletContract.sendAskToTransfer(
+fun JettonWallet.sendAskToTransfer(
     self,
     from: address,
     queryId: uint64,
@@ -101,7 +98,7 @@ fun JettonWalletContract.sendAskToTransfer(
     return net.send(from, genericMsg);
 }
 
-fun JettonWalletContract.sendAskToBurn(
+fun JettonWallet.sendAskToBurn(
     self,
     from: address,
     queryId: uint64,
@@ -120,12 +117,7 @@ fun JettonWalletContract.sendAskToBurn(
 }
 
 /// Send message to the contract with a custom body cell
-fun JettonWalletContract.sendAny(
-    self,
-    from: address,
-    body: cell,
-    config: SendParams = {},
-): SendResultList {
+fun JettonWallet.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
@@ -135,6 +127,6 @@ fun JettonWalletContract.sendAny(
     return net.send(from, genericMsg);
 }
 
-fun JettonWalletContract.getWalletData(self): JettonWalletDataReply {
+fun JettonWallet.getWalletData(self): JettonWalletDataReply {
     return net.runGetMethod(self.address, "get_wallet_data");
 }

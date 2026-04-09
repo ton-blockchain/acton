@@ -44,7 +44,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         cd first_counter
         ```
 
-        The project is already set up with `contracts/counter.tolk` and `contracts/types.tolk`.
+        The project is already set up with `contracts/Counter.tolk` and `contracts/types.tolk`.
     </Step>
 
     <Step title="Build contract">
@@ -118,7 +118,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         And **mutation testing** to find gaps in your tests:
 
         ```bash
-        acton test --mutate --mutate-contract counter
+        acton test --mutate --mutate-contract Counter
         ```
     </Step>
 
@@ -185,7 +185,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         Finally, let's verify our contract source code on the blockchain explorer. This proves that the deployed bytecode matches your source code.
 
         ```bash
-        acton verify counter --net testnet --address <YOUR_CONTRACT_ADDRESS>
+        acton verify Counter --net testnet --address <YOUR_CONTRACT_ADDRESS>
         ```
 
         Replace `<YOUR_CONTRACT_ADDRESS>` with the address from the previous step.

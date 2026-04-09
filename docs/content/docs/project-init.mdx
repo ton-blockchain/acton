@@ -101,7 +101,7 @@ A typical contract-only template project starts with the following structure:
     <File name="..." />
   </Folder>
   <Folder name="contracts" defaultOpen>
-    <File name="contract.tolk" />
+    <File name="Contract.tolk" />
   </Folder>
   <Folder name="scripts" defaultOpen>
     <File name="deploy.tolk" />
@@ -153,7 +153,7 @@ changes to keep contracts and frontend separate:
   </Folder>
   <Folder name="contracts" defaultOpen>
     <Folder name="src" defaultOpen>
-      <File name="counter.tolk" />
+      <File name="Counter.tolk" />
       <File name="types.tolk" />
     </Folder>
     <Folder name="tests" defaultOpen>
@@ -210,17 +210,17 @@ name = "my-project"
 description = "A TON blockchain project"
 license = "MIT"
 
-[contracts.counter]
-display-name = "counter"
-src = "contracts/counter.tolk"
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/Counter.tolk"
 ```
 
 For the `counter --app` layout, the contract source moves under `contracts/src`:
 
 ```toml
-[contracts.counter]
-display-name = "counter"
-src = "contracts/src/counter.tolk"
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/src/Counter.tolk"
 ```
 
 Learn more about [Acton Manifest](/docs/acton-toml/).

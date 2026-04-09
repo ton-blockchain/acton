@@ -4,9 +4,9 @@ description = "git init failure description"
 version = "0.1.0"
 license = "MIT"
 
-[contracts.empty]
+[contracts.Empty]
 display-name = "Empty"
-src = "contracts/contract.tolk"
+src = "contracts/Empty.tolk"
 depends = []
 
 [test]

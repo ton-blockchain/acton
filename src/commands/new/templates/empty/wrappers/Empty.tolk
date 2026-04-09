@@ -9,7 +9,7 @@ struct Empty {
 
 fun Empty.fromStorage(storage: Storage): Empty {
     val init = ContractState {
-        code: build("empty"),
+        code: build("Empty"),
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();

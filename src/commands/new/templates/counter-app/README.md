@@ -36,7 +36,7 @@ npm run dev
 
 ## Notes
 
-- `acton build` compiles the contract using `contracts/src/counter.tolk`.
+- `acton build` compiles the contract using `contracts/src/Counter.tolk`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
 - The app reads blockchain data through Toncenter. Set
