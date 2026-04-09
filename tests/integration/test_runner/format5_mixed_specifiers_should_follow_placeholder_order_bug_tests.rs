@@ -31,7 +31,7 @@ fn format5_mixed_specifiers_should_follow_placeholder_order_bug() {
         "br-stdlib-format5-placeholder-order-bug",
         r#"
 get fun `test-br-stdlib-format5-placeholder-order-bug`() {
-    val rendered = format5("{} | {:ton} | {:x} | {} | {}", 255, 1500000000, 16, "left", "right");
+    val rendered = format("{} | {:ton} | {:x} | {} | {}", 255, 1500000000, 16, "left", "right");
     expect(rendered).toEqual("255 | 1.5 TON | 10 | left | right");
 }
 "#,
@@ -46,7 +46,7 @@ fn format5_mixed_specifiers_should_follow_placeholder_order_in_fixture_project_b
     let source = wrap_fmt_test_source(
         r#"
 get fun `test-br-stdlib-format5-placeholder-order-fixture-bug`() {
-    val rendered = format5("{:ton} | {} | {:x} | {} | {}", 1500000000, 2000000000, 16, "mid", "end");
+    val rendered = format("{:ton} | {} | {:x} | {} | {}", 1500000000, 2000000000, 16, "mid", "end");
     expect(rendered).toEqual("1.5 TON | 2000000000 | 10 | mid | end");
 }
 "#,

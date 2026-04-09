@@ -82,7 +82,7 @@ import "@acton/fmt"
 fun Expectation<int>.toBeEven(self) {
     if (self.value % 2 != 0) {
         Assert.fail(
-            format1("Expected {} to be even", self.value),
+            format("Expected {} to be even", self.value),
             self.location
         );
     }
@@ -108,7 +108,7 @@ fun Expectation<address>.toHaveWorkchain(self, expectedWorkchain: int) {
     val actualWorkchain = self.value.getWorkchain();
     if (actualWorkchain != expectedWorkchain) {
         Assert.fail(
-            format2(
+            format(
                 "Expected address to have workchain {}, but got {}",
                 expectedWorkchain,
                 actualWorkchain
@@ -136,7 +136,7 @@ import "@acton/fmt"
 fun Expectation<slice>.toStartWith(self, prefix: slice) {
     if (!self.value.getFirstBits(prefix.remainingBitsCount()).bitsEqual(prefix)) {
         Assert.fail(
-            format2(
+            format(
                 "Expected slice '{}' to start with prefix '{}'",
                 self.value,
                 prefix
@@ -177,7 +177,7 @@ import "@acton/fmt"
 fun Expectation<User>.toBeActive(self) {
     if (!self.value.isActive) {
         Assert.fail(
-            format1("Expected user {} to be active", self.value.name),
+            format("Expected user {} to be active", self.value.name),
             self.location
         );
     }
@@ -202,7 +202,7 @@ The `Assert.fail()` function is particularly useful for providing custom error m
 fun Expectation<int>.toBePositive(self) {
     if (self.value <= 0) {
         Assert.fail(
-            format1("Expected {} to be a positive number", self.value),
+            format("Expected {} to be a positive number", self.value),
             self.location // Pass the location for better error reporting
         );
     }
@@ -227,7 +227,7 @@ Assert.fail("Value is not even");
 **Good:**
 ```tolk
 Assert.fail(
-    format1("Expected {} to be even, but it was odd.", self.value),
+    format("Expected {} to be even, but it was odd.", self.value),
     self.location
 );
 ```

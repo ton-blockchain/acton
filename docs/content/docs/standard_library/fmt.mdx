@@ -7,7 +7,8 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 
 Module for string formatting.
 
-This module provides functions (`format1` to `format5`) for creating formatted strings.
+This module provides a universal `format` function for creating formatted strings.
+It accepts up to 5 typed arguments.
 
 Supported placeholders:
 - `{}`: default formatting
@@ -26,109 +27,30 @@ Format rules and edge cases:
 Examples:
 ```tolk
 // Simple string substitution
-val greeting = format1("Hello, {}!", "Tolk");
+val greeting = format("Hello, {}!", "Tolk");
 
 // Formatting numbers
-val hex = format1("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
+val hex = format("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
 
 // Formatting TON amounts
-val balance = format1("Balance: {:ton}", 500000000); // "Balance: 0.5 TON"
+val balance = format("Balance: {:ton}", 500000000); // "Balance: 0.5 TON"
 
 // Escaping braces
-val escaped = format1("Use {{}} to print braces", 0); // "Use {} to print braces"
+val escaped = format("Use {{}} to print braces", 0); // "Use {} to print braces"
 
 // Missing argument keeps placeholder as-is
-val partial = format1("{} {}", "left"); // "left {}"
+val partial = format("{} {}", "left"); // "left {}"
 
 // Multiple arguments
-val info = format3("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
+val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
 ```
 
 ## Definitions
 
-## `format1`
+## `format`
 
 ```tolk
-fun format1<T1>(fmt: string, arg1: T1): string
-```
-
-Formats a string with 1 argument.
-
-Uses the module-level format rules, including escaping (`{{`/`}}`), mismatch behavior,
-and runtime parser errors for invalid format strings.
-
-Example:
-```tolk
-val msg = format1("Hello {}", "world");
-println(msg);  // prints "Hello world"
-```
-
-Non-int fallback examples:
-```tolk
-format1("{:x}", "abc");   // "abc"
-format1("{:ton}", true);  // "true"
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L59" />
-
-## `format2`
-
-```tolk
-fun format2<T1, T2>(fmt: string, arg1: T1, arg2: T2): string
-```
-
-Formats a string with 2 arguments.
-
-Uses the same placeholder rules and edge-case behavior as [format1](#format1).
-
-Example:
-```tolk
-val msg = format2("{}: {}", "name", "John");
-println(msg);  // prints "name: John"
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L72" />
-
-## `format3`
-
-```tolk
-fun format3<T1, T2, T3>(fmt: string, arg1: T1, arg2: T2, arg3: T3): string
-```
-
-Formats a string with 3 arguments.
-
-Uses the same placeholder rules and edge-case behavior as [format1](#format1).
-
-Example:
-```tolk
-val msg = format3("{} + {} = {}", 2, 3, 5);
-println(msg);  // prints "2 + 3 = 5"
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L91" />
-
-## `format4`
-
-```tolk
-fun format4<T1, T2, T3, T4>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4): string
-```
-
-Formats a string with 4 arguments.
-
-Uses the same placeholder rules and edge-case behavior as [format1](#format1).
-
-Example:
-```tolk
-val msg = format4("{} {} {} {}", "a", "b", "c", "d");
-println(msg);  // prints "a b c d"
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L112" />
-
-## `format5`
-
-```tolk
-fun format5<T1, T2, T3, T4, T5>(
+fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
     fmt: string,
     arg1: T1,
     arg2: T2,
@@ -138,15 +60,23 @@ fun format5<T1, T2, T3, T4, T5>(
 ): string
 ```
 
-Formats a string with 5 arguments.
+Formats a string with up to 5 arguments.
 
-Uses the same placeholder rules and edge-case behavior as [format1](#format1).
+Uses the module-level format rules, including escaping (`{{`/`}}`), mismatch behavior,
+and runtime parser errors for invalid format strings.
 
 Example:
 ```tolk
-val msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
-println(msg);  // prints "1 2 3 4 5"
+val a = format("Hello {}", "world");
+val b = format("{} + {} = {}", 2, 3, 5);
+val c = format("hello");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L135" />
+Non-int fallback examples:
+```tolk
+format("{:x}", "abc");   // "abc"
+format("{:ton}", true);  // "true"
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L61" />
 

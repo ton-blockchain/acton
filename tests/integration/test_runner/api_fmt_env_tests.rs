@@ -11,7 +11,7 @@ fn fmt_supports_mixed_hex_ton_and_plain_placeholders() {
             import "../../lib/testing/expect"
 
             get fun `test-fmt-mixed-placeholders`() {
-                val rendered = format3("hex={:x} ton={:ton} label={}", 255, 1500000000, "ok");
+                val rendered = format("hex={:x} ton={:ton} label={}", 255, 1500000000, "ok");
                 expect(rendered).toEqual("hex=ff ton=1.5 TON label=ok");
             }
         "#,
@@ -37,7 +37,7 @@ fn fmt_plain_and_hex_placeholders_should_follow_argument_order_bug() {
             import "../../lib/testing/expect"
 
             get fun `test-fmt-placeholder-order`() {
-                val rendered = format2("{} {:x}", 255, 16);
+                val rendered = format("{} {:x}", 255, 16);
                 expect(rendered).toEqual("255 10");
             }
         "#,
@@ -63,10 +63,10 @@ fn fmt_fallback_for_non_int_specs_and_ignores_extra_args() {
             import "../../lib/testing/expect"
 
             get fun `test-fmt-fallback-and-extra-args`() {
-                val fallback = format2("{:x} {:ton}", "abc", "tonlike");
+                val fallback = format("{:x} {:ton}", "abc", "tonlike");
                 expect(fallback).toEqual("abc tonlike");
 
-                val extra = format2("{}", 255, 16);
+                val extra = format("{}", 255, 16);
                 expect(extra).toEqual("255");
             }
         "#,

@@ -199,8 +199,8 @@ fn env_parses_user_friendly_address_form() {
                 val parsed = env<address>("Z_ENV_ADDRESS_FRIENDLY");
                 expect(parsed).toBeNotNull();
 
-                val renderedParsed = format1("{}", parsed!);
-                val renderedExpected = format1("{}", address("0:0000000000000000000000000000000000000000000000000000000000000000"));
+                val renderedParsed = format("{}", parsed!);
+                val renderedExpected = format("{}", address("0:0000000000000000000000000000000000000000000000000000000000000000"));
                 expect(renderedParsed).toEqual(renderedExpected);
             }
         "#,

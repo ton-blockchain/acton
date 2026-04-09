@@ -699,7 +699,7 @@ fun main() {
    val result = counter.deploy(deployer.address, ton("0.05"));
    result.wait();
 
-   println1("Deployed counter to {}", counter.address);
+   println("Deployed counter to {}", counter.address);
 }
 ```
 
@@ -1013,7 +1013,7 @@ Example:
 ```tolk
 val state = net.getAccountState(contract.address);
 if (state != null) {
-    println1("Balance: {:ton}", state.storage.balance.grams);
+    println("Balance: {:ton}", state.storage.balance.grams);
 } else {
     println("Account not found");
 }
@@ -1035,7 +1035,7 @@ Example:
 ```tolk
 val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
 if (storage_fee != null) {
-    println1("Daily storage fee: {:ton}", storage_fee);
+    println("Daily storage fee: {:ton}", storage_fee);
 }
 ```
 
@@ -1096,7 +1096,7 @@ Returns the current time in the emulated blockchain.
 Example:
 ```tolk
 val current_time = net.now();
-println1("Current emulation time: {}", current_time);
+println("Current emulation time: {}", current_time);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1048" />
@@ -1132,7 +1132,7 @@ Returns 0 if the address is not deployed.
 Example:
 ```tolk
 val balance = net.balance(address);
-println1("{:ton}", balance);
+println("{:ton}", balance);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1080" />
@@ -1191,7 +1191,7 @@ Example:
 ```tolk
 val shard = net.getShardAccount(addr);
 if (shard != null) {
-    println1("Last LT: {}", shard.lastTransLt);
+    println("Last LT: {}", shard.lastTransLt);
 }
 ```
 
@@ -1323,7 +1323,7 @@ val gasPrice = config.getGasPrices(BASECHAIN);
 val storagePrices = config.getStoragePrices();
 val globalVersion = config.getGlobalVersion();
 
-println(format1("Network version: {}", globalVersion.version));
+println("Network version: {}", globalVersion.version);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1282" />

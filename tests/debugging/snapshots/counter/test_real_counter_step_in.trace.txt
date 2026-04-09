@@ -7,7 +7,7 @@ Step 1 (before):
                                        ^^^^^^^^^^^
      71| 
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     73|     println(format1("Counter: {}", counterRes));
+     73|     println("Counter: {}", counterRes);
 
 Step 2 (step_in):
   Code:
@@ -239,7 +239,7 @@ Step 18 (step_over):
                  ^^^^^^^^^^^^^^^^^^^
      71| 
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     73|     println(format1("Counter: {}", counterRes));
+     73|     println("Counter: {}", counterRes);
 
 Step 19 (step_over):
   Code:
@@ -248,7 +248,7 @@ Step 19 (step_over):
      71| 
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                                                                             ^^^^^^^^^^^^^^^^
-     73|     println(format1("Counter: {}", counterRes));
+     73|     println("Counter: {}", counterRes);
      74| 
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
@@ -260,11 +260,11 @@ Step 20 (step_over):
      70|     val (counter, deployer) = setupTest();
      71| 
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     73|     println(format1("Counter: {}", counterRes));
-                             ^^^^^^^^^^^^^
+     73|     println("Counter: {}", counterRes);
+                     ^^^^^^^^^^^^^
      74| 
      75|     val info = net.getAccountState(counter.address)!;
-     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
   Variables:
     counter = Counter
     deployer = Treasury
@@ -273,11 +273,11 @@ Step 20 (step_over):
 Step 21 (step_over):
   Code:
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     73|     println(format1("Counter: {}", counterRes));
+     73|     println("Counter: {}", counterRes);
      74| 
      75|     val info = net.getAccountState(counter.address)!;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
   Variables:
@@ -287,11 +287,11 @@ Step 21 (step_over):
 
 Step 22 (step_over):
   Code:
-     73|     println(format1("Counter: {}", counterRes));
+     73|     println("Counter: {}", counterRes);
      74| 
      75|     val info = net.getAccountState(counter.address)!;
-     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-                             ^^^^^^^^^^^^^^^^^
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+                     ^^^^^^^^^^^^^^^^^
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
      79|     println(res);
@@ -304,7 +304,7 @@ Step 22 (step_over):
 Step 23 (step_over):
   Code:
      75|     val info = net.getAccountState(counter.address)!;
-     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
                                ^^^^^^^^^^^^
@@ -319,7 +319,7 @@ Step 23 (step_over):
 
 Step 24 (step_over):
   Code:
-     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
      79|     println(res);
