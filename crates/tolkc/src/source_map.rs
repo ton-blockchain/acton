@@ -198,15 +198,10 @@ impl SourceMap {
 
 #[derive(Deserialize)]
 struct SourceMapDe {
-    #[serde(default)]
     files: Vec<SrcFileInfo>,
-    #[serde(default)]
     declarations: Vec<Declaration>,
-    #[serde(default)]
     unique_ty: Vec<UniqueTy>,
-    #[serde(default)]
     functions: Vec<FunctionInfo>,
-    #[serde(default)]
     debug_marks: Vec<DebugMark>,
 }
 
@@ -330,9 +325,7 @@ pub enum Declaration {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PrefixInfo {
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-    #[serde(rename = "prefixLen")]
     pub prefix_len: usize,
 }
 

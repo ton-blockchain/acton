@@ -197,8 +197,8 @@ fn test_wrapper_generation_typescript_defaults_to_wrappers_dir() {
 
     let abi_json: Value = serde_json::from_str(&fs::read_to_string(&capture_path).unwrap())
         .expect("captured ABI JSON should be valid");
-    assert_eq!(abi_json["contractName"], "MyContract");
-    assert_eq!(abi_json["compilerName"], "tolk");
+    assert_eq!(abi_json["contract_name"], "MyContract");
+    assert_eq!(abi_json["compiler_name"], "tolk");
     assert!(
         abi_json["codeBoc64"]
             .as_str()

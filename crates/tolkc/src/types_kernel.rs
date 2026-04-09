@@ -55,9 +55,7 @@ pub enum Ty {
     #[serde(rename = "nullable")]
     Nullable {
         inner: Box<Ty>,
-        #[serde(rename = "stackTypeId")]
         stack_type_id: Option<usize>,
-        #[serde(rename = "stackWidth")]
         stack_width: Option<usize>,
     },
     #[serde(rename = "cellOf")]
@@ -75,33 +73,22 @@ pub enum Ty {
 
     // references to user-defined types
     #[serde(rename = "EnumRef")]
-    EnumRef {
-        #[serde(rename = "enumName")]
-        enum_name: String,
-    },
+    EnumRef { enum_name: String },
     #[serde(rename = "StructRef")]
     StructRef {
-        #[serde(rename = "structName")]
         struct_name: String,
-        #[serde(rename = "typeArgs")]
         type_args: Option<Vec<Ty>>,
     },
     #[serde(rename = "AliasRef")]
     AliasRef {
-        #[serde(rename = "aliasName")]
         alias_name: String,
-        #[serde(rename = "typeArgs")]
         type_args: Option<Vec<Ty>>,
     },
     #[serde(rename = "genericT")]
-    GenericT {
-        #[serde(rename = "nameT")]
-        name_t: String,
-    },
+    GenericT { name_t: String },
     #[serde(rename = "union")]
     Union {
         variants: Vec<UnionVariant>,
-        #[serde(rename = "stackWidth")]
         stack_width: Option<usize>,
     },
 }
@@ -212,17 +199,11 @@ impl fmt::Display for Ty {
 /// or auto-generated (implicit), e.g. `int8 | int16 | int32` is serialized as '00'+int8 / '01'+int16 / '10'+int32.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnionVariant {
-    #[serde(rename = "variantTy")]
     pub variant_ty: Ty,
-    #[serde(rename = "prefixStr")]
     pub prefix_str: String,
-    #[serde(rename = "prefixLen")]
     pub prefix_len: usize,
-    #[serde(rename = "isPrefixImplicit")]
     pub is_prefix_implicit: Option<bool>,
-    #[serde(rename = "stackTypeId")]
     pub stack_type_id: Option<usize>,
-    #[serde(rename = "stackWidth")]
     pub stack_width: Option<usize>,
 }
 

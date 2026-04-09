@@ -21,7 +21,7 @@ use xxhash_rust::xxh3::Xxh3;
 
 use crate::paths;
 
-const CACHE_SCHEMA_VERSION: u32 = 6;
+const CACHE_SCHEMA_VERSION: u32 = 7;
 const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
 const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
 const DEBUG_CACHE_SUBDIR: &str = "debug";
