@@ -106,7 +106,6 @@ jobs:
           ref: ${{ needs.prepare.outputs.ton_commit }}
           fetch-depth: 1
           submodules: true
-          path: ton-repo
 
       - name: Build TON static libraries
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -116,7 +115,6 @@ jobs:
           AR: llvm-ar-16
           RANLIB: llvm-ranlib-16
         run: |
-          cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
           ./build-ubuntu-static.sh -a -c
@@ -125,21 +123,14 @@ jobs:
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: ccache -s
 
-      - name: Collect TON objects
-        if: steps.archive-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
-
       - name: Generate TON artifacts lock file
         if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         # language=Bash
         run: |
-          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
-          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+          libemulator_sha256=$(sha256sum artifacts/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum artifacts/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
@@ -151,16 +142,16 @@ jobs:
               rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
-            }' > objs/ton-artifacts.lock
+            }' > artifacts/ton-artifacts.lock
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          ls -lh objs
-          test -f objs/libemulator.a
-          test -f objs/libtolk.a
-          test -f objs/ton-artifacts.lock
-          cat objs/ton-artifacts.lock
+          ls -lh artifacts
+          test -f artifacts/libemulator.a
+          test -f artifacts/libtolk.a
+          test -f artifacts/ton-artifacts.lock
+          cat artifacts/ton-artifacts.lock
 
       - name: Pack TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -169,7 +160,7 @@ jobs:
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
 
           mkdir -p dist
-          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
@@ -234,22 +225,13 @@ jobs:
           ref: ${{ needs.prepare.outputs.ton_commit }}
           fetch-depth: 1
           submodules: true
-          path: ton-repo
 
       - name: Build TON static libraries
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          cd ton-repo
           cp assembly/native/build-macos-static.sh .
           chmod +x build-macos-static.sh
           ./build-macos-static.sh -a
-
-      - name: Collect TON objects
-        if: steps.archive-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Generate TON artifacts lock file
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -257,8 +239,8 @@ jobs:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         # language=Bash
         run: |
-          libemulator_sha256=$(shasum -a 256 objs/libemulator.a | awk '{ print $1 }')
-          libtolk_sha256=$(shasum -a 256 objs/libtolk.a | awk '{ print $1 }')
+          libemulator_sha256=$(shasum -a 256 artifacts/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(shasum -a 256 artifacts/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
@@ -270,16 +252,16 @@ jobs:
               rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
-            }' > objs/ton-artifacts.lock
+            }' > artifacts/ton-artifacts.lock
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          ls -lh objs
-          test -f objs/libemulator.a
-          test -f objs/libtolk.a
-          test -f objs/ton-artifacts.lock
-          cat objs/ton-artifacts.lock
+          ls -lh artifacts
+          test -f artifacts/libemulator.a
+          test -f artifacts/libtolk.a
+          test -f artifacts/ton-artifacts.lock
+          cat artifacts/ton-artifacts.lock
 
       - name: Pack TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -288,7 +270,7 @@ jobs:
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
 
           mkdir -p dist
-          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
