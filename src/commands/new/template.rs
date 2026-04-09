@@ -52,8 +52,8 @@ impl ProjectLayout {
     #[must_use]
     pub(super) const fn wrappers_mapping(self) -> &'static str {
         match self {
-            Self::Standard => "tests/wrappers",
-            Self::App => "contracts/tests/wrappers",
+            Self::Standard => "wrappers",
+            Self::App => "contracts/wrappers",
         }
     }
 

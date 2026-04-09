@@ -19,7 +19,7 @@ pub const DEFAULT_PROJECT_MAPPINGS: &[(&str, &str)] = &[
     ("acton", ".acton"),
     ("contracts", "contracts"),
     ("tests", "tests"),
-    ("wrappers", "tests/wrappers"),
+    ("wrappers", "wrappers"),
     ("gen", "gen"),
 ];
 

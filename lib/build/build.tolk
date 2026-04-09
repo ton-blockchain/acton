@@ -6,7 +6,7 @@
 /// Build a contract with a specified name and optional path.
 ///
 /// `name` is the contract id key in `Acton.toml` (`[contracts.<id>]`), not the display
-/// name stored in `[contracts.<id>].name`.
+/// name stored in `[contracts.<id>].display-name`.
 ///
 /// If `path` is omitted (empty string), Acton looks up the contract id in `Acton.toml`.
 /// If no contract with that id is found, execution fails.

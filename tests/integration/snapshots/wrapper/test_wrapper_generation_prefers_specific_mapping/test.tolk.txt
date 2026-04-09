@@ -3,7 +3,7 @@ import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
 import "@core_sub/types"
-import "wrappers/Main"
+import "../wrappers/Main"
 
 /// Example test case demonstrating the basic flow
 get fun `test-basic-flow`() {

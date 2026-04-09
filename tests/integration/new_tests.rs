@@ -454,11 +454,7 @@ fn test_new_counter_project_with_app_flag() {
             .join("contracts/tests/counter.test.tolk")
             .exists()
     );
-    assert!(
-        project_dir
-            .join("contracts/tests/wrappers/Counter.tolk")
-            .exists()
-    );
+    assert!(project_dir.join("contracts/wrappers/Counter.tolk").exists());
     assert!(project_dir.join(".prettierrc").exists());
 }
 

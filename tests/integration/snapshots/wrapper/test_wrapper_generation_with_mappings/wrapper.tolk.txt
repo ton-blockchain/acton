@@ -5,7 +5,7 @@ import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
 import "@core/types"
-import "../../contracts/main"
+import "../contracts/main"
 
 struct Main {
     address: address

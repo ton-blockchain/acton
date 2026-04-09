@@ -9,7 +9,7 @@ script that deploys the minter and mints the initial supply.
 - `contracts/jetton-minter-contract.tolk` implements the jetton minter.
 - `contracts/jetton-wallet-contract.tolk` implements user jetton wallets.
 - `contracts/errors.tolk` defines starter errors for the template.
-- `tests/wrappers/JettonMinter.tolk` and `tests/wrappers/JettonWallet.tolk`
+- `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
   are the wrappers used by tests and scripts.
 - `tests/wallet.test.tolk` covers minting, admin updates, content updates, and
   transfers.
@@ -40,7 +40,7 @@ acton run deploy-emulation
 
 1. Update the contracts under `contracts/` for your token policy and business
    rules.
-2. Adjust `tests/wrappers/JettonMinter.tolk` and `tests/wrappers/JettonWallet.tolk`
+2. Adjust `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
    to match the new ABI, or regenerate them with `acton wrapper jetton_minter`
    and `acton wrapper jetton_wallet`.
 3. Extend `tests/wallet.test.tolk` with the scenarios you care about.

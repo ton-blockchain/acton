@@ -4,7 +4,7 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
-import "../../contracts/storage"
+import "../contracts/storage"
 
 struct MyContract {
     address: address

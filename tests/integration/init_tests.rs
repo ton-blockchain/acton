@@ -132,7 +132,7 @@ acton = ".acton"
 contracts = "contracts"
 gen = "gen"
 tests = "tests"
-wrappers = "tests/wrappers"
+wrappers = "wrappers"
 "#,
     )
     .unwrap();

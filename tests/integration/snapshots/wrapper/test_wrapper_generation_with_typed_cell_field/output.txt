@@ -1,1 +1,1 @@
-   Generated tests/wrappers/MyContract.tolk
+   Generated wrappers/MyContract.tolk

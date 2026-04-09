@@ -24,7 +24,7 @@ acton = ".acton"
 contracts = "contracts"
 gen = "gen"
 tests = "tests"
-wrappers = "tests/wrappers"
+wrappers = "wrappers"
 
 # Check full Acton.toml reference and all available keys:
 # [ACTON_DOCS_URL]/acton-toml

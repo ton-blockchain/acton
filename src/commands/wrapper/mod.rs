@@ -112,6 +112,9 @@ fn build_model(
         .map(ToOwned::to_owned);
     let configured_tolk_test_output_dir =
         config.tolk_wrapper_test_output_dir().map(ToOwned::to_owned);
+    let mapped_wrapper_output_dir = mappings
+        .as_ref()
+        .and_then(|mappings| mappings.get("@wrappers").cloned());
     let storage = abi.resolve_storage_struct()?;
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let storage_path = storage
@@ -129,6 +132,7 @@ fn build_model(
         wrapper_output_dir,
         configured_tolk_output_dir,
         configured_typescript_output_dir,
+        mapped_wrapper_output_dir,
         generate_typescript,
     );
     let test_path = resolve_test_path(
@@ -265,6 +269,7 @@ pub fn wrapper_cmd(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_wrapper_path(
     project_root: &Path,
     contract_name: &str,
@@ -272,6 +277,7 @@ fn resolve_wrapper_path(
     wrapper_output_dir: Option<String>,
     configured_tolk_output_dir: Option<String>,
     configured_ts_output_dir: Option<String>,
+    mapped_wrapper_output_dir: Option<String>,
     generate_typescript: bool,
 ) -> PathBuf {
     if let Some(wrapper_output) = non_empty_path(wrapper_output) {
@@ -298,8 +304,12 @@ fn resolve_wrapper_path(
             .join(&file_name);
     }
 
-    // default path for Tolk wrappers
-    project_root.join("tests").join("wrappers").join(&file_name)
+    if let Some(mapped_wrapper_output_dir) = non_empty_path(mapped_wrapper_output_dir) {
+        return resolve_project_config_path(project_root, &mapped_wrapper_output_dir)
+            .join(&file_name);
+    }
+
+    project_root.join("wrappers").join(&file_name)
 }
 
 fn resolve_test_path(

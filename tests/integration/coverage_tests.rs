@@ -14,7 +14,7 @@ const COUNTER_TEMPLATE_CONTRACT: &str =
 const COUNTER_TEMPLATE_TYPES: &str =
     include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
 const COUNTER_TEMPLATE_WRAPPER: &str =
-    include_str!("../../src/commands/new/templates/counter/tests/wrappers/Counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
 
@@ -60,11 +60,11 @@ fn build_counter_template_project(name: &str, test_source: &str) -> Project {
     let project = ProjectBuilder::new(name)
         .contract("counter", COUNTER_TEMPLATE_CONTRACT)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
-        .file("tests/wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
+        .file("wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
         .mapping("acton", "./.acton")
         .mapping("contracts", "contracts")
-        .mapping("wrappers", "tests/wrappers")
+        .mapping("wrappers", "wrappers")
         .build();
     project.acton().init().run().success();
     project
@@ -101,12 +101,12 @@ fn build_jetton_template_project(name: &str) -> Project {
             "src/commands/new/templates/jetton/contracts/storage.tolk",
         )
         .file_from_path(
-            "tests/wrappers/JettonMinter",
-            "src/commands/new/templates/jetton/tests/wrappers/JettonMinter.tolk",
+            "wrappers/JettonMinter",
+            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
         )
         .file_from_path(
-            "tests/wrappers/JettonWallet",
-            "src/commands/new/templates/jetton/tests/wrappers/JettonWallet.tolk",
+            "wrappers/JettonWallet",
+            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
         )
         .test_file_from_path(
             "wallet",
@@ -114,7 +114,7 @@ fn build_jetton_template_project(name: &str) -> Project {
         )
         .mapping("acton", "./.acton")
         .mapping("contracts", "contracts")
-        .mapping("wrappers", "tests/wrappers")
+        .mapping("wrappers", "wrappers")
         .build();
     project.acton().init().run().success();
     project

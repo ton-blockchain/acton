@@ -108,9 +108,9 @@ A typical contract-only template project starts with the following structure:
   </Folder>
   <Folder name="tests" defaultOpen>
     <File name="contract.test.tolk" />
-    <Folder name="wrappers">
-      <File name="Contract.tolk" />
-    </Folder>
+  </Folder>
+  <Folder name="wrappers" defaultOpen>
+    <File name="Contract.tolk" />
   </Folder>
   <File name="Acton.toml" />
   <File name=".env" />
@@ -126,7 +126,7 @@ A typical contract-only template project starts with the following structure:
 - **`contracts/`**: This is where your `.tolk` smart contract source files live.
 - **`scripts/`**: Contains auxiliary Tolk scripts for deployment, administration, and interaction with your contracts.
 - **`tests/`**: Contains your unit and integration tests.
-- **`tests/wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
+- **`wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
 - **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
 - **`.env`**: Local environment variables template (includes commented `TONCENTER_API_KEY` hint).
 - **`.editorconfig`**: Shared formatting defaults for the generated project.
@@ -158,9 +158,9 @@ changes to keep contracts and frontend separate:
     </Folder>
     <Folder name="tests" defaultOpen>
       <File name="counter.test.tolk" />
-      <Folder name="wrappers">
-        <File name="Counter.tolk" />
-      </Folder>
+    </Folder>
+    <Folder name="wrappers" defaultOpen>
+      <File name="Counter.tolk" />
     </Folder>
     <Folder name="scripts" defaultOpen>
       <File name="deploy.tolk" />
@@ -184,7 +184,8 @@ changes to keep contracts and frontend separate:
 </Files>
 
 - **`contracts/src/`**: Tolk contract sources and shared types.
-- **`contracts/tests/`**: Tolk tests and generated Tolk wrappers.
+- **`contracts/tests/`**: Tolk tests.
+- **`contracts/wrappers/`**: Generated Tolk wrappers used by tests and scripts.
 - **`contracts/scripts/`**: Contract deployment and maintenance scripts.
 - **`wrappers/`**: Generated TypeScript wrappers consumed by the frontend.
 - **`app/`**: React + Vite application.

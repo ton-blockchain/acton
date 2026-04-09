@@ -72,7 +72,7 @@ fn test_wrapper_generation_defaults() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_defaults/wrapper.tolk.txt",
@@ -100,7 +100,7 @@ fn test_wrapper_generation_without_test_stub() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_without_test_stub/wrapper.tolk.txt",
@@ -368,7 +368,7 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
     if tests_dir.exists() {
         fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
     }
-    fs::create_dir_all(generated_project_path.join("tests/wrappers"))
+    fs::create_dir_all(generated_project_path.join("wrappers"))
         .expect("Failed to recreate wrappers directory");
 
     let minter_output = workspace
@@ -395,12 +395,12 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
 
     assert!(
         generated_project_path
-            .join("tests/wrappers/JettonMinterContract.tolk")
+            .join("wrappers/JettonMinterContract.tolk")
             .exists()
     );
     assert!(
         generated_project_path
-            .join("tests/wrappers/JettonWalletContract.tolk")
+            .join("wrappers/JettonWalletContract.tolk")
             .exists()
     );
     assert!(
@@ -417,14 +417,14 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
     wallet_output
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("tests/wrappers/JettonMinterContract.tolk")
+                .join("wrappers/JettonMinterContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_minter_wrapper.tolk.txt",
         )
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("tests/wrappers/JettonWalletContract.tolk")
+                .join("wrappers/JettonWalletContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_wallet_wrapper.tolk.txt",
@@ -506,7 +506,7 @@ fn test_wrapper_generation_with_types_and_storage_in_the_same_file() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_types_and_storage_in_the_same_file/wrapper.tolk.txt",
@@ -576,7 +576,7 @@ fn test_wrapper_generation_with_several_storages() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/first_wrapper.tolk.txt",
@@ -653,7 +653,7 @@ fn test_wrapper_generation_with_typed_cell_field_in_storage() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_field_in_storage/wrapper.tolk.txt",
@@ -736,7 +736,7 @@ fn test_wrapper_generation_with_typed_cell_field() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_field/wrapper.tolk.txt",
@@ -814,7 +814,7 @@ fn test_wrapper_generation_with_typed_cell_param() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_param/wrapper.tolk.txt",
@@ -850,7 +850,7 @@ fn test_wrapper_generation_with_snake_case_getters() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_snake_case_getters/wrapper.tolk.txt",
@@ -1033,7 +1033,7 @@ fn test_with_several_files_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_with_several_files_contract/wrapper.tolk.txt",
@@ -1079,7 +1079,7 @@ fn test_wrapper_with_storage_in_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_with_storage_in_contract/wrapper.tolk.txt",
@@ -1125,7 +1125,7 @@ fn test_wrapper_with_message_in_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_with_message_in_contract/wrapper.tolk.txt",
@@ -1170,7 +1170,7 @@ fn test_generated_wrapper_test_runs_with_contract_local_types() {
     if tests_dir.exists() {
         fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
     }
-    fs::create_dir_all(generated_project_path.join("tests/wrappers"))
+    fs::create_dir_all(generated_project_path.join("wrappers"))
         .expect("Failed to recreate wrappers directory");
 
     fs::write(
@@ -1306,7 +1306,7 @@ fn test_wrapper_generation_with_mappings() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/Main.tolk")
+                .join("wrappers/Main.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_mappings/wrapper.tolk.txt",
@@ -1430,7 +1430,7 @@ fn test_wrapper_generation_prefers_specific_mapping() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/Main.tolk")
+                .join("wrappers/Main.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_prefers_specific_mapping/wrapper.tolk.txt",
@@ -1553,7 +1553,7 @@ fn test_wrapper_generation_with_conflicting_field_names() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_conflicting_field_names/wrapper.tolk.txt",

@@ -8,7 +8,7 @@ tests, and a deployment script you can extend.
 
 - `contracts/contract.tolk` implements a small ownable contract.
 - `contracts/types.tolk` defines storage, messages, and starter error codes.
-- `tests/wrappers/Empty.tolk` is the wrapper used by tests and scripts.
+- `wrappers/Empty.tolk` is the wrapper used by tests and scripts.
 - `tests/contract.test.tolk` covers deployment and ownership transfer.
 - `scripts/deploy.tolk` deploys the contract with `deployer` as the initial
   owner and reads the owner back after deployment.
@@ -37,7 +37,7 @@ acton run deploy-emulation
 
 1. Extend `contracts/types.tolk` with your storage and messages.
 2. Update `contracts/contract.tolk` with your contract logic.
-3. Adjust `tests/wrappers/Empty.tolk` to match the new ABI, or regenerate it
+3. Adjust `wrappers/Empty.tolk` to match the new ABI, or regenerate it
    with `acton wrapper empty`.
 4. Extend `tests/contract.test.tolk` with the scenarios you care about.
 5. Update `scripts/deploy.tolk` with the storage and deployment flow you want.
