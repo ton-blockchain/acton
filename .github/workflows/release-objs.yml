@@ -484,10 +484,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p artifacts/fift-stdlib
+          mkdir -p artifacts
           cp -R crypto/smartcont/tolk-stdlib artifacts/
-          cp crypto/fift/lib/Asm.fif artifacts/fift-stdlib/
-          cp crypto/fift/lib/Fift.fif artifacts/fift-stdlib/
+          cp -R crypto/fift/lib artifacts/fift-stdlib
 
       - name: Validate TON stdlib sources
         shell: bash
@@ -496,8 +495,7 @@ jobs:
           set -euo pipefail
 
           test -d artifacts/tolk-stdlib
-          test -f artifacts/fift-stdlib/Asm.fif
-          test -f artifacts/fift-stdlib/Fift.fif
+          test -d artifacts/fift-stdlib
           ls -lh artifacts artifacts/tolk-stdlib artifacts/fift-stdlib
 
       - name: Pack TON stdlib sources
