@@ -461,9 +461,72 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  package-stdlib-sources:
+    name: Package TON stdlib sources
+    needs: [ prepare ]
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone TON repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          repository: ${{ env.TON_REPOSITORY }}
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+
+      - name: Collect TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifacts/fift-stdlib
+          cp -R crypto/smartcont/tolk-stdlib artifacts/
+          cp crypto/fift/lib/Asm.fif artifacts/fift-stdlib/
+          cp crypto/fift/lib/Fift.fif artifacts/fift-stdlib/
+
+      - name: Validate TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          test -d artifacts/tolk-stdlib
+          test -f artifacts/fift-stdlib/Asm.fif
+          test -f artifacts/fift-stdlib/Fift.fif
+          ls -lh artifacts artifacts/tolk-stdlib artifacts/fift-stdlib
+
+      - name: Pack TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_NAME="ton-stdlib.tar.gz"
+
+          mkdir -p dist
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
+            tolk-stdlib \
+            fift-stdlib
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
+
+      - name: Upload TON stdlib artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ton-stdlib
+          path: |
+            dist/ton-stdlib.tar.gz
+            dist/ton-stdlib.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
   create-release-objs-release:
     name: Create Release Objs Release
-    needs: [ prepare, check-objs, generate-release-objs-manifest ]
+    needs: [ prepare, check-objs, generate-release-objs-manifest, package-stdlib-sources ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 
@@ -478,6 +541,12 @@ jobs:
           pattern: ton-objs-*
           path: dist
           merge-multiple: true
+
+      - name: Download TON stdlib artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ton-stdlib
+          path: dist
 
       - name: Delete previous release-objs release and tag
         env:
