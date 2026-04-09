@@ -367,11 +367,7 @@ fn confirm_impl(
 }
 
 extension!(prompt_wallet in (Context) with (message: String) using prompt_wallet_impl);
-fn prompt_wallet_impl(
-    ctx: &mut Context,
-    stack: &mut Tuple,
-    message: String,
-) -> anyhow::Result<()> {
+fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> anyhow::Result<()> {
     let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
 
     if wallet_names.is_empty() {
