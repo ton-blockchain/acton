@@ -94,10 +94,7 @@ pub fn script_cmd(
     let mappings = match ActonConfig::load() {
         Ok(config) => config.mappings(),
         Err(e) => {
-            eprintln!(
-                "  {} Failed to load Acton.toml: {e:#}",
-                "⚠".yellow().bold()
-            );
+            eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
             None
         }
     };

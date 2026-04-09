@@ -16,10 +16,7 @@ use walkdir::WalkDir;
 pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let config = ActonConfig::load()
         .map_err(|e| {
-            eprintln!(
-                "  {} Failed to load Acton.toml: {e:#}",
-                "⚠".yellow().bold()
-            );
+            eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
         })
         .ok();
     let fmt_settings = config.as_ref().and_then(|c| c.fmt.as_ref());

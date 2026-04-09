@@ -49,10 +49,7 @@ pub fn compile_cmd(
 
     let acton_config = config::ActonConfig::load()
         .map_err(|e| {
-            eprintln!(
-                "  {} Failed to load Acton.toml: {e:#}",
-                "⚠".yellow().bold()
-            );
+            eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
         })
         .ok();
 
