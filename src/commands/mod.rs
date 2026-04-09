@@ -26,6 +26,7 @@ pub mod script;
 pub mod simulator;
 pub mod studio;
 pub mod test;
+pub mod tsa;
 pub mod up;
 pub mod verify;
 pub mod wallet;

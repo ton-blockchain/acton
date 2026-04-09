@@ -75,6 +75,9 @@ All notable changes to this project will be documented in this file.
 
 ### CLI
 
+- `acton tsa check` runs custom TSA checkers against project contracts, with
+  typed Tolk helpers, SARIF reports, and ABI-decoded execution inputs.
+
 - `acton up --rollback` restores the previous version from the local backup
   that `acton up` creates before replacing the binary. The rollback is
   offline, picks the most recently modified backup, and is a no-op once the

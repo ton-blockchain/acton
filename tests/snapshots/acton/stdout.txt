@@ -9,6 +9,7 @@ Commands:
   test             [PATH]              Run tests from files or directories
   build            [CONTRACT_NAME]     Build one contract or every contract
   check            [TARGET]            Check project Tolk sources for errors
+  tsa              <COMMAND>           Run TSA custom checkers against Acton contracts
   script           <PATH> [ARGS...]    Run a standalone Tolk script file
   fmt              [PATHS...]          Format project Tolk source files
 
