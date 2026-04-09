@@ -885,7 +885,7 @@ fn test_project_root_full_flow_from_sibling_directory_on_new_project() {
     );
 
     assert!(
-        project_dir.join("build/empty.json").exists(),
+        project_dir.join("build/Empty.json").exists(),
         "build output should be created under project root when using --project-root"
     );
 

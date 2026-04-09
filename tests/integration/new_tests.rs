@@ -1196,7 +1196,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         .run()
         .success();
 
-    assert!(project_dir.join("build/counter.json").exists());
+    assert!(project_dir.join("build/Counter.json").exists());
     assert!(project_dir.join("dist/index.html").exists());
 }
 
