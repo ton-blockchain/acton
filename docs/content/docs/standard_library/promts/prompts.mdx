@@ -95,3 +95,24 @@ if (answer) {
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L72" />
 
+## `promptWallet`
+
+```tolk
+fun promptWallet(message: string): string
+```
+
+Prompts the user to select a wallet from the configured wallets.
+
+Behavior:
+- If no wallets are configured, returns `""`.
+- If only one wallet is configured, returns its name automatically.
+- If multiple wallets are configured, shows an interactive selection.
+- In non-interactive mode, returns `""`.
+
+Example:
+```tolk
+val walletName = promptWallet("Select a wallet:");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L88" />
+

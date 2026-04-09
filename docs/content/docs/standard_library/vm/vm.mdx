@@ -261,3 +261,41 @@ Invalid or malformed input (including non-BOC payloads) fails with an error like
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L169" />
 
+## `vm.parseAddress`
+
+```tolk
+fun vm.parseAddress(s: string): address
+```
+
+Parse a string representation of address into an internal [address](../../../tolk_standard_library/common/#address) value.
+
+Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+(base64/base64url with flags).
+Invalid input fails with an error.
+
+Example:
+```tolk
+val addr = vm.parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L183" />
+
+## `vm.parseInt`
+
+```tolk
+fun vm.parseInt(x: string): int
+```
+
+Parse a decimal string into an [int](../../../tolk_standard_library/common/#int) value.
+
+Accepts optional leading `-` sign followed by decimal digits.
+Invalid input (non-numeric characters, empty string) fails with an error.
+
+Example:
+```tolk
+val n = vm.parseInt("12345");
+val negative = vm.parseInt("-42");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L198" />
+
