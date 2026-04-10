@@ -5,13 +5,13 @@ on:
     branches:
       - master
     paths:
-      - ".github/workflows/grammars.yml"
+      - ".github/workflows/build-grammars.yml"
       - "crates/tree-sitter-**/**"
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/grammars.yml"
+      - ".github/workflows/build-grammars.yml"
       - "crates/tree-sitter-**/**"
 
 concurrency:
@@ -50,8 +50,6 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 22.x
-          cache-dependency-path: crates/tree-sitter-${{ matrix.language }}/yarn.lock
-          cache: "yarn"
 
       - name: Install dependencies
         working-directory: crates/tree-sitter-${{ matrix.language }}
