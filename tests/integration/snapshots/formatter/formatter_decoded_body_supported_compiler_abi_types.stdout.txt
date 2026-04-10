@@ -32,7 +32,7 @@
                        nibble: 0xABC0 (12 bits)
                        bytesTag: 0xCAFEBABE
                        rawCell: [BOC_HEX]
-                       mode: FmAbiMegaMode.Beta
+                       mode: { value: 2 }
                    }
                }
                tuples: {

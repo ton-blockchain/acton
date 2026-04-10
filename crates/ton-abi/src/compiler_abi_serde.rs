@@ -156,19 +156,27 @@ fn decode_enum(
 
     let encoded_ty = parse_enum_encoded_as(decl.encoded_as)?;
     let value = decode_type(data, abi, encoded_ty)?;
-
-    if let Some(member_name) = find_enum_member_name(&value, decl.members) {
-        return Ok(Data::Symbol(format!("{enum_name}.{member_name}")));
-    }
+    let label = find_enum_member_name(&value, decl.members).map_or_else(
+        || format!("{enum_name}({})", format_enum_encoded_value(&value)),
+        |member_name| format!("{enum_name}.{member_name}"),
+    );
 
     Ok(Data::Object(DataObject {
-        name: enum_name.to_owned(),
+        name: label,
         fields: vec![DataField {
             name: "value".to_owned(),
             field_type: encoded_ty.clone(),
             value,
         }],
     }))
+}
+
+fn format_enum_encoded_value(value: &Data) -> String {
+    match value {
+        Data::Number(value) => value.to_string(),
+        Data::Bool(value) => value.to_string(),
+        other => format!("{other:?}"),
+    }
 }
 
 fn decode_union(
@@ -829,7 +837,7 @@ mod tests {
     }
 
     #[test]
-    fn decodes_enum_to_symbol() {
+    fn decodes_enum_to_object_with_raw_value() {
         let mut abi = empty_abi();
         abi.declarations = vec![ABIDeclaration::Enum {
             name: "Color".to_owned(),
@@ -863,11 +871,18 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(format!("{data:?}"), "Symbol(\"Color.Blue\")");
+        let Data::Object(object) = data else {
+            panic!("expected object");
+        };
+        assert_eq!(object.name, "Color.Blue");
+        assert_eq!(object.fields.len(), 1);
+        assert_eq!(object.fields[0].name, "value");
+        assert!(matches!(object.fields[0].field_type, Ty::UintN { n: 8 }));
+        assert!(matches!(object.fields[0].value, Data::Number(_)));
     }
 
     #[test]
-    fn decodes_bool_encoded_enum_to_symbol() {
+    fn decodes_bool_encoded_enum_to_object_with_raw_value() {
         let mut abi = empty_abi();
         abi.declarations = vec![ABIDeclaration::Enum {
             name: "Toggle".to_owned(),
@@ -901,7 +916,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(format!("{data:?}"), "Symbol(\"Toggle.On\")");
+        let Data::Object(object) = data else {
+            panic!("expected object");
+        };
+        assert_eq!(object.name, "Toggle.On");
+        assert_eq!(object.fields.len(), 1);
+        assert_eq!(object.fields[0].name, "value");
+        assert!(matches!(object.fields[0].field_type, Ty::Bool));
+        assert!(matches!(object.fields[0].value, Data::Bool(true)));
     }
 
     #[test]

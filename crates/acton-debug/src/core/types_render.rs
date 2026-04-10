@@ -34,6 +34,11 @@ pub enum RenderedValue {
         value: String,
         fields: Vec<(String, RenderedValue)>, // "decoded" field with actual value
     },
+    EnumValue {
+        type_name: String,
+        value: String,
+        fields: Vec<(String, RenderedValue)>,
+    },
     UnionCase {
         type_name: String,
         variant_name: String,
@@ -95,6 +100,9 @@ impl RenderedValue {
             RenderedValue::CellOf {
                 type_name, value, ..
             } => (value.clone(), Some(type_name.clone())),
+            RenderedValue::EnumValue {
+                type_name, value, ..
+            } => (value.clone(), Some(type_name.clone())),
             RenderedValue::UnionCase {
                 type_name,
                 variant_name,
@@ -134,6 +142,7 @@ impl RenderedValue {
             RenderedValue::CellOf {
                 type_name, value, ..
             } => format!("{type_name} {value}"),
+            RenderedValue::EnumValue { value, .. } => value.clone(),
             RenderedValue::UnionCase { variant_name, .. } => variant_name.clone(),
             RenderedValue::Struct { type_name, .. } => type_name.clone(),
             RenderedValue::Address { legacy_value, .. } => legacy_value.clone(),
@@ -168,6 +177,7 @@ impl RenderedValue {
             RenderedValue::Address { fields, .. } => !fields.is_empty(),
             RenderedValue::CellLike { fields, .. } => !fields.is_empty(),
             RenderedValue::CellOf { fields, .. } => !fields.is_empty(),
+            RenderedValue::EnumValue { fields, .. } => !fields.is_empty(),
             RenderedValue::UnionCase { fields, .. } => !fields.is_empty(),
             RenderedValue::Tensor { items, .. } => !items.is_empty(),
             RenderedValue::ArrayOf { items, .. } => !items.is_empty(),
@@ -218,6 +228,7 @@ impl fmt::Display for RenderedValue {
             RenderedValue::CellOf {
                 type_name, value, ..
             } => write!(f, "{type_name} {value}"),
+            RenderedValue::EnumValue { value, .. } => write!(f, "{value}"),
             RenderedValue::UnionCase {
                 variant_name,
                 fields,
@@ -597,6 +608,14 @@ fn render_union_case(
     }
 }
 
+fn render_enum_value(ty: &Ty, value: impl Into<String>, raw_value: RenderedValue) -> RenderedValue {
+    RenderedValue::EnumValue {
+        type_name: ty.to_string(),
+        value: value.into(),
+        fields: vec![("value".to_owned(), raw_value)],
+    }
+}
+
 fn map_type_name(k: &Ty, v: &Ty) -> String {
     format!("map<{k}, {v}>")
 }
@@ -773,6 +792,17 @@ fn render_typed_cell(symbols: &SourceMap, ty: &Ty, inner: &Ty, cell: &CellLike) 
 
 fn render_abi_data(data: ParsedAbiData, ty: &Ty) -> RenderedValue {
     match data {
+        ParsedAbiData::Object(object) if matches!(ty, Ty::EnumRef { .. }) => {
+            let mut fields = object.fields.into_iter();
+            match fields.next() {
+                Some(field) => render_enum_value(
+                    ty,
+                    object.name,
+                    render_abi_data(field.value, &field.field_type),
+                ),
+                None => typed_leaf_for_ty(ty, object.name),
+            }
+        }
         ParsedAbiData::Object(object) => RenderedValue::Struct {
             type_name: object.name,
             fields: object
@@ -855,6 +885,9 @@ fn format_abi_map_key(data: &ParsedAbiData, key_ty: &Ty) -> String {
         ParsedAbiData::Bool(value) => value.to_string(),
         ParsedAbiData::String(value) => format!("\"{value}\""),
         ParsedAbiData::Symbol(value) => value.clone(),
+        ParsedAbiData::Object(object) if matches!(key_ty, Ty::EnumRef { .. }) => {
+            object.name.clone()
+        }
         ParsedAbiData::Address(value) => value.to_string(),
         ParsedAbiData::ExtAddress(value) => value.to_string(),
         ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
@@ -1378,7 +1411,11 @@ fn debug_format(
                     || format!("{}({})", enum_ref.name, s),
                     |m| format!("{}.{}", enum_ref.name, m.name),
                 );
-                typed_leaf_for_ty(ty, text)
+                let slot = VmStackValue::Integer(s.clone());
+                let slots = [SlotValue::Live(&slot)];
+                let mut sub = StackReader::new(&slots);
+                let raw_value = debug_format(symbols, &mut sub, &enum_ref.encoded_as, false);
+                render_enum_value(ty, text, raw_value)
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM int"),
@@ -1673,6 +1710,38 @@ mod tests {
     }
 
     #[test]
+    fn render_abi_enum_value_exposes_raw_value_field() {
+        let rendered = render_abi_data(
+            ParsedAbiData::Object(DataObject {
+                name: "Color.Blue".to_owned(),
+                fields: vec![DataField {
+                    name: "value".to_owned(),
+                    field_type: Ty::UintN { n: 8 },
+                    value: ParsedAbiData::Number(2.into()),
+                }],
+            }),
+            &Ty::EnumRef {
+                enum_name: "Color".to_owned(),
+            },
+        );
+
+        let RenderedValue::EnumValue {
+            type_name,
+            value,
+            fields,
+        } = rendered
+        else {
+            panic!("expected enum value");
+        };
+        assert_eq!(type_name, "Color");
+        assert_eq!(value, "Color.Blue");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, "value");
+        assert_eq!(fields[0].1.dap_parts().0, "2");
+        assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("uint8"));
+    }
+
+    #[test]
     fn render_openable_cell_like_shows_bits_refs_and_hash() {
         let child = CellBuilder::new().build().unwrap();
         let mut builder = CellBuilder::new();
@@ -1705,6 +1774,52 @@ mod tests {
         assert_eq!(fields[1].1.dap_parts().0, "1");
         assert_eq!(fields[2].0, "hash");
         assert_eq!(fields[2].1.dap_parts().0, render_cell_hash(&cell));
+    }
+
+    #[test]
+    fn render_stack_enum_value_exposes_raw_value_field() {
+        let mut symbols_json = serde_json::json!({
+            "files": [],
+            "declarations": [{
+                "kind": "enum",
+                "name": "Color",
+                "ident_loc": [0, 0, 0, 0, 0],
+                "encoded_as": {"kind": "uintN", "n": 8},
+                "members": [
+                    {"name": "Red", "value": "1"},
+                    {"name": "Blue", "value": "2"}
+                ]
+            }],
+            "unique_ty": [],
+            "functions": [],
+            "debug_marks": []
+        });
+        let symbols: SourceMap = serde_json::from_value(symbols_json.take()).unwrap();
+
+        let stack_values = [VmStackValue::Integer("2".to_owned())];
+        let slots = [SlotValue::Live(&stack_values[0])];
+        let rendered = debug_print_from_stack(
+            &symbols,
+            &slots,
+            &Ty::EnumRef {
+                enum_name: "Color".to_owned(),
+            },
+        );
+
+        let RenderedValue::EnumValue {
+            type_name,
+            value,
+            fields,
+        } = rendered
+        else {
+            panic!("expected enum value");
+        };
+        assert_eq!(type_name, "Color");
+        assert_eq!(value, "Color.Blue");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, "value");
+        assert_eq!(fields[0].1.dap_parts().0, "2");
+        assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("uint8"));
     }
 
     #[test]

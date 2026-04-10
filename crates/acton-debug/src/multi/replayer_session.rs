@@ -594,6 +594,7 @@ impl ReplayerDebugSession {
             RenderedValue::Struct { fields, .. }
             | RenderedValue::Address { fields, .. }
             | RenderedValue::CellLike { fields, .. }
+            | RenderedValue::EnumValue { fields, .. }
             | RenderedValue::UnionCase { fields, .. }
             | RenderedValue::CellOf { fields, .. } => fields
                 .iter()
