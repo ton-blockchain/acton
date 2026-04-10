@@ -10,9 +10,6 @@ on:
       - "crates/tree-sitter-tasm"
       - "crates/tree-sitter-tlb"
       - "crates/tree-sitter-tolk"
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 concurrency:
@@ -23,7 +20,7 @@ permissions: { }
 
 jobs:
   grammar-audit:
-    name: Grammar audit
+    name: Yarn audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
@@ -43,5 +40,16 @@ jobs:
         with:
           node-version: 22.x
 
-      - name: Run Bun audit
-        run: yarn npm audit --severity=moderate
+      - name: Run Yarn audits
+        shell: bash
+        # language=Bash
+        run: |
+          while IFS= read -r lockfile; do
+            dir="$(dirname "$lockfile")"
+            echo "::group::yarn npm audit (${dir#./})"
+            (
+              cd "$dir"
+              yarn npm audit --all --recursive --severity=moderate
+            )
+            echo "::endgroup::"
+          done < <(find . -name yarn.lock -not -path '*/node_modules/*' | sort)

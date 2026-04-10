@@ -11,9 +11,6 @@ on:
       - "crates/acton-litenode-ui"
       - "crates/acton-shared-ui"
       - "crates/acton-test-ui"
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 concurrency:
