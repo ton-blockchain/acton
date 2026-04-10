@@ -25,7 +25,7 @@ output-format = "sarif"
 Behavior notes:
 
 - In project-wide mode (`acton check` without target), contracts matching `exclude` are skipped as roots.
-- If you pass an explicit target (`acton check <contract-id>` or `acton check <file.tolk>`), that root target is still analyzed.
+- If you pass an explicit target (`acton check <contract-name>` or `acton check <file.tolk>`), that root target is still analyzed.
 - Excluded dependency files can still be parsed/resolved, but their lint diagnostics are filtered out.
 - Compiler errors are never filtered by `exclude`.
 
@@ -49,21 +49,21 @@ Supported levels:
 
 ## Per-Contract Overrides
 
-Override rule levels for one contract id:
+Override rule levels for a specific contract:
 
 ```toml
-[contracts.counter]
+[contracts.Counter]
 display-name = "Counter"
-src = "contracts/counter.tolk"
+src = "contracts/Counter.tolk"
 
 [lint.rules]
 unused-variable = "deny"
 
-[lint.rules.counter]
+[lint.rules.Counter]
 unused-variable = "allow"
 ```
 
-The subsection key (`counter` above) must match the contract key under `[contracts]`.
+The subsection name (`Counter` above) must match `[contracts.NAME]`.
 
 ## Inline Suppressions
 

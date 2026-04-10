@@ -195,9 +195,9 @@ If passed without a value, Acton uses \fBbuild/traces\fR\&.
 Run tests in mutation testing mode.
 .RE
 .sp
-\fB\-\-mutate\-contract\fR \fIcontract\-id\fR
+\fB\-\-mutate\-contract\fR \fIcontract\-name\fR
 .RS 4
-Contract ID to mutate during mutation testing.
+Contract name to mutate during mutation testing.
 .RE
 .sp
 \fB\-\-mutation\-diff\fR \fImode\fR
@@ -558,7 +558,7 @@ acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet
+acton test \-\-mutate \-\-mutate\-contract Wallet
 .fi
 .RE
 .RE
@@ -568,7 +568,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-diff worktree
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff worktree
 .fi
 .RE
 .RE
@@ -578,7 +578,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-diff worktree
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-diff branch \-\-mutation\-levels critical,major
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \-\-mutation\-levels critical,major
 .fi
 .RE
 .RE
@@ -588,7 +588,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-diff branch \-\-
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-id 2
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-id 2
 .fi
 .RE
 .RE
@@ -599,7 +599,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-id 2
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-session\-id wallet\-pr\-42 \-\-mutation\-diff worktree
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wallet\-pr\-42 \-\-mutation\-diff worktree
 .fi
 .RE
 .sp
@@ -609,7 +609,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-session\-id wall
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-minimum\-percent 85
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-minimum\-percent 85
 .fi
 .RE
 .sp
@@ -619,7 +619,7 @@ acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-minimum\-percent
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract wallet \-\-mutation\-workers 4
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-workers 4
 .fi
 .RE
 .sp

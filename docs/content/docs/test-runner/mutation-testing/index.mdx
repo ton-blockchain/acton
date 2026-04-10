@@ -38,10 +38,10 @@ Beyond testing gaps, mutation testing can also reveal implementation issues. For
 
 ## Running Mutation Tests
 
-To run mutation tests, you need to specify the contract you want to mutate using the `--mutate-contract` flag. This corresponds to the contract ID defined in your `Acton.toml`.
+To run mutation tests, you need to specify the contract you want to mutate using the `--mutate-contract` flag. This corresponds to the contract name defined in your `Acton.toml`.
 
 ```bash
-acton test --mutate --mutate-contract wallet
+acton test --mutate --mutate-contract Wallet
 ```
 
 ### Options
@@ -49,7 +49,7 @@ acton test --mutate --mutate-contract wallet
 | Option                            | Description                                                                        |
 |-----------------------------------|------------------------------------------------------------------------------------|
 | `--mutate`                        | Enables mutation testing mode.                                                     |
-| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.                              |
+| `--mutate-contract <NAME>`        | Specifies which contract from `Acton.toml` to mutate.                            |
 | `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope.  |
 | `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.               |
 | `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                       |
@@ -70,7 +70,7 @@ Use `--mutation-workers <N>` when you want to cap or raise concurrency for a
 specific run:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-workers 4
+acton test --mutate --mutate-contract Wallet --mutation-workers 4
 ```
 
 This is useful when you want to reduce CPU, disk, or process pressure on a
@@ -99,16 +99,16 @@ Examples:
 
 ```bash
 # Only mutate lines changed in the current worktree
-acton test --mutate --mutate-contract wallet --mutation-diff worktree
+acton test --mutate --mutate-contract Wallet --mutation-diff worktree
 
 # Compare against an explicit ref or commit
-acton test --mutate --mutate-contract wallet --mutation-diff ref --mutation-diff-ref HEAD~1
+acton test --mutate --mutate-contract Wallet --mutation-diff ref --mutation-diff-ref HEAD~1
 
 # Compare the current branch against its upstream merge-base
-acton test --mutate --mutate-contract wallet --mutation-diff branch
+acton test --mutate --mutate-contract Wallet --mutation-diff branch
 
 # Compare the current branch against a specific branch instead of upstream
-acton test --mutate --mutate-contract wallet --mutation-diff branch --mutation-diff-ref origin/main
+acton test --mutate --mutate-contract Wallet --mutation-diff branch --mutation-diff-ref origin/main
 ```
 
 #### Level and rule filters
@@ -116,20 +116,20 @@ acton test --mutate --mutate-contract wallet --mutation-diff branch --mutation-d
 Use `--mutation-levels` to restrict the run to selected rule levels:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-levels critical,major
+acton test --mutate --mutate-contract Wallet --mutation-levels critical,major
 ```
 
 Use `--mutation-disable-rules` to exclude noisy or intentionally ignored rules:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-disable-rules flip_plus --mutation-disable-rules flip_minus
+acton test --mutate --mutate-contract Wallet --mutation-disable-rules flip_plus --mutation-disable-rules flip_minus
 ```
 
 All mutation filters compose. For example, this command runs only `critical`
 mutations on lines changed in the current worktree and skips one specific rule:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation-levels critical --mutation-disable-rules remove_logical_not
+acton test --mutate --mutate-contract Wallet --mutation-diff worktree --mutation-levels critical --mutation-disable-rules remove_logical_not
 ```
 
 The reported mutation score always reflects only the mutants that remain after
@@ -169,7 +169,7 @@ Example:
 Then run:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-rules-file mutation-rules.json
+acton test --mutate --mutate-contract Wallet --mutation-rules-file mutation-rules.json
 ```
 
 Currently, JSON rules support only the serializable `query` matcher and `remove`
@@ -186,7 +186,7 @@ the same run later:
 
 ```bash
 # Start or resume a session for the current worktree changes
-acton test --mutate --mutate-contract wallet --mutation-diff worktree --mutation-session-id wallet-worktree
+acton test --mutate --mutate-contract Wallet --mutation-diff worktree --mutation-session-id wallet-worktree
 ```
 
 To resume successfully, keep the same contract and the same mutation filters.
@@ -205,10 +205,10 @@ Examples:
 
 ```bash
 # Re-run one specific mutant
-acton test --mutate --mutate-contract wallet --mutation-id 2
+acton test --mutate --mutate-contract Wallet --mutation-id 2
 
 # Re-run several mutants from the same filtered run
-acton test --mutate --mutate-contract wallet --mutation-id 1,3
+acton test --mutate --mutate-contract Wallet --mutation-id 1,3
 ```
 
 If you also use filters such as `--mutation-diff`, `--mutation-levels`, or
@@ -222,7 +222,7 @@ Use `--mutation-minimum-percent` to turn mutation testing into a CI quality
 gate:
 
 ```bash
-acton test --mutate --mutate-contract wallet --mutation-minimum-percent 85
+acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
 ```
 
 The threshold is applied to the final mutation score after filters are applied.
@@ -245,14 +245,14 @@ CLI flags override `[test.mutation]` for the current run.
 
 ### Requirements
 
-For mutation testing to work correctly, your tests must build contracts using their ID from `Acton.toml`, not direct file paths:
+For mutation testing to work correctly, your tests must build contracts using their name from `Acton.toml`, not direct file paths:
 
 ```tolk
-// ✅ Correct — uses contract ID
-val wallet = build("jetton-wallet");
+// ✅ Correct — uses contract name
+val wallet = build("JettonWallet");
 
 // ❌ Incorrect — uses direct file path
-val wallet = build("wallet", "./contracts/jetton-wallet-contract.tolk");
+val wallet = build("JettonWallet", "./contracts/JettonWallet.tolk");
 ```
 
 Mutation testing analyzes the contract specified by `--mutate-contract` and its dependencies. When tests use direct file paths, the mutated code won't be used, making mutation testing inefficient.
@@ -273,20 +273,20 @@ After running mutation tests, you will see a summary of the results:
 Mutation Testing
 ────────────────────────────────────────────────────────────
 Session:  4949ed3b0ae13461
-Contract: Wallet
-Source:   .jetton/contracts/jetton-wallet-contract.tolk
+Contract: JettonWallet
+Source:   contracts/JettonWallet.tolk
 Files:    6
 Mutants:  51
 
-  ◉ Mutation 1/51 contracts/jetton-wallet.tolk:36:17 Remove assert statements KILLED
-  ◉ Mutation 2/51 contracts/jetton-wallet.tolk:77:13 Remove assert statements SURVIVED
-  ◉ Mutation 3/51 contracts/jetton-wallet.tolk:78:13 Remove assert statements KILLED
-  ◉ Mutation 4/51 contracts/jetton-wallet.tolk:81:13 Remove assert statements KILLED
-  ◉ Mutation 5/51 contracts/jetton-wallet.tolk:82:13 Remove assert statements KILLED
-  ◉ Mutation 6/51 contracts/jetton-wallet.tolk:87:13 Remove assert statements KILLED
-  ◉ Mutation 7/51 contracts/jetton-wallet.tolk:113:13 Remove assert statements KILLED
-  ◉ Mutation 8/51 contracts/jetton-wallet.tolk:114:13 Remove assert statements KILLED
-  ◉ Mutation 9/51 contracts/jetton-wallet.tolk:134:13 Remove assert statements SURVIVED
+  ◉ Mutation 1/51 contracts/JettonWallet.tolk:36:17 Remove assert statements KILLED
+  ◉ Mutation 2/51 contracts/JettonWallet.tolk:77:13 Remove assert statements SURVIVED
+  ◉ Mutation 3/51 contracts/JettonWallet.tolk:78:13 Remove assert statements KILLED
+  ◉ Mutation 4/51 contracts/JettonWallet.tolk:81:13 Remove assert statements KILLED
+  ◉ Mutation 5/51 contracts/JettonWallet.tolk:82:13 Remove assert statements KILLED
+  ◉ Mutation 6/51 contracts/JettonWallet.tolk:87:13 Remove assert statements KILLED
+  ◉ Mutation 7/51 contracts/JettonWallet.tolk:113:13 Remove assert statements KILLED
+  ◉ Mutation 8/51 contracts/JettonWallet.tolk:114:13 Remove assert statements KILLED
+  ◉ Mutation 9/51 contracts/JettonWallet.tolk:134:13 Remove assert statements SURVIVED
   ...
 ```
 
@@ -304,7 +304,7 @@ For survived mutants, Acton provides a diff showing exactly what was changed and
   Rule:  Remove assert statements [remove_assert]
   Level: critical
   Group: assertion
-  at contracts/jetton-minter.tolk:46:13
+  at contracts/JettonMinter.tolk:46:13
     44 │
     45 │         RequestWalletAddress => {
     46 │             assert (

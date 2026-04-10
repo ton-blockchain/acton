@@ -348,7 +348,7 @@ enum Commands {
             long,
             help = "Contract to mutate during mutation testing",
             help_heading = "Mutation Testing",
-            value_name = "CONTRACT_ID"
+            value_name = "CONTRACT_NAME"
         )]
         mutate_contract: Option<String>,
         #[arg(
@@ -441,7 +441,7 @@ enum Commands {
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract ID to generate wrapper", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to generate wrapper", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(
             long,
@@ -571,7 +571,7 @@ enum Commands {
         after_help = detailed_help_pointer("build")
     )]
     Build {
-        #[arg(help = "Contract ID to build (defaults to all if not specified)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to build (defaults to all if not specified)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Clear compilation cache before building")]
         clear_cache: bool,
@@ -677,7 +677,7 @@ enum Commands {
         after_help = detailed_help_pointer("verify")
     )]
     Verify {
-        #[arg(help = "Contract ID to verify (prompts if not provided)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to verify (prompts if not provided)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
@@ -701,7 +701,7 @@ enum Commands {
         after_help = detailed_help_pointer("check")
     )]
     Check {
-        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
+        #[arg(help = "Contract name to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
@@ -904,7 +904,7 @@ enum Commands {
     InternalRegisterContract {
         #[arg(help = "Path to the contract file")]
         path: String,
-        #[arg(long, help = "Contract ID")]
+        #[arg(long, help = "Contract name")]
         id: Option<String>,
     },
 }
@@ -977,7 +977,7 @@ pub enum LitenodeCommand {
 pub enum LibraryCommand {
     #[command(about = "Publish a library to the blockchain")]
     Publish {
-        #[arg(help = "Contract ID to publish (see --code to pass arbitrary code)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to publish (see --code to pass arbitrary code)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Code to use instead of compiling contract")]
         code: Option<String>,
@@ -1210,7 +1210,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let core_commands = vec![("new", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
-        ("build", "[CONTRACT_ID]"),
+        ("build", "[CONTRACT_NAME]"),
         ("check", "[TARGET]"),
         ("script", "<PATH> [ARGS...]"),
         ("fmt", "[PATHS...]"),
@@ -1218,7 +1218,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let blockchain_commands = vec![
         ("wallet", "<COMMAND>"),
         ("rpc", "<COMMAND>"),
-        ("verify", "[CONTRACT_ID]"),
+        ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         ("litenode", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
@@ -1226,7 +1226,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let tooling_commands = vec![
         ("run", "<SCRIPT> [ARGS...]"),
         ("compile", "<PATH>"),
-        ("wrapper", "<CONTRACT_ID>"),
+        ("wrapper", "<CONTRACT_NAME>"),
         ("disasm", "[BOC_FILE]"),
         ("doc", "tvm <QUERY...>"),
     ];

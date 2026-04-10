@@ -25,9 +25,9 @@ description = "The Best Counter Ever"
 version = "0.1.0"
 license = "MIT"
 
-[contracts.counter]
+[contracts.Counter]
 display-name = "Counter"
-src = "contracts/counter.tolk"
+src = "contracts/Counter.tolk"
 depends = []
 ```
 
@@ -48,18 +48,18 @@ Acton supports all three approaches and provides convenient file generation for 
 Let's imagine we have a Jetton Minter and Jetton Wallet, and we need the Wallet code inside the Minter. All you need to do to embed the Wallet code into the Minter is to specify the dependency in Acton.toml:
 
 ```toml
-[contracts.jetton-minter]
+[contracts.JettonMinter]
 display-name = "Minter"
-src = "contracts/jetton-minter-contract.tolk"
-depends = ["jetton-wallet"]
+src = "contracts/JettonMinter.tolk"
+depends = ["JettonWallet"]
 
-[contracts.jetton-wallet]
+[contracts.JettonWallet]
 display-name = "Wallet"
-src = "contracts/jetton-wallet-contract.tolk"
+src = "contracts/JettonWallet.tolk"
 depends = []
 ```
 
-Now after calling `acton build`, a file `gen/jetton-wallet_code.tolk` will appear in the `gen/` folder with the function `jettonWalletCompiledCode` which returns a Cell with the Wallet code.
+Now after calling `acton build`, a file `gen/JettonWallet_code.tolk` will appear in the `gen/` folder with the function `jettonWalletCompiledCode` which returns a Cell with the Wallet code.
 
 
 ### Library References
@@ -67,20 +67,20 @@ Now after calling `acton build`, a file `gen/jetton-wallet_code.tolk` will appea
 If you want to reference code through a library reference, specify the dependency kind in the `depends` array:
 
 ```toml
-[contracts.jetton-minter]
+[contracts.JettonMinter]
 display-name = "Minter"
-src = "contracts/jetton-minter-contract.tolk"
+src = "contracts/JettonMinter.tolk"
 depends = [
-  { name = "jetton-wallet", kind = "library_ref" }
+  { name = "JettonWallet", kind = "library_ref" }
 ]
 
-[contracts.jetton-wallet]
+[contracts.JettonWallet]
 display-name = "Wallet"
-src = "contracts/jetton-wallet-contract.tolk"
+src = "contracts/JettonWallet.tolk"
 depends = []
 ```
 
-The generated file `gen/jetton-wallet_code.tolk` will contain the function `jettonWalletCompiledCode` which references the library by its hash instead of embedding the full code.
+The generated file `gen/JettonWallet_code.tolk` will contain the function `jettonWalletCompiledCode` which references the library by its hash instead of embedding the full code.
 
 <Callout type="info">
 Check out the [Libraries](/docs/advanced/libraries) guide for more information on how to deploy and use libraries.

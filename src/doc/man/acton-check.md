@@ -10,7 +10,7 @@ acton-check --- Lint Tolk contracts and files
 
 ## DESCRIPTION
 
-Run the Tolk linter on the whole project, a specific contract ID from
+Run the Tolk linter on the whole project, a specific contract name from
 `Acton.toml`, or a single `.tolk` file.
 
 By default, Acton checks contracts from `Acton.toml` together with workspace
@@ -24,7 +24,7 @@ supports machine-readable output formats and rule explanations.
 {{#options}}
 
 {{#option "_target_" }}
-Contract ID from `Acton.toml` or path to a `.tolk` file.
+Contract name from `Acton.toml` or path to a `.tolk` file.
 {{/option}}
 
 {{#option "`--fix`" }}
@@ -73,9 +73,9 @@ Print an explanation for a lint rule.
   script roots that define `main()`
 - single-file mode relaxes `E014 (acton-import-in-contract)`
 - targets ending with `.tolk` are treated as file paths; other targets are
-  resolved as contract IDs from `Acton.toml`
-- use an explicit `.tolk` path such as `./contracts/counter.tolk` when a name
-  could be mistaken for a contract ID
+  resolved as contract names from `Acton.toml`
+- use an explicit `.tolk` path such as `./contracts/Counter.tolk` when a name
+  could be mistaken for a contract name
 - inline suppressions use `// check-disable-next-line E001,S001`
 - `--fix` applies only linter-provided fixes; diagnostics without a safe fix
   remain in the report
@@ -95,16 +95,16 @@ Print an explanation for a lint rule.
    acton check
    ```
 
-2. Check a specific contract by ID:
+2. Check a specific contract by name:
 
    ```bash
-   acton check counter
+   acton check Counter
    ```
 
 3. Check one file:
 
    ```bash
-   acton check counter.tolk
+   acton check ./contracts/Counter.tolk
    ```
 
 4. Emit SARIF to a file:

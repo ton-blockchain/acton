@@ -56,7 +56,7 @@ Write VM and executor logs into the specified directory.
 {{#options}}
 
 {{#option "`--contract` _name_" }}
-Contract ID from `Acton.toml` used to build a source-level trace for the
+Contract name from `Acton.toml` used to build a source-level trace for the
 retraced transaction.
 {{/option}}
 
@@ -208,13 +208,13 @@ When `--logs-dir` is set, Acton creates the target directory and writes
 4. Prepare a source-level retrace for a project contract:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter
    ```
 
 5. Start a local DAP server for editor debugging:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter --debug --debug-port 4711
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter --debug --debug-port 4711
    ```
 
 ## SEE ALSO

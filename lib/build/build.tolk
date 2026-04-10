@@ -5,16 +5,16 @@
 ///
 /// Build a contract with a specified name and optional path.
 ///
-/// `name` is the contract id key in `Acton.toml` (`[contracts.<id>]`), not the display
-/// name stored in `[contracts.<id>].display-name`.
+/// `name` is the contract name in `Acton.toml` (the key in `[contracts.<name>]`), not
+/// the display name stored in `[contracts.<name>].display-name`.
 ///
-/// If `path` is omitted (empty string), Acton looks up the contract id in `Acton.toml`.
-/// If no contract with that id is found, execution fails.
+/// If `path` is omitted (empty string), Acton looks up the contract name in
+/// `Acton.toml`. If no contract with that name is found, execution fails.
 ///
 /// Example:
 ///
 /// ```tolk
-/// val cell = build("jetton-wallet");
+/// val cell = build("JettonWallet");
 /// ```
 ///
 /// If `path` is non-empty, `Acton.toml` lookup is skipped and that path is used directly.
@@ -24,12 +24,12 @@
 ///
 /// Example:
 /// ```tolk
-/// val cell = build("jetton-wallet", "contracts/jetton-wallet-contract.tolk");
+/// val cell = build("JettonWallet", "contracts/non-standard-filename.tolk");
 /// ```
 ///
 /// Example with prebuilt code:
 /// ```tolk
-/// val cell = build("jetton-wallet", "build/jetton-wallet.boc");
+/// val cell = build("JettonWallet", "build/JettonWallet.boc");
 /// ```
 ///
 /// The path should be absolute or relative to the project root (the directory with `Acton.toml`).

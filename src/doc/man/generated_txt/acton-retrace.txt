@@ -40,7 +40,7 @@ OPTIONS
 
    Source-Level Debugging Options
        --contract name
-           Contract ID from Acton.toml used to build a source-level trace for
+           Contract name from Acton.toml used to build a source-level trace for
            the retraced transaction.
 
        --debug
@@ -199,11 +199,11 @@ EXAMPLES
 
        4. Prepare a source-level retrace for a project contract:
 
-              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter
+              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter
 
        5. Start a local DAP server for editor debugging:
 
-              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter --debug --debug-port 4711
+              acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter --debug --debug-port 4711
 
 SEE ALSO
        o  acton help disasm

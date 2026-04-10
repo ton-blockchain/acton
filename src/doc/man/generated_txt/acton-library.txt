@@ -30,11 +30,11 @@ SUBCOMMANDS
        Publish a contract or arbitrary code as a library.
 
       Synopsis
-          acton library publish [options] [contract-id]
+          acton library publish [options] [contract-name]
 
       Options
-          contract-id
-              Contract ID to publish.
+          contract-name
+              Contract name to publish.
 
               Use --code to publish arbitrary code instead of compiling a
               project contract.
@@ -236,7 +236,7 @@ EXIT STATUS
 EXAMPLES
        1. Publish a contract as a library:
 
-              acton library publish math --duration 365d --wallet deployer
+              acton library publish Math --duration 365d --wallet deployer
 
        2. Publish arbitrary code:
 
@@ -248,7 +248,7 @@ EXAMPLES
 
        4. Top up a library for one year:
 
-              acton library topup math --duration 1y
+              acton library topup Math --duration 1y
 
        5. Fetch raw code into a BoC file:
 

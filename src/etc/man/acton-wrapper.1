@@ -6,9 +6,9 @@
 .SH "NAME"
 acton\-wrapper \[em] Generate Tolk or TypeScript wrappers for a contract
 .SH "SYNOPSIS"
-\fBacton wrapper\fR [\fIoptions\fR] \fIcontract\-id\fR
+\fBacton wrapper\fR [\fIoptions\fR] \fIcontract\-name\fR
 .SH "DESCRIPTION"
-Generate a wrapper for the contract identified by \fB_contract\-id_\fR from
+Generate a wrapper for the contract identified by \fB_contract\-name_\fR from
 \fBActon.toml\fR\&.
 .sp
 Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
@@ -23,9 +23,9 @@ run is not required.
 .SH "OPTIONS"
 .SS "Wrapper Options"
 .sp
-\fIcontract\-id\fR
+\fIcontract\-name\fR
 .RS 4
-Contract ID from \fBActon.toml\fR to generate the wrapper for.
+Contract name from \fBActon.toml\fR to generate the wrapper for.
 .RE
 .sp
 \fB\-o\fR, \fB\-\-output\fR \fIpath\fR
@@ -160,7 +160,7 @@ TypeScript generator could not run, or an output file could not be written.
 .sp
 .RS 4
 .nf
-acton wrapper counter
+acton wrapper Counter
 .fi
 .RE
 .RE
@@ -170,7 +170,7 @@ acton wrapper counter
 .sp
 .RS 4
 .nf
-acton wrapper counter \-\-test
+acton wrapper Counter \-\-test
 .fi
 .RE
 .RE
@@ -180,7 +180,7 @@ acton wrapper counter \-\-test
 .sp
 .RS 4
 .nf
-acton wrapper counter \-\-ts
+acton wrapper Counter \-\-ts
 .fi
 .RE
 .RE
@@ -190,9 +190,9 @@ acton wrapper counter \-\-ts
 .sp
 .RS 4
 .nf
-acton wrapper counter \-\-output\-dir tests/generated
-acton wrapper counter \-\-test \-\-test\-output\-dir tests/generated
-acton wrapper counter \-\-ts \-\-output\-dir wrappers
+acton wrapper Counter \-\-output\-dir tests/generated
+acton wrapper Counter \-\-test \-\-test\-output\-dir tests/generated
+acton wrapper Counter \-\-ts \-\-output\-dir wrappers
 .fi
 .RE
 .RE
@@ -202,7 +202,7 @@ acton wrapper counter \-\-ts \-\-output\-dir wrappers
 .sp
 .RS 4
 .nf
-acton wrapper counter \-\-ts \-\-output\-dir app/src/wrappers
+acton wrapper Counter \-\-ts \-\-output\-dir app/src/wrappers
 .fi
 .RE
 .RE

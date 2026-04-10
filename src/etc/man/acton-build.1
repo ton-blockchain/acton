@@ -6,13 +6,13 @@
 .SH "NAME"
 acton\-build \[em] Build all configured contracts or a selected contract
 .SH "SYNOPSIS"
-\fBacton build\fR [\fIoptions\fR] [\fIcontract\-id\fR]
+\fBacton build\fR [\fIoptions\fR] [\fIcontract\-name\fR]
 .SH "DESCRIPTION"
 Compile contracts declared in \fBActon.toml\fR, resolve their dependencies, and
 write build artifacts for the requested build set.
 .sp
 By default, \fBacton build\fR compiles every configured contract. If you pass a
-\fB_contract\-id_\fR, Acton builds only that contract and its transitive
+\fB_contract\-name_\fR, Acton builds only that contract and its transitive
 dependencies.
 .sp
 For each successful build, Acton writes a JSON artifact to the build output
@@ -28,11 +28,11 @@ command prints guidance and exits without compiling anything.
 .SH "OPTIONS"
 .SS "Build Options"
 .sp
-\fIcontract\-id\fR
+\fIcontract\-name\fR
 .RS 4
 Build only the specified contract and its transitive dependencies.
 .sp
-The value must match a \fB[contracts.<id>]\fR key in \fBActon.toml\fR\&.
+The value must match a \fB[contracts.<name>]\fR key in \fBActon.toml\fR\&.
 .RE
 .sp
 \fB\-\-clear\-cache\fR
@@ -102,11 +102,11 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .sp
 .RS 4
 .nf
-[contracts.wallet]
+[contracts.Wallet]
 display\-name = "Wallet Contract"
-src = "contracts/wallet.tolk"
-output = "wallet.boc"
-depends = ["child"]
+src = "contracts/Wallet.tolk"
+output = "Wallet.boc"
+depends = ["Child"]
 .fi
 .RE
 .sp
@@ -126,7 +126,7 @@ CLI flags override config values for the current invocation.
 Depending on command flags and project configuration, \fBacton build\fR may write:
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB<out\-dir>/<contract\-id>.json\fR with \fBcode_boc64\fR and \fBhash\fR
+\h'-04'\(bu\h'+03'\fB<out\-dir>/<contract\-name>.json\fR with \fBcode_boc64\fR and \fBhash\fR
 .RE
 .sp
 .RS 4
@@ -138,7 +138,7 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB<output\-fift>/<contract\-id>.fif\fR for compiled \fB\&.tolk\fR contracts
+\h'-04'\(bu\h'+03'\fB<output\-fift>/<contract\-name>.fif\fR for compiled \fB\&.tolk\fR contracts
 .RE
 .sp
 .RS 4
@@ -178,7 +178,7 @@ acton build
 .sp
 .RS 4
 .nf
-acton build wallet
+acton build Wallet
 .fi
 .RE
 .RE

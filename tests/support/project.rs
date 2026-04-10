@@ -1191,11 +1191,11 @@ impl ActonCommand {
     }
 
     /// Start wrapper command
-    pub(crate) fn wrapper(mut self, contract_id: &str) -> Self {
+    pub(crate) fn wrapper(mut self, contract_name: &str) -> Self {
         self.cmd = self
             .cmd
             .arg("wrapper")
-            .arg(contract_id)
+            .arg(contract_name)
             .current_dir(&self.project.path);
         self
     }

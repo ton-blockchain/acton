@@ -51,7 +51,7 @@ Write VM and executor logs into the specified directory.
 .sp
 \fB\-\-contract\fR \fIname\fR
 .RS 4
-Contract ID from \fBActon.toml\fR used to build a source\-level trace for the
+Contract name from \fBActon.toml\fR used to build a source\-level trace for the
 retraced transaction.
 .RE
 .sp
@@ -289,7 +289,7 @@ acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
 .sp
 .RS 4
 .nf
-acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract JettonMinter
 .fi
 .RE
 .RE
@@ -299,7 +299,7 @@ acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
 .sp
 .RS 4
 .nf
-acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter \-\-debug \-\-debug\-port 4711
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract JettonMinter \-\-debug \-\-debug\-port 4711
 .fi
 .RE
 .RE

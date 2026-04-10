@@ -1,9 +1,9 @@
 {{#options}}
 
-{{#option "_contract-id_" }}
+{{#option "_contract-name_" }}
 Build only the specified contract and its transitive dependencies.
 
-The value must match a `[contracts.<id>]` key in `Acton.toml`.
+The value must match a `[contracts.<name>]` key in `Acton.toml`.
 {{/option}}
 
 {{#option "`--clear-cache`" }}

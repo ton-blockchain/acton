@@ -66,11 +66,11 @@ license = "MIT"
 
 ## `[contracts]` Section
 
-This section is a map where each key is a unique contract identifier and the value is a contract configuration object.
+This section is a map where each key is a contract name and the value is a contract configuration object.
 
 | Field          | Type     | Required | Description                                                             |
 |:---------------|:---------|:---------|:------------------------------------------------------------------------|
-| `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract key.      |
+| `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.          |
 | `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
 | `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
@@ -94,7 +94,7 @@ Example:
 ```toml
 [contracts.MainContract]
 display-name = "Main Contract"
-src = "contracts/main.tolk"
+src = "contracts/MainContract.tolk"
 depends = [
     "ChildContract",
     { name = "LibraryContract", kind = "library_ref", function = "get_lib_code" }
@@ -320,7 +320,7 @@ output-format = "sarif"
 ```
 
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
-When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
+When you pass an explicit target to `acton check` (contract name or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
 CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
 Use `acton check --output-file <PATH>` to write non-plain output into a file.
@@ -346,19 +346,19 @@ mutable-variable-can-be-immutable = "warn"
 
 ### Contract Overrides
 
-You can override lint levels for specific contracts by creating a subsection with the contract's identifier (the key used in the `[contracts]` section).
+You can override lint levels for specific contracts by creating a subsection with the contract's name (the `NAME` from `[contracts.NAME]`).
 
 Example:
 ```toml
-[contracts.counter]
+[contracts.Counter]
 display-name = "My Counter"
-src = "counter.tolk"
+src = "contracts/Counter.tolk"
 
 [lint.rules]
 unused-variable = "deny"
 
-[lint.rules.counter]
-unused-variable = "allow" # Disable for counter contract only
+[lint.rules.Counter]
+unused-variable = "allow" # Disable for the Counter contract only
 ```
 
 ---

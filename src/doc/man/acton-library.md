@@ -33,14 +33,14 @@ Publish a contract or arbitrary code as a library.
 
 #### Synopsis
 
-`acton library publish` [_options_] [_contract-id_]
+`acton library publish` [_options_] [_contract-name_]
 
 #### Options
 
 {{#options}}
 
-{{#option "_contract-id_" }}
-Contract ID to publish.
+{{#option "_contract-name_" }}
+Contract name to publish.
 
 Use `--code` to publish arbitrary code instead of compiling a project contract.
 {{/option}}
@@ -263,7 +263,7 @@ Saved library metadata typically includes:
 1. Publish a contract as a library:
 
    ```bash
-   acton library publish math --duration 365d --wallet deployer
+   acton library publish Math --duration 365d --wallet deployer
    ```
 
 2. Publish arbitrary code:
@@ -281,7 +281,7 @@ Saved library metadata typically includes:
 4. Top up a library for one year:
 
    ```bash
-   acton library topup math --duration 1y
+   acton library topup Math --duration 1y
    ```
 
 5. Fetch raw code into a BoC file:

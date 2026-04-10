@@ -747,7 +747,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         anyhow::bail!(
             "Provide {} {} to choose which contract to mutate",
             "--mutate-contract".yellow(),
-            "<CONTRACT_ID>".yellow()
+            "<CONTRACT_NAME>".yellow()
         )
     };
     if let Some(minimum_percent) = config.mutation_minimum_percent

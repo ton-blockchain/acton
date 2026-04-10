@@ -66,8 +66,8 @@ depends = []
 }
 
 #[test]
-fn build_supports_quoted_contract_keys_in_dependency_resolution() {
-    let project = ProjectBuilder::new("build-config-edge-quoted-keys")
+fn build_supports_quoted_contract_names_in_dependency_resolution() {
+    let project = ProjectBuilder::new("build-config-edge-quoted-names")
         .raw_file(
             "contracts/child.lib.tolk",
             r"fun onInternalMessage(_: InMessage) {}
@@ -85,7 +85,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
     write_acton_toml(
         project.path(),
         r#"[package]
-name = "build-config-edge-quoted-keys"
+name = "build-config-edge-quoted-names"
 description = ""
 version = "0.1.0"
 
@@ -111,11 +111,11 @@ depends = ["child.lib"]
 
     assert!(
         project.path().join("build/child.lib.json").exists(),
-        "build artifact should use quoted contract key for child contract"
+        "build artifact should use quoted contract name for child contract"
     );
     assert!(
         project.path().join("build/parent-contract.json").exists(),
-        "build artifact should use hyphenated contract key for parent contract"
+        "build artifact should use hyphenated contract name for parent contract"
     );
 
     let generated_dep = fs::read_to_string(project.path().join("gen/child.lib_code.tolk"))

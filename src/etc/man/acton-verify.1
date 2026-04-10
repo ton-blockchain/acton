@@ -6,7 +6,7 @@
 .SH "NAME"
 acton\-verify \[em] Verify contract source code on the TON verifier service
 .SH "SYNOPSIS"
-\fBacton verify\fR [\fIoptions\fR] [\fIcontract\-id\fR]
+\fBacton verify\fR [\fIoptions\fR] [\fIcontract\-name\fR]
 .SH "DESCRIPTION"
 Verify that a deployed contract address matches the local source code for a
 contract from your project.
@@ -17,9 +17,9 @@ verification transaction to the blockchain.
 .SH "OPTIONS"
 .SS "Verify Options"
 .sp
-\fIcontract\-id\fR
+\fIcontract\-name\fR
 .RS 4
-Contract ID to verify.
+Contract name to verify.
 .sp
 If omitted, Acton prompts when the project contains multiple contracts.
 .RE
@@ -136,7 +136,7 @@ Verification usually consists of:
 .SH "CONTRACT AND WALLET SELECTION"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'if \fB_contract\-id_\fR is omitted and exactly one contract is configured, Acton
+\h'-04'\(bu\h'+03'if \fB_contract\-name_\fR is omitted and exactly one contract is configured, Acton
 selects it automatically
 .RE
 .sp
@@ -212,7 +212,7 @@ blockchain transaction could not be sent.
 .sp
 .RS 4
 .nf
-acton verify counter \-\-address EQDt7LL...
+acton verify Counter \-\-address EQDt7LL...
 .fi
 .RE
 .RE
@@ -222,7 +222,7 @@ acton verify counter \-\-address EQDt7LL...
 .sp
 .RS 4
 .nf
-acton verify counter \-\-address UQDt7LL... \-\-net mainnet
+acton verify Counter \-\-address UQDt7LL... \-\-net mainnet
 .fi
 .RE
 .RE
@@ -232,7 +232,7 @@ acton verify counter \-\-address UQDt7LL... \-\-net mainnet
 .sp
 .RS 4
 .nf
-acton verify counter \-\-address EQDt7LL... \-\-wallet deployer
+acton verify Counter \-\-address EQDt7LL... \-\-wallet deployer
 .fi
 .RE
 .RE
@@ -242,7 +242,7 @@ acton verify counter \-\-address EQDt7LL... \-\-wallet deployer
 .sp
 .RS 4
 .nf
-acton verify counter \-\-address EQDt7LL... \-\-dry\-run
+acton verify Counter \-\-address EQDt7LL... \-\-dry\-run
 .fi
 .RE
 .RE
@@ -252,7 +252,7 @@ acton verify counter \-\-address EQDt7LL... \-\-dry\-run
 .sp
 .RS 4
 .nf
-acton verify counter \-\-address EQDt7LL... \-\-compiler\-version 1.1.0
+acton verify Counter \-\-address EQDt7LL... \-\-compiler\-version 1.1.0
 .fi
 .RE
 .RE

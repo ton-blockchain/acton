@@ -25,9 +25,9 @@ Often when you start testing a contract, you need the same setup boilerplate: im
 acton wrapper Counter --test
 ```
 
-This generates `tests/counter.test.tolk` with a `setupTest()` helper and an example test case:
+This generates `tests/Counter.test.tolk` with a `setupTest()` helper and an example test case:
 
-```tolk
+```tolk title="tests/Counter.test.tolk"
 import "wrappers/Counter"
 // ... other imports
 
@@ -128,7 +128,7 @@ fun onInternalMessage(in: InMessage) {
 
 ### Contract must be in Acton.toml
 
-The command takes a **contract ID**, not a file path. Ensure your contract is defined in the configuration:
+The command takes a **contract name**, not a file path. Ensure your contract is defined in the configuration:
 
 ```toml title="Acton.toml"
 [contracts.Counter]
@@ -144,7 +144,7 @@ The generated wrapper provides a struct representing your contract and methods t
 
 The wrapper provides a static `fromStorage` method to create the initial state and a `deploy` method to put it on the chain.
 
-```tolk title="tests/counter.test.tolk"
+```tolk title="tests/Counter.test.tolk"
 import "@wrappers/Counter"
 // Don't forget to import types for the storage struct!
 import "@contracts/types"
@@ -225,7 +225,7 @@ output-dir = "./wrappers"
 ```
 
 Then:
-- `acton wrapper Counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/counter.test.tolk`
+- `acton wrapper Counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/Counter.test.tolk`
 - `acton wrapper Counter --ts` writes `wrappers/Counter.ts` by default
 
 See the [wrapper command reference](/docs/commands/wrapper) for more details about CLI options.

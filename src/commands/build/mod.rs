@@ -83,9 +83,9 @@ pub fn build_cmd(
                     "No contracts section found in Acton.toml. Add at least one contract.
 To add a contract add the following section to Acton.toml:
 
-[contracts.my-contract]
+[contracts.MyContract]
 display-name = \"MyContract\"
-src = \"contracts/my-contract.tolk\"
+src = \"contracts/MyContract.tolk\"
 depends = []
 
 See https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
@@ -445,7 +445,7 @@ fn save_fift_file(
 pub(crate) fn generate_dependency_files(
     parent_contract: &str,
     config: &ContractConfig,
-    compiled_contracts: &HashMap<String, String>, // contract_key -> boc_base64
+    compiled_contracts: &HashMap<String, String>, // contract_name -> boc_base64
     failed_contracts: &BTreeMap<String, anyhow::Error>,
     acton_config: &ActonConfig,
     gen_dir: &Path,

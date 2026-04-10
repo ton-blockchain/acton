@@ -6,7 +6,7 @@ acton-build --- Build all configured contracts or a selected contract
 
 ## SYNOPSIS
 
-`acton build` [_options_] [_contract-id_]
+`acton build` [_options_] [_contract-name_]
 
 ## DESCRIPTION
 
@@ -14,7 +14,7 @@ Compile contracts declared in `Acton.toml`, resolve their dependencies, and
 write build artifacts for the requested build set.
 
 By default, `acton build` compiles every configured contract. If you pass a
-`_contract-id_`, Acton builds only that contract and its transitive
+`_contract-name_`, Acton builds only that contract and its transitive
 dependencies.
 
 For each successful build, Acton writes a JSON artifact to the build output
@@ -47,11 +47,11 @@ command prints guidance and exits without compiling anything.
 `acton build` reads contracts from `Acton.toml`:
 
 ```toml
-[contracts.wallet]
+[contracts.Wallet]
 display-name = "Wallet Contract"
-src = "contracts/wallet.tolk"
-output = "wallet.boc"
-depends = ["child"]
+src = "contracts/Wallet.tolk"
+output = "Wallet.boc"
+depends = ["Child"]
 ```
 
 Optional default output paths can be configured in `[build]`:
@@ -69,10 +69,10 @@ CLI flags override config values for the current invocation.
 
 Depending on command flags and project configuration, `acton build` may write:
 
-- `<out-dir>/<contract-id>.json` with `code_boc64` and `hash`
+- `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
 - the configured contract `output` `.boc` file
 - `<gen-dir>/<dependency>_code.tolk` helper files for dependencies
-- `<output-fift>/<contract-id>.fif` for compiled `.tolk` contracts
+- `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
 Existing output files at those paths are replaced with freshly generated
@@ -101,7 +101,7 @@ built successfully, the successful artifacts remain on disk.
 2. Build one contract and its dependencies:
 
    ```bash
-   acton build wallet
+   acton build Wallet
    ```
 
 3. Rebuild with a cleared cache:
