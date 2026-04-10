@@ -198,7 +198,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install UI dependencies
-        run: bun install
+        run: bun ci
 
       - name: Run UI checks
         run: |
