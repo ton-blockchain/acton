@@ -25,7 +25,7 @@ fn crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time() {
     run_crypto_case(
         "az-stdlib-fast-random-without-seed-fixed-time",
         r"
-get fun `test-az-stdlib-fast-random-without-seed-fixed-time`() {
+get fun `test az stdlib fast random without seed fixed time`() {
     vm.setTime(1700004321);
 
     val randomA = crypto.getFastRandomBytes(64);

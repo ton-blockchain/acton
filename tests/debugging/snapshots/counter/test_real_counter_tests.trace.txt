@@ -94,7 +94,7 @@ Step 7 (step_over):
              ^^^^^^^^^^^^
      80| }
      81| 
-     82| get fun `test-should-reset-counter`() {
+     82| get fun `test should reset counter`() {
   Variables:
     counter = Counter
     deployer = Treasury (last seen)

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/outlist_behavior.test.tolk (1 test)
-  ✓ af-outlist-opcode-mismatch-unknown-type [TIME]
+  ✓ af outlist opcode mismatch unknown type [TIME]
 
  ✓ 1 passed in 1 file

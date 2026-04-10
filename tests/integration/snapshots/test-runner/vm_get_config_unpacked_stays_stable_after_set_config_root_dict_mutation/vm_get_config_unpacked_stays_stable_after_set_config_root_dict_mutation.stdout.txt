@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dk_vm_config_unpacked.test.tolk (1 test)
-  ✓ dk-stdlib-vm-config-unpacked-after-root-dict-mutation [TIME]
+  ✓ dk stdlib vm config unpacked after root dict mutation [TIME]
 
  ✓ 1 passed in 1 file

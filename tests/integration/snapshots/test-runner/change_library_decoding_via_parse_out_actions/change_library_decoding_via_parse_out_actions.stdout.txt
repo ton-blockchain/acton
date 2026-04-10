@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/out_actions.test.tolk (1 test)
-  ✓ cx-change-library-decoding-via-parse-out-actions [TIME]
+  ✓ cx change library decoding via parse out actions [TIME]
 
  ✓ 1 passed in 1 file

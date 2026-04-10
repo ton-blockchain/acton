@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_bin.test.tolk (1 test)
-  ✗ ac-assert-not-equal-failure-branch [TIME]
+  ✗ ac assert not equal failure branch [TIME]
     └─ Error: numbers should differ
        Values are equal but expected to be different:
          7

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/format5_placeholder_order_bug.test.tolk (1 test)
-  ✓ br-stdlib-format5-placeholder-order-fixture-bug [TIME]
+  ✓ br stdlib format5 placeholder order fixture bug [TIME]
 
  ✓ 1 passed in 1 file

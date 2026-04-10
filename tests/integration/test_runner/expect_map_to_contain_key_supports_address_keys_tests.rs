@@ -23,7 +23,7 @@ fn expect_map_to_contain_key_supports_address_keys() {
     run_expect_success(
         "ec-stdlib-map-to-contain-key-address-pass",
         r#"
-get fun `test-ec-stdlib-map-to-contain-key-address-pass`() {
+get fun `test ec stdlib map to contain key address pass`() {
     val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
     val outsider = address("0:00000000000000000000000000000000000000000000000000000000000000aa");
 
@@ -44,7 +44,7 @@ fn expect_map_to_contain_key_supports_equivalent_friendly_address() {
     run_expect_success(
         "ec-stdlib-map-to-contain-key-friendly-equivalent",
         r#"
-get fun `test-ec-stdlib-map-to-contain-key-friendly-equivalent`() {
+get fun `test ec stdlib map to contain key friendly equivalent`() {
     val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
     val ownerFriendly = address("EQCDVtBfh-xRQbNJxeGqfwwXXDq8GP6zCKTVVTkeklmBR6sT");
 

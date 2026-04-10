@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_env.test.tolk (1 test)
-  ✗ env-unsupported-type [TIME]
+  ✗ env unsupported type [TIME]
     └─ Error: env() supports only int, coins, bool, string, slice, address and cell types, but got Unsupported
 
  ✗ 1 failed in 1 file

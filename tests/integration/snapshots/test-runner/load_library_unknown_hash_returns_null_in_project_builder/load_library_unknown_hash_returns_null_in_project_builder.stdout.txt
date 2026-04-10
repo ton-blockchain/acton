@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/load_library_unknown_hash.test.tolk (1 test)
-  ✓ bm-load-library-unknown-hash-project-builder [TIME]
+  ✓ bm load library unknown hash project builder [TIME]
     └─ Test output:
        bm-load-library-null-project-builder
 

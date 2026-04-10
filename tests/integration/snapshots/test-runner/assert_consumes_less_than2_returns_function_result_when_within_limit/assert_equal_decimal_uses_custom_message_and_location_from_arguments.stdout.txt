@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_decimal.test.tolk (1 test)
-  ✗ ac-decimal-custom-message-location [TIME]
+  ✗ ac decimal custom message location [TIME]
     └─ Error: custom decimal mismatch from Assert.equalDecimal
       └─ at tests/custom_decimal.test[LINE]
 

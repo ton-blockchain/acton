@@ -12,7 +12,7 @@
  TEST  [ROOT]
 
  > tests/formatter_linear.test.tolk (1 test)
-  ✓ formatter-orphan-chain-println-missing-parent [TIME]
+  ✓ formatter orphan chain println missing parent [TIME]
     └─ Test output:
        N/A -> fm_linear_root A
        └── FmRelay 0.1994148 TON -> fm_linear_mid B                                    gas=1782

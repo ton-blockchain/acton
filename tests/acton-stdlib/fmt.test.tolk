@@ -35,13 +35,13 @@ struct VeryNested1 {
     nested: DoubleInt = {}
 }
 
-get fun `test-format-struct-with-single-field`() {
+get fun `test format struct with single field`() {
     expect(format("{}", SingleInt { a: 100 })).toEqual("""SingleInt {
     a: 100
 }""");
 }
 
-get fun `test-format-struct-with-two-fields`() {
+get fun `test format struct with two fields`() {
     expect(
         format(
             "{}",
@@ -56,7 +56,7 @@ get fun `test-format-struct-with-two-fields`() {
 }""");
 }
 
-get fun `test-format-struct-with-nested-single-int`() {
+get fun `test format struct with nested single int`() {
     expect(
         format(
             "{}",
@@ -75,7 +75,7 @@ get fun `test-format-struct-with-nested-single-int`() {
 }""");
 }
 
-get fun `test-format-struct-with-nested-double-int`() {
+get fun `test format struct with nested double int`() {
     expect(
         format("{}", DoubleIntAndNestedDoubleInt {}),
     ).toEqual("""DoubleIntAndNestedDoubleInt {
@@ -88,7 +88,7 @@ get fun `test-format-struct-with-nested-double-int`() {
 }""");
 }
 
-get fun `test-format-struct-with-very-nested-`() {
+get fun `test format struct with very nested`() {
     val formatted = format("{}", VeryNested {});
     expect(
         formatted,
@@ -104,7 +104,7 @@ get fun `test-format-struct-with-very-nested-`() {
 }""");
 }
 
-get fun `test-format-message`() {
+get fun `test format message`() {
     val src = net.randomAddress("src");
     val dest = net.randomAddress("counter");
     val msg = createMessage({
@@ -145,7 +145,7 @@ get fun `test-format-message`() {
     }
 }
 
-get fun `test-format-multiple-arguments-and-modifiers`() {
+get fun `test format multiple arguments and modifiers`() {
     expect(format("{} {:x}", "hex", 255)).toEqual("hex ff");
     expect(format("{} {} {:ton}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 TON");
     expect(format("{{{}}} {} {} {}", 1, 2, 3, 4)).toEqual("{1} 2 3 4");
@@ -161,7 +161,7 @@ get fun `test-format-multiple-arguments-and-modifiers`() {
     ).toEqual("1 2 3 4 5");
 }
 
-get fun `test-format-with-optional-arguments`() {
+get fun `test format with optional arguments`() {
     expect(format("hello")).toEqual("hello");
     expect(format("value = {}", 42)).toEqual("value = 42");
     expect(format("pair {} {}", 0, 0)).toEqual("pair 0 0");

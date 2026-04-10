@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/wallet_fallback.test.tolk (1 test)
-  ✓ bf-wallet-fallback-unknown-name-non-broadcast [TIME]
+  ✓ bf wallet fallback unknown name non broadcast [TIME]
 
  ✓ 1 passed in 1 file

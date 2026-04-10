@@ -65,7 +65,7 @@ fn declared_pack_prefix_helpers_direct_calls_return_expected_values() {
     run_success_case(
         "ep-stdlib-declared-pack-prefix-helpers-direct-calls",
         r"
-get fun `test-ep-declared-pack-prefix-helpers-direct-calls`() {
+get fun `test ep declared pack prefix helpers direct calls`() {
     expect(EpDeclaredPrefixBody.getDeclaredPackPrefix()).toEqual(0xE5000001);
     expect(unknown.getDeclaredPackPrefix()).toEqual(-1);
     expect(unknown.getDeclaredPackPrefixLen()).toEqual(-1);
@@ -80,7 +80,7 @@ fn transaction_expect_matchers_use_default_and_typed_declared_pack_prefix_paths(
     run_success_case(
         "ep-stdlib-transaction-expect-matchers-declared-pack-prefix-paths",
         r#"
-get fun `test-ep-transaction-expect-matchers-declared-pack-prefix-paths`() {
+get fun `test ep transaction expect matchers declared pack prefix paths`() {
     val (sender, harness) = deployHarness();
 
     val msg = createMessage({

@@ -21,7 +21,7 @@ fn env_parses_int_bool_address_and_cell_in_supported_formats() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-z-stdlib-env-supported-formats`() {
+            get fun `test z stdlib env supported formats`() {
                 expect(env<int>("Z_ENV_INT_DEC")).toEqual(-17);
                 expect(env<int>("Z_ENV_INT_HEX")).toEqual(26);
 
@@ -73,7 +73,7 @@ fn env_parses_coins_and_env_or_coins_in_supported_formats() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-z-stdlib-env-coins-supported-formats`() {
+            get fun `test z stdlib env coins supported formats`() {
                 expect(env<coins>("Z_ENV_COINS_DEC")).toEqual(ton("1.5"));
                 expect(env<coins>("Z_ENV_COINS_HEX")).toEqual(26);
                 expect(env<coins>("Z_ENV_COINS_MISSING")).toBeNull();
@@ -106,7 +106,7 @@ fn env_returns_null_for_invalid_inputs_and_missing_values() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-z-stdlib-env-invalid-inputs`() {
+            get fun `test z stdlib env invalid inputs`() {
                 expect(env<int>("Z_BAD_INT")).toBeNull();
                 expect(env<int>("Z_MISSING_INT")).toBeNull();
                 expect(env<coins>("Z_BAD_COINS")).toBeNull();
@@ -145,7 +145,7 @@ fn env_or_uses_defaults_only_for_null_paths() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-z-stdlib-env-or-defaults`() {
+            get fun `test z stdlib env or defaults`() {
                 expect(envOr<int>("Z_OR_MISSING_INT", 42)).toEqual(42);
                 expect(envOr<int>("Z_OR_BAD_INT", 42)).toEqual(42);
                 expect(envOr<coins>("Z_OR_MISSING_COINS", ton("0.1"))).toEqual(ton("0.1"));
@@ -195,7 +195,7 @@ fn env_parses_user_friendly_address_form() {
             import "../../lib/fmt"
             import "../../lib/testing/expect"
 
-            get fun `test-z-stdlib-env-address-friendly-form`() {
+            get fun `test z stdlib env address friendly form`() {
                 val parsed = env<address>("Z_ENV_ADDRESS_FRIENDLY");
                 expect(parsed).toBeNotNull();
 

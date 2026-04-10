@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-zero-max-test-rejects-config [TIME]
-    └─ Fuzz max-test-rejects must be greater than 0 for test 'test-fuzz-zero-max-test-rejects-config'
+  ✗ fuzz zero max test rejects config [TIME]
+    └─ Fuzz max-test-rejects must be greater than 0 for test 'test fuzz zero max test rejects config'
 
  ✗ 1 failed in 1 file
 

@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_equal_failure.test.tolk (1 test)
-  ✗ ek-stdlib-assert-equal-failure-diagnostics [TIME]
+  ✗ ek stdlib assert equal failure diagnostics [TIME]
     └─ Error: ek Assert.equal mismatch diagnostic
         (
             42,

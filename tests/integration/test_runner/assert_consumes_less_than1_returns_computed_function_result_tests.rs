@@ -11,7 +11,7 @@ fn assert_consumes_less_than1_returns_computed_function_result() {
     let source = format!(
         r"{ASSERT_IMPORTS}
 
-get fun `test-bt-consumes-less-than1-returns-result`() {{
+get fun `test bt consumes less than1 returns result`() {{
     val result = Assert.consumesLessThan1(
         fun(value: int): int {{
             return value * 3 + 7;

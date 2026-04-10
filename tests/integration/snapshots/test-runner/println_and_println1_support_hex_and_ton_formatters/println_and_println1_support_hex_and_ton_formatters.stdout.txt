@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ println-and-println1-formatters [TIME]
+  ✓ println and println1 formatters [TIME]
     └─ Test output:
        17
        hex=beef

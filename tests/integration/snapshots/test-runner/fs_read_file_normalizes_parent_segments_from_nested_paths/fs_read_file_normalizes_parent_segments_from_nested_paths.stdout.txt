@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fs_behavior.test.tolk (1 test)
-  ✓ fs-read-parent-normalization-nested [TIME]
+  ✓ fs read parent normalization nested [TIME]
 
  ✓ 1 passed in 1 file

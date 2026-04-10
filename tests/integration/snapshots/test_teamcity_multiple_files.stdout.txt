@@ -10,29 +10,29 @@
 ##teamcity[testingStarted]
  > tests/utils_test.test.tolk (2 tests)
 ##teamcity[testSuiteStarted name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/utils_test.test.tolk']
-##teamcity[testStarted name='test_pow2_basic' nodeId='test_test_pow2_basic' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/utils_test.test.tolk:test_pow2_basic']
-  ✓ pow2_basic [TIME]
-##teamcity[testFinished name='test_pow2_basic' nodeId='test_test_pow2_basic' [DURATION] parentNodeId='suite_utils_test.test.tolk']
-##teamcity[testStarted name='test_pow2_edge' nodeId='test_test_pow2_edge' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/utils_test.test.tolk:test_pow2_edge']
-  ✗ pow2_edge [TIME]
+##teamcity[testStarted name='test pow2 basic' nodeId='test_test pow2 basic' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/utils_test.test.tolk:test pow2 basic']
+  ✓ pow2 basic [TIME]
+##teamcity[testFinished name='test pow2 basic' nodeId='test_test pow2 basic' [DURATION] parentNodeId='suite_utils_test.test.tolk']
+##teamcity[testStarted name='test pow2 edge' nodeId='test_test pow2 edge' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/utils_test.test.tolk:test pow2 edge']
+  ✗ pow2 edge [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
             2
         )
       └─ at tests/utils_test.test[LINE]
-##teamcity[testFailed type='comparisonFailure' name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/utils_test.test[LINE]' expected='2' actual='1']
-##teamcity[testFinished name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] parentNodeId='suite_utils_test.test.tolk']
+##teamcity[testFailed type='comparisonFailure' name='test pow2 edge' nodeId='test_test pow2 edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/utils_test.test[LINE]' expected='2' actual='1']
+##teamcity[testFinished name='test pow2 edge' nodeId='test_test pow2 edge' [DURATION] parentNodeId='suite_utils_test.test.tolk']
 ##teamcity[testSuiteFinished name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk']
 
  > tests/wallet_test.test.tolk (2 tests)
 ##teamcity[testSuiteStarted name='wallet_test.test.tolk' nodeId='suite_wallet_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/wallet_test.test.tolk']
-##teamcity[testStarted name='test_wallet_balance' nodeId='test_test_wallet_balance' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/wallet_test.test.tolk:test_wallet_balance']
-  ✓ wallet_balance [TIME]
-##teamcity[testFinished name='test_wallet_balance' nodeId='test_test_wallet_balance' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
-##teamcity[testStarted name='test_wallet_utils' nodeId='test_test_wallet_utils' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/wallet_test.test.tolk:test_wallet_utils']
-  ✓ wallet_utils [TIME]
-##teamcity[testFinished name='test_wallet_utils' nodeId='test_test_wallet_utils' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
+##teamcity[testStarted name='test wallet balance' nodeId='test_test wallet balance' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/wallet_test.test.tolk:test wallet balance']
+  ✓ wallet balance [TIME]
+##teamcity[testFinished name='test wallet balance' nodeId='test_test wallet balance' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
+##teamcity[testStarted name='test wallet utils' nodeId='test_test wallet utils' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/wallet_test.test.tolk:test wallet utils']
+  ✓ wallet utils [TIME]
+##teamcity[testFinished name='test wallet utils' nodeId='test_test wallet utils' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
 ##teamcity[testSuiteFinished name='wallet_test.test.tolk' nodeId='suite_wallet_test.test.tolk']
 
  ✓ 3 passed, ✗ 1 failed in 2 files

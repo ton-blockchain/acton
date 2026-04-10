@@ -46,7 +46,7 @@ fun setupTest(): (Counter, Treasury) {
     return (counter, deployer);
 }
 
-get fun `test-load-transaction-body`() {
+get fun `test load transaction body`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -58,7 +58,7 @@ get fun `test-load-transaction-body`() {
 }
 
 @test({ fail_with: 63 })
-get fun `test-fail-to-load-transaction-body`() {
+get fun `test fail to load transaction body`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -69,7 +69,7 @@ get fun `test-fail-to-load-transaction-body`() {
     expect(body).toEqual(ResetCounter {});
 }
 
-get fun `test-load-transaction-body-after-find-transaction`() {
+get fun `test load transaction body after find transaction`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -81,7 +81,7 @@ get fun `test-load-transaction-body-after-find-transaction`() {
 }
 
 @test({ fail_with: 63 })
-get fun `test-fail-to-load-transaction-body-after-find-transaction`() {
+get fun `test fail to load transaction body after find transaction`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -92,7 +92,7 @@ get fun `test-fail-to-load-transaction-body-after-find-transaction`() {
     expect(body).toEqual(ResetCounter {});
 }
 
-get fun `test-load-transaction-in-message`() {
+get fun `test load transaction in message`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -103,7 +103,7 @@ get fun `test-load-transaction-in-message`() {
     expect(inMsg.loadBody()).toEqual(IncreaseCounter { increaseBy: 100 });
 }
 
-get fun `test-transaction-helpers`() {
+get fun `test transaction helpers`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

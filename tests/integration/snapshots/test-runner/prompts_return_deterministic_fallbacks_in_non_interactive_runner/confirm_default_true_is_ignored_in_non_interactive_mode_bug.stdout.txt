@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/prompt_wrappers_bug.test.tolk (1 test)
-  ✓ confirm-default-true-in-non-interactive-mode [TIME]
+  ✓ confirm default true in non interactive mode [TIME]
 
  ✓ 1 passed in 1 file

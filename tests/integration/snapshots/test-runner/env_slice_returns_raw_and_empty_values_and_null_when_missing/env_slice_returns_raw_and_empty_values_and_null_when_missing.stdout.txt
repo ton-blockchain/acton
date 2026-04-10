@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/env_slice_branches.test.tolk (1 test)
-  ✓ bp-stdlib-env-slice-branches [TIME]
+  ✓ bp stdlib env slice branches [TIME]
 
  ✓ 1 passed in 1 file

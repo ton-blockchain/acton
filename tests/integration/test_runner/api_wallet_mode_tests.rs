@@ -28,7 +28,7 @@ fn wallet_uses_local_treasury_when_broadcast_disabled() {
     run_wallet_mode_success(
         "s-lib-api-wallet-local-when-not-broadcasting",
         r#"
-get fun `test-s-lib-api-wallet-local-when-not-broadcasting`() {
+get fun `test s lib api wallet local when not broadcasting`() {
     expect(net.isBroadcasting()).toEqual(false);
 
     val deployer = net.wallet("deployer");
@@ -44,7 +44,7 @@ get fun `test-s-lib-api-wallet-local-when-not-broadcasting`() {
 fn enable_broadcast_wallet_lookup_requires_configured_wallet() {
     let source = wrap_test_source(
         r#"
-get fun `test-s-lib-api-enable-broadcast-requires-configured-wallet`() {
+get fun `test s lib api enable broadcast requires configured wallet`() {
     expect(net.isBroadcasting()).toEqual(false);
     net.enableBroadcast();
     expect(net.isBroadcasting()).toEqual(true);
@@ -92,7 +92,7 @@ fn broadcast_toggle_roundtrip_updates_mode() {
     run_wallet_mode_success(
         "s-lib-api-broadcast-toggle-roundtrip",
         r"
-get fun `test-s-lib-api-broadcast-toggle-roundtrip`() {
+get fun `test s lib api broadcast toggle roundtrip`() {
     expect(net.isBroadcasting()).toEqual(false);
 
     net.disableBroadcast();
@@ -115,7 +115,7 @@ fn local_wallet_names_map_to_distinct_treasuries() {
     run_wallet_mode_success(
         "s-lib-api-local-wallet-names-distinct",
         r#"
-get fun `test-s-lib-api-local-wallet-names-distinct`() {
+get fun `test s lib api local wallet names distinct`() {
     val alpha = net.wallet("alpha");
     val beta = net.wallet("beta");
 

@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/outlist_behavior.test.tolk (1 test)
-  ✗ af-outlist-opcode-mismatch-known-type [TIME]
+  ✗ af outlist opcode mismatch known type [TIME]
     └─ Error: Out action is a send message, but it cannot be load as a `DecreaseCounter` (opcode: 0x51fd716d) since body has opcode 0x7e8764ef (IncreaseCounter)
       └─ at tests/outlist_behavior.test[LINE]
 

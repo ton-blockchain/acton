@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/network.test.tolk (1 test)
-  ✓ ah-stdlib-top-up-is-additive [TIME]
+  ✓ ah stdlib top up is additive [TIME]
 
  ✓ 1 passed in 1 file

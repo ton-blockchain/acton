@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_decimal_edges.test.tolk (1 test)
-  ✓ ef-decimal-equality-zero-and-high-precision [TIME]
+  ✓ ef decimal equality zero and high precision [TIME]
 
  ✓ 1 passed in 1 file

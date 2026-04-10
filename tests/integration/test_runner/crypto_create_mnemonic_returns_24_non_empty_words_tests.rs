@@ -26,7 +26,7 @@ fn crypto_create_mnemonic_returns_24_non_empty_words() {
     run_crypto_case(
         "dw-stdlib-create-mnemonic-returns-24-non-empty-words",
         r#"
-get fun `test-dw-stdlib-create-mnemonic-returns-24-non-empty-words`() {
+get fun `test dw stdlib create mnemonic returns 24 non empty words`() {
     val words = crypto.createMnemonic();
     expect(words.size()).toEqual(24);
 
@@ -49,7 +49,7 @@ fn crypto_create_mnemonic_outputs_are_valid_for_keypair_derivation_in_fixture_pr
     let source = format!(
         r#"
 {CRYPTO_IMPORTS}
-get fun `test-dw-stdlib-create-mnemonic-keypair-shape`() {{
+get fun `test dw stdlib create mnemonic keypair shape`() {{
     val words = crypto.createMnemonic();
     expect(words.size()).toEqual(24);
 

@@ -27,7 +27,7 @@ fn vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation() {
     run_success_case(
         "dk-stdlib-vm-config-unpacked-after-root-dict-mutation",
         r"
-get fun `test-dk-stdlib-vm-config-unpacked-after-root-dict-mutation`() {
+get fun `test dk stdlib vm config unpacked after root dict mutation`() {
     val unpackedBefore = vm.getConfigUnpacked();
     val beforeStorage = StoragePrices.fromSlice(unpackedBefore.get(0) as slice);
 

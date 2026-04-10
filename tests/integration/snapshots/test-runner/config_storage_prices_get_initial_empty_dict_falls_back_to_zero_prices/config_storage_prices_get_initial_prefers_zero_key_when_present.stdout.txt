@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ dp-stdlib-config-storage-prices-get-initial-prefers-zero-key [TIME]
+  ✓ dp stdlib config storage prices get initial prefers zero key [TIME]
 
  ✓ 1 passed in 1 file

@@ -14,9 +14,9 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/comparison.test.tolk (4 tests)
-  ✓ less-pass [TIME]
-  ✓ greater-pass [TIME]
-  ✓ less-or-equal-boundary-pass [TIME]
-  ✓ greater-or-equal-boundary-pass [TIME]
+  ✓ less pass [TIME]
+  ✓ greater pass [TIME]
+  ✓ less or equal boundary pass [TIME]
+  ✓ greater or equal boundary pass [TIME]
 
  ✓ 4 passed in 1 file

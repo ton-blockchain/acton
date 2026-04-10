@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero [TIME]
+  ✓ bc stdlib config storage prices set initial overwrites index zero [TIME]
 
  ✓ 1 passed in 1 file

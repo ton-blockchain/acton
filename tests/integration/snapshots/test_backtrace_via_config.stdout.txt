@@ -8,10 +8,10 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ with-error [TIME]
+  ✗ with error [TIME]
     └─ exit_code=42
       ├─ at tests/test.test[LINE]
-      │     test-with-error   at tests/test.test[LINE]
+      │     test with error   at tests/test.test[LINE]
       ├─ Library change action error
       └─ Phase: Action phase
 

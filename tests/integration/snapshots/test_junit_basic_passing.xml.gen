@@ -4,9 +4,9 @@
         <properties>
             <property name="file.path" value="[ROOT]/tests/counter.test.tolk"/>
         </properties>
-        <testcase name="test-should-increase-counter" classname="counter.test.tolk" [TIME]>
+        <testcase name="test should increase counter" classname="counter.test.tolk" [TIME]>
         </testcase>
-        <testcase name="test-should-reset-counter" classname="counter.test.tolk" [TIME]>
+        <testcase name="test should reset counter" classname="counter.test.tolk" [TIME]>
         </testcase>
     </testsuite>
 </testsuites>

@@ -20,7 +20,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ send-iter-execute-till-miss [TIME]
+  ✗ send iter execute till miss [TIME]
     └─ Error: executeTill() did not find a matching transaction before queue exhaustion
 
  ✗ 1 failed in 1 file

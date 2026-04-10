@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/prompt_select.test.tolk (1 test)
-  ✓ ap-stdlib-select-starting-cursor-index-zero-bug [TIME]
+  ✓ ap stdlib select starting cursor index zero bug [TIME]
 
  ✓ 1 passed in 1 file

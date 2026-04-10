@@ -20,7 +20,7 @@ Save the current emulation state:
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 
-get fun `test-save-snapshot`() {
+get fun `test save snapshot`() {
     val target = net.randomAddress("snapshot-target");
 
     net.topUp(target, ton("3"));
@@ -36,7 +36,7 @@ Load it in another test run:
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 
-get fun `test-load-snapshot`() {
+get fun `test load snapshot`() {
     val target = net.randomAddress("snapshot-target");
 
     expect(net.loadSnapshot("fixtures/world-state.json")).toBeTrue();
@@ -85,7 +85,7 @@ You can also use snapshots as checkpoints inside a single test:
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 
-get fun `test-checkpoint-and-restore`() {
+get fun `test checkpoint and restore`() {
     val target = net.randomAddress("checkpoint-target");
 
     net.topUp(target, ton("5"));

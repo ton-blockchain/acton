@@ -26,7 +26,7 @@ Annotated Code:
 2   |             import "../../lib/testing/expect"                      |
 3   |             import "@wrappers/TestWrapper"                         |
 4   |                                                                    |
-5   |             get fun `test-config-coverage-scope`() {               |
+5   |             get fun `test config coverage scope`() {               |
 6 ✓ |                 expect(callThroughWrapper(5)).toEqual(6);          | hits:2
 7   |             }                                                      |
 8   |                                                                    |

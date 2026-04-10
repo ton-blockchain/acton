@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/account_state.test.tolk (1 test)
-  ✓ set-shard-account-null-resets-state-and-balance [TIME]
+  ✓ set shard account null resets state and balance [TIME]
 
  ✓ 1 passed in 1 file

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_consumes_less_than3.test.tolk (1 test)
-  ✓ bu-consumes-less-than3-returns-result [TIME]
+  ✓ bu consumes less than3 returns result [TIME]
 
  ✓ 1 passed in 1 file

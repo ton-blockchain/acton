@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/aj_vm_helpers.test.tolk (1 test)
-  ✓ aj-stdlib-vm-get-config-param-generic-bug [TIME]
+  ✓ aj stdlib vm get config param generic bug [TIME]
 
  ✓ 1 passed in 1 file

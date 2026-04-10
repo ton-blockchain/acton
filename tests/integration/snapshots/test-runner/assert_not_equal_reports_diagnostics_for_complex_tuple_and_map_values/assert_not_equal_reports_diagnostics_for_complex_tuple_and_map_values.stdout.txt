@@ -14,11 +14,11 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_not_equal_complex.test.tolk (2 tests)
-  ✗ ej-stdlib-assert-not-equal-complex-tuple-diagnostic [TIME]
+  ✗ ej stdlib assert not equal complex tuple diagnostic [TIME]
     └─ Error: ej tuple/map notEqual diagnostic tuple
        Values are equal but expected to be different:
          [11, [22, 33], [BOC_HEX]]
-  ✗ ej-stdlib-assert-not-equal-complex-map-diagnostic [TIME]
+  ✗ ej stdlib assert not equal complex map diagnostic [TIME]
     └─ Error: ej tuple/map notEqual diagnostic map
        Values are equal but expected to be different:
          map<int32, int32> {

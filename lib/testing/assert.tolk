@@ -126,7 +126,7 @@ fun Assert.assume(condition: bool, message: string = "", location: string = ""):
 ///
 /// Example:
 /// ```tolk
-/// get fun test_gas_consumption() {
+/// get fun `test gas consumption`() {
 ///     val result = Assert.consumesLessThan(fun do_something() {
 ///         // do something that consumes gas
 ///         return 42;
@@ -153,7 +153,7 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int): Ret {
 ///
 /// Example:
 /// ```tolk
-/// get fun test_gas_consumption() {
+/// get fun `test gas consumption`() {
 ///     val result = Assert.consumesLessThan1(fun do_something(a: int) {
 ///         // do something that consumes gas
 ///         return a + 1;
@@ -179,7 +179,7 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
 ///
 /// Example:
 /// ```tolk
-/// get fun test_gas_consumption() {
+/// get fun `test gas consumption`() {
 ///     val result = Assert.consumesLessThan2(fun do_something(a: int, b: int) {
 ///         // do something that consumes gas
 ///         return a + b;
@@ -211,7 +211,7 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
 ///
 /// Example:
 /// ```tolk
-/// get fun test_gas_consumption() {
+/// get fun `test gas consumption`() {
 ///     val result = Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
 ///         // do something that consumes gas
 ///         return a + b + c;

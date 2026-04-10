@@ -20,6 +20,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ send-iter-execute-n-and-from [TIME]
+  ✓ send iter execute n and from [TIME]
 
  ✓ 1 passed in 1 file

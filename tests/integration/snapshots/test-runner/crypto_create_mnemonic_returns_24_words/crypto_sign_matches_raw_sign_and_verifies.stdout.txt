@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/crypto_behavior.test.tolk (1 test)
-  ✓ an-stdlib-sign-matches-raw-sign [TIME]
+  ✓ an stdlib sign matches raw sign [TIME]
 
  ✓ 1 passed in 1 file

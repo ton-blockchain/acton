@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/address.test.tolk (1 test)
-  ✓ testnet-format [TIME]
+  ✓ testnet format [TIME]
     └─ Test output:
        [WALLET_ADDRESS_BASE]
 

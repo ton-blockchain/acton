@@ -32,7 +32,7 @@ fn vm_set_block_and_logical_time_are_independent_in_c7_slots() {
     run_success_case(
         "dj-stdlib-vm-set-block-and-logical-time-independent-slots",
         r"
-get fun `test-dj-vm-set-block-and-logical-time-independent-slots`() {
+get fun `test dj vm set block and logical time independent slots`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
     val nowBefore = paramsBefore.get(3) as int;
@@ -65,7 +65,7 @@ fn vm_set_logical_then_block_time_preserves_slot_isolation_in_fixture_project() 
     let source = format!(
         r"
 {DJ_VM_IMPORTS}
-get fun `test-dj-vm-set-logical-then-block-slot-isolation`() {{
+get fun `test dj vm set logical then block slot isolation`() {{
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
     val nowBefore = paramsBefore.get(3) as int;

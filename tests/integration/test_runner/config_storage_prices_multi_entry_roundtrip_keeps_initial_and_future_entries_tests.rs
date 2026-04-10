@@ -25,7 +25,7 @@ fn config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries(
     run_config_success_case(
         "bc-stdlib-config-storage-prices-multi-entry-roundtrip",
         r"
-get fun `test-bc-stdlib-config-storage-prices-multi-entry-roundtrip`() {
+get fun `test bc stdlib config storage prices multi entry roundtrip`() {
     val extraTs: uint32 = 1000000;
     var config = net.getConfig();
 
@@ -78,7 +78,7 @@ fn config_storage_prices_set_initial_overwrites_index_zero_only() {
     run_config_success_case(
         "bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero",
         r"
-get fun `test-bc-stdlib-config-storage-prices-set-initial-overwrites-index-zero`() {
+get fun `test bc stdlib config storage prices set initial overwrites index zero`() {
     val extraTs: uint32 = 2000000;
     var config = net.getConfig();
 

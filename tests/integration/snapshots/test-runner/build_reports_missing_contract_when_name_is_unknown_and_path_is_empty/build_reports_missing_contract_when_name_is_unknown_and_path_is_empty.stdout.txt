@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/build_missing_contract_empty_path.test.tolk (1 test)
-  ✗ ax-build-missing-contract-empty-path [TIME]
+  ✗ ax build missing contract empty path [TIME]
     └─ Error: Contract missing not found in Acton.toml
 Available contracts:
  simple

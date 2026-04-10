@@ -21,7 +21,7 @@ fn get_deployed_code_transitions_from_null_to_non_null_in_project_builder() {
         r#"
 {PROJECT_IMPORTS}
 
-get fun `test-co-get-deployed-code-transition-project-builder`() {{
+get fun `test co get deployed code transition project builder`() {{
     val deployer = net.treasury("co_deployer_project_builder");
     val init = ContractState {{
         code: build("simple"),
@@ -80,7 +80,7 @@ import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/io"
 
-get fun `test-co-get-deployed-code-transition-fixture-project`() {
+get fun `test co get deployed code transition fixture project`() {
     val deployer = net.treasury("co_deployer_fixture_project");
     val init = ContractState {
         code: build("counter"),

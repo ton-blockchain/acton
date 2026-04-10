@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/expect_tuple_membership.test.tolk (1 test)
-  ✗ ca-stdlib-to-contain-empty-tuple-missing-value [TIME]
+  ✗ ca stdlib to contain empty tuple missing value [TIME]
     └─ Error: Array doesn't contain the value
       └─ at tests/expect_tuple_membership.test[LINE]
 

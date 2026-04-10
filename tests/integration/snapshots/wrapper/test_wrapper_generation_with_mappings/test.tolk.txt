@@ -6,7 +6,7 @@ import "@core/types"
 import "../wrappers/Main"
 
 /// Example test case demonstrating the basic flow
-get fun `test-basic-flow`() {
+get fun `test basic flow`() {
     val (contract, deployer, not_deployer) = setupTest();
     // TODO: Implement your test logic here
     // Example:

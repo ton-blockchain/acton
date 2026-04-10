@@ -56,7 +56,7 @@ fun deployReceiver() {
     return (sender, receiverAddress);
 }
 
-get fun `test-cf-stdlib-to-consume-less-than-pass`() {
+get fun `test cf stdlib to consume less than pass`() {
     val (sender, receiverAddress) = deployReceiver();
 
     val payload = beginCell().storeUint(0xCF, 8).storeUint(1, 8).endCell();
@@ -96,7 +96,7 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 import "../contracts/counter_messages"
 
-get fun `test-cf-stdlib-to-consume-less-than-equal-threshold`() {
+get fun `test cf stdlib to consume less than equal threshold`() {
     val deployer = net.treasury("deployer");
 
     val stateInit = ContractState {

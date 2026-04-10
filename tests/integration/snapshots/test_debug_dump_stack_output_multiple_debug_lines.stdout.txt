@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ debug-dump-stack-multiple-debug-lines [TIME]
+  ✓ debug dump stack multiple debug lines [TIME]
     └─ Test output:
        dbg-line
        stack(0 values) :

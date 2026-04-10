@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/bj_get_account_state_transition.test.tolk (1 test)
-  ✓ bj-stdlib-get-account-state-after-top-up [TIME]
+  ✓ bj stdlib get account state after top up [TIME]
 
  ✓ 1 passed in 1 file

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dh_create_external_message.test.tolk (1 test)
-  ✓ dh-create-external-message-src-override-no-state-init [TIME]
+  ✓ dh create external message src override no state init [TIME]
 
  ✓ 1 passed in 1 file

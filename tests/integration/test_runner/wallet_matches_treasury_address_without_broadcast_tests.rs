@@ -25,7 +25,7 @@ fn wallet_matches_treasury_address_without_broadcast() {
     run_wallet_success(
         "bf-stdlib-wallet-fallback-matches-treasury-address",
         r#"
-get fun `test-bf-wallet-fallback-matches-treasury-address`() {
+get fun `test bf wallet fallback matches treasury address`() {
     expect(net.isBroadcasting()).toEqual(false);
 
     val wallet = net.wallet("bf_fallback_owner");
@@ -43,7 +43,7 @@ fn wallet_unknown_name_uses_treasury_and_sends_in_non_broadcast_mode() {
     run_wallet_success(
         "bf-stdlib-wallet-fallback-unknown-name-non-broadcast",
         r#"
-get fun `test-bf-wallet-fallback-unknown-name-non-broadcast`() {
+get fun `test bf wallet fallback unknown name non broadcast`() {
     expect(net.isBroadcasting()).toEqual(false);
 
     val wallet = net.wallet("bf_wallet_missing_from_wallets_config");

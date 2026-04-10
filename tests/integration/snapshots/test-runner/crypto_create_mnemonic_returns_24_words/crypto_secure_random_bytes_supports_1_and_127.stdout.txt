@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/crypto_behavior.test.tolk (1 test)
-  ✓ an-stdlib-secure-random-supports-1-and-127 [TIME]
+  ✓ an stdlib secure random supports 1 and 127 [TIME]
 
  ✓ 1 passed in 1 file

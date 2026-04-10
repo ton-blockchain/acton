@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/wallet_missing.test.tolk (1 test)
-  ✗ bw-wallet-missing-with-wallets-config [TIME]
+  ✗ bw wallet missing with wallets config [TIME]
     └─
 
  ✗ 1 failed in 1 file

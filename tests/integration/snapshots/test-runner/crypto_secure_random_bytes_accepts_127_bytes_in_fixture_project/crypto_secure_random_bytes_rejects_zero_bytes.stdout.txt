@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/secure_random_boundary.test.tolk (1 test)
-  ✗ ay-stdlib-secure-random-rejects-zero-bytes [TIME]
+  ✗ ay stdlib secure random rejects zero bytes [TIME]
     └─ Error: bytesNum must be between 1 and 128
 
  ✗ 1 failed in 1 file

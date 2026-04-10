@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/ei_crc16_vectors.test.tolk (1 test)
-  ✓ ei-stdlib-crc16-deterministic-u16-range [TIME]
+  ✓ ei stdlib crc16 deterministic u16 range [TIME]
 
  ✓ 1 passed in 1 file

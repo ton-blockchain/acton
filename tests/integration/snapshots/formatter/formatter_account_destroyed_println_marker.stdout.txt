@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_destroy.test.tolk (1 test)
-  ✓ formatter-account-destroyed-println [TIME]
+  ✓ formatter account destroyed println [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmDestroyNow 0.2 TON -> EQBstq..62kAiU B                                    gas=1557

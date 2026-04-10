@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/outlist_to_be_empty.test.tolk (1 test)
-  ✓ cc-outlist-to-be-empty-pass [TIME]
+  ✓ cc outlist to be empty pass [TIME]
 
  ✓ 1 passed in 1 file

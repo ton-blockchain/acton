@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/ed_map_value_matchers.test.tolk (1 test)
-  ✓ ed-stdlib-map-value-matchers-typed-any-address-success [TIME]
+  ✓ ed stdlib map value matchers typed any address success [TIME]
 
  ✓ 1 passed in 1 file

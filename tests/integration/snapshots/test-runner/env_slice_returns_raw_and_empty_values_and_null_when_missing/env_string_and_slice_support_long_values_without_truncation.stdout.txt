@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/env_long_values.test.tolk (1 test)
-  ✓ bp-stdlib-env-string-and-slice-long-values [TIME]
+  ✓ bp stdlib env string and slice long values [TIME]
 
  ✓ 1 passed in 1 file

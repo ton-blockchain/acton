@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/cw_load_body_mismatch.test.tolk (1 test)
-  ✗ cw-out-action-load-body-mismatch-diagnostic [TIME]
+  ✗ cw out action load body mismatch diagnostic [TIME]
     └─ exit_code=63
       ├─ Re-run with --backtrace full to get more information
       ├─ Unable to load data from cell because prefix does not match

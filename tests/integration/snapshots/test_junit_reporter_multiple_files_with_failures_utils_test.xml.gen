@@ -4,9 +4,9 @@
         <properties>
             <property name="file.path" value="[ROOT]/tests/utils.test.tolk"/>
         </properties>
-        <testcase name="test_pow2_basic" classname="utils.test.tolk" [TIME]>
+        <testcase name="test pow2 basic" classname="utils.test.tolk" [TIME]>
         </testcase>
-        <testcase name="test_pow2_edge" classname="utils.test.tolk" [TIME]>
+        <testcase name="test pow2 edge" classname="utils.test.tolk" [TIME]>
             <failure message="expect(&amp;lt;actual&amp;gt;).toEqual(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/utils.test[LINE]</failure>
         </testcase>
     </testsuite>

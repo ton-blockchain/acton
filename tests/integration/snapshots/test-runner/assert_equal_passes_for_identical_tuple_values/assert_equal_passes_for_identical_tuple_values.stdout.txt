@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_equal_pass.test.tolk (1 test)
-  ✓ ek-stdlib-assert-equal-pass-identical-tuple [TIME]
+  ✓ ek stdlib assert equal pass identical tuple [TIME]
 
  ✓ 1 passed in 1 file

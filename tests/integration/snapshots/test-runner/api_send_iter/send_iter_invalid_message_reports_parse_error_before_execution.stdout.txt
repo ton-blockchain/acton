@@ -20,7 +20,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ send-iter-invalid-message [TIME]
+  ✗ send iter invalid message [TIME]
     └─ Error: Cannot execute step-by-step transaction: Failed to parse message: invalid tag
 
  ✗ 1 failed in 1 file

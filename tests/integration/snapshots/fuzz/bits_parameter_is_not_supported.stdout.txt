@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-bits [TIME]
-    └─ Fuzzing parameter 'value' of type 'bits12' is not supported yet in test 'test-fuzz-bits'
+  ✗ fuzz bits [TIME]
+    └─ Fuzzing parameter 'value' of type 'bits12' is not supported yet in test 'test fuzz bits'
 
  ✗ 1 failed in 1 file
 

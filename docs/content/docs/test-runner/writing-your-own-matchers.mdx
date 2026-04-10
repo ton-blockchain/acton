@@ -18,7 +18,7 @@ fun checkIfValueIsEqualWithFlags(left: int, right: int, param1: bool, param2: bo
     Assert.equal(left, right);
 }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     checkIfValueIsEqualWithFlags(5 + 5, 10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }
@@ -39,7 +39,7 @@ fun Expectation<int>.toEqualWithFlags(self, right: int, param1: bool, param2: bo
     Assert.equal(self.value, right);
 }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     expect(5 + 5).toEqualWithFlags(10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }
@@ -88,7 +88,7 @@ fun Expectation<int>.toBeEven(self) {
     }
 }
 
-get fun `test-even-number`() {
+get fun `test even number`() {
     expect(10).toBeEven();
     // expect(9).toBeEven(); // This would fail
 }
@@ -118,7 +118,7 @@ fun Expectation<address>.toHaveWorkchain(self, expectedWorkchain: int) {
     }
 }
 
-get fun `test-address-workchain`() {
+get fun `test address workchain`() {
     val myAddress = address("0:527964d55cfa6eb731f4bfc07e9d025098097ef8505519e853986279bd8400d8");
     expect(myAddress).toHaveWorkchain(0);
 }
@@ -146,7 +146,7 @@ fun Expectation<slice>.toStartWith(self, prefix: slice) {
     }
 }
 
-get fun `test-slice-prefix`() {
+get fun `test slice prefix`() {
     expect("hello world").toStartWith("hello");
 }
 ```
@@ -183,7 +183,7 @@ fun Expectation<User>.toBeActive(self) {
     }
 }
 
-get fun `test-user-status`() {
+get fun `test user status`() {
     val activeUser = User { id: 1, name: "Alice", isActive: true };
     val inactiveUser = User { id: 2, name: "Bob", isActive: false };
 
@@ -255,7 +255,7 @@ Then, you can import them in your test files where needed:
 ```tolk
 import "./matchers"
 
-get fun `my-test`() {
+get fun `test my`() {
     expect(42).toBeEven();
 }
 ```

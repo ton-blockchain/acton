@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dw_crypto_mnemonic.test.tolk (1 test)
-  ✓ dw-stdlib-create-mnemonic-returns-24-non-empty-words [TIME]
+  ✓ dw stdlib create mnemonic returns 24 non empty words [TIME]
 
  ✓ 1 passed in 1 file

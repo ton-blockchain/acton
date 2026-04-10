@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dv_vm_register_library.test.tolk (1 test)
-  ✓ dv-stdlib-vm-register-library-repeated-idempotent [TIME]
+  ✓ dv stdlib vm register library repeated idempotent [TIME]
 
  ✓ 1 passed in 1 file

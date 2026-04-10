@@ -25,7 +25,7 @@ fn config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entrie
     run_config_success_case(
         "dq-stdlib-config-storage-prices-set-initial-overwrite-preserves-future",
         r"
-get fun `test-dq-stdlib-config-storage-prices-set-initial-overwrite-preserves-future`() {
+get fun `test dq stdlib config storage prices set initial overwrite preserves future`() {
     val futureTsA: uint32 = 1000000;
     val futureTsB: uint32 = 2000000;
     var config = net.getConfig();

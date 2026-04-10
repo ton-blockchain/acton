@@ -69,7 +69,7 @@ fn net_send_single_matches_net_send_first_result_transaction_and_action_in_proje
     run_project_success(
         "df-stdlib-send-single-vs-send-first-result-project-builder",
         r#"
-get fun `test-df-send-single-vs-send-first-result-project-builder`() {
+get fun `test df send single vs send first result project builder`() {
     val sender = net.treasury("df_sender_project");
 
     val init = ContractState {
@@ -182,7 +182,7 @@ depends = []
     let test_path = "tests/df_send_single_vs_send_first_result_equivalence.test.tolk";
     let source = format!(
         r#"{DF_IMPORTS}
-get fun `test-df-send-single-vs-send-first-result-fixture-project`() {{
+get fun `test df send single vs send first result fixture project`() {{
     val sender = net.treasury("df_sender_fixture");
 
     val init = ContractState {{

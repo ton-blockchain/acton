@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dr_config_storage_prices.test.tolk (1 test)
-  ✓ dr-stdlib-config-storage-prices-multi-entry-roundtrip [TIME]
+  ✓ dr stdlib config storage prices multi entry roundtrip [TIME]
 
  ✓ 1 passed in 1 file

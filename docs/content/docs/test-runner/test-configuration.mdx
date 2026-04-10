@@ -65,13 +65,13 @@ acton test --reporter console,teamcity
 acton test --coverage
 
 # Override filter setting from config
-acton test --filter "test-mint.*"
+acton test --filter "mint.*"
 
 # Override reporter setting
 acton test --reporter teamcity
 
 # Multiple overrides
-acton test --coverage --filter "test-deploy" --debug --reporter junit
+acton test --coverage --filter "test deploy" --debug --reporter junit
 ```
 
 ## Configuration Options Reference
@@ -87,7 +87,7 @@ acton test --coverage --filter "test-deploy" --debug --reporter junit
 **Examples:**
 ```toml
 [test]
-filter = "test-wallet.*"           # Only wallet tests
+filter = ".*wallet.*"              # Only get fun `...wallet...`
 exclude = ["**/integration/**"]    # Skip integration directory
 include = ["**/unit/**"]           # Only include unit test files
 ```

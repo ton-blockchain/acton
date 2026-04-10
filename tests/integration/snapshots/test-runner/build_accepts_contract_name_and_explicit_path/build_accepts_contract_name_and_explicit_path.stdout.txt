@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/build_paths.test.tolk (1 test)
-  ✓ build-by-name-and-path [TIME]
+  ✓ build by name and path [TIME]
 
  ✓ 1 passed in 1 file

@@ -14,22 +14,22 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/comparison.test.tolk (4 tests)
-  ✗ less-fail [TIME]
+  ✗ less fail [TIME]
     └─ Error: expect(actual).toBeLess(expected)
         Actual:   5
         Expected: 5
       └─ at tests/comparison.test[LINE]
-  ✗ greater-fail [TIME]
+  ✗ greater fail [TIME]
     └─ Error: expect(actual).toBeGreater(expected)
         Actual:   5
         Expected: 6
       └─ at tests/comparison.test[LINE]
-  ✗ less-or-equal-fail [TIME]
+  ✗ less or equal fail [TIME]
     └─ Error: expect(actual).toBeLessOrEqual(expected)
         Actual:   8
         Expected: 7
       └─ at tests/comparison.test[LINE]
-  ✗ greater-or-equal-fail [TIME]
+  ✗ greater or equal fail [TIME]
     └─ Error: expect(actual).toBeGreaterOrEqual(expected)
         Actual:   -2
         Expected: -1

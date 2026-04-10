@@ -34,7 +34,7 @@ fn vm_register_library_is_idempotent_under_repeated_same_cell_registration() {
     run_success_case(
         "dv-stdlib-vm-register-library-repeated-idempotent",
         r#"
-get fun `test-dv-stdlib-vm-register-library-repeated-idempotent`() {
+get fun `test dv stdlib vm register library repeated idempotent`() {
     val libraryCode = build("simple");
     val c7Before = vm.getC7();
     val c5Before = vm.getC5();

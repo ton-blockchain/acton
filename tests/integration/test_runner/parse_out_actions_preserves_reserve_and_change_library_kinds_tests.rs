@@ -28,7 +28,7 @@ fn parse_out_actions_preserves_reserve_and_change_library_kinds() {
     run_success(
         "cj-stdlib-parse-out-actions-preserves-kinds",
         r#"
-get fun `test-cj-parse-out-actions-preserves-kinds`() {
+get fun `test cj parse out actions preserves kinds`() {
     reserveToncoinsOnBalance(
         ton("0.05"),
         RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL
@@ -56,7 +56,7 @@ fn parse_out_actions_reserve_nanoton_is_misparsed_as_change_library_bug() {
     run_success(
         "cj-stdlib-parse-out-actions-reserve-one-nanoton-kind-bug",
         r#"
-get fun `test-cj-parse-out-actions-reserve-one-nanoton-kind-bug`() {
+get fun `test cj parse out actions reserve one nanoton kind bug`() {
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = vm.parseOutActions(vm.getC5());
@@ -74,7 +74,7 @@ fn parse_out_actions_reserve_zero_nanoton_stays_reserve_currency() {
     run_success(
         "cj-stdlib-parse-out-actions-reserve-zero-nanoton-kind",
         r#"
-get fun `test-cj-parse-out-actions-reserve-zero-nanoton-kind`() {
+get fun `test cj parse out actions reserve zero nanoton kind`() {
     reserveToncoinsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = vm.parseOutActions(vm.getC5());
@@ -91,7 +91,7 @@ fn parse_out_actions_single_set_code_action_is_decoded() {
     run_success(
         "cj-stdlib-parse-out-actions-single-set-code",
         r#"
-get fun `test-cj-parse-out-actions-single-set-code`() {
+get fun `test cj parse out actions single set code`() {
     contract.setCodePostponed(beginCell().storeUint(0xA1, 8).endCell());
 
     val parsed = vm.parseOutActions(vm.getC5());
@@ -108,7 +108,7 @@ fn parse_out_actions_single_send_message_action_preserves_mode() {
     run_success(
         "cj-stdlib-parse-out-actions-single-send-message",
         r#"
-get fun `test-cj-parse-out-actions-single-send-message`() {
+get fun `test cj parse out actions single send message`() {
     val dest = net.randomAddress("cj_single_send_dest");
     createMessage({
         bounce: false,
@@ -134,7 +134,7 @@ fn parse_out_actions_reserve_zero_and_one_preserve_kind_and_amount() {
     run_success(
         "cj-stdlib-parse-out-actions-reserve-zero-and-one",
         r#"
-get fun `test-cj-parse-out-actions-reserve-zero-and-one`() {
+get fun `test cj parse out actions reserve zero and one`() {
     reserveToncoinsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
@@ -164,7 +164,7 @@ fn parse_out_actions_mixed_action_chain_preserves_order_and_types() {
     run_success(
         "cj-stdlib-parse-out-actions-mixed-chain",
         r#"
-get fun `test-cj-parse-out-actions-mixed-chain`() {
+get fun `test cj parse out actions mixed chain`() {
     val dest = net.randomAddress("cj_mixed_chain_dest");
 
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);

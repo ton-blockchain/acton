@@ -338,7 +338,7 @@ Defaults can be configured in `Acton.toml`:
 ```toml
 [test]
 reporter = ["console"]
-filter = "test-.*"
+filter = ".*jetton.*"
 junit-path = "reports"
 junit-merge = false
 

@@ -6,7 +6,7 @@ import "../contracts/my_contract"
 import "../wrappers/MyContract"
 
 /// Example test case demonstrating the basic flow
-get fun `test-basic-flow`() {
+get fun `test basic flow`() {
     val (contract, deployer, not_deployer) = setupTest();
     // TODO: Implement your test logic here
     // Example:

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/run_get_method_by_id_undeployed.test.tolk (1 test)
-  ✗ bg-run-get-method-by-id-undeployed [TIME]
+  ✗ bg run get method by id undeployed [TIME]
     └─ exit_code=678
       ├─ Re-run with --backtrace full to get more information
       └─ Cannot run method of not deployed contract, make sure you're deployed contract first or passed --fork-net

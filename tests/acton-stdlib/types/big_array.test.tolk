@@ -13,24 +13,24 @@ fun createFilledBigArray(size: int): BigArray<int> {
     return big;
 }
 
-get fun `test-big-array-create-empty`() {
+get fun `test big array create empty`() {
     val big = BigArray<int>.createEmpty();
     expect(big.size()).toEqual(0);
 }
 
-get fun `test-big-array-create-from-array`() {
+get fun `test big array create from array`() {
     val big = BigArray<int>.createFromArray([4, 7, 9]);
     expect(big.size()).toEqual(3);
     expect(big.first()).toEqual(4);
     expect(big.last()).toEqual(9);
 }
 
-get fun `test-big-array-create-from-empty-array`() {
+get fun `test big array create from empty array`() {
     val big = BigArray<int>.createFromArray([]);
     expect(big).toBeEmpty();
 }
 
-get fun `test-big-array-push-first-last-size`() {
+get fun `test big array push first last size`() {
     val big = createFilledBigArray(3);
 
     expect(big.size()).toEqual(3);
@@ -38,7 +38,7 @@ get fun `test-big-array-push-first-last-size`() {
     expect(big.last()).toEqual(2);
 }
 
-get fun `test-big-array-set-updates-element`() {
+get fun `test big array set updates element`() {
     var big = createFilledBigArray(3);
 
     big.set(777, 2);
@@ -48,7 +48,7 @@ get fun `test-big-array-set-updates-element`() {
     expect(big.last()).toEqual(777);
 }
 
-get fun `test-big-array-pop-updates-size-and-last`() {
+get fun `test big array pop updates size and last`() {
     var big = createFilledBigArray(4);
 
     big.pop();
@@ -58,7 +58,7 @@ get fun `test-big-array-pop-updates-size-and-last`() {
     expect(big.last()).toEqual(2);
 }
 
-get fun `test-big-array-second-bin-layout`() {
+get fun `test big array second bin layout`() {
     var big = createFilledBigArray(260);
 
     expect(big.size()).toEqual(260);
@@ -77,7 +77,7 @@ get fun `test-big-array-second-bin-layout`() {
     expect(big.last()).toEqual(700);
 }
 
-get fun `test-big-array-get-reads-across-bins`() {
+get fun `test big array get reads across bins`() {
     var big = createFilledBigArray(260);
 
     expect(big.get(0)).toEqual(0);

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dc_transaction_account_address.test.tolk (1 test)
-  ✓ dc-stdlib-transaction-get-account-address-default-vs-masterchain [TIME]
+  ✓ dc stdlib transaction get account address default vs masterchain [TIME]
 
  ✓ 1 passed in 1 file

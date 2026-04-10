@@ -24,7 +24,7 @@ fn network_random_address_reuses_identical_symbolic_name_bug() {
     run_network_success_case(
         "bo-stdlib-network-random-address-reuse",
         r#"
-get fun `test-bo-stdlib-network-random-address-reuse`() {
+get fun `test bo stdlib network random address reuse`() {
     val first = net.randomAddress("bo_reused_symbolic_name");
     val second = net.randomAddress("bo_reused_symbolic_name");
 

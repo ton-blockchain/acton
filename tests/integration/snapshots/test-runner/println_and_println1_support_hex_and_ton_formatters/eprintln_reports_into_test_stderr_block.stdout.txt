@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ eprintln-stderr-path [TIME]
+  ✓ eprintln stderr path [TIME]
     └─ Test output:
        stdout-before
        stdout-after

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/change_library_decode.test.tolk (1 test)
-  ✓ cz-change-library-mode-preserved-remove [TIME]
+  ✓ cz change library mode preserved remove [TIME]
 
  ✓ 1 passed in 1 file

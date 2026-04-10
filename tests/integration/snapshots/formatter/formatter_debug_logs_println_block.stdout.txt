@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_debug.test.tolk (1 test)
-  ✓ formatter-debug-logs-println [TIME]
+  ✓ formatter debug logs println [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmDebugPing 0.2 TON -> fm_debug B                                           gas=540

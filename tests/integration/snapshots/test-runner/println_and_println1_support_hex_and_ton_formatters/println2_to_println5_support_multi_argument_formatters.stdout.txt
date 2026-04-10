@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ println2-to-println5-formatters [TIME]
+  ✓ println2 to println5 formatters [TIME]
     └─ Test output:
        left + right
        hex=ff ton=2.5 TON label=ok

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_map_address_keys.test.tolk (1 test)
-  ✓ ec-stdlib-map-to-contain-key-friendly-equivalent [TIME]
+  ✓ ec stdlib map to contain key friendly equivalent [TIME]
 
  ✓ 1 passed in 1 file

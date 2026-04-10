@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
-  ✓ br-stdlib-format5-placeholder-order-bug [TIME]
+  ✓ br stdlib format5 placeholder order bug [TIME]
 
  ✓ 1 passed in 1 file

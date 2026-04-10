@@ -4,7 +4,7 @@
         <properties>
             <property name="file.path" value="[ROOT]/tests/test.test.tolk"/>
         </properties>
-        <testcase name="test-junit-custom-path" classname="test.test.tolk" [TIME]>
+        <testcase name="test junit custom path" classname="test.test.tolk" [TIME]>
         </testcase>
     </testsuite>
 </testsuites>

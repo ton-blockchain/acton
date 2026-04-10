@@ -16,7 +16,7 @@ import "@acton/testing/expect"
 import "@acton/testing/fuzz"
 
 @test({ fuzz: true })
-get fun `test-balance-stays-bounded`(value: int) {
+get fun `test balance stays bounded`(value: int) {
     val bounded = fuzz.bound(value, 0, 100);
     fuzz.assume(bounded != 13);
     expect(bounded >= 0).toBeTrue();

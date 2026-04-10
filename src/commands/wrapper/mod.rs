@@ -962,7 +962,7 @@ fn generate_example_test(_contract_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Example test case demonstrating the basic flow\n");
-    code.push_str("get fun `test-basic-flow`() {\n");
+    code.push_str("get fun `test basic flow`() {\n");
     code.push_str("    val (contract, deployer, not_deployer) = setupTest();\n");
     code.push('\n');
     code.push_str("    // TODO: Implement your test logic here\n");

@@ -39,7 +39,7 @@ fun TickTockContract.getTockCount(self): int {
     return net.runGetMethod(self.address, "tockCount");
 }
 
-get fun `test-run-tick`() {
+get fun `test run tick`() {
     val contract = TickTockContract.deploy();
 
     val res = net.runTickTock(contract.address, false);
@@ -49,7 +49,7 @@ get fun `test-run-tick`() {
     expect(contract.getTockCount()).toEqual(0);
 }
 
-get fun `test-run-tock`() {
+get fun `test run tock`() {
     val contract = TickTockContract.deploy();
 
     val res = net.runTickTock(contract.address, true);

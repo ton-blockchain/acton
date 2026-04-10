@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/env_or_slice.test.tolk (1 test)
-  ✓ bp-stdlib-env-or-slice-fallback-vs-present [TIME]
+  ✓ bp stdlib env or slice fallback vs present [TIME]
 
  ✓ 1 passed in 1 file

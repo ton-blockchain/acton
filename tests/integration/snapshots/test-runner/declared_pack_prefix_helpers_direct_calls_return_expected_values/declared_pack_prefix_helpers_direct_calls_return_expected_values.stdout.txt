@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/ep_declared_pack_prefix.test.tolk (1 test)
-  ✓ ep-declared-pack-prefix-helpers-direct-calls [TIME]
+  ✓ ep declared pack prefix helpers direct calls [TIME]
 
  ✓ 1 passed in 1 file

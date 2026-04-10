@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/bo_random_address_reuse.test.tolk (1 test)
-  ✓ bo-stdlib-network-random-address-reuse [TIME]
+  ✓ bo stdlib network random address reuse [TIME]
 
  ✓ 1 passed in 1 file

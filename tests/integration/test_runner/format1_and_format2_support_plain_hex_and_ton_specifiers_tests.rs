@@ -28,7 +28,7 @@ fn format1_and_format2_support_plain_hex_and_ton_specifiers() {
     run_fmt_success(
         "y-stdlib-format1-format2-specifiers",
         r#"
-get fun `test-y-stdlib-format1-format2-specifiers`() {
+get fun `test y stdlib format1 format2 specifiers`() {
     val plain = format("hello {}", "world");
     expect(plain).toEqual("hello world");
 
@@ -48,7 +48,7 @@ fn format3_and_format4_support_mixed_plain_hex_and_ton() {
     run_fmt_success(
         "y-stdlib-format3-format4-mixed-specifiers",
         r#"
-get fun `test-y-stdlib-format3-format4-mixed-specifiers`() {
+get fun `test y stdlib format3 format4 mixed specifiers`() {
     val formatted3 = format("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
     expect(formatted3).toEqual("hex=ff ton=2.5 TON label=ok");
 
@@ -65,7 +65,7 @@ fn format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug() {
     run_fmt_success(
         "y-stdlib-format5-placeholder-order-bug",
         r#"
-get fun `test-y-stdlib-format5-placeholder-order-bug`() {
+get fun `test y stdlib format5 placeholder order bug`() {
     val rendered = format("{} | {:x} | {:ton} | {} | {}", 255, 16, 1500000000, "left", "right");
     expect(rendered).toEqual("255 | 10 | 1.5 TON | left | right");
 }

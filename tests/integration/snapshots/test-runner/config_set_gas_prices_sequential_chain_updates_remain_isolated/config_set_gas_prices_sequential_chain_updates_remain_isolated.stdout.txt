@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ ds-stdlib-config-gas-prices-sequential-isolation [TIME]
+  ✓ ds stdlib config gas prices sequential isolation [TIME]
 
  ✓ 1 passed in 1 file

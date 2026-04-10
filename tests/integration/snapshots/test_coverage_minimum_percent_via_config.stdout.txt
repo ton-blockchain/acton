@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ partial-coverage [TIME]
+  ✓ partial coverage [TIME]
 
  ✓ 1 passed in 1 file
 

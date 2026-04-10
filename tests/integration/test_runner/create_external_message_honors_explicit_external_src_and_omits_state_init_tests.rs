@@ -41,7 +41,7 @@ fn create_external_message_honors_explicit_external_src_and_omits_state_init() {
     run_success_case(
         "dh-stdlib-create-external-src-override-no-init",
         r#"
-get fun `test-dh-create-external-message-src-override-no-state-init`() {
+get fun `test dh create external message src override no state init`() {
     val dest = net.randomAddress("dh_dest_src_override");
     val src = dhExternalAddress(0xD1000001);
 
@@ -71,7 +71,7 @@ fn create_external_message_defaults_src_to_none_and_keeps_state_init_absent() {
     run_success_case(
         "dh-stdlib-create-external-default-src-no-init",
         r#"
-get fun `test-dh-create-external-message-default-src-no-state-init`() {
+get fun `test dh create external message default src no state init`() {
     val dest = net.randomAddress("dh_dest_default_src");
 
     val msg = createExternalMessage(

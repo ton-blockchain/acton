@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/account_state.test.tolk (1 test)
-  ✓ set-shard-account-copies-state-between-addresses [TIME]
+  ✓ set shard account copies state between addresses [TIME]
 
  ✓ 1 passed in 1 file

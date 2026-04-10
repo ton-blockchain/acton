@@ -14,14 +14,14 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_bool.test.tolk (2 tests)
-  ✗ by-expect-bool-fail-to-be-true [TIME]
+  ✗ by expect bool fail to be true [TIME]
     └─ Error: expect(actual).toBeTrue()
         (
             false,
             true
         )
       └─ at tests/expect_bool.test[LINE]
-  ✗ by-expect-bool-fail-to-be-false [TIME]
+  ✗ by expect bool fail to be false [TIME]
     └─ Error: expect(actual).toBeFalse()
         (
             true,

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ bd-stdlib-config-gas-prices-single-chain-independence [TIME]
+  ✓ bd stdlib config gas prices single chain independence [TIME]
 
  ✓ 1 passed in 1 file

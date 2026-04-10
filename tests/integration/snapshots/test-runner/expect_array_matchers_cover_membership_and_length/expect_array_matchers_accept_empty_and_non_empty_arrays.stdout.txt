@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_array.test.tolk (2 tests)
-  ✓ stdlib-array-matchers-non-empty [TIME]
-  ✓ stdlib-array-matchers-empty [TIME]
+  ✓ stdlib array matchers non empty [TIME]
+  ✓ stdlib array matchers empty [TIME]
 
  ✓ 2 passed in 1 file

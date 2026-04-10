@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/aj_vm_helpers.test.tolk (1 test)
-  ✓ aj-stdlib-vm-convert-address-valid [TIME]
+  ✓ aj stdlib vm convert address valid [TIME]
 
  ✓ 1 passed in 1 file

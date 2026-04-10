@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_bool.test.tolk (2 tests)
-  ✓ by-expect-bool-pass-true [TIME]
-  ✓ by-expect-bool-pass-false [TIME]
+  ✓ by expect bool pass true [TIME]
+  ✓ by expect bool pass false [TIME]
 
  ✓ 2 passed in 1 file

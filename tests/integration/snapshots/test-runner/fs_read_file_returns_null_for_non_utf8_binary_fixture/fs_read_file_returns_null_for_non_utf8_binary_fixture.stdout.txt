@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fs_binary_fixture.test.tolk (1 test)
-  ✓ au-fs-read-non-utf8-binary-fixture [TIME]
+  ✓ au fs read non utf8 binary fixture [TIME]
 
  ✓ 1 passed in 1 file

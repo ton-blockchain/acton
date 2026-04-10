@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
-  ✓ eb-stdlib-format4-missing-placeholder-slot [TIME]
+  ✓ eb stdlib format4 missing placeholder slot [TIME]
 
  ✓ 1 passed in 1 file

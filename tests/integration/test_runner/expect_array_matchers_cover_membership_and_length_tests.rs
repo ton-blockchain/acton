@@ -23,7 +23,7 @@ fn expect_array_matchers_accept_empty_and_non_empty_arrays() {
     run_expect_array_suite(
         "stdlib-expect-array-success",
         r"
-get fun `test-stdlib-array-matchers-non-empty`() {
+get fun `test stdlib array matchers non empty`() {
     val values = [1, 2, 3];
 
     expect(values).toContain(2);
@@ -32,7 +32,7 @@ get fun `test-stdlib-array-matchers-non-empty`() {
     expect(values).toHaveLength(3);
 }
 
-get fun `test-stdlib-array-matchers-empty`() {
+get fun `test stdlib array matchers empty`() {
     val values = array<int> [];
 
     expect(values).toBeEmpty();
@@ -53,27 +53,27 @@ fn expect_array_matchers_report_membership_and_length_mismatches() {
     run_expect_array_suite(
         "stdlib-expect-array-failures",
         r"
-get fun `test-stdlib-array-to-contain-missing`() {
+get fun `test stdlib array to contain missing`() {
     val values = [10, 20];
     expect(values).toContain(30);
 }
 
-get fun `test-stdlib-array-to-not-contain-present`() {
+get fun `test stdlib array to not contain present`() {
     val values = [10, 20];
     expect(values).toNotContain(10);
 }
 
-get fun `test-stdlib-array-to-be-empty-on-non-empty`() {
+get fun `test stdlib array to be empty on non empty`() {
     val values = [1];
     expect(values).toBeEmpty();
 }
 
-get fun `test-stdlib-array-to-be-non-empty-on-empty`() {
+get fun `test stdlib array to be non empty on empty`() {
     val values = array<int> [];
     expect(values).toBeNonEmpty();
 }
 
-get fun `test-stdlib-array-to-have-length-mismatch`() {
+get fun `test stdlib array to have length mismatch`() {
     val values = [1, 2, 3];
     expect(values).toHaveLength(4);
 }

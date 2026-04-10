@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_known_address.test.tolk (1 test)
-  ✓ formatter-decoded-body-known-addresses [TIME]
+  ✓ formatter decoded body known addresses [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmKnownAddressBody 0.05 TON -> fm_known_address_sink B                      gas=333

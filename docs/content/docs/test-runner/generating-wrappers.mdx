@@ -48,7 +48,7 @@ fun setupTest() {
 }
 
 /// Example test case demonstrating the basic flow
-get fun `test-basic-flow`() {
+get fun `test basic flow`() {
     val (contract, deployer, not_deployer) = setupTest();
 
     // TODO: Implement your test logic here
@@ -149,7 +149,7 @@ import "@wrappers/Counter"
 // Don't forget to import types for the storage struct!
 import "@contracts/types"
 
-get fun `test-example`() {
+get fun `test example`() {
     // 1. Create contract instance from storage data
     val contract = Counter.fromStorage({
         counter: 0,

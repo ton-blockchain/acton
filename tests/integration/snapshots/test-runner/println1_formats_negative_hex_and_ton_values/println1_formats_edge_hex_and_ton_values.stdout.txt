@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ as-stdlib-println1-edge-formatters [TIME]
+  ✓ as stdlib println1 edge formatters [TIME]
     └─ Test output:
        hex_zero=0
        hex_i64_max=7fffffffffffffff

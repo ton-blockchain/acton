@@ -46,7 +46,7 @@ fun externalInfo(): ExtMsgInfoRelaxed {
     };
 }
 
-get fun `test-load-opcode`() {
+get fun `test load opcode`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -69,7 +69,7 @@ get fun `test-load-opcode`() {
     }
 }
 
-get fun `test-load-opcode-for-bounced-message`() {
+get fun `test load opcode for bounced message`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -95,7 +95,7 @@ get fun `test-load-opcode-for-bounced-message`() {
     }
 }
 
-get fun `test-load-body-from-inline-and-ref`() {
+get fun `test load body from inline and ref`() {
     val inlineMessage = MessageRelaxed<DemoPayload> {
         info: internalInfo(),
         init: Maybe<Either<StateInit, Cell<StateInit>>>.none(),
@@ -118,7 +118,7 @@ get fun `test-load-body-from-inline-and-ref`() {
     expect(extRefMessage.loadBody()).toEqual(DemoPayload { value: 3 });
 }
 
-get fun `test-load-opcode-from-inline-and-ref-body`() {
+get fun `test load opcode from inline and ref body`() {
     val opcode = reflect.serializationPrefixOf<IncreaseCounter>().0;
 
     val inlineMessage = MessageRelaxedGeneric {
@@ -151,7 +151,7 @@ get fun `test-load-opcode-from-inline-and-ref-body`() {
     expect(externalMessage.loadOpcode()).toEqual(opcode);
 }
 
-get fun `test-load-opcode-returns-null-for-malformed-body`() {
+get fun `test load opcode returns null for malformed body`() {
     val missingRef = MessageRelaxedGeneric {
         info: internalInfo(),
         init: Maybe<Either<StateInit, Cell<StateInit>>>.none(),

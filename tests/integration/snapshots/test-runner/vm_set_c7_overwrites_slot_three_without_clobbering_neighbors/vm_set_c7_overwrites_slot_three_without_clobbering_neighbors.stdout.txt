@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/cm_vm_set_c7.test.tolk (1 test)
-  ✓ cm-stdlib-vm-set-c7-overwrite-slot-three [TIME]
+  ✓ cm stdlib vm set c7 overwrite slot three [TIME]
 
  ✓ 1 passed in 1 file

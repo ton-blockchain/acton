@@ -34,7 +34,7 @@ fn to_have_successful_deploy_rejects_non_deploy_success_transaction() {
     run_deploy_expect_failure(
         "cg-stdlib-to-have-successful-deploy-rejects-non-deploy-success-transaction",
         r#"
-get fun `test-cg-to-have-successful-deploy-rejects-non-deploy-success-transaction`() {
+get fun `test cg to have successful deploy rejects non deploy success transaction`() {
     val sender = net.treasury("sender");
 
     val deployState = ContractState {
@@ -80,7 +80,7 @@ fn to_have_successful_deploy_failure_format_includes_expected_search_params() {
     run_deploy_expect_failure(
         "cg-stdlib-to-have-successful-deploy-formatting-expected-search-params",
         r#"
-get fun `test-cg-to-have-successful-deploy-formatting-expected-search-params`() {
+get fun `test cg to have successful deploy formatting expected search params`() {
     val sender = net.treasury("sender");
 
     val deployState = ContractState {

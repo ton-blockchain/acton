@@ -20,7 +20,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ send-iter-rejects-broadcast-mode [TIME]
+  ✗ send iter rejects broadcast mode [TIME]
     └─ Error: net.sendIter() is available only in emulation mode
 
  ✗ 1 failed in 1 file

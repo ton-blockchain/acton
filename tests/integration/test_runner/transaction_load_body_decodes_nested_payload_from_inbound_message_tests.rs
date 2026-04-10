@@ -42,7 +42,7 @@ fn transaction_load_body_decodes_nested_payload_from_inbound_message() {
     run_transaction_success(
         "db-stdlib-transaction-load-body-nested-inline",
         r#"
-get fun `test-db-stdlib-transaction-load-body-nested-inline`() {
+get fun `test db stdlib transaction load body nested inline`() {
     val sender = net.treasury("db_sender_inline");
     val destination = net.randomAddress("db_destination_inline");
     val payload = DbNestedPayload {
@@ -98,7 +98,7 @@ fn transaction_load_body_decodes_nested_payload_in_fixture_project() {
         "{imports}\n{body}\n",
         imports = DB_TRANSACTION_IMPORTS,
         body = r#"
-get fun `test-db-stdlib-transaction-load-body-nested-fixture`() {
+get fun `test db stdlib transaction load body nested fixture`() {
     val sender = net.treasury("db_sender_fixture");
     val destination = net.randomAddress("db_destination_fixture");
     val payload = DbNestedPayload {

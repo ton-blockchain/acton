@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
-  ✗ eb-stdlib-format1-unsupported-placeholder-payload [TIME]
+  ✗ eb stdlib format1 unsupported placeholder payload [TIME]
     └─ Error: Invalid format string at byte 6: unsupported placeholder {name} (supported: {}, {:x}, {:ton})
 
  ✗ 1 failed in 1 file

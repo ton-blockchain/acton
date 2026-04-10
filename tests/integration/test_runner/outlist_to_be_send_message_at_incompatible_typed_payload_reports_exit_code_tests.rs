@@ -32,7 +32,7 @@ fn outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code() 
     run_outlist_success(
         "cb-stdlib-outlist-incompatible-typed-payload",
         r#"
-get fun `test-cb-outlist-incompatible-typed-payload`() {
+get fun `test cb outlist incompatible typed payload`() {
     val dest = net.randomAddress("counter");
     val incompatible_payload = beginCell()
         .storeUint(0x7e8764ef, 32)
@@ -60,7 +60,7 @@ fn outlist_to_be_send_message_at_fails_for_non_send_action() {
     run_outlist_success(
         "cb-stdlib-outlist-non-send-action",
         r#"
-get fun `test-cb-outlist-non-send-action`() {
+get fun `test cb outlist non send action`() {
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val out_actions = vm.outActions();

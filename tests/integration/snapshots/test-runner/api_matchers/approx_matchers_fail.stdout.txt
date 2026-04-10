@@ -14,13 +14,13 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/approx.test.tolk (3 tests)
-  ✗ approx-abs-fail [TIME]
+  ✗ approx abs fail [TIME]
     └─ Error: 10 !~= 20 (max delta: 5, real delta: 10)
       └─ at tests/approx.test[LINE]
-  ✗ approx-rel-fail [TIME]
+  ✗ approx rel fail [TIME]
     └─ Error: 10 !~= 20 (max delta: 50%, real delta: 100%)
       └─ at tests/approx.test[LINE]
-  ✗ approx-rel-small-threshold-fail [TIME]
+  ✗ approx rel small threshold fail [TIME]
     └─ Error: 200 !~= 220 (max delta: 9%, real delta: 10%)
       └─ at tests/approx.test[LINE]
 

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/map.test.tolk (1 test)
-  ✓ map-length-after-overwrite [TIME]
+  ✓ map length after overwrite [TIME]
 
  ✓ 1 passed in 1 file

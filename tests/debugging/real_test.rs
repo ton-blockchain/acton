@@ -184,7 +184,7 @@ fun main() {
     println(res);
 }
 
-get fun `test-should-reset-counter`() {
+get fun `test should reset counter`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

@@ -38,7 +38,7 @@ fn balance_returns_zero_for_unknown_address_then_top_up_updates_balance() {
     run_case(
         "ah-stdlib-balance-zero-then-top-up",
         r#"
-get fun `test-ah-stdlib-balance-zero-then-top-up`() {
+get fun `test ah stdlib balance zero then top up`() {
     val target = net.randomAddress("ah_balance_target_zero_then_top_up");
     expect(net.balance(target)).toEqual(0);
 
@@ -56,7 +56,7 @@ fn top_up_is_additive_for_the_same_address() {
     run_case(
         "ah-stdlib-top-up-additive",
         r#"
-get fun `test-ah-stdlib-top-up-is-additive`() {
+get fun `test ah stdlib top up is additive`() {
     val target = net.randomAddress("ah_top_up_additive_target");
 
     net.topUp(target, ton("1"));
@@ -75,7 +75,7 @@ fn set_account_on_fresh_target_preserves_shard_markers() {
     run_case(
         "ah-stdlib-set-account-fresh-target-preserves-markers",
         r#"
-get fun `test-ah-stdlib-set-account-fresh-target-preserves-markers`() {
+get fun `test ah stdlib set account fresh target preserves markers`() {
     val target = net.randomAddress("ah_set_account_target_fresh");
 
     val beforeShard = net.getShardAccount(target);
@@ -104,7 +104,7 @@ fn set_account_preserves_existing_shard_markers_and_balance() {
     run_case(
         "ah-stdlib-set-account-preserves-markers-and-balance",
         r#"
-get fun `test-ah-stdlib-set-account-preserves-existing-shard-markers-and-balance`() {
+get fun `test ah stdlib set account preserves existing shard markers and balance`() {
     val target = net.randomAddress("ah_set_account_existing_target");
 
     net.topUp(target, ton("1"));
@@ -137,7 +137,7 @@ fn set_shard_account_copies_markers_and_balance_between_addresses() {
     run_case(
         "ah-stdlib-set-shard-account-copy-state",
         r#"
-get fun `test-ah-stdlib-set-shard-account-copy-state`() {
+get fun `test ah stdlib set shard account copy state`() {
     val source = net.randomAddress("ah_set_shard_source");
     val target = net.randomAddress("ah_set_shard_target");
 
@@ -170,7 +170,7 @@ fn set_shard_account_null_resets_balance_and_markers() {
     run_case(
         "ah-stdlib-set-shard-account-null-reset",
         r#"
-get fun `test-ah-stdlib-set-shard-account-null-reset`() {
+get fun `test ah stdlib set shard account null reset`() {
     val target = net.randomAddress("ah_set_shard_null_target");
     net.topUp(target, ton("1"));
 
@@ -197,7 +197,7 @@ fn register_address_name_is_used_in_transaction_output() {
     run_case(
         "ah-stdlib-register-address-output-name",
         r#"
-get fun `test-ah-stdlib-register-address-output-name`() {
+get fun `test ah stdlib register address output name`() {
     val deployer = net.treasury("ah_register_address_deployer");
     val target = address("0:0000000000000000000000000000000000000000000000000000000000000011");
 
@@ -224,7 +224,7 @@ fn register_code_cell_name_is_used_for_auto_deploy_output() {
     run_case(
         "ah-stdlib-register-code-cell-output-name",
         r#"
-get fun `test-ah-stdlib-register-code-cell-output-name`() {
+get fun `test ah stdlib register code cell output name`() {
     val deployer = net.treasury("ah_register_code_deployer");
     val code = build("simple");
 

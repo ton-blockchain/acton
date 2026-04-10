@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/em_message_matches.test.tolk (1 test)
-  ✓ em-message-matches-external-out-filters [TIME]
+  ✓ em message matches external out filters [TIME]
 
  ✓ 1 passed in 1 file

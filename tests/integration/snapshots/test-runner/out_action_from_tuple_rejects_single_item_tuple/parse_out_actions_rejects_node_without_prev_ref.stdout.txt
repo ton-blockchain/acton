@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/out_actions_malformed.test.tolk (1 test)
-  ✗ parse-out-actions-rejects-node-without-prev-ref [TIME]
+  ✗ parse out actions rejects node without prev ref [TIME]
     └─ Error: Malformed out action list node
 
  ✗ 1 failed in 1 file

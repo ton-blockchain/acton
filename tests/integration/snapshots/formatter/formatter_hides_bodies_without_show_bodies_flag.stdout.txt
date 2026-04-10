@@ -12,7 +12,7 @@
  TEST  [ROOT]
 
  > tests/formatter_linear.test.tolk (1 test)
-  ✓ formatter-hides-bodies-without-show-bodies-flag [TIME]
+  ✓ formatter hides bodies without show bodies flag [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828

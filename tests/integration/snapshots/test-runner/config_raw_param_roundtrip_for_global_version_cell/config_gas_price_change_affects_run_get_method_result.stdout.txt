@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ ai-stdlib-config-gas-price-affects-run-get-method [TIME]
+  ✓ ai stdlib config gas price affects run get method [TIME]
 
  ✓ 1 passed in 1 file

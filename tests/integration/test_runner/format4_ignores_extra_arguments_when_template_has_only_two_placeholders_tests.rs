@@ -45,7 +45,7 @@ fn format4_ignores_extra_arguments_when_template_has_only_two_placeholders() {
     run_fmt_success(
         "eb-stdlib-format4-extra-args-ignored",
         r#"
-get fun `test-eb-stdlib-format4-extra-args-ignored`() {
+get fun `test eb stdlib format4 extra args ignored`() {
     val rendered = format("{}: {:ton}", "alpha", 2500000000, "unused", 255);
     expect(rendered).toEqual("alpha: 2.5 TON");
 }
@@ -59,7 +59,7 @@ fn format4_leaves_unmatched_placeholder_when_template_has_five_slots() {
     run_fmt_success(
         "eb-stdlib-format4-missing-placeholder-slot",
         r#"
-get fun `test-eb-stdlib-format4-missing-placeholder-slot`() {
+get fun `test eb stdlib format4 missing placeholder slot`() {
     val rendered = format("a={} b={} c={} d={} e={}", 1, 2, 3, 4);
     expect(rendered).toEqual("a=1 b=2 c=3 d=4 e={}");
 }
@@ -73,7 +73,7 @@ fn format1_rejects_unknown_modifier_in_placeholder() {
     run_fmt_failure(
         "eb-stdlib-format1-unknown-modifier",
         r#"
-get fun `test-eb-stdlib-format1-unknown-modifier`() {
+get fun `test eb stdlib format1 unknown modifier`() {
     format("value={:hex}", 255);
 }
 "#,
@@ -87,7 +87,7 @@ fn format1_rejects_empty_modifier_in_placeholder() {
     run_fmt_failure(
         "eb-stdlib-format1-empty-modifier",
         r#"
-get fun `test-eb-stdlib-format1-empty-modifier`() {
+get fun `test eb stdlib format1 empty modifier`() {
     format("value={:}", 255);
 }
 "#,
@@ -101,7 +101,7 @@ fn format1_rejects_unsupported_placeholder_payload() {
     run_fmt_failure(
         "eb-stdlib-format1-unsupported-placeholder-payload",
         r#"
-get fun `test-eb-stdlib-format1-unsupported-placeholder-payload`() {
+get fun `test eb stdlib format1 unsupported placeholder payload`() {
     format("value={name}", 255);
 }
 "#,
@@ -115,7 +115,7 @@ fn format1_rejects_unclosed_open_brace() {
     run_fmt_failure(
         "eb-stdlib-format1-unclosed-open-brace",
         r#"
-get fun `test-eb-stdlib-format1-unclosed-open-brace`() {
+get fun `test eb stdlib format1 unclosed open brace`() {
     format("value={", 255);
 }
 "#,
@@ -129,7 +129,7 @@ fn format1_rejects_unmatched_closing_brace() {
     run_fmt_failure(
         "eb-stdlib-format1-unmatched-closing-brace",
         r#"
-get fun `test-eb-stdlib-format1-unmatched-closing-brace`() {
+get fun `test eb stdlib format1 unmatched closing brace`() {
     format("value=}", 255);
 }
 "#,
@@ -143,7 +143,7 @@ fn format2_escaped_braces_are_treated_as_literals() {
     run_fmt_success(
         "eb-stdlib-format2-escaped-braces-literals",
         r#"
-get fun `test-eb-stdlib-format2-escaped-braces-literals`() {
+get fun `test eb stdlib format2 escaped braces literals`() {
     val rendered = format("literal={{}} value={}", 42, 999);
     expect(rendered).toEqual("literal={} value=42");
 }
@@ -157,7 +157,7 @@ fn format1_supports_utf8_literals_with_plain_placeholder() {
     run_fmt_success(
         "eb-stdlib-format1-utf8-literal-placeholder",
         r#"
-get fun `test-eb-stdlib-format1-utf8-literal-placeholder`() {
+get fun `test eb stdlib format1 utf8 literal placeholder`() {
     val rendered = format("привет🙂 {}", 7);
     expect(rendered).toEqual("привет🙂 7");
 }
@@ -171,7 +171,7 @@ fn format1_escaped_braces_without_placeholders_render_as_literals() {
     run_fmt_success(
         "eb-stdlib-format1-escaped-only-literals",
         r#"
-get fun `test-eb-stdlib-format1-escaped-only-literals`() {
+get fun `test eb stdlib format1 escaped only literals`() {
     val rendered = format("{{}} and }}{{", 42);
     expect(rendered).toEqual("{} and }{");
 }
@@ -185,7 +185,7 @@ fn format1_rejects_invalid_modifier_payload() {
     run_fmt_failure(
         "eb-stdlib-format1-invalid-modifier-payload",
         r#"
-get fun `test-eb-stdlib-format1-invalid-modifier-payload`() {
+get fun `test eb stdlib format1 invalid modifier payload`() {
     format("value={:x:}", 255);
 }
 "#,

@@ -271,7 +271,7 @@ CONFIGURATION
 
            [test]
            reporter = ["console"]
-           filter = "test-.*"
+           filter = ".*jetton.*"
            junit-path = "reports"
            junit-merge = false
            

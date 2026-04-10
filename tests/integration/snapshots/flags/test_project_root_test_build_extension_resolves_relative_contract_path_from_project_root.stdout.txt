@@ -8,6 +8,6 @@
  TEST  [ROOT]/runner
 
  > ../tests/build_from_project_root.test.tolk (1 test)
-  ✓ build-path-from-project-root [TIME]
+  ✓ build path from project root [TIME]
 
  ✓ 1 passed in 1 file

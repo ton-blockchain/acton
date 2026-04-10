@@ -28,7 +28,7 @@ fn format3_mixed_placeholders_should_follow_template_order_bug() {
     run_fmt_success(
         "ea-stdlib-format3-mixed-placeholder-order-bug",
         r#"
-get fun `test-ea-stdlib-format3-mixed-placeholder-order-bug`() {
+get fun `test ea stdlib format3 mixed placeholder order bug`() {
     val rendered = format("{} | {:x} | {:ton}", 255, 16, 1500000000);
     expect(rendered).toEqual("255 | 10 | 1.5 TON");
 }
@@ -42,7 +42,7 @@ fn format3_escaped_braces_around_placeholder_should_collapse_bug() {
     run_fmt_success(
         "ea-stdlib-format3-escaped-braces-bug",
         r#"
-get fun `test-ea-stdlib-format3-escaped-braces-bug`() {
+get fun `test ea stdlib format3 escaped braces bug`() {
     val rendered = format("wrap={{{}}} hex={:x} ton={:ton}", "inner", 255, 2500000000);
     expect(rendered).toEqual("wrap={inner} hex=ff ton=2.5 TON");
 }

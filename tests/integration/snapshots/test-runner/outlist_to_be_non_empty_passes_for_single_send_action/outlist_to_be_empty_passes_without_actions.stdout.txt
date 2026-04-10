@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/outlist_behavior.test.tolk (1 test)
-  ✓ af-outlist-to-be-empty [TIME]
+  ✓ af outlist to be empty [TIME]
 
  ✓ 1 passed in 1 file

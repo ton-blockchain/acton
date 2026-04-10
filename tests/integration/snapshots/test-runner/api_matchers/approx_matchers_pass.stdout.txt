@@ -14,9 +14,9 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/approx.test.tolk (4 tests)
-  ✓ approx-abs-pass [TIME]
-  ✓ approx-abs-boundary-pass [TIME]
-  ✓ approx-rel-pass [TIME]
-  ✓ approx-rel-boundary-pass [TIME]
+  ✓ approx abs pass [TIME]
+  ✓ approx abs boundary pass [TIME]
+  ✓ approx rel pass [TIME]
+  ✓ approx rel boundary pass [TIME]
 
  ✓ 4 passed in 1 file

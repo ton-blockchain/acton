@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/out_actions.test.tolk (1 test)
-  ✓ al-parse-out-actions-from-c5 [TIME]
+  ✓ al parse out actions from c5 [TIME]
 
  ✓ 1 passed in 1 file

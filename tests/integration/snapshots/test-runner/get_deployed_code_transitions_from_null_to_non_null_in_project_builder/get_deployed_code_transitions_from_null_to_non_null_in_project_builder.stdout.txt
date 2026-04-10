@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/co_get_deployed_code_transition.test.tolk (1 test)
-  ✓ co-get-deployed-code-transition-project-builder [TIME]
+  ✓ co get deployed code transition project builder [TIME]
     └─ Test output:
        co-before-deploy-code-is-null
        co-after-deploy-code-is-not-null

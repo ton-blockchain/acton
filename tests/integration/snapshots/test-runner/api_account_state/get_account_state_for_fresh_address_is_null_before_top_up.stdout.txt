@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/account_state.test.tolk (1 test)
-  ✓ get-account-state-for-fresh-address-should-be-null [TIME]
+  ✓ get account state for fresh address should be null [TIME]
 
  ✓ 1 passed in 1 file

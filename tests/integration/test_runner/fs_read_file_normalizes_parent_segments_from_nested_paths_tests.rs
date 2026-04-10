@@ -40,7 +40,7 @@ fn fs_read_file_normalizes_parent_segments_from_nested_paths() {
             ("fixtures/nested/marker.txt", "marker"),
         ],
         r#"
-get fun `test-fs-read-parent-normalization-nested`() {
+get fun `test fs read parent normalization nested`() {
     val direct = fs.readFile("fixtures/av-root.txt");
     val viaParent = fs.readFile("fixtures/nested/../av-root.txt");
     val viaParentAndDot = fs.readFile("./fixtures/nested/.././av-root.txt");
@@ -81,7 +81,7 @@ fn fs_read_file_repeated_normalized_reads_are_stable() {
     let test_code = format!(
         r#"
 {FS_IMPORTS}
-get fun `test-fs-read-repeated-normalized-is-stable`() {{
+get fun `test fs read repeated normalized is stable`() {{
     val first = fs.readFile("fixtures/stable/nested/../value.txt");
     val second = fs.readFile("fixtures/stable/nested/../value.txt");
     val direct = fs.readFile("./fixtures/stable/value.txt");

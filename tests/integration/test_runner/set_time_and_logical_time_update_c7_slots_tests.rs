@@ -56,7 +56,7 @@ fn set_time_and_logical_time_update_c7_slots() {
     run_success_case(
         "aj-stdlib-vm-set-time-and-logical-slots-3-4-5",
         r"
-get fun `test-aj-stdlib-vm-set-time-and-logical-slots-3-4-5`() {
+get fun `test aj stdlib vm set time and logical slots 3 4 5`() {
     vm.setTime(1700001234);
     vm.setBlockLogicalTime(123456789);
     vm.setLogicalTime(223456789);
@@ -79,7 +79,7 @@ fn set_original_balance_updates_balance_tuple_with_and_without_extra_dict() {
     run_success_case(
         "aj-stdlib-vm-set-original-balance-slot-7",
         r#"
-get fun `test-aj-stdlib-vm-set-original-balance-slot-7`() {
+get fun `test aj stdlib vm set original balance slot 7`() {
     vm.setOriginalBalance(ton("3"));
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
@@ -105,7 +105,7 @@ fn set_config_root_dict_replaces_c7_root_config_slot() {
     run_success_case(
         "aj-stdlib-vm-set-config-root-slot-9",
         r"
-get fun `test-aj-stdlib-vm-set-config-root-slot-9`() {
+get fun `test aj stdlib vm set config root slot 9`() {
     var config = net.getConfig();
     var version = config.getGlobalVersion();
     version.version += 1;
@@ -132,7 +132,7 @@ fn set_and_get_config_unpacked_round_trip_slot_14() {
     run_success_case(
         "aj-stdlib-vm-config-unpacked-slot-14",
         r#"
-get fun `test-aj-stdlib-vm-config-unpacked-slot-14`() {
+get fun `test aj stdlib vm config unpacked slot 14`() {
     var unpacked = [];
     unpacked.push(777);
     unpacked.push("aj-unpacked");
@@ -156,7 +156,7 @@ fn register_library_accepts_code_and_empty_cells() {
     run_success_case(
         "aj-stdlib-vm-register-library",
         r#"
-get fun `test-aj-stdlib-vm-register-library`() {
+get fun `test aj stdlib vm register library`() {
     val codeCell = build("simple");
 
     vm.registerLibrary(codeCell);
@@ -174,7 +174,7 @@ fn convert_address_supports_raw_and_user_friendly_forms() {
     run_success_case(
         "aj-stdlib-vm-convert-address-valid",
         r#"
-get fun `test-aj-stdlib-vm-convert-address-valid`() {
+get fun `test aj stdlib vm convert address valid`() {
     val raw = "0:0000000000000000000000000000000000000000000000000000000000000000";
     val friendly = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
 
@@ -197,7 +197,7 @@ fn convert_address_reports_invalid_input() {
     run_failure_case(
         "aj-stdlib-vm-convert-address-invalid",
         r#"
-get fun `test-aj-stdlib-vm-convert-address-invalid`() {
+get fun `test aj stdlib vm convert address invalid`() {
     val _ = vm.convertAddress("not-an-address");
 }
 "#,
@@ -211,7 +211,7 @@ fn get_config_param_generic_is_not_usable_bug() {
     run_success_case(
         "aj-stdlib-vm-get-config-param-generic-bug",
         r"
-get fun `test-aj-stdlib-vm-get-config-param-generic-bug`() {
+get fun `test aj stdlib vm get config param generic bug`() {
     vm.setTime(1700001000);
     val now = vm.getConfigParam<int>(3);
     expect(now).toEqual(1700001000);
@@ -226,7 +226,7 @@ fn cell_from_hex_decodes_valid_boc_hex() {
     run_success_case(
         "aj-stdlib-vm-cell-from-hex-valid",
         r#"
-get fun `test-aj-stdlib-vm-cell-from-hex-valid`() {
+get fun `test aj stdlib vm cell from hex valid`() {
     val decoded = vm.cellFromHex("b5ee9c72010101010002000000");
     expect(decoded).toEqual(createEmptyCell());
 }
@@ -240,7 +240,7 @@ fn cell_from_hex_reports_invalid_hex() {
     run_failure_case(
         "aj-stdlib-vm-cell-from-hex-invalid",
         r#"
-get fun `test-aj-stdlib-vm-cell-from-hex-invalid`() {
+get fun `test aj stdlib vm cell from hex invalid`() {
     val _ = vm.cellFromHex("deadbeef");
 }
 "#,

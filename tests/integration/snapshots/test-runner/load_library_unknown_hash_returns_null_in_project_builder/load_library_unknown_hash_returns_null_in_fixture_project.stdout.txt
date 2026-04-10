@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/bm_load_library_unknown_hash.test.tolk (1 test)
-  ✓ bm-load-library-unknown-hash-fixture [TIME]
+  ✓ bm load library unknown hash fixture [TIME]
     └─ Test output:
        bm-load-library-null-fixture
 

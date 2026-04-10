@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/register_code.test.tolk (1 test)
-  ✓ register-address-priority-over-code-name [TIME]
+  ✓ register address priority over code name [TIME]
     └─ Test output:
        N/A -> q_deployer A
        └── empty 1 TON -> q_address_alias B                                            gas=253

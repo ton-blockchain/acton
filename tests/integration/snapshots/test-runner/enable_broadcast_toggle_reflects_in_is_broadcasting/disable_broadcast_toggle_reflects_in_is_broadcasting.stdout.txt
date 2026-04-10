@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/broadcast_toggle.test.tolk (1 test)
-  ✓ bn-disable-broadcast-toggle [TIME]
+  ✓ bn disable broadcast toggle [TIME]
 
  ✓ 1 passed in 1 file

@@ -4,19 +4,19 @@ use crate::support::project::ProjectBuilder;
 const COMPARISON_PASS_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-less-pass`() {
+get fun `test less pass`() {
     expect(-3).toBeLess(0);
 }
 
-get fun `test-greater-pass`() {
+get fun `test greater pass`() {
     expect(42).toBeGreater(7);
 }
 
-get fun `test-less-or-equal-boundary-pass`() {
+get fun `test less or equal boundary pass`() {
     expect(10).toBeLessOrEqual(10);
 }
 
-get fun `test-greater-or-equal-boundary-pass`() {
+get fun `test greater or equal boundary pass`() {
     expect(-5).toBeGreaterOrEqual(-5);
 }
 "#;
@@ -24,19 +24,19 @@ get fun `test-greater-or-equal-boundary-pass`() {
 const COMPARISON_FAIL_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-less-fail`() {
+get fun `test less fail`() {
     expect(5).toBeLess(5);
 }
 
-get fun `test-greater-fail`() {
+get fun `test greater fail`() {
     expect(5).toBeGreater(6);
 }
 
-get fun `test-less-or-equal-fail`() {
+get fun `test less or equal fail`() {
     expect(8).toBeLessOrEqual(7);
 }
 
-get fun `test-greater-or-equal-fail`() {
+get fun `test greater or equal fail`() {
     expect(-2).toBeGreaterOrEqual(-1);
 }
 "#;
@@ -44,19 +44,19 @@ get fun `test-greater-or-equal-fail`() {
 const APPROX_PASS_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-approx-abs-pass`() {
+get fun `test approx abs pass`() {
     expect(1000).toBeApproxEqAbs(995, 5);
 }
 
-get fun `test-approx-abs-boundary-pass`() {
+get fun `test approx abs boundary pass`() {
     expect(-50).toBeApproxEqAbs(-55, 5);
 }
 
-get fun `test-approx-rel-pass`() {
+get fun `test approx rel pass`() {
     expect(200).toBeApproxEqRel(220, 10);
 }
 
-get fun `test-approx-rel-boundary-pass`() {
+get fun `test approx rel boundary pass`() {
     expect(40).toBeApproxEqRel(44, 10);
 }
 "#;
@@ -64,15 +64,15 @@ get fun `test-approx-rel-boundary-pass`() {
 const APPROX_FAIL_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-approx-abs-fail`() {
+get fun `test approx abs fail`() {
     expect(10).toBeApproxEqAbs(20, 5);
 }
 
-get fun `test-approx-rel-fail`() {
+get fun `test approx rel fail`() {
     expect(10).toBeApproxEqRel(20, 50);
 }
 
-get fun `test-approx-rel-small-threshold-fail`() {
+get fun `test approx rel small threshold fail`() {
     expect(200).toBeApproxEqRel(220, 9);
 }
 "#;

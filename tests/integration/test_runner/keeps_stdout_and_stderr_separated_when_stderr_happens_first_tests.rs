@@ -30,7 +30,7 @@ fn keeps_stdout_and_stderr_separated_when_stderr_happens_first() {
     run_stdlib_io_case(
         "at-stdlib-stderr-first-separation",
         r#"
-get fun `test-at-stdlib-stderr-first-separation`() {
+get fun `test at stdlib stderr first separation`() {
     eprintln("stderr-1-first");
     println("stdout-1-after-first-stderr");
     eprintln("stderr-2-middle");
@@ -47,7 +47,7 @@ fn preserves_stdout_order_during_interleaved_println_and_eprintln() {
     run_stdlib_io_case(
         "at-stdlib-interleaved-stdout-order",
         r#"
-get fun `test-at-stdlib-interleaved-stdout-order`() {
+get fun `test at stdlib interleaved stdout order`() {
     println("stdout-1");
     eprintln("stderr-1");
     println("stdout-2");

@@ -48,7 +48,7 @@ fn test_action_fail() {
 
             import "../gen/child_code.tolk"
 
-            get fun `test-action-fail`() {
+            get fun `test action fail`() {
                 val deployer = net.treasury("deployer");
 
                 {
@@ -89,7 +89,7 @@ fn test_action_fail() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("action-fail")
+        .assert_contains("action fail")
         .assert_snapshot_matches("integration/snapshots/test_action_fail.stdout.txt");
 }
 
@@ -113,7 +113,7 @@ fn test_invalid_action_fail() {
             import "../../lib/emulation/network"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-action-fail`() {
+            get fun `test action fail`() {
                 val deployer = net.treasury("deployer");
 
                  val addr = AutoDeployAddress {
@@ -144,7 +144,7 @@ fn test_invalid_action_fail() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("action-fail")
+        .assert_contains("action fail")
         .assert_snapshot_matches("integration/snapshots/test_invalid_action_fail.stdout.txt");
 }
 
@@ -168,7 +168,7 @@ fn test_invalid_action_fail_without_backtrace() {
             import "../../lib/emulation/network"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-action-fail`() {
+            get fun `test action fail`() {
                 val deployer = net.treasury("deployer");
 
                  val addr = AutoDeployAddress {
@@ -198,7 +198,7 @@ fn test_invalid_action_fail_without_backtrace() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("action-fail")
+        .assert_contains("action fail")
         .assert_snapshot_matches(
             "integration/snapshots/test_invalid_action_fail_without_backtrace.stdout.txt",
         );

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/crypto_sign_behavior.test.tolk (1 test)
-  ✓ dz-stdlib-sign-deterministic-same-key-cell [TIME]
+  ✓ dz stdlib sign deterministic same key cell [TIME]
 
  ✓ 1 passed in 1 file

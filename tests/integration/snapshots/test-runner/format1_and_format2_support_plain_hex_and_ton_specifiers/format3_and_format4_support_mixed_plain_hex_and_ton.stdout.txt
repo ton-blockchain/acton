@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
-  ✓ y-stdlib-format3-format4-mixed-specifiers [TIME]
+  ✓ y stdlib format3 format4 mixed specifiers [TIME]
 
  ✓ 1 passed in 1 file

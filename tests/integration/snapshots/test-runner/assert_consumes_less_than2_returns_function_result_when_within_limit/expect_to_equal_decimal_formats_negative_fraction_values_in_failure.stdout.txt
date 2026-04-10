@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_decimal.test.tolk (1 test)
-  ✗ ac-decimal-default-message-formatting [TIME]
+  ✗ ac decimal default message formatting [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
        Actual:   -0.15
        Expected: -0.1

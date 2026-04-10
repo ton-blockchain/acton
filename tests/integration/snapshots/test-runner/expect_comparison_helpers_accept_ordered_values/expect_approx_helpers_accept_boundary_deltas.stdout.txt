@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_behavior.test.tolk (1 test)
-  ✓ ad-stdlib-approx-boundary-deltas [TIME]
+  ✓ ad stdlib approx boundary deltas [TIME]
 
  ✓ 1 passed in 1 file

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/co_get_deployed_code_transition.test.tolk (1 test)
-  ✓ co-get-deployed-code-transition-fixture-project [TIME]
+  ✓ co get deployed code transition fixture project [TIME]
     └─ Test output:
        co-fixture-before-deploy-code-is-null
        co-fixture-after-deploy-code-is-not-null

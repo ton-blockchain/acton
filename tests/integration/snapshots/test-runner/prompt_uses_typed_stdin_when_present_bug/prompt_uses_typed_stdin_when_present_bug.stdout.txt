@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/prompt_stdin_value.test.tolk (1 test)
-  ✓ ao-prompt-typed-stdin [TIME]
+  ✓ ao prompt typed stdin [TIME]
 
  ✓ 1 passed in 1 file

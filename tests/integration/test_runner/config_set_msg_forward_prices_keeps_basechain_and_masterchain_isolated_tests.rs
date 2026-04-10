@@ -25,7 +25,7 @@ fn config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated() {
     run_config_success_case(
         "be-stdlib-config-msg-forward-prices-branch-isolation",
         r"
-get fun `test-be-stdlib-config-msg-forward-prices-branch-isolation`() {
+get fun `test be stdlib config msg forward prices branch isolation`() {
     var config = net.getConfig();
 
     var basechain = config.getMsgForwardPrices(BASECHAIN);

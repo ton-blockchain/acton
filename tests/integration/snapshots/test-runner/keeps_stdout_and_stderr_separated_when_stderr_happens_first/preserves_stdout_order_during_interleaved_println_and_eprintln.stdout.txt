@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ at-stdlib-interleaved-stdout-order [TIME]
+  ✓ at stdlib interleaved stdout order [TIME]
     └─ Test output:
        stdout-1
        stdout-2

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/dx_crypto_to_keypair.test.tolk (1 test)
-  ✓ dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls [TIME]
+  ✓ dx stdlib mnemonic to keypair deterministic repeated calls [TIME]
 
  ✓ 1 passed in 1 file

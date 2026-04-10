@@ -17,7 +17,7 @@ fn wait_for_transaction_returns_true_in_emulation_mode() {
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-bi-stdlib-wait-for-transaction-missing-hash-before-send`() {{
+get fun `test bi stdlib wait for transaction missing hash before send`() {{
     val sender = net.treasury("bi_wait_sender");
     val missingHashSlice = beginCell().storeUint(0xB1, 8).storeUint(0, 248).toSlice();
 

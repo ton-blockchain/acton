@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/cv_out_action_parity.test.tolk (1 test)
-  ✓ cv-out-action-inline-parity [TIME]
+  ✓ cv out action inline parity [TIME]
 
  ✓ 1 passed in 1 file

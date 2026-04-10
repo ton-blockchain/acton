@@ -15,7 +15,7 @@ fn env_or_address_falls_back_for_invalid_present_and_uses_valid_present_value() 
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-eh-stdlib-env-or-address-fallback-vs-valid-precedence`() {
+            get fun `test eh stdlib env or address fallback vs valid precedence`() {
                 val fallbackAddress = address("0:1111111111111111111111111111111111111111111111111111111111111111");
                 val expectedAddress = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
 
@@ -54,7 +54,7 @@ fn env_or_cell_falls_back_for_invalid_present_and_uses_valid_present_value() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-eh-stdlib-env-or-cell-fallback-vs-valid-precedence`() {
+            get fun `test eh stdlib env or cell fallback vs valid precedence`() {
                 val fallbackCell = beginCell().storeUint(0xCAFE, 16).endCell();
 
                 val resolvedFromInvalidPresent = envOr<cell>("EH_ENV_OR_CELL_INVALID", fallbackCell);

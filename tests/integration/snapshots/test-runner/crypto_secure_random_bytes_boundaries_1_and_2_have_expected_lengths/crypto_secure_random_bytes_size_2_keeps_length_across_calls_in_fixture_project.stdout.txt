@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dy_secure_random_size_2_across_calls.test.tolk (1 test)
-  ✓ dy-stdlib-secure-random-size-2-keeps-length-across-calls [TIME]
+  ✓ dy stdlib secure random size 2 keeps length across calls [TIME]
 
  ✓ 1 passed in 1 file

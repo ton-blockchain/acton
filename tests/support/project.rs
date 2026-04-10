@@ -634,7 +634,7 @@ impl ProjectBuilder {
     /// # Examples
     /// ```
     /// .with_test_config(TestConfig {
-    ///     filter: Some("test-unit-.*".to_string()),
+    ///     filter: Some("test unit .*".to_string()),
     ///     coverage: Some(true),
     ///     backtrace: Some("full".to_string()),
     /// })
@@ -1455,7 +1455,7 @@ impl ActonCommand {
     ///
     /// # Examples
     /// ```
-    /// .test().filter("test-basic")        // Run tests matching "test-basic"
+    /// .test().filter("test basic")        // Run tests matching "test basic"
     /// .test().filter("counter.*")         // Run tests starting with "counter"
     /// ```
     pub(crate) fn filter(mut self, pattern: &str) -> Self {

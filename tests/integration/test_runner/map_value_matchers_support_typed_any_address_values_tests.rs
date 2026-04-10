@@ -36,7 +36,7 @@ fn map_value_matchers_support_typed_any_address_values() {
     run_success(
         "ed-stdlib-map-value-matchers-typed-any-address-success",
         r#"
-get fun `test-ed-stdlib-map-value-matchers-typed-any-address-success`() {
+get fun `test ed stdlib map value matchers typed any address success`() {
     val alice = address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address;
     val bob = address("0:00000000000000000000000000000000000000000000000000000000000000BB") as any_address;
     val carol = address("0:00000000000000000000000000000000000000000000000000000000000000CC") as any_address;
@@ -59,7 +59,7 @@ fn map_value_matchers_report_typed_any_address_mismatches() {
     run_failure(
         "ed-stdlib-map-value-matchers-typed-any-address-mismatch-reporting",
         r#"
-get fun `test-ed-stdlib-map-to-contain-value-reports-missing-typed-address`() {
+get fun `test ed stdlib map to contain value reports missing typed address`() {
     val alice = address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address;
     val missing = address("0:00000000000000000000000000000000000000000000000000000000000000DD") as any_address;
 
@@ -69,7 +69,7 @@ get fun `test-ed-stdlib-map-to-contain-value-reports-missing-typed-address`() {
     expect(balances).toContainValue(missing);
 }
 
-get fun `test-ed-stdlib-map-to-not-contain-value-reports-present-typed-address`() {
+get fun `test ed stdlib map to not contain value reports present typed address`() {
     val alice = address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address;
 
     var balances = createEmptyMap<int32, any_address>();

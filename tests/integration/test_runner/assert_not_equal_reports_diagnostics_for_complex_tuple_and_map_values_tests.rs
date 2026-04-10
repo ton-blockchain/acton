@@ -9,7 +9,7 @@ import "../../lib/testing/assert"
 fn assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values() {
     let source = format!(
         r#"{ASSERT_IMPORTS}
-get fun `test-ej-stdlib-assert-not-equal-complex-tuple-diagnostic`() {{
+get fun `test ej stdlib assert not equal complex tuple diagnostic`() {{
     var nested = [];
     nested.push(22);
     nested.push(33);
@@ -22,7 +22,7 @@ get fun `test-ej-stdlib-assert-not-equal-complex-tuple-diagnostic`() {{
     Assert.notEqual(payload, payload, "ej tuple/map notEqual diagnostic tuple");
 }}
 
-get fun `test-ej-stdlib-assert-not-equal-complex-map-diagnostic`() {{
+get fun `test ej stdlib assert not equal complex map diagnostic`() {{
     var balances = createEmptyMap<int32, int32>();
     balances.set(7, 70);
     balances.set(11, 110);

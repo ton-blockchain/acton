@@ -24,7 +24,7 @@ fn mnemonic_to_keypair_is_deterministic_for_repeated_calls() {
     run_crypto_case(
         "dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls",
         r"
-get fun `test-dx-stdlib-mnemonic-to-keypair-deterministic-repeated-calls`() {
+get fun `test dx stdlib mnemonic to keypair deterministic repeated calls`() {
     val words = crypto.createMnemonic();
     val kpFirst = words.toKeyPair();
     val kpSecond = words.toKeyPair();

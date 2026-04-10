@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/c5_roundtrip.test.tolk (1 test)
-  ✓ cn-set-c5-empty-cell-out-actions-bug [TIME]
+  ✓ cn set c5 empty cell out actions bug [TIME]
 
  ✓ 1 passed in 1 file

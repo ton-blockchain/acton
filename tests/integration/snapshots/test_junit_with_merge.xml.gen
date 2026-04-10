@@ -4,14 +4,14 @@
         <properties>
             <property name="file.path" value="[ROOT]/tests/first_test.test.tolk"/>
         </properties>
-        <testcase name="test_first" classname="first_test.test.tolk" [TIME]>
+        <testcase name="test first" classname="first_test.test.tolk" [TIME]>
         </testcase>
     </testsuite>
     <testsuite name="second_test.test.tolk" tests="1" disabled="0" errors="0" failures="0" timestamp="[DATE]" [TIME]>
         <properties>
             <property name="file.path" value="[ROOT]/tests/second_test.test.tolk"/>
         </properties>
-        <testcase name="test_second" classname="second_test.test.tolk" [TIME]>
+        <testcase name="test second" classname="second_test.test.tolk" [TIME]>
         </testcase>
     </testsuite>
 </testsuites>

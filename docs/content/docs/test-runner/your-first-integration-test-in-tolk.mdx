@@ -89,7 +89,7 @@ struct (0x3a752f06) ResetCounter {}
 First, as in the case with unit tests, let's create a file **counter.test.tolk** and declare a new test there:
 
 ```tolk
-get fun `test-should-deploy`() {
+get fun `test should deploy`() {
 
 }
 ```
@@ -127,7 +127,7 @@ We use `Storage` directly from **types.tolk**. If you add new fields in the futu
 Now let's write our first test in which we will deploy the contract.
 
 ```tolk
-get fun `test-should-deploy`() {
+get fun `test should deploy`() {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
     val deployer = net.treasury("deployer");
@@ -176,7 +176,7 @@ acton test counter.test.tolk
 The complete test code looks like this:
 
 ````tolk
-get fun `test-should-deploy`() {
+get fun `test should deploy`() {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
     val deployer = net.treasury("deployer");
@@ -224,7 +224,7 @@ Its body contains the same code as our test, except that we also return `counter
 Our test now simplifies to one line:
 
 ```tolk
-get fun `test-should-deploy`() {
+get fun `test should deploy`() {
     setupTest()
 }
 ```
@@ -238,7 +238,7 @@ For those who have already written contracts in TypeScript, this approach may be
 Now writing a test for the `increase` logic becomes trivial. First, we get our contracts:
 
 ```tolk
-get fun `test-should-increase-counter`() {
+get fun `test should increase counter`() {
     val (counter, deployer) = setupTest();
 }
 ```
@@ -246,7 +246,7 @@ get fun `test-should-increase-counter`() {
 Now we need to create a message via `createMessage` and send it:
 
 ```tolk
-get fun `test-should-increase-counter`() {
+get fun `test should increase counter`() {
     val (counter, deployer) = setupTest();
 
     val msg = createMessage({
@@ -291,7 +291,7 @@ Perfect! Now we can use this method in our test to get the current counter value
 Let's run the test via:
 
 ```bash
-acton test counter.test.tolk --filter "test-should-increase-counter"
+acton test counter.test.tolk --filter "should increase counter"
 ```
 
 And we will see that our test failed:
@@ -300,7 +300,7 @@ And we will see that our test failed:
  TEST  /Users/dev/counter
 
  > counter.test.tolk (1 tests)
-  ✗ test-should-increase-counter 21ms
+  ✗ should increase counter 21ms
     └─ Error: expect(actual).toEqual(expected)
         (
             100,
@@ -335,7 +335,7 @@ The test expected 0, but the correct result is 100. Let's fix the expectation by
 Now we have a full-fledged test that deploys a contract, sends a message, and checks that this message changed the state of our contract as we expected. It looks like this in full:
 
 ```tolk
-get fun `test-should-increase-counter`() {
+get fun `test should increase counter`() {
     val (counter, deployer) = setupTest();
 
     val msg = createMessage({
@@ -380,7 +380,7 @@ fun Counter.sendReset(self, from: address) {
     return net.send(from, msg);
 }
 
-get fun `test-should-reset-counter`() {
+get fun `test should reset counter`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

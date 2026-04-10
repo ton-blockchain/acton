@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/config_behavior.test.tolk (1 test)
-  ✓ dn-stdlib-config-msg-forward-prices-dual-write [TIME]
+  ✓ dn stdlib config msg forward prices dual write [TIME]
 
  ✓ 1 passed in 1 file

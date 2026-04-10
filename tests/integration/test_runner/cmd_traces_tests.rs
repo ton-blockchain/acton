@@ -633,7 +633,7 @@ fn profiling_snapshot_merges_step_execution_batches_into_single_named_trace_chai
             import "../../lib/testing/transaction_expect"
             import "../contracts/messages"
 
-            get fun `test-step-profile-merge`() {
+            get fun `test step profile merge`() {
                 val sender = net.treasury("sender");
 
                 val forwarderInit = ContractState {
@@ -721,7 +721,7 @@ fn profiling_snapshot_merges_step_execution_batches_into_single_named_trace_chai
     let merged_trace = merged_traces[0];
     assert_eq!(
         merged_trace["test_name"].as_str(),
-        Some("test-step-profile-merge"),
+        Some("test step profile merge"),
         "profiling snapshot should keep the owning test name"
     );
     assert_eq!(
@@ -736,7 +736,7 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
     let project = trace_project(
         "h-regular-run-no-trace",
         r"
-        get fun `test-no-trace`() {
+        get fun `test no trace`() {
             deployCounter();
         }
         ",

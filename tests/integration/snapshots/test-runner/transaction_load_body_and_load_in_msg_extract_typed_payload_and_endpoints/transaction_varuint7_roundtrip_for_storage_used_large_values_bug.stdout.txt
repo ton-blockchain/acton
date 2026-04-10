@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/transaction_helpers.test.tolk (1 test)
-  ✓ am-transaction-varuint7-roundtrip-bug [TIME]
+  ✓ am transaction varuint7 roundtrip bug [TIME]
 
  ✓ 1 passed in 1 file

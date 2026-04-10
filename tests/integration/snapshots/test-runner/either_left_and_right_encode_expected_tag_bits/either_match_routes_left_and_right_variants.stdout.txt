@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/either_behavior.test.tolk (1 test)
-  ✓ ab-stdlib-either-match-routes-variants [TIME]
+  ✓ ab stdlib either match routes variants [TIME]
 
  ✓ 1 passed in 1 file

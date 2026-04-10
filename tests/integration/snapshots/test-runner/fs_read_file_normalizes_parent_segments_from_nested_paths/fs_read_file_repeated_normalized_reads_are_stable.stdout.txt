@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/fs_read_stable.test.tolk (1 test)
-  ✓ fs-read-repeated-normalized-is-stable [TIME]
+  ✓ fs read repeated normalized is stable [TIME]
 
  ✓ 1 passed in 1 file

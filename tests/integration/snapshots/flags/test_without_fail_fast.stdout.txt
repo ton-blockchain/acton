@@ -8,17 +8,17 @@
  TEST  [ROOT]
 
  > tests/test1.test.tolk (3 tests)
-  ✓ first-pass [TIME]
-  ✗ second-fail [TIME]
+  ✓ first pass [TIME]
+  ✗ second fail [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
             2
         )
       └─ at tests/test1.test[LINE]
-  ✓ third-pass [TIME]
+  ✓ third pass [TIME]
  > tests/test2.test.tolk (1 test)
-  ✓ fourth-pass [TIME]
+  ✓ fourth pass [TIME]
 
  ✓ 3 passed, ✗ 1 failed in 2 files
 

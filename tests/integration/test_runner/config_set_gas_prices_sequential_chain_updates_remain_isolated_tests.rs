@@ -25,7 +25,7 @@ fn config_set_gas_prices_sequential_chain_updates_remain_isolated() {
     run_config_success_case(
         "ds-stdlib-config-gas-prices-sequential-isolation",
         r"
-get fun `test-ds-stdlib-config-gas-prices-sequential-isolation`() {
+get fun `test ds stdlib config gas prices sequential isolation`() {
     var firstConfig = net.getConfig();
     val initialBase = firstConfig.getGasPrices(BASECHAIN);
     val initialMaster = firstConfig.getGasPrices(MASTERCHAIN);

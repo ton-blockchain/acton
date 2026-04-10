@@ -436,7 +436,7 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
 ///
 /// Example:
 /// ```tolk
-/// get fun `test-send-message`() {
+/// get fun `test send message`() {
 ///     // ...
 ///     val message = createMessage({
 ///         bounce: false,
@@ -614,7 +614,7 @@ struct Treasury {
 ///
 /// Example:
 /// ```tolk
-/// get fun `test-mint`() {
+/// get fun `test mint`() {
 ///     val treasury = net.treasury("treasury");
 ///     // ...
 /// }

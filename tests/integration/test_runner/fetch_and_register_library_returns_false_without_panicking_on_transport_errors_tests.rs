@@ -17,7 +17,7 @@ fn fetch_and_register_library_returns_false_without_panicking_on_transport_error
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 
-get fun `test-bl-stdlib-fetch-register-library-false`() {{
+get fun `test bl stdlib fetch register library false`() {{
     expect(net.fetchAndRegisterLibrary("{MISSING_LIBRARY_HASH}")).toBeFalse();
     expect(net.fetchAndRegisterLibrary("not-a-hash")).toBeFalse();
     expect(net.fetchAndRegisterLibrary("")).toBeFalse();
@@ -66,7 +66,7 @@ fn fetch_and_register_library_returns_true_for_known_hash_in_fixture_project() {
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 
-get fun `test-bl-stdlib-fetch-register-library-true`() {{
+get fun `test bl stdlib fetch register library true`() {{
     expect(net.fetchAndRegisterLibrary("{KNOWN_LIBRARY_HASH}")).toBeTrue();
     expect(net.loadLibrary("{KNOWN_LIBRARY_HASH}")).toBeNotNull();
 }}

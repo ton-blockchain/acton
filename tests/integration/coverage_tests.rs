@@ -143,7 +143,7 @@ fn build_coverage_scope_project(name: &str) -> Project {
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
 
-            get fun `test-coverage-scope`() {
+            get fun `test coverage scope`() {
                 expect(callThroughWrapper(5)).toEqual(6);
             }
         "#,
@@ -173,7 +173,7 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
             import "../../lib/testing/expect"
             import "../code/math"
 
-            get fun `test-partial-coverage`() {
+            get fun `test partial coverage`() {
                 expect(classify(2)).toEqual(1);
             }
         "#,
@@ -206,7 +206,7 @@ fn test_coverage_basic_output() {
             import "../../lib/testing/expect"
             import "../code/math"
 
-            get fun `test-coverage-example`() {
+            get fun `test coverage example`() {
                 val result = add(1, 2);
                 expect(result).toEqual(3);
 
@@ -262,12 +262,12 @@ fn test_coverage_multiple_tests() {
             import "../../lib/testing/expect"
             import "../code/calculator"
 
-            get fun `test-multiply`() {
+            get fun `test multiply`() {
                 val result = multiply(3, 4);
                 expect(result).toEqual(12);
             }
 
-            get fun `test-divide`() {
+            get fun `test divide`() {
                 val result = divide(10, 2);
                 expect(result).toEqual(5);
             }
@@ -313,12 +313,12 @@ fn test_coverage_with_failing_tests() {
             import "../../lib/testing/expect"
             import "../code/validator"
 
-            get fun `test-passing`() {
+            get fun `test passing`() {
                 val result = validate(10);
                 expect(result).toEqual(true);
             }
 
-            get fun `test-failing`() {
+            get fun `test failing`() {
                 val result = validate(10);
                 expect(result).toEqual(false); // This will fail
             }
@@ -368,12 +368,12 @@ fn test_coverage_with_filter() {
             import "../../lib/testing/expect"
             import "../code/helpers"
 
-            get fun `test-unit-double`() {
+            get fun `test unit double`() {
                 val result = double(5);
                 expect(result).toEqual(10);
             }
 
-            get fun `test-integration-triple`() {
+            get fun `test integration triple`() {
                 val result = triple(5);
                 expect(result).toEqual(15);
             }
@@ -400,7 +400,7 @@ fn test_coverage_with_filter() {
     project
         .acton()
         .test()
-        .filter("test-unit-.*")
+        .filter("test unit .*")
         .with_coverage()
         .with_coverage_format("text")
         .run()
@@ -437,7 +437,7 @@ fn test_coverage_lcov_snapshot() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-lcov-snapshot`() {
+            get fun `test lcov snapshot`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -496,12 +496,12 @@ fn test_coverage_exports_files_with_zero_hits() {
             import "../code/main"
             import "../code/unused"
 
-            get fun `test-used-only`() {
+            get fun `test used only`() {
                 val result = used(2);
                 expect(result).toEqual(3);
             }
 
-            get fun `test-unused-helper-reference`() {
+            get fun `test unused helper reference`() {
                 val result = neverCalled(10);
                 expect(result).toEqual(20);
             }
@@ -512,7 +512,7 @@ fn test_coverage_exports_files_with_zero_hits() {
     project
         .acton()
         .test()
-        .filter("test-used-only")
+        .filter("test used only")
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("zero-hit-coverage.txt")
@@ -529,7 +529,7 @@ fn test_coverage_exports_files_with_zero_hits() {
     let output = project
         .acton()
         .test()
-        .filter("test-used-only")
+        .filter("test used only")
         .with_coverage()
         .with_coverage_format("lcov")
         .with_coverage_file("zero-hit-lcov.info")
@@ -569,7 +569,7 @@ fn test_coverage_does_not_mark_function_closing_braces_as_executable() {
             import "../../lib/testing/expect"
             import "../code/helpers"
 
-            get fun `test-touch`() {
+            get fun `test touch`() {
                 touch(5);
                 expect(1).toEqual(1);
             }
@@ -630,7 +630,7 @@ fn test_coverage_empty_functions_snapshot() {
             import "../../lib/testing/expect"
             import "../code/empty_functions"
 
-            get fun `test-empty-functions-coverage`() {
+            get fun `test empty functions coverage`() {
                 singleLineTouched();
                 multiLineTouched();
                 nonEmptyTouched();
@@ -1141,7 +1141,7 @@ fn test_coverage_text_custom_filename() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-custom-filename`() {
+            get fun `test custom filename`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -1199,7 +1199,7 @@ fn test_coverage_text_custom_filename_from_config() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-custom-filename`() {
+            get fun `test custom filename`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -1316,7 +1316,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
             "integration/snapshots/test_coverage_scope_with_tests.txt",
         )
         .assert_file_contains("with-tests.txt", "tests/test.test.tolk")
-        .assert_file_contains("with-tests.txt", "test-coverage-scope");
+        .assert_file_contains("with-tests.txt", "test coverage scope");
 }
 
 #[test]
@@ -1347,7 +1347,7 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
 
-            get fun `test-config-coverage-scope`() {
+            get fun `test config coverage scope`() {
                 expect(callThroughWrapper(5)).toEqual(6);
             }
         "#,
@@ -1387,7 +1387,7 @@ fn test_coverage_text_output_write_error_is_non_zero() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-coverage-text-write-error`() {
+            get fun `test coverage text write error`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -1498,7 +1498,7 @@ fn test_coverage_lcov_output_write_error_is_non_zero() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-coverage-lcov-write-error`() {
+            get fun `test coverage lcov write error`() {
                 expect(1).toEqual(1);
             }
         "#,

@@ -700,7 +700,7 @@ fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()): Expecta
 ///
 /// ```tolk
 /// @test({ fail_with: 10 })
-/// get fun test_fail_with() {
+/// get fun `test fail with`() {
 ///     throw 10; // ok
 /// }
 /// ```

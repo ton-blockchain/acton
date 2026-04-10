@@ -34,6 +34,6 @@ fun setupTest(): (Counter, Treasury) {
     return (counter, deployer);
 }
 
-get fun `test-should-setup-test`() {
+get fun `test should setup test`() {
     setupTest();
 }

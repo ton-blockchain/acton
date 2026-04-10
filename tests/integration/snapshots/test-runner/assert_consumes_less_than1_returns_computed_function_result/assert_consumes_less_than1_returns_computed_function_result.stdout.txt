@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_consumes_less_than1.test.tolk (1 test)
-  ✓ bt-consumes-less-than1-returns-result [TIME]
+  ✓ bt consumes less than1 returns result [TIME]
 
  ✓ 1 passed in 1 file

@@ -14,14 +14,14 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/expect_nan.test.tolk (2 tests)
-  ✗ bx-expect-nan-fail-regular-int [TIME]
+  ✗ bx expect nan fail regular int [TIME]
     └─ Error: expect(actual).toBeNaN()
         (
             0,
             NaN
         )
       └─ at tests/expect_nan.test[LINE]
-  ✗ bx-expect-non-nan-fail-nan [TIME]
+  ✗ bx expect non nan fail nan [TIME]
     └─ Error: expect(actual).toBeNonNaN()
        Values are equal but expected to be different:
          NaN

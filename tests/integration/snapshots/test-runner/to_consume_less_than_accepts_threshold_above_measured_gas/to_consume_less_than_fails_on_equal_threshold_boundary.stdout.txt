@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/cf_to_consume_less_than_equal_threshold.test.tolk (1 test)
-  ✗ cf-stdlib-to-consume-less-than-equal-threshold [TIME]
+  ✗ cf stdlib to consume less than equal threshold [TIME]
     └─ Error: expect(actual).toConsumeLessThan(expected)
         Actual:   1442
         Expected: 1442

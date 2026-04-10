@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/wallet_mode.test.tolk (1 test)
-  ✗ s-lib-api-enable-broadcast-requires-configured-wallet [TIME]
+  ✗ s lib api enable broadcast requires configured wallet [TIME]
     └─
 
  ✗ 1 failed in 1 file

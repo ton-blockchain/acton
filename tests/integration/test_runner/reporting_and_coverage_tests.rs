@@ -15,11 +15,11 @@ fn cli_reporter_overrides_config_reporter() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-alpha`() {
+            get fun `test alpha`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-beta`() {
+            get fun `test beta`() {
                 expect(2).toEqual(2);
             }
         "#,
@@ -39,7 +39,7 @@ fn cli_reporter_overrides_config_reporter() {
         .assert_file_exists("test-results/TEST-test.test.tolk.xml")
         .assert_file_contains(
             "test-results/TEST-test.test.tolk.xml",
-            r#"<testcase name="test-alpha""#,
+            r#"<testcase name="test alpha""#,
         )
         .assert_not_contains("··");
 }
@@ -53,7 +53,7 @@ fn teamcity_escapes_special_characters_in_test_names() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-teamcity [special]|quote'`() {
+            get fun `test teamcity [special]|quote'`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -66,7 +66,7 @@ fn teamcity_escapes_special_characters_in_test_names() {
         .run()
         .success()
         .assert_contains("##teamcity[testStarted")
-        .assert_contains("test-teamcity |[special|]||quote|'")
+        .assert_contains("test teamcity |[special|]||quote|'")
         .assert_contains("##teamcity[testFinished");
 }
 
@@ -79,7 +79,7 @@ fn junit_merge_creates_only_single_output_file() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-first-suite`() {
+            get fun `test first suite`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -89,7 +89,7 @@ fn junit_merge_creates_only_single_output_file() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-second-suite`() {
+            get fun `test second suite`() {
                 expect(2).toEqual(2);
             }
         "#,
@@ -141,7 +141,7 @@ fn coverage_and_junit_reporter_work_together() {
             import "../../lib/testing/expect"
             import "../code/math"
 
-            get fun `test-mul`() {
+            get fun `test mul`() {
                 expect(mul(3, 7)).toEqual(21);
             }
         "#,
@@ -182,7 +182,7 @@ fn cli_coverage_format_overrides_config_coverage_format() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-id`() {
+            get fun `test id`() {
                 expect(id(5)).toEqual(5);
             }
         "#,

@@ -1367,7 +1367,7 @@ fn find_all_test(
             let name_node = method.name()?;
             let name = name_node.normalized_name(content);
 
-            // get fun `test-foo`() or get fun test_foo() or get fun `test foo`()
+            // Preferred style: get fun `test foo`() (legacy dash/underscore forms stay supported)
             if name.starts_with("test-") || name.starts_with("test_") || name.starts_with("test ") {
                 let id = i32::from(CRC16.checksum(name.as_bytes())) | 0x1_00_00;
                 let test_annotations = annotations::find_test_annotations(content, method);

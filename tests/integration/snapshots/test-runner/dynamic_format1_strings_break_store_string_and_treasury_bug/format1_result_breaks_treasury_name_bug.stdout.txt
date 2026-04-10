@@ -8,10 +8,10 @@
  TEST  [ROOT]
 
  > tests/dynamic_string_bug.test.tolk (2 tests)
-  ✓ bz-static-treasury-name-works [TIME]
+  ✓ bz static treasury name works [TIME]
     └─ Test output:
        [WALLET_ADDRESS_BASE] (bz_static_treasury)
-  ✓ bz-format1-treasury-name-not-a-cell [TIME]
+  ✓ bz format1 treasury name not a cell [TIME]
     └─ Test output:
        [WALLET_ADDRESS_BASE] (bz_dynamic_1)
 

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/db_transaction_load_body_nested.test.tolk (1 test)
-  ✓ db-stdlib-transaction-load-body-nested-inline [TIME]
+  ✓ db stdlib transaction load body nested inline [TIME]
 
  ✓ 1 passed in 1 file

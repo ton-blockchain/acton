@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/env_or_cell.test.tolk (1 test)
-  ✓ eh-stdlib-env-or-cell-fallback-vs-valid-precedence [TIME]
+  ✓ eh stdlib env or cell fallback vs valid precedence [TIME]
 
  ✓ 1 passed in 1 file

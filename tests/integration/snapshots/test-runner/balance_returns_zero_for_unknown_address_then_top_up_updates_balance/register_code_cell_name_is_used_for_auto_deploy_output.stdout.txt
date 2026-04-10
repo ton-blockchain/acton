@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/network.test.tolk (1 test)
-  ✓ ah-stdlib-register-code-cell-output-name [TIME]
+  ✓ ah stdlib register code cell output name [TIME]
     └─ Test output:
        N/A -> ah_register_code_deployer A
        └── empty 1 TON -> ah_registered_simple_code B                                  gas=253

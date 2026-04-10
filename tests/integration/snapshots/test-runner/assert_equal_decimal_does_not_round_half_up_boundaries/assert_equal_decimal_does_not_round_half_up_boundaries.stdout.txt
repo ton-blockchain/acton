@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_equal_decimal_rounding.test.tolk (1 test)
-  ✗ eg-assert-equal-decimal-no-round-half-up [TIME]
+  ✗ eg assert equal decimal no round half up [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
        Actual:   1.49
        Expected: 1.5

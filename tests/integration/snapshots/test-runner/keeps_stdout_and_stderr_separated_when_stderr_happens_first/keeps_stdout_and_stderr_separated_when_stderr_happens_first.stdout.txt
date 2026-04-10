@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ at-stdlib-stderr-first-separation [TIME]
+  ✓ at stdlib stderr first separation [TIME]
     └─ Test output:
        stdout-1-after-first-stderr
        stdout-2-after-middle-stderr

@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/fmt_env.test.tolk (1 test)
-  ✓ fmt-fallback-and-extra-args [TIME]
+  ✓ fmt fallback and extra args [TIME]
 
  ✓ 1 passed in 1 file

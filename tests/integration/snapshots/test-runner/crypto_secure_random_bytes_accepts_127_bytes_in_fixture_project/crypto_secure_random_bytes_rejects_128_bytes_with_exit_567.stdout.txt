@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/secure_random_boundary.test.tolk (1 test)
-  ✓ ay-stdlib-secure-random-rejects-128-bytes [TIME]
+  ✓ ay stdlib secure random rejects 128 bytes [TIME]
 
  ✓ 1 passed in 1 file

@@ -16,11 +16,11 @@ fn test_skip_annotation_string_literal() {
             import "../../lib/testing/expect"
 
             @test("skip")
-            get fun `test-skipped-string`() {
+            get fun `test skipped string`() {
                 expect(1).toEqual(2); // This should not run
             }
 
-            get fun `test-not-skipped`() {
+            get fun `test not skipped`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -45,11 +45,11 @@ fn test_skip_annotation_object_literal() {
             import "../../lib/testing/expect"
 
             @test({ skip: true })
-            get fun `test-skipped-object`() {
+            get fun `test skipped object`() {
                 expect(1).toEqual(2); // This should not run
             }
 
-            get fun `test-not-skipped`() {
+            get fun `test not skipped`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -74,11 +74,11 @@ fn test_todo_annotation_string_literal() {
             import "../../lib/testing/expect"
 
             @test("todo")
-            get fun `test-todo-string`() {
+            get fun `test todo string`() {
                 expect(1).toEqual(2); // This should not run
             }
 
-            get fun `test-not-todo`() {
+            get fun `test not todo`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -103,11 +103,11 @@ fn test_todo_annotation_with_description() {
             import "../../lib/testing/expect"
 
             @test({ todo: "Implement this later" })
-            get fun `test-todo-described`() {
+            get fun `test todo described`() {
                 expect(1).toEqual(2); // This should not run
             }
 
-            get fun `test-not-todo`() {
+            get fun `test not todo`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -132,11 +132,11 @@ fn test_todo_annotation_boolean() {
             import "../../lib/testing/expect"
 
             @test({ todo: true })
-            get fun `test-todo-boolean`() {
+            get fun `test todo boolean`() {
                 expect(1).toEqual(2); // This should not run
             }
 
-            get fun `test-not-todo`() {
+            get fun `test not todo`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -162,7 +162,7 @@ fn test_gas_limit_annotation() {
             import "../../lib/testing/expect"
 
             @test({ gas_limit: 100 })
-            get fun `test-gas-limit-exceeded`() {
+            get fun `test gas limit exceeded`() {
                 // This loop should exceed the gas limit
                 var i = 0;
                 while (i < 1000) {
@@ -171,7 +171,7 @@ fn test_gas_limit_annotation() {
                 expect(1).toEqual(1); // Should not reach here
             }
 
-            get fun `test-normal-gas`() {
+            get fun `test normal gas`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -197,11 +197,11 @@ fn test_fail_with_annotation() {
             import "../../lib/testing/expect"
 
             @test({ fail_with: 42 })
-            get fun `test-expected-failure`() {
+            get fun `test expected failure`() {
                 throw 42; // This is expected
             }
 
-            get fun `test-normal-pass`() {
+            get fun `test normal pass`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -226,7 +226,7 @@ fn test_fail_with_annotation_wrong_code() {
             import "../../lib/testing/expect"
 
             @test({ fail_with: 42 })
-            get fun `test-wrong-exit-code`() {
+            get fun `test wrong exit code`() {
                 throw 99; // Expected 42, got 99
             }
         "#,
@@ -251,12 +251,12 @@ fn test_multiple_annotations() {
             import "../../lib/testing/expect"
 
             @test({ skip: true, gas_limit: 1000, fail_with: 10 })
-            get fun `test-multiple-annotations`() {
+            get fun `test multiple annotations`() {
                 // This should be skipped, so these annotations don't matter
                 throw 10;
             }
 
-            get fun `test-normal`() {
+            get fun `test normal`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -283,16 +283,16 @@ fn test_annotations_with_filter() {
             import "../../lib/testing/expect"
 
             @test({ skip: true })
-            get fun `test-skipped-1`() {
+            get fun `test skipped 1`() {
                 expect(1).toEqual(2);
             }
 
             @test({ skip: true })
-            get fun `test-skipped-2`() {
+            get fun `test skipped 2`() {
                 expect(1).toEqual(2);
             }
 
-            get fun `test-not-skipped`() {
+            get fun `test not skipped`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -300,7 +300,7 @@ fn test_annotations_with_filter() {
         .build()
         .acton()
         .test()
-        .filter("test-not-skipped")
+        .filter("test not skipped")
         .run()
         .success()
         .assert_passed(1);

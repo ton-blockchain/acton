@@ -7,7 +7,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ missing-library-ref-is-reported [TIME]
+  ✓ missing library ref is reported [TIME]
     └─ Test output:
        N/A -> deployer A
        └── 0x1 1 TON -> main B                                                         gas=1790

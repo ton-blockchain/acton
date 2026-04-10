@@ -6,7 +6,7 @@
      Running tests
 x
 
-FAIL test-fuzz-fails-with-inputs: expect(<actual>).toEqual(<expected>)
+FAIL test fuzz fails with inputs: expect(<actual>).toEqual(<expected>)
   tests/test.test[LINE]
   Fuzz seed: 17
   Fuzz runs: 2

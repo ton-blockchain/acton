@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/stdlib_io.test.tolk (1 test)
-  ✓ as-stdlib-println1-negative-formatters [TIME]
+  ✓ as stdlib println1 negative formatters [TIME]
     └─ Test output:
        hex_neg_one=-1
        hex_neg_255=-ff

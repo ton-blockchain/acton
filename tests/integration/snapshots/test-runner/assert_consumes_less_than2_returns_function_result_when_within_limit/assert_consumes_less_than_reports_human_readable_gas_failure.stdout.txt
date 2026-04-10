@@ -14,7 +14,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/assert_gas.test.tolk (1 test)
-  ✗ ac-consumes-less-than-failure [TIME]
+  ✗ ac consumes less than failure [TIME]
     └─ Error: Gas consumption was expected to be less than or equal to 0, but 9170 was consumed
 
  ✗ 1 failed in 1 file
