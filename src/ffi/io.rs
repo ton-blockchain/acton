@@ -1,3 +1,4 @@
+use crate::commands::common::error_fmt;
 use crate::context::Context;
 use crate::formatter::FormatterContext;
 use anyhow::bail;
@@ -371,8 +372,7 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
     let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
 
     if wallet_names.is_empty() {
-        stack.push_string("");
-        return Ok(());
+        bail!(error_fmt::no_wallets_found());
     }
 
     if wallet_names.len() == 1 {
@@ -380,14 +380,17 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
         return Ok(());
     }
 
-    let result = if stdin().is_terminal() {
-        Select::new(&message, wallet_names)
-            .with_starting_cursor(0)
-            .prompt()
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
+    if !stdin().is_terminal() {
+        bail!(
+            "Cannot prompt for wallet selection in a non-interactive environment. \
+             Please specify the wallet explicitly."
+        );
+    }
+
+    let result = Select::new(&message, wallet_names)
+        .with_starting_cursor(0)
+        .prompt()
+        .unwrap_or_default();
 
     stack.push_string(&result);
     Ok(())

@@ -171,7 +171,7 @@ fun vm.cellFromHex(cellHex: string): cell {
 }
 
 
-/// Parse a decimal string into an [int] value.
+/// Parse a decimal string into an int value.
 ///
 /// Accepts optional leading `-` sign followed by decimal digits.
 /// Invalid input (non-numeric characters, empty string) fails with an error.
