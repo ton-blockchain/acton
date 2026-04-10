@@ -2278,6 +2278,101 @@ fn format_currency_collection(currency: &CurrencyCollection) -> String {
     result
 }
 
+pub(crate) fn render_runtime_in_message(c7: &VmStackValue) -> Option<RenderedValue> {
+    Some(RenderedValue::Struct {
+        type_name: "InMessage".to_owned(),
+        fields: vec![
+            (
+                "senderAddress".to_owned(),
+                render_runtime_in_msg_sender_address_field(runtime_in_msg_param(c7, 2)?),
+            ),
+            (
+                "valueCoins".to_owned(),
+                render_runtime_coins_field(runtime_in_msg_param(c7, 7)?),
+            ),
+            (
+                "valueExtra".to_owned(),
+                render_runtime_extra_currencies_field(runtime_in_msg_param(c7, 8)?),
+            ),
+            (
+                "originalForwardFee".to_owned(),
+                render_runtime_coins_field(runtime_in_msg_param(c7, 3)?),
+            ),
+            (
+                "createdLt".to_owned(),
+                render_runtime_uint_field(runtime_in_msg_param(c7, 4)?, "uint64"),
+            ),
+            (
+                "createdAt".to_owned(),
+                render_runtime_uint_field(runtime_in_msg_param(c7, 5)?, "uint32"),
+            ),
+        ],
+    })
+}
+
+fn runtime_in_msg_param(c7: &VmStackValue, index: usize) -> Option<&VmStackValue> {
+    let env = match c7 {
+        VmStackValue::Tuple(items) => items.first()?,
+        _ => return None,
+    };
+    let in_msg_params = match env {
+        VmStackValue::Tuple(items) => items.get(17)?,
+        _ => return None,
+    };
+    match in_msg_params {
+        VmStackValue::Tuple(items) => items.get(index),
+        _ => None,
+    }
+}
+
+fn render_runtime_in_msg_sender_address_field(value: &VmStackValue) -> RenderedValue {
+    match value {
+        VmStackValue::CellSlice(cs) => match try_parse_address(cs) {
+            Some(raw) => match raw.parse::<StdAddr>() {
+                Ok(addr) => render_std_address("address".to_owned(), render_slice(cs), &addr),
+                Err(_) => RenderedValue::typed_leaf(raw, "address"),
+            },
+            None => RenderedValue::typed_leaf(render_slice(cs), "address"),
+        },
+        _ => RenderedValue::typed_leaf(render_runtime_vm_value(value).dap_value(), "address"),
+    }
+}
+
+fn render_runtime_coins_field(value: &VmStackValue) -> RenderedValue {
+    match value {
+        VmStackValue::Integer(value) => match value.parse::<u128>() {
+            Ok(tokens) => RenderedValue::typed_leaf(format_tokens(tokens), "coins"),
+            Err(_) => RenderedValue::typed_leaf(value.clone(), "coins"),
+        },
+        _ => RenderedValue::typed_leaf(render_runtime_vm_value(value).dap_value(), "coins"),
+    }
+}
+
+fn render_runtime_uint_field(value: &VmStackValue, ty: &str) -> RenderedValue {
+    match value {
+        VmStackValue::Integer(value) => RenderedValue::typed_leaf(value.clone(), ty),
+        _ => RenderedValue::typed_leaf(render_runtime_vm_value(value).dap_value(), ty),
+    }
+}
+
+fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue {
+    match value {
+        VmStackValue::Cell(cell) => {
+            let ty = Ty::MapKV {
+                k: Box::new(Ty::IntN { n: 32 }),
+                v: Box::new(Ty::VaruintN { n: 32 }),
+            };
+            let (bits, refs, hash) = cell_like_meta(cell);
+            render_openable_cell_like(&ty, render_cell_like(cell), bits, refs, hash)
+        }
+        VmStackValue::Null => RenderedValue::typed_leaf("()", "map<int32, varuint32>"),
+        _ => RenderedValue::typed_leaf(
+            render_runtime_vm_value(value).dap_value(),
+            "map<int32, varuint32>",
+        ),
+    }
+}
+
 /// Helper to convert data from `SourceMap` to ABI
 fn build_compiler_abi(symbols: &SourceMap) -> Option<ContractABI> {
     Some(ContractABI {
@@ -2461,6 +2556,61 @@ mod tests {
         assert_eq!(fields[1].1.dap_parts().0, "1");
         assert_eq!(fields[2].0, "hash");
         assert_eq!(fields[2].1.dap_parts().0, render_cell_hash(&cell));
+    }
+
+    #[test]
+    fn render_runtime_in_message_reads_fields_from_c7() {
+        let addr = IntAddr::Std(StdAddr::new(0, HashBytes([0x11; 32])));
+        let mut builder = CellBuilder::new();
+        addr.store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let addr_cell = builder.build().unwrap();
+        let extra_cell = Cell::empty_cell();
+
+        let mut in_msg_params = vec![VmStackValue::Null; 10];
+        in_msg_params[2] = VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(&addr_cell),
+            bits: None,
+            refs: None,
+        });
+        in_msg_params[3] = VmStackValue::Integer("123456789".to_owned());
+        in_msg_params[4] = VmStackValue::Integer("42".to_owned());
+        in_msg_params[5] = VmStackValue::Integer("1710000000".to_owned());
+        in_msg_params[7] = VmStackValue::Integer("1000000000".to_owned());
+        in_msg_params[8] = VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&extra_cell)));
+
+        let mut env = vec![VmStackValue::Null; 18];
+        env[17] = VmStackValue::Tuple(in_msg_params);
+
+        let rendered =
+            render_runtime_in_message(&VmStackValue::Tuple(vec![VmStackValue::Tuple(env)]))
+                .expect("expected in message");
+
+        let RenderedValue::Struct { type_name, fields } = rendered else {
+            panic!("expected InMessage struct");
+        };
+        assert_eq!(type_name, "InMessage");
+        assert_eq!(fields.len(), 6);
+        assert_eq!(fields[0].0, "senderAddress");
+        assert_eq!(fields[0].1.dap_parts().0, addr.to_string());
+        assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("address"));
+        assert_eq!(fields[1].0, "valueCoins");
+        assert_eq!(fields[1].1.dap_parts().0, "1.000000000 TON");
+        assert_eq!(fields[1].1.dap_parts().1.as_deref(), Some("coins"));
+        assert_eq!(fields[2].0, "valueExtra");
+        assert_eq!(
+            fields[2].1.dap_parts().1.as_deref(),
+            Some("map<int32, varuint32>")
+        );
+        assert_eq!(fields[3].0, "originalForwardFee");
+        assert_eq!(fields[3].1.dap_parts().0, "0.123456789 TON");
+        assert_eq!(fields[3].1.dap_parts().1.as_deref(), Some("coins"));
+        assert_eq!(fields[4].0, "createdLt");
+        assert_eq!(fields[4].1.dap_parts().0, "42");
+        assert_eq!(fields[4].1.dap_parts().1.as_deref(), Some("uint64"));
+        assert_eq!(fields[5].0, "createdAt");
+        assert_eq!(fields[5].1.dap_parts().0, "1710000000");
+        assert_eq!(fields[5].1.dap_parts().1.as_deref(), Some("uint32"));
     }
 
     #[test]

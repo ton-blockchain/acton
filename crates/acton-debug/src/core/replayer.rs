@@ -8,7 +8,7 @@
 use super::debug_executor_handle::DebugExecutorHandle;
 use super::debug_executor_handle::RuntimeDebugSnapshot;
 use super::types_render::{
-    RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack,
+    RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack, render_runtime_in_message,
     render_runtime_out_actions, render_runtime_storage_with_compiler_abi, render_runtime_vm_value,
 };
 use anyhow::anyhow;
@@ -777,6 +777,7 @@ impl TolkReplayer {
                     &self.call_stack[i],
                     &exec.last_seen_values,
                     &exec.accumulated_ir_live,
+                    depth == 0,
                 )
             }
             None => Vec::new(),
@@ -1298,6 +1299,7 @@ impl TolkReplayer {
         frame: &CallFrame,
         last_seen: &HashMap<usize, VmStackValue>,
         ir_live: &HashSet<usize>,
+        is_top_frame: bool,
     ) -> Vec<LocalVarRendered> {
         let mut result: Vec<LocalVarRendered> = Vec::new();
 
@@ -1339,6 +1341,22 @@ impl TolkReplayer {
                 var_name: var.name.clone(),
                 value: debug_val,
             });
+        }
+
+        // TODO: unify with `in.data`? Currently `in` uses only runtime data from c7, while `in.data` takes value from the stack
+        if is_top_frame
+            && frame.f_name == "onInternalMessage"
+            && let Some(snapshot) = self.runtime_source.runtime_debug_snapshot()
+            && let Some(c7) = snapshot.c7.as_ref()
+            && let Some(value) = render_runtime_in_message(c7)
+        {
+            result.insert(
+                0,
+                LocalVarRendered {
+                    var_name: "in".to_owned(),
+                    value,
+                },
+            );
         }
 
         for (name, (ty_idx, values)) in &self.global_var_values {
