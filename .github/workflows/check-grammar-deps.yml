@@ -6,10 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-fift"
-      - "crates/tree-sitter-tasm"
-      - "crates/tree-sitter-tlb"
-      - "crates/tree-sitter-tolk"
+      - "crates/tree-sitter-**/**"
   workflow_dispatch:
 
 concurrency:
@@ -44,12 +41,16 @@ jobs:
         shell: bash
         # language=Bash
         run: |
-          while IFS= read -r lockfile; do
-            dir="$(dirname "$lockfile")"
-            echo "::group::yarn npm audit (${dir#./})"
+          shopt -s nullglob
+
+          for dir in crates/tree-sitter-*; do
+            [ -d "$dir" ] || continue
+            [ -f "$dir/yarn.lock" ] || continue
+
+            echo "::group::yarn npm audit (${dir})"
             (
               cd "$dir"
               yarn npm audit --all --recursive --severity=moderate
             )
             echo "::endgroup::"
-          done < <(find . -name yarn.lock -not -path '*/node_modules/*' | sort)
+          done
