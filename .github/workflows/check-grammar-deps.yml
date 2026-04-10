@@ -41,6 +41,7 @@ jobs:
         shell: bash
         # language=Bash
         run: |
+          set -uo pipefail
           shopt -s nullglob
 
           for dir in crates/tree-sitter-*; do
@@ -48,9 +49,12 @@ jobs:
             [ -f "$dir/yarn.lock" ] || continue
 
             echo "::group::yarn npm audit (${dir})"
-            (
+            if ! (
               cd "$dir"
               yarn npm audit --all --recursive --severity=moderate
-            )
+            ); then
+              echo "::endgroup::"
+              exit 1
+            fi
             echo "::endgroup::"
           done
