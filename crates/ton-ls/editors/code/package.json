@@ -1,24 +1,34 @@
 {
   "name": "tolk-vscode",
   "displayName": "Tolk, TASM, Fift, TL-B & TOML Support",
-  "description": "Language support for Tolk, TASM, Fift, TL-B and Acton.toml",
   "version": "0.0.1",
-  "publisher": "petrmakhnev",
-  "engines": {
-    "vscode": "^1.75.0"
-  },
+  "description": "Language support for Tolk, TASM, Fift, TL-B and Acton.toml",
   "categories": [
     "Programming Languages"
   ],
-  "activationEvents": [
-    "onLanguage:tolk",
-    "onLanguage:tasm",
-    "onLanguage:fift",
-    "onLanguage:tlb",
-    "onLanguage:toml"
-  ],
+  "publisher": "petrmakhnev",
   "main": "./out/extension",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
   "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Tolk",
+      "properties": {
+        "tolk.serverPath": {
+          "type": "string",
+          "default": "ton-ls",
+          "description": "Path to the ton-ls executable"
+        },
+        "tolk.serverPort": {
+          "type": "number",
+          "default": 0,
+          "description": "Port to connect to for TCP debugging (0 to use executable)"
+        }
+      }
+    },
     "languages": [
       {
         "id": "tolk",
@@ -70,28 +80,15 @@
           "Acton.toml"
         ]
       }
-    ],
-    "configuration": {
-      "type": "object",
-      "title": "Tolk",
-      "properties": {
-        "tolk.serverPath": {
-          "type": "string",
-          "default": "ton-ls",
-          "description": "Path to the ton-ls executable"
-        },
-        "tolk.serverPort": {
-          "type": "number",
-          "default": 0,
-          "description": "Port to connect to for TCP debugging (0 to use executable)"
-        }
-      }
-    }
+    ]
   },
-  "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
-  },
+  "activationEvents": [
+    "onLanguage:tolk",
+    "onLanguage:tasm",
+    "onLanguage:fift",
+    "onLanguage:tlb",
+    "onLanguage:toml"
+  ],
   "dependencies": {
     "vscode-languageclient": "^8.1.0"
   },
@@ -99,5 +96,8 @@
     "@types/node": "^18.14.6",
     "@types/vscode": "^1.75.0",
     "typescript": "^4.9.5"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
   }
 }
