@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - ".github/workflows/check-bun-deps.yml"
+      - ".github/workflows/check-ui-deps.yml"
       - "bun.lock"
       - "package.json"
       - "crates/acton-litenode-ui"
