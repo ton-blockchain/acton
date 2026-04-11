@@ -236,12 +236,12 @@ fn replace_tolk_stdlib_from_unpacked_dir(
         bail!("`{TON_STDLIB_ASSET_NAME}` did not contain `{TOLK_STDLIB_ARCHIVE_DIR}/`");
     }
 
-    if staged_tolk_stdlib_dir.exists() {
-        fs::remove_dir_all(&staged_tolk_stdlib_dir)
-            .with_context(|| format!("failed to remove `{}`", staged_tolk_stdlib_dir.display()))?;
+    if tolk_stdlib_dir.exists() {
+        fs::remove_dir_all(tolk_stdlib_dir)
+            .with_context(|| format!("failed to remove `{}`", tolk_stdlib_dir.display()))?;
     }
 
-    copy_directory(tolk_stdlib_dir, &staged_tolk_stdlib_dir)
+    copy_directory(&staged_tolk_stdlib_dir, tolk_stdlib_dir)
 }
 
 fn replace_fift_stdlib_from_unpacked_dir(
