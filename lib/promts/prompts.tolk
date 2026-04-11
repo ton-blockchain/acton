@@ -86,10 +86,14 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 /// val walletName = promptWallet("Select a wallet:");
 /// ```
 fun promptWallet(message: string): string {
-    return ffi.promptWallet(message);
+    val name = ffi.promptWallet(message);
+    if (name == null) {
+        throw 1;
+    }
+    return name;
 }
 
 fun ffi.prompt(message: string, placeholder: string = ""): string asm "205 EXTCALL"
 fun ffi.select(message: string, variants: tuple): string asm "206 EXTCALL"
 fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
-fun ffi.promptWallet(message: string): string asm "208 EXTCALL"
+fun ffi.promptWallet(message: string): string? asm "208 EXTCALL"

@@ -372,7 +372,9 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
     let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
 
     if wallet_names.is_empty() {
-        bail!(error_fmt::no_wallets_found());
+        ctx.asserts.fail(error_fmt::no_wallets_found());
+        stack.push(TupleItem::Null);
+        return Ok(());
     }
 
     if wallet_names.len() == 1 {
@@ -381,16 +383,25 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
     }
 
     if !stdin().is_terminal() {
-        bail!(
+        ctx.asserts.fail(
             "Cannot prompt for wallet selection in a non-interactive environment. \
              Please specify the wallet explicitly."
+                .to_string(),
         );
+        stack.push(TupleItem::Null);
+        return Ok(());
     }
 
-    let result = Select::new(&message, wallet_names)
+    let result = match Select::new(&message, wallet_names)
         .with_starting_cursor(0)
         .prompt()
-        .unwrap_or_default();
+    {
+        Ok(name) => name,
+        Err(_) => {
+            stack.push(TupleItem::Null);
+            return Ok(());
+        }
+    };
 
     stack.push_string(&result);
     Ok(())

@@ -25,6 +25,7 @@ mod logging_tests;
 mod mappings_tests;
 mod new_tests;
 mod println_tests;
+mod prompt_wallet_tests;
 mod reporters_tests;
 mod retrace_tests;
 mod rpc_tests;
