@@ -12,7 +12,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolk_syntax::SourceFile;
+use tolk_syntax::{SourceFile, parse_tolk_int_literal};
 
 fn resolve_mapped_path<'a>(
     import_path: &'a str,
@@ -776,22 +776,13 @@ fn extract_struct_abi(
             .unwrap_or("")
             .to_string();
 
-        // Clean the number by removing underscores
-        let clean_text = prefix_text.replace('_', "");
-
-        let (prefix_val, radix) = if let Some(stripped) = clean_text.strip_prefix("0x") {
-            (u32::from_str_radix(stripped, 16), 16)
-        } else if let Some(stripped) = clean_text.strip_prefix("0b") {
-            (u32::from_str_radix(stripped, 2), 2)
-        } else {
-            (clean_text.parse::<u32>(), 10)
-        };
-
-        if let Ok(val) = prefix_val {
+        if let Some(prefix) = parse_tolk_int_literal(&prefix_text)
+            && let Some(val) = prefix.parse_u32()
+        {
             opcode = Some(val);
-            opcode_width = match radix {
-                16 => Some((clean_text.len() - 2) * 4),
-                2 => Some(clean_text.len() - 2),
+            opcode_width = match prefix.radix() {
+                16 => Some(prefix.digit_len() * 4),
+                2 => Some(prefix.digit_len()),
                 _ => Some(format!("{val:b}").len()),
             };
         }
@@ -1011,14 +1002,7 @@ fn get_explicit_method_id(func_node: &tree_sitter::Node<'_>, content: &str) -> O
             for arg in args_node.children(&mut args_cursor) {
                 if arg.kind() == "number_literal" {
                     let value_text = arg.utf8_text(content.as_bytes()).unwrap_or("").to_string();
-
-                    let id = if let Some(stripped) = value_text.strip_prefix("0x") {
-                        u32::from_str_radix(stripped, 16).ok()
-                    } else {
-                        value_text.parse::<u32>().ok()
-                    };
-
-                    return id;
+                    return parse_tolk_int_literal(&value_text)?.parse_u32();
                 }
             }
         }
@@ -1079,7 +1063,7 @@ fun onInternalMessage() {
     #[test]
     fn test_contract_abi_explicit_method_id() {
         let code = r"
-@method_id(0x12345)
+@method_id(0x1_2345)
 get fun custom_method(): int {
     return 42;
 }
@@ -1116,7 +1100,7 @@ get simple_method(): int {
 }
 
 // Get method with method_id annotation
-@method_id(0x10001)
+@method_id(0x1_0001)
 get fun custom_id(): int {
     return 2;
 }
@@ -1157,18 +1141,18 @@ struct Storage {
 }
 
 // Struct with hex pack prefix
-struct (0xABCD) MessageData {
+struct (0xAB_CD) MessageData {
     data: cell;
 }
 
 // Struct with decimal pack prefix
-struct (123) TokenInfo {
+struct (1_23) TokenInfo {
     amount: int;
     symbol: string;
 }
 
 // Struct with binary pack prefix
-struct (0b1010) BinaryData {
+struct (0b10_10) BinaryData {
     flag: bool;
 }
 ";
@@ -1245,19 +1229,19 @@ fun regular_function() {
     fn test_method_id_formats() {
         let code = r"
 // Decimal method ID
-@method_id(65537)
+@method_id(65_537)
 get fun decimal_id(): int {
     return 1;
 }
 
 // Hex method ID
-@method_id(0x10001)
+@method_id(0x1_0001)
 get fun hex_id(): int {
     return 2;
 }
 
 // Large method ID
-@method_id(0xFFFFFFFF)
+@method_id(0xFFFF_FFFF)
 get fun large_id(): int {
     return 3;
 }

@@ -101,7 +101,7 @@ type ForwardPayloadRemainder = RemainingBitsAndRefs
 
 fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self): cell {}
 
-struct (0x178d4519) InternalTransferStep {
+struct (0x178d_4519) InternalTransferStep {
     forwardPayload: ForwardPayloadRemainder
 }
 
@@ -159,9 +159,9 @@ Maybe unwrap and chained method call
 ========================================================================
 type Maybe<X> = Value<X> | None
 
-struct (0b0) None
+struct (0b_0) None
 
-struct (0b1) Value<X> {
+struct (0b_1) Value<X> {
     value: X
 }
 
@@ -198,9 +198,9 @@ Maybe unwrap after generic method with default type parameter
 ========================================================================
 type Maybe2<X> = Value2<X> | None2
 
-struct (0b0) None2
+struct (0b_0) None2
 
-struct (0b1) Value2<X> {
+struct (0b_1) Value2<X> {
     value: X
 }
 
@@ -257,17 +257,17 @@ fun Assert.fail(): never {
     throw 0;
 }
 
-struct (0b0) AccountNone
-struct (0b1) AccountInfo {
+struct (0b_0) AccountNone
+struct (0b_1) AccountInfo {
     storage: AccountStorage
 }
 type Account = AccountNone | AccountInfo
 
-struct (0b00) AccountStateUninit
-struct (0b1) AccountStateActive {
+struct (0b0_0) AccountStateUninit
+struct (0b_1) AccountStateActive {
     marker: int,
 }
-struct (0b01) AccountStateFrozen {
+struct (0b0_1) AccountStateFrozen {
     hash: int,
 }
 type AccountState = AccountStateUninit | AccountStateActive | AccountStateFrozen

@@ -120,7 +120,7 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
             }
             "fail_with" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Ok(code) = n.text(content).parse::<i32>()
+                    && let Some(code) = n.parse_i32(content)
                 {
                     expected_exit_code = Some(code);
                 }
@@ -130,7 +130,7 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
             }
             "gas_limit" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Ok(limit) = n.text(content).parse::<u64>()
+                    && let Some(limit) = n.parse_u64(content)
                 {
                     gas_limit = Some(limit);
                 }
@@ -151,15 +151,11 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
 fn parse_fuzz_value(content: &str, value: Option<Expr<'_>>) -> Option<FuzzConfig> {
     match value? {
         Expr::BoolLit(b) if b.value() => Some(FuzzConfig::default()),
-        Expr::NumberLit(n) => n
-            .text(content)
-            .parse::<usize>()
-            .ok()
-            .map(|runs| FuzzConfig {
-                runs: Some(runs),
-                max_test_rejects: None,
-                seed: None,
-            }),
+        Expr::NumberLit(n) => n.parse_u32(content).map(|runs| FuzzConfig {
+            runs: Some(runs as usize),
+            max_test_rejects: None,
+            seed: None,
+        }),
         Expr::ObjectLit(object) => parse_fuzz_object(content, object),
         _ => None,
     }
@@ -177,23 +173,23 @@ fn parse_fuzz_object(content: &str, object: ObjectLit<'_>) -> Option<FuzzConfig>
         match name_node.text(content) {
             "runs" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Ok(runs) = n.text(content).parse::<usize>()
+                    && let Some(runs) = n.parse_u32(content)
                 {
-                    config.runs = Some(runs);
+                    config.runs = Some(runs as usize);
                     found_field = true;
                 }
             }
             "max_test_rejects" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Ok(max_test_rejects) = n.text(content).parse::<usize>()
+                    && let Some(max_test_rejects) = n.parse_u32(content)
                 {
-                    config.max_test_rejects = Some(max_test_rejects);
+                    config.max_test_rejects = Some(max_test_rejects as usize);
                     found_field = true;
                 }
             }
             "seed" => {
                 if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Ok(seed) = n.text(content).parse::<u64>()
+                    && let Some(seed) = n.parse_u64(content)
                 {
                     config.seed = Some(seed);
                     found_field = true;

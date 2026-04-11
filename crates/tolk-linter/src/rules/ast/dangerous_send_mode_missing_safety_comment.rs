@@ -1,4 +1,4 @@
-use super::mode_literal_helpers::{parse_int_literal, resolve_call_symbol};
+use super::mode_literal_helpers::resolve_call_symbol;
 use super::safety_comment_helpers::has_safety_comment_above;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
@@ -6,7 +6,6 @@ use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_index::FileId;
-use tolk_syntax::AstNode;
 use tolk_syntax::ast::expressions::{Call, DotAccessField, Expr};
 use tolk_ty::InferenceResult;
 
@@ -101,7 +100,8 @@ fn is_message_send_call(
 
 fn contains_dangerous_send_mode(expr: Expr, source: &str) -> bool {
     match expr {
-        Expr::NumberLit(lit) => parse_int_literal(lit.text(source))
+        Expr::NumberLit(lit) => lit
+            .parse_u32(source)
             .is_some_and(|value| value & DANGEROUS_SEND_MODE_MASK != 0),
         Expr::Ident(ident) => is_dangerous_flag_name(ident.normalized_name(source)),
         Expr::DotAccess(dot_access) => match dot_access.field() {
