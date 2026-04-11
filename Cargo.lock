@@ -6409,6 +6409,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
+ "tempfile",
  "toml_edit 0.24.0+spec-1.1.0",
  "urlencoding",
 ]
