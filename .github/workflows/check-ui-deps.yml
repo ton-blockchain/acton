@@ -8,9 +8,7 @@ on:
       - ".github/workflows/check-ui-deps.yml"
       - "bun.lock"
       - "package.json"
-      - "crates/acton-litenode-ui"
-      - "crates/acton-shared-ui"
-      - "crates/acton-test-ui"
+      - "crates/acton-**-ui/**"
   workflow_dispatch:
 
 concurrency:
