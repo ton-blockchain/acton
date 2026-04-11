@@ -142,7 +142,7 @@ pub(super) fn generate_dependency_graph_dot(
         let Some(config) = contracts.get(key) else {
             continue;
         };
-        let label = format!("{}\\n({})", config.name, key);
+        let label = format!("{}\\n({})", config.display_name(key), key);
         dot_content.push_str(&format!("    \"{key}\" [label=\"{label}\"];\n"));
     }
 

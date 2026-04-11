@@ -14,7 +14,7 @@ fun changeLib(code: cell, mode: int): void
     asm "SETLIBCODE"
 
 /// Tests that we can actually retrieve out actions and parse it correctly
-get fun `test-out-actions`() {
+get fun `test out actions`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -73,7 +73,7 @@ get fun `test-out-actions`() {
     }
 }
 
-get fun `test-out-message-out-actions-helper`() {
+get fun `test out message out actions helper`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -103,12 +103,12 @@ get fun `test-out-message-out-actions-helper`() {
     }
 }
 
-get fun `test-parse-empty-out-actions`() {
+get fun `test parse empty out actions`() {
     val actions = vm.parseOutActions(createEmptyCell());
     expect(actions).toHaveLength(0);
 }
 
-get fun `test-get-send-message-helpers-return-null-for-non-send-action`() {
+get fun `test get send message helpers return null for non send action`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/register_code.test.tolk (1 test)
-  ✓ register-code-cell-last-wins [TIME]
+  ✓ register code cell last wins [TIME]
     └─ Test output:
        N/A -> q_deployer A
        └── empty 1 TON -> q_alias_new B                                                gas=253

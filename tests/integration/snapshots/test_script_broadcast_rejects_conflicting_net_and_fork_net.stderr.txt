@@ -1,1 +1,1 @@
-Error: `--broadcast` cannot use different `--net` (testnet) and `--fork-net` (mainnet); use one network or omit `--fork-net`
+Error: `--net` (testnet) and `--fork-net` (mainnet) cannot differ when broadcasting; use one network or omit `--fork-net`

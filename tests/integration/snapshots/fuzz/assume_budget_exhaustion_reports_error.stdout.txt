@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-assume-exhaustion [TIME] (1 run, seed 42)
+  ✗ fuzz assume exhaustion [TIME] (1 run, seed 42)
     └─ Error: assume(...) rejected 256 fuzz inputs before reaching 1 successful runs (completed 0)
       └─ at tests/test.test[LINE]
 

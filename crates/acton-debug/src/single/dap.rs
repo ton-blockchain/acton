@@ -3,7 +3,7 @@
 //! 1. uses tolerant request parsing for custom VS Code messages
 //! 2. attaches to an already prepared `TolkReplayer`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
@@ -81,6 +81,7 @@ struct DapState {
     /// Maps variable `req_id` → `RenderedValue` for structured drill-down.
     /// Rebuilt on every `StackTrace` request (old values are stale after stepping).
     vars_debug_values: HashMap<i64, RenderedValue>,
+    runtime_register_scope_requests: HashSet<i64>,
 }
 
 impl DapState {
@@ -97,6 +98,7 @@ impl DapState {
             next_req_id: 1_000_000,
             frame_to_depth: HashMap::new(),
             vars_debug_values: HashMap::new(),
+            runtime_register_scope_requests: HashSet::new(),
         }
     }
 
@@ -193,6 +195,8 @@ fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
     }
 }
 
+/// Emit the standard DAP `stopped` event once the replayer has already advanced
+/// to the location that should be shown to the client.
 fn send_stopped(
     server: &mut DapConnection<impl BufRead, impl Write>,
     reason: StoppedEventReason,
@@ -211,6 +215,7 @@ fn send_stopped(
     Ok(())
 }
 
+/// Finish the debuggee from DAP's point of view: first `exited`, then `terminated`.
 fn send_terminated(server: &mut DapConnection<impl BufRead, impl Write>) -> anyhow::Result<()> {
     server.send_event(Event::Exited(events::ExitedEventBody { exit_code: 0 }))?;
     server.send_event(Event::Terminated(Some(
@@ -219,6 +224,8 @@ fn send_terminated(server: &mut DapConnection<impl BufRead, impl Write>) -> anyh
     Ok(())
 }
 
+/// Run one logical debugger action and translate the resulting stop reason
+/// (termination / exception / breakpoint / plain step) into DAP events.
 fn step_and_notify(
     state: &mut DapState,
     step_mode: StepMode,
@@ -516,6 +523,9 @@ fn handle_configuration_done(
         .pending_breakpoints
         .values()
         .any(|breakpoints| !breakpoints.is_empty());
+    // Match VS Code's startup flow: after configuration completes the adapter itself
+    // must advance to the first interesting stop and report it as Entry unless a
+    // stronger reason (breakpoint / exception / termination) wins first.
     let step_mode = if has_breakpoints {
         StepMode::RunUntilBreakpoint
     } else {
@@ -629,6 +639,7 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
     // Now allocate frame IDs (mutable borrow of state — no conflict with replayer)
     state.frame_to_depth.clear();
     state.vars_debug_values.clear();
+    state.runtime_register_scope_requests.clear();
     let total = 1 + parents.len();
     let mut frames: Vec<StackFrame> = Vec::with_capacity(total);
 
@@ -680,8 +691,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
     }))
 }
 
-fn handle_scopes(_state: &DapState, args: &requests::ScopesArguments, req: Request) -> Response {
-    let scopes = vec![Scope {
+fn handle_scopes(state: &mut DapState, args: &requests::ScopesArguments, req: Request) -> Response {
+    let mut scopes = vec![Scope {
         name: "Locals".to_string(),
         variables_reference: args.frame_id,
         named_variables: None,
@@ -694,6 +705,29 @@ fn handle_scopes(_state: &DapState, args: &requests::ScopesArguments, req: Reque
         end_column: None,
         presentation_hint: Some(ScopePresentationhint::Locals),
     }];
+
+    if state
+        .replayer
+        .as_ref()
+        .is_some_and(|r| r.runtime_backend_kind() == replayer::RuntimeBackendKind::LiveVm)
+    {
+        let registers_ref = state.alloc_req_id();
+        state.runtime_register_scope_requests.insert(registers_ref);
+        scopes.push(Scope {
+            name: "Registers".to_string(),
+            variables_reference: registers_ref,
+            named_variables: None,
+            indexed_variables: None,
+            expensive: false,
+            source: None,
+            line: None,
+            column: None,
+            end_line: None,
+            end_column: None,
+            presentation_hint: Some(ScopePresentationhint::Registers),
+        });
+    }
+
     req.success(ResponseBody::Scopes(ScopesResponse { scopes }))
 }
 
@@ -718,6 +752,18 @@ fn handle_variables(
         return req.success(ResponseBody::Variables(VariablesResponse { variables }));
     }
 
+    if state.runtime_register_scope_requests.contains(&req_id) {
+        let variables = state
+            .replayer
+            .as_ref()
+            .map(|r| r.runtime_registers())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|lv| debug_value_to_variable(state, lv.var_name, &lv.value))
+            .collect();
+        return req.success(ResponseBody::Variables(VariablesResponse { variables }));
+    }
+
     // Path B: drill-down into a structured RenderedValue
     if let Some(dv) = state.vars_debug_values.get(&req_id).cloned() {
         let variables = expand_debug_value(state, &dv);
@@ -731,7 +777,12 @@ fn handle_variables(
 
 fn expand_debug_value(state: &mut DapState, dv: &RenderedValue) -> Vec<Variable> {
     match dv {
-        RenderedValue::Struct { fields, .. } | RenderedValue::Address { fields, .. } => fields
+        RenderedValue::Struct { fields, .. }
+        | RenderedValue::Address { fields, .. }
+        | RenderedValue::CellLike { fields, .. }
+        | RenderedValue::EnumValue { fields, .. }
+        | RenderedValue::UnionCase { fields, .. }
+        | RenderedValue::CellOf { fields, .. } => fields
             .iter()
             .map(|(name, val)| debug_value_to_variable(state, name.clone(), val))
             .collect(),

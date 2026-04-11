@@ -28,7 +28,7 @@ contract entry files.
 `acton init` is safe to run repeatedly.
 
 - it never replaces an existing `Acton.toml`
-- it backfills default `mappings` only when they are missing
+- it backfills default `import-mappings` only when they are missing
 - it appends missing `.gitignore` patterns without deleting existing ones
 - it refreshes `.acton/tolk-stdlib`
 - it re-attempts global wallet and library symlinks on each run
@@ -56,10 +56,10 @@ project config and may include:
 - `[package]` metadata
 - `[fmt]` defaults
 - discovered `[contracts]`
-- default `[mappings]`
+- default `[import-mappings]`
 
 When `Acton.toml` already exists, `acton init` only backfills missing default
-`[mappings]` entries.
+`[import-mappings]` entries.
 
 When patching `.gitignore`, Acton adds groups for:
 

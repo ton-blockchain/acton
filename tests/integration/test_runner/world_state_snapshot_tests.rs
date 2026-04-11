@@ -22,7 +22,7 @@ fn build_world_state_snapshot_project(project_name: &str) -> Project {
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-world-state-snapshot`() {{
+get fun `test save world state snapshot`() {{
     val target = net.randomAddress("snapshot-target");
 
     expect(net.balance(target)).toEqual(0);
@@ -38,7 +38,7 @@ get fun `test-save-world-state-snapshot`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-from-disk`() {{
+get fun `test load world state snapshot from disk`() {{
     val target = net.randomAddress("snapshot-target");
 
     expect(net.balance(target)).toEqual(0);
@@ -58,7 +58,7 @@ get fun `test-load-world-state-snapshot-from-disk`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-replaces-current-state`() {{
+get fun `test load world state snapshot replaces current state`() {{
     val target = net.randomAddress("snapshot-target");
 
     net.topUp(target, ton("1"));
@@ -78,7 +78,7 @@ get fun `test-load-world-state-snapshot-replaces-current-state`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-invalid-inputs`() {{
+get fun `test load world state snapshot invalid inputs`() {{
     expect(net.loadSnapshot("missing-world-state.json")).toBeFalse();
     expect(net.loadSnapshot("broken-world-state.json")).toBeFalse();
     expect(net.loadSnapshot("unsupported-world-state.json")).toBeFalse();
@@ -94,7 +94,7 @@ get fun `test-load-world-state-snapshot-invalid-inputs`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-empty-world-state-snapshot`() {{
+get fun `test save empty world state snapshot`() {{
     expect(net.now()).toEqual(0);
     expect(net.saveSnapshot("empty-world-state.json")).toBeTrue();
 }}
@@ -105,7 +105,7 @@ get fun `test-save-empty-world-state-snapshot`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-empty-world-state-snapshot`() {{
+get fun `test load empty world state snapshot`() {{
     val target = net.randomAddress("snapshot-empty-target");
 
     net.topUp(target, ton("1"));
@@ -123,7 +123,7 @@ get fun `test-load-empty-world-state-snapshot`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-world-state-snapshot-skips-cached-non-existing-accounts`() {{
+get fun `test save world state snapshot skips cached non existing accounts`() {{
     val target = net.randomAddress("snapshot-cache-only-target");
 
     expect(net.balance(target)).toEqual(0);
@@ -137,7 +137,7 @@ get fun `test-save-world-state-snapshot-skips-cached-non-existing-accounts`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-world-state-snapshot-rich-state`() {{
+get fun `test save world state snapshot rich state`() {{
     val primary = net.randomAddress("snapshot-rich-primary");
     val secondary = net.randomAddress("snapshot-rich-secondary");
 
@@ -165,7 +165,7 @@ get fun `test-save-world-state-snapshot-rich-state`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-rich-state`() {{
+get fun `test load world state snapshot rich state`() {{
     val primary = net.randomAddress("snapshot-rich-primary");
     val secondary = net.randomAddress("snapshot-rich-secondary");
 
@@ -188,7 +188,7 @@ get fun `test-load-world-state-snapshot-rich-state`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-mutate-load-world-state-snapshot-in-same-run`() {{
+get fun `test save mutate load world state snapshot in same run`() {{
     val primary = net.randomAddress("snapshot-same-run-primary");
     val secondary = net.randomAddress("snapshot-same-run-secondary");
 
@@ -235,7 +235,7 @@ get fun `test-save-mutate-load-world-state-snapshot-in-same-run`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-drops-transient-state`() {{
+get fun `test load world state snapshot drops transient state`() {{
     val transient = net.randomAddress("snapshot-transient-target");
 
     net.topUp(transient, ton("9"));
@@ -252,7 +252,7 @@ get fun `test-load-world-state-snapshot-drops-transient-state`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-load-world-state-snapshot-failure-keeps-current-state`() {{
+get fun `test load world state snapshot failure keeps current state`() {{
     val target = net.randomAddress("snapshot-preserve-target");
 
     net.topUp(target, ton("4"));
@@ -273,7 +273,7 @@ get fun `test-load-world-state-snapshot-failure-keeps-current-state`() {{
         r#"
 {NETWORK_IMPORTS}
 
-get fun `test-save-world-state-snapshot-path-failures`() {{
+get fun `test save world state snapshot path failures`() {{
     expect(net.saveSnapshot("missing-dir/world-state.json")).toBeFalse();
     expect(net.saveSnapshot("fixtures")).toBeFalse();
     expect(net.saveSnapshot("fixtures/ok-world-state.json")).toBeTrue();

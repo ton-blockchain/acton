@@ -33,7 +33,7 @@ fn vm_set_c7_overwrites_slot_three_without_clobbering_neighbors() {
     run_success_case(
         "cm-stdlib-vm-set-c7-overwrite-slot-three",
         r"
-get fun `test-cm-stdlib-vm-set-c7-overwrite-slot-three`() {
+get fun `test cm stdlib vm set c7 overwrite slot three`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeBlockLogicalTime = paramsBefore.get(4) as int;
@@ -65,7 +65,7 @@ fn vm_set_c7_repeated_reads_and_writes_preserve_unmodified_slots() {
     let source = format!(
         r"
 {VM_IMPORTS}
-get fun `test-cm-stdlib-vm-set-c7-repeated-reads-writes`() {{
+get fun `test cm stdlib vm set c7 repeated reads writes`() {{
     val c7Initial = vm.getC7();
     val paramsInitial = c7Initial.get(0) as tuple;
     val initialNow = paramsInitial.get(3) as int;

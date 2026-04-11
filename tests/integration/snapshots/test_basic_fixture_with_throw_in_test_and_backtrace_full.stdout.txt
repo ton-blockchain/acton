@@ -8,11 +8,11 @@
  TEST  [ROOT]
 
  > tests/counter.test.tolk (2 tests)
-  ✓ should-increase-counter [TIME]
-  ✗ should-reset-counter [TIME]
+  ✓ should increase counter [TIME]
+  ✗ should reset counter [TIME]
     └─ exit_code=9
       ├─ at tests/counter.test[LINE]
-      │     test-should-reset-counter   at tests/counter.test[LINE]
+      │     test should reset counter   at tests/counter.test[LINE]
       ├─ Cell underflow
       └─ Phase: Compute phase
 

@@ -26,7 +26,7 @@ fn config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape() {
     run_config_success_case(
         "dm-stdlib-config-raw-roundtrip",
         r"
-get fun `test-dm-stdlib-config-raw-roundtrip`() {
+get fun `test dm stdlib config raw roundtrip`() {
     var config = net.getConfig();
 
     val payload = beginCell()
@@ -55,7 +55,7 @@ fn config_set_param_raw_overwrite_keeps_neighbor_slot_unchanged() {
     run_config_success_case(
         "dm-stdlib-config-neighbor-isolation",
         r"
-get fun `test-dm-stdlib-config-neighbor-isolation`() {
+get fun `test dm stdlib config neighbor isolation`() {
     var config = net.getConfig();
 
     val leftOriginal = beginCell().storeUint(0x11, 8).storeUint(0xAA, 8).endCell();

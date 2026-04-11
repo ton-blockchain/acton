@@ -2,34 +2,7 @@ Coverage Summary:
 Lines: 170/170 (100.00%)
 Total Hits: 2736
 
-File: [ROOT]/contracts/jetton-utils.tolk
-Annotated Code:
- 1   | import "storage"                                                                                    |
- 2   |                                                                                                     |
- 3   | fun calcDeployedJettonWallet(                                                                       |
- 4   |     ownerAddress: address,                                                                          |
- 5   |     minterAddress: address,                                                                         |
- 6   |     jettonWalletCode: cell,                                                                         |
- 7   | ): AutoDeployAddress {                                                                              |
- 8 ✓ |     val emptyWalletStorage: WalletStorage = {                                                       | hits:74
- 9 ✓ |         jettonBalance: 0,                                                                           | hits:74
-10 ✓ |         ownerAddress,                                                                               | hits:74
-11 ✓ |         minterAddress,                                                                              | hits:74
-12   |     };                                                                                              |
-13   |                                                                                                     |
-14 ✓ |     return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };            | hits:74
-15   | }                                                                                                   |
-16   |                                                                                                     |
-17   | fun calcAddressOfJettonWallet(                                                                      |
-18   |     ownerAddress: address,                                                                          |
-19   |     minterAddress: address,                                                                         |
-20   |     jettonWalletCode: cell,                                                                         |
-21   | ): address {                                                                                        |
-22 ✓ |     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);       | hits:104
-23 ✓ |     return jwDeployed.calculateAddress();                                                           | hits:52
-24   | }                                                                                                   |
-
-File: [ROOT]/contracts/jetton_minter.tolk
+File: [ROOT]/contracts/JettonMinter.tolk
 Annotated Code:
   1   | import "errors"                                                                                     |
   2   | import "fees-management"                                                                            |
@@ -171,7 +144,7 @@ Annotated Code:
 138 ✓ |     return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);| hits:42
 139   | }                                                                                                   |
 
-File: [ROOT]/contracts/jetton_wallet.tolk
+File: [ROOT]/contracts/JettonWallet.tolk
 Annotated Code:
   1   | import "errors"                                                                                     |
   2   | import "fees-management"                                                                            |
@@ -334,6 +307,33 @@ Annotated Code:
 159 ✓ |         jettonWalletCode: contract.getCode(),                                                       | hits:32
 160   |     };                                                                                              |
 161   | }                                                                                                   |
+
+File: [ROOT]/contracts/jetton-utils.tolk
+Annotated Code:
+ 1   | import "storage"                                                                                    |
+ 2   |                                                                                                     |
+ 3   | fun calcDeployedJettonWallet(                                                                       |
+ 4   |     ownerAddress: address,                                                                          |
+ 5   |     minterAddress: address,                                                                         |
+ 6   |     jettonWalletCode: cell,                                                                         |
+ 7   | ): AutoDeployAddress {                                                                              |
+ 8 ✓ |     val emptyWalletStorage: WalletStorage = {                                                       | hits:74
+ 9 ✓ |         jettonBalance: 0,                                                                           | hits:74
+10 ✓ |         ownerAddress,                                                                               | hits:74
+11 ✓ |         minterAddress,                                                                              | hits:74
+12   |     };                                                                                              |
+13   |                                                                                                     |
+14 ✓ |     return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };            | hits:74
+15   | }                                                                                                   |
+16   |                                                                                                     |
+17   | fun calcAddressOfJettonWallet(                                                                      |
+18   |     ownerAddress: address,                                                                          |
+19   |     minterAddress: address,                                                                         |
+20   |     jettonWalletCode: cell,                                                                         |
+21   | ): address {                                                                                        |
+22 ✓ |     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);       | hits:104
+23 ✓ |     return jwDeployed.calculateAddress();                                                           | hits:52
+24   | }                                                                                                   |
 
 File: [ROOT]/contracts/storage.tolk
 Annotated Code:

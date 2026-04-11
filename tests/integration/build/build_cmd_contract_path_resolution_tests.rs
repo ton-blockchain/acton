@@ -16,7 +16,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.{contract_name}]
-name = "{contract_name}"
+display-name = "{contract_name}"
 src = "{src}"
 depends = []
 "#

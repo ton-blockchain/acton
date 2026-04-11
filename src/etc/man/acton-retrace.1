@@ -16,7 +16,7 @@ original on\-chain execution.
 .sp
 When \fB\-\-contract\fR is provided, Acton also prepares a source\-level retrace for
 the named project contract by recompiling it with debug info and source maps.
-When \fB\-\-dap\-port\fR is added, the prepared replay is exposed as a local Debug
+When \fB\-\-debug\fR is added, the prepared replay is exposed as a local Debug
 Adapter Protocol (DAP) server for editor integration.
 .SH "OPTIONS"
 .SS "Retrace Options"
@@ -51,16 +51,22 @@ Write VM and executor logs into the specified directory.
 .sp
 \fB\-\-contract\fR \fIname\fR
 .RS 4
-Contract ID from \fBActon.toml\fR used to build a source\-level trace for the
+Contract name from \fBActon.toml\fR used to build a source\-level trace for the
 retraced transaction.
 .RE
 .sp
-\fB\-\-dap\-port\fR \fIport\fR
+\fB\-\-debug\fR
 .RS 4
-Expose the prepared source\-level retrace as a DAP server on the given local TCP
-port.
+Expose the prepared source\-level retrace as a local DAP server.
 .sp
 Requires \fB\-\-contract\fR\&.
+.RE
+.sp
+\fB\-\-debug\-port\fR \fIport\fR
+.RS 4
+Debug server port to use with \fB\-\-debug\fR\&.
+.sp
+When omitted, Acton uses \fB12345\fR\&.
 .RE
 .SS "Display Options"
 .sp
@@ -126,9 +132,9 @@ transaction
 .RE
 .sp
 If you run the command outside the project directory, use \fB\-\-manifest\-path\fR or
-\fB\-\-project\-root\fR so Acton can resolve the contract configuration and mappings.
-.SH "DAP MODE"
-When \fB\-\-dap\-port\fR is used together with \fB\-\-contract\fR:
+\fB\-\-project\-root\fR so Acton can resolve the contract configuration and import mappings.
+.SH "DEBUG MODE"
+When \fB\-\-debug\fR is used together with \fB\-\-contract\fR:
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'Acton starts a local DAP server on \fB127.0.0.1:<port>\fR
@@ -144,6 +150,9 @@ When \fB\-\-dap\-port\fR is used together with \fB\-\-contract\fR:
 .sp
 This mode is intended for editor integrations that speak the Debug Adapter
 Protocol.
+.sp
+\fB\-\-debug\-port\fR follows the same convention as other Acton debug commands:
+without \fB\-\-debug\fR it does not start a debug server.
 .SH "VS CODE SETUP"
 Typical setup:
 .sp
@@ -191,7 +200,7 @@ Then start retrace in a terminal from the project root:
 .sp
 .RS 4
 .nf
-acton retrace <HASH> \-\-contract <NAME> \-\-dap\-port 4711
+acton retrace <HASH> \-\-contract <NAME> \-\-debug \-\-debug\-port 4711
 .fi
 .RE
 .sp
@@ -226,7 +235,7 @@ The command prints:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'DAP startup status when \fB\-\-dap\-port\fR is used
+\h'-04'\(bu\h'+03'DAP startup status when \fB\-\-debug\fR is used
 .RE
 .sp
 When \fB\-\-logs\-dir\fR is set, Acton creates the target directory and writes
@@ -280,7 +289,7 @@ acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
 .sp
 .RS 4
 .nf
-acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract JettonMinter
 .fi
 .RE
 .RE
@@ -290,7 +299,7 @@ acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
 .sp
 .RS 4
 .nf
-acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract jetton_minter \-\-dap\-port 4711
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-contract JettonMinter \-\-debug \-\-debug\-port 4711
 .fi
 .RE
 .RE

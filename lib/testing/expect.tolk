@@ -172,7 +172,7 @@ fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int): void {
     val realDelta = abs(self.value - expected);
     if (realDelta > maxDelta) {
         ffi.assertFail(
-            format4(
+            format(
                 "{} !~= {} (max delta: {}, real delta: {})",
                 self.value,
                 expected,
@@ -205,7 +205,7 @@ fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int): void {
     if (denominator == 0) {
         if (valueDelta > 0) {
             ffi.assertFail(
-                format3(
+                format(
                     "{} !~= {} (max delta: {}%, real delta: inf%)",
                     self.value,
                     expected,
@@ -221,7 +221,7 @@ fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int): void {
     val percent = mulDivFloor(valueDelta, 100, denominator);
     if (percent > maxDelta) {
         ffi.assertFail(
-            format4(
+            format(
                 "{} !~= {} (max delta: {}%, real delta: {}%)",
                 self.value,
                 expected,
@@ -530,7 +530,7 @@ fun Expectation<map<K, V>>.toContainKey(self, key: K): void {
     val result = self.value.get(key);
     if (!result.isFound) {
         Assert.fail(
-            format1(
+            format(
                 "expect(<actual>).toContainKey(<expected>): Key '{}' not found in the map",
                 key,
             ),
@@ -552,7 +552,7 @@ fun Expectation<map<K, V>>.toNotContainKey(self, key: K): void {
     val result = self.value.get(key);
     if (result.isFound) {
         Assert.fail(
-            format1(
+            format(
                 "expect(<actual>).toNotContainKey(<expected>): Key '{}' is found in the map",
                 key,
             ),
@@ -581,7 +581,7 @@ fun Expectation<map<K, V>>.toContainValue(self, value: V): void {
     }
 
     Assert.fail(
-        format1(
+        format(
             "expect(<actual>).toContainValue(<expected>): Value '{}' not found in the map",
             value,
         ),
@@ -604,7 +604,7 @@ fun Expectation<map<K, V>>.toNotContainValue(self, value: V): void {
         val mapValue = r.loadValue();
         if (mapValue == value) {
             Assert.fail(
-                format1(
+                format(
                     "expect(<actual>).toNotContainValue(<expected>): Value '{}' is found in the map",
                     value,
                 ),
@@ -664,7 +664,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
 }
 
 fun formatExpectLocation(loc: SourceLocation): string {
-    return format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
+    return format("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
 }
 
 /// Creates a new expectation for the given value.
@@ -700,7 +700,7 @@ fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()): Expecta
 ///
 /// ```tolk
 /// @test({ fail_with: 10 })
-/// get fun test_fail_with() {
+/// get fun `test fail with`() {
 ///     throw 10; // ok
 /// }
 /// ```

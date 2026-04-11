@@ -56,7 +56,7 @@ fn external_out_message_matches_src_to_and_body_prefix() {
     run_success_case(
         "em-stdlib-message-matches-external-out-filters",
         r#"
-get fun `test-em-message-matches-external-out-filters`() {
+get fun `test em message matches external out filters`() {
     val src = address("0:00000000000000000000000000000000000000000000000000000000000000E1");
     val wrongSrc = address("0:00000000000000000000000000000000000000000000000000000000000000E2");
     val dest = createAddressNone();

@@ -31,7 +31,7 @@ fn set_config_param_keeps_neighbor_slots_consistent() {
     run_success_case(
         "cl-stdlib-set-config-param-neighbor-slots",
         r"
-get fun `test-cl-stdlib-set-config-param-neighbor-slots`() {
+get fun `test cl stdlib set config param neighbor slots`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeNow = paramsBefore.get(3) as int;
@@ -56,7 +56,7 @@ fn set_config_param_slot_three_updates_blockchain_now_and_c7() {
     run_success_case(
         "cl-stdlib-set-config-param-slot-three",
         r"
-get fun `test-cl-stdlib-set-config-param-slot-three`() {
+get fun `test cl stdlib set config param slot three`() {
     val c7Before = vm.getC7();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeBlockLogicalTime = paramsBefore.get(4) as int;
@@ -82,7 +82,7 @@ fn get_config_param_tuple_read_is_not_usable_bug() {
     run_success_case(
         "cl-stdlib-get-config-param-tuple-read-bug",
         r#"
-get fun `test-cl-stdlib-get-config-param-tuple-read-bug`() {
+get fun `test cl stdlib get config param tuple read bug`() {
     vm.setConfigParam(tuple [ton("9"), null], 7);
 
     val originalBalance = vm.getConfigParam<tuple>(7);

@@ -27,6 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tolkc::TolkSourceMap;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -48,27 +49,25 @@ const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
 
 fn resolve_script_networks(
-    broadcast: bool,
     net: Option<&str>,
     fork_net: Option<&str>,
 ) -> anyhow::Result<(Option<Network>, Option<Network>)> {
     let net = net.map(Network::from_str).transpose()?;
     let fork_net = fork_net.map(Network::from_str).transpose()?;
 
-    if !broadcast {
-        return Ok((net, fork_net));
-    }
-
     if let (Some(net), Some(fork_net)) = (&net, &fork_net)
         && net != fork_net
     {
         anyhow::bail!(
-            "`--broadcast` cannot use different `--net` ({net}) and `--fork-net` ({fork_net}); use one network or omit `--fork-net`"
+            "`--net` ({net}) and `--fork-net` ({fork_net}) cannot differ when broadcasting; use one network or omit `--fork-net`"
         );
     }
 
-    let net = net.or_else(|| fork_net.clone()).or(Some(Network::Testnet));
-    let fork_net = fork_net.or_else(|| net.clone());
+    let fork_net = if fork_net.is_none() {
+        net.clone()
+    } else {
+        fork_net
+    };
 
     Ok((net, fork_net))
 }
@@ -84,16 +83,19 @@ pub fn script_cmd(
     fork_net: Option<String>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
-    broadcast: bool,
     net: Option<String>,
     explorer: Option<Explorer>,
     show_bodies: bool,
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
-    let mappings = ActonConfig::load()
-        .ok()
-        .and_then(|config| config.mappings());
+    let mappings = match ActonConfig::load() {
+        Ok(config) => config.mappings(),
+        Err(e) => {
+            eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
+            None
+        }
+    };
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -119,8 +121,7 @@ pub fn script_cmd(
 
     let stack = parse_stack_args(args)?;
 
-    let (network, fork_net) =
-        resolve_script_networks(broadcast, net.as_deref(), fork_net.as_deref())?;
+    let (network, fork_net) = resolve_script_networks(net.as_deref(), fork_net.as_deref())?;
     let debug_listener = if debug {
         Some(reserve_dap_listener(debug_port)?)
     } else {
@@ -138,7 +139,6 @@ pub fn script_cmd(
         fork_net,
         api_key,
         fork_block_number,
-        broadcast,
         network,
         explorer,
         show_bodies,
@@ -162,7 +162,6 @@ fn run_script_file(
     fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
-    broadcast: bool,
     net: Option<Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
@@ -181,12 +180,12 @@ fn run_script_file(
                 &code_cell,
                 result.debug_mark_base64.as_deref(),
             )?);
-
             execute_script(
                 &code_cell,
                 &data_cell,
                 stack,
                 Arc::new(abi),
+                result.abi.map(Arc::new),
                 source_map,
                 debug,
                 backtrace,
@@ -195,7 +194,6 @@ fn run_script_file(
                 fork_net,
                 api_key,
                 fork_block_number,
-                broadcast,
                 net.as_ref(),
                 explorer,
                 show_bodies,
@@ -219,6 +217,7 @@ fn execute_script(
     data_cell: &Cell,
     stack: Tuple,
     abi: Arc<ContractAbi>,
+    compiler_abi: Option<Arc<CompilerContractABI>>,
     source_map: Arc<TolkSourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
@@ -227,11 +226,11 @@ fn execute_script(
     fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
-    broadcast: bool,
     net: Option<&Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
 ) -> anyhow::Result<()> {
+    let broadcast = net.is_some();
     let dest_address = contract_address(code_cell)?;
     let formatted_address = format_std_address(&dest_address, net);
 
@@ -332,7 +331,8 @@ fn execute_script(
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
-        let replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+        let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+        replayer.set_compiler_abi(compiler_abi);
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);

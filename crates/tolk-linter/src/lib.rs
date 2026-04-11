@@ -82,7 +82,7 @@ pub struct Checker<'a> {
     pub profiler: Profiler,
 }
 
-const SUPPRESSION_MARKER: &str = "acton-disable-next-line";
+const SUPPRESSION_MARKER: &str = "check-disable-next-line";
 
 impl<'a> Checker<'a> {
     pub fn new(

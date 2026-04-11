@@ -51,7 +51,7 @@ acton wallet list --balance
 
 ## Getting Testnet TON
 
-Newly created wallets have zero balance. Before running `--broadcast` flows on testnet, fund the wallet with testnet TON.
+Newly created wallets have zero balance. Before running `acton script --net testnet` or other real-network flows, fund the wallet with testnet TON.
 
 ### Option 1: Request Airdrop During Wallet Creation
 
@@ -121,21 +121,21 @@ import "@acton/io"
 
 fun main() {
     val deployer = net.wallet("deployer");
-    println1("Deployer address: {}", deployer.address);
+    println("Deployer address: {}", deployer.address);
 
     // Use deployer.address for contract deployment
     // ...
 }
 ```
 
-Run the script with the `--broadcast` flag to use the real wallet:
+Run the script with `--net <network>` to use the real wallet:
 
 ```bash
-acton script deploy.tolk --broadcast
+acton script deploy.tolk --net testnet
 ```
 
-Without `--broadcast`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
-When you do run with `--broadcast`, script-side getters and account reads also
+Without `--net`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
+When you do run with `--net`, script-side getters and account reads also
 default to the selected broadcast network, so deploy scripts can send a
 transaction and immediately verify live state without adding `--fork-net`.
 
@@ -187,7 +187,7 @@ address-mainnet = "UQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8XSS"
 
 `acton wallet new` and `acton wallet import` automatically populate only `expected.address-testnet`. Add `address-mainnet` manually for mainnet safety checks.
 
-Acton performs strict derived-vs-expected address verification when opening real wallets for blockchain operations (for example `acton script --broadcast`, `acton verify`, `acton library publish/topup`).
+Acton performs strict derived-vs-expected address verification when opening real wallets for blockchain operations (for example `acton script --net testnet`, `acton verify`, `acton library publish/topup`).
 
 Some wallet management commands (for example `wallet list`/`wallet airdrop`) may use configured `expected.address-testnet` directly to resolve the displayed/claim address.
 
@@ -254,7 +254,7 @@ Set the environment variable before running your script:
 
 ```bash
 export WALLET_MNEMONIC="word1 word2 ... word24"
-acton script deploy.tolk --broadcast
+acton script deploy.tolk --net testnet
 ```
 
 ### 4. File References
@@ -272,7 +272,7 @@ keys = { mnemonic-file = ".secrets/deployer.txt" }
 1. **Use Secure Native Store**: Always prefer `mnemonic-keyring` for local development. It's the most secure way to handle your keys.
 2. **Never commit mnemonics**: If you don't use the keyring, always use environment variables or files listed in `.gitignore`.
 3. **Use expected addresses**: Configure `expected.address-testnet` and `expected.address-mainnet` to catch configuration errors.
-4. **Test first**: Run scripts without `--broadcast` to test locally before interacting with the real blockchain.
+4. **Test first**: Run scripts without `--net` to test locally before interacting with the real blockchain.
 5. **Separate wallets**: Use different wallets for testnet and mainnet operations.
 6. **Start with testnet**: Always test your scripts on testnet before running them on mainnet.
 

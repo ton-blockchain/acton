@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/search_params.test.tolk (1 test)
-  ✓ find-transaction-opcode-filter [TIME]
+  ✓ find transaction opcode filter [TIME]
 
  ✓ 1 passed in 1 file

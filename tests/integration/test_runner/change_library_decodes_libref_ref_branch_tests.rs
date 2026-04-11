@@ -28,7 +28,7 @@ fn change_library_decodes_libref_ref_branch() {
     run_success(
         "cz-stdlib-change-library-decodes-libref-ref-branch",
         r#"
-get fun `test-cz-change-library-decodes-libref-ref-branch`() {
+get fun `test cz change library decodes libref ref branch`() {
     val expectedCell = beginCell()
         .storeUint(0xBEEF, 16)
         .storeUint(0xCAFE, 16)
@@ -62,7 +62,7 @@ fn change_library_mode_is_preserved_for_remove_action() {
     run_success(
         "cz-stdlib-change-library-mode-preserved-remove",
         r#"
-get fun `test-cz-change-library-mode-preserved-remove`() {
+get fun `test cz change library mode preserved remove`() {
     val libCell = beginCell().storeUint(0xAA, 8).endCell();
     changeLib(libCell, 0);
 

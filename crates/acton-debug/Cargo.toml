@@ -17,6 +17,7 @@ dap = { workspace = true }
 log = { workspace = true }
 serde_json = { workspace = true }
 tolkc = { workspace = true }
+ton-abi = { workspace = true }
 ton-executor = { workspace = true }
 tvmffi = { workspace = true }
 tycho-types = { workspace = true }

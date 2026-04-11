@@ -14,7 +14,7 @@
  TEST  [ROOT]
 
  > tests/network_paths.test.tolk (1 test)
-  ✗ ag-wait-zero-attempts-rejected [TIME]
+  ✗ ag wait zero attempts rejected [TIME]
     └─ Error: Attempt number must be positive
 
  ✗ 1 failed in 1 file

@@ -1,0 +1,2 @@
+  Installing standard library [ACTON_VERSION]
+Wallet id is available only for configured wallets opened with `net.wallet()` in scripts started with `--net`

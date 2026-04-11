@@ -35,7 +35,7 @@ fn fs_read_file_returns_null_for_non_utf8_binary_fixture() {
         r#"
 {FS_IMPORTS}
 
-get fun `test-au-fs-read-non-utf8-binary-fixture`() {{
+get fun `test au fs read non utf8 binary fixture`() {{
     val binaryLike = fs.readFile("fixtures/au-non-utf8.bin");
     expect(binaryLike).toBeNull();
 }}
@@ -79,7 +79,7 @@ fn fs_read_file_keeps_binary_like_text_content_across_normalized_paths() {
             "B5EE9C72\r\n00FF10AA\r\n7F00\r\n",
         )],
         r#"
-get fun `test-au-fs-read-binary-like-content-normalized-paths`() {
+get fun `test au fs read binary like content normalized paths`() {
     val direct = fs.readFile("fixtures/au-binary-like.txt");
     val viaDot = fs.readFile("./fixtures/au-binary-like.txt");
     val viaParent = fs.readFile("fixtures/../fixtures/au-binary-like.txt");

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-cli-seed-overrides-config [TIME] (1 run, seed 42)
+  ✗ fuzz cli seed overrides config [TIME] (1 run, seed 42)
     ├─ Fuzz case 1/1
     ├─ Inputs: value=-71
     └─ Error: expect(actual).toBeTrue()

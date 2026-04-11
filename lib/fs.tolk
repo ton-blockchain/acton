@@ -38,7 +38,7 @@ struct fs
 /// ```tolk
 /// val content = fs.readFile("config.txt");
 /// if (content != null) {
-///     println1("File content: {}", content);
+///     println("File content: {}", content);
 /// } else {
 ///     println("File not found");
 /// }

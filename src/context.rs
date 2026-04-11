@@ -590,7 +590,7 @@ pub struct Env<'a> {
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
-    pub build_override: BTreeMap<String, Cell>, // contract ID -> code
+    pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,

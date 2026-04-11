@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-zero-runs-annotation [TIME]
-    └─ Fuzz runs must be greater than 0 for test 'test-fuzz-zero-runs-annotation'
+  ✗ fuzz zero runs annotation [TIME]
+    └─ Fuzz runs must be greater than 0 for test 'test fuzz zero runs annotation'
 
  ✗ 1 failed in 1 file
 

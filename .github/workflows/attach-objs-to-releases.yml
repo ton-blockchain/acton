@@ -26,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download trunk-objs \
+          gh release download release-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "ton-objs-*.tar.gz*" \
             --dir .

@@ -42,7 +42,7 @@ fn register_code_cell_duplicate_name_is_hash_specific() {
     run_project_case(
         "cr-stdlib-register-code-cell-duplicate-name-hash-specific",
         r#"
-get fun `test-cr-register-code-cell-duplicate-name-hash-specific`() {
+get fun `test cr register code cell duplicate name hash specific`() {
     val deployer = net.treasury("cr_duplicate_name_deployer");
     val alphaCode = build("alpha");
     val betaCode = build("beta");
@@ -99,7 +99,7 @@ import "../../lib/emulation/network"
 import "../../lib/io"
 import "../contracts/counter_messages"
 
-get fun `test-cr-register-code-cell-duplicate-name-precedence`() {
+get fun `test cr register code cell duplicate name precedence`() {
     val deployer = net.treasury("cr_precedence_deployer");
     val code = build("counter");
 

@@ -4,14 +4,14 @@ NAME
        acton-build — Build all configured contracts or a selected contract
 
 SYNOPSIS
-       acton build [options] [contract-id]
+       acton build [options] [contract-name]
 
 DESCRIPTION
        Compile contracts declared in Acton.toml, resolve their dependencies,
        and write build artifacts for the requested build set.
 
        By default, acton build compiles every configured contract. If you pass
-       a _contract-id_, Acton builds only that contract and its transitive
+       a _contract-name_, Acton builds only that contract and its transitive
        dependencies.
 
        For each successful build, Acton writes a JSON artifact to the build
@@ -29,10 +29,10 @@ DESCRIPTION
 
 OPTIONS
    Build Options
-       contract-id
+       contract-name
            Build only the specified contract and its transitive dependencies.
 
-           The value must match a [contracts.<id>] key in Acton.toml.
+           The value must match a [contracts.<name>] key in Acton.toml.
 
        --clear-cache
            Clear the project compilation cache before building.
@@ -84,11 +84,11 @@ OPTIONS
 CONFIGURATION
        acton build reads contracts from Acton.toml:
 
-           [contracts.wallet]
-           name = "Wallet Contract"
-           src = "contracts/wallet.tolk"
-           output = "wallet.boc"
-           depends = ["child"]
+           [contracts.Wallet]
+           display-name = "Wallet Contract"
+           src = "contracts/Wallet.tolk"
+           output = "Wallet.boc"
+           depends = ["Child"]
 
        Optional default output paths can be configured in [build]:
 
@@ -103,13 +103,13 @@ OUTPUTS
        Depending on command flags and project configuration, acton build may
        write:
 
-       o  <out-dir>/<contract-id>.json with code_boc64 and hash
+       o  <out-dir>/<contract-name>.json with code_boc64 and hash
 
        o  the configured contract output .boc file
 
        o  <gen-dir>/<dependency>_code.tolk helper files for dependencies
 
-       o  <output-fift>/<contract-id>.fif for compiled .tolk contracts
+       o  <output-fift>/<contract-name>.fif for compiled .tolk contracts
 
        o  a DOT dependency graph file when --graph is passed
 
@@ -135,7 +135,7 @@ EXAMPLES
 
        2. Build one contract and its dependencies:
 
-              acton build wallet
+              acton build Wallet
 
        3. Rebuild with a cleared cache:
 

@@ -376,7 +376,7 @@ fn send_iter_execute_n_processes_first_hop_and_execute_from_drains_rest() {
     run_send_iter_success(
         "n-lib-api-send-iter-execute-n",
         r#"
-get fun `test-send-iter-execute-n-and-from`() {
+get fun `test send iter execute n and from`() {
     val sender = net.treasury("sender");
 
     val forwarderInit = ContractState {
@@ -452,7 +452,7 @@ fn send_iter_execute_till_stops_at_matching_transaction_and_preserves_tail() {
     run_send_iter_success(
         "n-lib-api-send-iter-execute-till",
         r#"
-get fun `test-send-iter-execute-till`() {
+get fun `test send iter execute till`() {
     val sender = net.treasury("sender");
 
     val routerInit = ContractState {
@@ -537,7 +537,7 @@ fn send_iter_allows_interleaving_multiple_cursors_against_shared_world_state() {
     run_send_iter_success(
         "n-lib-api-send-iter-interleaving",
         r#"
-get fun `test-send-iter-interleaving`() {
+get fun `test send iter interleaving`() {
     val sender = net.treasury("sender");
     val attacker = net.treasury("attacker");
 
@@ -605,7 +605,7 @@ fn send_iter_execute_n_zero_is_noop_and_overshoot_backfills_relationships() {
     run_send_iter_success(
         "n-lib-api-send-iter-zero-and-overshoot",
         r#"
-get fun `test-send-iter-zero-and-overshoot`() {
+get fun `test send iter zero and overshoot`() {
     val sender = net.treasury("sender");
 
     val forwarderInit = ContractState {
@@ -666,7 +666,7 @@ fn send_iter_collects_external_messages_and_keeps_internal_tail_queued() {
     run_send_iter_success(
         "n-lib-api-send-iter-externals",
         r#"
-get fun `test-send-iter-collects-externals`() {
+get fun `test send iter collects externals`() {
     val sender = net.treasury("sender");
 
     val emitterInit = ContractState {
@@ -747,7 +747,7 @@ import "../../lib/testing/transaction_expect"
 import "../../lib/vm/vm"
 import "../gen/lib_code.tolk"
 
-get fun `test-send-iter-live-libraries`() {
+get fun `test send iter live libraries`() {
     val sender = net.treasury("sender");
 
     val spawnerInit = ContractState {
@@ -807,7 +807,7 @@ fn send_iter_close_after_partial_execution_discards_tail_and_bogus_cursor_is_emp
     run_send_iter_success(
         "n-lib-api-send-iter-close-and-bogus",
         r#"
-get fun `test-send-iter-close-after-partial-execution`() {
+get fun `test send iter close after partial execution`() {
     val sender = net.treasury("sender");
 
     val forwarderInit = ContractState {
@@ -867,7 +867,7 @@ fn send_iter_rejects_broadcast_mode_before_cursor_creation() {
     run_send_iter_failure(
         "n-lib-api-send-iter-broadcast-reject",
         r#"
-get fun `test-send-iter-rejects-broadcast-mode`() {
+get fun `test send iter rejects broadcast mode`() {
     val sender = net.treasury("sender");
     val receiverInit = ContractState {
         code: build("receiver"),
@@ -893,7 +893,7 @@ fn send_iter_invalid_message_reports_parse_error_before_execution() {
     run_send_iter_failure(
         "n-lib-api-send-iter-invalid-message",
         r#"
-get fun `test-send-iter-invalid-message`() {
+get fun `test send iter invalid message`() {
     val sender = net.treasury("sender");
     val invalidAddress = AutoDeployAddress {
         stateInit: beginCell()
@@ -919,7 +919,7 @@ fn send_iter_execute_till_without_match_fails_after_queue_exhaustion() {
     run_send_iter_failure(
         "n-lib-api-send-iter-execute-till-miss",
         r#"
-get fun `test-send-iter-execute-till-miss`() {
+get fun `test send iter execute till miss`() {
     val sender = net.treasury("sender");
 
     val forwarderInit = ContractState {

@@ -130,6 +130,7 @@ dependencies = [
  "log",
  "serde_json",
  "tolkc",
+ "ton-abi",
  "ton-executor",
  "tvmffi",
  "tycho-types",

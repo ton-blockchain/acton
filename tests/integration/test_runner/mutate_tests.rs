@@ -23,7 +23,7 @@ get fun addOne(x: int): int {
 const PASSING_TEST: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-always-pass`() {
+get fun `test always pass`() {
     expect(1).toEqual(1);
 }
 "#;
@@ -706,7 +706,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -742,7 +742,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -1386,7 +1386,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -1425,7 +1425,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -1459,7 +1459,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -1493,7 +1493,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
@@ -1527,7 +1527,7 @@ description = "A test project"
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]

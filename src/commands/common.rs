@@ -180,7 +180,7 @@ script-name = \"command invocation\""
             "No {} section found in Acton.toml.\nTo add a script add the following section to Acton.toml:\n\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/commands/run/ for more information",
             "[scripts]".yellow(),
             "[scripts]".green(),
-            "deploy = \"acton script scripts/deploy.tolk --broadcast\"".green(),
+            "deploy = \"acton script scripts/deploy.tolk --net testnet\"".green(),
             "test = \"acton test tests/unit\"".green()
         )
     }

@@ -165,7 +165,7 @@ fn transaction_get_action_fee_tick_and_tock_match_ord_action_fee() {
     run_success_case(
         "ck-stdlib-transaction-get-action-fee-tick-and-tock",
         r"
-get fun `test-ck-transaction-get-action-fee-tick-and-tock`() {
+get fun `test ck transaction get action fee tick and tock`() {
     val (sender, workerAddress) = deployCkHarness();
     val txs = sendCkPing(sender, workerAddress, 201, 4);
     val baseTx = txs.findTransaction<CkPing>({
@@ -195,7 +195,7 @@ fn transaction_get_action_fee_tick_tock_without_action_returns_none() {
     run_success_case(
         "ck-stdlib-transaction-get-action-fee-tick-tock-none",
         r"
-get fun `test-ck-transaction-get-action-fee-tick-tock-none`() {
+get fun `test ck transaction get action fee tick tock none`() {
     val (sender, workerAddress) = deployCkHarness();
     val txs = sendCkPing(sender, workerAddress, 202, 0);
     val baseTx = txs.findTransaction<CkPing>({

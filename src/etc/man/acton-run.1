@@ -56,7 +56,7 @@ Scripts are defined in \fBActon.toml\fR:
 .RS 4
 .nf
 [scripts]
-deploy = "acton script scripts/deploy.tolk \-\-broadcast"
+deploy = "acton script scripts/deploy.tolk \-\-net testnet"
 test\-unit = "acton test tests/unit"
 custom\-task = "echo 'Running custom task...'"
 .fi
@@ -95,6 +95,11 @@ nested exit code in the error message
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'forwarded arguments are appended literally, so avoid passing the same
+single\-use flag twice if the configured command already includes it
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'Acton does not guard against recursive script aliases; avoid scripts that
 call themselves through \fBacton run\fR
 .RE
@@ -126,7 +131,7 @@ acton run deploy
 .sp
 .RS 4
 .nf
-acton run deploy \-\-net mainnet
+acton run deploy \-\-explorer tonviewer
 .fi
 .RE
 .RE
@@ -146,7 +151,7 @@ acton run custom\-task
 .sp
 .RS 4
 .nf
-acton run deploy \-\- \-\-net testnet
+acton run deploy \-\- \-\-show\-bodies
 .fi
 .RE
 .RE

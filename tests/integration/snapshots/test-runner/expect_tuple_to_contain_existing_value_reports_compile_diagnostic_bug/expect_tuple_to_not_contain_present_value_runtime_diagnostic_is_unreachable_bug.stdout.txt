@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/expect_tuple_membership.test.tolk (1 test)
-  ✗ ca-stdlib-to-not-contain-present-value-diagnostic-bug [TIME]
+  ✗ ca stdlib to not contain present value diagnostic bug [TIME]
     └─ Error: Array contains the value, but it should not
       └─ at tests/expect_tuple_membership.test[LINE]
 

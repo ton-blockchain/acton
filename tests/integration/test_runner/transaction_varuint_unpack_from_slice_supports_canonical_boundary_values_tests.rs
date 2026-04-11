@@ -63,7 +63,7 @@ fn transaction_varuint_unpack_from_slice_supports_canonical_boundary_values() {
     run_success_case(
         "eo-stdlib-transaction-varuint-unpack-canonical-boundaries",
         r"
-get fun `test-eo-varuint-unpack-canonical-boundaries`() {
+get fun `test eo varuint unpack canonical boundaries`() {
     expect(canonicalVarUint7Box(0).load().value).toEqual(0);
     expect(canonicalVarUint7Box(255).load().value).toEqual(255);
     expect(canonicalVarUint7Box(256).load().value).toEqual(256);
@@ -85,7 +85,7 @@ fn transaction_varuint7_pack_to_builder_roundtrip_boundary_bug() {
     run_success_case(
         "eo-stdlib-transaction-varuint7-pack-roundtrip-boundary-bug",
         r"
-get fun `test-eo-varuint7-pack-roundtrip-boundary-bug`() {
+get fun `test eo varuint7 pack roundtrip boundary bug`() {
     val source = EoVarUint7Box { value: 0 };
 
     var directBuilder = beginCell();
@@ -109,7 +109,7 @@ fn transaction_varuint3_pack_to_builder_roundtrip_boundary_bug() {
     run_success_case(
         "eo-stdlib-transaction-varuint3-pack-roundtrip-boundary-bug",
         r"
-get fun `test-eo-varuint3-pack-roundtrip-boundary-bug`() {
+get fun `test eo varuint3 pack roundtrip boundary bug`() {
     val source = EoVarUint3Box { value: 255 };
 
     var directBuilder = beginCell();

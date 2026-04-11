@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/network.test.tolk (1 test)
-  ✓ ah-stdlib-register-address-output-name [TIME]
+  ✓ ah stdlib register address output name [TIME]
     └─ Test output:
        N/A -> ah_register_address_deployer A
        └── empty 0.5 TON -> ah_registered_target B                                     compute phase skipped aborted

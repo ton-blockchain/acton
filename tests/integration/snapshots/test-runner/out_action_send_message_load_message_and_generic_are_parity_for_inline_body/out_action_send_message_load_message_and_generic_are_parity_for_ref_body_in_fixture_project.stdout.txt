@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/cv_out_action_ref_parity.test.tolk (1 test)
-  ✓ cv-out-action-ref-parity [TIME]
+  ✓ cv out action ref parity [TIME]
 
  ✓ 1 passed in 1 file

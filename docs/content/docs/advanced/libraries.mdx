@@ -16,9 +16,9 @@ Acton provides a convenient command to publish any code as a library to the Mast
 
 ### Step 1: Create a contract
 
-First, create a simple contract that you want to publish as a library. For example, let's create a `math.tolk` file:
+First, create a simple contract that you want to publish as a library. For example, let's create a `Math.tolk` file:
 
-```tolk title="contracts/math.tolk"
+```tolk title="contracts/Math.tolk"
 fun add(a: int, b: int): int {
     return a + b;
 }
@@ -27,17 +27,17 @@ fun add(a: int, b: int): int {
 Make sure to register it in your `Acton.toml`:
 
 ```toml title="Acton.toml"
-[contracts.math]
-name = "Math Library"
-src = "contracts/math.tolk"
+[contracts.Math]
+display-name = "Math Library"
+src = "contracts/Math.tolk"
 ```
 
 ### Step 2: Publish the library
 
-Use the `acton library publish` command to deploy your library. You can specify the contract ID defined in `Acton.toml`:
+Use the `acton library publish` command to deploy your library. You can specify the contract name defined in `Acton.toml`:
 
 ```bash
-acton library publish math
+acton library publish Math
 ```
 
 The CLI will guide you through the process:
@@ -71,7 +71,7 @@ You can also publish arbitrary code using the `--code` flag or specify options n
 acton library publish --code "te6cckEBAQEAAgAAAEysuc0="
 
 # Non-interactive mode
-acton library publish math --duration 100d --wallet my-wallet --net mainnet
+acton library publish Math --duration 100d --wallet my-wallet --net mainnet
 ```
 
 ## Monitoring Library Status
@@ -79,7 +79,7 @@ acton library publish math --duration 100d --wallet my-wallet --net mainnet
 Once a library is published, it's important to monitor its balance to ensure it doesn't get frozen due to lack of TON for storage fees. Acton provides the `info` command for this:
 
 ```bash
-acton library info math
+acton library info Math
 ```
 
 This command shows:
@@ -97,10 +97,10 @@ If a library is running low on funds, you can top it up using the `topup` comman
 
 ```bash
 # Top up for another 2 years
-acton library topup math --duration 2y
+acton library topup Math --duration 2y
 
 # Top up with a specific amount
-acton library topup math --amount 5.0
+acton library topup Math --amount 5.0
 ```
 
 The `topup` command uses the same cost estimation logic as `publish`, ensuring you send enough funds for the desired period.

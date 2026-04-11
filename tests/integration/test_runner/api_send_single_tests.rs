@@ -127,7 +127,7 @@ fn send_single_keeps_out_messages_without_executing_children() {
             import "../../lib/types/message"
             import "../contracts/messages"
 
-            get fun `test-send-single-keeps-out-messages`() {
+            get fun `test send single keeps out messages`() {
                 val sender = net.treasury("sender");
 
                 val forwarderInit = ContractState {
@@ -210,7 +210,7 @@ fn send_executes_child_transactions_and_matches_notify_expectation() {
             import "../../lib/types/message"
             import "../contracts/messages"
 
-            get fun `test-send-processes-child-transactions`() {
+            get fun `test send processes child transactions`() {
                 val sender = net.treasury("sender");
 
                 val forwarderInit = ContractState {

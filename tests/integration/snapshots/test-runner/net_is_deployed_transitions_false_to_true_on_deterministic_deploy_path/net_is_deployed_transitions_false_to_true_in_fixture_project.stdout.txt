@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/cp_net_is_deployed_boundary.test.tolk (1 test)
-  ✓ cp-net-is-deployed-fixture-transition [TIME]
+  ✓ cp net is deployed fixture transition [TIME]
 
  ✓ 1 passed in 1 file

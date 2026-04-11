@@ -52,8 +52,8 @@ impl ProjectLayout {
     #[must_use]
     pub(super) const fn wrappers_mapping(self) -> &'static str {
         match self {
-            Self::Standard => "tests/wrappers",
-            Self::App => "contracts/tests/wrappers",
+            Self::Standard => "wrappers",
+            Self::App => "contracts/wrappers",
         }
     }
 
@@ -96,33 +96,33 @@ struct TemplateDefinition {
 }
 
 const EMPTY_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
-    id: "empty",
+    id: "Empty",
     name: "Empty",
-    src: "contracts/contract.tolk",
+    src: "contracts/Empty.tolk",
 }];
 
 const COUNTER_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
-    id: "counter",
+    id: "Counter",
     name: "Counter",
-    src: "contracts/counter.tolk",
+    src: "contracts/Counter.tolk",
 }];
 
 const COUNTER_APP_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
-    id: "counter",
+    id: "Counter",
     name: "Counter",
-    src: "contracts/src/counter.tolk",
+    src: "contracts/src/Counter.tolk",
 }];
 
 const JETTON_CONTRACTS: [ContractTemplate; 2] = [
     ContractTemplate {
-        id: "jetton_minter",
+        id: "JettonMinter",
         name: "JettonMinter",
-        src: "contracts/jetton-minter-contract.tolk",
+        src: "contracts/JettonMinter.tolk",
     },
     ContractTemplate {
-        id: "jetton_wallet",
+        id: "JettonWallet",
         name: "JettonWallet",
-        src: "contracts/jetton-wallet-contract.tolk",
+        src: "contracts/JettonWallet.tolk",
     },
 ];
 

@@ -1,5 +1,6 @@
 use crate::{BaseTypeInfo, TypeAbi, TypeInfo};
 use num_bigint::BigInt;
+use tolkc::abi::Ty;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
 use tycho_types::models::{AnyAddr, ExtAddr, IntAddr};
 
@@ -29,6 +30,7 @@ pub struct DataObject {
 #[derive(Debug)]
 pub struct DataField {
     pub name: String,
+    pub field_type: Ty,
     pub value: Data,
 }
 
@@ -60,6 +62,7 @@ pub fn decode(
         let value = decode_field(data, abi, &field.type_info)?;
         object.fields.push(DataField {
             name: field.name.clone(),
+            field_type: Ty::Unknown,
             value,
         });
     }
@@ -258,9 +261,19 @@ mod tests {
         };
 
         let result = decode(&mut slice, &abi.types, &abi_type).expect("decode failed");
-        assert_eq!(
-            format!("{result:?}"),
-            "Object(DataObject { name: \"MyStruct\", fields: [DataField { name: \"is_deployed\", value: Bool(true) }, DataField { name: \"data\", value: Bits(([1, 2, 3], 24)) }, DataField { name: \"opt\", value: Number(888) }] })"
-        );
+        let Data::Object(object) = result else {
+            panic!("expected object");
+        };
+        assert_eq!(object.name, "MyStruct");
+        assert_eq!(object.fields.len(), 3);
+        assert_eq!(object.fields[0].name, "is_deployed");
+        assert!(matches!(object.fields[0].field_type, Ty::Unknown));
+        assert!(matches!(object.fields[0].value, Data::Bool(true)));
+        assert_eq!(object.fields[1].name, "data");
+        assert!(matches!(object.fields[1].field_type, Ty::Unknown));
+        assert!(matches!(object.fields[1].value, Data::Bits((_, 24))));
+        assert_eq!(object.fields[2].name, "opt");
+        assert!(matches!(object.fields[2].field_type, Ty::Unknown));
+        assert!(matches!(object.fields[2].value, Data::Number(_)));
     }
 }

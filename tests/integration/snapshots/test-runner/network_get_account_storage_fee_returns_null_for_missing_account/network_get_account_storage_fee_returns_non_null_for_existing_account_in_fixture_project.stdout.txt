@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/network_get_account_storage_fee_existing.test.tolk (1 test)
-  ✓ bk-stdlib-network-get-account-storage-fee-existing-account [TIME]
+  ✓ bk stdlib network get account storage fee existing account [TIME]
 
  ✓ 1 passed in 1 file

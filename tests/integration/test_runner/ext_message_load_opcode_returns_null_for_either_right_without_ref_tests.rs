@@ -41,7 +41,7 @@ fn ext_message_load_opcode_returns_null_for_either_right_without_ref() {
     run_message_case(
         "ci-stdlib-ext-message-load-opcode-right-without-ref",
         r"
-get fun `test-ci-stdlib-ext-message-load-opcode-right-without-ref`() {
+get fun `test ci stdlib ext message load opcode right without ref`() {
     val body = beginCell().storeBool(true).endCell().beginParse();
 
     val msg = ExtMessageRelaxedGeneric {

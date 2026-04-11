@@ -5,7 +5,7 @@ version = "0.1.0"
 license = "MIT"
 
 [contracts.my_contract]
-name = "My Contract"
+display-name = "My Contract"
 src = "contracts/my_contract.tolk"
 depends = []
 
@@ -13,9 +13,9 @@ depends = []
 width = 100
 ignore = []
 
-[mappings]
+[import-mappings]
 acton = ".acton"
 contracts = "contracts"
 gen = "gen"
 tests = "tests"
-wrappers = "tests/wrappers"
+wrappers = "wrappers"

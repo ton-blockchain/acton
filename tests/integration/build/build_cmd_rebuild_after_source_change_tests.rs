@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 use std::path::Path;
 
-fn read_artifact(project_path: &Path, contract_key: &str) -> String {
+fn read_artifact(project_path: &Path, contract_name: &str) -> String {
     let artifact_path = project_path
         .join("build")
-        .join(format!("{contract_key}.json"));
+        .join(format!("{contract_name}.json"));
     fs::read_to_string(&artifact_path).unwrap_or_else(|err| {
         panic!(
             "Failed to read artifact '{}': {err}",

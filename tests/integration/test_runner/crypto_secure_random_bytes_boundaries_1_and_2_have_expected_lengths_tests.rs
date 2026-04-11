@@ -32,7 +32,7 @@ fn crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths() {
     run_secure_random_case(
         "dy-stdlib-secure-random-boundaries-1-and-2-lengths",
         r"
-get fun `test-dy-stdlib-secure-random-boundaries-1-and-2-lengths`() {
+get fun `test dy stdlib secure random boundaries 1 and 2 lengths`() {
     val bytes1 = crypto.getSecureRandomBytes(1);
     val bytes2 = crypto.getSecureRandomBytes(2);
 
@@ -52,7 +52,7 @@ fn crypto_secure_random_bytes_size_2_keeps_length_across_calls_in_fixture_projec
     let source = format!(
         r"
 {CRYPTO_IMPORTS}
-get fun `test-dy-stdlib-secure-random-size-2-keeps-length-across-calls`() {{
+get fun `test dy stdlib secure random size 2 keeps length across calls`() {{
     val bytesA = crypto.getSecureRandomBytes(2);
     val bytesB = crypto.getSecureRandomBytes(2);
 

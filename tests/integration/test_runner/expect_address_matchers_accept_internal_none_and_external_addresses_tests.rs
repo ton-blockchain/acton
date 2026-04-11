@@ -39,7 +39,7 @@ fn expect_address_matchers_accept_internal_none_and_external_addresses() {
     run_success_case(
         "bz-stdlib-expect-address-matchers-success",
         r#"
-get fun `test-bz-stdlib-expect-address-matchers-success`() {
+get fun `test bz stdlib expect address matchers success`() {
     val internalAddress = address("0:00000000000000000000000000000000000000000000000000000000000000AA")
         as any_address;
     val noneAddress = createAddressNone();
@@ -60,18 +60,18 @@ fn expect_address_matchers_report_assertion_failures_for_wrong_kinds() {
     let test_path = "tests/expect_address_matchers_wrong_kind_failures.test.tolk";
     let source = with_source(
         r#"
-get fun `test-bz-stdlib-to-be-internal-address-fails-for-none`() {
+get fun `test bz stdlib to be internal address fails for none`() {
     expectToEndWithExitCode(567);
     expect(createAddressNone()).toBeInternalAddress();
 }
 
-get fun `test-bz-stdlib-to-be-none-address-fails-for-internal`() {
+get fun `test bz stdlib to be none address fails for internal`() {
     expectToEndWithExitCode(567);
     expect(address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address)
         .toBeNoneAddress();
 }
 
-get fun `test-bz-stdlib-to-be-external-address-fails-for-internal`() {
+get fun `test bz stdlib to be external address fails for internal`() {
     expectToEndWithExitCode(567);
     expect(address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address)
         .toBeExternalAddress();

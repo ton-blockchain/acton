@@ -24,7 +24,7 @@ fn crc16_matches_known_vectors() {
     run_network_success(
         "ei-stdlib-crc16-known-vectors",
         r#"
-get fun `test-ei-stdlib-crc16-known-vectors`() {
+get fun `test ei stdlib crc16 known vectors`() {
     expect(crc16("")).toEqual(0);
     expect(crc16("hello")).toEqual(50018);
     expect(crc16("123456789")).toEqual(12739);
@@ -40,7 +40,7 @@ fn crc16_is_deterministic_and_stays_in_u16_range() {
     run_network_success(
         "ei-stdlib-crc16-deterministic-u16-range",
         r#"
-get fun `test-ei-stdlib-crc16-deterministic-u16-range`() {
+get fun `test ei stdlib crc16 deterministic u16 range`() {
     val first = crc16("Acton");
     val second = crc16("Acton");
     val third = crc16("Acton");

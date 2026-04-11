@@ -23,7 +23,7 @@ fn build_reads_explicit_boc_path_and_executes_runtime_code() {
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-aw-build-boc-path-runtime`() {
+            get fun `test aw build boc path runtime`() {
                 val fromSource = build("simple");
                 val fromBocPath = build("simple", "contracts/simple.boc");
                 expect(fromBocPath).toEqual(fromSource);

@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/dd_find_external_out_message.test.tolk (1 test)
-  ✓ dd-find-external-out-message-type-and-source [TIME]
+  ✓ dd find external out message type and source [TIME]
 
  ✓ 1 passed in 1 file

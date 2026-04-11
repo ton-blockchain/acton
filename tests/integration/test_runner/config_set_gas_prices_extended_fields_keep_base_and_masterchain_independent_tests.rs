@@ -25,7 +25,7 @@ fn config_set_gas_prices_extended_fields_keep_base_and_masterchain_independent()
     run_config_success_case(
         "bd-stdlib-config-gas-prices-extended-dual-chain-independence",
         r"
-get fun `test-bd-stdlib-config-gas-prices-extended-dual-chain-independence`() {
+get fun `test bd stdlib config gas prices extended dual chain independence`() {
     var config = net.getConfig();
 
     val baseBefore = config.getGasPrices(BASECHAIN);
@@ -99,7 +99,7 @@ fn config_set_gas_prices_for_basechain_does_not_change_masterchain_extended_fiel
     run_config_success_case(
         "bd-stdlib-config-gas-prices-single-chain-independence",
         r"
-get fun `test-bd-stdlib-config-gas-prices-single-chain-independence`() {
+get fun `test bd stdlib config gas prices single chain independence`() {
     var config = net.getConfig();
 
     val baseBefore = config.getGasPrices(BASECHAIN);

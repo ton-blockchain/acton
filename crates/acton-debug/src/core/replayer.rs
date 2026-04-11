@@ -6,10 +6,16 @@
 #![allow(clippy::unwrap_used)]
 
 use super::debug_executor_handle::DebugExecutorHandle;
-use super::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
+use super::debug_executor_handle::RuntimeDebugSnapshot;
+use super::types_render::{
+    RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack, render_runtime_in_message,
+    render_runtime_out_actions, render_runtime_storage_with_compiler_abi, render_runtime_vm_value,
+};
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 use tolkc::TolkSourceMap;
+use tolkc::abi::ContractABI;
 use tolkc::debug_marks_dict::DebugMarksDict;
 use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
 use tolkc::types_kernel::Ty;
@@ -81,6 +87,9 @@ pub trait RuntimeEventSource {
     fn next_event(&mut self) -> Option<RuntimeEvent>;
     fn is_exhausted(&self) -> bool;
     fn backend_kind(&self) -> RuntimeBackendKind;
+    fn runtime_debug_snapshot(&self) -> Option<RuntimeDebugSnapshot> {
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -403,6 +412,10 @@ impl RuntimeEventSource for LiveVmRuntimeEventSource {
     fn backend_kind(&self) -> RuntimeBackendKind {
         RuntimeBackendKind::LiveVm
     }
+
+    fn runtime_debug_snapshot(&self) -> Option<RuntimeDebugSnapshot> {
+        Some(self.executor.runtime_snapshot())
+    }
 }
 
 /// Tick — atomic unit of work for the replayer.
@@ -499,6 +512,8 @@ pub struct TolkReplayer {
     // glob_name → (ty_idx, captured TVM values) for globals that have been SET
     global_var_values: HashMap<String, (usize, Vec<VmStackValue>)>,
 
+    compiler_abi: Option<Arc<ContractABI>>,
+
     // raw TVM stack (updated from runtime stack events);
     // global (not per-context) because TvmStackValues tick arrives before PushFrame
     tvm_stack_values: Vec<VmStackValue>,
@@ -587,6 +602,7 @@ impl TolkReplayer {
             current_vm_position: None,
             exec_stack: vec![NoinlineExecState::new()],
             global_var_values: HashMap::new(),
+            compiler_abi: None,
             tvm_stack_values: Vec::new(),
             breakpoints: HashSet::new(),
             exception_break_mode: ExceptionBreakMode::Never,
@@ -598,6 +614,10 @@ impl TolkReplayer {
             breakpoint_skip_line: 0,
             pending_ticks: VecDeque::new(),
         }
+    }
+
+    pub fn set_compiler_abi(&mut self, compiler_abi: Option<Arc<ContractABI>>) {
+        self.compiler_abi = compiler_abi;
     }
 
     /// Set breakpoints for a file. Each requested line is resolved to the nearest
@@ -641,6 +661,39 @@ impl TolkReplayer {
     #[must_use]
     pub fn runtime_backend_kind(&self) -> RuntimeBackendKind {
         self.runtime_source.backend_kind()
+    }
+
+    #[must_use]
+    pub fn runtime_registers(&self) -> Vec<LocalVarRendered> {
+        let Some(snapshot) = self.runtime_source.runtime_debug_snapshot() else {
+            return Vec::new();
+        };
+
+        let mut values = Vec::new();
+        if let Some(c4) = snapshot.c4.as_ref() {
+            values.push(LocalVarRendered {
+                var_name: "c4 (storage)".to_owned(),
+                value: self
+                    .compiler_abi
+                    .as_deref()
+                    .and_then(|abi| render_runtime_storage_with_compiler_abi(c4, abi))
+                    .unwrap_or_else(|| render_runtime_vm_value(c4)),
+            });
+        }
+        if let Some(c5) = snapshot.c5.as_ref() {
+            values.push(LocalVarRendered {
+                var_name: "c5 (output actions)".to_owned(),
+                value: render_runtime_out_actions(c5, self.compiler_abi.as_deref())
+                    .unwrap_or_else(|| render_runtime_vm_value(c5)),
+            });
+        }
+        if let Some(c7) = snapshot.c7.as_ref() {
+            values.push(LocalVarRendered {
+                var_name: "c7 (temporary data)".to_owned(),
+                value: render_runtime_vm_value(c7),
+            });
+        }
+        values
     }
 
     #[must_use]
@@ -724,6 +777,7 @@ impl TolkReplayer {
                     &self.call_stack[i],
                     &exec.last_seen_values,
                     &exec.accumulated_ir_live,
+                    depth == 0,
                 )
             }
             None => Vec::new(),
@@ -1245,6 +1299,7 @@ impl TolkReplayer {
         frame: &CallFrame,
         last_seen: &HashMap<usize, VmStackValue>,
         ir_live: &HashSet<usize>,
+        is_top_frame: bool,
     ) -> Vec<LocalVarRendered> {
         let mut result: Vec<LocalVarRendered> = Vec::new();
 
@@ -1286,6 +1341,22 @@ impl TolkReplayer {
                 var_name: var.name.clone(),
                 value: debug_val,
             });
+        }
+
+        // TODO: unify with `in.data`? Currently `in` uses only runtime data from c7, while `in.data` takes value from the stack
+        if is_top_frame
+            && frame.f_name == "onInternalMessage"
+            && let Some(snapshot) = self.runtime_source.runtime_debug_snapshot()
+            && let Some(c7) = snapshot.c7.as_ref()
+            && let Some(value) = render_runtime_in_message(c7)
+        {
+            result.insert(
+                0,
+                LocalVarRendered {
+                    var_name: "in".to_owned(),
+                    value,
+                },
+            );
         }
 
         for (name, (ty_idx, values)) in &self.global_var_values {

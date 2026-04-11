@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/aj_vm_helpers.test.tolk (1 test)
-  ✓ aj-stdlib-vm-set-time-and-logical-slots-3-4-5 [TIME]
+  ✓ aj stdlib vm set time and logical slots 3 4 5 [TIME]
 
  ✓ 1 passed in 1 file

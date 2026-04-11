@@ -8,7 +8,8 @@ a Vite-based React app in `app/`.
 ## Layout
 
 - `contracts/src` contains the counter contract and shared Tolk types.
-- `contracts/tests` contains integration tests and Tolk wrappers.
+- `contracts/tests` contains integration tests.
+- `contracts/wrappers` contains Tolk wrappers used by tests and scripts.
 - `contracts/scripts` contains deployment scripts.
 - `wrappers/Counter.ts` is the generated TypeScript wrapper consumed by the app.
 - `app/` contains the React + Vite frontend.
@@ -35,7 +36,7 @@ npm run dev
 
 ## Notes
 
-- `acton build` compiles the contract using `contracts/src/counter.tolk`.
+- `acton build` compiles the contract using `contracts/src/Counter.tolk`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
 - The app reads blockchain data through Toncenter. Set

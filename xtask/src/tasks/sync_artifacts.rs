@@ -10,7 +10,7 @@ use flate2::bufread::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use tar::Archive;
 
-const TRUNK_OBJS_RELEASE_TAG: &str = "trunk-objs";
+const RELEASE_OBJS_RELEASE_TAG: &str = "release-objs";
 const ARTIFACTS_MANIFEST_ASSET_NAME: &str = "artifacts_manifest.toml";
 const TON_OBJS_ARTIFACTS_MANIFEST_PATH: &str = "crates/ton-objs/artifacts_manifest.toml";
 const TON_OBJS_DIR: &str = "objs";
@@ -29,14 +29,14 @@ pub(crate) struct SyncArtifactsArgs {
 
 pub(crate) fn run(args: SyncArtifactsArgs) -> Result<()> {
     println!(
-        "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from GitHub release `{TRUNK_OBJS_RELEASE_TAG}`"
+        "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from GitHub release `{RELEASE_OBJS_RELEASE_TAG}`"
     );
 
     let objs_dir = Path::new(TON_OBJS_DIR);
     let should_refresh_objs = args.force || !objs_dir.is_dir();
     let github = Github::new();
     let downloaded_asset =
-        github.download_release_asset(TRUNK_OBJS_RELEASE_TAG, ARTIFACTS_MANIFEST_ASSET_NAME)?;
+        github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, ARTIFACTS_MANIFEST_ASSET_NAME)?;
 
     let manifest_contents = str::from_utf8(&downloaded_asset)
         .context("downloaded artifacts manifest is not valid UTF-8")?;
@@ -102,7 +102,7 @@ fn maybe_offer_local_objs_refresh(github: &Github, objs_dir: &Path, force: bool)
 
     if !force && objs_dir.is_dir() {
         print!(
-            "`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` changed. Update local `objs/` from release `{TRUNK_OBJS_RELEASE_TAG}` asset `{archive_name}`? Type `yes` to continue: "
+            "`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` changed. Update local `objs/` from release `{RELEASE_OBJS_RELEASE_TAG}` asset `{archive_name}`? Type `yes` to continue: "
         );
         io::stdout()
             .flush()
@@ -122,7 +122,7 @@ fn maybe_offer_local_objs_refresh(github: &Github, objs_dir: &Path, force: bool)
 
     refresh_local_objs_from_release(github, &archive_name, objs_dir)?;
     println!(
-        "Updated local `objs/` from release `{TRUNK_OBJS_RELEASE_TAG}` asset `{archive_name}`"
+        "Updated local `objs/` from release `{RELEASE_OBJS_RELEASE_TAG}` asset `{archive_name}`"
     );
 
     Ok(())
@@ -139,11 +139,11 @@ fn refresh_local_objs_from_release(
             .context("failed to build download progress style")?,
     );
     progress.set_message(format!(
-        "Downloading `{archive_name}` from GitHub release `{TRUNK_OBJS_RELEASE_TAG}`"
+        "Downloading `{archive_name}` from GitHub release `{RELEASE_OBJS_RELEASE_TAG}`"
     ));
     progress.enable_steady_tick(std::time::Duration::from_millis(120));
 
-    let downloaded_archive = github.download_release_asset(TRUNK_OBJS_RELEASE_TAG, archive_name);
+    let downloaded_archive = github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, archive_name);
     progress.finish_and_clear();
 
     let downloaded_archive = downloaded_archive?;

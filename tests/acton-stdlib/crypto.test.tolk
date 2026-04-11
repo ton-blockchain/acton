@@ -1,12 +1,12 @@
 import "@local-acton/crypto/crypto"
 import "@local-acton/testing/expect"
 
-get fun `test-mnemonic-new-returns-24-words`() {
+get fun `test mnemonic new returns 24 words`() {
     val words = crypto.createMnemonic();
     expect(words.size()).toEqual(24);
 }
 
-get fun `test-mnemonic-to-key-pair-and-sign`() {
+get fun `test mnemonic to key pair and sign`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
 
@@ -24,14 +24,14 @@ get fun `test-mnemonic-to-key-pair-and-sign`() {
     expect(valid).toBeTrue();
 }
 
-get fun `test-fast-random-bytes`() {
+get fun `test fast random bytes`() {
     // Different seeds produce different output
     val bytes1 = crypto.getFastRandomBytes(32, 42);
     val bytes2 = crypto.getFastRandomBytes(32, 43);
     expect(bytes1).toNotEqual(bytes2);
 }
 
-get fun `test-secure-random-bytes`() {
+get fun `test secure random bytes`() {
     val bytes1 = crypto.getSecureRandomBytes(32);
     val bytes2 = crypto.getSecureRandomBytes(32);
 
@@ -39,7 +39,7 @@ get fun `test-secure-random-bytes`() {
     expect(bytes1).toNotEqual(bytes2);
 }
 
-get fun `test-generate-key-pair`() {
+get fun `test generate key pair`() {
     val kp = crypto.generateKeyPair();
 
     expect(kp.privateKey).toNotEqual(0);
@@ -52,7 +52,7 @@ get fun `test-generate-key-pair`() {
     expect(valid).toBeTrue();
 }
 
-get fun `test-seed-to-key-pair-deterministic`() {
+get fun `test seed to key pair deterministic`() {
     // Same seed must produce the same key pair
     val seed = 12345;
     val kp1 = crypto.seedToKeyPair(seed);
@@ -62,7 +62,7 @@ get fun `test-seed-to-key-pair-deterministic`() {
     expect(kp1.publicKey).toEqual(kp2.publicKey);
 }
 
-get fun `test-seed-to-key-pair-signs-correctly`() {
+get fun `test seed to key pair signs correctly`() {
     val seed = 99999;
     val kp = crypto.seedToKeyPair(seed);
 
@@ -72,7 +72,7 @@ get fun `test-seed-to-key-pair-signs-correctly`() {
     expect(valid).toBeTrue();
 }
 
-get fun `test-raw-sign-matches-sign`() {
+get fun `test raw sign matches sign`() {
     val kp = crypto.generateKeyPair();
     val data = beginCell().storeUint(0xBEEF, 16).endCell();
 

@@ -25,7 +25,7 @@ fn config_get_msg_forward_prices_returns_per_chain_values_after_both_writes() {
     run_config_success_case(
         "dn-stdlib-config-msg-forward-prices-dual-write",
         r"
-get fun `test-dn-stdlib-config-msg-forward-prices-dual-write`() {
+get fun `test dn stdlib config msg forward prices dual write`() {
     var config = net.getConfig();
     var basechain = config.getMsgForwardPrices(BASECHAIN);
     var masterchain = config.getMsgForwardPrices(MASTERCHAIN);

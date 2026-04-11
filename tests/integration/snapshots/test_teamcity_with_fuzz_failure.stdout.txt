@@ -10,8 +10,8 @@
 ##teamcity[testingStarted]
  > tests/test.test.tolk (1 test)
 ##teamcity[testSuiteStarted name='test.test.tolk' nodeId='suite_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/test.test.tolk']
-##teamcity[testStarted name='test-fuzz-fails-with-inputs' nodeId='test_test-fuzz-fails-with-inputs' parentNodeId='suite_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/test.test.tolk:test-fuzz-fails-with-inputs']
-  ✗ fuzz-fails-with-inputs [TIME] (2 runs, seed 17)
+##teamcity[testStarted name='test fuzz fails with inputs' nodeId='test_test fuzz fails with inputs' parentNodeId='suite_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/test.test.tolk:test fuzz fails with inputs']
+  ✗ fuzz fails with inputs [TIME] (2 runs, seed 17)
     ├─ Fuzz case 1/2
     ├─ Inputs: value=0
     └─ Error: expect(actual).toEqual(expected)
@@ -20,8 +20,8 @@
             1
         )
       └─ at tests/test.test[LINE]
-##teamcity[testFailed type='comparisonFailure' name='test-fuzz-fails-with-inputs' nodeId='test_test-fuzz-fails-with-inputs' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/test.test[LINE]|nFuzz seed: 17|nFuzz runs: 2|nFuzz case: 1/2|nInputs: value=0' expected='1' actual='0']
-##teamcity[testFinished name='test-fuzz-fails-with-inputs' nodeId='test_test-fuzz-fails-with-inputs' [DURATION] parentNodeId='suite_test.test.tolk']
+##teamcity[testFailed type='comparisonFailure' name='test fuzz fails with inputs' nodeId='test_test fuzz fails with inputs' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/test.test[LINE]|nFuzz seed: 17|nFuzz runs: 2|nFuzz case: 1/2|nInputs: value=0' expected='1' actual='0']
+##teamcity[testFinished name='test fuzz fails with inputs' nodeId='test_test fuzz fails with inputs' [DURATION] parentNodeId='suite_test.test.tolk']
 ##teamcity[testSuiteFinished name='test.test.tolk' nodeId='suite_test.test.tolk']
 
  ✗ 1 failed in 1 file

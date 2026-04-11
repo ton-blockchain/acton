@@ -53,7 +53,7 @@ fn exclude_has_priority_over_include() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-unit-selected`() {
+            get fun `test unit selected`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -63,7 +63,7 @@ fn exclude_has_priority_over_include() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-integration-excluded`() {
+            get fun `test integration excluded`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -78,8 +78,8 @@ fn exclude_has_priority_over_include() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("unit-selected")
-        .assert_not_contains("integration-excluded");
+        .assert_contains("unit selected")
+        .assert_not_contains("integration excluded");
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn cli_include_overrides_config_include() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-from-cli-include`() {
+            get fun `test from cli include`() {
                 expect(10).toEqual(10);
             }
         "#,
@@ -101,7 +101,7 @@ fn cli_include_overrides_config_include() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-from-config-include`() {
+            get fun `test from config include`() {
                 expect(20).toEqual(20);
             }
         "#,
@@ -119,8 +119,8 @@ fn cli_include_overrides_config_include() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("from-cli-include")
-        .assert_not_contains("from-config-include");
+        .assert_contains("from cli include")
+        .assert_not_contains("from config include");
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn cli_exclude_overrides_config_exclude() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-from-cli-exclude`() {
+            get fun `test from cli exclude`() {
                 expect(100).toEqual(100);
             }
         "#,
@@ -142,7 +142,7 @@ fn cli_exclude_overrides_config_exclude() {
             r#"
             import "../../../lib/testing/expect"
 
-            get fun `test-from-config-exclude`() {
+            get fun `test from config exclude`() {
                 expect(200).toEqual(200);
             }
         "#,
@@ -160,8 +160,8 @@ fn cli_exclude_overrides_config_exclude() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("from-cli-exclude")
-        .assert_not_contains("from-config-exclude");
+        .assert_contains("from cli exclude")
+        .assert_not_contains("from config exclude");
 }
 
 #[test]
@@ -174,20 +174,20 @@ fn fail_fast_stops_after_first_failure_with_todo_and_skip() {
             import "../../lib/testing/expect"
 
             @test("todo")
-            get fun `test-todo-before-failure`() {
+            get fun `test todo before failure`() {
                 expect(1).toEqual(2); // Must not run
             }
 
             @test("skip")
-            get fun `test-skip-before-failure`() {
+            get fun `test skip before failure`() {
                 expect(1).toEqual(2); // Must not run
             }
 
-            get fun `test-first-failure`() {
+            get fun `test first failure`() {
                 expect(1).toEqual(2);
             }
 
-            get fun `test-should-not-run`() {
+            get fun `test should not run`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -201,6 +201,6 @@ fn fail_fast_stops_after_first_failure_with_todo_and_skip() {
         .assert_failed(1)
         .assert_skipped(1)
         .assert_todo(1)
-        .assert_contains("first-failure")
-        .assert_not_contains("should-not-run");
+        .assert_contains("first failure")
+        .assert_not_contains("should not run");
 }

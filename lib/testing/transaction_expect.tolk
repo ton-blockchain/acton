@@ -298,7 +298,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
     }
 
     Assert.fail(
-        format3(
+        format(
             "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
             reflect.typeNameOf<Msg>(),
             reflect.typeNameOf<Msg>(),

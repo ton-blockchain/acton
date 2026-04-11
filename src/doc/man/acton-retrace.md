@@ -18,7 +18,7 @@ original on-chain execution.
 
 When `--contract` is provided, Acton also prepares a source-level retrace for
 the named project contract by recompiling it with debug info and source maps.
-When `--dap-port` is added, the prepared replay is exposed as a local Debug
+When `--debug` is added, the prepared replay is exposed as a local Debug
 Adapter Protocol (DAP) server for editor integration.
 
 ## OPTIONS
@@ -56,15 +56,20 @@ Write VM and executor logs into the specified directory.
 {{#options}}
 
 {{#option "`--contract` _name_" }}
-Contract ID from `Acton.toml` used to build a source-level trace for the
+Contract name from `Acton.toml` used to build a source-level trace for the
 retraced transaction.
 {{/option}}
 
-{{#option "`--dap-port` _port_" }}
-Expose the prepared source-level retrace as a DAP server on the given local TCP
-port.
+{{#option "`--debug`" }}
+Expose the prepared source-level retrace as a local DAP server.
 
 Requires `--contract`.
+{{/option}}
+
+{{#option "`--debug-port` _port_" }}
+Debug server port to use with `--debug`.
+
+When omitted, Acton uses `12345`.
 {{/option}}
 
 {{/options}}
@@ -99,11 +104,11 @@ When `--contract` is set:
   transaction
 
 If you run the command outside the project directory, use `--manifest-path` or
-`--project-root` so Acton can resolve the contract configuration and mappings.
+`--project-root` so Acton can resolve the contract configuration and import mappings.
 
-## DAP MODE
+## DEBUG MODE
 
-When `--dap-port` is used together with `--contract`:
+When `--debug` is used together with `--contract`:
 
 - Acton starts a local DAP server on `127.0.0.1:<port>`
 - the normal retrace summary is still printed before the debug server starts
@@ -111,6 +116,9 @@ When `--dap-port` is used together with `--contract`:
 
 This mode is intended for editor integrations that speak the Debug Adapter
 Protocol.
+
+`--debug-port` follows the same convention as other Acton debug commands:
+without `--debug` it does not start a debug server.
 
 ## VS CODE SETUP
 
@@ -147,7 +155,7 @@ For a manual setup, create `.vscode/launch.json` like this:
 Then start retrace in a terminal from the project root:
 
 ```bash
-acton retrace <HASH> --contract <NAME> --dap-port 4711
+acton retrace <HASH> --contract <NAME> --debug --debug-port 4711
 ```
 
 After the DAP server is listening, launch the matching VS Code debug
@@ -164,7 +172,7 @@ The command prints:
 - decoded outgoing actions
 - additional full VM and executor logs when `--logs-dir` is used
 - source-level debug preparation errors when `--contract` is used
-- DAP startup status when `--dap-port` is used
+- DAP startup status when `--debug` is used
 
 When `--logs-dir` is set, Acton creates the target directory and writes
 `vm.log` plus `executor.log` there.
@@ -200,13 +208,13 @@ When `--logs-dir` is set, Acton creates the target directory and writes
 4. Prepare a source-level retrace for a project contract:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter
    ```
 
 5. Start a local DAP server for editor debugging:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract jetton_minter --dap-port 4711
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter --debug --debug-port 4711
    ```
 
 ## SEE ALSO

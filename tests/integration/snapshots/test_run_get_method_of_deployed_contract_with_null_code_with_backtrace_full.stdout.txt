@@ -13,7 +13,7 @@
       ├─ at ../lib/emulation/network[LINE]
       │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
       │     net.runGetMethod<int,tuple>        at ../lib/emulation/network[LINE]
-      │     test-foo                           at tests/test.test[LINE]
+      │     test foo                           at tests/test.test[LINE]
       ├─ custom THROW
       └─ Cannot run method of contract without code
 

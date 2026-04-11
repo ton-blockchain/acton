@@ -6,10 +6,10 @@ script that deploys the minter and mints the initial supply.
 
 ## What Is Included
 
-- `contracts/jetton-minter-contract.tolk` implements the jetton minter.
-- `contracts/jetton-wallet-contract.tolk` implements user jetton wallets.
+- `contracts/JettonMinter.tolk` implements the jetton minter.
+- `contracts/JettonWallet.tolk` implements user jetton wallets.
 - `contracts/errors.tolk` defines starter errors for the template.
-- `tests/wrappers/JettonMinter.tolk` and `tests/wrappers/JettonWallet.tolk`
+- `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
   are the wrappers used by tests and scripts.
 - `tests/wallet.test.tolk` covers minting, admin updates, content updates, and
   transfers.
@@ -40,9 +40,9 @@ acton run deploy-emulation
 
 1. Update the contracts under `contracts/` for your token policy and business
    rules.
-2. Adjust `tests/wrappers/JettonMinter.tolk` and `tests/wrappers/JettonWallet.tolk`
-   to match the new ABI, or regenerate them with `acton wrapper jetton_minter`
-   and `acton wrapper jetton_wallet`.
+2. Adjust `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
+   to match the new ABI, or regenerate them with `acton wrapper JettonMinter`
+   and `acton wrapper JettonWallet`.
 3. Extend `tests/wallet.test.tolk` with the scenarios you care about.
 4. Update metadata defaults and deployment behavior in `scripts/deploy.tolk`.
 
@@ -69,7 +69,7 @@ acton wallet new --name deployer --local --airdrop
 4. Broadcast the deployment to testnet:
 
 ```bash
-acton script scripts/deploy.tolk --broadcast --net testnet
+acton script scripts/deploy.tolk --net testnet
 ```
 
 The starter script waits for deploy and mint transactions, then reads total

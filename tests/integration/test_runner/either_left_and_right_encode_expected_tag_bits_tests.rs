@@ -31,7 +31,7 @@ fn either_left_and_right_encode_expected_tag_bits() {
     run_either_case(
         "ab-stdlib-either-tags",
         r"
-        get fun `test-ab-stdlib-either-tags`() {
+        get fun `test ab stdlib either tags`() {
             val left = Either<uint32, uint32>.left(17);
             val right = Either<uint32, uint32>.right(99);
 
@@ -60,7 +60,7 @@ fn either_match_routes_left_and_right_variants() {
             };
         }
 
-        get fun `test-ab-stdlib-either-match-routes-variants`() {
+        get fun `test ab stdlib either match routes variants`() {
             val left = Either<uint32, uint32>.left(11);
             val right = Either<uint32, uint32>.right(11);
 

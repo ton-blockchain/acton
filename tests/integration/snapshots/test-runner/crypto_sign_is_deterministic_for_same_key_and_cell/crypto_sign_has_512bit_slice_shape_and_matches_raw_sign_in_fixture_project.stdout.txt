@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dz_crypto_sign_shape.test.tolk (1 test)
-  ✓ dz-stdlib-sign-shape-and-raw-sign-parity [TIME]
+  ✓ dz stdlib sign shape and raw sign parity [TIME]
 
  ✓ 1 passed in 1 file

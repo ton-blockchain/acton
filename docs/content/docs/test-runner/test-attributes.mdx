@@ -15,12 +15,12 @@ For simple attributes like `skip` and `todo`:
 
 ```tolk
 @test("skip")
-get fun `test-should-be-skipped`() {
+get fun `test should be skipped`() {
     // This test will be skipped
 }
 
 @test("todo")
-get fun `test-not-implemented-yet`() {
+get fun `test not implemented yet`() {
     // This test will be marked as TODO
 }
 ```
@@ -31,12 +31,12 @@ For attributes that require parameters:
 
 ```tolk
 @test({ fail_with: 42 })
-get fun `test-expects-exit-code-42`() {
+get fun `test expects exit code 42`() {
     // This test expects exit code 42
 }
 
 @test({ gas_limit: 1000 })
-get fun `test-with-gas-limit`() {
+get fun `test with gas limit`() {
     // This test will fail if it uses more than 1000 gas
 }
 ```
@@ -48,7 +48,7 @@ You can combine multiple attributes in a single object:
     fail_with: 13,
     gas_limit: 5000
 })
-get fun `test-complex-validation`() {
+get fun `test complex validation`() {
     // This test expects exit code 13,
     // and has a gas limit of 5000
     expensive_operation_that_fails();
@@ -71,7 +71,7 @@ Skips the test execution. The test won't run but will be counted in the test sum
 **Example:**
 ```tolk
 @test("skip")
-get fun `test-broken-for-now`() {
+get fun `test broken for now`() {
     expect(1 + 1).toEqual(3); // This won't execute
 }
 ```
@@ -98,12 +98,12 @@ Marks the test as a work-in-progress item. The test won't run and will be counte
 
 ```tolk
 @test("todo")
-get fun `test-new-feature`() {
+get fun `test new feature`() {
     // Will show "TODO" as description
 }
 
 @test({ todo: "Waiting for API changes" })
-get fun `test-depends-on-external-api`() {
+get fun `test depends on external api`() {
     // Will show custom description
 }
 ```
@@ -126,7 +126,7 @@ Sets the expected exit code for the test. By default, tests expect exit code 0 (
 **Example:**
 ```tolk
 @test({ fail_with: 42 })
-get fun `test-expects-failure`() {
+get fun `test expects failure`() {
     throw 42; // Test will pass because it expects exit code 42
 }
 ```
@@ -148,7 +148,7 @@ Sets a maximum gas limit for the test. If the test consumes more gas than specif
 **Example:**
 ```tolk
 @test({ gas_limit: 1000 })
-get fun `test-efficient-algorithm`() {
+get fun `test efficient algorithm`() {
     // If this test uses more than 1000 gas, it will fail
     val result = expensive_computation();
     expect(result).toEqual(42);
@@ -177,17 +177,17 @@ the test ABI and executes the same test multiple times.
 **Examples:**
 ```tolk
 @test({ fuzz: true })
-get fun `test-default-fuzz-runs`(value: int) {
+get fun `test default fuzz runs`(value: int) {
     expect(value).toEqual(value);
 }
 
 @test({ fuzz: 64 })
-get fun `test-custom-fuzz-runs`(flag: bool) {
+get fun `test custom fuzz runs`(flag: bool) {
     expect(flag).toEqual(flag);
 }
 
 @test({ fuzz: { runs: 64, max_test_rejects: 1024, seed: 42 } })
-get fun `test-custom-fuzz-budget`(value: int) {
+get fun `test custom fuzz budget`(value: int) {
     fuzz.assume(value != 0);
     expect(value != 0).toBeTrue();
 }

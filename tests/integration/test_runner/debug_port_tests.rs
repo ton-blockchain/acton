@@ -12,7 +12,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const SIMPLE_TEST: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-debug-smoke`() {
+get fun `test debug smoke`() {
     expect(1).toEqual(1);
 }
 "#;

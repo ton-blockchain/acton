@@ -40,7 +40,7 @@ scenarios:
       Requests may time out or return a temporary server error.
 
     steps:
-      - The user runs `acton script scripts/deploy.tolk --broadcast --net testnet`.
+      - The user runs `acton script scripts/deploy.tolk --net testnet`.
       - The CLI tries to contact TonCenter.
       - The external service does not respond successfully.
 

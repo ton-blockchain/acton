@@ -69,15 +69,15 @@ fun balances(first: int32, second: int32): map<int32, int32> {
     return value;
 }
 
-get fun test_tuple_diff() {
+get fun `test tuple diff`() {
     expect((10, 20, 30)).toEqual((10, 20, 31));
 }
 
-get fun test_struct_diff() {
+get fun `test struct diff`() {
     expect(Point { x: 1, y: 2 }).toEqual(Point { x: 1, y: 3 });
 }
 
-get fun test_nested_struct_diff() {
+get fun `test nested struct diff`() {
     val actual = Segment {
         start: Point { x: 1, y: 2 },
         end: Point { x: 3, y: 4 },
@@ -90,14 +90,14 @@ get fun test_nested_struct_diff() {
     expect(actual).toEqual(expected);
 }
 
-get fun test_nullable_diff() {
+get fun `test nullable diff`() {
     val actual: int? = 10;
     val expected: int? = null;
 
     expect(actual).toEqual(expected);
 }
 
-get fun test_map_diff() {
+get fun `test map diff`() {
     expect(balances(10, 20)).toEqual(balances(10, 30));
 }
 "#;
@@ -106,7 +106,7 @@ const FUZZ_FAILURE_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
 @test({ fuzz: { runs: 2, seed: 17 } })
-get fun `test-fuzz-fails-with-inputs`(value: int) {
+get fun `test fuzz fails with inputs`(value: int) {
     expect(value).toEqual(1);
 }
 "#;
@@ -154,7 +154,7 @@ fn test_teamcity_reporter_with_get_method_failure() {
             "test",
             (GET_METHOD_FAILURE_TEST_PREPARE.to_string()
                 + r#"
-            get fun test_get_method_failure() {
+            get fun `test get method failure`() {
                 val counter = setupTest();
                 val _res: int = net.runGetMethod(counter.address, "currentCounterFail");
             }
@@ -232,7 +232,7 @@ fn test_junit_reporter_basic_passing() {
         )
         .assert_file_contains(
             "test-results/TEST-counter.test.tolk.xml",
-            r#"<testcase name="test-should-increase-counter""#,
+            r#"<testcase name="test should increase counter""#,
         )
         .assert_snapshot_matches("integration/snapshots/test_junit_basic_passing.stdout.txt")
         .assert_file_snapshot_matches(
@@ -307,11 +307,11 @@ fn test_teamcity_reporter_multiple_files() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_wallet_balance() {
+            get fun `test wallet balance`() {
                 expect(1).toEqual(1);
             }
 
-            get fun test_wallet_utils() {
+            get fun `test wallet utils`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -321,11 +321,11 @@ fn test_teamcity_reporter_multiple_files() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_pow2_basic() {
+            get fun `test pow2 basic`() {
                 expect(1).toEqual(1);
             }
 
-            get fun test_pow2_edge() {
+            get fun `test pow2 edge`() {
                 expect(1).toEqual(2);
             }
         "#,
@@ -395,11 +395,11 @@ fn test_junit_reporter_multiple_files_with_failures() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_wallet_balance() {
+            get fun `test wallet balance`() {
                 expect(1).toEqual(1);
             }
 
-            get fun test_wallet_utils() {
+            get fun `test wallet utils`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -409,11 +409,11 @@ fn test_junit_reporter_multiple_files_with_failures() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_pow2_basic() {
+            get fun `test pow2 basic`() {
                 expect(1).toEqual(1);
             }
 
-            get fun test_pow2_edge() {
+            get fun `test pow2 edge`() {
                 expect(1).toEqual(2);
             }
         "#,
@@ -447,14 +447,14 @@ fn test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs()
         .raw_file(
             "tests/a/shared.test.tolk",
             r"
-            get fun `test-shared-a`() {
+            get fun `test shared a`() {
             }
         ",
         )
         .raw_file(
             "tests/b/shared.test.tolk",
             r"
-            get fun `test-shared-b`() {
+            get fun `test shared b`() {
             }
         ",
         )
@@ -484,7 +484,7 @@ fn test_junit_reporter_with_merge() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_first() {
+            get fun `test first`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -494,7 +494,7 @@ fn test_junit_reporter_with_merge() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun test_second() {
+            get fun `test second`() {
                 expect(2).toEqual(2);
             }
         "#,
@@ -554,7 +554,7 @@ fn test_dot_reporter_with_fuzz_failure_includes_seed_and_inputs() {
         .with_reporter("dot")
         .run()
         .failure()
-        .assert_contains("FAIL test-fuzz-fails-with-inputs")
+        .assert_contains("FAIL test fuzz fails with inputs")
         .assert_contains("Fuzz seed: 17")
         .assert_contains("Inputs: value=0")
         .assert_snapshot_matches("integration/snapshots/test_dot_with_fuzz_failure.stdout.txt");
@@ -570,7 +570,7 @@ fn test_dot_reporter_multiple_files() {
             import "../../lib/testing/expect"
             import "../../lib/io"
 
-            get fun test_first() {
+            get fun `test first`() {
                 println("First test output");
                 expect(1).toEqual(1);
             }
@@ -582,11 +582,11 @@ fn test_dot_reporter_multiple_files() {
             import "../../lib/testing/expect"
             import "../../lib/io"
 
-            get fun test_second() {
+            get fun `test second`() {
                 expect(2).toEqual(2);
             }
 
-            get fun test_second_fail() {
+            get fun `test second fail`() {
                 println("This test will fail");
                 eprintln("Error output");
                 expect(1).toEqual(2); // This will fail

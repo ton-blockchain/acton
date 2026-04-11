@@ -18,7 +18,7 @@ fn fs_read_bytes_supports_binary_content_and_path_normalization() {
     let project = build_fs_project(
         "w-stdlib-fs-read-bytes-path-normalization",
         r#"
-get fun `test-fs-read-bytes-supports-binary-and-normalized-paths`() {
+get fun `test fs read bytes supports binary and normalized paths`() {
     val direct = fs.readBytes("fixtures/input.bin");
     val viaDot = fs.readBytes("./fixtures/input.bin");
     val viaParent = fs.readBytes("fixtures/../fixtures/input.bin");
@@ -56,7 +56,7 @@ fn fs_read_bytes_handles_empty_large_missing_and_directory_paths() {
     let project = build_fs_project(
         "w-stdlib-fs-read-bytes-corner-cases",
         r#"
-get fun `test-fs-read-bytes-corner-cases`() {
+get fun `test fs read bytes corner cases`() {
     val empty = fs.readBytes("fixtures/empty.bin");
     expect(empty).toBeNotNull();
     expect(empty!.remainingBitsCount()).toEqual(0);
@@ -102,7 +102,7 @@ fn fs_write_string_writes_overwrites_and_handles_failures() {
     let project = build_fs_project(
         "w-stdlib-fs-write-string-corner-cases",
         r#"
-get fun `test-fs-write-string-corner-cases`() {
+get fun `test fs write string corner cases`() {
     expect(fs.exists("written.txt")).toBeFalse();
     expect(fs.writeString("written.txt", "alpha\nbeta")).toBeTrue();
     expect(fs.exists("written.txt")).toBeTrue();
@@ -142,7 +142,7 @@ fn fs_write_bytes_roundtrips_small_and_empty_payloads() {
     let project = build_fs_project(
         "w-stdlib-fs-write-bytes-small-and-empty",
         r#"
-get fun `test-fs-write-bytes-small-and-empty`() {
+get fun `test fs write bytes small and empty`() {
     val data = beginCell()
         .storeUint(0xDE, 8)
         .storeUint(0xAD, 8)
@@ -186,7 +186,7 @@ fn fs_write_bytes_handles_large_payload_and_rejects_invalid_slices() {
     let project = build_fs_project(
         "w-stdlib-fs-write-bytes-corner-cases",
         r#"
-get fun `test-fs-write-bytes-corner-cases`() {
+get fun `test fs write bytes corner cases`() {
     val large = fs.readBytes("fixtures/large-input.bin");
     expect(large).toBeNotNull();
 
@@ -247,7 +247,7 @@ fn fs_read_bytes_boundary_sizes_126_and_127_bytes() {
     let project = build_fs_project(
         "w-stdlib-fs-read-bytes-boundary-sizes",
         r#"
-get fun `test-fs-read-bytes-boundary-sizes`() {
+get fun `test fs read bytes boundary sizes`() {
     val bytes126 = fs.readBytes("fixtures/b126.bin");
     expect(bytes126).toBeNotNull();
     var s126 = bytes126!;
@@ -283,7 +283,7 @@ fn fs_read_bytes_reads_non_utf8_data_that_read_file_cannot_decode() {
     let project = build_fs_project(
         "w-stdlib-fs-read-bytes-vs-read-file-non-utf8",
         r#"
-get fun `test-fs-read-bytes-vs-read-file-non-utf8`() {
+get fun `test fs read bytes vs read file non utf8`() {
     val bytes = fs.readBytes("fixtures/non-utf8.bin");
     val text = fs.readFile("fixtures/non-utf8.bin");
 
@@ -316,7 +316,7 @@ fn fs_write_methods_reject_directory_targets() {
     let project = build_fs_project(
         "w-stdlib-fs-write-reject-directory-target",
         r#"
-get fun `test-fs-write-reject-directory-target`() {
+get fun `test fs write reject directory target`() {
     val payload = beginCell().storeUint(0xAB, 8).toSlice();
 
     expect(fs.exists("fixtures/dir-target")).toBeTrue();
@@ -338,7 +338,7 @@ fn fs_exists_reports_files_directories_and_normalized_paths() {
     let project = build_fs_project(
         "w-stdlib-fs-exists-corner-cases",
         r#"
-get fun `test-fs-exists-corner-cases`() {
+get fun `test fs exists corner cases`() {
     expect(fs.exists("fixtures")).toBeTrue();
     expect(fs.exists("./fixtures")).toBeTrue();
     expect(fs.exists("fixtures/../fixtures")).toBeTrue();

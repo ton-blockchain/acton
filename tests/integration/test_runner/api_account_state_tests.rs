@@ -31,7 +31,7 @@ fn top_up_materializes_account_and_increases_balance() {
     run_account_state_case(
         "r-lib-api-top-up-materializes-account",
         r#"
-        get fun `test-top-up-materializes-account-and-increases-balance`() {
+        get fun `test top up materializes account and increases balance`() {
             val target = net.randomAddress("r-top-up-target");
             val initialBalance = net.balance(target);
 
@@ -53,7 +53,7 @@ fn set_shard_account_null_resets_state_and_balance() {
     run_account_state_case(
         "r-lib-api-set-shard-account-null",
         r#"
-        get fun `test-set-shard-account-null-resets-state-and-balance`() {
+        get fun `test set shard account null resets state and balance`() {
             val target = net.randomAddress("r-shard-reset-target");
             net.topUp(target, ton("1"));
 
@@ -79,7 +79,7 @@ fn set_account_preserves_shard_markers_for_existing_address() {
     run_account_state_case(
         "r-lib-api-set-account-preserves-shard-markers",
         r#"
-        get fun `test-set-account-preserves-shard-markers`() {
+        get fun `test set account preserves shard markers`() {
             val target = net.randomAddress("r-set-account-target");
 
             net.topUp(target, ton("1"));
@@ -106,7 +106,7 @@ fn set_shard_account_copies_state_between_addresses() {
     run_account_state_case(
         "r-lib-api-set-shard-account-copies-state",
         r#"
-        get fun `test-set-shard-account-copies-state-between-addresses`() {
+        get fun `test set shard account copies state between addresses`() {
             val source = net.randomAddress("r-shard-source");
             val target = net.randomAddress("r-shard-target");
 
@@ -139,7 +139,7 @@ fn get_account_state_for_fresh_address_is_null_before_top_up() {
     run_account_state_case(
         "r-lib-api-get-account-state-fresh-address",
         r#"
-        get fun `test-get-account-state-for-fresh-address-should-be-null`() {
+        get fun `test get account state for fresh address should be null`() {
             val target = net.randomAddress("r-fresh-account-state");
             val before = net.getAccountState(target);
             expect(before == null).toEqual(true);

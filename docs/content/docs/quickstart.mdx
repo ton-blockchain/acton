@@ -44,7 +44,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         cd first_counter
         ```
 
-        The project is already set up with `contracts/counter.tolk` and `contracts/types.tolk`.
+        The project is already set up with `contracts/Counter.tolk` and `contracts/types.tolk`.
     </Step>
 
     <Step title="Build contract">
@@ -56,7 +56,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
         This command compiles the contract and places the build artifacts (including a JSON report) in the `build/` folder.
 
-        ```json title="build/counter.json"
+        ```json title="build/Counter.json"
         {
           "code_boc64": "te6ccgEBBAEAbwABFP8A9KQT9Lzy...",
           "hash": "1F6548A25E04497496242AD7804B653E6DA9A47E474DC17436313FFA04E15F18"
@@ -67,7 +67,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
     </Step>
 
     <Step title="Test contract">
-        Acton includes a powerful test runner that allows you to write tests in **Tolk**. The template includes a test file `tests/counter.test.tolk` and generated wrappers in `tests/wrappers/`.
+        Acton includes a powerful test runner that allows you to write tests in **Tolk**. The template includes a test file `tests/counter.test.tolk` and generated wrappers in `wrappers/`.
 
         Let's look at the included test in `tests/counter.test.tolk`:
 
@@ -118,7 +118,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         And **mutation testing** to find gaps in your tests:
 
         ```bash
-        acton test --mutate --mutate-contract counter
+        acton test --mutate --mutate-contract Counter
         ```
     </Step>
 
@@ -158,34 +158,37 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         fun main() {
             val deployer = net.wallet("deployer");
 
-            val counter = Counter.fromStorage(Storage { id: 0, counter: 0 });
+            val counter = Counter.fromStorage({
+                id: 0,
+                counter: 0,
+            });
             val res = counter.deploy(deployer.address, { value: ton("0.005") });
             if (!res.wait()) {
                 return;
             }
 
-            println1("Deployed counter to {}", counter.address);
-            println1("On-chain counter is {}", counter.currentCounter());
+            println("Deployed counter to {}", counter.address);
+            println("On-chain counter is {}", counter.currentCounter());
         }
         ```
 
         Let's use it:
 
         ```bash
-        acton script scripts/deploy.tolk --broadcast --net testnet
+        acton script scripts/deploy.tolk --net testnet
         ```
 
         If successful, you'll see the deployment transaction hash, the contract
         address, and the freshly read on-chain counter value. The getter call
-        works without a separate `--fork-net` because `--broadcast --net
-        testnet` now uses testnet for reads by default.
+        works without a separate `--fork-net` because `--net testnet` now uses
+        testnet for reads by default.
     </Step>
 
     <Step title="Verify contract">
         Finally, let's verify our contract source code on the blockchain explorer. This proves that the deployed bytecode matches your source code.
 
         ```bash
-        acton verify counter --net testnet --address <YOUR_CONTRACT_ADDRESS>
+        acton verify Counter --net testnet --address <YOUR_CONTRACT_ADDRESS>
         ```
 
         Replace `<YOUR_CONTRACT_ADDRESS>` with the address from the previous step.

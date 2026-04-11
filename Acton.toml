@@ -5,17 +5,17 @@ version = "0.2.0"
 license = "MIT"
 
 [contracts.counter]
-name = "Counter"
+display-name = "Counter"
 src = "counter.tolk"
 depends = []
 
 [contracts.jetton-minter]
-name = "Minter"
+display-name = "Minter"
 src = ".jetton/contracts/jetton-minter-contract.tolk"
 depends = ["jetton-wallet"]
 
 [contracts.jetton-wallet]
-name = "Wallet"
+display-name = "Wallet"
 src = ".jetton/contracts/jetton-wallet-contract.tolk"
 depends = []
 
@@ -32,6 +32,6 @@ accounts = ["local-wallet"]
 [networks.localnet]
 api = { v2 = "http://localhost:3010/api/v2", v3 = "http://localhost:3010/api/v3" }
 
-[mappings]
+[import-mappings]
 acton = ".acton"
 local-acton = "lib"

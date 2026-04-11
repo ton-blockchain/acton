@@ -26,7 +26,7 @@ IDEMPOTENCY
 
        o  it never replaces an existing Acton.toml
 
-       o  it backfills default mappings only when they are missing
+       o  it backfills default import-mappings only when they are missing
 
        o  it appends missing .gitignore patterns without deleting existing ones
 
@@ -74,10 +74,10 @@ GENERATED AND PATCHED FILES
 
        o  discovered [contracts]
 
-       o  default [mappings]
+       o  default [import-mappings]
 
        When Acton.toml already exists, acton init only backfills missing
-       default [mappings] entries.
+       default [import-mappings] entries.
 
        When patching .gitignore, Acton adds groups for:
 

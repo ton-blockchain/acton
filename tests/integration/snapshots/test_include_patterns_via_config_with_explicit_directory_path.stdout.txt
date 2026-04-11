@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/selected/path_case.test.tolk (1 test)
-  ✓ folder-path [TIME]
+  ✓ folder path [TIME]
 
  ✓ 1 passed in 1 file

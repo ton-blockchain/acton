@@ -13,7 +13,7 @@ fn assert_consumes_less_than3_returns_computed_result() {
     let source = format!(
         r"{ASSERT_IMPORTS}
 
-get fun `test-bu-consumes-less-than3-returns-result`() {{
+get fun `test bu consumes less than3 returns result`() {{
     val result = Assert.consumesLessThan3(
         fun(a: int, b: int, c: int): int {{
             return a * 100 + b * 10 + c;
@@ -49,7 +49,7 @@ fn assert_consumes_less_than3_rejects_wrong_callback_arity() {
     let source = format!(
         r"{ASSERT_IMPORTS}
 
-get fun `test-bu-consumes-less-than3-wrong-arity`() {{
+get fun `test bu consumes less than3 wrong arity`() {{
     Assert.consumesLessThan3(
         fun(a: int, b: int): int {{
             return a + b;

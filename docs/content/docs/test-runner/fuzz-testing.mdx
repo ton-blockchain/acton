@@ -37,18 +37,18 @@ import "@acton/testing/expect"
 import "@acton/testing/fuzz"
 
 @test({ fuzz: true })
-get fun `test-counter-never-goes-negative`(value: int) {
+get fun `test counter never goes negative`(value: int) {
     val bounded = fuzz.bound(value, 0, 1000);
     expect(bounded >= 0).toBeTrue();
 }
 
 @test({ fuzz: 64 })
-get fun `test-bool-roundtrip`(flag: bool) {
+get fun `test bool roundtrip`(flag: bool) {
     expect(flag).toEqual(flag);
 }
 
 @test({ fuzz: { runs: 64, max_test_rejects: 1024, seed: 42 } })
-get fun `test-only-even-values`(value: int) {
+get fun `test only even values`(value: int) {
     fuzz.assume(value % 2 == 0);
     expect(value % 2).toEqual(0);
 }
@@ -92,7 +92,7 @@ import "@acton/testing/expect"
 import "@acton/testing/fuzz"
 
 @test({ fuzz: true })
-get fun `test-only-positive-values`(value: int) {
+get fun `test only positive values`(value: int) {
     fuzz.assume(value > 0, "this check only applies to positive values");
     expect(value > 0).toBeTrue();
 }
@@ -107,7 +107,7 @@ import "@acton/testing/expect"
 import "@acton/testing/fuzz"
 
 @test({ fuzz: true })
-get fun `test-transfer-amounts`(rawAmount: int, rawRecipient: address?) {
+get fun `test transfer amounts`(rawAmount: int, rawRecipient: address?) {
     val amount = fuzz.bound(rawAmount, 1, 1_000_000);
     fuzz.assume(rawRecipient != null, "recipient must be present");
 

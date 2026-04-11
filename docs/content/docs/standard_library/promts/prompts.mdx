@@ -45,7 +45,7 @@ Non-interactive fallback:
 Example:
 ```tolk
 val name = prompt("What is your name?", "John");
-println(format1("Hello {}", name));
+println("Hello {}", name);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L37" />
@@ -67,7 +67,7 @@ Input and fallback behavior:
 Example:
 ```tolk
 val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
-println(format1("Hello {}", name));
+println("Hello {}", name);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L54" />

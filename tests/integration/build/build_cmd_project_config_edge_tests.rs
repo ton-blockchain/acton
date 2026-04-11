@@ -29,8 +29,45 @@ fn append_build_gen_dir(project_root: &Path, gen_dir: &str) {
 }
 
 #[test]
-fn build_supports_quoted_contract_keys_in_dependency_resolution() {
-    let project = ProjectBuilder::new("build-config-edge-quoted-keys")
+fn build_accepts_contract_without_display_name() {
+    let project = ProjectBuilder::new("build-config-edge-optional-display-name")
+        .raw_file(
+            "contracts/no-display.tolk",
+            r"fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .build();
+
+    write_acton_toml(
+        project.path(),
+        r#"[package]
+name = "build-config-edge-optional-display-name"
+description = ""
+version = "0.1.0"
+
+[contracts.no-display]
+src = "contracts/no-display.tolk"
+depends = []
+"#,
+    );
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_contains("Compiling no-display");
+
+    assert!(
+        project.path().join("build/no-display.json").exists(),
+        "build artifact should use the contract key when display-name is omitted"
+    );
+}
+
+#[test]
+fn build_supports_quoted_contract_names_in_dependency_resolution() {
+    let project = ProjectBuilder::new("build-config-edge-quoted-names")
         .raw_file(
             "contracts/child.lib.tolk",
             r"fun onInternalMessage(_: InMessage) {}
@@ -48,17 +85,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
     write_acton_toml(
         project.path(),
         r#"[package]
-name = "build-config-edge-quoted-keys"
+name = "build-config-edge-quoted-names"
 description = ""
 version = "0.1.0"
 
 [contracts."child.lib"]
-name = "Child Library"
+display-name = "Child Library"
 src = "contracts/child.lib.tolk"
 depends = []
 
 [contracts.parent-contract]
-name = "Parent Contract"
+display-name = "Parent Contract"
 src = "contracts/parent-contract.tolk"
 depends = ["child.lib"]
 "#,
@@ -74,11 +111,11 @@ depends = ["child.lib"]
 
     assert!(
         project.path().join("build/child.lib.json").exists(),
-        "build artifact should use quoted contract key for child contract"
+        "build artifact should use quoted contract name for child contract"
     );
     assert!(
         project.path().join("build/parent-contract.json").exists(),
-        "build artifact should use hyphenated contract key for parent contract"
+        "build artifact should use hyphenated contract name for parent contract"
     );
 
     let generated_dep = fs::read_to_string(project.path().join("gen/child.lib_code.tolk"))
@@ -297,12 +334,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [{ kind = "library_ref", function = "childCode" }]
 "#,
@@ -343,12 +380,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [42]
 "#,
@@ -389,12 +426,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = { name = "child" }
 "#,
@@ -463,11 +500,11 @@ description = ""
 version = "0.1.0"
 
 [contracts.base]
-name = "Base"
+display-name = "Base"
 src = "contracts/base.tolk"
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = ["base"]
 "#,
@@ -520,12 +557,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [{ name = "child", kind = "dynamic_ref" }]
 "#,
@@ -566,12 +603,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [""]
 "#,
@@ -611,12 +648,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [{ name = "", kind = "embed_code", function = "childCode" }]
 "#,
@@ -657,12 +694,12 @@ description = ""
 version = "0.1.0"
 
 [contracts.child]
-name = "Child"
+display-name = "Child"
 src = "contracts/child.tolk"
 depends = []
 
 [contracts.root]
-name = "Root"
+display-name = "Root"
 src = "contracts/root.tolk"
 depends = [{ name = "child" }]
 "#,

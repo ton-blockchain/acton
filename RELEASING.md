@@ -8,7 +8,7 @@ For everyday contributor setup, builds, tests, and docs workflows, see
 ## Scope
 
 - This file covers versioned releases such as `v0.22.0`.
-- `trunk` and `trunk-objs` releases are maintained by GitHub Actions and are
+- `trunk` and `release-objs` releases are maintained by GitHub Actions and are
   not part of the manual release flow below.
 
 ## Release command

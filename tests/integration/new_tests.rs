@@ -298,7 +298,6 @@ fn assert_new_project_localnet_deploy_snapshot(
         .acton()
         .script(deploy_script_path)
         .current_dir(&project_dir)
-        .broadcast()
         .verify_network("localnet")
         .run()
         .success()
@@ -403,12 +402,12 @@ fn test_new_counter_project_non_interactive() {
     assert!(
         project
             .path()
-            .join("foobar/contracts/counter.tolk")
+            .join("foobar/contracts/Counter.tolk")
             .exists()
     );
     assert!(!project.path().join("foobar/package.json").exists());
     assert!(!project.path().join("foobar/app").exists());
-    assert!(content.contains(r"[contracts.counter]"));
+    assert!(content.contains(r"[contracts.Counter]"));
 }
 
 #[test]
@@ -449,17 +448,13 @@ fn test_new_counter_project_with_app_flag() {
     let project_dir = project.path().join("foobar");
     assert!(project_dir.join("app/src/App.tsx").exists());
     assert!(project_dir.join("wrappers/Counter.ts").exists());
-    assert!(project_dir.join("contracts/src/counter.tolk").exists());
+    assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir
             .join("contracts/tests/counter.test.tolk")
             .exists()
     );
-    assert!(
-        project_dir
-            .join("contracts/tests/wrappers/Counter.tolk")
-            .exists()
-    );
+    assert!(project_dir.join("contracts/wrappers/Counter.tolk").exists());
     assert!(project_dir.join(".prettierrc").exists());
 }
 
@@ -853,7 +848,7 @@ fn test_new_counter_project_can_be_selected_interactively() {
         .send("\u{1b}[B")
         .expect("failed to navigate to counter template");
     session.send_line("", "failed to select counter template");
-    session.expect("Include the TypeScript app scaffold?");
+    session.expect("Include the TypeScript dApp?");
     session.send_line("", "failed to keep default no-app choice");
     session.expect("Install the default Git hooks?");
     session.send_line("", "failed to keep default no-hooks choice");
@@ -871,7 +866,7 @@ fn test_new_counter_project_can_be_selected_interactively() {
     );
 
     let project_dir = project.path().join("foobar");
-    assert!(project_dir.join("contracts/counter.tolk").exists());
+    assert!(project_dir.join("contracts/Counter.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());
@@ -901,7 +896,7 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Include the TypeScript app scaffold?");
+    session.expect("Include the TypeScript dApp?");
     session.send_line("y", "failed to confirm TypeScript app scaffold");
     session.expect("Install the default Git hooks?");
     session.send_line("", "failed to keep default no-hooks choice");
@@ -956,7 +951,7 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Include the TypeScript app scaffold?");
+    session.expect("Include the TypeScript dApp?");
     session.send_line("", "failed to keep default no-app choice");
     session.expect("Install the default Git hooks?");
     session.send_line("", "failed to keep default no-hooks choice");
@@ -977,7 +972,7 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     );
 
     let project_dir = project.path().join("foobar");
-    assert!(project_dir.join("contracts/counter.tolk").exists());
+    assert!(project_dir.join("contracts/Counter.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());
@@ -1201,7 +1196,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         .run()
         .success();
 
-    assert!(project_dir.join("build/counter.json").exists());
+    assert!(project_dir.join("build/Counter.json").exists());
     assert!(project_dir.join("dist/index.html").exists());
 }
 

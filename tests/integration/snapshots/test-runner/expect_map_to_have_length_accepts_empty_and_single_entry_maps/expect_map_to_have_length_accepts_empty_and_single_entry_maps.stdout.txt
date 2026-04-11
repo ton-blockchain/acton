@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/map.test.tolk (1 test)
-  ✓ ee-stdlib-map-to-have-length-empty-non-empty-boundaries [TIME]
+  ✓ ee stdlib map to have length empty non empty boundaries [TIME]
 
  ✓ 1 passed in 1 file

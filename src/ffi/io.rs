@@ -8,21 +8,53 @@ use num_traits::ToPrimitive;
 use std::io::{IsTerminal, stdin};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
+use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};
 
-extension!(println in (Context) with (s: TupleItem, type_name: String) using println_impl);
+extension!(println in (Context) with (arg6: TupleItem, type6: String, arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String) using println_impl);
+#[allow(clippy::too_many_arguments)]
 fn println_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
-    arg: TupleItem,
-    type_name: String,
+    arg6: TupleItem,
+    type6: String,
+    arg5: TupleItem,
+    type5: String,
+    arg4: TupleItem,
+    type4: String,
+    arg3: TupleItem,
+    type3: String,
+    arg2: TupleItem,
+    type2: String,
+    arg1: TupleItem,
+    type1: String,
 ) -> anyhow::Result<()> {
-    let typed_arg = arg.unwrap_single().to_typed(&type_name);
-
-    let formatted = {
-        let formatter = FormatterContext::from_context(ctx);
-        formatter.format_with_color(&typed_arg)
+    let args = collect_non_void_args([
+        (type1, arg1),
+        (type2, arg2),
+        (type3, arg3),
+        (type4, arg4),
+        (type5, arg5),
+        (type6, arg6),
+    ]);
+    let formatter = FormatterContext::from_context(ctx);
+    let (mut formatted, tail) = if let Some((type_name, arg)) = args.first()
+        && type_name == "string"
+        && let Ok(fmt) = String::from_item(arg.clone().unwrap_single())
+        && let Ok((rendered, consumed)) = format_args(&formatter, &fmt, &args[1..])
+    {
+        (rendered, &args[1 + consumed..])
+    } else {
+        (String::new(), args.as_slice())
     };
+
+    for (type_name, arg) in tail {
+        if !formatted.is_empty() {
+            formatted.push(' ');
+        }
+        let typed_arg = arg.unwrap_single().to_typed(type_name);
+        formatted.push_str(&formatter.format_with_color(&typed_arg));
+    }
 
     if ctx.io.capture_output {
         ctx.io.stdout_buffer.push_str(&formatted);
@@ -44,79 +76,9 @@ fn eprintln_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) -> anyhow::Re
     Ok(())
 }
 
-extension!(format1 in (Context) with (arg1: TupleItem, type1: String, fmt: String) using format1_impl);
-fn format1_impl(
-    ctx: &mut Context,
-    stack: &mut Tuple,
-    arg1: TupleItem,
-    type1: String,
-    fmt: String,
-) -> anyhow::Result<()> {
-    let args = vec![(type1, arg1)];
-    let result = format_args(ctx, fmt, args)?;
-    stack.push_string(&result);
-    Ok(())
-}
-
-extension!(format2 in (Context) with (arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format2_impl);
-fn format2_impl(
-    ctx: &mut Context,
-    stack: &mut Tuple,
-    arg2: TupleItem,
-    type2: String,
-    arg1: TupleItem,
-    type1: String,
-    fmt: String,
-) -> anyhow::Result<()> {
-    let args = vec![(type1, arg1), (type2, arg2)];
-    let result = format_args(ctx, fmt, args)?;
-    stack.push_string(&result);
-    Ok(())
-}
-
-extension!(format3 in (Context) with (arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format3_impl);
+extension!(format in (Context) with (arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format_impl);
 #[allow(clippy::too_many_arguments)]
-fn format3_impl(
-    ctx: &mut Context,
-    stack: &mut Tuple,
-    arg3: TupleItem,
-    type3: String,
-    arg2: TupleItem,
-    type2: String,
-    arg1: TupleItem,
-    type1: String,
-    fmt: String,
-) -> anyhow::Result<()> {
-    let args = vec![(type1, arg1), (type2, arg2), (type3, arg3)];
-    let result = format_args(ctx, fmt, args)?;
-    stack.push_string(&result);
-    Ok(())
-}
-
-extension!(format4 in (Context) with (arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format4_impl);
-#[allow(clippy::too_many_arguments)]
-fn format4_impl(
-    ctx: &mut Context,
-    stack: &mut Tuple,
-    arg4: TupleItem,
-    type4: String,
-    arg3: TupleItem,
-    type3: String,
-    arg2: TupleItem,
-    type2: String,
-    arg1: TupleItem,
-    type1: String,
-    fmt: String,
-) -> anyhow::Result<()> {
-    let args = vec![(type1, arg1), (type2, arg2), (type3, arg3), (type4, arg4)];
-    let result = format_args(ctx, fmt, args)?;
-    stack.push_string(&result);
-    Ok(())
-}
-
-extension!(format5 in (Context) with (arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format5_impl);
-#[allow(clippy::too_many_arguments)]
-fn format5_impl(
+fn format_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
     arg5: TupleItem,
@@ -131,14 +93,15 @@ fn format5_impl(
     type1: String,
     fmt: String,
 ) -> anyhow::Result<()> {
-    let args = vec![
+    let args = collect_non_void_args([
         (type1, arg1),
         (type2, arg2),
         (type3, arg3),
         (type4, arg4),
         (type5, arg5),
-    ];
-    let result = format_args(ctx, fmt, args)?;
+    ]);
+    let formatter = FormatterContext::from_context(ctx);
+    let (result, _) = format_args(&formatter, &fmt, &args)?;
     stack.push_string(&result);
     Ok(())
 }
@@ -278,23 +241,37 @@ fn format_single_arg(
     }
 }
 
+fn collect_non_void_args<const N: usize>(
+    args: [(String, TupleItem); N],
+) -> Vec<(String, TupleItem)> {
+    let mut collected = Vec::with_capacity(N);
+    for (type_name, arg) in args {
+        if type_name == "void" {
+            break;
+        }
+        collected.push((type_name, arg));
+    }
+    collected
+}
+
 fn format_args(
-    ctx: &mut Context,
-    fmt: String,
-    args: Vec<(String, TupleItem)>,
-) -> anyhow::Result<String> {
-    let tokens = parse_format(&fmt)?;
+    formatter: &FormatterContext<'_>,
+    fmt: &str,
+    args: &[(String, TupleItem)],
+) -> anyhow::Result<(String, usize)> {
+    let tokens = parse_format(fmt)?;
     let mut out = String::with_capacity(fmt.len());
-    let mut args_iter = args.into_iter();
-    let formatter = FormatterContext::from_context(ctx);
+    let mut args_iter = args.iter().cloned();
+    let mut consumed = 0;
 
     for token in tokens {
         match token {
             FormatToken::Literal(text) => out.push_str(&text),
             FormatToken::Placeholder(kind) => {
                 if let Some((type_name, arg)) = args_iter.next() {
-                    let formatted = format_single_arg(&formatter, kind, &type_name, arg);
+                    let formatted = format_single_arg(formatter, kind, &type_name, arg);
                     out.push_str(&formatted);
+                    consumed += 1;
                 } else {
                     out.push_str(placeholder_repr(kind));
                 }
@@ -302,7 +279,7 @@ fn format_args(
         }
     }
 
-    Ok(out)
+    Ok((out, consumed))
 }
 
 extension!(prompt in (Context) with (placeholder: String, message: String) using prompt_impl);
@@ -409,13 +386,9 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        1 => println : 2,
+        1 => println : 12,
         2 => eprintln : 1,
-        200 => format1 : 3,
-        201 => format2 : 5,
-        202 => format3 : 7,
-        203 => format4 : 9,
-        204 => format5 : 11,
+        200 => format : 11,
         205 => prompt : 2,
         206 => select : 2,
         207 => confirm : 3,

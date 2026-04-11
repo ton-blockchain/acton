@@ -155,7 +155,7 @@ fn find_external_out_message_filters_by_type_and_source_across_transactions() {
     run_project_builder_success(
         "dd-stdlib-find-external-out-message-type-and-source",
         r"
-get fun `test-dd-find-external-out-message-type-and-source`() {
+get fun `test dd find external out message type and source`() {
     val (sender, rootAddress, relayAddress) = deployDdHarness();
     val txs = sendDdTrigger(sender, rootAddress, relayAddress, 451);
 
@@ -205,7 +205,7 @@ fn find_external_out_message_uses_body_type_per_send_result_list() {
     run_project_builder_success(
         "dd-stdlib-find-external-out-message-per-send",
         r"
-get fun `test-dd-find-external-out-message-per-send`() {
+get fun `test dd find external out message per send`() {
     val (sender, rootAddress, relayAddress) = deployDdHarness();
     val first = sendDdTrigger(sender, rootAddress, relayAddress, 700);
     val second = sendDdTrigger(sender, rootAddress, relayAddress, 701);

@@ -13,7 +13,7 @@ fn wrap_assert_source(test_body: &str) -> String {
 fn assert_equal_passes_for_identical_tuple_values() {
     let source = wrap_assert_source(
         r#"
-get fun `test-ek-stdlib-assert-equal-pass-identical-tuple`() {
+get fun `test ek stdlib assert equal pass identical tuple`() {
     var left = [];
     left.push(10);
     left.push("ok");
@@ -44,7 +44,7 @@ get fun `test-ek-stdlib-assert-equal-pass-identical-tuple`() {
 fn assert_equal_reports_actual_and_expected_on_failure() {
     let source = wrap_assert_source(
         r#"
-get fun `test-ek-stdlib-assert-equal-failure-diagnostics`() {
+get fun `test ek stdlib assert equal failure diagnostics`() {
     Assert.equal(42, 41, "ek Assert.equal mismatch diagnostic");
 }
 "#,

@@ -15,7 +15,7 @@ use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashSet;
 use std::collections::HashMap;
@@ -54,6 +54,9 @@ fn run_nested_executor_until_finished(
     mut direct_step: impl FnMut() -> bool,
 ) -> anyhow::Result<()> {
     if child_debug_started {
+        // StepInto / instruction stepping bootstrap the child by stopping on its
+        // first user-visible location. "Continue"-style entry needs one explicit
+        // kick so the nested replayer starts driving the live executor.
         let child_was_bootstrapped = matches!(
             child_step_mode,
             StepMode::StepInto | StepMode::EachAsmInstruction
@@ -99,7 +102,7 @@ fn build_impl(
 
         if let Some(found_contract) = found_contract {
             debug!("Found contract with info: {found_contract:?}");
-            name = found_contract.name; // use actual name instead of id
+            name = found_contract.display_name_owned(&id);
             path = found_contract.src;
             path = dunce::canonicalize(&path)
                 .map(|p| p.to_string_lossy().to_string())
@@ -889,6 +892,9 @@ fn send_message_debug(
     let dest_account = ctx.chain.world_state.get_account(dst);
     let code = Emulator::get_code_cell(&msg, &dest_account);
 
+    // Nested send-message debugging executes the recipient transaction through a
+    // live step executor. Compilation artifacts are reused only for source/ABI
+    // rendering; execution itself still comes from the prepared emulator state.
     let step_executor = StepExecutor::new().expect("Failed to create executor");
     let compilation_result = ctx
         .build
@@ -898,6 +904,9 @@ fn send_message_debug(
     let source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
+    let compiler_abi = compilation_result
+        .as_ref()
+        .and_then(|result| result.compiler_abi.clone());
 
     let msg_cell = Emulator::patch_message(
         ctx.chain.world_state.get_config(),
@@ -930,6 +939,8 @@ fn send_message_debug(
     }
 
     let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+    // Push the recipient transaction as a child debug context so a single DAP
+    // session can step across `net.send*` without losing the parent stack.
     let child_debug_started = ctx
         .debug
         .begin_child_context(ChildDebugContextSpec {
@@ -937,10 +948,13 @@ fn send_message_debug(
             name: "Send internal message".to_string(),
             executor: step_executor.clone().into(),
             source_map,
+            compiler_abi,
             stop_on_entry: need_to_stop_on_entry,
         })
         .context("Cannot start nested debug context")?;
 
+    // Step Into should stop on the first user-visible line in the child. Otherwise,
+    // let the nested runtime run until its own breakpoint / exception / completion.
     let child_step_mode = if need_to_stop_on_entry {
         match ctx.debug.performing_step() {
             Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
@@ -1360,10 +1374,15 @@ fn run_get_method_impl(
         .build_cache
         .result_for_code(&Some(code))
         .map(|(_, result)| result);
+    // Remote/forked contracts may have no local debug info. We still run the live
+    // executor, but the child replayer will then fall back to a synthetic source map.
     let source_map = compilation_result.as_ref().map_or_else(
         || Arc::new(TolkSourceMap::without_debug_info()),
         |result| result.source_map.clone(),
     );
+    let compiler_abi = compilation_result
+        .as_ref()
+        .and_then(|result| result.compiler_abi.clone());
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -1378,6 +1397,8 @@ fn run_get_method_impl(
             .context("Cannot prepare get method")?;
 
         let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+        // Nested get methods reuse the same DAP session via a child context, exactly
+        // like nested message sends do, so Step Into can cross the runtime boundary.
         let child_debug_started = ctx
             .debug
             .begin_child_context(ChildDebugContextSpec {
@@ -1385,10 +1406,13 @@ fn run_get_method_impl(
                 name: "Run get method".to_string(),
                 executor: step_executor.clone().into(),
                 source_map: Some(source_map.clone()),
+                compiler_abi,
                 stop_on_entry: need_to_stop_on_entry,
             })
             .context("Cannot send response")?;
 
+        // Keep the child aligned with the parent stepping intent: stop on entry when
+        // stepping into the call, otherwise continue until the child stops or ends.
         let child_step_mode = if need_to_stop_on_entry {
             match ctx.debug.performing_step() {
                 Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
@@ -1723,6 +1747,48 @@ fn get_wallet_by_name_impl(
     Ok(())
 }
 
+extension!(get_wallet_key_pair in (Context) with (addr: StdAddr) using get_wallet_key_pair_impl);
+fn get_wallet_key_pair_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: StdAddr,
+) -> anyhow::Result<()> {
+    let Some(wallet) = find_open_wallet_by_address(ctx, &addr) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    // Match lib/crypto/crypto.tolk: privateKey is the 32-byte Ed25519 seed.
+    let private_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.secret_key[..32]);
+    let public_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.public_key);
+
+    let mut result = Tuple::empty();
+    result.push(TupleItem::Int(private_key));
+    result.push(TupleItem::Int(public_key));
+    stack.push(TupleItem::Tuple(result));
+
+    Ok(())
+}
+
+extension!(get_wallet_id in (Context) with (addr: StdAddr) using get_wallet_id_impl);
+fn get_wallet_id_impl(ctx: &mut Context, stack: &mut Tuple, addr: StdAddr) -> anyhow::Result<()> {
+    let Some(wallet) = find_open_wallet_by_address(ctx, &addr) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    stack.push(TupleItem::Int(BigInt::from(wallet.wallet.wallet_id)));
+
+    Ok(())
+}
+
+fn find_open_wallet_by_address<'a>(ctx: &'a Context, addr: &StdAddr) -> Option<&'a Wallet> {
+    ctx.env
+        .open_wallets
+        .values()
+        .find(|wallet| wallet.address() == *addr)
+}
+
 const WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS: u64 = 1000;
 const WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS: u64 = 1000;
 
@@ -2048,7 +2114,9 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         42 => execute_message_iter_from : 1,
         43 => is_message_iter_done : 1,
         44 => close_message_iter : 1,
-        45 => parse_int : 1,
+        45 => get_wallet_key_pair : 1,
+        46 => get_wallet_id : 1,
+        47 => parse_int : 1,
     });
 }
 

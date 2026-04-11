@@ -65,7 +65,7 @@ fn expect_map_to_have_length_accepts_empty_and_single_entry_maps() {
     map_project(
         "ee-stdlib-map-to-have-length-empty-non-empty-boundaries",
         r#"
-        get fun `test-ee-stdlib-map-to-have-length-empty-non-empty-boundaries`() {
+        get fun `test ee stdlib map to have length empty non empty boundaries`() {
             val ledger = deployLedger();
 
             val emptyBalances: map<int32, int32> = net.runGetMethod(ledger.address, "emptyBalances");
@@ -93,7 +93,7 @@ fn expect_map_to_have_length_reports_boundary_mismatch_for_single_entry_map() {
     map_project(
         "ee-stdlib-map-to-have-length-boundary-mismatch",
         r#"
-        get fun `test-ee-stdlib-map-to-have-length-boundary-mismatch`() {
+        get fun `test ee stdlib map to have length boundary mismatch`() {
             val ledger = deployLedger();
             val oneEntryBalances: map<int32, int32> = net.runGetMethod(ledger.address, "singleBalance");
 

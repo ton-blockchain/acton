@@ -3,32 +3,32 @@ title: "Interacting with the real blockchain"
 description: "Learn how to use scripts to deploy contracts and send transactions on testnet and mainnet"
 ---
 
-Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using the `--broadcast` flag, your scripts can execute real operations using configured wallets.
+Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using `--net <network>`, your scripts can execute real operations using configured wallets.
 
 ## Prerequisites
 
 Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/setup-wallets/) guide to configure your wallet with a mnemonic.
 
-## The --broadcast Flag
+## The `--net` Flag
 
 Scripts in Acton can run in two modes:
 
 1. **Local mode** (default): Uses a local blockchain emulator with test wallets
-2. **Broadcast mode** (`--broadcast` flag): Connects to the real blockchain and uses configured wallets
+2. **Broadcast mode** (`--net <network>`): Connects to the real blockchain and uses configured wallets
 
 ```bash
 # Test locally without spending real TON
 acton script deploy.tolk
 
 # Deploy to testnet using real wallet
-acton script deploy.tolk --broadcast
+acton script deploy.tolk --net testnet
 
 # Deploy to mainnet using real wallet
-acton script deploy.tolk --broadcast --net mainnet
+acton script deploy.tolk --net mainnet
 ```
 
 <Callout type="error">
-Always test your scripts without `--broadcast` first. The local emulator allows you to verify logic before spending real TON on testnet or mainnet.
+Always test your scripts without `--net` first. The local emulator allows you to verify logic before spending real TON on testnet or mainnet.
 </Callout>
 
 ### Manually Controlling Broadcasting Mode
@@ -63,7 +63,7 @@ import "@wrappers/Counter"
 
 fun main() {
     val deployer = net.wallet("deployer");
-    val counter = Counter.fromStorage(Storage {
+    val counter = Counter.fromStorage({
         id: 8,
         counter: 0,
     });
@@ -73,14 +73,15 @@ fun main() {
         return;
     }
 
-    println1("Deployed counter to {}", counter.address);
-    println1("On-chain counter is {}", counter.currentCounter());
+    println("Deployed counter to {}", counter.address);
+    println("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
 The `counter_wrapper.tolk` file provides a convenient wrapper around the counter contract:
 
 ```tolk collapse={2-3, 10-17, 30-42} title="counter_wrapper.tolk"
+// todo update snippet to actual wrapper
 import "@acton/build/build"
 import "@acton/emulation/network"
 
@@ -97,7 +98,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 
 fun Counter.deploy(self, deployer: address, value: coins) {
@@ -122,7 +123,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int) {
 }
 
 fun Counter.getCounter(self): int {
-    return net.runGetMethod(self.address, "currentCounter")
+    return net.runGetMethod(self.address, "currentCounter");
 }
 ```
 
@@ -131,16 +132,16 @@ Notice that the wrapper uses the same patterns as in tests, making it easy to re
 Deploy to testnet:
 
 ```bash
-acton script deploy.tolk --broadcast
+acton script deploy.tolk --net testnet
 ```
 
 Deploy to mainnet:
 
 ```bash
-acton script deploy.tolk --broadcast --net mainnet
+acton script deploy.tolk --net mainnet
 ```
 
-In `--broadcast` mode, post-deploy getter calls such as
+In broadcast mode, post-deploy getter calls such as
 `counter.currentCounter()` automatically read from the selected broadcast
 network. You do not need a separate `--fork-net` for the common deploy-and-check
 flow.
@@ -152,13 +153,13 @@ The `net.wallet()` function returns a wallet struct with an `address` field:
 ```tolk
 fun main() {
     val deployer = net.wallet("deployer");
-    println1("Wallet address: {}", deployer.address);
+    println("Wallet address: {}", deployer.address);
 }
 ```
 
 **Behavior:**
-- Without `--broadcast`: Creates a local test wallet (similar to `net.treasury()`)
-- With `--broadcast`: Uses the real wallet configured in `wallets.toml` or global wallets
+- Without `--net`: Creates a local test wallet (similar to `net.treasury()`)
+- With `--net`: Uses the real wallet configured in `wallets.toml` or global wallets
 
 This dual behavior allows you to test scripts locally before running them on the real blockchain.
 
@@ -183,7 +184,7 @@ fun main() {
 ```
 
 <Callout type="error">
-Be extremely careful with message values when using `--broadcast`. While local tests allow arbitrary big values, sending messages with large values to the real blockchain will spend real TON.
+Be extremely careful with `--net`. While local tests allow arbitrary big values, sending messages with large values to the real blockchain will spend real TON.
 
 **Recommendation:** Use small values like `ton("0.05")` or `ton("0.1")` for most operations.
 </Callout>
@@ -197,11 +198,14 @@ fun main() {
     val deployer = net.wallet("deployer");
 
     // Deploy counter
-    val counter = Counter.fromStorage(Storage { id: 8, counter: 0 });
+    val counter = Counter.fromStorage({
+        id: 8,
+        counter: 0,
+    });
     val deployResult = counter.deploy(deployer.address, ton("0.05"));
     deployResult.wait(); // Wait for deployment
 
-    println1("Counter deployed at {}", counter.address);
+    println("Counter deployed at {}", counter.address);
 
     // Send increase message
     val increaseResult = counter.sendIncrease(deployer.address, 5);
@@ -234,7 +238,7 @@ The `wait()` method automatically adapts to the execution mode:
 | Mode            | Behavior                                       |
 |-----------------|------------------------------------------------|
 | Local (default) | Returns `true` immediately (no waiting needed) |
-| `--broadcast`   | Polls the network until transaction is found   |
+| `--net <network>` | Polls the network until transaction is found |
 
 You can check the current mode using `net.isBroadcasting()`:
 
@@ -253,15 +257,15 @@ Scripts can read contract state using `net.runGetMethod()`:
 ```tolk
 fun main() {
     val counterAddress = address("EQDt7LL...");
-    val currentValue: int = net.runGetMethod(counterAddress, "currentCounter");
-    println1("Counter value: {}", currentValue);
+    val currentValue = net.runGetMethod<int>(counterAddress, "currentCounter");
+    println("Counter value: {}", currentValue);
 }
 ```
 
 ### Local vs Remote State
 
 By default, `net.runGetMethod()` queries the **local emulator state** when the
-script runs without `--broadcast`. To query **real deployed contracts** without
+script runs without `--net`. To query **real deployed contracts** without
 broadcasting, use the `--fork-net` flag:
 
 ```bash
@@ -282,7 +286,7 @@ you to:
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
 
-When the script runs with `--broadcast`, the selected `--net` already becomes
+When the script runs with `--net`, the selected network already becomes
 the default remote read network. This means deploy scripts can send a
 transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper
 getters against the same chain without passing `--fork-net`.
@@ -291,32 +295,35 @@ getters against the same chain without passing `--fork-net`.
 Learn more about fork testing in the [Fork Testing](/docs/test-runner/fork-testing/) article.
 </Callout>
 
-### Combining with --broadcast
+### Combining with `--net`
 
-`--fork-net` and `--broadcast` can still be combined, but in broadcast mode
+`--fork-net` and `--net` can still be combined, but in broadcast mode
 they must point to the same network.
 
 | Flags                                          | Blockchain State           | Wallets      | Use Case                                                        |
 |------------------------------------------------|----------------------------|--------------|-----------------------------------------------------------------|
 | None                                           | Local emulator             | Test wallets | Local development                                               |
 | `--fork-net testnet`                           | Real testnet state         | Test wallets | Query real contracts locally                                    |
-| `--broadcast`                                  | Selected broadcast network | Real wallets | Deploy and read back live state on testnet                      |
-| `--broadcast --net mainnet`                    | Real mainnet state         | Real wallets | Mainnet deployment and post-deploy verification                 |
-| `--broadcast --net testnet --fork-net testnet` | Real testnet state         | Real wallets | Explicit same-network fork setup, optionally with block pinning |
+| `--net testnet`                                | Real testnet state         | Real wallets | Deploy and read back live state on testnet                      |
+| `--net mainnet`                                | Real mainnet state         | Real wallets | Mainnet deployment and post-deploy verification                 |
+| `--net testnet --fork-net testnet`             | Real testnet state         | Real wallets | Explicit same-network fork setup, optionally with block pinning |
 
-Passing different `--net` and `--fork-net` values in `--broadcast` mode is
+Passing different `--net` and `--fork-net` values in broadcast mode is
 rejected to avoid reading from one network while sending to another.
 
 ## Network Selection
 
-Acton scripts supports both testnet and mainnet:
+Acton scripts support testnet, mainnet, and localnet:
 
 ```bash
-# Testnet (default)
-acton script deploy.tolk --broadcast
+# Testnet
+acton script deploy.tolk --net testnet
 
-# Mainnet (explicit)
-acton script deploy.tolk --broadcast --net mainnet
+# Mainnet
+acton script deploy.tolk --net mainnet
+
+# Localnet
+acton script deploy.tolk --net localnet
 ```
 
 ## Local Testing vs Broadcasting

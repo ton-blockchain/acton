@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ fuzz-int1 [TIME] (4 runs, seed 42)
+  ✓ fuzz int1 [TIME] (4 runs, seed 42)
 
  ✓ 1 passed in 1 file

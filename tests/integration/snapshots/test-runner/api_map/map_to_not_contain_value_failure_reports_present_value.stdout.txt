@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/map.test.tolk (1 test)
-  ✗ map-not-contain-value-fails [TIME]
+  ✗ map not contain value fails [TIME]
     └─ Error: expect(actual).toNotContainValue(expected): Value '77' is found in the map
       └─ at tests/map.test[LINE]
 

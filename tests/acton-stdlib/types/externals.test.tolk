@@ -45,7 +45,7 @@ fun setupTest(): (Counter, Treasury) {
     return (counter, deployer);
 }
 
-get fun `test-externals`() {
+get fun `test externals`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -67,7 +67,7 @@ get fun `test-externals`() {
     expect(second.info.dest).toEqual(addr);
 }
 
-get fun `test-externals-at-or-null-and-emit-matchers`() {
+get fun `test externals at or null and emit matchers`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -82,7 +82,7 @@ get fun `test-externals-at-or-null-and-emit-matchers`() {
     expect(res).toEmitExternalMessage<ResetCounter>();
 }
 
-get fun `test-find-external-out-message`() {
+get fun `test find external out message`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

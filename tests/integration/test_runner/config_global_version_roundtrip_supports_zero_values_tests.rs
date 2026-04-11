@@ -26,7 +26,7 @@ fn config_global_version_roundtrip_supports_zero_values() {
     run_config_success_case(
         "do-stdlib-config-global-version-zero-roundtrip",
         r"
-get fun `test-do-stdlib-config-global-version-zero-roundtrip`() {
+get fun `test do stdlib config global version zero roundtrip`() {
     var config = net.getConfig();
 
     val zeroVersion = GlobalVersion {
@@ -51,7 +51,7 @@ fn config_global_version_roundtrip_supports_non_zero_values() {
     run_config_success_case(
         "do-stdlib-config-global-version-non-zero-roundtrip",
         r"
-get fun `test-do-stdlib-config-global-version-non-zero-roundtrip`() {
+get fun `test do stdlib config global version non zero roundtrip`() {
     var config = net.getConfig();
 
     val nonZero = GlobalVersion {

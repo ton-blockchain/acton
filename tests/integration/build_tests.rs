@@ -976,7 +976,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.broken]
-name = "broken"
+display-name = "broken"
 src = "contracts/missing.boc"
 depends = []
 "#;
@@ -1022,7 +1022,7 @@ description = ""
 version = "0.1.0"
 
 [contracts]
-missing_closing_bracket = { name = "test", src = "contracts/test.tolk" }
+missing_closing_bracket = { display-name = "test", src = "contracts/test.tolk" }
 "#,
     )
     .expect("Failed to write invalid TOML");
@@ -1048,7 +1048,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.missing]
-name = "missing"
+display-name = "missing"
 src = "contracts/missing_file.tolk"
 depends = []
 "#;
@@ -1074,7 +1074,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.missing]
-name = "missing"
+display-name = "missing"
 src = "/contracts/missing_file.tolk"
 depends = []
 "#;
@@ -1102,7 +1102,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.txt"
 depends = []
 "#;
@@ -1233,7 +1233,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple file.tolk"
 depends = []
 "#;
@@ -1481,7 +1481,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.corrupted]
-name = "corrupted"
+display-name = "corrupted"
 src = "contracts/corrupted.boc"
 depends = []
 "#;

@@ -47,7 +47,7 @@ fun Counter.getCounter(self): int {
     return net.runGetMethod(self.address, "currentCounter");
 }
 
-get fun `test-run-get-method-with-int-return-type`() {
+get fun `test run get method with int return type`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -56,7 +56,7 @@ get fun `test-run-get-method-with-int-return-type`() {
     expect(counter.getCounter()).toEqual(100);
 }
 
-get fun `test-run-get-method-with-int-int-return-type`() {
+get fun `test run get method with int int return type`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -66,7 +66,7 @@ get fun `test-run-get-method-with-int-int-return-type`() {
     expect(result).toEqual([100, 200]);
 }
 
-get fun `test-run-get-method-with-nullable-int-return-type`() {
+get fun `test run get method with nullable int return type`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -82,7 +82,7 @@ get fun `test-run-get-method-with-nullable-int-return-type`() {
     expect(result2).toEqual(30000);
 }
 
-get fun `test-run-get-method-with-struct-with-two-int-return-type`() {
+get fun `test run get method with struct with two int return type`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -92,7 +92,7 @@ get fun `test-run-get-method-with-struct-with-two-int-return-type`() {
     expect(result).toEqual([0, 100]);
 }
 
-get fun `test-run-get-method-with-nullable-struct-with-two-int-return-type`() {
+get fun `test run get method with nullable struct with two int return type`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -108,7 +108,7 @@ get fun `test-run-get-method-with-nullable-struct-with-two-int-return-type`() {
     expect([result2.get(0) as int, result2.get(1) as int]).toEqual([0, 200]);
 }
 
-get fun `test-run-get-method-with-single-int-argument`() {
+get fun `test run get method with single int argument`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -121,7 +121,7 @@ get fun `test-run-get-method-with-single-int-argument`() {
     expect(result2).toEqual(2098);
 }
 
-get fun `test-run-get-method-with-two-int-argument`() {
+get fun `test run get method with two int argument`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -131,7 +131,7 @@ get fun `test-run-get-method-with-two-int-argument`() {
     expect(result).toEqual(102098);
 }
 
-get fun `test-run-get-method-with-objectt-argument`() {
+get fun `test run get method with objectt argument`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -151,7 +151,7 @@ get fun `test-run-get-method-with-objectt-argument`() {
     });
 }
 
-get fun `test-run-get-method-with-int-return-type-by-id`() {
+get fun `test run get method with int return type by id`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

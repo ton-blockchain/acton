@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/network.test.tolk (1 test)
-  ✓ ah-stdlib-set-account-preserves-existing-shard-markers-and-balance [TIME]
+  ✓ ah stdlib set account preserves existing shard markers and balance [TIME]
 
  ✓ 1 passed in 1 file

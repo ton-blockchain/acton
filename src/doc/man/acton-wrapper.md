@@ -6,11 +6,11 @@ acton-wrapper --- Generate Tolk or TypeScript wrappers for a contract
 
 ## SYNOPSIS
 
-`acton wrapper` [_options_] _contract-id_
+`acton wrapper` [_options_] _contract-name_
 
 ## DESCRIPTION
 
-Generate a wrapper for the contract identified by `_contract-id_` from
+Generate a wrapper for the contract identified by `_contract-name_` from
 `Acton.toml`.
 
 Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
@@ -29,8 +29,8 @@ run is not required.
 
 {{#options}}
 
-{{#option "_contract-id_" }}
-Contract ID from `Acton.toml` to generate the wrapper for.
+{{#option "_contract-name_" }}
+Contract name from `Acton.toml` to generate the wrapper for.
 {{/option}}
 
 {{#option "`-o`, `--output` _path_" }}
@@ -116,7 +116,7 @@ Project-wide defaults can be configured in `Acton.toml`:
 
 ```toml
 [wrappers.tolk]
-output-dir = "tests/wrappers"
+output-dir = "wrappers"
 generate-test = true
 test-output-dir = "tests"
 
@@ -137,33 +137,33 @@ CLI flags override config values for the current invocation.
 1. Generate the default Tolk wrapper:
 
    ```bash
-   acton wrapper counter
+   acton wrapper Counter
    ```
 
 2. Generate a wrapper and stub test:
 
    ```bash
-   acton wrapper counter --test
+   acton wrapper Counter --test
    ```
 
 3. Generate a TypeScript wrapper:
 
    ```bash
-   acton wrapper counter --ts
+   acton wrapper Counter --ts
    ```
 
 4. Generate into custom locations:
 
    ```bash
-   acton wrapper counter --output-dir tests/generated
-   acton wrapper counter --test --test-output-dir tests/generated
-   acton wrapper counter --ts --output-dir wrappers
+   acton wrapper Counter --output-dir tests/generated
+   acton wrapper Counter --test --test-output-dir tests/generated
+   acton wrapper Counter --ts --output-dir wrappers
    ```
 
 5. Generate a frontend-oriented TypeScript wrapper layout:
 
    ```bash
-   acton wrapper counter --ts --output-dir app/src/wrappers
+   acton wrapper Counter --ts --output-dir app/src/wrappers
    ```
 
 ## SEE ALSO

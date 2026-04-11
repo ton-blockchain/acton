@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/df_send_single_vs_send.test.tolk (1 test)
-  ✓ df-send-single-vs-send-first-result-project-builder [TIME]
+  ✓ df send single vs send first result project builder [TIME]
 
  ✓ 1 passed in 1 file

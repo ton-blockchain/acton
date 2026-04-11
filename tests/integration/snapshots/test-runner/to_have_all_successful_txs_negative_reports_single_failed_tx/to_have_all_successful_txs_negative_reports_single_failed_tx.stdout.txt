@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/tx_expect_all_successful.test.tolk (1 test)
-  ✗ ce-all-successful-negative-single-failing-tx [TIME]
+  ✗ ce all successful negative single failing tx [TIME]
     └─ Error: expect(actual).toHaveAllSuccessfulTxs(expected)
         N/A -> sender A
         └── 0x1 1 TON -> failing B                                                      gas=332 exit_code=77 aborted

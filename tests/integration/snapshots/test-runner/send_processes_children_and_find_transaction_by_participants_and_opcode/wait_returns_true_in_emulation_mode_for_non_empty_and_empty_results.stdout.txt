@@ -14,6 +14,6 @@
  TEST  [ROOT]
 
  > tests/network_paths.test.tolk (1 test)
-  ✓ ag-wait-in-emulation-mode [TIME]
+  ✓ ag wait in emulation mode [TIME]
 
  ✓ 1 passed in 1 file

@@ -26,7 +26,7 @@ import "../../lib/io"
 
 fun main() {
     val wallet = net.wallet("deployer");
-    println1("DEPLOYER_ADDRESS={}", wallet.address);
+    println("DEPLOYER_ADDRESS={}", wallet.address);
 }
 "#;
 const DEPLOY_COUNTER_SCRIPT: &str = r#"
@@ -58,7 +58,7 @@ fun main() {
     });
     net.send(wallet.address, deployCounter);
 
-    println1("COUNTER_ADDRESS={}", counterAddress);
+    println("COUNTER_ADDRESS={}", counterAddress);
 }
 "#;
 
@@ -126,7 +126,7 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .build();
     let log_dir = prepare_log_dir(project.path());
@@ -189,7 +189,7 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .build();
     let log_dir = prepare_log_dir(project.path());
@@ -297,7 +297,6 @@ fn test_rpc_info_reads_wallet_account_from_litenode() {
     let script_output = project
         .acton()
         .script("scripts/print_deployer_address.tolk")
-        .broadcast()
         .verify_network("localnet")
         .arg("--api-key")
         .arg("local-test-api-key")
@@ -338,7 +337,7 @@ fn test_rpc_info_decodes_storage_from_litenode() {
         )
         .contract_from_path(
             "counter",
-            "src/commands/new/templates/counter/contracts/counter.tolk",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
         )
         .script_file("deploy_counter", DEPLOY_COUNTER_SCRIPT)
         .build();
@@ -355,7 +354,6 @@ fn test_rpc_info_decodes_storage_from_litenode() {
     let deploy_output = project
         .acton()
         .script("scripts/deploy_counter.tolk")
-        .broadcast()
         .verify_network("localnet")
         .arg("--api-key")
         .arg("local-test-api-key")

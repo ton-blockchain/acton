@@ -38,12 +38,12 @@ A typical library workflow is:
 .SS "acton library publish"
 Publish a contract or arbitrary code as a library.
 .SS "Synopsis"
-\fBacton library publish\fR [\fIoptions\fR] [\fIcontract\-id\fR]
+\fBacton library publish\fR [\fIoptions\fR] [\fIcontract\-name\fR]
 .SS "Options"
 .sp
-\fIcontract\-id\fR
+\fIcontract\-name\fR
 .RS 4
-Contract ID to publish.
+Contract name to publish.
 .sp
 Use \fB\-\-code\fR to publish arbitrary code instead of compiling a project contract.
 .RE
@@ -330,7 +330,7 @@ failed.
 .sp
 .RS 4
 .nf
-acton library publish math \-\-duration 365d \-\-wallet deployer
+acton library publish Math \-\-duration 365d \-\-wallet deployer
 .fi
 .RE
 .RE
@@ -360,7 +360,7 @@ acton library fetch <HASH> \-\-disasm
 .sp
 .RS 4
 .nf
-acton library topup math \-\-duration 1y
+acton library topup Math \-\-duration 1y
 .fi
 .RE
 .RE

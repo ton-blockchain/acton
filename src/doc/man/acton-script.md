@@ -14,7 +14,7 @@ Execute a standalone Tolk script.
 
 Scripts are useful for experimentation, deployment flows, blockchain queries,
 and one-off operational tasks. Unlike tests, scripts use a `main()` entry point
-and can send real transactions when `--broadcast` is enabled.
+and can send real transactions when `--net` is provided.
 
 ## OPTIONS
 
@@ -68,7 +68,7 @@ Clear the compilation cache before running.
 
 {{#option "`--fork-net` _network_" }}
 Fork blockchain state from a remote network for local execution.
-With `--broadcast`, omitted `--fork-net` defaults to the selected broadcast
+When `--net` is set, omitted `--fork-net` defaults to the selected broadcast
 network.
 {{/option}}
 
@@ -86,13 +86,9 @@ TonCenter API key for blockchain queries.
 
 {{#options}}
 
-{{#option "`--broadcast`" }}
-Send transactions to the selected blockchain network instead of emulating them.
-Conflicting `--net` and `--fork-net` values are rejected.
-{{/option}}
-
 {{#option "`--net` _network_" }}
-Network to use for broadcasting.
+Broadcast to the selected network. If omitted, the script runs in emulation
+mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{/option}}
 
 {{#option "`--explorer` _name_" }}
@@ -128,7 +124,7 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - state is not preserved between runs
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
-- `--broadcast` sends real transactions using configured wallets
+- `--net` sends real transactions using configured wallets
 
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
@@ -148,8 +144,8 @@ acton script scripts/query.tolk -- --net-like-value
 ## SIDE EFFECTS
 
 `acton script` always compiles and executes the selected script. With
-`--broadcast`, it can send real blockchain transactions; without
-`--broadcast`, execution stays local even when `--fork-net` is used.
+`--net`, it can send real blockchain transactions; without `--net`, execution
+stays local even when `--fork-net` is used.
 
 ## EXIT STATUS
 
@@ -163,8 +159,8 @@ When a script can affect on-chain state, the usual safe sequence is:
 
 1. `acton build`
 2. `acton test`
-3. `acton script <path>` without `--broadcast`
-4. only then `acton script <path> --broadcast`
+3. `acton script <path>` without `--net`
+4. only then `acton script <path> --net testnet`
 
 ## EXAMPLES
 
@@ -177,7 +173,7 @@ When a script can affect on-chain state, the usual safe sequence is:
 2. Broadcast to testnet:
 
    ```bash
-   acton script scripts/deploy.tolk --broadcast --net testnet
+   acton script scripts/deploy.tolk --net testnet
    ```
 
 3. Query mainnet state without broadcasting:
@@ -189,7 +185,7 @@ When a script can affect on-chain state, the usual safe sequence is:
 4. Broadcast a deploy flow and print explorer links:
 
    ```bash
-   acton script scripts/deploy.tolk --broadcast --net testnet --explorer tonviewer
+   acton script scripts/deploy.tolk --net testnet --explorer tonviewer
    ```
 
 ## SEE ALSO

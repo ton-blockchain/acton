@@ -103,7 +103,7 @@ fn ext_out_list_at_or_null_out_of_range_returns_null_bug() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-out-of-range",
         r"
-get fun `test-ct-ext-out-list-atornull-out-of-range`() {
+get fun `test ct ext out list atornull out of range`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
@@ -127,7 +127,7 @@ fn ext_out_list_at_or_null_negative_index_returns_null() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-negative-index",
         r"
-get fun `test-ct-ext-out-list-atornull-negative-index`() {
+get fun `test ct ext out list atornull negative index`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
@@ -151,7 +151,7 @@ fn ext_out_list_at_or_null_opcode_mismatch_returns_null() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-opcode-mismatch",
         r"
-get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
+get fun `test ct ext out list atornull opcode mismatch`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
@@ -175,7 +175,7 @@ fn ext_out_list_at_or_null_valid_index_returns_message() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-valid-index",
         r"
-get fun `test-ct-ext-out-list-atornull-valid-index`() {
+get fun `test ct ext out list atornull valid index`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
@@ -200,7 +200,7 @@ fn ext_out_list_at_or_null_empty_list_returns_null() {
     run_success(
         "ct-stdlib-ext-out-list-atornull-empty-list",
         r#"
-get fun `test-ct-ext-out-list-atornull-empty-list`() {
+get fun `test ct ext out list atornull empty list`() {
     val externalAddress = deployCtExternalHarness();
     val sender = net.treasury("ct_internal_sender");
 

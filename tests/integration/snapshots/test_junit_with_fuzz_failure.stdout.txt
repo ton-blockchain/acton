@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-fails-with-inputs [TIME] (2 runs, seed 17)
+  ✗ fuzz fails with inputs [TIME] (2 runs, seed 17)
     ├─ Fuzz case 1/2
     ├─ Inputs: value=0
     └─ Error: expect(actual).toEqual(expected)

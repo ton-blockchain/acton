@@ -1,0 +1,1 @@
+Error: `acton lint` is not supported. Use `acton check counter --fix` instead.

@@ -9,7 +9,7 @@
 /// import "@acton/testing/fuzz"
 ///
 /// @test({ fuzz: true })
-/// get fun `test-balance-stays-bounded`(value: int) {
+/// get fun `test balance stays bounded`(value: int) {
 ///     val bounded = fuzz.bound(value, 0, 100);
 ///     fuzz.assume(bounded != 13);
 ///     expect(bounded >= 0).toBeTrue();
@@ -51,7 +51,7 @@ fun fuzz.bound<T>(
     val maxInt = maxValue as int;
     if (minInt > maxInt) {
         Assert.fail(
-            format2(
+            format(
                 "fuzz.bound(<value>, <min>, <max>): min {} must be less than or equal to max {}",
                 minInt,
                 maxInt,
@@ -84,5 +84,5 @@ fun fuzz.bound<T>(
 }
 
 fun formatFuzzLocation(loc: SourceLocation): string {
-    return format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
+    return format("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
 }

@@ -96,10 +96,10 @@ fn create_project_and_run_tests() {
             "integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
         )
         .assert_file_exists("foobar/Acton.toml")
-        .assert_file_exists("foobar/contracts/contract.tolk")
+        .assert_file_exists("foobar/contracts/Empty.tolk")
         .assert_file_exists("foobar/contracts/types.tolk")
         .assert_file_exists("foobar/tests/contract.test.tolk")
-        .assert_file_exists("foobar/tests/wrappers/Empty.tolk")
+        .assert_file_exists("foobar/wrappers/Empty.tolk")
         .assert_file_exists("foobar/scripts/deploy.tolk")
         .assert_file_exists("foobar/README.md")
         .assert_file_exists("foobar/.github/workflows/ci.yml");
@@ -128,7 +128,6 @@ fn deploy_script_fails_when_toncenter_is_unavailable() {
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .current_dir(&project_dir)
-        .broadcast()
         .verify_network("custom:toncenter-down")
         .run()
         .failure();

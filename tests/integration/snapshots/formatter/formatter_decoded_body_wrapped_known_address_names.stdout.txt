@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_wrapped_known_address.test.tolk (1 test)
-  ✓ formatter-decoded-body-wrapped-known-addresses [TIME]
+  ✓ formatter decoded body wrapped known addresses [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmWrappedKnownAddressBody 0.05 TON -> fm_wrapped_known_address_sink B       gas=333

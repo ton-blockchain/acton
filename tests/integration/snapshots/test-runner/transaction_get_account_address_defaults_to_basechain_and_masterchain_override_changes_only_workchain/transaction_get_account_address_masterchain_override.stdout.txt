@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dc_transaction_get_account_address_fixture.test.tolk (1 test)
-  ✓ dc-stdlib-transaction-get-account-address-masterchain-stable [TIME]
+  ✓ dc stdlib transaction get account address masterchain stable [TIME]
 
  ✓ 1 passed in 1 file

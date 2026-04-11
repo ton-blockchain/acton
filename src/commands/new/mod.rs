@@ -215,7 +215,7 @@ pub fn new_cmd(
         contracts.insert(
             contract.id.to_owned(),
             ContractConfig {
-                name: contract.name.to_owned(),
+                name: Some(contract.name.to_owned()),
                 src: contract.src.to_owned(),
                 depends: Some(vec![]),
                 output: None,
@@ -235,7 +235,7 @@ pub fn new_cmd(
     scripts.insert(
         "deploy-testnet".to_owned(),
         format!(
-            "acton script {} --broadcast --net testnet",
+            "acton script {} --net testnet",
             scaffold.layout().deploy_script_path()
         ),
     );
@@ -342,7 +342,7 @@ fn resolve_include_app(template: ProjectTemplate, app: bool) -> anyhow::Result<b
     if app {
         if !template::template_supports_app(template) {
             anyhow::bail!(
-                "Template {} does not include a TypeScript app scaffold",
+                "Template {} does not include a TypeScript dApp",
                 template.to_string().cyan()
             );
         }
@@ -355,7 +355,7 @@ fn resolve_include_app(template: ProjectTemplate, app: bool) -> anyhow::Result<b
     }
 
     if stdin().is_terminal() && stdout().is_terminal() {
-        Confirm::new("Include the TypeScript app scaffold?")
+        Confirm::new("Include the TypeScript dApp?")
             .with_default(false)
             .prompt()
             .map_err(Into::into)

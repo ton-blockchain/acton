@@ -107,8 +107,8 @@ fun onBouncedMessage(_: InMessageBounced) {}
 }
 
 #[test]
-fn build_named_contract_selection_accepts_normalized_id_for_mixed_case_and_hyphen_name() {
-    let project = ProjectBuilder::new("build-cmd-contract-select-normalized-id")
+fn build_named_contract_selection_accepts_normalized_name_for_mixed_case_and_hyphen_name() {
+    let project = ProjectBuilder::new("build-cmd-contract-select-normalized-name")
         .contract(
             "My-Contract",
             r"
@@ -139,12 +139,12 @@ fun onBouncedMessage(_: InMessageBounced) {}
     assert!(!project.path().join("build/other.json").exists());
 
     output.assert_snapshot_matches(
-        "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_accepts_normalized_id_for_mixed_case_and_hyphen_name.stdout.txt",
+        "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_accepts_normalized_name_for_mixed_case_and_hyphen_name.stdout.txt",
     );
 }
 
 #[test]
-fn build_named_contract_selection_nonexistent_contract_lists_normalized_available_ids() {
+fn build_named_contract_selection_nonexistent_contract_lists_normalized_available_names() {
     let project = ProjectBuilder::new("build-cmd-contract-select-missing-multi")
         .contract(
             "Zeta",
@@ -176,12 +176,12 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_nonexistent_contract_lists_normalized_available_ids.stderr.txt",
+            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_nonexistent_contract_lists_normalized_available_names.stderr.txt",
         );
 }
 
 #[test]
-fn build_named_contract_selection_treats_option_like_value_after_double_dash_as_contract_id() {
+fn build_named_contract_selection_treats_option_like_value_after_double_dash_as_contract_name() {
     let project = ProjectBuilder::new("build-cmd-contract-select-double-dash-option-like")
         .contract(
             "existing",
@@ -200,12 +200,12 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_treats_option_like_value_after_double_dash_as_contract_id.stderr.txt",
+            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_treats_option_like_value_after_double_dash_as_contract_name.stderr.txt",
         );
 }
 
 #[test]
-fn build_named_contract_selection_rejects_multiple_positional_contract_ids() {
+fn build_named_contract_selection_rejects_multiple_positional_contract_names() {
     let project = ProjectBuilder::new("build-cmd-contract-select-extra-positional")
         .contract(
             "alpha",
@@ -231,7 +231,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_rejects_multiple_positional_contract_ids.stderr.txt",
+            "integration/snapshots/build/build_cmd_contract_selection_tests/build_named_contract_selection_rejects_multiple_positional_contract_names.stderr.txt",
         );
 
     assert!(

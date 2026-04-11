@@ -16,14 +16,14 @@ pub mod analysis;
 /// ### Example
 /// ```tolk
 /// fun main(a: int, b: int, c: int): int {
-///   return a / b * c;
+///     return a / b * c;
 /// }
 /// ```
 ///
 /// Use instead:
 /// ```tolk
 /// fun main(a: int, b: int, c: int): int {
-///   return a * c / b;
+///     return a * c / b;
 /// }
 /// ```
 ///

@@ -6,7 +6,7 @@
 /// Examples:
 /// ```tolk
 /// // Mock time
-/// vm.setTime(1700000000);
+/// vm.setTime(1_700_000_000);
 ///
 /// // Register a mock library
 /// vm.registerLibrary(myLibCell);
@@ -195,4 +195,4 @@ fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"
 
 fun ffi.parseInt(x: string): int
-    asm "45 EXTCALL"
+    asm "47 EXTCALL"

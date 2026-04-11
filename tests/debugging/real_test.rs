@@ -175,16 +175,16 @@ fun main() {
     val (counter, deployer) = setupTest();
 
     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-    println(format1("Counter: {}", counterRes));
+    println("Counter: {}", counterRes);
 
     val info = net.getAccountState(counter.address)!;
-    println(format1("Balance: {:ton}", info.storage.balance.grams));
+    println("Balance: {:ton}", info.storage.balance.grams);
 
     val res = counter.sendIncrease(deployer.address, 100);
     println(res);
 }
 
-get fun `test-should-reset-counter`() {
+get fun `test should reset counter`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);

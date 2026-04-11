@@ -23,7 +23,7 @@ fn register_code_cell_labels_auto_deploy_transactions() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-register-code-cell-label`() {
+            get fun `test register code cell label`() {
                 val deployer = net.treasury("q_deployer");
                 val code = build("simple");
                 net.registerCodeCell(code, "q_simple_alias");
@@ -68,7 +68,7 @@ fn register_code_cell_last_registration_wins_for_same_hash() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-register-code-cell-last-wins`() {
+            get fun `test register code cell last wins`() {
                 val deployer = net.treasury("q_deployer");
                 val code = build("simple");
 
@@ -116,7 +116,7 @@ fn register_code_cell_does_not_rename_other_contract_hashes() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-register-code-cell-is-hash-specific`() {
+            get fun `test register code cell is hash specific`() {
                 val deployer = net.treasury("q_deployer");
                 net.registerCodeCell(build("simple"), "q_simple_alias");
 
@@ -172,7 +172,7 @@ fn register_address_name_has_priority_over_registered_code_name() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-register-address-priority-over-code-name`() {
+            get fun `test register address priority over code name`() {
                 val deployer = net.treasury("q_deployer");
                 val code = build("simple");
                 net.registerCodeCell(code, "q_code_alias");
@@ -221,7 +221,7 @@ fn register_code_cell_from_get_deployed_code_applies_to_future_transactions() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-register-code-cell-from-get-deployed-code`() {
+            get fun `test register code cell from get deployed code`() {
                 val deployer = net.treasury("q_deployer");
                 val init = ContractState {
                     code: build("simple"),

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/di_net_set_now_boundary_overwrite.test.tolk (1 test)
-  ✓ di-net-set-now-boundary-overwrite [TIME]
+  ✓ di net set now boundary overwrite [TIME]
 
  ✓ 1 passed in 1 file

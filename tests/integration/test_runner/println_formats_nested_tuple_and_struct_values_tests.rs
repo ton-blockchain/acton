@@ -56,7 +56,7 @@ fn println_formats_nested_tuple_and_struct_values() {
     run_success_case(
         "ar-stdlib-println-nested-tuple-and-struct-values",
         r#"
-get fun `test-ar-stdlib-println-nested-tuple-and-struct-values`() {
+get fun `test ar stdlib println nested tuple and struct values`() {
     val frame = Frame {
         name: "root",
         point: Point { x: 7, y: 9 },
@@ -81,7 +81,7 @@ fn println1_formats_nested_tuple_and_struct_values_via_placeholder_pipeline() {
     run_success_case(
         "ar-stdlib-println1-nested-tuple-and-struct-values",
         r#"
-get fun `test-ar-stdlib-println1-nested-tuple-and-struct-values`() {
+get fun `test ar stdlib println1 nested tuple and struct values`() {
     val frame = Frame {
         name: "root",
         point: Point { x: 7, y: 9 },
@@ -94,7 +94,7 @@ get fun `test-ar-stdlib-println1-nested-tuple-and-struct-values`() {
         ([29, 31], Point { x: 37, y: 41 }),
     );
 
-    println1("nested={}", nested);
+    println("nested={}", nested);
 }
 "#,
         "integration/snapshots/test-runner/println_formats_nested_tuple_and_struct_values/println1_formats_nested_tuple_and_struct_values_via_placeholder_pipeline.stdout.txt",

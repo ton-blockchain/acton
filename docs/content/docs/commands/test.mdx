@@ -470,11 +470,11 @@ Run tests in mutation testing mode.
 <CommandOption>
 <CommandOptionTitle>
 
-`--mutate-contract` _contract-id_
+`--mutate-contract` _contract-name_
 
 </CommandOptionTitle>
 
-Contract ID to mutate during mutation testing.
+Contract name to mutate during mutation testing.
 
 </CommandOption>
 
@@ -719,7 +719,7 @@ Defaults can be configured in `Acton.toml`:
 ```toml
 [test]
 reporter = ["console"]
-filter = "test-.*"
+filter = ".*jetton.*"
 junit-path = "reports"
 junit-merge = false
 
@@ -819,43 +819,43 @@ CLI flags override config values for the current invocation.
 6. Run mutation testing for one contract:
 
    ```bash
-   acton test --mutate --mutate-contract wallet
+   acton test --mutate --mutate-contract Wallet
    ```
 
 7. Run mutation testing only for changed lines in the current worktree:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-diff worktree
+   acton test --mutate --mutate-contract Wallet --mutation-diff worktree
    ```
 
 8. Run mutation testing for selected levels on the current branch:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-diff branch --mutation-levels critical,major
+   acton test --mutate --mutate-contract Wallet --mutation-diff branch --mutation-levels critical,major
    ```
 
 9. Re-run one specific mutant from a previous report:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-id 2
+   acton test --mutate --mutate-contract Wallet --mutation-id 2
    ```
 
 10. Resume an unfinished mutation session:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
+   acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
    ```
 
 11. Fail the run when mutation score drops below 85%:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-minimum-percent 85
+   acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
    ```
 
 12. Limit mutation testing to four workers:
 
    ```bash
-   acton test --mutate --mutate-contract wallet --mutation-workers 4
+   acton test --mutate --mutate-contract Wallet --mutation-workers 4
    ```
 
 13. Debug a forked-state failure with traces and the UI:

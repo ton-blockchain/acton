@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-max-test-rejects-without-runs [TIME] (5 runs, seed 17)
+  ✗ fuzz max test rejects without runs [TIME] (5 runs, seed 17)
     └─ Error: assume(...) rejected 3 fuzz inputs before reaching 5 successful runs (completed 0)
       └─ at tests/test.test[LINE]
 

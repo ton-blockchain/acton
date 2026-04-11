@@ -14,7 +14,7 @@ fn wrap_assert_source(test_body: &str) -> String {
 fn assert_consumes_less_than2_returns_function_result_when_within_limit() {
     let source = wrap_assert_source(
         r"
-get fun `test-ac-consumes-less-than2-returns-result`() {
+get fun `test ac consumes less than2 returns result`() {
     val sum = Assert.consumesLessThan2(
         fun(a: int, b: int): int {
             return a + b;
@@ -45,7 +45,7 @@ get fun `test-ac-consumes-less-than2-returns-result`() {
 fn assert_consumes_less_than_reports_human_readable_gas_failure() {
     let source = wrap_assert_source(
         r"
-get fun `test-ac-consumes-less-than-failure`() {
+get fun `test ac consumes less than failure`() {
     Assert.consumesLessThan(
         fun() {
             var i = 0;
@@ -77,7 +77,7 @@ get fun `test-ac-consumes-less-than-failure`() {
 fn expect_to_equal_decimal_formats_negative_fraction_values_in_failure() {
     let source = wrap_assert_source(
         r"
-get fun `test-ac-decimal-default-message-formatting`() {
+get fun `test ac decimal default message formatting`() {
     expect(-15).toEqualDecimal(-10, 2);
 }
 ",
@@ -102,7 +102,7 @@ get fun `test-ac-decimal-default-message-formatting`() {
 fn assert_equal_decimal_uses_custom_message_and_location_from_arguments() {
     let source = wrap_assert_source(
         r#"
-get fun `test-ac-decimal-custom-message-location`() {
+get fun `test ac decimal custom message location`() {
     Assert.equalDecimal(
         120,
         121,
@@ -134,7 +134,7 @@ get fun `test-ac-decimal-custom-message-location`() {
 fn assert_not_equal_failure_surfaces_ffi_not_equal_branch_details() {
     let source = wrap_assert_source(
         r#"
-get fun `test-ac-assert-not-equal-failure-branch`() {
+get fun `test ac assert not equal failure branch`() {
     Assert.notEqual(7, 7, "numbers should differ");
 }
 "#,

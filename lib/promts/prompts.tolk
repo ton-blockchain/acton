@@ -32,7 +32,7 @@ import "../ffi/ffi"
 /// Example:
 /// ```tolk
 /// val name = prompt("What is your name?", "John");
-/// println(format1("Hello {}", name));
+/// println("Hello {}", name);
 /// ```
 fun prompt(message: string, placeholder: string = ""): string {
     return ffi.prompt(message, placeholder);
@@ -49,7 +49,7 @@ fun prompt(message: string, placeholder: string = ""): string {
 /// Example:
 /// ```tolk
 /// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
-/// println(format1("Hello {}", name));
+/// println("Hello {}", name);
 /// ```
 fun select(message: string, variants: tuple): string {
     return ffi.select(message, variants);

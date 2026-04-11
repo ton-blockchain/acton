@@ -20,6 +20,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ send-iter-close-after-partial-execution [TIME]
+  ✓ send iter close after partial execution [TIME]
 
  ✓ 1 passed in 1 file

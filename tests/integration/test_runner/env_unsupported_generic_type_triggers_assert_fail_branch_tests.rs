@@ -13,7 +13,7 @@ fn env_unsupported_generic_type_triggers_assert_fail_branch() {
                 value: int,
             }
 
-            get fun `test-bq-stdlib-env-unsupported-generic`() {
+            get fun `test bq stdlib env unsupported generic`() {
                 env<Unsupported>("BQ_ENV_UNSUPPORTED");
             }
         "#,

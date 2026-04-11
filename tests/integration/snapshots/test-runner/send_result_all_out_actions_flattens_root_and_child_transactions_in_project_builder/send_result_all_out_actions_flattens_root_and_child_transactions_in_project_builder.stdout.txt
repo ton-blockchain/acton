@@ -12,6 +12,6 @@
  TEST  [ROOT]
 
  > tests/cs_send_result_all_out_actions.test.tolk (1 test)
-  ✓ cs-send-result-all-out-actions-project-builder [TIME]
+  ✓ cs send result all out actions project builder [TIME]
 
  ✓ 1 passed in 1 file

@@ -23,7 +23,7 @@ fn run_get_method_by_id_fails_for_undeployed_contract() {
             import "../../lib/emulation/network"
             import "../../lib/io"
 
-            get fun `test-bg-run-get-method-by-id-undeployed`() {
+            get fun `test bg run get method by id undeployed`() {
                 val undeployed = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
                 val value: int = net.runGetMethodById(undeployed, 0x10000);
                 println(value);
@@ -82,7 +82,7 @@ fn run_get_method_by_id_fails_for_invalid_method_id_on_deployed_contract() {
             return counter
         }
 
-        get fun `test-bg-run-get-method-by-id-invalid-id`() {
+        get fun `test bg run get method by id invalid id`() {
             val counter = setupCounter();
             val value: int = net.runGetMethodById(counter.address, 777777);
             println(value);

@@ -91,7 +91,7 @@ acton test
 acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
-acton script scripts/deploy.tolk --broadcast --net testnet
+acton script scripts/deploy.tolk --net testnet
 ```
 
 For a step-by-step walkthrough, see the

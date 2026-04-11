@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/build_missing.test.tolk (1 test)
-  ✗ build-contract-not-found [TIME]
+  ✗ build contract not found [TIME]
     └─ Error: Contract missing not found in Acton.toml
 Available contracts:
  simple

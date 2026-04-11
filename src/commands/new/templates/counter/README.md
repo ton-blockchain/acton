@@ -5,9 +5,9 @@ counter contract, wrapper helpers, tests, and a ready-to-run deployment script.
 
 ## What Is Included
 
-- `contracts/counter.tolk` implements the counter contract.
+- `contracts/Counter.tolk` implements the counter contract.
 - `contracts/types.tolk` defines storage, message types, and starter errors.
-- `tests/wrappers/Counter.tolk` is the wrapper used by tests and scripts.
+- `wrappers/Counter.tolk` is the wrapper used by tests and scripts.
 - `tests/counter.test.tolk` covers increment, reset, and invalid-message flows.
 - `scripts/deploy.tolk` deploys the contract with initial counter state and
   reads the counter back after deployment.
@@ -35,9 +35,9 @@ acton run deploy-emulation
 ## Customize The Starter
 
 1. Extend `contracts/types.tolk` with your storage, messages, and errors.
-2. Update `contracts/counter.tolk` with your contract logic.
-3. Adjust `tests/wrappers/Counter.tolk` to match the new ABI, or regenerate it
-   with `acton wrapper counter`.
+2. Update `contracts/Counter.tolk` with your contract logic.
+3. Adjust `wrappers/Counter.tolk` to match the new ABI, or regenerate it
+   with `acton wrapper Counter`.
 4. Extend `tests/counter.test.tolk` with the scenarios you care about.
 5. Update `scripts/deploy.tolk` with the storage and deployment flow you want.
 
@@ -54,7 +54,7 @@ acton wallet new --name deployer --local --airdrop
 2. Broadcast the deployment to testnet:
 
 ```bash
-acton script scripts/deploy.tolk --broadcast --net testnet
+acton script scripts/deploy.tolk --net testnet
 ```
 
 The starter script waits for the transaction and then reads the deployed

@@ -36,7 +36,7 @@ fn transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode() {
     run_transaction_success(
         "da-stdlib-transaction-load-in-msg-inline-opcode",
         r#"
-get fun `test-da-stdlib-transaction-load-in-msg-inline-opcode`() {
+get fun `test da stdlib transaction load in msg inline opcode`() {
     val sender = net.treasury("da_sender_inline");
     val destination = net.randomAddress("da_destination_inline");
 
@@ -85,7 +85,7 @@ fn transaction_load_in_msg_in_fixture_project_matches_inbound_opcode() {
         "{imports}\n{body}\n",
         imports = DA_TRANSACTION_IMPORTS,
         body = r#"
-get fun `test-da-stdlib-transaction-load-in-msg-fixture-opcode`() {
+get fun `test da stdlib transaction load in msg fixture opcode`() {
     val sender = net.treasury("da_sender_fixture");
     val destination = net.randomAddress("da_destination_fixture");
     val payload = DaInlinePayload { queryId: 77, amount: 99 };

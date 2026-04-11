@@ -57,7 +57,7 @@ fn config_raw_param_roundtrip_for_global_version_cell() {
     run_config_success_case(
         "ai-stdlib-config-raw-param-roundtrip",
         r"
-get fun `test-ai-stdlib-config-raw-param-roundtrip`() {
+get fun `test ai stdlib config raw param roundtrip`() {
     var config = net.getConfig();
     val overrideVersion = GlobalVersion {
         version: 12345,
@@ -82,7 +82,7 @@ fn config_set_config_rejects_invalid_global_version_cell() {
     run_config_success_case(
         "ai-stdlib-config-invalid-global-version",
         r"
-get fun `test-ai-stdlib-config-invalid-global-version-cell`() {
+get fun `test ai stdlib config invalid global version cell`() {
     var config = net.getConfig();
     config.setParamRaw(GLOBAL_VERSION_INDEX, beginCell().endCell());
 
@@ -99,7 +99,7 @@ fn config_storage_prices_roundtrip_updates_initial_entry() {
     run_config_success_case(
         "ai-stdlib-config-storage-prices-roundtrip",
         r"
-get fun `test-ai-stdlib-config-storage-prices-roundtrip`() {
+get fun `test ai stdlib config storage prices roundtrip`() {
     var config = net.getConfig();
     var prices = config.getStoragePrices();
     var initial = prices.getInitial();
@@ -127,7 +127,7 @@ fn config_gas_prices_update_basechain_and_masterchain_independently() {
     run_config_success_case(
         "ai-stdlib-config-gas-prices-roundtrip",
         r"
-get fun `test-ai-stdlib-config-gas-prices-roundtrip`() {
+get fun `test ai stdlib config gas prices roundtrip`() {
     var config = net.getConfig();
 
     var basechain = config.getGasPrices(BASECHAIN);
@@ -168,7 +168,7 @@ fn config_msg_forward_prices_update_changes_forward_fee_opcode_result() {
 fun calculateForwardFeeLocal(workchain: int8, bits: int, cells: int): coins
     asm(cells bits workchain) "GETFORWARDFEE"
 
-get fun `test-ai-stdlib-config-msg-forward-prices`() {
+get fun `test ai stdlib config msg forward prices`() {
     val before = calculateForwardFeeLocal(BASECHAIN, 100, 100);
 
     var config = net.getConfig();
@@ -195,7 +195,7 @@ fn config_precompiled_contracts_roundtrip_and_duplicate_insert_guard() {
     run_config_success_case(
         "ai-stdlib-config-precompiled-contracts",
         r"
-get fun `test-ai-stdlib-config-precompiled-contracts`() {
+get fun `test ai stdlib config precompiled contracts`() {
     var precompiled = PrecompiledContractsConfig {
         list: createEmptyMap<uint256, PrecompiledSmartContract>(),
     };
@@ -230,7 +230,7 @@ fn config_gas_price_change_affects_run_get_method_result() {
     run_config_success_case_with_contract(
         "ai-stdlib-config-gas-price-affects-get-method",
         r#"
-get fun `test-ai-stdlib-config-gas-price-affects-run-get-method`() {
+get fun `test ai stdlib config gas price affects run get method`() {
     val simpleCode = build("simple");
     val autoAddress = AutoDeployAddress {
         stateInit: { code: simpleCode, data: beginCell().endCell() },

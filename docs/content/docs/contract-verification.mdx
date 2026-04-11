@@ -38,7 +38,7 @@ Before verifying, ensure that:
 To verify a contract, use the `acton verify` command followed by the contract name and its deployed address.
 
 ```bash
-acton verify my_contract --address EQDt7LL...
+acton verify MyContract --address EQDt7LL...
 ```
 
 By default, this attempts to verify on **testnet**.
@@ -48,7 +48,7 @@ By default, this attempts to verify on **testnet**.
 To verify a contract on the mainnet, add the `--net mainnet` flag:
 
 ```bash
-acton verify my_contract --address EQDt7LL... --net mainnet
+acton verify MyContract --address EQDt7LL... --net mainnet
 ```
 
 ### Specifying a Wallet
@@ -56,7 +56,7 @@ acton verify my_contract --address EQDt7LL... --net mainnet
 If you have multiple wallets configured, you can specify which one to use for the transaction:
 
 ```bash
-acton verify my_contract --address EQDt7LL... --wallet deployer
+acton verify MyContract --address EQDt7LL... --wallet deployer
 ```
 
 ## Viewing results
@@ -75,7 +75,7 @@ You can share this link with your users to prove the authenticity of your contra
 - **Hash Mismatch**: If the command reports a hash mismatch, it means your local source code compiles to different bytecode than what is on-chain. Ensure you are on the exact commit used for deployment and that you are using the same compiler version.
 - **Compiler Version**: If you deployed using a specific version of the Tolk compiler, you can specify it with `--compiler-version`:
   ```bash
-  acton verify my_contract --address ... --compiler-version 1.1.0
+  acton verify MyContract --address ... --compiler-version 1.1.0
     ```
 
 ## Learn more

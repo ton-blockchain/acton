@@ -3,9 +3,9 @@
 No contracts section found in Acton.toml. Add at least one contract.
 To add a contract add the following section to Acton.toml:
 
-[contracts.my-contract]
-name = "MyContract"
-src = "contracts/my-contract.tolk"
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
 depends = []
 
 See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for more information
@@ -14,10 +14,10 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/ed_map_value_matchers.test.tolk (2 tests)
-  ✗ ed-stdlib-map-to-contain-value-reports-missing-typed-address [TIME]
+  ✗ ed stdlib map to contain value reports missing typed address [TIME]
     └─ Error: expect(actual).toContainValue(expected): Value '[WALLET_ADDRESS_BASE]' not found in the map
       └─ at tests/ed_map_value_matchers.test[LINE]
-  ✗ ed-stdlib-map-to-not-contain-value-reports-present-typed-address [TIME]
+  ✗ ed stdlib map to not contain value reports present typed address [TIME]
     └─ Error: expect(actual).toNotContainValue(expected): Value '[WALLET_ADDRESS_BASE]' is found in the map
       └─ at tests/ed_map_value_matchers.test[LINE]
 

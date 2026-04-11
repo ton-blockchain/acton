@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/tx_expect_to_consume_less_than.test.tolk (1 test)
-  ✓ cf-stdlib-to-consume-less-than-pass [TIME]
+  ✓ cf stdlib to consume less than pass [TIME]
 
  ✓ 1 passed in 1 file

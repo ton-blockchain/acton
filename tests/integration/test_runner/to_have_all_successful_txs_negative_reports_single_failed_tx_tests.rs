@@ -37,7 +37,7 @@ fn to_have_all_successful_txs_negative_reports_single_failed_tx() {
     run_project_builder_failure(
         "ce-stdlib-all-successful-negative-single-fail",
         r#"
-get fun `test-ce-all-successful-negative-single-failing-tx`() {
+get fun `test ce all successful negative single failing tx`() {
     val init = ContractState {
         code: build("failing"),
         data: createEmptyCell(),
@@ -70,7 +70,7 @@ fn to_have_all_successful_txs_negative_reports_single_failed_tx_in_fixture() {
         r#"{TX_EXPECT_IMPORTS}
 import "../contracts/counter_messages"
 
-get fun `test-ce-all-successful-negative-fixture-single-failing-tx`() {{
+get fun `test ce all successful negative fixture single failing tx`() {{
     val init = ContractState {{
         code: build("counter"),
         data: Storage {{ id: 0, counter: 0 }}.toCell(),

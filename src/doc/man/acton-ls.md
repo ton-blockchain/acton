@@ -12,7 +12,7 @@ acton-ls --- Run the Acton language server
 
 Start the language server used for TON language tooling.
 
-The server boots with the resolved project root, loads path mappings from
+The server boots with the resolved project root, loads import path mappings from
 `Acton.toml` when available, initializes the bundled standard library from
 `.acton/tolk-stdlib`, and serves requests either over stdio or a local TCP
 socket.
@@ -75,7 +75,7 @@ Parent directories for a custom `--log-file` are created automatically.
 Before starting the server, Acton:
 
 - resolves the project root and manifest path
-- loads `mappings` from `Acton.toml` when present
+- loads `[import-mappings]` from `Acton.toml` when present
 - preloads `.acton/tolk-stdlib/common.tolk`
 
 ## EXIT STATUS

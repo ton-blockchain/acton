@@ -25,7 +25,7 @@ output-format = "sarif"
 Behavior notes:
 
 - In project-wide mode (`acton check` without target), contracts matching `exclude` are skipped as roots.
-- If you pass an explicit target (`acton check <contract-id>` or `acton check <file.tolk>`), that root target is still analyzed.
+- If you pass an explicit target (`acton check <contract-name>` or `acton check <file.tolk>`), that root target is still analyzed.
 - Excluded dependency files can still be parsed/resolved, but their lint diagnostics are filtered out.
 - Compiler errors are never filtered by `exclude`.
 
@@ -49,41 +49,41 @@ Supported levels:
 
 ## Per-Contract Overrides
 
-Override rule levels for one contract id:
+Override rule levels for a specific contract:
 
 ```toml
-[contracts.counter]
-name = "Counter"
-src = "contracts/counter.tolk"
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/Counter.tolk"
 
 [lint.rules]
 unused-variable = "deny"
 
-[lint.rules.counter]
+[lint.rules.Counter]
 unused-variable = "allow"
 ```
 
-The subsection key (`counter` above) must match the contract key under `[contracts]`.
+The subsection name (`Counter` above) must match `[contracts.NAME]`.
 
 ## Inline Suppressions
 
 You can suppress diagnostics for the next line with an inline comment:
 
 ```tolk
-// acton-disable-next-line <rule-name>[, <rule-name>...]
+// check-disable-next-line <rule-name>[, <rule-name>...]
 ```
 
 Examples:
 
 ```tolk
-// acton-disable-next-line unused-variable
+// check-disable-next-line unused-variable
 val x = 1;
 
-// acton-disable-next-line unused-variable, write-only-variable
+// check-disable-next-line unused-variable, write-only-variable
 var tmp = 10;
 tmp = 20;
 
-// acton-disable-next-line all
+// check-disable-next-line all
 val legacy = oldLogic();
 ```
 

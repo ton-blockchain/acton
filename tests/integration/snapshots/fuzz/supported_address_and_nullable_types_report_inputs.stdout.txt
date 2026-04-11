@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-supported-addresses-nullables [TIME] (1 run, seed 42)
+  ✗ fuzz supported addresses nullables [TIME] (1 run, seed 42)
     ├─ Fuzz case 1/1
     ├─ Inputs: maybeText=null, owner=Ef___________________________________________7Sg, target=[WALLET_ADDRESS_BASE], maybeCount=-1, maybeOwner=null
     └─ Error: expect(actual).toBeTrue()

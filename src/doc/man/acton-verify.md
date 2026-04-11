@@ -6,7 +6,7 @@ acton-verify --- Verify contract source code on the TON verifier service
 
 ## SYNOPSIS
 
-`acton verify` [_options_] [_contract-id_]
+`acton verify` [_options_] [_contract-name_]
 
 ## DESCRIPTION
 
@@ -23,8 +23,8 @@ verification transaction to the blockchain.
 
 {{#options}}
 
-{{#option "_contract-id_" }}
-Contract ID to verify.
+{{#option "_contract-name_" }}
+Contract name to verify.
 
 If omitted, Acton prompts when the project contains multiple contracts.
 {{/option}}
@@ -100,7 +100,7 @@ Verification usually consists of:
 
 ## CONTRACT AND WALLET SELECTION
 
-- if `_contract-id_` is omitted and exactly one contract is configured, Acton
+- if `_contract-name_` is omitted and exactly one contract is configured, Acton
   selects it automatically
 - if multiple contracts are configured, Acton prompts for the contract
 - if `--wallet` is omitted and exactly one wallet is configured, Acton selects
@@ -143,31 +143,31 @@ blockchain transaction.
 1. Verify on testnet:
 
    ```bash
-   acton verify counter --address EQDt7LL...
+   acton verify Counter --address EQDt7LL...
    ```
 
 2. Verify on mainnet:
 
    ```bash
-   acton verify counter --address UQDt7LL... --net mainnet
+   acton verify Counter --address UQDt7LL... --net mainnet
    ```
 
 3. Use a specific wallet:
 
    ```bash
-   acton verify counter --address EQDt7LL... --wallet deployer
+   acton verify Counter --address EQDt7LL... --wallet deployer
    ```
 
 4. Test the flow without sending the final transaction:
 
    ```bash
-   acton verify counter --address EQDt7LL... --dry-run
+   acton verify Counter --address EQDt7LL... --dry-run
    ```
 
 5. Verify with an explicit compiler version:
 
    ```bash
-   acton verify counter --address EQDt7LL... --compiler-version 1.1.0
+   acton verify Counter --address EQDt7LL... --compiler-version 1.1.0
    ```
 
 ## SEE ALSO

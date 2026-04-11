@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ fuzz-annotation-seed-with-config-runs [TIME] (3 runs, seed 99)
+  ✓ fuzz annotation seed with config runs [TIME] (3 runs, seed 99)
 
  ✓ 1 passed in 1 file

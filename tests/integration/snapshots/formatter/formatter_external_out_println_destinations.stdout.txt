@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_external.test.tolk (1 test)
-  ✓ formatter-external-out-println-destinations [TIME]
+  ✓ formatter external out println destinations [TIME]
     └─ Test output:
        N/A -> external
        └── ext-in FmExternalTrigger -> fm_external_root A                              gas=2757

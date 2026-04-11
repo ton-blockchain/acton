@@ -634,7 +634,7 @@ impl ProjectBuilder {
     /// # Examples
     /// ```
     /// .with_test_config(TestConfig {
-    ///     filter: Some("test-unit-.*".to_string()),
+    ///     filter: Some("test unit .*".to_string()),
     ///     coverage: Some(true),
     ///     backtrace: Some("full".to_string()),
     /// })
@@ -808,7 +808,7 @@ version = "0.1.0"
 
             write!(
                 toml_content,
-                "[contracts.{}]\nname = \"{}\"\nsrc = \"{}\"\n",
+                "[contracts.{}]\ndisplay-name = \"{}\"\nsrc = \"{}\"\n",
                 contract.name.to_lowercase().replace('-', "_"),
                 contract.name,
                 contract_path,
@@ -865,7 +865,7 @@ version = "0.1.0"
         }
 
         if !mappings.is_empty() {
-            toml_content.push_str("[mappings]\n");
+            toml_content.push_str("[import-mappings]\n");
             for (prefix, target) in mappings {
                 toml_content.push_str(&format!("\"{prefix}\" = \"{target}\"\n"));
             }
@@ -1113,7 +1113,6 @@ impl Project {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
-            script_broadcast: false,
             test_fail_fast: false,
             script_fork_net: None,
             build_info: false,
@@ -1164,7 +1163,6 @@ pub(crate) struct ActonCommand {
     pub(crate) verify_address: Option<String>,
     pub(crate) verify_wallet: Option<String>,
     pub(crate) verify_network: Option<String>,
-    pub(crate) script_broadcast: bool,
     pub(crate) test_fail_fast: bool,
     pub(crate) script_fork_net: Option<String>,
     pub(crate) build_info: bool,
@@ -1193,11 +1191,11 @@ impl ActonCommand {
     }
 
     /// Start wrapper command
-    pub(crate) fn wrapper(mut self, contract_id: &str) -> Self {
+    pub(crate) fn wrapper(mut self, contract_name: &str) -> Self {
         self.cmd = self
             .cmd
             .arg("wrapper")
-            .arg(contract_id)
+            .arg(contract_name)
             .current_dir(&self.project.path);
         self
     }
@@ -1457,7 +1455,7 @@ impl ActonCommand {
     ///
     /// # Examples
     /// ```
-    /// .test().filter("test-basic")        // Run tests matching "test-basic"
+    /// .test().filter("test basic")        // Run tests matching "test basic"
     /// .test().filter("counter.*")         // Run tests starting with "counter"
     /// ```
     pub(crate) fn filter(mut self, pattern: &str) -> Self {
@@ -1745,17 +1743,6 @@ impl ActonCommand {
         self
     }
 
-    /// Enable broadcast mode for script execution (only for script command)
-    ///
-    /// # Examples
-    /// ```
-    /// .script("deploy.tolk").broadcast()     // Send transactions to blockchain
-    /// ```
-    pub(crate) fn broadcast(mut self) -> Self {
-        self.script_broadcast = true;
-        self
-    }
-
     /// Show decoded message bodies in printed transaction trees.
     pub(crate) fn show_bodies(mut self) -> Self {
         self.cmd = self.cmd.arg("--show-bodies");
@@ -1819,10 +1806,6 @@ impl ActonCommand {
 
         if self.build_clear_cache {
             self.cmd = self.cmd.arg("--clear-cache");
-        }
-
-        if self.script_broadcast {
-            self.cmd = self.cmd.arg("--broadcast");
         }
 
         if let Some(graph_path) = self.build_graph {

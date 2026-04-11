@@ -26,7 +26,7 @@ fn config_storage_prices_roundtrip_preserves_multiple_timestamp_entries() {
     run_config_success_case(
         "dr-stdlib-config-storage-prices-multi-entry-roundtrip",
         r"
-get fun `test-dr-stdlib-config-storage-prices-multi-entry-roundtrip`() {
+get fun `test dr stdlib config storage prices multi entry roundtrip`() {
     val tsA: uint32 = 1700000000;
     val tsB: uint32 = 1700003600;
 
@@ -95,7 +95,7 @@ fn config_storage_prices_roundtrip_replaces_old_dictionary_entries_on_second_wri
     run_config_success_case(
         "dr-stdlib-config-storage-prices-second-write-replacement",
         r"
-get fun `test-dr-stdlib-config-storage-prices-second-write-replacement`() {
+get fun `test dr stdlib config storage prices second write replacement`() {
     val oldTsA: uint32 = 1800000000;
     val oldTsB: uint32 = 1800003600;
     val newTs: uint32 = 1900000000;

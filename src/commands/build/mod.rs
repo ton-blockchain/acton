@@ -83,9 +83,9 @@ pub fn build_cmd(
                     "No contracts section found in Acton.toml. Add at least one contract.
 To add a contract add the following section to Acton.toml:
 
-[contracts.my-contract]
-name = \"MyContract\"
-src = \"contracts/my-contract.tolk\"
+[contracts.MyContract]
+display-name = \"MyContract\"
+src = \"contracts/MyContract.tolk\"
 depends = []
 
 See https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
@@ -156,6 +156,7 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
 
         let (code_boc64, code_hash, fift_code) = match process_contract(
             &mut file_cache,
+            &parent_contract,
             contract_config,
             &contract_config.src,
             &contract_path,
@@ -173,7 +174,7 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
 
         if show_info {
             build_info.push((
-                contract_config.name.clone(),
+                contract_config.display_name_owned(&parent_contract),
                 code_boc64.clone(),
                 code_hash.clone(),
             ));
@@ -269,6 +270,7 @@ fn record_contract_error(
 
 fn process_contract(
     file_cache: &mut FileBuildCache,
+    contract_id: &str,
     contract_config: &ContractConfig,
     contract_src: &str,
     contract_path: &Path,
@@ -303,7 +305,8 @@ fn process_contract(
         } else {
             debug!("Cache miss, recompile '{}'", contract_path.display());
             let compile_start = Instant::now();
-            println!("   {} {}", "Compiling".green().bold(), contract_config.name);
+            let display_name = contract_config.display_name(contract_id);
+            println!("   {} {}", "Compiling".green().bold(), display_name);
 
             let mappings = acton_config.mappings();
             let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
@@ -315,7 +318,7 @@ fn process_contract(
                     if let Err(e) = file_cache.put(contract_src, &result, false, 2, "1.3") {
                         eprintln!(
                             "Warning: Failed to cache compilation result for {}: {}",
-                            contract_config.name, e
+                            display_name, e
                         );
                     }
 
@@ -442,7 +445,7 @@ fn save_fift_file(
 pub(crate) fn generate_dependency_files(
     parent_contract: &str,
     config: &ContractConfig,
-    compiled_contracts: &HashMap<String, String>, // contract_key -> boc_base64
+    compiled_contracts: &HashMap<String, String>, // contract_name -> boc_base64
     failed_contracts: &BTreeMap<String, anyhow::Error>,
     acton_config: &ActonConfig,
     gen_dir: &Path,
