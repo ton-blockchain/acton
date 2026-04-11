@@ -11,11 +11,8 @@ use heck::ToLowerCamelCase;
 use log::debug;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
 mod dep_graph;
@@ -32,9 +29,9 @@ pub fn build_cmd(
     let project_root = configured_project_root();
     stdlib::ensure_latest(project_root)?;
 
-    // Due to global variables, we need to enable debug mode for emulator as early as possible
-    // since first compilation WITHOUT debug mode will set debug=false forever
-    enable_emulator_debug_mode()?;
+    // Prime native TVM codepage 0 with debug opcodes before any non-debug build
+    // can freeze the process-wide singleton in no-debug mode.
+    tolkc::prime_debug_cp0()?;
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -657,17 +654,4 @@ fun {func_name}(): cell asm \"\"\"
 \"\"\"
 "
     )
-}
-
-fn enable_emulator_debug_mode() -> anyhow::Result<()> {
-    // hacky init VM with debug enabled due to global variables :/
-    let dummy_contract: &'static str = "fun onInternalMessage(in: InMessage) {}";
-    let tmp_dir = TempDir::new()?;
-    let tmp_file_path = tmp_dir.path().join("enable_debug.tolk");
-    let mut tmp_file = File::create(&tmp_file_path)?;
-    tmp_file.write_all(dummy_contract.as_bytes())?;
-
-    let compiler = tolkc::Compiler::new(2);
-    let _ = compiler.compile(tmp_file_path.as_ref(), true);
-    Ok(())
 }
