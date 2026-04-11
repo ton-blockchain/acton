@@ -134,6 +134,11 @@ This command:
 - updates `crates/ton-objs/artifacts_manifest.toml` when needed;
 - downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
   `objs/` on a fresh checkout;
+- downloads a temporary `ton-stdlib.tar.gz`, replaces
+  `crates/tolkc/assets/tolk-stdlib/` and `crates/tolkc/assets/fift-stdlib/` from its
+  `tolk-stdlib/` directory and `fift-stdlib/Asm.fif` plus
+  `fift-stdlib/Fift.fif` whenever local `objs/` are refreshed, then removes
+  the temporary archive;
 - can also refresh local `objs/` later when the tracked manifest changes.
 
 Use `just sync-artifacts --force` if you want to overwrite the local
