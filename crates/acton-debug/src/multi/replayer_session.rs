@@ -3,6 +3,7 @@
 //! (`send_message`, `run_get_method`) temporarily push child contexts backed by
 //! live executors and later pop back to the parent.
 
+use crate::core::evaluate::evaluate_expression;
 use crate::multi::dap_transport::{DapMessage, DapTransport};
 use crate::multi::session::ChildDebugContextSpec;
 use crate::replayer::{
@@ -215,6 +216,40 @@ impl ReplayerDebugSession {
         let id = self.alloc_req_id();
         self.vars_debug_values.insert(id, dv);
         id
+    }
+
+    fn evaluate_on_frame(
+        &self,
+        frame_id: Option<i64>,
+        expression: &str,
+    ) -> anyhow::Result<RenderedValue> {
+        let locals = match frame_id {
+            Some(frame_id) => {
+                let locator = self
+                    .frame_to_depth
+                    .get(&frame_id)
+                    .copied()
+                    .ok_or_else(|| anyhow!("Unknown frame id {frame_id}"))?;
+                self.contexts
+                    .get(locator.context_idx)
+                    .and_then(|ctx| {
+                        ctx.try_borrow()
+                            .ok()
+                            .map(|ctx| ctx.replayer.locals_for_frame(locator.depth_from_top))
+                    })
+                    .unwrap_or_default()
+            }
+            None => self
+                .active_context()
+                .and_then(|ctx| {
+                    ctx.try_borrow()
+                        .ok()
+                        .map(|ctx| ctx.replayer.locals_for_frame(0))
+                })
+                .unwrap_or_default(),
+        };
+
+        evaluate_expression(&locals, expression)
     }
 
     fn alloc_frame_id(&mut self, locator: FrameLocator) -> i64 {
@@ -629,6 +664,25 @@ impl ReplayerDebugSession {
         }
     }
 
+    fn evaluate_response_from_value(&mut self, value: RenderedValue) -> EvaluateResponse {
+        let (result, type_field) = value.dap_parts_for_client();
+        let variables_reference = if value.has_children() {
+            self.store_debug_value(value)
+        } else {
+            0
+        };
+
+        EvaluateResponse {
+            result,
+            type_field,
+            presentation_hint: None,
+            variables_reference,
+            named_variables: None,
+            indexed_variables: None,
+            memory_reference: None,
+        }
+    }
+
     fn handle_request(&mut self, req: Request, terminate_at_end: bool) -> anyhow::Result<bool> {
         let command = req.command.clone();
         match command {
@@ -749,15 +803,13 @@ impl ReplayerDebugSession {
                 return Ok(true);
             }
             Command::Evaluate(args) => {
-                self.send_response(req.success(ResponseBody::Evaluate(EvaluateResponse {
-                    result: args.expression,
-                    type_field: None,
-                    presentation_hint: None,
-                    variables_reference: 0,
-                    named_variables: None,
-                    indexed_variables: None,
-                    memory_reference: None,
-                })))?;
+                let response = match self.evaluate_on_frame(args.frame_id, &args.expression) {
+                    Ok(value) => req.success(ResponseBody::Evaluate(
+                        self.evaluate_response_from_value(value),
+                    )),
+                    Err(err) => req.error(&err.to_string()),
+                };
+                self.send_response(response)?;
             }
             _ => {
                 return Err(anyhow!("Unhandled command: {:?}", req.command));
@@ -1114,6 +1166,7 @@ fn make_capabilities() -> dap::types::Capabilities {
     dap::types::Capabilities {
         supports_configuration_done_request: Some(true),
         supports_exception_info_request: Some(true),
+        supports_evaluate_for_hovers: Some(true),
         exception_breakpoint_filters: Some(vec![
             ExceptionBreakpointsFilter {
                 filter: "uncaught".to_string(),

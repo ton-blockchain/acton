@@ -18,6 +18,7 @@ use dap::types::{
     Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
 
+use crate::core::evaluate::evaluate_expression;
 use crate::core::exception_format::{build_exception_details, exception_overview};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::transport::{DapConnection, IncomingRequest};
@@ -30,6 +31,7 @@ fn make_capabilities() -> types::Capabilities {
         supports_configuration_done_request: Some(true),
         supports_step_back: Some(false),
         supports_exception_info_request: Some(true),
+        supports_evaluate_for_hovers: Some(true),
         exception_breakpoint_filters: Some(vec![
             ExceptionBreakpointsFilter {
                 filter: "uncaught".to_string(),
@@ -174,6 +176,33 @@ impl DapState {
         let file_id = r.file_id_by_path(path)?;
         Some(r.resolve_breakpoint_lines(file_id, requested_lines))
     }
+
+    fn evaluate_on_frame(
+        &self,
+        frame_id: Option<i64>,
+        expression: &str,
+    ) -> anyhow::Result<RenderedValue> {
+        let locals = match frame_id {
+            Some(frame_id) => {
+                let depth = self
+                    .frame_to_depth
+                    .get(&frame_id)
+                    .copied()
+                    .ok_or_else(|| anyhow::anyhow!("Unknown frame id {frame_id}"))?;
+                self.replayer
+                    .as_ref()
+                    .map(|replayer| replayer.locals_for_frame(depth))
+                    .unwrap_or_default()
+            }
+            None => self
+                .replayer
+                .as_ref()
+                .map(|replayer| replayer.locals_for_frame(0))
+                .unwrap_or_default(),
+        };
+
+        evaluate_expression(&locals, expression)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +336,25 @@ fn debug_value_to_variable(state: &mut DapState, name: String, dv: &RenderedValu
     }
 }
 
+fn evaluate_response_from_value(state: &mut DapState, value: RenderedValue) -> EvaluateResponse {
+    let (result, type_field) = value.dap_parts_for_client();
+    let variables_reference = if value.has_children() {
+        state.store_debug_value(value.clone())
+    } else {
+        0
+    };
+
+    EvaluateResponse {
+        result,
+        type_field,
+        presentation_hint: None,
+        variables_reference,
+        named_variables: None,
+        indexed_variables: None,
+        memory_reference: None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Request handling
 // ---------------------------------------------------------------------------
@@ -365,15 +413,12 @@ fn handle_request(
             state.replayer = None;
             req.success(ResponseBody::Disconnect)
         }
-        Command::Evaluate(args) => req.success(ResponseBody::Evaluate(EvaluateResponse {
-            result: args.expression,
-            type_field: None,
-            presentation_hint: None,
-            variables_reference: 0,
-            named_variables: None,
-            indexed_variables: None,
-            memory_reference: None,
-        })),
+        Command::Evaluate(args) => match state.evaluate_on_frame(args.frame_id, &args.expression) {
+            Ok(value) => req.success(ResponseBody::Evaluate(evaluate_response_from_value(
+                state, value,
+            ))),
+            Err(err) => req.error(&err.to_string()),
+        },
         _ => req.error("Unsupported command"),
     };
 
