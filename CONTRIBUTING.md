@@ -55,6 +55,10 @@ Optional CLI tools:
   ```bash
   cargo install cargo-shear --locked
   ```
+- `cargo-deny` (dependency policy checks for `just check`)
+  ```bash
+  cargo install cargo-deny --locked
+  ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
   cargo install typos-cli --locked
@@ -95,7 +99,7 @@ For a fresh checkout, the shortest path to a working contributor setup is:
 ```bash
 just sync-artifacts
 just build-ui
-cargo build
+just build-dev
 ./target/debug/acton --help
 ```
 
@@ -105,7 +109,7 @@ What this does:
    from the `release-objs` release and, on a fresh checkout, downloads the
    matching prebuilt `objs/` archive for your current platform.
 2. `just build-ui` installs UI dependencies and builds the bundled UI assets.
-3. `cargo build` builds the CLI against the synced TON archives.
+3. `just build-dev` builds the debug CLI against the synced TON archives.
 4. `./target/debug/acton --help` confirms that the binary starts.
 
 If `objs/` already exists and the tracked manifest changed, `just
@@ -124,7 +128,7 @@ Use the built-in sync task instead of downloading release assets manually:
 ```bash
 just sync-artifacts
 just build-ui
-cargo build
+just build-dev
 ./target/debug/acton --help
 ```
 
@@ -182,7 +186,7 @@ cp ton-repo/artifacts/libtolk.a objs/
 
 just build-ui
 
-cargo build
+just build-dev
 ./target/debug/acton --help
 ```
 
@@ -383,8 +387,8 @@ Every pull request must pass all checks from:
 just check
 ```
 
-This command runs Rust formatting, docgen, dependency, lint, schema, and test checks.
-Install `cargo-shear` and `typos-cli` if you want to run it locally.
+This command runs Rust formatting, docgen, dependency, dependency-policy, lint, schema, and test checks.
+Install `cargo-shear`, `cargo-deny`, and `typos-cli` if you want to run it locally.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-litenode-ui`,
