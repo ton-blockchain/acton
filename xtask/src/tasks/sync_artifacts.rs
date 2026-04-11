@@ -23,7 +23,7 @@ const TOLK_STDLIB_ARCHIVE_DIR: &str = "tolk-stdlib";
 const TOLK_STDLIB_DIR: &str = "crates/tolkc/assets/tolk-stdlib";
 
 const FIFT_STDLIB_ARCHIVE_DIR: &str = "fift-stdlib";
-const FIFT_STDLIB_DIR: &str = "crates/tolkc/assets/fift";
+const FIFT_STDLIB_DIR: &str = "crates/tolkc/assets/fift-stdlib";
 const FIFT_STDLIB_FILES: &[&str] = &["Asm.fif", "Fift.fif"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

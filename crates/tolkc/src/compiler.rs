@@ -463,7 +463,7 @@ pub struct CompilerErrorRange {
 
 /// We embed the whole standard library of Tolk and Fift in binary for easier distribution.
 pub static TOLK_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/tolk-stdlib");
-static FIFT_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/fift");
+static FIFT_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/fift-stdlib");
 
 fn read_stdlib_file(path: &str) -> Option<&'static str> {
     TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()

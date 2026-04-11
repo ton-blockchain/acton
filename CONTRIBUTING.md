@@ -135,7 +135,7 @@ This command:
 - downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
   `objs/` on a fresh checkout;
 - downloads a temporary `ton-stdlib.tar.gz`, replaces
-  `crates/tolkc/assets/tolk-stdlib/` and `crates/tolkc/assets/fift/` from its
+  `crates/tolkc/assets/tolk-stdlib/` and `crates/tolkc/assets/fift-stdlib/` from its
   `tolk-stdlib/` directory and `fift-stdlib/Asm.fif` plus
   `fift-stdlib/Fift.fif` whenever local `objs/` are refreshed, then removes
   the temporary archive;
