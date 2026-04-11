@@ -13,11 +13,11 @@ import {unpackFromSliceDynamic} from "gen-typescript-from-tolk-dev/src/dynamic-s
 import {renderTy} from "gen-typescript-from-tolk-dev/src/types-kernel"
 
 interface MessageCandidate {
-  readonly bodyTy: Ty
+  readonly body_ty: Ty
 }
 
 interface DeclarationCandidate {
-  readonly bodyTy: Ty
+  readonly body_ty: Ty
   readonly priority: number
 }
 
@@ -29,13 +29,13 @@ const getCompilerAbi = (contract: BackendContractInfo | undefined): ContractABI 
 const getBodyTypeName = (bodyTy: Ty): string => {
   switch (bodyTy.kind) {
     case "StructRef": {
-      return bodyTy.structName
+      return bodyTy.struct_name
     }
     case "AliasRef": {
-      return bodyTy.aliasName
+      return bodyTy.alias_name
     }
     case "EnumRef": {
-      return bodyTy.enumName
+      return bodyTy.enum_name
     }
     default: {
       return renderTy(bodyTy)
@@ -46,13 +46,13 @@ const getBodyTypeName = (bodyTy: Ty): string => {
 const getBodyTypeKey = (bodyTy: Ty): string => {
   switch (bodyTy.kind) {
     case "StructRef": {
-      return `StructRef:${bodyTy.structName}`
+      return `StructRef:${bodyTy.struct_name}`
     }
     case "AliasRef": {
-      return `AliasRef:${bodyTy.aliasName}`
+      return `AliasRef:${bodyTy.alias_name}`
     }
     case "EnumRef": {
-      return `EnumRef:${bodyTy.enumName}`
+      return `EnumRef:${bodyTy.enum_name}`
     }
     default: {
       return renderTy(bodyTy)
@@ -76,36 +76,36 @@ const getDeclarationCandidates = (
 
   for (const declaration of compilerAbi.declarations) {
     switch (declaration.kind) {
-      case "Struct": {
-        if (declaration.typeParams && declaration.typeParams.length > 0) {
+      case "struct": {
+        if (declaration.type_params && declaration.type_params.length > 0) {
           continue
         }
 
         const matchesOpcode =
           opcode !== undefined &&
-          declaration.prefix?.prefixLen === 32 &&
-          parsePrefixNumber(declaration.prefix.prefixStr) === opcode
+          declaration.prefix?.prefix_len === 32 &&
+          parsePrefixNumber(declaration.prefix.prefix_str) === opcode
 
         candidates.push({
-          bodyTy: {kind: "StructRef", structName: declaration.name},
+          body_ty: {kind: "StructRef", struct_name: declaration.name},
           priority: matchesOpcode ? 0 : declaration.prefix ? 1 : 2,
         })
         break
       }
-      case "Alias": {
-        if (declaration.typeParams && declaration.typeParams.length > 0) {
+      case "alias": {
+        if (declaration.type_params && declaration.type_params.length > 0) {
           continue
         }
 
         candidates.push({
-          bodyTy: {kind: "AliasRef", aliasName: declaration.name},
+          body_ty: {kind: "AliasRef", alias_name: declaration.name},
           priority: 3,
         })
         break
       }
-      case "Enum": {
+      case "enum": {
         candidates.push({
-          bodyTy: {kind: "EnumRef", enumName: declaration.name},
+          body_ty: {kind: "EnumRef", enum_name: declaration.name},
           priority: 4,
         })
         break
@@ -121,20 +121,20 @@ const getCandidateMessages = (
   isInternal: boolean,
   opcode: number | undefined,
 ): readonly MessageCandidate[] => {
-  const directCandidates = isInternal ? compilerAbi.incomingMessages : compilerAbi.incomingExternal
+  const directCandidates = isInternal ? compilerAbi.incoming_messages : compilerAbi.incoming_external
   if (!isInternal) {
     return directCandidates
   }
 
   const deduped = new Map<string, MessageCandidate>()
   for (const candidate of directCandidates) {
-    deduped.set(getBodyTypeKey(candidate.bodyTy), candidate)
+    deduped.set(getBodyTypeKey(candidate.body_ty), candidate)
   }
 
   for (const candidate of getDeclarationCandidates(compilerAbi, opcode)) {
-    const key = getBodyTypeKey(candidate.bodyTy)
+    const key = getBodyTypeKey(candidate.body_ty)
     if (!deduped.has(key)) {
-      deduped.set(key, {bodyTy: candidate.bodyTy})
+      deduped.set(key, {body_ty: candidate.body_ty})
     }
   }
 
@@ -279,13 +279,13 @@ const tryDecodeWithAbi = (
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
     try {
-      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.bodyTy, parser) as unknown
+      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty, parser) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue
       }
 
       return {
-        name: getBodyTypeName(candidate.bodyTy),
+        name: getBodyTypeName(candidate.body_ty),
         value: toParsedValue(decoded),
       }
     } catch {
@@ -297,7 +297,7 @@ const tryDecodeWithAbi = (
 }
 
 const getStorageCandidates = (compilerAbi: ContractABI): readonly Ty[] => {
-  const candidates = [compilerAbi.storage.storageTy, compilerAbi.storage.storageAtDeploymentTy]
+  const candidates = [compilerAbi.storage.storage_ty, compilerAbi.storage.storage_at_deployment_ty]
     .filter((ty): ty is Ty => ty !== undefined && ty.kind !== "nullLiteral")
     .map(ty => [getBodyTypeKey(ty), ty] as const)
 
