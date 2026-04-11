@@ -4616,7 +4616,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       );
       if (('\t' <= lookahead && lookahead <= '\r') ||
           lookahead == ' ') SKIP(0);
-      if (('0' <= lookahead && lookahead <= '9')) ADVANCE(52);
+      if (('0' <= lookahead && lookahead <= '9')) ADVANCE(193);
       if (lookahead == '$' ||
           ('A' <= lookahead && lookahead <= 'Z') ||
           ('_' <= lookahead && lookahead <= 'z')) ADVANCE(192);
@@ -4916,7 +4916,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 44:
       if (lookahead == '0' ||
-          lookahead == '1') ADVANCE(163);
+          lookahead == '1' ||
+          lookahead == '_') ADVANCE(163);
       END_STATE();
     case 45:
       if (('0' <= lookahead && lookahead <= '9')) ADVANCE(53);
@@ -4927,6 +4928,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
     case 47:
       if (('0' <= lookahead && lookahead <= '9') ||
           ('A' <= lookahead && lookahead <= 'F') ||
+          lookahead == '_' ||
           ('a' <= lookahead && lookahead <= 'f')) ADVANCE(165);
       END_STATE();
     case 48:
@@ -5562,21 +5564,25 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       ACCEPT_TOKEN(sym_number_literal);
       if (lookahead == 'b') ADVANCE(44);
       if (lookahead == 'x') ADVANCE(47);
-      if (('0' <= lookahead && lookahead <= '9')) ADVANCE(164);
+      if (('0' <= lookahead && lookahead <= '9') ||
+          lookahead == '_') ADVANCE(164);
       END_STATE();
     case 163:
       ACCEPT_TOKEN(sym_number_literal);
       if (lookahead == '0' ||
-          lookahead == '1') ADVANCE(163);
+          lookahead == '1' ||
+          lookahead == '_') ADVANCE(163);
       END_STATE();
     case 164:
       ACCEPT_TOKEN(sym_number_literal);
-      if (('0' <= lookahead && lookahead <= '9')) ADVANCE(164);
+      if (('0' <= lookahead && lookahead <= '9') ||
+          lookahead == '_') ADVANCE(164);
       END_STATE();
     case 165:
       ACCEPT_TOKEN(sym_number_literal);
       if (('0' <= lookahead && lookahead <= '9') ||
           ('A' <= lookahead && lookahead <= 'F') ||
+          lookahead == '_' ||
           ('a' <= lookahead && lookahead <= 'f')) ADVANCE(165);
       END_STATE();
     case 166:
@@ -7858,7 +7864,6 @@ static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
     [ts_builtin_sym_end] = ACTIONS(1),
     [sym_identifier] = ACTIONS(1),
     [anon_sym_tolk] = ACTIONS(1),
-    [sym_version_value] = ACTIONS(1),
     [anon_sym_import] = ACTIONS(1),
     [anon_sym_contract] = ACTIONS(1),
     [anon_sym_LBRACE] = ACTIONS(1),

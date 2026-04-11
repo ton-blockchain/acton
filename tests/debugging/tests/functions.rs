@@ -488,7 +488,7 @@ fn test_noinline_function_call_step_out() -> anyhow::Result<()> {
     let code = r"
 global foo: int;
 
-@method_id(123)
+@method_id(1_2_3)
 fun my_sum(a: int, b: int): int {
     return a + b;
 }

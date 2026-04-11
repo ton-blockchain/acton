@@ -1,0 +1,56 @@
+========================================================================
+Separated numeric literals
+========================================================================
+
+fun main() {
+    val million = 1_000_000;
+    val decimalZero = 0_0;
+    val trailingDecimal = 123_;
+    val hexMask = 0xFF_FF_;
+    val binaryFlag = 0b_0____1;
+    val negated = -1_024;
+}
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block_statement
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (number_literal)))
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (number_literal)))
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (number_literal)))
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (number_literal)))
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (number_literal)))
+      (expression_statement
+        (assignment
+          left: (var_declaration_lhs
+            (var_declaration
+              name: (identifier)))
+          right: (unary_operator
+            argument: (number_literal)))))))

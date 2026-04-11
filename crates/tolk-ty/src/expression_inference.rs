@@ -20,7 +20,7 @@ use tolk_syntax::{
     AsCast, Assign, AstNode, Bin, BoolLit, Call, DotAccess, DotAccessField, Expr, HasName, Ident,
     Instantiation, IsType, Lambda, Lazy, Match, MatchArmBody, MatchPattern, NotNull, NullLit,
     NumberLit, ObjectLit, Paren, SetAssign, StringLit, Tensor, Ternary, TopLevel, Tuple, Type,
-    Unary, Underscore, VarDecl, VarDeclPattern,
+    Unary, Underscore, VarDecl, VarDeclPattern, parse_tolk_int_literal,
 };
 
 impl<'t> TypeInferenceWalker<'_, '_> {
@@ -87,7 +87,9 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         if as_cond {
             let value = self.text_of(&v);
             // `if (0)` always false
-            if value == "0" {
+            if parse_tolk_int_literal(value.as_str())
+                .is_some_and(|literal| literal.parse_i32() == Some(0))
+            {
                 after_v
                     .true_flow
                     .mark_unreachable(UnreachableKind::CantHappen);
