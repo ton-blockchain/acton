@@ -18,8 +18,7 @@ this repository.
 
 - Unless stated otherwise, run commands from the repository root.
 - Prefer `just` targets over ad-hoc commands when both exist.
-- Some targets intentionally modify files (`just check-ui`, `just fmt-ui`,
-  `just test-update`).
+- Some targets intentionally modify files (`just check-ui`, `just fmt-ui`, `just test-update`).
 
 ## Prerequisites
 
@@ -55,7 +54,7 @@ Optional CLI tools:
   ```bash
   cargo install cargo-shear --locked
   ```
-- `cargo-deny` (dependency policy checks for `just check`)
+- `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
   cargo install cargo-deny --locked
   ```
@@ -264,6 +263,25 @@ Run it until no further changes are produced, then stage updated files.
 `just typos` checks the repository from the root using `_typos.toml`.
 It skips `docs/` and selected generated or imported trees with high false-positive rates.
 
+## Security checks
+
+Run repository-wide dependency and supply-chain audits with:
+
+```bash
+just check-security
+```
+
+This target stops on the first failure and currently checks:
+
+- Rust dependencies with `cargo deny check`
+- root/UI workspace dependencies with `bun audit`
+- `docs/`, `crates/tree-sitter-*`, and `crates/ton-ls/editors/code` with
+  `yarn npm audit`
+- `src/commands/new/templates/counter-app` with `npm audit`
+
+Run it when your PR changes lockfiles, dependency manifests, or package
+versions anywhere in the repository.
+
 ## Coverage
 
 Generate LCOV:
@@ -362,14 +380,15 @@ just update-test-tree-sitter
 
 Use this as a quick local matrix before pushing:
 
-| Change type                                                                                        | Required local checks                                                                                     |
-|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Rust-only code                                                                                     | `just check`                                                                                              |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui`                                                          |
-| Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata) | `just check` + `acton docgen` and  commit generated docs                                                  |
-| Docs site content/config (`docs/`)                                                                 | `corepack enable && cd docs && yarn install --immutable --check-cache --check-resolutions && yarn build`  |
-| Tree-sitter grammar (`crates/tree-sitter-*`)                                                       | `just check` +`just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
-| Release preparation (maintainers)                                                                  | Follow [RELEASING.md](RELEASING.md)                                                                       |
+| Change type                                                                                                               | Required local checks                                                                                     |
+|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Rust-only code                                                                                                            | `just check`                                                                                              |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                                        | `just check` + `just build-ui` + `just check-ui`                                                          |
+| Dependency or lockfile changes (`Cargo.lock`, `bun.lock`, `docs/`, tree-sitter/code extension/template package manifests) | `just check-security`                                                                                     |
+| Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata)                        | `just check` + `acton docgen` and  commit generated docs                                                  |
+| Docs site content/config (`docs/`)                                                                                        | `corepack enable && cd docs && yarn install --immutable --check-cache --check-resolutions && yarn build`  |
+| Tree-sitter grammar (`crates/tree-sitter-*`)                                                                              | `just check` +`just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
+| Release preparation (maintainers)                                                                                         | Follow [RELEASING.md](RELEASING.md)                                                                       |
 
 ## PR requirements
 
