@@ -21,8 +21,6 @@ interface DeclarationCandidate {
   readonly priority: number
 }
 
-type DynamicSlice = Parameters<typeof unpackFromSliceDynamic>[2]
-
 const getCompilerAbi = (contract: BackendContractInfo | undefined): ContractABI | undefined => {
   const compilerAbi = contract?.compiler_abi
   return compilerAbi ? (compilerAbi as ContractABI) : undefined
@@ -123,7 +121,9 @@ const getCandidateMessages = (
   isInternal: boolean,
   opcode: number | undefined,
 ): readonly MessageCandidate[] => {
-  const directCandidates = isInternal ? compilerAbi.incoming_messages : compilerAbi.incoming_external
+  const directCandidates = isInternal
+    ? compilerAbi.incoming_messages
+    : compilerAbi.incoming_external
   if (!isInternal) {
     return directCandidates
   }
@@ -281,11 +281,7 @@ const tryDecodeWithAbi = (
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
     try {
-      const decoded: unknown = unpackFromSliceDynamic(
-        ctx,
-        candidate.body_ty,
-        parser as DynamicSlice,
-      ) as unknown
+      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty, parser) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue
       }
@@ -343,11 +339,7 @@ const tryDecodeStorageWithAbi = (
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
     try {
-      const decoded: unknown = unpackFromSliceDynamic(
-        ctx,
-        candidate,
-        parser as DynamicSlice,
-      ) as unknown
+      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate, parser) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue
       }
