@@ -80,8 +80,8 @@ If you want to access the body of the message, use [OutActionSendMessage.loadBod
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadMessage<IncreaseCounter>();
     val body = message.loadBody();
@@ -103,8 +103,8 @@ Note that you should provide the message type as a generic parameter.
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val body = action.loadBody<IncreaseCounter>();
     println(body.increaseBy);
@@ -125,8 +125,8 @@ Instead it loads the message with body as a slice. Use this method if don't know
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadGenericMessage();
     val opcode = message.loadOpcode();
@@ -272,8 +272,8 @@ Fails with [Assert.fail](../../testing/assert/#assertfail) if the stored tuple e
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 println(action.kind());
 ```
 
@@ -291,8 +291,8 @@ If the action is not a send message, returns null.
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.getSendMessageAt(0);
+val outActions = vm.outActions();
+val action = outActions.getSendMessageAt(0);
 if (action != null) {
     println(action.mode);
 }
@@ -316,8 +316,8 @@ If the action is a send message but `Msg` does not match actual body type, this 
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val body = out_actions.getSendMessageBodyAt<IncreaseCounter>(0);
+val outActions = vm.outActions();
+val body = outActions.getSendMessageBodyAt<IncreaseCounter>(0);
 if (body != null) {
     println(body.increaseBy);
 }
@@ -345,8 +345,8 @@ Returns the out actions from the control register C5 at that moment.
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-println(out_actions.size());
+val outActions = vm.outActions();
+println(outActions.size());
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L261" />
@@ -364,8 +364,8 @@ Fails with [Assert.fail](../../testing/assert/#assertfail) if list node layout i
 
 Example:
 ```tolk
-val out_actions = vm.parseOutActions(vm.getC5());
-println(out_actions.size());
+val outActions = vm.parseOutActions(vm.getC5());
+println(outActions.size());
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L275" />

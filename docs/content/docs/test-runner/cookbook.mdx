@@ -22,7 +22,7 @@ get fun `test mint`() {
         dest: address,
         body: ChangeMinterAdmin {
             queryId: 0,
-            newAdminAddress: new_owner,
+            newAdminAddress: newOwner,
         },
     });
     val result = net.send(from, msg);
@@ -45,7 +45,7 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 
 ```tolk
 fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", owner)
+    return net.runGetMethod(self.address, "get_wallet_address", owner);
 }
 ```
 
@@ -73,8 +73,8 @@ get fun `test mint`() {
 ```tolk
 get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveSuccessfulTx({
-        rom: minter.address,
+    expect(mintResult).toHaveSuccessfulTx({
+        from: minter.address,
         to: wallet.address,
     });
 }
@@ -85,8 +85,8 @@ get fun `test mint`() {
 ```tolk
 get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveSuccessfulTx<MintNewJettons>({
-        rom: minter.address,
+    expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
+        from: minter.address,
         to: wallet.address,
     });
 }
@@ -113,8 +113,8 @@ get fun `test mint`() {
 ```tolk
 get fun `test mint`() {
     // ...
-    expect(send_result).toHaveBouncedTx({
-        from: deployer_jetton_wallet.address,
+    expect(sendResult).toHaveBouncedTx({
+        from: deployerJettonWallet.address,
         to: deployer.address,
     });
 }
@@ -125,10 +125,10 @@ get fun `test mint`() {
 ```tolk
 get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveFailedTx({
-        from: not_deployer.address,
+    expect(mintResult).toHaveFailedTx({
+        from: notDeployer.address,
         to: minter.address,
-        exit_code: ERR_NOT_FROM_ADMIN,
+        exitCode: ERR_NOT_FROM_ADMIN,
     });
 }
 ```
@@ -138,9 +138,9 @@ get fun `test mint`() {
 ```tolk
 get fun `test mint`() {
     // ...
-    expect(send_result).toNotHaveTx({
-        from: not_deployer_jetton_wallet.address,
-        to: not_deployer.address
+    expect(sendResult).toNotHaveTx({
+        from: notDeployerJettonWallet.address,
+        to: notDeployer.address
     });
 }
 ```
@@ -159,7 +159,7 @@ get fun `test something`() {
 ```tolk
 get fun `test something`() {
     // ...
-    expect(send_result.at(0)).toConsumeLessThan(1500);
+    expect(sendResult.at(0)).toConsumeLessThan(1500);
 }
 ```
 
@@ -168,9 +168,9 @@ get fun `test something`() {
 ```tolk
 get fun `test something`() {
     // ...
-    val out_actions = send_result.at(0).allOutActions();
-    val first = out_actions.at(0);
-    println(first.kind())
+    val outActions = sendResult.at(0).allOutActions();
+    val first = outActions.at(0);
+    println(first.kind());
 }
 ```
 
@@ -187,12 +187,11 @@ get fun `test something`() {
 ```tolk
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0
+        return 0;
     }
 
-    val result: JettonWalletDataReply =
-        net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+    return result.jettonBalance;
 }
 ```
 

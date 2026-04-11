@@ -35,8 +35,8 @@ import "expect"
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
+/// val outActions = vm.outActions();
+/// expect(outActions).toBeSendMessageAt<IncreaseCounter>(0);
 /// ```
 ///
 /// Note that you should provide the message type as a generic parameter.

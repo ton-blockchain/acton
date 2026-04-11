@@ -484,14 +484,14 @@ fun net.sendIter(from: address, message: OutMessage): TxCursor {
 ///
 /// Example:
 /// ```tolk
-/// val bounced_msg = createMessage({
+/// val bouncedMsg = createMessage({
 ///     bounce: false,
 ///     value: ton("0.95"),
-///     dest: deployer_jetton_wallet.address,
+///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
 ///
-/// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+/// net.sendSingle(notDeployer.address, bouncedMsg);
 /// ```
 ///
 /// See [net.send] if you need to send a message and process out messages.
@@ -587,14 +587,14 @@ fun net.runTickTock(onAccount: address, isTock: bool): SendResultList {
 ///
 /// Example:
 /// ```tolk
-/// val bounced_msg = createMessage({
+/// val bouncedMsg = createMessage({
 ///     bounce: false,
 ///     value: ton("0.95"),
-///     dest: deployer_jetton_wallet.address,
+///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
 ///
-/// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+/// net.sendSingle(notDeployer.address, bouncedMsg);
 /// ```
 fun OutMessage.bounced(self): OutMessage {
     var msg = (self.messageCell as Cell<MessageRelaxedGeneric>).load();
@@ -663,16 +663,16 @@ struct Wallet {
 /// ```tolk
 /// /// Script that deploys a counter contract using a wallet to real blockchain.
 /// fun main() {
-///    val deployer = net.wallet("deployer");
-///    val counter = Counter.fromStorage(Storage {
-///        id: 8,
-///        counter: 0,
-///    });
+///     val deployer = net.wallet("deployer");
+///     val counter = Counter.fromStorage({
+///         id: 8,
+///         counter: 0,
+///     });
 ///
-///    val result = counter.deploy(deployer.address, ton("0.05"));
-///    result.wait();
+///     val result = counter.deploy(deployer.address, ton("0.05"));
+///     result.wait();
 ///
-///    println("Deployed counter to {}", counter.address);
+///     println("Deployed counter to {}", counter.address);
 /// }
 /// ```
 fun net.wallet(name: string): Wallet {
@@ -844,7 +844,7 @@ fun net.disableBroadcast(): void {
 /// get fun get_all_data(): (int, slice) { ... }
 /// ```
 /// ```tolk
-/// val data: tuple = net.runGetMethod(wallet.address, "get_all_data");
+/// val data = net.runGetMethod<tuple>(wallet.address, "get_all_data");
 /// val first = data.get(0) as int;
 /// val second = data.get(1) as int;
 /// ```
@@ -877,12 +877,12 @@ fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? 
 /// ```tolk
 /// fun JettonWallet.getJettonBalance(self): coins {
 ///     if (!net.isDeployed(self.address)) {
-///         return 0 // return 0 if contract is not deployed
+///         return 0; // return 0 if contract is not deployed
 ///     }
 ///
 ///     // and if deployed, actually run get method
-///     val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-///     return result.jettonBalance
+///     val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+///     return result.jettonBalance;
 /// }
 /// ```
 fun net.isDeployed(addr: address): bool {
@@ -948,7 +948,7 @@ fun net.waitForTransaction(
 /// Example:
 /// ```tolk
 /// val address = net.randomAddress("random_user");
-/// val masterchain_address = net.randomAddress("random_user", -1);
+/// val masterchainAddress = net.randomAddress("random_user", -1);
 /// ```
 fun net.randomAddress(name: string? = null, wc: int = 0): address {
     var builder = beginCell();
@@ -1038,9 +1038,9 @@ fun net.getAccountState(addr: address): AccountInfo? {
 ///
 /// Example:
 /// ```tolk
-/// val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
-/// if (storage_fee != null) {
-///     println("Daily storage fee: {:ton}", storage_fee);
+/// val storageFee = net.getAccountStorageFee(contract.address, 86400); // 1 day
+/// if (storageFee != null) {
+///     println("Daily storage fee: {:ton}", storageFee);
 /// }
 /// ```
 fun net.getAccountStorageFee(addr: address, seconds: int): coins? {
@@ -1077,8 +1077,8 @@ fun net.fetchAndRegisterLibrary(hash: string): bool {
 ///
 /// Example:
 /// ```tolk
-/// val future_time = net.now() + 1000; // 1000 seconds from now
-/// net.setNow(future_time);
+/// val futureTime = net.now() + 1000; // 1000 seconds from now
+/// net.setNow(futureTime);
 /// ```
 fun net.setNow(now: uint32): void {
     // Update C7[0][3] (unixtime) FIRST so blockchain.now() stays in sync
@@ -1093,8 +1093,8 @@ fun net.setNow(now: uint32): void {
 ///
 /// Example:
 /// ```tolk
-/// val current_time = net.now();
-/// println("Current emulation time: {}", current_time);
+/// val currentTime = net.now();
+/// println("Current emulation time: {}", currentTime);
 /// ```
 fun net.now(): uint32 {
     return ffi.getNow();

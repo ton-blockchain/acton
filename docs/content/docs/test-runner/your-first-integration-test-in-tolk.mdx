@@ -114,7 +114,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 ```
 
@@ -128,7 +128,10 @@ Now let's write our first test in which we will deploy the contract.
 
 ```tolk
 get fun `test should deploy`() {
-    val counter = Counter.fromStorage({ id: 0, counter: 0 });
+    val counter = Counter.fromStorage({
+        id: 0,
+        counter: 0,
+    });
 
     val deployer = net.treasury("deployer");
     val msg = createMessage({
@@ -177,7 +180,10 @@ The complete test code looks like this:
 
 ````tolk
 get fun `test should deploy`() {
-    val counter = Counter.fromStorage({ id: 0, counter: 0 });
+    val counter = Counter.fromStorage({
+        id: 0,
+        counter: 0,
+    });
 
     val deployer = net.treasury("deployer");
     val msg = createMessage({
@@ -202,7 +208,10 @@ For our `Counter` tests, we need both `counter` and `deployer` contracts. Let's 
 
 ```tolk
 fun setupTest() {
-    val counter = Counter.fromStorage({ id: 0, counter: 0 });
+    val counter = Counter.fromStorage({
+        id: 0,
+        counter: 0,
+    });
 
     val deployer = net.treasury("deployer");
     val msg = createMessage({
@@ -215,7 +224,7 @@ fun setupTest() {
     val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
-    return (counter, deployer)
+    return (counter, deployer);
 }
 ```
 
@@ -272,7 +281,7 @@ To call a getter method on the desired contract, just call the `net.runGetMethod
 
 ```tolk
 fun Counter.getCounter(self): int {
-    return net.runGetMethod(self.address, "currentCounter")
+    return net.runGetMethod(self.address, "currentCounter");
 }
 ```
 

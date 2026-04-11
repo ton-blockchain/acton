@@ -140,7 +140,7 @@ The fixed `26` gas measurement overhead is subtracted before the `<= expected` c
 Example:
 ```tolk
 get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan(fun do_something() {
+    val result = Assert.consumesLessThan(fun() {
         // do something that consumes gas
         return 42;
     }, 100);
@@ -168,7 +168,7 @@ Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expecte
 Example:
 ```tolk
 get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan1(fun do_something(a: int) {
+    val result = Assert.consumesLessThan1(fun(a: int) {
         // do something that consumes gas
         return a + 1;
     }, 100, 100);
@@ -200,7 +200,7 @@ Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expecte
 Example:
 ```tolk
 get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan2(fun do_something(a: int, b: int) {
+    val result = Assert.consumesLessThan2(fun(a: int, b: int) {
         // do something that consumes gas
         return a + b;
     }, 10, 20, 100);
@@ -234,7 +234,7 @@ Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expecte
 Example:
 ```tolk
 get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
+    val result = Assert.consumesLessThan3(fun(a: int, b: int, c: int) {
         // do something that consumes gas
         return a + b + c;
     }, 10, 20, 30, 100);

@@ -56,8 +56,8 @@ struct (0x0ec3c86d) OutActionSendMessage {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();
@@ -74,8 +74,8 @@ fun OutActionSendMessage.loadMessage<Msg>(self): MessageRelaxed<Msg> {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val body = action.loadBody<IncreaseCounter>();
 ///     println(body.increaseBy);
@@ -91,8 +91,8 @@ fun OutActionSendMessage.loadBody<Msg>(self): Msg {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode();
@@ -185,8 +185,8 @@ type OutActionList = array<Cell<OutAction>>
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// println(action.kind());
 /// ```
 fun OutActionList.at(self, i: int): OutAction {
@@ -204,8 +204,8 @@ fun OutActionList.at(self, i: int): OutAction {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.getSendMessageAt(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.getSendMessageAt(0);
 /// if (action != null) {
 ///     println(action.mode);
 /// }
@@ -228,8 +228,8 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val body = out_actions.getSendMessageBodyAt<IncreaseCounter>(0);
+/// val outActions = vm.outActions();
+/// val body = outActions.getSendMessageBodyAt<IncreaseCounter>(0);
 /// if (body != null) {
 ///     println(body.increaseBy);
 /// }
@@ -255,8 +255,8 @@ fun OutMessage.outActions(self, mode: int): OutActionList {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// println(out_actions.size());
+/// val outActions = vm.outActions();
+/// println(outActions.size());
 /// ```
 fun vm.outActions(): OutActionList {
     return vm.parseOutActions(vm.getC5());
@@ -269,8 +269,8 @@ fun vm.outActions(): OutActionList {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.parseOutActions(vm.getC5());
-/// println(out_actions.size());
+/// val outActions = vm.parseOutActions(vm.getC5());
+/// println(outActions.size());
 /// ```
 fun vm.parseOutActions(cell: cell): OutActionList {
     val rootSlice = cell.beginParse();

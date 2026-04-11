@@ -46,8 +46,8 @@ later manually (for example to load the opcode).
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadGenericMessage();
     val opcode = message.loadOpcode();
@@ -75,8 +75,8 @@ If [skipBounce](#messagerelaxedgenericloadopcode) is true, the `0xFFFFFFFF` pref
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadGenericMessage();
     val opcode = message.loadOpcode(true);
@@ -135,8 +135,8 @@ If actual message body has a different type, loading will fail with exit code 63
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadMessage<IncreaseCounter>();
     val body = message.loadBody();
@@ -162,8 +162,8 @@ Note that if message type mismatch, loading will fail with exit code 63.
 
 Example:
 ```tolk
-val out_actions = vm.outActions();
-val action = out_actions.at(0);
+val outActions = vm.outActions();
+val action = outActions.at(0);
 if (action is OutActionSendMessage) {
     val message = action.loadMessage<IncreaseCounter>();
     val body = message.loadBody();

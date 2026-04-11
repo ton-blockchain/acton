@@ -26,7 +26,7 @@
 /// val hex = format("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
 ///
 /// // Formatting TON amounts
-/// val balance = format("Balance: {:ton}", 500000000); // "Balance: 0.5 TON"
+/// val balance = format("Balance: {:ton}", 500_000_000); // "Balance: 0.5 TON"
 ///
 /// // Escaping braces
 /// val escaped = format("Use {{}} to print braces", 0); // "Use {} to print braces"
@@ -35,7 +35,7 @@
 /// val partial = format("{} {}", "left"); // "left {}"
 ///
 /// // Multiple arguments
-/// val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
+/// val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1_000_000_000);
 /// ```
 
 import "@stdlib/reflection"

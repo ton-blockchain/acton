@@ -6,7 +6,7 @@
 /// Examples:
 /// ```tolk
 /// // Mock time
-/// vm.setTime(1700000000);
+/// vm.setTime(1_700_000_000);
 ///
 /// // Register a mock library
 /// vm.registerLibrary(myLibCell);

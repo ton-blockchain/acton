@@ -17,8 +17,7 @@ For example, consider a script that adds two numbers:
 import "@acton/io"
 
 fun main(a: int, b: int) {
-    println("The sum is:")
-    println(a + b)
+    println("The sum is: {}", a + b);
 }
 ```
 
@@ -85,10 +84,10 @@ You can pass tuples by enclosing the values in `[ ... ]` or `( ... )`.
 import "@acton/io"
 
 fun main(data: tuple) {
-    val a: int = data.get(0)
-    val b: int = data.get(1)
-    println("First element: {}", a)
-    println("Second element: {}", b)
+    val a: int = data.get(0);
+    val b: int = data.get(1);
+    println("First element: {}", a);
+    println("Second element: {}", b);
 }
 ```
 
@@ -118,8 +117,8 @@ struct Point {
 }
 
 fun main(p: Point) {
-    println("Point x: {}", p.x)
-    println("Point y: {}", p.y)
+    println("Point x: {}", p.x);
+    println("Point y: {}", p.y);
 }
 ```
 
@@ -169,9 +168,9 @@ You can also pass raw cells and slices using the `C{...}` and `CS{...}` syntax, 
 import "@acton/io"
 
 fun main(data: cell) {
-    val s = data.beginParse()
-    val value = s.loadUint(32)
-    println("Value from cell: {}", value)
+    val s = data.beginParse();
+    val value = s.loadUint(32);
+    println("Value from cell: {}", value);
 }
 ```
 

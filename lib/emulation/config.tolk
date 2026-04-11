@@ -12,15 +12,15 @@
 /// ```tolk
 /// // Set custom gas prices
 /// var config = net.blockchainConfig();
-/// val gasPrice = GasPricesSimple {
+/// val gasPrices = GasPricesSimple {
 ///     gasPrice: 1000,
-///     gasLimit: 1000000,
+///     gasLimit: 1_000_000,
 ///     gasCredit: 10000,
-///     blockGasLimit: 10000000,
-///     freezeDueLimit: 1000000000,
-///     deleteDueLimit: 5000000000
+///     blockGasLimit: 10_000_000,
+///     freezeDueLimit: 1_000_000_000,
+///     deleteDueLimit: 5_000_000_000
 /// };
-/// config.setGasPrices(simplePrices, MASTERCHAIN);
+/// config.setGasPrices(gasPrices, MASTERCHAIN);
 ///
 /// // Access storage prices
 /// val storagePrices = config.getStoragePrices();
@@ -235,8 +235,8 @@ fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices): void {
 /// Example:
 /// ```tolk
 /// var pricesDict = StoragePricesDict.fromMap(createEmptyMap<uint32, StoragePrices>());
-/// pricesDict.set(1000000, StoragePrices {
-///     initialUnixTime: 1000000,
+/// pricesDict.set(1_000_000, StoragePrices {
+///     initialUnixTime: 1_000_000,
 ///     bitPrice: 1,
 ///     cellPrice: 1000,
 ///     masterchainBitPrice: 1,
@@ -264,7 +264,7 @@ fun Config.setStoragePrices(mutate self, prices: StoragePricesDict): void {
 /// Example:
 /// ```tolk
 /// val storagePrices = config.getStoragePrices();
-/// val prices = storagePrices.get(1000000);
+/// val prices = storagePrices.get(1_000_000);
 /// println("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
 ///     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice);
 /// ```

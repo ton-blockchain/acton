@@ -63,7 +63,7 @@ import "@wrappers/Counter"
 
 fun main() {
     val deployer = net.wallet("deployer");
-    val counter = Counter.fromStorage(Storage {
+    val counter = Counter.fromStorage({
         id: 8,
         counter: 0,
     });
@@ -81,6 +81,7 @@ fun main() {
 The `counter_wrapper.tolk` file provides a convenient wrapper around the counter contract:
 
 ```tolk collapse={2-3, 10-17, 30-42} title="counter_wrapper.tolk"
+// todo update snippet to actual wrapper
 import "@acton/build/build"
 import "@acton/emulation/network"
 
@@ -97,7 +98,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init }
+    return Counter { address, init };
 }
 
 fun Counter.deploy(self, deployer: address, value: coins) {
@@ -122,7 +123,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int) {
 }
 
 fun Counter.getCounter(self): int {
-    return net.runGetMethod(self.address, "currentCounter")
+    return net.runGetMethod(self.address, "currentCounter");
 }
 ```
 
@@ -197,7 +198,10 @@ fun main() {
     val deployer = net.wallet("deployer");
 
     // Deploy counter
-    val counter = Counter.fromStorage(Storage { id: 8, counter: 0 });
+    val counter = Counter.fromStorage({
+        id: 8,
+        counter: 0,
+    });
     val deployResult = counter.deploy(deployer.address, ton("0.05"));
     deployResult.wait(); // Wait for deployment
 
@@ -253,7 +257,7 @@ Scripts can read contract state using `net.runGetMethod()`:
 ```tolk
 fun main() {
     val counterAddress = address("EQDt7LL...");
-    val currentValue: int = net.runGetMethod(counterAddress, "currentCounter");
+    val currentValue = net.runGetMethod<int>(counterAddress, "currentCounter");
     println("Counter value: {}", currentValue);
 }
 ```

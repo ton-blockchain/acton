@@ -44,7 +44,7 @@ fun main() {
 
     // 2. Prepare the contract
     // We create the contract instance locally with its initial state
-    val counter = Counter.fromStorage(Storage {
+    val counter = Counter.fromStorage({
         id: 123,       // Unique ID to randomize address
         counter: 0,    // Initial counter value
     });
@@ -84,7 +84,7 @@ fun main() {
     });
 
     val minter = JettonMinter.fromStorage({
-        totalSupply: 1000000000,
+        totalSupply: 1_000_000_000,
         adminAddress: deployer.address,
         content: content,
         jettonWalletCode: build("JettonWallet"),

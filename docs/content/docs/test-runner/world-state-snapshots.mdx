@@ -24,7 +24,7 @@ get fun `test save snapshot`() {
     val target = net.randomAddress("snapshot-target");
 
     net.topUp(target, ton("3"));
-    net.setNow(1700023001);
+    net.setNow(1_700_023_001);
 
     expect(net.saveSnapshot("fixtures/world-state.json")).toBeTrue();
 }
@@ -40,7 +40,7 @@ get fun `test load snapshot`() {
     val target = net.randomAddress("snapshot-target");
 
     expect(net.loadSnapshot("fixtures/world-state.json")).toBeTrue();
-    expect(net.now()).toEqual(1700023001);
+    expect(net.now()).toEqual(1_700_023_001);
     expect(net.balance(target)).toEqual(ton("3"));
 }
 ```

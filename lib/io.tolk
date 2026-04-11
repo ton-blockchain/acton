@@ -39,7 +39,7 @@ import "ffi/ffi"
 /// println((1, 2, 3));
 /// println(Data {
 ///     value: 10,
-///     is_set: true
+///     isSet: true
 /// });
 ///
 /// println("Hello, 0x{:x}", 10);

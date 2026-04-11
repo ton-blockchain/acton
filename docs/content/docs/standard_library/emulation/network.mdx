@@ -521,14 +521,14 @@ This method is useful for bounce testing where you want to simulate a bounced me
 
 Example:
 ```tolk
-val bounced_msg = createMessage({
+val bouncedMsg = createMessage({
     bounce: false,
     value: ton("0.95"),
-    dest: deployer_jetton_wallet.address,
+    dest: deployer.address,
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
 
-net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+net.sendSingle(notDeployer.address, bouncedMsg);
 ```
 
 See [net.send](#netsend) if you need to send a message and process out messages.
@@ -613,14 +613,14 @@ This is useful for testing single messages with [net.sendSingle](#netsendsingle)
 
 Example:
 ```tolk
-val bounced_msg = createMessage({
+val bouncedMsg = createMessage({
     bounce: false,
     value: ton("0.95"),
-    dest: deployer_jetton_wallet.address,
+    dest: deployer.address,
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
 
-net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+net.sendSingle(notDeployer.address, bouncedMsg);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L599" />
@@ -690,16 +690,16 @@ Example:
 ```tolk
 /// Script that deploys a counter contract using a wallet to real blockchain.
 fun main() {
-   val deployer = net.wallet("deployer");
-   val counter = Counter.fromStorage(Storage {
-       id: 8,
-       counter: 0,
-   });
+    val deployer = net.wallet("deployer");
+    val counter = Counter.fromStorage({
+        id: 8,
+        counter: 0,
+    });
 
-   val result = counter.deploy(deployer.address, ton("0.05"));
-   result.wait();
+    val result = counter.deploy(deployer.address, ton("0.05"));
+    result.wait();
 
-   println("Deployed counter to {}", counter.address);
+    println("Deployed counter to {}", counter.address);
 }
 ```
 
@@ -898,7 +898,7 @@ If get method returns a tensor, specify tuple as a first type argument:
 get fun get_all_data(): (int, slice) { ... }
 ```
 ```tolk
-val data: tuple = net.runGetMethod(wallet.address, "get_all_data");
+val data = net.runGetMethod<tuple>(wallet.address, "get_all_data");
 val first = data.get(0) as int;
 val second = data.get(1) as int;
 ```
@@ -940,12 +940,12 @@ Example:
 ```tolk
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0 // return 0 if contract is not deployed
+        return 0; // return 0 if contract is not deployed
     }
 
     // and if deployed, actually run get method
-    val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+    return result.jettonBalance;
 }
 ```
 
@@ -1020,7 +1020,7 @@ This allows test runner to show the name instead of the address in the test outp
 Example:
 ```tolk
 val address = net.randomAddress("random_user");
-val masterchain_address = net.randomAddress("random_user", -1);
+val masterchainAddress = net.randomAddress("random_user", -1);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L953" />
@@ -1100,9 +1100,9 @@ Returns `null` if the contract with given address is not deployed.
 
 Example:
 ```tolk
-val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
-if (storage_fee != null) {
-    println("Daily storage fee: {:ton}", storage_fee);
+val storageFee = net.getAccountStorageFee(contract.address, 86400); // 1 day
+if (storageFee != null) {
+    println("Daily storage fee: {:ton}", storageFee);
 }
 ```
 
@@ -1144,8 +1144,8 @@ This is useful for testing time-dependent contracts.
 
 Example:
 ```tolk
-val future_time = net.now() + 1000; // 1000 seconds from now
-net.setNow(future_time);
+val futureTime = net.now() + 1000; // 1000 seconds from now
+net.setNow(futureTime);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1083" />
@@ -1162,8 +1162,8 @@ Returns the current time in the emulated blockchain.
 
 Example:
 ```tolk
-val current_time = net.now();
-println("Current emulation time: {}", current_time);
+val currentTime = net.now();
+println("Current emulation time: {}", currentTime);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1099" />
