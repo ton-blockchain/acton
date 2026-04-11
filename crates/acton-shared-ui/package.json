@@ -16,7 +16,7 @@
     "lint:fix": "eslint --fix . --cache"
   },
   "dependencies": {
-    "@ton/core": "^0.62.0",
+    "@ton/core": "0.62.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.474.0",
     "react-d3-tree": "^3.6.6",

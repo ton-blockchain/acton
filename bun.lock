@@ -27,7 +27,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
-        "@ton/core": "^0.62.0",
+        "@ton/core": "0.62.0",
         "@types/react-router-dom": "^5.3.3",
         "buffer": "^6.0.3",
         "lucide-react": "^0.474.0",
@@ -53,7 +53,7 @@
       "name": "@acton/shared-ui",
       "version": "1.0.0",
       "dependencies": {
-        "@ton/core": "^0.62.0",
+        "@ton/core": "0.62.0",
         "clsx": "^2.1.1",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
@@ -73,7 +73,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
-        "@ton/core": "^0.62.0",
+        "@ton/core": "0.62.0",
         "bignumber.js": "^9.3.1",
         "buffer": "^6.0.3",
         "d3-hierarchy": "^1.1.9",
@@ -309,7 +309,7 @@
 
     "@shikijs/vscode-textmate": ["@shikijs/vscode-textmate@10.0.2", "", {}, "sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg=="],
 
-    "@ton/core": ["@ton/core@0.62.1", "", { "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-RaEGBo9gCf6ZHyS8SKq1K53pswvYW9E5A6vwUuzFBTRX14g4qMDlB9F+fq4aBE5kN7XyVr8ScQtOJfQj41usCw=="],
+    "@ton/core": ["@ton/core@0.62.0", "", { "dependencies": { "symbol.inspect": "1.0.1" }, "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-GCYlzzx11rSESKkiHvNy9tL8zWth+ZtUbvV29WH478FvBp8xTw24AyoigwXWNV+OLCAcnwlGhZpTpxjD3wzCwA=="],
 
     "@ton/crypto": ["@ton/crypto@3.3.0", "", { "dependencies": { "@ton/crypto-primitives": "2.1.0", "jssha": "3.2.0", "tweetnacl": "1.0.3" } }, "sha512-/A6CYGgA/H36OZ9BbTaGerKtzWp50rg67ZCH2oIjV1NcrBaCK9Z343M+CxedvM7Haf3f/Ee9EhxyeTp0GKMUpA=="],
 

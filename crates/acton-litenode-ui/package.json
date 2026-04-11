@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@acton/shared-ui": "workspace:*",
-    "@ton/core": "^0.62.0",
+    "@ton/core": "0.62.0",
     "@types/react-router-dom": "^5.3.3",
     "buffer": "^6.0.3",
     "lucide-react": "^0.474.0",

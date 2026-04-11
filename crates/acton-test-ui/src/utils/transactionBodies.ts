@@ -284,7 +284,7 @@ const tryDecodeWithAbi = (
       const decoded: unknown = unpackFromSliceDynamic(
         ctx,
         candidate.body_ty,
-        parser as unknown as DynamicSlice,
+        parser as DynamicSlice,
       ) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue
@@ -346,7 +346,7 @@ const tryDecodeStorageWithAbi = (
       const decoded: unknown = unpackFromSliceDynamic(
         ctx,
         candidate,
-        parser as unknown as DynamicSlice,
+        parser as DynamicSlice,
       ) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue

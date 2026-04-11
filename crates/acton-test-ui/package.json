@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@acton/shared-ui": "workspace:*",
-    "@ton/core": "^0.62.0",
+    "@ton/core": "0.62.0",
     "bignumber.js": "^9.3.1",
     "buffer": "^6.0.3",
     "d3-hierarchy": "^1.1.9",
