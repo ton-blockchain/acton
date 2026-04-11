@@ -293,6 +293,67 @@ fn test_coverage_multiple_tests() {
 }
 
 #[test]
+fn test_coverage_multiple_files() {
+    let project = ProjectBuilder::new("coverage-multiple-files")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/calculator",
+            r"
+            fun multiply(a: int, b: int): int {
+                return a * b;
+            }
+
+            fun divide(a: int, b: int): int {
+                if (b == 0) {
+                    throw 100;
+                }
+                return a / b;
+            }
+        ",
+        )
+        .raw_file(
+            "tests/multiply.test.tolk",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/calculator"
+
+            get fun `test multiply`() {
+                val result = multiply(3, 4);
+                expect(result).toEqual(12);
+            }
+        "#,
+        )
+        .raw_file(
+            "tests/divide.test.tolk",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/calculator"
+
+            get fun `test divide`() {
+                val result = divide(10, 2);
+                expect(result).toEqual(5);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_contains(" COVERAGE ")
+        .assert_contains("calculator.tolk")
+        .assert_contains("✓ 2 passed")
+        .assert_file_contains("coverage.txt", "Lines: 3/3 (100.00%)")
+        .assert_file_contains("coverage.txt", "return a * b;")
+        .assert_file_contains("coverage.txt", "return a / b;");
+}
+
+#[test]
 fn test_coverage_with_failing_tests() {
     let project = ProjectBuilder::new("coverage-with-failures")
         .contract("simple", SIMPLE_CONTRACT)

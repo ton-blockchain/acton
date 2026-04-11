@@ -15,11 +15,15 @@ const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
 #[derive(Debug, Clone)]
 pub(crate) struct ConsoleConfig {
     pub show_output: bool,
+    pub show_suite_prefix: bool,
 }
 
 impl Default for ConsoleConfig {
     fn default() -> Self {
-        Self { show_output: true }
+        Self {
+            show_output: true,
+            show_suite_prefix: false,
+        }
     }
 }
 
@@ -56,6 +60,19 @@ impl ConsoleReporter {
             " {}",
             format!("({} {label}, seed {})", fuzz.total_runs, fuzz.seed).dimmed()
         )
+    }
+
+    fn format_test_label(&self, test: &TestReport) -> String {
+        let beautified_name = self.beatify_test_name(&test.name);
+        if self.config.show_suite_prefix {
+            format!(
+                "{} {}",
+                format!("[{}]", test.suite_name).dimmed(),
+                beautified_name
+            )
+        } else {
+            beautified_name
+        }
     }
 }
 
@@ -138,6 +155,14 @@ impl TestReporter for ConsoleReporter {
     ) -> anyhow::Result<()> {
         self.count_suites += 1;
 
+        if self.config.show_suite_prefix {
+            return Ok(());
+        }
+
+        if self.count_suites > 1 {
+            println!();
+        }
+
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let relative = pathdiff::diff_paths(file_path, cwd);
         let relative_path = relative.unwrap_or_else(|| file_path.to_owned());
@@ -166,7 +191,7 @@ impl TestReporter for ConsoleReporter {
     }
 
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
-        let beautified_name = self.beatify_test_name(&test.name);
+        let test_label = self.format_test_label(test);
         let duration_ms = test.duration.as_millis();
         let (time_value, time_unit) = if duration_ms > 0 {
             (duration_ms.to_string(), "ms")
@@ -179,7 +204,7 @@ impl TestReporter for ConsoleReporter {
             println!(
                 "  {} {} {}{}{}",
                 "✓".green(),
-                beautified_name,
+                test_label,
                 time_value.green(),
                 time_unit.green().dimmed(),
                 fuzz_suffix
@@ -187,12 +212,7 @@ impl TestReporter for ConsoleReporter {
         }
 
         if test.status == TestStatus::Skipped {
-            println!(
-                "  {} {} {}",
-                "○".dimmed(),
-                beautified_name,
-                "skipped".dimmed()
-            );
+            println!("  {} {} {}", "○".dimmed(), test_label, "skipped".dimmed());
         }
 
         if test.status == TestStatus::Todo {
@@ -200,7 +220,7 @@ impl TestReporter for ConsoleReporter {
             println!(
                 "  {} {} {}{}{}",
                 "□".purple().bold(),
-                beautified_name,
+                test_label,
                 "[".dimmed(),
                 description.dimmed(),
                 "]".dimmed()
@@ -211,7 +231,7 @@ impl TestReporter for ConsoleReporter {
             println!(
                 "  {} {} {}{}{}",
                 "✗".red(),
-                beautified_name,
+                test_label,
                 time_value.red(),
                 time_unit.red().dimmed(),
                 fuzz_suffix

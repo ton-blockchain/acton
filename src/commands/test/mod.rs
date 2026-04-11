@@ -31,6 +31,7 @@ use acton_debug::{
     DapTransport, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
 };
 use anyhow::anyhow;
+use crossbeam_channel::{Sender, unbounded};
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
@@ -41,6 +42,7 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpListener;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
@@ -196,11 +198,15 @@ impl<'a> TestRunner<'a> {
         reporter_manager: &mut ReporterManager,
         config: &TestConfig,
         ui_reporter: Option<UiReporter>,
+        show_suite_prefix_on_console_lines: bool,
     ) {
         if config.report_formats.is_empty()
             || config.report_formats.contains(&ReportFormat::Console)
         {
-            let console_config = ConsoleConfig { show_output: true };
+            let console_config = ConsoleConfig {
+                show_output: true,
+                show_suite_prefix: show_suite_prefix_on_console_lines,
+            };
             reporter_manager.add_reporter(Box::new(ConsoleReporter::new(console_config)));
         }
 
@@ -526,6 +532,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let project_root = configured_project_root();
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
+    if config.fuzz_seed.is_none() {
+        config.fuzz_seed = Some(rand::random());
+    }
 
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
@@ -592,15 +601,22 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     } else {
         None
     };
+    let run_files_in_parallel = should_run_test_files_in_parallel(&config, test_files.len());
 
     let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
 
     let mut global_reporter = ReporterManager::new();
-    TestRunner::setup_reporters(&mut global_reporter, &config, ui_reporter);
+    TestRunner::setup_reporters(
+        &mut global_reporter,
+        &config,
+        ui_reporter,
+        run_files_in_parallel,
+    );
     global_reporter.init()?;
     global_reporter.on_testing_started()?;
 
     let mut file_cache = FileBuildCache::new(None)?;
+    let mutation_overrides = build_overrides_for_mutations(&config)?;
 
     let mut total_passed = 0;
     let mut total_failed = 0;
@@ -613,32 +629,34 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         debug_listener,
         &mut file_cache,
         &mut global_reporter,
-        build_overrides_for_mutations(&config)?,
+        mutation_overrides.clone(),
     )?;
 
-    for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(&mut runner, file);
-        match result {
-            Ok(stats) => {
-                total_passed += stats.passed;
-                total_failed += stats.failed;
-                total_skipped += stats.skipped;
-                total_todo += stats.todo;
-
-                if index + 1 < test_files.len()
-                    && config.report_formats.contains(&ReportFormat::Console)
-                {
-                    println!();
+    if run_files_in_parallel {
+        let stats = run_test_files_in_parallel(&mut runner, &test_files, &mutation_overrides)?;
+        total_passed += stats.passed;
+        total_failed += stats.failed;
+        total_skipped += stats.skipped;
+        total_todo += stats.todo;
+    } else {
+        for file in &test_files {
+            let result = run_tests_for_file(&mut runner, file);
+            match result {
+                Ok(stats) => {
+                    total_passed += stats.passed;
+                    total_failed += stats.failed;
+                    total_skipped += stats.skipped;
+                    total_todo += stats.todo;
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    total_failed += 1;
                 }
             }
-            Err(err) => {
-                eprintln!("{err}");
-                total_failed += 1;
-            }
-        }
 
-        if config.fail_fast && total_failed > 0 {
-            break;
+            if config.fail_fast && total_failed > 0 {
+                break;
+            }
         }
     }
 
@@ -919,12 +937,219 @@ pub fn find_test_files_recursively(
     Ok(out)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct TestStats {
     passed: usize,
     failed: usize,
     skipped: usize,
     todo: usize,
+}
+
+impl TestStats {
+    fn add_assign(&mut self, other: &TestStats) {
+        self.passed += other.passed;
+        self.failed += other.failed;
+        self.skipped += other.skipped;
+        self.todo += other.todo;
+    }
+}
+
+#[derive(Debug)]
+struct TestFileRunOutcome {
+    stats: TestStats,
+    build_cache: BuildCache,
+    emulations: EmulationsState,
+}
+
+#[derive(Debug)]
+enum ReporterEvent {
+    SuiteStarted {
+        file_path: PathBuf,
+        tests: Vec<TestDescriptor>,
+    },
+    TestStarted(TestReport),
+    TestFinished(TestReport),
+    SuiteFinished {
+        file_path: PathBuf,
+        stats: TestSuiteStats,
+    },
+}
+
+#[derive(Debug)]
+enum ParallelTestRunMessage {
+    ReporterEvent(ReporterEvent),
+    Outcome(anyhow::Result<TestFileRunOutcome>),
+}
+
+struct StreamingReporter {
+    sender: Sender<ParallelTestRunMessage>,
+}
+
+impl StreamingReporter {
+    fn new(sender: Sender<ParallelTestRunMessage>) -> Self {
+        Self { sender }
+    }
+
+    fn send_event(&self, event: ReporterEvent) {
+        let _ = self
+            .sender
+            .send(ParallelTestRunMessage::ReporterEvent(event));
+    }
+}
+
+impl reporting::TestReporter for StreamingReporter {
+    fn on_suite_started(
+        &mut self,
+        file_path: &Path,
+        tests: &[TestDescriptor],
+    ) -> anyhow::Result<()> {
+        self.send_event(ReporterEvent::SuiteStarted {
+            file_path: file_path.to_path_buf(),
+            tests: tests.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn on_test_started(&mut self, test: &TestReport) -> anyhow::Result<()> {
+        self.send_event(ReporterEvent::TestStarted(test.clone()));
+        Ok(())
+    }
+
+    fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
+        self.send_event(ReporterEvent::TestFinished(test.clone()));
+        Ok(())
+    }
+
+    fn on_suite_finished(
+        &mut self,
+        file_path: &Path,
+        stats: &TestSuiteStats,
+    ) -> anyhow::Result<()> {
+        self.send_event(ReporterEvent::SuiteFinished {
+            file_path: file_path.to_path_buf(),
+            stats: stats.clone(),
+        });
+        Ok(())
+    }
+}
+
+fn should_run_test_files_in_parallel(config: &TestConfig, test_file_count: usize) -> bool {
+    test_file_count > 1 && !config.debug && !config.fail_fast
+}
+
+fn run_test_files_in_parallel(
+    runner: &mut TestRunner,
+    test_files: &[String],
+    mutation_overrides: &BTreeMap<String, Cell>,
+) -> anyhow::Result<TestStats> {
+    let (sender, receiver) = unbounded();
+
+    for file_path in test_files.iter().cloned() {
+        let sender = sender.clone();
+        let acton_config = runner.acton_config.clone();
+        let config = runner.config.clone();
+        let mutation_overrides = mutation_overrides.clone();
+
+        rayon::spawn(move || {
+            let outcome = catch_unwind(AssertUnwindSafe(|| {
+                collect_test_file_run_outcome(
+                    &file_path,
+                    acton_config,
+                    config,
+                    mutation_overrides,
+                    sender.clone(),
+                )
+            }))
+            .map_err(|panic_payload| {
+                let panic_message = if let Some(message) = panic_payload.downcast_ref::<&str>() {
+                    (*message).to_owned()
+                } else if let Some(message) = panic_payload.downcast_ref::<String>() {
+                    message.clone()
+                } else {
+                    "unknown panic".to_owned()
+                };
+                anyhow!(
+                    "internal error: parallel test worker panicked while running '{file_path}': {panic_message}"
+                )
+            })
+            .and_then(|result| result);
+
+            let _ = sender.send(ParallelTestRunMessage::Outcome(outcome));
+        });
+    }
+    drop(sender);
+
+    let mut stats = TestStats::default();
+    for message in receiver {
+        match message {
+            ParallelTestRunMessage::ReporterEvent(event) => {
+                dispatch_reporter_event(runner.reporter_manager, event)?;
+            }
+            ParallelTestRunMessage::Outcome(result) => match result {
+                Ok(outcome) => {
+                    stats.add_assign(&outcome.stats);
+                    runner.build_cache.built.extend(outcome.build_cache.built);
+                    runner.emulations.results.extend(outcome.emulations.results);
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    stats.failed += 1;
+                }
+            },
+        }
+    }
+
+    Ok(stats)
+}
+
+fn collect_test_file_run_outcome(
+    filepath: &str,
+    acton_config: ActonConfig,
+    config: TestConfig,
+    mutation_overrides: BTreeMap<String, Cell>,
+    sender: Sender<ParallelTestRunMessage>,
+) -> anyhow::Result<TestFileRunOutcome> {
+    let mut reporter_manager = ReporterManager::new();
+    reporter_manager.add_reporter(Box::new(StreamingReporter::new(sender)));
+
+    let mut file_cache = FileBuildCache::new(None)?;
+    let mut runner = TestRunner::new(
+        acton_config,
+        config,
+        None,
+        &mut file_cache,
+        &mut reporter_manager,
+        mutation_overrides,
+    )?;
+    let stats = run_tests_for_file(&mut runner, filepath)?;
+
+    Ok(TestFileRunOutcome {
+        stats,
+        build_cache: runner.build_cache.clone(),
+        emulations: runner.emulations.clone(),
+    })
+}
+
+fn dispatch_reporter_event(
+    reporter_manager: &mut ReporterManager,
+    event: ReporterEvent,
+) -> anyhow::Result<()> {
+    match event {
+        ReporterEvent::SuiteStarted { file_path, tests } => {
+            reporter_manager.on_suite_started(&file_path, &tests)?;
+        }
+        ReporterEvent::TestStarted(test) => {
+            reporter_manager.on_test_started(&test)?;
+        }
+        ReporterEvent::TestFinished(test) => {
+            reporter_manager.on_test_finished(&test)?;
+        }
+        ReporterEvent::SuiteFinished { file_path, stats } => {
+            reporter_manager.on_suite_finished(&file_path, &stats)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn compile_test_file(
@@ -1365,7 +1590,7 @@ pub enum TestAnnotation {
     Skip,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TestDescriptor {
     pub id: i32,
     pub name: Arc<str>,

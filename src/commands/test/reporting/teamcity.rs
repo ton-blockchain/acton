@@ -6,6 +6,7 @@ use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use std::borrow::Cow;
+use std::io::{Write, stdout};
 use std::path::Path;
 
 pub(crate) struct TeamCityReporter;
@@ -148,6 +149,16 @@ impl TeamCityReporter {
 
         (message, details, expected, actual)
     }
+
+    fn flow_id(&self, file_path: &Path) -> String {
+        self.escape_name(&file_path.display().to_string())
+    }
+
+    fn emit_message(&self, message: String) -> anyhow::Result<()> {
+        println!("{message}");
+        stdout().flush()?;
+        Ok(())
+    }
 }
 
 impl Default for TeamCityReporter {
@@ -158,13 +169,11 @@ impl Default for TeamCityReporter {
 
 impl TestReporter for TeamCityReporter {
     fn on_testing_started(&mut self) -> anyhow::Result<()> {
-        println!("##teamcity[testingStarted]");
-        Ok(())
+        self.emit_message("##teamcity[testingStarted]".to_owned())
     }
 
     fn on_testing_finished(&mut self, _stats: &TestSuiteStats) -> anyhow::Result<()> {
-        println!("##teamcity[testingFinished]");
-        Ok(())
+        self.emit_message("##teamcity[testingFinished]".to_owned())
     }
 
     fn on_suite_started(
@@ -174,12 +183,13 @@ impl TestReporter for TeamCityReporter {
     ) -> anyhow::Result<()> {
         let suite_name = extract_suite_name(file_path);
         let escaped_name = self.escape_name(&suite_name);
+        let flow_id = self.flow_id(file_path);
 
-        println!(
-            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' locationHint='file://{}']",
-            file_path.display()
-        );
-        Ok(())
+        self.emit_message(format!("##teamcity[flowStarted flowId='{flow_id}']"))?;
+        self.emit_message(format!(
+            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' flowId='{flow_id}' locationHint='file://{}']",
+            file_path.display(),
+        ))
     }
 
     fn on_suite_finished(
@@ -189,67 +199,69 @@ impl TestReporter for TeamCityReporter {
     ) -> anyhow::Result<()> {
         let suite_name = extract_suite_name(file_path);
         let escaped_name = self.escape_name(&suite_name);
+        let flow_id = self.flow_id(file_path);
 
-        println!(
-            "##teamcity[testSuiteFinished name='{escaped_name}' nodeId='suite_{escaped_name}']"
-        );
-        Ok(())
+        self.emit_message(format!(
+            "##teamcity[testSuiteFinished name='{escaped_name}' nodeId='suite_{escaped_name}' flowId='{flow_id}']"
+        ))?;
+        self.emit_message(format!("##teamcity[flowFinished flowId='{flow_id}']"))
     }
 
     fn on_test_started(&mut self, test: &TestReport) -> anyhow::Result<()> {
         let test_name = self.escape_name(&test.name);
         let suite_name = self.escape_name(&extract_suite_name(Path::new(&test.file_path)));
         let location = self.escape_name(&format!("{}:{}", test.file_path.display(), test.name));
+        let flow_id = self.flow_id(&test.file_path);
 
-        println!(
-            "##teamcity[testStarted name='{test_name}' nodeId='test_{test_name}' parentNodeId='suite_{suite_name}' locationHint='tolk_qn://{location}']"
-        );
-        Ok(())
+        self.emit_message(format!(
+            "##teamcity[testStarted name='{test_name}' nodeId='test_{test_name}' parentNodeId='suite_{suite_name}' flowId='{flow_id}' locationHint='tolk_qn://{location}']"
+        ))
     }
 
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
         let test_name = self.escape_name(&test.name);
         let suite_name = self.escape_name(&extract_suite_name(Path::new(&test.file_path)));
         let duration_ms = test.duration.as_millis();
+        let flow_id = self.flow_id(&test.file_path);
 
         match test.status {
             TestStatus::Failed => {
                 let (message, details, expected, actual) = self.format_test_failure(test);
 
                 if let (Some(exp), Some(act)) = (expected, actual) {
-                    println!(
-                        "##teamcity[testFailed type='comparisonFailure' name='{}' nodeId='test_{}' duration='{}' message='{}' details='{}' expected='{}' actual='{}']",
+                    self.emit_message(format!(
+                        "##teamcity[testFailed type='comparisonFailure' name='{}' nodeId='test_{}' duration='{}' flowId='{}' message='{}' details='{}' expected='{}' actual='{}']",
                         test_name,
                         test_name,
                         duration_ms,
+                        flow_id,
                         self.escape_name(&message),
                         self.escape_name(&details),
                         self.escape_name(&exp),
                         self.escape_name(&act),
-                    );
+                    ))?;
                 } else {
-                    println!(
-                        "##teamcity[testFailed name='{}' nodeId='test_{}' duration='{}' message='{}' details='{}']",
+                    self.emit_message(format!(
+                        "##teamcity[testFailed name='{}' nodeId='test_{}' duration='{}' flowId='{}' message='{}' details='{}']",
                         test_name,
                         test_name,
                         duration_ms,
+                        flow_id,
                         self.escape_name(&message),
                         self.escape_name(&details),
-                    );
+                    ))?;
                 }
             }
             TestStatus::Skipped | TestStatus::Todo => {
-                println!(
-                    "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}']"
-                );
+                self.emit_message(format!(
+                    "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' flowId='{flow_id}']"
+                ))?;
             }
             TestStatus::Passed => {}
         }
 
-        println!(
-            "##teamcity[testFinished name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' parentNodeId='suite_{suite_name}']"
-        );
-
-        Ok(())
+        self.emit_message(format!(
+            "##teamcity[testFinished name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' parentNodeId='suite_{suite_name}' flowId='{flow_id}']"
+        ))
     }
 }

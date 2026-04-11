@@ -119,6 +119,7 @@ sha2 = "0.10" # for cache
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] } # fast file content hash for cache
 fs2 = "0.4" # build cache locking
 quick-junit = "0.5.2" # junit format for tests
+rayon = "1.11.0"
 
 # disasm for blockchain addresses
 reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
@@ -254,6 +255,7 @@ sha2 = { workspace = true } # for cache
 xxhash-rust = { workspace = true } # fast file content hash for cache
 fs2 = { workspace = true } # build cache locking
 quick-junit = { workspace = true } # junit format for tests
+rayon = { workspace = true }
 
 # disasm for blockchain addresses
 reqwest = { workspace = true }
