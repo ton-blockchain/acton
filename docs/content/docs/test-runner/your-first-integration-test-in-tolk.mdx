@@ -110,7 +110,7 @@ struct Counter {
 
 fun Counter.fromStorage(storage: Storage): Counter {
     val init = ContractState {
-        code: build("Counter", "counter.tolk"),
+        code: build("Counter"),
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();

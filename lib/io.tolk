@@ -84,7 +84,7 @@ fun println<T1, T2 = void, T3 = void, T4 = void, T5 = void, T6 = void>(
     );
 }
 
-/// Prints the given slice string to the standard error output.
+/// Prints the given string to the standard error output.
 ///
 /// Example:
 /// ```tolk
