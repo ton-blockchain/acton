@@ -32,11 +32,13 @@ pub enum RenderedValue {
         type_name: String,
         value: String,
         fields: Vec<(String, RenderedValue)>, // "bits" and "refs" fields
+        raw: Option<CellLike>,
     },
     CellOf {
         type_name: String,
         value: String,
         fields: Vec<(String, RenderedValue)>, // "decoded" field with actual value
+        raw: Option<CellLike>,
     },
     EnumValue {
         type_name: String,
@@ -187,6 +189,15 @@ impl RenderedValue {
             RenderedValue::ArrayOf { items, .. } => !items.is_empty(),
             RenderedValue::LastSeen { inner } => inner.has_children(),
             _ => false,
+        }
+    }
+
+    pub(crate) fn raw_cell_like(&self) -> Option<&CellLike> {
+        match self {
+            RenderedValue::CellLike { raw: Some(raw), .. }
+            | RenderedValue::CellOf { raw: Some(raw), .. } => Some(raw),
+            RenderedValue::LastSeen { inner } => inner.raw_cell_like(),
+            _ => None,
         }
     }
 }
@@ -582,17 +593,23 @@ fn slice_meta(cs: &CellSlice) -> (Option<usize>, Option<usize>, Option<String>) 
     (bits, refs, hash)
 }
 
+fn slice_as_cell_like(cs: &CellSlice) -> Option<CellLike> {
+    exact_slice_cell(cs).map(|cell| CellLike::Cell(Boc::encode_hex(&cell)))
+}
+
 fn render_openable_cell_like(
     ty: &Ty,
     value: impl Into<String>,
     bits: Option<usize>,
     refs: Option<usize>,
     hash: Option<String>,
+    raw: Option<CellLike>,
 ) -> RenderedValue {
     RenderedValue::CellLike {
         type_name: ty.to_string(),
         value: value.into(),
         fields: render_cell_meta_fields(bits, refs, hash),
+        raw,
     }
 }
 
@@ -606,16 +623,37 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
         VmStackValue::Unknown => RenderedValue::leaf("???"),
         VmStackValue::Cell(cell) => {
             let (bits, refs, hash) = cell_like_meta(cell);
-            render_openable_cell_like(&Ty::Cell, render_cell_like(cell), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Cell,
+                render_cell_like(cell),
+                bits,
+                refs,
+                hash,
+                Some(cell.clone()),
+            )
         }
         VmStackValue::Builder(builder_hex) => {
             let cell_like = CellLike::Builder(builder_hex.clone());
             let (bits, refs, hash) = cell_like_meta(&cell_like);
-            render_openable_cell_like(&Ty::Builder, render_builder(builder_hex), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Builder,
+                render_builder(builder_hex),
+                bits,
+                refs,
+                hash,
+                Some(cell_like),
+            )
         }
         VmStackValue::CellSlice(slice) => {
             let (bits, refs, hash) = slice_meta(slice);
-            render_openable_cell_like(&Ty::Slice, render_slice(slice), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Slice,
+                render_slice(slice),
+                bits,
+                refs,
+                hash,
+                slice_as_cell_like(slice),
+            )
         }
         VmStackValue::Tuple(items) => RenderedValue::ArrayOf {
             type_name: "tuple".to_owned(),
@@ -822,23 +860,35 @@ fn render_typed_cell_with_compiler_abi(
     inner: &Ty,
     cell: &CellLike,
 ) -> RenderedValue {
+    let decoded = if let Some(cell) = decode_cell_like(cell)
+        && let Some(abi) = abi
+    {
+        let mut parser = cell.as_slice_allow_exotic();
+        decode_abi_data_with_compiler_abi(abi, &mut parser, inner).map(|data| (inner, data))
+    } else {
+        None
+    };
+    render_typed_cell_with_decoded_data(ty, cell, decoded)
+}
+
+fn render_typed_cell_with_decoded_data(
+    ty: &Ty,
+    cell: &CellLike,
+    decoded: Option<(&Ty, ParsedAbiData)>,
+) -> RenderedValue {
     let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
     let mut fields = render_cell_meta_fields(bits, refs, hash);
 
-    if let Some(cell) = decode_cell_like(cell)
-        && let Some(abi) = abi
-    {
-        let mut parser = cell.as_slice_allow_exotic();
-        if let Some(data) = decode_abi_data_with_compiler_abi(abi, &mut parser, inner) {
-            fields.insert(0, ("decoded".to_owned(), render_abi_data(data, inner)));
-        }
+    if let Some((inner, data)) = decoded {
+        fields.insert(0, ("decoded".to_owned(), render_abi_data(data, inner)));
     }
 
     RenderedValue::CellOf {
         type_name: ty.to_string(),
         value,
         fields,
+        raw: Some(cell.clone()),
     }
 }
 
@@ -863,6 +913,86 @@ pub(crate) fn render_runtime_storage_with_compiler_abi(
         storage_ty,
         cell,
     ))
+}
+
+fn decode_abi_data_with_compiler_abi_result(
+    abi: &ContractABI,
+    parser: &mut TyCellSlice<'_>,
+    ty: &Ty,
+) -> Result<ParsedAbiData, String> {
+    let data = compiler_abi_serde::decode(parser, abi, ty).map_err(|err| err.to_string())?;
+    if parser.size_bits() != 0 || parser.size_refs() != 0 {
+        return Err(format!(
+            "remaining bits/refs after decode: {} bits, {} refs",
+            parser.size_bits(),
+            parser.size_refs()
+        ));
+    }
+    Ok(data)
+}
+
+pub(crate) fn render_cell_like_as_type(
+    symbols: &SourceMap,
+    value: &RenderedValue,
+    ty: &Ty,
+) -> Result<RenderedValue, String> {
+    let cell_like = value.raw_cell_like().ok_or_else(|| {
+        format!(
+            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
+            debugger_value_kind(value)
+        )
+    })?;
+    let CellLike::Cell(_) = cell_like else {
+        return Err(format!(
+            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
+            debugger_value_kind(value)
+        ));
+    };
+
+    let Ty::CellOf { inner } = ty else {
+        return Err(format!(
+            "Debugger evaluate only supports casts to Cell<T>, got `{ty}`"
+        ));
+    };
+
+    let abi = build_compiler_abi(symbols)
+        .ok_or_else(|| "Failed to build debug ABI from SourceMap declarations".to_owned())?;
+    let decoded_cell = decode_cell_like(cell_like).ok_or_else(|| {
+        format!(
+            "Failed to materialize {} as a TVM cell while decoding `{ty}`",
+            debugger_value_kind(value)
+        )
+    })?;
+    let mut parser = decoded_cell.as_slice_allow_exotic();
+    let data = decode_abi_data_with_compiler_abi_result(&abi, &mut parser, inner.as_ref())?;
+
+    Ok(render_typed_cell_with_decoded_data(
+        ty,
+        cell_like,
+        Some((inner.as_ref(), data)),
+    ))
+}
+
+fn debugger_value_kind(value: &RenderedValue) -> String {
+    match value {
+        RenderedValue::Leaf {
+            value,
+            type_field: Some(type_field),
+        } => format!("`{type_field}` (`{value}`)"),
+        RenderedValue::Leaf { value, .. } => format!("`{value}`"),
+        RenderedValue::CellLike { type_name, .. }
+        | RenderedValue::CellOf { type_name, .. }
+        | RenderedValue::EnumValue { type_name, .. }
+        | RenderedValue::UnionCase { type_name, .. }
+        | RenderedValue::Struct { type_name, .. }
+        | RenderedValue::Address { type_name, .. }
+        | RenderedValue::Tensor { type_name, .. }
+        | RenderedValue::ArrayOf { type_name, .. }
+        | RenderedValue::LazyUnresolved { type_name } => format!("`{type_name}`"),
+        RenderedValue::LastSeen { inner } => debugger_value_kind(inner),
+        RenderedValue::OptimizedOut => "<optimized out>".to_owned(),
+        RenderedValue::NotYetLoaded => "<not loaded>".to_owned(),
+    }
 }
 
 fn render_abi_data(data: ParsedAbiData, ty: &Ty) -> RenderedValue {
@@ -1253,7 +1383,14 @@ fn debug_format(
         Ty::Cell => match r.read_slot() {
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 let (bits, refs, hash) = cell_like_meta(cell);
-                render_openable_cell_like(ty, render_cell_like(cell), bits, refs, hash)
+                render_openable_cell_like(
+                    ty,
+                    render_cell_like(cell),
+                    bits,
+                    refs,
+                    hash,
+                    Some(cell.clone()),
+                )
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM cell"),
@@ -1287,7 +1424,7 @@ fn debug_format(
             SlotValue::Live(VmStackValue::Builder(b)) => {
                 let cell = CellLike::Builder(b.clone());
                 let (bits, refs, hash) = cell_like_meta(&cell);
-                render_openable_cell_like(ty, render_builder(b), bits, refs, hash)
+                render_openable_cell_like(ty, render_builder(b), bits, refs, hash, Some(cell))
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM builder"),
@@ -1296,7 +1433,14 @@ fn debug_format(
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => {
                 let (bits, refs, hash) = slice_meta(cs);
-                render_openable_cell_like(ty, render_slice(cs), bits, refs, hash)
+                render_openable_cell_like(
+                    ty,
+                    render_slice(cs),
+                    bits,
+                    refs,
+                    hash,
+                    slice_as_cell_like(cs),
+                )
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM slice"),
@@ -1701,6 +1845,7 @@ pub(crate) fn render_runtime_out_actions(
         type_name: "Cell<array<OutAction>>".to_owned(),
         value,
         fields,
+        raw: Some(cell.clone()),
     })
 }
 
@@ -1867,6 +2012,7 @@ fn render_message_body(
         type_name: format!("Cell<{body_type_name}>"),
         value: render_cell_like(&cell_like),
         fields,
+        raw: Some(cell_like),
     }
 }
 
@@ -2363,7 +2509,14 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
                 v: Box::new(Ty::VaruintN { n: 32 }),
             };
             let (bits, refs, hash) = cell_like_meta(cell);
-            render_openable_cell_like(&ty, render_cell_like(cell), bits, refs, hash)
+            render_openable_cell_like(
+                &ty,
+                render_cell_like(cell),
+                bits,
+                refs,
+                hash,
+                Some(cell.clone()),
+            )
         }
         VmStackValue::Null => RenderedValue::typed_leaf("()", "map<int32, varuint32>"),
         _ => RenderedValue::typed_leaf(
@@ -2538,12 +2691,14 @@ mod tests {
             bits,
             refs,
             hash,
+            Some(CellLike::Cell(Boc::encode_hex(&cell))),
         );
 
         let RenderedValue::CellLike {
             type_name,
             value,
             fields,
+            ..
         } = rendered
         else {
             panic!("expected CellLike");
@@ -2801,6 +2956,7 @@ mod tests {
             Some(16),
             Some(0),
             Some(hash.clone()),
+            None,
         );
 
         let RenderedValue::CellLike { fields, .. } = rendered else {
@@ -2825,8 +2981,14 @@ mod tests {
         let cell_like = CellLike::Builder(builder_hex.clone());
         let (bits, refs, hash) = cell_like_meta(&cell_like);
 
-        let rendered =
-            render_openable_cell_like(&Ty::Builder, render_builder(&builder_hex), bits, refs, hash);
+        let rendered = render_openable_cell_like(
+            &Ty::Builder,
+            render_builder(&builder_hex),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
 
         let RenderedValue::CellLike { fields, .. } = rendered else {
             panic!("expected CellLike");

@@ -241,33 +241,33 @@ impl ReplayerDebugSession {
         frame_id: Option<i64>,
         expression: &str,
     ) -> anyhow::Result<RenderedValue> {
-        let locals = match frame_id {
+        match frame_id {
             Some(frame_id) => {
                 let locator = self
                     .frame_to_depth
                     .get(&frame_id)
                     .copied()
                     .ok_or_else(|| anyhow!("Unknown frame id {frame_id}"))?;
-                self.contexts
-                    .get(locator.context_idx)
-                    .and_then(|ctx| {
-                        ctx.try_borrow()
-                            .ok()
-                            .map(|ctx| ctx.replayer.locals_for_frame(locator.depth_from_top))
-                    })
-                    .unwrap_or_default()
+                let Some(ctx) = self.contexts.get(locator.context_idx) else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let Ok(ctx) = ctx.try_borrow() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let locals = ctx.replayer.locals_for_frame(locator.depth_from_top);
+                evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
             }
-            None => self
-                .active_context()
-                .and_then(|ctx| {
-                    ctx.try_borrow()
-                        .ok()
-                        .map(|ctx| ctx.replayer.locals_for_frame(0))
-                })
-                .unwrap_or_default(),
-        };
-
-        evaluate_expression(&locals, expression)
+            None => {
+                let Some(ctx) = self.active_context() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let Ok(ctx) = ctx.try_borrow() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let locals = ctx.replayer.locals_for_frame(0);
+                evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            }
+        }
     }
 
     fn alloc_frame_id(&mut self, locator: FrameLocator) -> i64 {

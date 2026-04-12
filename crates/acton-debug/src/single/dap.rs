@@ -209,6 +209,10 @@ impl DapState {
         frame_id: Option<i64>,
         expression: &str,
     ) -> anyhow::Result<RenderedValue> {
+        let Some(replayer) = self.replayer.as_ref() else {
+            return evaluate_expression(&[], None, expression);
+        };
+
         let locals = match frame_id {
             Some(frame_id) => {
                 let depth = self
@@ -216,19 +220,12 @@ impl DapState {
                     .get(&frame_id)
                     .copied()
                     .ok_or_else(|| anyhow::anyhow!("Unknown frame id {frame_id}"))?;
-                self.replayer
-                    .as_ref()
-                    .map(|replayer| replayer.locals_for_frame(depth))
-                    .unwrap_or_default()
+                replayer.locals_for_frame(depth)
             }
-            None => self
-                .replayer
-                .as_ref()
-                .map(|replayer| replayer.locals_for_frame(0))
-                .unwrap_or_default(),
+            None => replayer.locals_for_frame(0),
         };
 
-        evaluate_expression(&locals, expression)
+        evaluate_expression(&locals, Some(replayer.source_map()), expression)
     }
 }
 

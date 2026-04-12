@@ -1489,4 +1489,9 @@ impl TolkReplayer {
     pub fn type_name(&self, ty_idx: usize) -> Option<String> {
         self.source_map.resolve_ty(ty_idx).map(ToString::to_string)
     }
+
+    #[must_use]
+    pub const fn source_map(&self) -> &SourceMap {
+        &self.source_map
+    }
 }

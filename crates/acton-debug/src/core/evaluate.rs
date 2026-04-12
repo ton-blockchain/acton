@@ -1,11 +1,14 @@
 use crate::replayer::LocalVarRendered;
-use crate::types_render::RenderedValue;
+use crate::types_render::{RenderedValue, render_cell_like_as_type};
 use anyhow::{Result, anyhow, bail};
 use num_bigint::BigInt;
 use std::cmp::Ordering;
 use tolk_syntax::{
-    AstNode, DotAccessField, Expr, FuncBody, FunctionLike, Stmt, TopLevel, parse_tolk_int_literal,
+    AstNode, DotAccessField, Expr, FuncBody, FunctionLike, Stmt, TopLevel, Type,
+    parse_tolk_int_literal,
 };
+use tolkc::source_map::{Declaration, SourceMap};
+use tolkc::types_kernel::Ty;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PathSegment {
@@ -21,12 +24,13 @@ struct ParsedValuePath {
 
 pub(crate) fn evaluate_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     expression: &str,
 ) -> Result<RenderedValue> {
     let source_file = parse_wrapped_source(expression)?;
     let expr = wrapped_expression(&source_file)
         .ok_or_else(|| anyhow!("expected a single expression statement"))?;
-    evaluate_parsed_expression(locals, expr, source_file.source.as_ref())
+    evaluate_parsed_expression(locals, source_map, expr, source_file.source.as_ref())
 }
 
 pub(crate) fn evaluate_condition_expression(
@@ -36,7 +40,7 @@ pub(crate) fn evaluate_condition_expression(
     let source_file = parse_wrapped_source(expression)?;
     let expr = wrapped_expression(&source_file)
         .ok_or_else(|| anyhow!("expected a single expression statement"))?;
-    evaluate_boolean_expression(locals, expr, source_file.source.as_ref())
+    evaluate_boolean_expression(locals, None, expr, source_file.source.as_ref())
 }
 
 fn resolve_locals_path(
@@ -176,6 +180,7 @@ fn parse_numeric_index(raw: &str) -> Result<usize> {
 
 fn evaluate_parsed_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     expr: Expr<'_>,
     source: &str,
 ) -> Result<RenderedValue> {
@@ -188,15 +193,16 @@ fn evaluate_parsed_expression(
             let inner = paren
                 .inner()
                 .ok_or_else(|| anyhow!("expected expression inside parentheses"))?;
-            evaluate_parsed_expression(locals, inner, source)
+            evaluate_parsed_expression(locals, source_map, inner, source)
         }
-        Expr::Unary(unary) => evaluate_unary_expression(locals, &unary, source),
+        Expr::Unary(unary) => evaluate_unary_expression(locals, source_map, &unary, source),
+        Expr::AsCast(as_cast) => evaluate_as_cast_expression(locals, source_map, &as_cast, source),
         Expr::Bin(bin) => match bin.operator_name(source) {
             "&&" => {
                 let left = bin
                     .left()
                     .ok_or_else(|| anyhow!("expected left operand for `&&`"))?;
-                let left = evaluate_boolean_expression(locals, left, source)?;
+                let left = evaluate_boolean_expression(locals, source_map, left, source)?;
                 if !left {
                     return Ok(render_bool(false));
                 }
@@ -205,14 +211,14 @@ fn evaluate_parsed_expression(
                     .right()
                     .ok_or_else(|| anyhow!("expected right operand for `&&`"))?;
                 Ok(render_bool(evaluate_boolean_expression(
-                    locals, right, source,
+                    locals, source_map, right, source,
                 )?))
             }
             "||" => {
                 let left = bin
                     .left()
                     .ok_or_else(|| anyhow!("expected left operand for `||`"))?;
-                let left = evaluate_boolean_expression(locals, left, source)?;
+                let left = evaluate_boolean_expression(locals, source_map, left, source)?;
                 if left {
                     return Ok(render_bool(true));
                 }
@@ -221,12 +227,14 @@ fn evaluate_parsed_expression(
                     .right()
                     .ok_or_else(|| anyhow!("expected right operand for `||`"))?;
                 Ok(render_bool(evaluate_boolean_expression(
-                    locals, right, source,
+                    locals, source_map, right, source,
                 )?))
             }
-            "==" => evaluate_equality_expression(locals, &bin, source, true),
-            "!=" => evaluate_equality_expression(locals, &bin, source, false),
-            "<" | "<=" | ">" | ">=" => evaluate_ordering_expression(locals, &bin, source),
+            "==" => evaluate_equality_expression(locals, source_map, &bin, source, true),
+            "!=" => evaluate_equality_expression(locals, source_map, &bin, source, false),
+            "<" | "<=" | ">" | ">=" => {
+                evaluate_ordering_expression(locals, source_map, &bin, source)
+            }
             operator => bail!("binary operator `{operator}` is not supported"),
         },
         _ => {
@@ -238,6 +246,7 @@ fn evaluate_parsed_expression(
 
 fn evaluate_unary_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     unary: &tolk_syntax::Unary<'_>,
     source: &str,
 ) -> Result<RenderedValue> {
@@ -248,11 +257,11 @@ fn evaluate_unary_expression(
 
     match operator {
         "!" => {
-            let value = evaluate_parsed_expression(locals, argument, source)?;
+            let value = evaluate_parsed_expression(locals, source_map, argument, source)?;
             Ok(render_bool(!rendered_value_as_bool(&value)?))
         }
         "-" => {
-            let value = evaluate_parsed_expression(locals, argument, source)?;
+            let value = evaluate_parsed_expression(locals, source_map, argument, source)?;
             let number = parse_rendered_number(&value)
                 .ok_or_else(|| anyhow!("unary operator `-` requires numeric operand"))?;
             Ok(RenderedValue::typed_leaf((-number).to_string(), "int"))
@@ -263,10 +272,11 @@ fn evaluate_unary_expression(
 
 fn evaluate_boolean_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     expr: Expr<'_>,
     source: &str,
 ) -> Result<bool> {
-    let value = evaluate_parsed_expression(locals, expr, source)?;
+    let value = evaluate_parsed_expression(locals, source_map, expr, source)?;
     rendered_value_as_bool(&value)
 }
 
@@ -280,6 +290,7 @@ fn rendered_value_as_bool(value: &RenderedValue) -> Result<bool> {
 
 fn evaluate_equality_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     bin: &tolk_syntax::Bin<'_>,
     source: &str,
     expected_equal: bool,
@@ -291,14 +302,15 @@ fn evaluate_equality_expression(
         .right()
         .ok_or_else(|| anyhow!("expected right operand for equality comparison"))?;
 
-    let left = evaluate_parsed_expression(locals, left, source)?;
-    let right = evaluate_parsed_expression(locals, right, source)?;
+    let left = evaluate_parsed_expression(locals, source_map, left, source)?;
+    let right = evaluate_parsed_expression(locals, source_map, right, source)?;
     let equal = rendered_value_text(&left) == rendered_value_text(&right);
     Ok(render_bool(equal == expected_equal))
 }
 
 fn evaluate_ordering_expression(
     locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
     bin: &tolk_syntax::Bin<'_>,
     source: &str,
 ) -> Result<RenderedValue> {
@@ -310,8 +322,8 @@ fn evaluate_ordering_expression(
         .right()
         .ok_or_else(|| anyhow!("expected right operand for `{operator}`"))?;
 
-    let left = evaluate_parsed_expression(locals, left, source)?;
-    let right = evaluate_parsed_expression(locals, right, source)?;
+    let left = evaluate_parsed_expression(locals, source_map, left, source)?;
+    let right = evaluate_parsed_expression(locals, source_map, right, source)?;
     let comparison = compare_rendered_values_as_numbers(&left, &right, operator)?;
 
     let result = match operator {
@@ -322,6 +334,226 @@ fn evaluate_ordering_expression(
         _ => unreachable!("unsupported ordering operator"),
     };
     Ok(render_bool(result))
+}
+
+fn evaluate_as_cast_expression(
+    locals: &[LocalVarRendered],
+    source_map: Option<&SourceMap>,
+    as_cast: &tolk_syntax::AsCast<'_>,
+    source: &str,
+) -> Result<RenderedValue> {
+    let expr = as_cast
+        .expr()
+        .ok_or_else(|| anyhow!("expected expression before `as`"))?;
+    let target = as_cast
+        .casted_to()
+        .ok_or_else(|| anyhow!("expected type after `as`"))?;
+    let source_map = source_map
+        .ok_or_else(|| anyhow!("type casts are not supported in this debugger context"))?;
+
+    let value = evaluate_parsed_expression(locals, Some(source_map), expr, source)?;
+    let ty = lower_evaluate_cast_type(target, source, source_map)?;
+
+    match &ty {
+        Ty::CellOf { .. } => {
+            render_cell_like_as_type(source_map, &value, &ty).map_err(anyhow::Error::msg)
+        }
+        _ => bail!("Debugger evaluate currently supports only casts to `Cell<T>`"),
+    }
+}
+
+fn lower_evaluate_cast_type(ty: Type<'_>, source: &str, source_map: &SourceMap) -> Result<Ty> {
+    match ty {
+        Type::TypeIdent(ident) => {
+            lower_named_or_primitive_type(ident.text(source), None, source_map)
+        }
+        Type::TypeInstantiatedTs(inst) => {
+            let name = inst
+                .name()
+                .ok_or_else(|| anyhow!("expected type name"))?
+                .text(source);
+            let type_args = inst
+                .arguments()
+                .map(|args| {
+                    args.types()
+                        .map(|arg| lower_evaluate_cast_type(arg, source, source_map))
+                        .collect::<Result<Vec<_>>>()
+                })
+                .transpose()?;
+            lower_named_or_primitive_type(name, type_args, source_map)
+        }
+        Type::ParenthesizedType(paren) => {
+            let inner = paren
+                .inner()
+                .ok_or_else(|| anyhow!("expected type inside parentheses"))?;
+            lower_evaluate_cast_type(inner, source, source_map)
+        }
+        Type::NullableType(nullable) => {
+            let inner = nullable
+                .inner()
+                .ok_or_else(|| anyhow!("expected type before `?`"))?;
+            Ok(Ty::Nullable {
+                inner: Box::new(lower_evaluate_cast_type(inner, source, source_map)?),
+                stack_type_id: None,
+                stack_width: None,
+            })
+        }
+        Type::TensorType(tensor) => Ok(Ty::Tensor {
+            items: tensor
+                .elements()
+                .map(|item| lower_evaluate_cast_type(item, source, source_map))
+                .collect::<Result<Vec<_>>>()?,
+        }),
+        Type::TupleType(tuple) => Ok(Ty::ShapedTuple {
+            items: tuple
+                .elements()
+                .map(|item| lower_evaluate_cast_type(item, source, source_map))
+                .collect::<Result<Vec<_>>>()?,
+        }),
+        Type::UnionType(_) => bail!(
+            "inline union types are not supported in debugger evaluate casts; cast to a named ABI type instead"
+        ),
+        Type::FunCallableType(_) => {
+            bail!("callable types are not supported in debugger evaluate casts")
+        }
+        Type::NullLit(_) => Ok(Ty::NullLiteral),
+        Type::Unmapped(raw) => bail!(
+            "unsupported cast type `{}`",
+            raw.0
+                .utf8_text(source.as_bytes())
+                .unwrap_or("<invalid utf8>")
+        ),
+    }
+}
+
+fn lower_named_or_primitive_type(
+    name: &str,
+    type_args: Option<Vec<Ty>>,
+    source_map: &SourceMap,
+) -> Result<Ty> {
+    if let Some(ty) = lower_primitive_type(name, type_args.as_deref())? {
+        return Ok(ty);
+    }
+
+    match resolve_named_declaration_kind(source_map, name) {
+        Some(NamedDeclarationKind::Struct) => Ok(Ty::StructRef {
+            struct_name: name.to_owned(),
+            type_args,
+        }),
+        Some(NamedDeclarationKind::Alias) => Ok(Ty::AliasRef {
+            alias_name: name.to_owned(),
+            type_args,
+        }),
+        Some(NamedDeclarationKind::Enum) => {
+            if type_args.as_ref().is_some_and(|args| !args.is_empty()) {
+                bail!("enum `{name}` does not take type arguments");
+            }
+            Ok(Ty::EnumRef {
+                enum_name: name.to_owned(),
+            })
+        }
+        None => bail!("type `{name}` is not known in the current SourceMap"),
+    }
+}
+
+fn lower_primitive_type(name: &str, type_args: Option<&[Ty]>) -> Result<Option<Ty>> {
+    let primitive = match name {
+        "int" => Some(Ty::Int),
+        "coins" => Some(Ty::Coins),
+        "bool" => Some(Ty::Bool),
+        "cell" | "Cell" if type_args.is_none() => Some(Ty::Cell),
+        "builder" => Some(Ty::Builder),
+        "slice" => Some(Ty::Slice),
+        "string" => Some(Ty::String),
+        "RemainingBitsAndRefs" => Some(Ty::Remaining),
+        "address" => Some(Ty::Address),
+        "ext_address" => Some(Ty::AddressExt),
+        "any_address" => Some(Ty::AddressAny),
+        "null" => Some(Ty::NullLiteral),
+        "Cell" => {
+            let [inner] = type_args.unwrap_or_default() else {
+                bail!("`Cell` expects exactly one type argument");
+            };
+            Some(Ty::CellOf {
+                inner: Box::new(inner.clone()),
+            })
+        }
+        "array" => {
+            let [inner] = type_args.unwrap_or_default() else {
+                bail!("`array` expects exactly one type argument");
+            };
+            Some(Ty::ArrayOf {
+                inner: Box::new(inner.clone()),
+            })
+        }
+        "lisp_list" => {
+            let [inner] = type_args.unwrap_or_default() else {
+                bail!("`lisp_list` expects exactly one type argument");
+            };
+            Some(Ty::LispListOf {
+                inner: Box::new(inner.clone()),
+            })
+        }
+        "map" => {
+            let [key, value] = type_args.unwrap_or_default() else {
+                bail!("`map` expects exactly two type arguments");
+            };
+            Some(Ty::MapKV {
+                k: Box::new(key.clone()),
+                v: Box::new(value.clone()),
+            })
+        }
+        _ => parse_sized_primitive_type(name),
+    };
+
+    Ok(primitive)
+}
+
+fn parse_sized_primitive_type(name: &str) -> Option<Ty> {
+    fn parse_suffix(name: &str, prefix: &str) -> Option<u32> {
+        name.strip_prefix(prefix)
+            .filter(|suffix| !suffix.is_empty())
+            .and_then(|suffix| suffix.parse::<u32>().ok())
+    }
+
+    if let Some(n) = parse_suffix(name, "int") {
+        return Some(Ty::IntN { n });
+    }
+    if let Some(n) = parse_suffix(name, "uint") {
+        return Some(Ty::UintN { n });
+    }
+    if let Some(n) = parse_suffix(name, "varint") {
+        return Some(Ty::VarintN { n });
+    }
+    if let Some(n) = parse_suffix(name, "varuint") {
+        return Some(Ty::VaruintN { n });
+    }
+    if let Some(n) = parse_suffix(name, "bits") {
+        return Some(Ty::BitsN { n });
+    }
+    None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NamedDeclarationKind {
+    Struct,
+    Alias,
+    Enum,
+}
+
+fn resolve_named_declaration_kind(
+    source_map: &SourceMap,
+    name: &str,
+) -> Option<NamedDeclarationKind> {
+    source_map
+        .declarations()
+        .iter()
+        .find_map(|decl| match decl {
+            Declaration::Struct(decl) if decl.name == name => Some(NamedDeclarationKind::Struct),
+            Declaration::Alias(decl) if decl.name == name => Some(NamedDeclarationKind::Alias),
+            Declaration::Enum(decl) if decl.name == name => Some(NamedDeclarationKind::Enum),
+            _ => None,
+        })
 }
 
 fn compare_rendered_values_as_numbers(
@@ -382,14 +614,43 @@ mod tests {
         parse_expr_to_path, parse_wrapped_source, wrapped_expression,
     };
     use crate::replayer::LocalVarRendered;
-    use crate::types_render::RenderedValue;
+    use crate::types_render::{RenderedValue, render_runtime_vm_value};
     use anyhow::anyhow;
+    use tolkc::source_map::SourceMap;
+    use tycho_types::boc::Boc;
+    use tycho_types::cell::CellBuilder;
+    use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
     fn parse_value_path(input: &str) -> anyhow::Result<ParsedValuePath> {
         let source_file = parse_wrapped_source(input)?;
         let expr = wrapped_expression(&source_file)
             .ok_or_else(|| anyhow!("expected a single expression statement"))?;
         parse_expr_to_path(expr, source_file.source.as_ref())
+    }
+
+    fn foo_source_map() -> SourceMap {
+        serde_json::from_value(serde_json::json!({
+            "files": [],
+            "declarations": [{
+                "kind": "struct",
+                "name": "Foo",
+                "ident_loc": [0, 0, 0, 0, 0],
+                "fields": [{
+                    "name": "value",
+                    "ty": {"kind": "uintN", "n": 32}
+                }]
+            }],
+            "unique_ty": [],
+            "functions": [],
+            "debug_marks": []
+        }))
+        .expect("valid source map")
+    }
+
+    fn foo_value_cell() -> tycho_types::cell::Cell {
+        let mut builder = CellBuilder::new();
+        builder.store_u32(42).expect("must store field");
+        builder.build().expect("must build cell")
     }
 
     #[test]
@@ -449,7 +710,8 @@ mod tests {
             },
         }];
 
-        let value = evaluate_expression(&locals, "foo.bar.0.baz").expect("path should resolve");
+        let value =
+            evaluate_expression(&locals, None, "foo.bar.0.baz").expect("path should resolve");
         assert_eq!(value.to_string(), "42");
     }
 
@@ -466,7 +728,7 @@ mod tests {
             },
         ];
 
-        let value = evaluate_expression(&locals, "foo").expect("path should resolve");
+        let value = evaluate_expression(&locals, None, "foo").expect("path should resolve");
         assert_eq!(value.to_string(), "2");
     }
 
@@ -507,7 +769,7 @@ mod tests {
             },
         }];
 
-        let value = evaluate_expression(&locals, "foo.enabled && (!foo.blocked || false)")
+        let value = evaluate_expression(&locals, None, "foo.enabled && (!foo.blocked || false)")
             .expect("logical expression should resolve");
         assert_eq!(value.to_string(), "true");
     }
@@ -529,11 +791,11 @@ mod tests {
     fn logical_operators_short_circuit() {
         let locals = Vec::new();
 
-        let value = evaluate_expression(&locals, "false && missing.flag")
+        let value = evaluate_expression(&locals, None, "false && missing.flag")
             .expect("short-circuit should avoid rhs lookup");
         assert_eq!(value.to_string(), "false");
 
-        let value = evaluate_expression(&locals, "true || missing.flag")
+        let value = evaluate_expression(&locals, None, "true || missing.flag")
             .expect("short-circuit should avoid rhs lookup");
         assert_eq!(value.to_string(), "true");
     }
@@ -545,7 +807,7 @@ mod tests {
             value: RenderedValue::typed_leaf("42", "int"),
         }];
 
-        let err = evaluate_expression(&locals, "count && true")
+        let err = evaluate_expression(&locals, None, "count && true")
             .expect_err("non-boolean operand should be rejected");
         assert_eq!(
             err.to_string(),
@@ -570,11 +832,12 @@ mod tests {
             },
         ];
 
-        let value = evaluate_expression(&locals, "lhs == rhs").expect("equality should resolve");
+        let value =
+            evaluate_expression(&locals, None, "lhs == rhs").expect("equality should resolve");
         assert_eq!(value.to_string(), "true");
 
         let value =
-            evaluate_expression(&locals, "lhs != other").expect("inequality should resolve");
+            evaluate_expression(&locals, None, "lhs != other").expect("inequality should resolve");
         assert_eq!(value.to_string(), "true");
     }
 
@@ -592,37 +855,37 @@ mod tests {
         ];
 
         assert_eq!(
-            evaluate_expression(&locals, "small < big")
+            evaluate_expression(&locals, None, "small < big")
                 .expect("comparison should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "big >= small")
+            evaluate_expression(&locals, None, "big >= small")
                 .expect("comparison should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "big >= 42")
+            evaluate_expression(&locals, None, "big >= 42")
                 .expect("comparison should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "small > -1")
+            evaluate_expression(&locals, None, "small > -1")
                 .expect("negative literal comparison should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "-small < 0")
+            evaluate_expression(&locals, None, "-small < 0")
                 .expect("unary minus on variables should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "small < 10")
+            evaluate_expression(&locals, None, "small < 10")
                 .expect("literal comparison should resolve")
                 .to_string(),
             "true"
@@ -636,7 +899,7 @@ mod tests {
             value: RenderedValue::typed_leaf("alice", "string"),
         }];
 
-        let err = evaluate_expression(&locals, "name < 10")
+        let err = evaluate_expression(&locals, None, "name < 10")
             .expect_err("non-numeric ordering operand should be rejected");
         assert_eq!(err.to_string(), "operator `<` requires numeric operands");
     }
@@ -649,19 +912,19 @@ mod tests {
         }];
 
         assert_eq!(
-            evaluate_expression(&locals, "\"alice\"")
+            evaluate_expression(&locals, None, "\"alice\"")
                 .expect("string literal should resolve")
                 .to_string(),
             "\"alice\""
         );
         assert_eq!(
-            evaluate_expression(&locals, "name == \"alice\"")
+            evaluate_expression(&locals, None, "name == \"alice\"")
                 .expect("string equality should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "name != \"bob\"")
+            evaluate_expression(&locals, None, "name != \"bob\"")
                 .expect("string inequality should resolve")
                 .to_string(),
             "true"
@@ -682,22 +945,88 @@ mod tests {
         ];
 
         assert_eq!(
-            evaluate_expression(&locals, "null")
+            evaluate_expression(&locals, None, "null")
                 .expect("null literal should resolve")
                 .to_string(),
             "null"
         );
         assert_eq!(
-            evaluate_expression(&locals, "missing == null")
+            evaluate_expression(&locals, None, "missing == null")
                 .expect("null equality should resolve")
                 .to_string(),
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "present != null")
+            evaluate_expression(&locals, None, "present != null")
                 .expect("null inequality should resolve")
                 .to_string(),
             "true"
         );
+    }
+
+    #[test]
+    fn evaluates_cell_cast_to_typed_cell_from_source_map() {
+        let source_map = foo_source_map();
+        let cell = foo_value_cell();
+        let locals = vec![LocalVarRendered {
+            var_name: "payload".to_owned(),
+            value: render_runtime_vm_value(&VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(
+                &cell,
+            )))),
+        }];
+
+        let rendered = evaluate_expression(&locals, Some(&source_map), "payload as Cell<Foo>")
+            .expect("cell cast should decode");
+
+        let RenderedValue::CellOf {
+            type_name, fields, ..
+        } = rendered
+        else {
+            panic!("expected Cell<Foo>");
+        };
+        assert_eq!(type_name, "Cell<Foo>");
+        assert_eq!(fields[0].0, "decoded");
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded Foo");
+        };
+        assert_eq!(type_name, "Foo");
+        assert_eq!(decoded_fields[0].0, "value");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "42");
+        assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn evaluates_slice_cast_to_typed_cell_from_source_map() {
+        let source_map = foo_source_map();
+        let cell = foo_value_cell();
+        let locals = vec![LocalVarRendered {
+            var_name: "payload".to_owned(),
+            value: render_runtime_vm_value(&VmStackValue::CellSlice(CellSlice {
+                value: Boc::encode_hex(&cell),
+                bits: None,
+                refs: None,
+            })),
+        }];
+
+        let rendered = evaluate_expression(&locals, Some(&source_map), "payload as Cell<Foo>")
+            .expect("slice cast should decode");
+
+        let RenderedValue::CellOf { fields, .. } = rendered else {
+            panic!("expected Cell<Foo>");
+        };
+        let RenderedValue::Struct {
+            fields: decoded_fields,
+            ..
+        } = &fields[0].1
+        else {
+            panic!("expected decoded Foo");
+        };
+        assert_eq!(decoded_fields[0].0, "value");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "42");
+        assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
     }
 }

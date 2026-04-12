@@ -171,6 +171,8 @@ Supported shapes are roughly:
 - `!` and unary `-`
 - `&&` and `||`
 - `==`, `!=`, `<`, `<=`, `>`, `>=`
+- debugger-only typed cell casts of the form `someCell as Cell<Foo>` or
+  `someSlice as Cell<Foo>`, decoded from the current frame's `SourceMap`
 
 What is not supported:
 
@@ -178,12 +180,18 @@ What is not supported:
 - arbitrary statement execution
 - mutating expressions
 - general arithmetic beyond the supported unary and comparison cases
+- general type casts; only `cell`/`slice` to `Cell<T>` is supported
 
 <Callout type="warn">
 `evaluate` is an inspection feature, not a full Tolk REPL. It operates on
 debug-rendered values, and some comparison behavior is renderer-driven rather
 than language-accurate execution semantics. Use it for watches, hovers, and
 conditional breakpoints, not for proving complicated logic.
+
+For typed cell casts, the debugger uses type declarations from the active
+frame's `SourceMap`. The cast succeeds only when the source expression resolves
+to a `cell` or `slice`, the target is `Cell<T>`, and the payload decodes fully
+as `T` without leftover bits or refs.
 </Callout>
 
 ### Practical limits
