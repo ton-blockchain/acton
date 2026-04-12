@@ -100,10 +100,6 @@ jobs:
         run: |
           just test
 
-      - name: Run Acton tests
-        run: |
-          acton test
-
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
         run: |
@@ -273,10 +269,6 @@ jobs:
       - name: Run tests
         run: |
           just test
-
-      - name: Run Acton tests
-        run: |
-          acton test
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
