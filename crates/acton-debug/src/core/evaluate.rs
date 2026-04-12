@@ -109,14 +109,6 @@ fn parse_wrapped_source(input: &str) -> Result<tolk_syntax::SourceFile> {
     Ok(source_file)
 }
 
-#[cfg(test)]
-fn parse_value_path(input: &str) -> Result<ParsedValuePath> {
-    let source_file = parse_wrapped_source(input)?;
-    let expr = wrapped_expression(&source_file)
-        .ok_or_else(|| anyhow!("expected a single expression statement"))?;
-    parse_expr_to_path(expr, source_file.source.as_ref())
-}
-
 fn wrapped_expression(source_file: &tolk_syntax::SourceFile) -> Option<Expr<'_>> {
     let func = match source_file.top_levels().next()? {
         TopLevel::Func(func) => func,
@@ -191,22 +183,14 @@ fn evaluate_parsed_expression(
         Expr::BoolLit(bool_lit) => Ok(render_bool(bool_lit.value())),
         Expr::NumberLit(number_lit) => render_number_literal(number_lit.text(source)),
         Expr::StringLit(string_lit) => Ok(render_string_literal(string_lit.text(source))),
+        Expr::NullLit(_) => Ok(render_null()),
         Expr::Paren(paren) => {
             let inner = paren
                 .inner()
                 .ok_or_else(|| anyhow!("expected expression inside parentheses"))?;
             evaluate_parsed_expression(locals, inner, source)
         }
-        Expr::Unary(unary) => match unary.operator_name(source) {
-            "!" => {
-                let argument = unary
-                    .argument()
-                    .ok_or_else(|| anyhow!("expected expression after `!`"))?;
-                let value = evaluate_parsed_expression(locals, argument, source)?;
-                Ok(render_bool(!rendered_value_as_bool(&value)?))
-            }
-            operator => bail!("unary operator `{operator}` is not supported"),
-        },
+        Expr::Unary(unary) => evaluate_unary_expression(locals, &unary, source),
         Expr::Bin(bin) => match bin.operator_name(source) {
             "&&" => {
                 let left = bin
@@ -249,6 +233,31 @@ fn evaluate_parsed_expression(
             let path = parse_expr_to_path(expr, source)?;
             resolve_locals_path(locals, &path)
         }
+    }
+}
+
+fn evaluate_unary_expression(
+    locals: &[LocalVarRendered],
+    unary: &tolk_syntax::Unary<'_>,
+    source: &str,
+) -> Result<RenderedValue> {
+    let operator = unary.operator_name(source);
+    let argument = unary
+        .argument()
+        .ok_or_else(|| anyhow!("expected expression after `{operator}`"))?;
+
+    match operator {
+        "!" => {
+            let value = evaluate_parsed_expression(locals, argument, source)?;
+            Ok(render_bool(!rendered_value_as_bool(&value)?))
+        }
+        "-" => {
+            let value = evaluate_parsed_expression(locals, argument, source)?;
+            let number = parse_rendered_number(&value)
+                .ok_or_else(|| anyhow!("unary operator `-` requires numeric operand"))?;
+            Ok(RenderedValue::typed_leaf((-number).to_string(), "int"))
+        }
+        _ => bail!("unary operator `{operator}` is not supported"),
     }
 }
 
@@ -358,6 +367,10 @@ fn render_string_literal(raw: &str) -> RenderedValue {
     RenderedValue::typed_leaf(raw, "string")
 }
 
+fn render_null() -> RenderedValue {
+    RenderedValue::typed_leaf("null", "null")
+}
+
 fn render_bool(value: bool) -> RenderedValue {
     RenderedValue::typed_leaf(value.to_string(), "bool")
 }
@@ -366,10 +379,18 @@ fn render_bool(value: bool) -> RenderedValue {
 mod tests {
     use super::{
         ParsedValuePath, PathSegment, evaluate_condition_expression, evaluate_expression,
-        parse_value_path,
+        parse_expr_to_path, parse_wrapped_source, wrapped_expression,
     };
     use crate::replayer::LocalVarRendered;
     use crate::types_render::RenderedValue;
+    use anyhow::anyhow;
+
+    fn parse_value_path(input: &str) -> anyhow::Result<ParsedValuePath> {
+        let source_file = parse_wrapped_source(input)?;
+        let expr = wrapped_expression(&source_file)
+            .ok_or_else(|| anyhow!("expected a single expression statement"))?;
+        parse_expr_to_path(expr, source_file.source.as_ref())
+    }
 
     #[test]
     fn parses_dot_and_numeric_index_segments() {
@@ -589,6 +610,18 @@ mod tests {
             "true"
         );
         assert_eq!(
+            evaluate_expression(&locals, "small > -1")
+                .expect("negative literal comparison should resolve")
+                .to_string(),
+            "true"
+        );
+        assert_eq!(
+            evaluate_expression(&locals, "-small < 0")
+                .expect("unary minus on variables should resolve")
+                .to_string(),
+            "true"
+        );
+        assert_eq!(
             evaluate_expression(&locals, "small < 10")
                 .expect("literal comparison should resolve")
                 .to_string(),
@@ -630,6 +663,39 @@ mod tests {
         assert_eq!(
             evaluate_expression(&locals, "name != \"bob\"")
                 .expect("string inequality should resolve")
+                .to_string(),
+            "true"
+        );
+    }
+
+    #[test]
+    fn evaluates_null_literals_and_compares_them() {
+        let locals = vec![
+            LocalVarRendered {
+                var_name: "missing".to_owned(),
+                value: RenderedValue::typed_leaf("null", "address?"),
+            },
+            LocalVarRendered {
+                var_name: "present".to_owned(),
+                value: RenderedValue::typed_leaf("7", "int"),
+            },
+        ];
+
+        assert_eq!(
+            evaluate_expression(&locals, "null")
+                .expect("null literal should resolve")
+                .to_string(),
+            "null"
+        );
+        assert_eq!(
+            evaluate_expression(&locals, "missing == null")
+                .expect("null equality should resolve")
+                .to_string(),
+            "true"
+        );
+        assert_eq!(
+            evaluate_expression(&locals, "present != null")
+                .expect("null inequality should resolve")
                 .to_string(),
             "true"
         );
