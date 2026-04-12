@@ -14,7 +14,7 @@ fn test_action_fail() {
         .contract_with_deps(
             "simple",
             r#"
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                  val addr = AutoDeployAddress {
@@ -46,7 +46,7 @@ fn test_action_fail() {
             import "../../lib/emulation/network"
             import "../../lib/testing/transaction_expect"
 
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             get fun `test action fail`() {
                 val deployer = net.treasury("deployer");

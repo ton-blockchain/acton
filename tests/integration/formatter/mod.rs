@@ -876,7 +876,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const ACTION_FAIL_CONTRACT: &str = r#"
-import "../gen/fm_action_child_code.tolk"
+import "../gen/fm_action_child.code.tolk"
 
 fun onInternalMessage(_: InMessage) {
     val addr = AutoDeployAddress {

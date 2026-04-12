@@ -141,7 +141,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const LIBRARY_SPAWNER_CONTRACT: &str = r#"
-import "../gen/lib_code.tolk"
+import "../gen/lib.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -745,7 +745,7 @@ import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 import "../../lib/vm/vm"
-import "../gen/lib_code.tolk"
+import "../gen/lib.code.tolk"
 
 get fun `test send iter live libraries`() {
     val sender = net.treasury("sender");
