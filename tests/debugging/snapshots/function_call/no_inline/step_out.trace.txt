@@ -24,7 +24,7 @@ Step 2 (step_over):
 Step 3 (step_in):
   Code:
       3| 
-      4| @method_id(123)
+      4| @method_id(1_2_3)
       5| fun my_sum(a: int, b: int): int {
       6|     return a + b;
                     ^^^^^
@@ -39,7 +39,7 @@ Step 3 (step_in):
 Step 4 (step_in):
   Code:
       3| 
-      4| @method_id(123)
+      4| @method_id(1_2_3)
       5| fun my_sum(a: int, b: int): int {
       6|     return a + b;
              ^^^^^^^^^^^^

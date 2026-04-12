@@ -1,4 +1,4 @@
-name: CI
+name: Trunk Build
 
 on:
   pull_request:

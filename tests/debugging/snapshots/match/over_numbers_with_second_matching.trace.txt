@@ -4,7 +4,7 @@ Step 1 (before):
       2| fun main(foo: int) {
       3|     match (foo) {
              ^
-      4|         100 => {
+      4|         10_0 => {
       5|             return 10
       6|         }
   Variables:
@@ -12,10 +12,10 @@ Step 1 (before):
 
 Step 2 (step_over):
   Code:
-      4|         100 => {
+      4|         10_0 => {
       5|             return 10
       6|         }
-      7|         200 => {
+      7|         2_00 => {
                  ^
       8|             return 20
       9|         }
@@ -27,7 +27,7 @@ Step 3 (step_over):
   Code:
       5|             return 10
       6|         }
-      7|         200 => {
+      7|         2_00 => {
       8|             return 20
                             ^^
       9|         }

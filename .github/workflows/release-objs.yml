@@ -407,7 +407,6 @@ jobs:
         run: |
           qemu-x86_64 -cpu qemu64,avx=off,avx2=off ./acton-mock
 
-
   generate-release-objs-manifest:
     name: Generate Release Objs Manifest
     needs: [ build-objs-linux, build-objs-macos ]
@@ -550,7 +549,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete release-objs --repo "${GITHUB_REPOSITORY}" -y || true
+          gh release delete release-objs --repo "${GITHUB_REPOSITORY}" --cleanup-tag -y || true
 
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/release-objs \
