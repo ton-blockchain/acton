@@ -29,6 +29,16 @@ pub(crate) fn evaluate_expression(
     evaluate_parsed_expression(locals, expr, source_file.source.as_ref())
 }
 
+pub(crate) fn evaluate_condition_expression(
+    locals: &[LocalVarRendered],
+    expression: &str,
+) -> Result<bool> {
+    let source_file = parse_wrapped_source(expression)?;
+    let expr = wrapped_expression(&source_file)
+        .ok_or_else(|| anyhow!("expected a single expression statement"))?;
+    evaluate_boolean_expression(locals, expr, source_file.source.as_ref())
+}
+
 fn resolve_locals_path(
     locals: &[LocalVarRendered],
     path: &ParsedValuePath,
@@ -107,7 +117,7 @@ fn parse_value_path(input: &str) -> Result<ParsedValuePath> {
     parse_expr_to_path(expr, source_file.source.as_ref())
 }
 
-fn wrapped_expression<'tree>(source_file: &'tree tolk_syntax::SourceFile) -> Option<Expr<'tree>> {
+fn wrapped_expression(source_file: &tolk_syntax::SourceFile) -> Option<Expr<'_>> {
     let func = match source_file.top_levels().next()? {
         TopLevel::Func(func) => func,
         _ => return None,
@@ -315,25 +325,12 @@ fn compare_rendered_values_as_numbers(
     let right = parse_rendered_number(right)
         .ok_or_else(|| anyhow!("operator `{operator}` requires numeric operands"))?;
 
-    Ok(match (left, right) {
-        (ComparableNumber::Integer(left), ComparableNumber::Integer(right)) => left.cmp(&right),
-        (left, right) => left
-            .as_f64()?
-            .partial_cmp(&right.as_f64()?)
-            .ok_or_else(|| anyhow!("operator `{operator}` requires finite numeric operands"))?,
-    })
+    Ok(left.cmp(&right))
 }
 
-fn parse_rendered_number(value: &RenderedValue) -> Option<ComparableNumber> {
+fn parse_rendered_number(value: &RenderedValue) -> Option<BigInt> {
     let text = rendered_value_text(value);
-    if let Ok(value) = text.parse::<BigInt>() {
-        return Some(ComparableNumber::Integer(value));
-    }
-
-    text.parse::<f64>()
-        .ok()
-        .filter(|value| value.is_finite())
-        .map(ComparableNumber::Float)
+    text.parse::<BigInt>().ok()
 }
 
 fn rendered_value_text(value: &RenderedValue) -> String {
@@ -365,26 +362,12 @@ fn render_bool(value: bool) -> RenderedValue {
     RenderedValue::typed_leaf(value.to_string(), "bool")
 }
 
-enum ComparableNumber {
-    Integer(BigInt),
-    Float(f64),
-}
-
-impl ComparableNumber {
-    fn as_f64(&self) -> Result<f64> {
-        match self {
-            Self::Integer(value) => value
-                .to_string()
-                .parse::<f64>()
-                .map_err(|_| anyhow!("numeric value is out of range for comparison")),
-            Self::Float(value) => Ok(*value),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{ParsedValuePath, PathSegment, evaluate_expression, parse_value_path};
+    use super::{
+        ParsedValuePath, PathSegment, evaluate_condition_expression, evaluate_expression,
+        parse_value_path,
+    };
     use crate::replayer::LocalVarRendered;
     use crate::types_render::RenderedValue;
 
@@ -509,6 +492,19 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_boolean_conditions() {
+        let locals = vec![LocalVarRendered {
+            var_name: "flag".to_owned(),
+            value: RenderedValue::typed_leaf("true", "bool"),
+        }];
+
+        assert!(
+            evaluate_condition_expression(&locals, "flag && true")
+                .expect("boolean condition should resolve")
+        );
+    }
+
+    #[test]
     fn logical_operators_short_circuit() {
         let locals = Vec::new();
 
@@ -572,10 +568,6 @@ mod tests {
                 var_name: "big".to_owned(),
                 value: RenderedValue::typed_leaf("42", "int"),
             },
-            LocalVarRendered {
-                var_name: "decimal".to_owned(),
-                value: RenderedValue::typed_leaf("7.5", "float"),
-            },
         ];
 
         assert_eq!(
@@ -591,7 +583,7 @@ mod tests {
             "true"
         );
         assert_eq!(
-            evaluate_expression(&locals, "decimal <= decimal")
+            evaluate_expression(&locals, "big >= 42")
                 .expect("comparison should resolve")
                 .to_string(),
             "true"

@@ -18,7 +18,7 @@ use dap::types::{
     Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
 
-use crate::core::evaluate::evaluate_expression;
+use crate::core::evaluate::{evaluate_condition_expression, evaluate_expression};
 use crate::core::exception_format::{build_exception_details, exception_overview};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::transport::{DapConnection, IncomingRequest};
@@ -32,6 +32,7 @@ fn make_capabilities() -> types::Capabilities {
         supports_step_back: Some(false),
         supports_exception_info_request: Some(true),
         supports_evaluate_for_hovers: Some(true),
+        supports_conditional_breakpoints: Some(true),
         exception_breakpoint_filters: Some(vec![
             ExceptionBreakpointsFilter {
                 filter: "uncaught".to_string(),
@@ -66,6 +67,26 @@ type PendingBreakpoints = HashMap<String, Vec<SourceBreakpointInfo>>;
 struct SourceBreakpointInfo {
     id: i64,
     line: i64,
+    condition: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct BreakpointStopInfo {
+    ids: Vec<i64>,
+    description: String,
+}
+
+enum BreakpointCheck {
+    None,
+    Skip,
+    Hit(BreakpointStopInfo),
+}
+
+enum AdvanceStop {
+    Terminated,
+    Exception { description: String, text: String },
+    Breakpoint(BreakpointStopInfo),
+    Step,
 }
 
 struct DapState {
@@ -74,7 +95,7 @@ struct DapState {
     pending_exception_mode: replayer::ExceptionBreakMode,
     config_done: bool,
     next_breakpoint_id: i64,
-    resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
+    resolved_breakpoints: HashMap<(usize, usize), Vec<SourceBreakpointInfo>>,
 
     next_req_id: i64,
     /// Maps frame `ref_id` (returned in `StackTrace`) → `depth_from_top` (0 = innermost).
@@ -122,7 +143,7 @@ impl DapState {
                         self.resolved_breakpoints
                             .entry((file_id, resolved_line))
                             .or_default()
-                            .push(bp.id);
+                            .push(bp.clone());
                     }
                 }
             }
@@ -160,11 +181,17 @@ impl DapState {
         }
     }
 
-    fn current_breakpoint_ids(&self) -> Option<Vec<i64>> {
-        let r = self.replayer.as_ref()?;
+    fn current_breakpoint_check(&self) -> BreakpointCheck {
+        let Some(r) = self.replayer.as_ref() else {
+            return BreakpointCheck::None;
+        };
         let file_id = r.current_file_id();
         let line = r.current_line();
-        self.resolved_breakpoints.get(&(file_id, line)).cloned()
+        let Some(breakpoints) = self.resolved_breakpoints.get(&(file_id, line)) else {
+            return BreakpointCheck::None;
+        };
+
+        evaluate_breakpoint_conditions(&r.locals_for_frame(0), breakpoints)
     }
 
     fn resolve_breakpoint_lines_for_path(
@@ -202,6 +229,47 @@ impl DapState {
         };
 
         evaluate_expression(&locals, expression)
+    }
+}
+
+fn evaluate_breakpoint_conditions(
+    locals: &[replayer::LocalVarRendered],
+    breakpoints: &[SourceBreakpointInfo],
+) -> BreakpointCheck {
+    let mut hit_ids = Vec::new();
+    let mut error_ids = Vec::new();
+    let mut first_error = None;
+
+    for breakpoint in breakpoints {
+        let Some(condition) = breakpoint.condition.as_deref() else {
+            hit_ids.push(breakpoint.id);
+            continue;
+        };
+
+        match evaluate_condition_expression(locals, condition) {
+            Ok(true) => hit_ids.push(breakpoint.id),
+            Ok(false) => {}
+            Err(err) => {
+                error_ids.push(breakpoint.id);
+                if first_error.is_none() {
+                    first_error = Some(err.to_string());
+                }
+            }
+        }
+    }
+
+    if !hit_ids.is_empty() {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: hit_ids,
+            description: "Breakpoint hit".to_string(),
+        })
+    } else if let Some(err) = first_error {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: error_ids,
+            description: format!("Conditional breakpoint evaluation failed: {err}"),
+        })
+    } else {
+        BreakpointCheck::Skip
     }
 }
 
@@ -260,23 +328,48 @@ fn step_and_notify(
     step_mode: StepMode,
     server: &mut DapConnection<impl BufRead, impl Write>,
 ) -> anyhow::Result<()> {
-    let finished = state.do_step(step_mode);
-    if finished {
-        send_terminated(server)?;
-    } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
-        let overview = exception_overview(exc);
-        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
-    } else if let Some(ids) = state.current_breakpoint_ids() {
-        send_stopped(
-            server,
-            StoppedEventReason::Breakpoint,
-            Some("Breakpoint hit".to_string()),
-            Some(ids),
-        )?;
-    } else {
-        send_stopped(server, StoppedEventReason::Step, None, None)?;
+    match advance_to_next_stop(state, step_mode) {
+        AdvanceStop::Terminated => send_terminated(server)?,
+        AdvanceStop::Exception { description, text } => {
+            send_stopped_exception(server, &description, &text)?
+        }
+        AdvanceStop::Breakpoint(stop) => {
+            send_stopped(
+                server,
+                StoppedEventReason::Breakpoint,
+                Some(stop.description),
+                Some(stop.ids),
+            )?;
+        }
+        AdvanceStop::Step => {
+            send_stopped(server, StoppedEventReason::Step, None, None)?;
+        }
     }
     Ok(())
+}
+
+fn advance_to_next_stop(state: &mut DapState, step_mode: StepMode) -> AdvanceStop {
+    loop {
+        if state.do_step(step_mode) {
+            return AdvanceStop::Terminated;
+        }
+
+        if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
+            let overview = exception_overview(exc);
+            return AdvanceStop::Exception {
+                description: overview.stop_description,
+                text: overview.stop_text,
+            };
+        }
+
+        match state.current_breakpoint_check() {
+            BreakpointCheck::Hit(stop) => return AdvanceStop::Breakpoint(stop),
+            BreakpointCheck::Skip if matches!(step_mode, StepMode::RunUntilBreakpoint) => {
+                continue;
+            }
+            BreakpointCheck::Skip | BreakpointCheck::None => return AdvanceStop::Step,
+        }
+    }
 }
 
 fn send_stopped_exception(
@@ -487,7 +580,11 @@ fn handle_set_breakpoints(
         let id = state.next_breakpoint_id;
         state.next_breakpoint_id += 1;
 
-        source_breakpoints.push(SourceBreakpointInfo { id, line: bp.line });
+        source_breakpoints.push(SourceBreakpointInfo {
+            id,
+            line: bp.line,
+            condition: bp.condition.clone(),
+        });
         breakpoints.push(Breakpoint {
             id: Some(id),
             verified: true,
@@ -576,22 +673,20 @@ fn handle_configuration_done(
     } else {
         StepMode::StepOver
     };
-    let finished = state.do_step(step_mode);
-
-    if finished {
-        send_terminated(server)?;
-    } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
-        let overview = exception_overview(exc);
-        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
-    } else if let Some(ids) = state.current_breakpoint_ids() {
-        send_stopped(
-            server,
-            StoppedEventReason::Breakpoint,
-            Some("Breakpoint hit".to_string()),
-            Some(ids),
-        )?;
-    } else {
-        send_stopped(server, StoppedEventReason::Entry, None, None)?;
+    match advance_to_next_stop(state, step_mode) {
+        AdvanceStop::Terminated => send_terminated(server)?,
+        AdvanceStop::Exception { description, text } => {
+            send_stopped_exception(server, &description, &text)?
+        }
+        AdvanceStop::Breakpoint(stop) => {
+            send_stopped(
+                server,
+                StoppedEventReason::Breakpoint,
+                Some(stop.description),
+                Some(stop.ids),
+            )?;
+        }
+        AdvanceStop::Step => send_stopped(server, StoppedEventReason::Entry, None, None)?,
     }
     Ok(req.success(ResponseBody::ConfigurationDone))
 }
