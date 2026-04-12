@@ -339,7 +339,7 @@ fn debug_value_to_variable(state: &mut DapState, name: String, dv: &RenderedValu
 fn evaluate_response_from_value(state: &mut DapState, value: RenderedValue) -> EvaluateResponse {
     let (result, type_field) = value.dap_parts_for_client();
     let variables_reference = if value.has_children() {
-        state.store_debug_value(value.clone())
+        state.store_debug_value(value)
     } else {
         0
     };

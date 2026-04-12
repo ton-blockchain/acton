@@ -128,6 +128,7 @@ dependencies = [
  "crossbeam-channel",
  "dap",
  "log",
+ "num-bigint",
  "serde_json",
  "tolk-syntax",
  "tolkc",
