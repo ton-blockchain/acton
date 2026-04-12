@@ -52,7 +52,6 @@ const tlbGrammar: LanguageRegistration = {
 export default defineConfig({
     mdxOptions: {
         rehypeCodeOptions: {
-            theme: 'one-dark-pro',
             themes: {
                 light: 'one-light',
                 dark: 'one-dark-pro',
