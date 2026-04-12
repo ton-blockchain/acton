@@ -1,11 +1,10 @@
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 use std::path::Path;
 use std::str;
 
 use crate::modules::github::Github;
 use anyhow::{Context, Result, bail};
-use clap::Args;
 use flate2::bufread::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use tar::Archive;
@@ -26,25 +25,12 @@ const FIFT_STDLIB_ARCHIVE_DIR: &str = "fift-stdlib";
 const FIFT_STDLIB_DIR: &str = "crates/tolkc/assets/fift-stdlib";
 const FIFT_STDLIB_FILES: &[&str] = &["Asm.fif", "Fift.fif"];
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SyncStatus {
-    Updated,
-    AlreadyUpToDate,
-}
-
-#[derive(Args)]
-pub(crate) struct SyncArtifactsArgs {
-    #[arg(long = "force", alias = "force")]
-    pub(crate) force: bool,
-}
-
-pub(crate) fn run(args: SyncArtifactsArgs) -> Result<()> {
+pub(crate) fn run() -> Result<()> {
     println!(
         "Syncing `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` from GitHub release `{RELEASE_OBJS_RELEASE_TAG}`"
     );
 
     let objs_dir = Path::new(TON_OBJS_DIR);
-    let should_refresh_objs = args.force || !objs_dir.is_dir();
     let github = Github::new();
     let downloaded_asset =
         github.download_release_asset(RELEASE_OBJS_RELEASE_TAG, ARTIFACTS_MANIFEST_ASSET_NAME)?;
@@ -52,47 +38,19 @@ pub(crate) fn run(args: SyncArtifactsArgs) -> Result<()> {
     let manifest_contents = str::from_utf8(&downloaded_asset)
         .context("downloaded artifacts manifest is not valid UTF-8")?;
 
-    let sync_status = write_manifest_if_changed(
+    write_manifest(
         Path::new(TON_OBJS_ARTIFACTS_MANIFEST_PATH),
         manifest_contents,
-        args.force,
     )?;
-
-    if sync_status == SyncStatus::Updated {
-        println!("Synchronized `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`");
-    } else {
-        println!("`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` is already up to date");
-    }
-
-    if should_refresh_objs || sync_status == SyncStatus::Updated {
-        maybe_offer_local_objs_refresh(&github, objs_dir, args.force)?;
-    }
+    println!("Synchronized `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`");
+    refresh_local_artifacts_from_release(&github, objs_dir)?;
 
     Ok(())
 }
 
-fn write_manifest_if_changed(path: &Path, contents: &str, force: bool) -> Result<SyncStatus> {
-    if force {
-        fs::write(path, contents)
-            .with_context(|| format!("failed to write `{}`", path.display()))?;
-        return Ok(SyncStatus::Updated);
-    }
-
-    match fs::read_to_string(path) {
-        Ok(existing) if existing == contents => {
-            return Ok(SyncStatus::AlreadyUpToDate);
-        }
-        Ok(_) => {}
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(error)
-                .with_context(|| format!("failed to read existing `{}`", path.display()));
-        }
-    }
-
+fn write_manifest(path: &Path, contents: &str) -> Result<()> {
     fs::write(path, contents).with_context(|| format!("failed to write `{}`", path.display()))?;
-
-    Ok(SyncStatus::Updated)
+    Ok(())
 }
 
 fn current_release_target() -> Result<String> {
@@ -107,29 +65,9 @@ fn release_archive_name(rust_target: &str) -> String {
     format!("ton-objs-{rust_target}.tar.gz")
 }
 
-fn maybe_offer_local_objs_refresh(github: &Github, objs_dir: &Path, force: bool) -> Result<()> {
+fn refresh_local_artifacts_from_release(github: &Github, objs_dir: &Path) -> Result<()> {
     let rust_target = current_release_target()?;
     let archive_name = release_archive_name(&rust_target);
-
-    if !force && objs_dir.is_dir() {
-        print!(
-            "`{TON_OBJS_ARTIFACTS_MANIFEST_PATH}` changed. Update local `objs/` and `ton-stdlib` from release `{RELEASE_OBJS_RELEASE_TAG}`? Type `yes` to continue: "
-        );
-        io::stdout()
-            .flush()
-            .context("failed to flush confirmation prompt")?;
-
-        let mut confirmation = Vec::new();
-        io::stdin()
-            .lock()
-            .read_until(b'\n', &mut confirmation)
-            .context("failed to read confirmation")?;
-
-        if String::from_utf8_lossy(&confirmation).trim() != "yes" {
-            println!("Skipped updating local `objs/` and `ton-stdlib`");
-            return Ok(());
-        }
-    }
 
     refresh_local_objs_from_release(github, &archive_name, objs_dir)?;
     download_local_stdlib_archive_from_release(

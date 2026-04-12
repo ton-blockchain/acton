@@ -106,15 +106,11 @@ just build-dev
 What this does:
 
 1. `just sync-artifacts` syncs `crates/ton-objs/artifacts_manifest.toml`
-   from the `release-objs` release and, on a fresh checkout, downloads the
-   matching prebuilt `objs/` archive for your current platform.
+   from the `release-objs` release and refreshes the matching prebuilt
+   `objs/` archive plus bundled stdlib assets for your current platform.
 2. `just build-ui` installs UI dependencies and builds the bundled UI assets.
 3. `just build-dev` builds the debug CLI against the synced TON archives.
 4. `./target/debug/acton --help` confirms that the binary starts.
-
-If `objs/` already exists and the tracked manifest changed, `just
-sync-artifacts` may ask whether local `objs/` should be refreshed. Use
-`just sync-artifacts --force` to refresh without a prompt.
 
 ## Building from source
 
@@ -135,18 +131,14 @@ just build-dev
 This command:
 
 - downloads the current `artifacts_manifest.toml` from the `release-objs` release;
-- updates `crates/ton-objs/artifacts_manifest.toml` when needed;
+- overwrites `crates/ton-objs/artifacts_manifest.toml` with the released manifest;
 - downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
-  `objs/` on a fresh checkout;
+  `objs/`;
 - downloads a temporary `ton-stdlib.tar.gz`, replaces
   `crates/tolkc/assets/tolk-stdlib/` and `crates/tolkc/assets/fift-stdlib/` from its
   `tolk-stdlib/` directory and `fift-stdlib/Asm.fif` plus
-  `fift-stdlib/Fift.fif` whenever local `objs/` are refreshed, then removes
-  the temporary archive;
-- can also refresh local `objs/` later when the tracked manifest changes.
-
-Use `just sync-artifacts --force` if you want to overwrite the local
-manifest and refresh `objs/` without confirmation.
+  `fift-stdlib/Fift.fif`, then removes
+  the temporary archive.
 
 ### Option 2: build TON artifacts manually
 

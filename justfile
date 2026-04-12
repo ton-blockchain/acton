@@ -9,8 +9,8 @@ build:
 build-dev:
     cargo build
 
-sync-artifacts force="":
-    cargo xtask sync-artifacts {{force}}
+sync-artifacts:
+    cargo xtask sync-artifacts
 
 test-unit:
     cargo nextest run --workspace --lib --bins {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
