@@ -1015,7 +1015,7 @@ fn test_auto_register_refs_if_any() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/lib_code.tolk"
+            import "../gen/lib.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                  val address = AutoDeployAddress {
@@ -1098,7 +1098,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/lib_code.tolk"
+            import "../gen/lib.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 if (in.body.isEmpty()) {
@@ -1170,7 +1170,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
 
     project.acton().build().run().success();
 
-    let generated_dep_path = project.path().join("gen/lib_code.tolk");
+    let generated_dep_path = project.path().join("gen/lib.code.tolk");
     let generated_dep = fs::read_to_string(&generated_dep_path)
         .expect("must read generated dependency function for lib");
     let empty_cell_boc = Boc::encode_base64(Cell::default());
@@ -1180,7 +1180,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
     let main_contract =
         fs::read_to_string(&main_contract_path).expect("must read main contract source");
     let main_contract_without_import =
-        main_contract.replace("import \"../gen/lib_code.tolk\"\n", "");
+        main_contract.replace("import \"../gen/lib.code.tolk\"\n", "");
     fs::write(
         &main_contract_path,
         format!("{main_contract_without_import}\n{tampered_dep}\n"),

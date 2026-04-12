@@ -48,7 +48,7 @@ OPTIONS
 
        --gen-dir dir
            Directory for generated dependency helper files such as
-           gen/<dependency>_code.tolk.
+           gen/<dependency>.code.tolk.
 
            Defaults to [build].gen-dir when configured, otherwise gen/.
 
@@ -107,7 +107,7 @@ OUTPUTS
 
        o  the configured contract output .boc file
 
-       o  <gen-dir>/<dependency>_code.tolk helper files for dependencies
+       o  <gen-dir>/<dependency>.code.tolk helper files for dependencies
 
        o  <output-fift>/<contract-name>.fif for compiled .tolk contracts
 

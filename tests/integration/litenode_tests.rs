@@ -16,7 +16,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const DEPLOYER_CONTRACT: &str = r#"
-import "../gen/child_code.tolk"
+import "../gen/child.code.tolk"
 
 fun onInternalMessage(_: InMessage) {
     val childInit = ContractState {
@@ -164,7 +164,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const LIBRARY_MANAGER_CONTRACT: &str = r#"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun workerStateInit(): ContractState {
     return ContractState {
@@ -207,7 +207,7 @@ const DEPLOY_MANAGER_AND_WORKER_SCRIPT: &str = r#"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/io"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun main() {
     val wallet = net.wallet("deployer");
@@ -252,7 +252,7 @@ const DESTROY_WORKER_VIA_MANAGER_SCRIPT: &str = r#"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/io"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun main() {
     val wallet = net.wallet("deployer");

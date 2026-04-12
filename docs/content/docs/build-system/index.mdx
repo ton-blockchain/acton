@@ -59,7 +59,7 @@ src = "contracts/JettonWallet.tolk"
 depends = []
 ```
 
-Now after calling `acton build`, a file `gen/JettonWallet_code.tolk` will appear in the `gen/` folder with the function `jettonWalletCompiledCode` which returns a Cell with the Wallet code.
+Now after calling `acton build`, a file `gen/JettonWallet.code.tolk` will appear in the `gen/` folder with the function `jettonWalletCompiledCode` which returns a Cell with the Wallet code.
 
 
 ### Library References
@@ -80,7 +80,7 @@ src = "contracts/JettonWallet.tolk"
 depends = []
 ```
 
-The generated file `gen/JettonWallet_code.tolk` will contain the function `jettonWalletCompiledCode` which references the library by its hash instead of embedding the full code.
+The generated file `gen/JettonWallet.code.tolk` will contain the function `jettonWalletCompiledCode` which references the library by its hash instead of embedding the full code.
 
 <Callout type="info">
 Check out the [Libraries](/docs/advanced/libraries) guide for more information on how to deploy and use libraries.

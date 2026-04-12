@@ -518,7 +518,7 @@ fn generate_single_dependency_file(
     let output_path = if let Some(output_path) = dependency.compiled_code_out_path() {
         resolve_project_config_path(project_root, output_path)
     } else {
-        gen_dir.join(format!("{dependency_contract}_code.tolk"))
+        gen_dir.join(format!("{dependency_contract}.code.tolk"))
     };
     let dir = output_path.parent();
 

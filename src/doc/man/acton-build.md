@@ -71,7 +71,7 @@ Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
 - the configured contract `output` `.boc` file
-- `<gen-dir>/<dependency>_code.tolk` helper files for dependencies
+- `<gen-dir>/<dependency>.code.tolk` helper files for dependencies
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
