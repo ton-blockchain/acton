@@ -155,7 +155,7 @@ fn to_have_successful_tx_matches_success_and_opcode_filters() {
     run_success_case(
         "ae-stdlib-successful-tx-search-filters",
         r"
-get fun `test-ae-successful-tx-search-filters`() {
+get fun `test ae successful tx search filters`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 1);
 
@@ -181,7 +181,7 @@ fn to_have_failed_tx_matches_compute_exit_code_filter() {
     run_success_case(
         "ae-stdlib-failed-tx-compute-exit-filter",
         r"
-get fun `test-ae-failed-tx-compute-exit-filter`() {
+get fun `test ae failed tx compute exit filter`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 10);
 
@@ -229,7 +229,7 @@ fn to_have_bounced_tx_matches_bounced_opcode_and_exit_code_filters() {
     run_success_case(
         "ae-stdlib-bounced-tx-opcode-filter",
         r#"
-get fun `test-ae-bounced-tx-opcode-filter`() {
+get fun `test ae bounced tx opcode filter`() {
     val (sender, harness, _) = deployHarness();
 
     val trigger = createMessage({
@@ -276,7 +276,7 @@ fn to_emit_external_message_matches_emitted_type() {
     run_success_case(
         "ae-stdlib-emit-external-message-positive",
         r"
-get fun `test-ae-emit-external-message-positive`() {
+get fun `test ae emit external message positive`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 30);
 
@@ -292,7 +292,7 @@ fn to_emit_external_message_fails_for_missing_external_output() {
     run_failure_case(
         "ae-stdlib-emit-external-message-missing",
         r"
-get fun `test-ae-emit-external-message-missing`() {
+get fun `test ae emit external message missing`() {
     val (sender, harness, _) = deployHarness();
     val res = sendPing(sender, harness, 1);
 
@@ -327,7 +327,7 @@ fn deploy_filter_distinguishes_deploy_and_non_deploy_transactions() {
     run_success_case(
         "ae-stdlib-deploy-filter",
         r"
-get fun `test-ae-deploy-filter`() {
+get fun `test ae deploy filter`() {
     val (sender, harness, deployRes) = deployHarness();
 
     expect(deployRes).toHaveTx({

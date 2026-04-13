@@ -45,7 +45,7 @@ fn ext_message_relaxed_load_body_returns_left_value() {
     run_ext_message_case(
         "ch-stdlib-ext-message-load-body-left",
         r"
-get fun `test-ch-stdlib-ext-message-load-body-left`() {
+get fun `test ch stdlib ext message load body left`() {
     val payload = ChExternalPayload {
         queryId: 41,
         amount: 900,
@@ -69,7 +69,7 @@ fn ext_message_relaxed_load_body_loads_right_cell_value() {
     run_ext_message_case(
         "ch-stdlib-ext-message-load-body-right",
         r"
-get fun `test-ch-stdlib-ext-message-load-body-right`() {
+get fun `test ch stdlib ext message load body right`() {
     val payload = ChExternalPayload {
         queryId: 77,
         amount: 321,

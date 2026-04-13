@@ -35,8 +35,8 @@ import "expect"
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
+/// val outActions = vm.outActions();
+/// expect(outActions).toBeSendMessageAt<IncreaseCounter>(0);
 /// ```
 ///
 /// Note that you should provide the message type as a generic parameter.
@@ -67,12 +67,12 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                 val opcodeTypeName = ffi.typeNameByOpcode(opcode);
 
                 Assert.fail(
-                    format4(
+                    format(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
                         reflect.typeNameOf<Msg>(),
                         reflect.serializationPrefixOf<Msg>().0,
                         opcode,
-                        opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
+                        opcodeTypeName == null ? "" : format(" ({})", opcodeTypeName),
                     ),
                     self.location,
                 );
@@ -83,14 +83,14 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
         return;
     }
 
-    Assert.fail(format1("Out action at index {} is not a send message", index), self.location);
+    Assert.fail(format("Out action at index {} is not a send message", index), self.location);
 }
 
 struct expectImpl
 
 fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string): never {
     Assert.fail(
-        format2(
+        format(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
             reflect.typeNameOf<Msg>(),
             exitCode,

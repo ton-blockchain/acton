@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dj_vm_set_logical_then_block_slot_isolation.test.tolk (1 test)
-  ✓ dj-vm-set-logical-then-block-slot-isolation [TIME]
+  ✓ dj vm set logical then block slot isolation [TIME]
 
  ✓ 1 passed in 1 file

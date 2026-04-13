@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/save_cache_only_world_state_snapshot.test.tolk (1 test)
-  ✓ save-world-state-snapshot-skips-cached-non-existing-accounts [TIME]
+  ✓ save world state snapshot skips cached non existing accounts [TIME]
 
  ✓ 1 passed in 1 file

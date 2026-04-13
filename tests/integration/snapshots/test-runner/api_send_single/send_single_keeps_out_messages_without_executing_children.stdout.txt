@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ send-single-keeps-out-messages [TIME]
+  ✓ send single keeps out messages [TIME]
 
  ✓ 1 passed in 1 file

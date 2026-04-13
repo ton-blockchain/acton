@@ -14,6 +14,6 @@
  TEST  [ROOT]
 
  > tests/network_paths.test.tolk (1 test)
-  ✓ ag-send-single-keeps-child-list-empty [TIME]
+  ✓ ag send single keeps child list empty [TIME]
 
  ✓ 1 passed in 1 file

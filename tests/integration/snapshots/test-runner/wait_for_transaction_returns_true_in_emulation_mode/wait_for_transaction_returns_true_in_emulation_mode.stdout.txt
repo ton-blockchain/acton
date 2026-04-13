@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/wait_for_transaction_known_hash.test.tolk (1 test)
-  ✓ bh-stdlib-wait-for-transaction-positive-known-body-hash [TIME]
+  ✓ bh stdlib wait for transaction positive known body hash [TIME]
 
  ✓ 1 passed in 1 file

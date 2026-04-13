@@ -29,7 +29,7 @@ fn outlist_to_be_empty_passes_for_empty_out_actions() {
     run_outlist_success(
         "cc-stdlib-outlist-to-be-empty-pass",
         r"
-get fun `test-cc-outlist-to-be-empty-pass`() {
+get fun `test cc outlist to be empty pass`() {
     val out_actions = [];
     expect(out_actions).toBeEmpty();
     expect(out_actions.size()).toEqual(0);
@@ -46,7 +46,7 @@ fn outlist_to_be_empty_fails_for_non_empty_out_actions() {
     let source = format!(
         "{OUTLIST_IMPORTS}\n{}\n",
         r#"
-get fun `test-cc-outlist-to-be-empty-non-empty-fail`() {
+get fun `test cc outlist to be empty non empty fail`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,

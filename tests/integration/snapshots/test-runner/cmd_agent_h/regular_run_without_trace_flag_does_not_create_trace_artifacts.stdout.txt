@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/trace.test.tolk (1 test)
-  ✓ no-trace [TIME]
+  ✓ no trace [TIME]
 
  ✓ 1 passed in 1 file

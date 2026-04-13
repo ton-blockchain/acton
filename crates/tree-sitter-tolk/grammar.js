@@ -683,7 +683,8 @@ const TOLK_GRAMMAR = {
     // ----------------------------------------------------------
     // common constructions
 
-    number_literal: $ => token(choice(seq("0x", /[0-9a-fA-F]+/), seq("0b", /[01]+/), /[0-9]+/)),
+    number_literal: $ =>
+        token(choice(seq("0x", /[0-9a-fA-F_]+/), seq("0b", /[01_]+/), /[0-9][0-9_]*/)),
     string_literal: $ =>
         token(
             choice(

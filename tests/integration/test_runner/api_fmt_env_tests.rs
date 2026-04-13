@@ -10,8 +10,8 @@ fn fmt_supports_mixed_hex_ton_and_plain_placeholders() {
             import "../../lib/fmt"
             import "../../lib/testing/expect"
 
-            get fun `test-fmt-mixed-placeholders`() {
-                val rendered = format3("hex={:x} ton={:ton} label={}", 255, 1500000000, "ok");
+            get fun `test fmt mixed placeholders`() {
+                val rendered = format("hex={:x} ton={:ton} label={}", 255, 1500000000, "ok");
                 expect(rendered).toEqual("hex=ff ton=1.5 TON label=ok");
             }
         "#,
@@ -36,8 +36,8 @@ fn fmt_plain_and_hex_placeholders_should_follow_argument_order_bug() {
             import "../../lib/fmt"
             import "../../lib/testing/expect"
 
-            get fun `test-fmt-placeholder-order`() {
-                val rendered = format2("{} {:x}", 255, 16);
+            get fun `test fmt placeholder order`() {
+                val rendered = format("{} {:x}", 255, 16);
                 expect(rendered).toEqual("255 10");
             }
         "#,
@@ -62,11 +62,11 @@ fn fmt_fallback_for_non_int_specs_and_ignores_extra_args() {
             import "../../lib/fmt"
             import "../../lib/testing/expect"
 
-            get fun `test-fmt-fallback-and-extra-args`() {
-                val fallback = format2("{:x} {:ton}", "abc", "tonlike");
+            get fun `test fmt fallback and extra args`() {
+                val fallback = format("{:x} {:ton}", "abc", "tonlike");
                 expect(fallback).toEqual("abc tonlike");
 
-                val extra = format2("{}", 255, 16);
+                val extra = format("{}", 255, 16);
                 expect(extra).toEqual("255");
             }
         "#,
@@ -91,7 +91,7 @@ fn env_bool_parsing_handles_case_numeric_falsey_and_missing() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-env-bool-edge-cases`() {
+            get fun `test env bool edge cases`() {
                 expect(env<bool>("T_BOOL_TRUE_MIXED")).toEqual(true);
                 expect(env<bool>("T_BOOL_ONE")).toEqual(true);
                 expect(env<bool>("T_BOOL_FALSE_WORD")).toEqual(false);
@@ -124,7 +124,7 @@ fn env_or_uses_defaults_for_invalid_int_address_and_cell_values() {
             import "../../lib/env"
             import "../../lib/testing/expect"
 
-            get fun `test-env-or-invalid-fallbacks`() {
+            get fun `test env or invalid fallbacks`() {
                 val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 val fallbackCell = beginCell().storeUint(777, 32).endCell();
 
@@ -167,7 +167,7 @@ fn env_rejects_unsupported_target_types_with_clear_error() {
                 value: int,
             }
 
-            get fun `test-env-unsupported-type`() {
+            get fun `test env unsupported type`() {
                 env<Unsupported>("T_ENV_UNSUPPORTED");
             }
         "#,

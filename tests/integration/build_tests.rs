@@ -79,7 +79,7 @@ fn test_build_with_dependency() {
         .contract_with_deps(
             "parent",
             r#"
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -99,8 +99,8 @@ fn test_build_with_dependency() {
         .assert_contains("Compiling parent")
         .assert_contains("Finished");
 
-    let gen_file = project.path().join("gen/child_code.tolk");
-    assert!(gen_file.exists(), "gen/child_code.tolk should be created");
+    let gen_file = project.path().join("gen/child.code.tolk");
+    assert!(gen_file.exists(), "gen/child.code.tolk should be created");
 
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
     assert!(
@@ -149,9 +149,9 @@ fn test_build_diamond_dependency() {
     order.assert_before("left", "top");
     order.assert_before("right", "top");
 
-    assert!(project.path().join("gen/base_code.tolk").exists());
-    assert!(project.path().join("gen/left_code.tolk").exists());
-    assert!(project.path().join("gen/right_code.tolk").exists());
+    assert!(project.path().join("gen/base.code.tolk").exists());
+    assert!(project.path().join("gen/left.code.tolk").exists());
+    assert!(project.path().join("gen/right.code.tolk").exists());
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn test_build_gen_file_content() {
         .contract_with_deps(
             "main",
             r#"
-            import "../gen/dependency_code.tolk"
+            import "../gen/dependency.code.tolk"
 
             fun onInternalMessage(in: InMessage) {}
             fun onBouncedMessage(_: InMessageBounced) {}
@@ -232,7 +232,7 @@ fn test_build_gen_file_content() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/dependency_code.tolk");
+    let gen_file = project.path().join("gen/dependency.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assertion().eq(
@@ -252,9 +252,9 @@ fn test_build_multiple_dependencies() {
 
     project.acton().build().run().success();
 
-    assert!(project.path().join("gen/utils_code.tolk").exists());
-    assert!(project.path().join("gen/storage_code.tolk").exists());
-    assert!(project.path().join("gen/math_code.tolk").exists());
+    assert!(project.path().join("gen/utils.code.tolk").exists());
+    assert!(project.path().join("gen/storage.code.tolk").exists());
+    assert!(project.path().join("gen/math.code.tolk").exists());
 }
 
 #[test]
@@ -417,17 +417,17 @@ fn test_build_gen_file_naming() {
 
     project.acton().build().run().success();
 
-    assert!(project.path().join("gen/my_contract_code.tolk").exists());
-    assert!(project.path().join("gen/my_contract_2_code.tolk").exists());
-    assert!(project.path().join("gen/my_contract_3_code.tolk").exists());
+    assert!(project.path().join("gen/my_contract.code.tolk").exists());
+    assert!(project.path().join("gen/my_contract_2.code.tolk").exists());
+    assert!(project.path().join("gen/my_contract_3.code.tolk").exists());
 
-    let file1 = fs::read_to_string(project.path().join("gen/my_contract_code.tolk")).unwrap();
+    let file1 = fs::read_to_string(project.path().join("gen/my_contract.code.tolk")).unwrap();
     assert!(file1.contains("fun myContractCompiledCode()"));
 
-    let file2 = fs::read_to_string(project.path().join("gen/my_contract_2_code.tolk")).unwrap();
+    let file2 = fs::read_to_string(project.path().join("gen/my_contract_2.code.tolk")).unwrap();
     assert!(file2.contains("fun myContract2CompiledCode()"));
 
-    let file3 = fs::read_to_string(project.path().join("gen/my_contract_3_code.tolk")).unwrap();
+    let file3 = fs::read_to_string(project.path().join("gen/my_contract_3.code.tolk")).unwrap();
     assert!(file3.contains("fun myContract3CompiledCode()"));
 }
 
@@ -616,7 +616,7 @@ fn test_build_dependency_embed_code() {
         .contract_with_detailed_deps(
             "parent",
             r#"
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -629,7 +629,7 @@ fn test_build_dependency_embed_code() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/child_code.tolk");
+    let gen_file = project.path().join("gen/child.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -649,7 +649,7 @@ fn test_build_dependency_library_ref() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/lib_code.tolk"
+            import "../gen/lib.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = libCompiledCode();
@@ -662,7 +662,7 @@ fn test_build_dependency_library_ref() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/lib_code.tolk");
+    let gen_file = project.path().join("gen/lib.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -683,8 +683,8 @@ fn test_build_dependency_mixed_kinds() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/embed_dep_code.tolk"
-            import "../gen/lib_dep_code.tolk"
+            import "../gen/embed_dep.code.tolk"
+            import "../gen/lib_dep.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code1 = embedDepCompiledCode();
@@ -701,7 +701,7 @@ fn test_build_dependency_mixed_kinds() {
 
     project.acton().build().run().success();
 
-    let embed_file = project.path().join("gen/embed_dep_code.tolk");
+    let embed_file = project.path().join("gen/embed_dep.code.tolk");
     let embed_content = fs::read_to_string(&embed_file).expect("Should read embed file");
     assert!(
         embed_content.contains("base64>B B>boc PUSHREF"),
@@ -712,7 +712,7 @@ fn test_build_dependency_mixed_kinds() {
         "embed_dep should not use hashu"
     );
 
-    let lib_file = project.path().join("gen/lib_dep_code.tolk");
+    let lib_file = project.path().join("gen/lib_dep.code.tolk");
     let lib_content = fs::read_to_string(&lib_file).expect("Should read lib file");
     assert!(
         lib_content.contains("hashu"),
@@ -727,7 +727,7 @@ fn test_build_dependency_custom_function_name() {
         .contract_with_detailed_deps(
             "parent",
             r#"
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = myCustomFunction();
@@ -740,7 +740,7 @@ fn test_build_dependency_custom_function_name() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/child_code.tolk");
+    let gen_file = project.path().join("gen/child.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -774,7 +774,7 @@ fn test_build_dependency_custom_output_path() {
     let custom_file = project.path().join("custom/mypath.tolk");
     assert!(custom_file.exists(), "Should create file at custom path");
 
-    let default_file = project.path().join("gen/child_code.tolk");
+    let default_file = project.path().join("gen/child.code.tolk");
     assert!(
         !default_file.exists(),
         "Should NOT create file at default path"
@@ -912,7 +912,7 @@ fn test_build_gen_file_with_license() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/child_code.tolk");
+    let gen_file = project.path().join("gen/child.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -931,7 +931,7 @@ fn test_build_gen_file_without_license() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/child_code.tolk");
+    let gen_file = project.path().join("gen/child.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -953,7 +953,7 @@ fn test_build_gen_file_default_mit_license() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/child_code.tolk");
+    let gen_file = project.path().join("gen/child.code.tolk");
     let content = fs::read_to_string(&gen_file).expect("Should read gen file");
 
     assert!(
@@ -976,7 +976,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.broken]
-name = "broken"
+display-name = "broken"
 src = "contracts/missing.boc"
 depends = []
 "#;
@@ -1022,7 +1022,7 @@ description = ""
 version = "0.1.0"
 
 [contracts]
-missing_closing_bracket = { name = "test", src = "contracts/test.tolk" }
+missing_closing_bracket = { display-name = "test", src = "contracts/test.tolk" }
 "#,
     )
     .expect("Failed to write invalid TOML");
@@ -1048,7 +1048,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.missing]
-name = "missing"
+display-name = "missing"
 src = "contracts/missing_file.tolk"
 depends = []
 "#;
@@ -1074,7 +1074,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.missing]
-name = "missing"
+display-name = "missing"
 src = "/contracts/missing_file.tolk"
 depends = []
 "#;
@@ -1102,7 +1102,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple.txt"
 depends = []
 "#;
@@ -1196,7 +1196,7 @@ fn test_build_dependency_custom_path_write_error() {
         .contract_with_detailed_deps(
             "parent",
             SIMPLE_CONTRACT,
-            vec![("child", None, None, Some("readonly/child_code.tolk"))],
+            vec![("child", None, None, Some("readonly/child.code.tolk"))],
         )
         .build();
 
@@ -1233,7 +1233,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "simple"
+display-name = "simple"
 src = "contracts/simple file.tolk"
 depends = []
 "#;
@@ -1365,7 +1365,7 @@ fn test_build_contract_with_numeric_name_dependency() {
 
     project.acton().build().run().success();
 
-    let gen_file = project.path().join("gen/123contract_code.tolk");
+    let gen_file = project.path().join("gen/123contract.code.tolk");
     assert!(
         gen_file.exists(),
         "Should create file for numeric contract name"
@@ -1481,7 +1481,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.corrupted]
-name = "corrupted"
+display-name = "corrupted"
 src = "contracts/corrupted.boc"
 depends = []
 "#;
@@ -1839,7 +1839,7 @@ fn test_build_with_gen_dir_from_config() {
         .contract_with_deps(
             "parent",
             r#"
-            import "../custom-gen/child_code.tolk"
+            import "../custom-gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -1858,12 +1858,12 @@ fn test_build_with_gen_dir_from_config() {
     project.acton().build().run().success();
 
     assert!(
-        project.path().join("custom-gen/child_code.tolk").exists(),
-        "custom-gen/child_code.tolk should be created"
+        project.path().join("custom-gen/child.code.tolk").exists(),
+        "custom-gen/child.code.tolk should be created"
     );
     assert!(
-        !project.path().join("gen/child_code.tolk").exists(),
-        "default gen/child_code.tolk should not be created when [build].gen-dir is set"
+        !project.path().join("gen/child.code.tolk").exists(),
+        "default gen/child.code.tolk should not be created when [build].gen-dir is set"
     );
 }
 
@@ -1874,7 +1874,7 @@ fn test_build_with_gen_dir_cli_overrides_config() {
         .contract_with_deps(
             "parent",
             r#"
-            import "../cli-gen/child_code.tolk"
+            import "../cli-gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -1898,12 +1898,12 @@ fn test_build_with_gen_dir_cli_overrides_config() {
         .success();
 
     assert!(
-        project.path().join("cli-gen/child_code.tolk").exists(),
-        "cli-gen/child_code.tolk should be created"
+        project.path().join("cli-gen/child.code.tolk").exists(),
+        "cli-gen/child.code.tolk should be created"
     );
     assert!(
-        !project.path().join("config-gen/child_code.tolk").exists(),
-        "config-gen/child_code.tolk should not be created when CLI override is used"
+        !project.path().join("config-gen/child.code.tolk").exists(),
+        "config-gen/child.code.tolk should not be created when CLI override is used"
     );
 }
 
@@ -1914,7 +1914,7 @@ fn test_build_with_gen_dir_cli() {
         .contract_with_deps(
             "parent",
             r#"
-            import "../cli-gen/child_code.tolk"
+            import "../cli-gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -1933,12 +1933,12 @@ fn test_build_with_gen_dir_cli() {
         .success();
 
     assert!(
-        project.path().join("cli-gen/child_code.tolk").exists(),
-        "cli-gen/child_code.tolk should be created"
+        project.path().join("cli-gen/child.code.tolk").exists(),
+        "cli-gen/child.code.tolk should be created"
     );
     assert!(
-        !project.path().join("gen/child_code.tolk").exists(),
-        "default gen/child_code.tolk should not be created when CLI --gen-dir is set"
+        !project.path().join("gen/child.code.tolk").exists(),
+        "default gen/child.code.tolk should not be created when CLI --gen-dir is set"
     );
 }
 
@@ -2181,7 +2181,7 @@ fn test_build_with_dependency_with_compilation_error() {
         .contract_with_deps(
             "parent",
             r#"
-                import "../gen/child_code.tolk"
+                import "../gen/child.code.tolk"
 
                 fun onInternalMessage(in: InMessage) {
                     val code = childCompiledCode();

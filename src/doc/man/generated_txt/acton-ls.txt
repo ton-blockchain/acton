@@ -9,10 +9,10 @@ SYNOPSIS
 DESCRIPTION
        Start the language server used for TON language tooling.
 
-       The server boots with the resolved project root, loads path mappings
-       from Acton.toml when available, initializes the bundled standard library
-       from .acton/tolk-stdlib, and serves requests either over stdio or a
-       local TCP socket.
+       The server boots with the resolved project root, loads import path
+       mappings from Acton.toml when available, initializes the bundled
+       standard library from .acton/tolk-stdlib, and serves requests either
+       over stdio or a local TCP socket.
 
 OPTIONS
    LSP Options
@@ -73,7 +73,7 @@ PROJECT CONTEXT
 
        o  resolves the project root and manifest path
 
-       o  loads mappings from Acton.toml when present
+       o  loads [import-mappings] from Acton.toml when present
 
        o  preloads .acton/tolk-stdlib/common.tolk
 

@@ -4,9 +4,9 @@ description = "interactive description"
 version = "0.1.0"
 license = "MIT"
 
-[contracts.counter]
-name = "Counter"
-src = "contracts/src/counter.tolk"
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/src/Counter.tolk"
 depends = []
 
 [test]
@@ -17,14 +17,14 @@ ignore = []
 
 [scripts]
 deploy-emulation = "acton script contracts/scripts/deploy.tolk"
-deploy-testnet = "acton script contracts/scripts/deploy.tolk --broadcast --net testnet"
+deploy-testnet = "acton script contracts/scripts/deploy.tolk --net testnet"
 
-[mappings]
+[import-mappings]
 acton = ".acton"
 contracts = "contracts/src"
 gen = "gen"
 tests = "contracts/tests"
-wrappers = "contracts/tests/wrappers"
+wrappers = "contracts/wrappers"
 
 # Check full Acton.toml reference and all available keys:
 # [ACTON_DOCS_URL]/acton-toml

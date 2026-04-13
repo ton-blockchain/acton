@@ -2,6 +2,6 @@ error: unexpected argument '--contract' found
 
   tip: to pass '--contract' as a value, use '-- --contract'
 
-Usage: acton[EXE] build [OPTIONS] [CONTRACT_ID]
+Usage: acton[EXE] build [OPTIONS] [CONTRACT_NAME]
 
 For more information, try '--help'.

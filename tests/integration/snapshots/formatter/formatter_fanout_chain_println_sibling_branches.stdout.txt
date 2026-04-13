@@ -12,7 +12,7 @@
  TEST  [ROOT]
 
  > tests/formatter_fanout.test.tolk (1 test)
-  ✓ formatter-fanout-chain-println [TIME]
+  ✓ formatter fanout chain println [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmFanKick 0.5 TON -> fm_fanout_root B                                       gas=3108

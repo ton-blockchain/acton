@@ -35,7 +35,7 @@ fn fs_read_file_returns_content_for_existing_and_normalized_paths() {
         "w-stdlib-fs-existing-and-stable-paths",
         &[("fixtures/w-existing.txt", "line-from-agent-w")],
         r#"
-get fun `test-fs-read-existing-and-normalized-paths`() {
+get fun `test fs read existing and normalized paths`() {
     val direct = fs.readFile("fixtures/w-existing.txt");
     val viaDot = fs.readFile("./fixtures/w-existing.txt");
     val viaParent = fs.readFile("fixtures/../fixtures/w-existing.txt");
@@ -59,7 +59,7 @@ fn fs_read_file_returns_null_for_missing_file() {
         "w-stdlib-fs-missing-file-null",
         &[],
         r#"
-get fun `test-fs-read-missing-file-returns-null`() {
+get fun `test fs read missing file returns null`() {
     val missing = fs.readFile("fixtures/w-missing.txt");
     val missingViaParent = fs.readFile("fixtures/../fixtures/w-missing.txt");
 

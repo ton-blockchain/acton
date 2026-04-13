@@ -2,34 +2,7 @@ Coverage Summary:
 Lines: 24/77 (31.17%)
 Total Hits: 38
 
-File: [ROOT]/contracts/jetton-utils.tolk
-Annotated Code:
- 1   | import "storage"                                                                                    |
- 2   |                                                                                                     |
- 3   | fun calcDeployedJettonWallet(                                                                       |
- 4   |     ownerAddress: address,                                                                          |
- 5   |     minterAddress: address,                                                                         |
- 6   |     jettonWalletCode: cell,                                                                         |
- 7   | ): AutoDeployAddress {                                                                              |
- 8 ✓ |     val emptyWalletStorage: WalletStorage = {                                                       | hits:1
- 9 ✓ |         jettonBalance: 0,                                                                           | hits:1
-10 ✓ |         ownerAddress,                                                                               | hits:1
-11 ✓ |         minterAddress,                                                                              | hits:1
-12   |     };                                                                                              |
-13   |                                                                                                     |
-14 ✓ |     return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };            | hits:1
-15   | }                                                                                                   |
-16   |                                                                                                     |
-17   | fun calcAddressOfJettonWallet(                                                                      |
-18   |     ownerAddress: address,                                                                          |
-19   |     minterAddress: address,                                                                         |
-20   |     jettonWalletCode: cell,                                                                         |
-21   | ): address {                                                                                        |
-22 ✓ |     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);       | hits:2
-23 ✓ |     return jwDeployed.calculateAddress();                                                           | hits:1
-24   | }                                                                                                   |
-
-File: [ROOT]/contracts/jetton_minter.tolk
+File: [ROOT]/contracts/JettonMinter.tolk
 Annotated Code:
   1   | import "errors"                                                                                     |
   2   | import "fees-management"                                                                            |
@@ -170,6 +143,33 @@ Annotated Code:
 137 ✓ |     val storage = lazy MinterStorage.load();                                                        | hits:1
 138 ✓ |     return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);| hits:1
 139   | }                                                                                                   |
+
+File: [ROOT]/contracts/jetton-utils.tolk
+Annotated Code:
+ 1   | import "storage"                                                                                    |
+ 2   |                                                                                                     |
+ 3   | fun calcDeployedJettonWallet(                                                                       |
+ 4   |     ownerAddress: address,                                                                          |
+ 5   |     minterAddress: address,                                                                         |
+ 6   |     jettonWalletCode: cell,                                                                         |
+ 7   | ): AutoDeployAddress {                                                                              |
+ 8 ✓ |     val emptyWalletStorage: WalletStorage = {                                                       | hits:1
+ 9 ✓ |         jettonBalance: 0,                                                                           | hits:1
+10 ✓ |         ownerAddress,                                                                               | hits:1
+11 ✓ |         minterAddress,                                                                              | hits:1
+12   |     };                                                                                              |
+13   |                                                                                                     |
+14 ✓ |     return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };            | hits:1
+15   | }                                                                                                   |
+16   |                                                                                                     |
+17   | fun calcAddressOfJettonWallet(                                                                      |
+18   |     ownerAddress: address,                                                                          |
+19   |     minterAddress: address,                                                                         |
+20   |     jettonWalletCode: cell,                                                                         |
+21   | ): address {                                                                                        |
+22 ✓ |     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);       | hits:2
+23 ✓ |     return jwDeployed.calculateAddress();                                                           | hits:1
+24   | }                                                                                                   |
 
 File: [ROOT]/contracts/storage.tolk
 Annotated Code:

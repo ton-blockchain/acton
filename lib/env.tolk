@@ -122,7 +122,7 @@ fun cell.__env(name: string): cell? {
 
 fun T.__env(name: string): T? {
     Assert.fail(
-        format1(
+        format(
             "env() supports only int, coins, bool, string, slice, address and cell types, but got {}",
             reflect.typeNameOf<T>(),
         ),

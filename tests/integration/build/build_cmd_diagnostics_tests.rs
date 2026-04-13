@@ -8,8 +8,8 @@ const INVALID_PRECOMPILED_BOC: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9];
 fn write_boc_contract_manifest(
     project_root: &Path,
     package_name: &str,
-    contract_key: &str,
     contract_name: &str,
+    display_name: &str,
     src: &str,
 ) {
     let toml_content = format!(
@@ -18,8 +18,8 @@ name = "{package_name}"
 description = ""
 version = "0.1.0"
 
-[contracts.{contract_key}]
-name = "{contract_name}"
+[contracts.{contract_name}]
+display-name = "{display_name}"
 src = "{src}"
 depends = []
 "#
@@ -89,7 +89,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         )
         .contract_with_deps(
             "parent",
-            r#"import "../gen/child_code.tolk"
+            r#"import "../gen/child.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     val code = childCompiledCode();
@@ -214,11 +214,11 @@ fn build_reports_original_relative_path_context_for_missing_precompiled_boc_file
 }
 
 #[test]
-fn build_sorts_multi_error_sections_by_contract_key_and_keeps_messages_consistent() {
+fn build_sorts_multi_error_sections_by_contract_name_and_keeps_messages_consistent() {
     let project = ProjectBuilder::new("build-diagnostics-multi-error-ordering-consistency")
         .contract_with_deps(
             "a_parent",
-            r#"import "../gen/child_code.tolk"
+            r#"import "../gen/child.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     val code = childCompiledCode();
@@ -269,6 +269,6 @@ fun onBouncedMessage(_: InMessageBounced) {}
     output
         .assert_stderr_contains("Build failed with 3 errors")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/build/build_cmd_diagnostics_tests/build_sorts_multi_error_sections_by_contract_key_and_keeps_messages_consistent.stderr.txt",
+            "integration/snapshots/build/build_cmd_diagnostics_tests/build_sorts_multi_error_sections_by_contract_name_and_keeps_messages_consistent.stderr.txt",
         );
 }

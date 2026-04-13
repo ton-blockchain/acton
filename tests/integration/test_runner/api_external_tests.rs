@@ -143,7 +143,7 @@ fn send_external_collects_external_messages_with_deterministic_order() {
     run_success_case(
         "o-lib-api-send-external-collects-externals",
         r"
-get fun `test-send-external-collects-externals`() {
+get fun `test send external collects externals`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
@@ -165,7 +165,7 @@ get fun `test-send-external-collects-externals`() {
     expect(beta.loadBody()).toEqual(ExternalBeta { value: 222 });
 }
 ",
-        "send-external-collects-externals",
+        "send external collects externals",
     );
 }
 
@@ -174,7 +174,7 @@ fn create_external_message_accepts_explicit_external_src() {
     run_success_case(
         "o-lib-api-create-external-explicit-src",
         r"
-get fun `test-create-external-message-with-external-src`() {
+get fun `test create external message with external src`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
@@ -193,7 +193,7 @@ get fun `test-create-external-message-with-external-src`() {
     expect(first.loadBody()).toEqual(ExternalAlpha { value: 111 });
 }
 ",
-        "create-external-message-with-external-src",
+        "create external message with external src",
     );
 }
 
@@ -202,7 +202,7 @@ fn send_external_is_repeatable_for_same_contract() {
     run_success_case(
         "o-lib-api-send-external-repeatable",
         r"
-get fun `test-send-external-repeatable`() {
+get fun `test send external repeatable`() {
     val (harness, _) = deployHarness();
 
     val first = net.sendExternal(
@@ -223,7 +223,7 @@ get fun `test-send-external-repeatable`() {
     expect(secondAlpha).toEqual(ExternalAlpha { value: 111 });
 }
 ",
-        "send-external-repeatable",
+        "send external repeatable",
     );
 }
 
@@ -232,7 +232,7 @@ fn send_external_returns_null_when_deployed_contract_has_too_low_balance() {
     run_success_case(
         "o-lib-api-send-external-low-balance-rejected",
         r#"
-get fun `test-send-external-low-balance-rejected`() {
+get fun `test send external low balance rejected`() {
     val (harness, _) = deployHarness();
 
     val tinyBalanceSource = net.randomAddress("o_external_tiny_balance_source");
@@ -265,7 +265,7 @@ get fun `test-send-external-low-balance-rejected`() {
     expect(txs == null).toBeTrue();
 }
 "#,
-        "send-external-low-balance-rejected",
+        "send external low balance rejected",
     );
 }
 
@@ -274,7 +274,7 @@ fn create_external_message_rejects_internal_src() {
     run_failure_case(
         "o-lib-api-create-external-rejects-internal-src",
         r"
-get fun `test-create-external-message-rejects-internal-src`() {
+get fun `test create external message rejects internal src`() {
     val (harness, deployer) = deployHarness();
 
     createExternalMessage(
@@ -285,7 +285,7 @@ get fun `test-create-external-message-rejects-internal-src`() {
     );
 }
 ",
-        "create-external-message-rejects-internal-src",
+        "create external message rejects internal src",
     );
 }
 
@@ -294,7 +294,7 @@ fn find_external_out_message_has_generic_compilation_bug() {
     run_success_case(
         "o-lib-api-find-external-out-generic-bug",
         r"
-get fun `test-find-external-out-message-bug`() {
+get fun `test find external out message bug`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
@@ -309,6 +309,6 @@ get fun `test-find-external-out-message-bug`() {
     expect(found).toBeDefined();
 }
 ",
-        "find-external-out-message-bug",
+        "find external out message bug",
     );
 }

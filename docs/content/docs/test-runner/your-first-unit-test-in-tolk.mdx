@@ -16,22 +16,21 @@ Let's write our first unit test in Tolk.
 ## 1. Tolk Test Structure
 
 All test files have the `.test.tolk` extension, for example, `wallet.test.tolk`, which allows you to quickly identify test files among others.
-To create a new test, write getter methods with names starting with `test `, `test_` or `test-`.
+To create a new test, write getter methods with names starting with `test `.
 
 The simplest unit test looks like this:
 
 ```tolk title="unit.test.tolk"
 import "@acton/testing/expect"
 
-get fun `test-unit`() {
+get fun `test unit`() {
     expect(5 + 5).toEqual(10);
 }
 ```
 
 <Callout type="warn">
     Test functions must be getter methods (using `get fun`) and their names must
-    start with `test_` or `test-`, otherwise the test runner will just ignore
-    them.
+    be `test xxx`, otherwise the test runner will just ignore them.
 </Callout>
 
 Unit tests use an API very similar to what is used in TypeScript. `expect()` creates a matcher object with the passed value, `toEqual()` is one of the matcher methods that compares two values for equality. The standard library provides a full range of necessary matchers for different types. Moreover, creating your own matchers is trivial—we'll look at this further.
@@ -55,7 +54,7 @@ import "@acton/testing/expect"
 
 fun checkIfValueIsEqualWithFlags(left: int, right: int, param1: bool, param2: bool) { ... }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     checkIfValueIsEqualWithFlags(5 + 5, 10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }
@@ -72,7 +71,7 @@ import "@acton/testing/expect"
 
 fun Expectation<int>.toEqualWithFlags(self, right: int, param1: bool, param2: bool) { ... }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     expect(5 + 5).toEqualWithFlags(10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }

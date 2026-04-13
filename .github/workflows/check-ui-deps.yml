@@ -1,0 +1,46 @@
+name: Check UI Dependencies
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui-deps.yml"
+      - "bun.lock"
+      - "package.json"
+      - "crates/acton-**-ui/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui-deps.yml"
+      - "bun.lock"
+      - "package.json"
+      - "crates/acton-**-ui/**"
+  workflow_dispatch:
+
+concurrency:
+  group: check-ui-deps-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  ui-audit:
+    name: UI audit
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Run Bun audit
+        run: bun audit --audit-level=moderate

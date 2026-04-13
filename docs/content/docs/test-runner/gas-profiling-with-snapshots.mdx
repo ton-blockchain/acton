@@ -143,7 +143,7 @@ Use [`tracing.save(...)`](/docs/standard_library/emulation/tracing/#tracingsave)
 ```tolk
 import "@acton/emulation/tracing"
 
-get fun `test-transfer-flow`() {
+get fun `test transfer flow`() {
     // ...
     val txs = net.send(sender.address, msg);
     tracing.save(txs, "transfer-wallet-to-wallet");
@@ -201,7 +201,7 @@ Gas snapshot is stored as JSON with this high-level structure:
 
 ```bash
 # Profile only selected tests
-acton test --filter "test-transfer.*" --snapshot gas-baseline.json
+acton test --filter "transfer.*" --snapshot gas-baseline.json
 
 # Profile one suite/file
 acton test tests/wallet.test.tolk --baseline-snapshot gas-baseline.json

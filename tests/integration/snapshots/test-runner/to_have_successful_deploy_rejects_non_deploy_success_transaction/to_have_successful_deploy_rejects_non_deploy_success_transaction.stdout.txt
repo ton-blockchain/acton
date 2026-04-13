@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/deploy_expect.test.tolk (1 test)
-  ✗ cg-to-have-successful-deploy-rejects-non-deploy-success-transaction [TIME]
+  ✗ cg to have successful deploy rejects non deploy success transaction [TIME]
     └─ Error: expect(actual).toHaveSuccessfulDeploy(expected)
         N/A -> sender A
         └── empty 0.1 TON -> receiver B                                                 gas=253

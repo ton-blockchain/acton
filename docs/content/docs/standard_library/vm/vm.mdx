@@ -13,7 +13,7 @@ It allows reading and writing to control registers (C5, C7) and configuring exec
 Examples:
 ```tolk
 // Mock time
-vm.setTime(1700000000);
+vm.setTime(1_700_000_000);
 
 // Register a mock library
 vm.registerLibrary(myLibCell);
@@ -32,7 +32,7 @@ struct vm
 
 Holds the methods to change the VM state.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L20" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L21" />
 
 ## `vm.getC7`
 
@@ -42,7 +42,7 @@ fun vm.getC7(): tuple
 
 Read control register C7.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L23" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L24" />
 
 ## `vm.setC7`
 
@@ -52,7 +52,7 @@ fun vm.setC7(c7: tuple): void
 
 Write a new value to control register C7.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L28" />
 
 ## `vm.getC5`
 
@@ -62,7 +62,7 @@ fun vm.getC5(): cell
 
 Read control register C5.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L31" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L32" />
 
 ## `vm.setC5`
 
@@ -72,7 +72,7 @@ fun vm.setC5(cell: cell): void
 
 Write a new value to control register C5.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L35" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L36" />
 
 ## `vm.getConfigParam`
 
@@ -82,7 +82,7 @@ fun vm.getConfigParam<T>(index: int): T
 
 Generic helper to get a single config parameter.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L39" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L40" />
 
 ## `vm.setConfigParam`
 
@@ -92,7 +92,7 @@ fun vm.setConfigParam<T>(value: T, index: int): void
 
 Generic helper to overwrite a single config parameter.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L46" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L47" />
 
 ## `CONFIG_ROOT_INDEX`
 
@@ -100,7 +100,7 @@ Generic helper to overwrite a single config parameter.
 const CONFIG_ROOT_INDEX = 9
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L54" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L55" />
 
 ## `vm.setConfigRootDict`
 
@@ -117,7 +117,7 @@ It writes C7 slot 9 only.
 Note that this does not recompute unpacked config in C7 slot 14.
 After [vm.setConfigRootDict](#vmsetconfigrootdict), [vm.getConfigUnpacked](#vmgetconfigunpacked) can still return stale values.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L64" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L65" />
 
 ## `CONFIG_UNPACKED_INDEX`
 
@@ -125,7 +125,7 @@ After [vm.setConfigRootDict](#vmsetconfigrootdict), [vm.getConfigUnpacked](#vmge
 const CONFIG_UNPACKED_INDEX = 14
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L73" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L74" />
 
 ## `vm.setConfigUnpacked`
 
@@ -143,7 +143,7 @@ Use [vm.getConfigUnpacked](#vmgetconfigunpacked) as a template for expected tupl
 If this tuple is malformed (for example, too short), later operations that assume
 specific indices can fail with runtime errors such as `Range check error`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L84" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L85" />
 
 ## `vm.getConfigUnpacked`
 
@@ -162,7 +162,7 @@ Example:
 val unpacked = vm.getConfigUnpacked();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L103" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L104" />
 
 ## `vm.setTime`
 
@@ -174,7 +174,7 @@ Override `blockchain.now()` for deterministic testing.
 
 Writes C7 parameter tuple slot 3 and affects `blockchain.now()` reads.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L113" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L114" />
 
 ## `vm.setBlockLogicalTime`
 
@@ -187,7 +187,7 @@ Override the **block** logical time.
 Writes C7 parameter tuple slot 4.
 Does not change slots 3 (`now`) or 5 (`logical time`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L121" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L122" />
 
 ## `vm.setLogicalTime`
 
@@ -200,7 +200,7 @@ Override the **transaction** logical time.
 Writes C7 parameter tuple slot 5.
 Does not change slots 3 (`now`) or 4 (`block logical time`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L129" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L130" />
 
 ## `vm.setOriginalBalance`
 
@@ -212,7 +212,7 @@ Override the original balance of the contract.
 
 Writes C7 parameter tuple slot 7 as `[balance, extraCurrencies]`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L136" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L137" />
 
 ## `vm.registerLibrary`
 
@@ -224,7 +224,7 @@ Register a new library for current test.
 
 Re-registering the same library cell is idempotent and does not change C5/C7.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L143" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L144" />
 
 ## `vm.convertAddress`
 
@@ -245,7 +245,7 @@ Example:
 val address = vm.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L159" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L160" />
 
 ## `vm.cellFromHex`
 
@@ -259,5 +259,24 @@ Decode a root cell from hex-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell hex <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L169" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L170" />
+
+## `vm.parseInt`
+
+```tolk
+fun vm.parseInt(x: string): int
+```
+
+Parse a decimal string into an int value.
+
+Accepts optional leading `-` sign followed by decimal digits.
+Invalid input (non-numeric characters, empty string) fails with an error.
+
+Example:
+```tolk
+val n = vm.parseInt("12345");
+val negative = vm.parseInt("-42");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/vm/vm.tolk#L185" />
 

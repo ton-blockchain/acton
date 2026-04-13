@@ -10,7 +10,7 @@ acton\-ls \[em] Run the Acton language server
 .SH "DESCRIPTION"
 Start the language server used for TON language tooling.
 .sp
-The server boots with the resolved project root, loads path mappings from
+The server boots with the resolved project root, loads import path mappings from
 \fBActon.toml\fR when available, initializes the bundled standard library from
 \fB\&.acton/tolk\-stdlib\fR, and serves requests either over stdio or a local TCP
 socket.
@@ -100,7 +100,7 @@ Before starting the server, Acton:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'loads \fBmappings\fR from \fBActon.toml\fR when present
+\h'-04'\(bu\h'+03'loads \fB[import\-mappings]\fR from \fBActon.toml\fR when present
 .RE
 .sp
 .RS 4

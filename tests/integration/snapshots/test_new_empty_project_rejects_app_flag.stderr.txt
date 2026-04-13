@@ -1,1 +1,1 @@
-Error: Template empty does not include a TypeScript app scaffold
+Error: Template empty does not include a TypeScript dApp

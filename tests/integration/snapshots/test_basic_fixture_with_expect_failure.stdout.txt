@@ -8,14 +8,14 @@
  TEST  [ROOT]
 
  > tests/counter.test.tolk (2 tests)
-  ✗ should-increase-counter [TIME]
+  ✗ should increase counter [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
             2
         )
       └─ at tests/counter.test[LINE]
-  ✓ should-reset-counter [TIME]
+  ✓ should reset counter [TIME]
 
  ✓ 1 passed, ✗ 1 failed in 1 file
 

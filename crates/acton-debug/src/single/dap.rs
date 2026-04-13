@@ -3,7 +3,7 @@
 //! 1. uses tolerant request parsing for custom VS Code messages
 //! 2. attaches to an already prepared `TolkReplayer`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 
@@ -18,6 +18,7 @@ use dap::types::{
     Source, StackFrame, StackFramePresentationhint, StoppedEventReason, Variable,
 };
 
+use crate::core::evaluate::{evaluate_condition_expression, evaluate_expression};
 use crate::core::exception_format::{build_exception_details, exception_overview};
 use crate::replayer::{self, StepMode, TolkReplayer};
 use crate::transport::{DapConnection, IncomingRequest};
@@ -30,6 +31,8 @@ fn make_capabilities() -> types::Capabilities {
         supports_configuration_done_request: Some(true),
         supports_step_back: Some(false),
         supports_exception_info_request: Some(true),
+        supports_evaluate_for_hovers: Some(true),
+        supports_conditional_breakpoints: Some(true),
         exception_breakpoint_filters: Some(vec![
             ExceptionBreakpointsFilter {
                 filter: "uncaught".to_string(),
@@ -64,6 +67,26 @@ type PendingBreakpoints = HashMap<String, Vec<SourceBreakpointInfo>>;
 struct SourceBreakpointInfo {
     id: i64,
     line: i64,
+    condition: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct BreakpointStopInfo {
+    ids: Vec<i64>,
+    description: String,
+}
+
+enum BreakpointCheck {
+    None,
+    Skip,
+    Hit(BreakpointStopInfo),
+}
+
+enum AdvanceStop {
+    Terminated,
+    Exception { description: String, text: String },
+    Breakpoint(BreakpointStopInfo),
+    Step,
 }
 
 struct DapState {
@@ -72,7 +95,7 @@ struct DapState {
     pending_exception_mode: replayer::ExceptionBreakMode,
     config_done: bool,
     next_breakpoint_id: i64,
-    resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
+    resolved_breakpoints: HashMap<(usize, usize), Vec<SourceBreakpointInfo>>,
 
     next_req_id: i64,
     /// Maps frame `ref_id` (returned in `StackTrace`) → `depth_from_top` (0 = innermost).
@@ -81,6 +104,7 @@ struct DapState {
     /// Maps variable `req_id` → `RenderedValue` for structured drill-down.
     /// Rebuilt on every `StackTrace` request (old values are stale after stepping).
     vars_debug_values: HashMap<i64, RenderedValue>,
+    runtime_register_scope_requests: HashSet<i64>,
 }
 
 impl DapState {
@@ -97,6 +121,7 @@ impl DapState {
             next_req_id: 1_000_000,
             frame_to_depth: HashMap::new(),
             vars_debug_values: HashMap::new(),
+            runtime_register_scope_requests: HashSet::new(),
         }
     }
 
@@ -118,7 +143,7 @@ impl DapState {
                         self.resolved_breakpoints
                             .entry((file_id, resolved_line))
                             .or_default()
-                            .push(bp.id);
+                            .push(bp.clone());
                     }
                 }
             }
@@ -156,11 +181,17 @@ impl DapState {
         }
     }
 
-    fn current_breakpoint_ids(&self) -> Option<Vec<i64>> {
-        let r = self.replayer.as_ref()?;
+    fn current_breakpoint_check(&self) -> BreakpointCheck {
+        let Some(r) = self.replayer.as_ref() else {
+            return BreakpointCheck::None;
+        };
         let file_id = r.current_file_id();
         let line = r.current_line();
-        self.resolved_breakpoints.get(&(file_id, line)).cloned()
+        let Some(breakpoints) = self.resolved_breakpoints.get(&(file_id, line)) else {
+            return BreakpointCheck::None;
+        };
+
+        evaluate_breakpoint_conditions(&r.locals_for_frame(0), breakpoints)
     }
 
     fn resolve_breakpoint_lines_for_path(
@@ -171,6 +202,71 @@ impl DapState {
         let r = self.replayer.as_ref()?;
         let file_id = r.file_id_by_path(path)?;
         Some(r.resolve_breakpoint_lines(file_id, requested_lines))
+    }
+
+    fn evaluate_on_frame(
+        &self,
+        frame_id: Option<i64>,
+        expression: &str,
+    ) -> anyhow::Result<RenderedValue> {
+        let Some(replayer) = self.replayer.as_ref() else {
+            return evaluate_expression(&[], None, expression);
+        };
+
+        let locals = match frame_id {
+            Some(frame_id) => {
+                let depth = self
+                    .frame_to_depth
+                    .get(&frame_id)
+                    .copied()
+                    .ok_or_else(|| anyhow::anyhow!("Unknown frame id {frame_id}"))?;
+                replayer.locals_for_frame(depth)
+            }
+            None => replayer.locals_for_frame(0),
+        };
+
+        evaluate_expression(&locals, Some(replayer.source_map()), expression)
+    }
+}
+
+fn evaluate_breakpoint_conditions(
+    locals: &[replayer::LocalVarRendered],
+    breakpoints: &[SourceBreakpointInfo],
+) -> BreakpointCheck {
+    let mut hit_ids = Vec::new();
+    let mut error_ids = Vec::new();
+    let mut first_error = None;
+
+    for breakpoint in breakpoints {
+        let Some(condition) = breakpoint.condition.as_deref() else {
+            hit_ids.push(breakpoint.id);
+            continue;
+        };
+
+        match evaluate_condition_expression(locals, condition) {
+            Ok(true) => hit_ids.push(breakpoint.id),
+            Ok(false) => {}
+            Err(err) => {
+                error_ids.push(breakpoint.id);
+                if first_error.is_none() {
+                    first_error = Some(err.to_string());
+                }
+            }
+        }
+    }
+
+    if !hit_ids.is_empty() {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: hit_ids,
+            description: "Breakpoint hit".to_string(),
+        })
+    } else if let Some(err) = first_error {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: error_ids,
+            description: format!("Conditional breakpoint evaluation failed: {err}"),
+        })
+    } else {
+        BreakpointCheck::Skip
     }
 }
 
@@ -193,6 +289,8 @@ fn build_source(replayer: &TolkReplayer, file_id: usize) -> Source {
     }
 }
 
+/// Emit the standard DAP `stopped` event once the replayer has already advanced
+/// to the location that should be shown to the client.
 fn send_stopped(
     server: &mut DapConnection<impl BufRead, impl Write>,
     reason: StoppedEventReason,
@@ -211,6 +309,7 @@ fn send_stopped(
     Ok(())
 }
 
+/// Finish the debuggee from DAP's point of view: first `exited`, then `terminated`.
 fn send_terminated(server: &mut DapConnection<impl BufRead, impl Write>) -> anyhow::Result<()> {
     server.send_event(Event::Exited(events::ExitedEventBody { exit_code: 0 }))?;
     server.send_event(Event::Terminated(Some(
@@ -219,28 +318,55 @@ fn send_terminated(server: &mut DapConnection<impl BufRead, impl Write>) -> anyh
     Ok(())
 }
 
+/// Run one logical debugger action and translate the resulting stop reason
+/// (termination / exception / breakpoint / plain step) into DAP events.
 fn step_and_notify(
     state: &mut DapState,
     step_mode: StepMode,
     server: &mut DapConnection<impl BufRead, impl Write>,
 ) -> anyhow::Result<()> {
-    let finished = state.do_step(step_mode);
-    if finished {
-        send_terminated(server)?;
-    } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
-        let overview = exception_overview(exc);
-        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
-    } else if let Some(ids) = state.current_breakpoint_ids() {
-        send_stopped(
-            server,
-            StoppedEventReason::Breakpoint,
-            Some("Breakpoint hit".to_string()),
-            Some(ids),
-        )?;
-    } else {
-        send_stopped(server, StoppedEventReason::Step, None, None)?;
+    match advance_to_next_stop(state, step_mode) {
+        AdvanceStop::Terminated => send_terminated(server)?,
+        AdvanceStop::Exception { description, text } => {
+            send_stopped_exception(server, &description, &text)?
+        }
+        AdvanceStop::Breakpoint(stop) => {
+            send_stopped(
+                server,
+                StoppedEventReason::Breakpoint,
+                Some(stop.description),
+                Some(stop.ids),
+            )?;
+        }
+        AdvanceStop::Step => {
+            send_stopped(server, StoppedEventReason::Step, None, None)?;
+        }
     }
     Ok(())
+}
+
+fn advance_to_next_stop(state: &mut DapState, step_mode: StepMode) -> AdvanceStop {
+    loop {
+        if state.do_step(step_mode) {
+            return AdvanceStop::Terminated;
+        }
+
+        if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
+            let overview = exception_overview(exc);
+            return AdvanceStop::Exception {
+                description: overview.stop_description,
+                text: overview.stop_text,
+            };
+        }
+
+        match state.current_breakpoint_check() {
+            BreakpointCheck::Hit(stop) => return AdvanceStop::Breakpoint(stop),
+            BreakpointCheck::Skip if matches!(step_mode, StepMode::RunUntilBreakpoint) => {
+                continue;
+            }
+            BreakpointCheck::Skip | BreakpointCheck::None => return AdvanceStop::Step,
+        }
+    }
 }
 
 fn send_stopped_exception(
@@ -294,6 +420,25 @@ fn debug_value_to_variable(state: &mut DapState, name: String, dv: &RenderedValu
         presentation_hint: None,
         evaluate_name: None,
         variables_reference: var_ref,
+        named_variables: None,
+        indexed_variables: None,
+        memory_reference: None,
+    }
+}
+
+fn evaluate_response_from_value(state: &mut DapState, value: RenderedValue) -> EvaluateResponse {
+    let (result, type_field) = value.dap_parts_for_client();
+    let variables_reference = if value.has_children() {
+        state.store_debug_value(value)
+    } else {
+        0
+    };
+
+    EvaluateResponse {
+        result,
+        type_field,
+        presentation_hint: None,
+        variables_reference,
         named_variables: None,
         indexed_variables: None,
         memory_reference: None,
@@ -358,15 +503,12 @@ fn handle_request(
             state.replayer = None;
             req.success(ResponseBody::Disconnect)
         }
-        Command::Evaluate(args) => req.success(ResponseBody::Evaluate(EvaluateResponse {
-            result: args.expression,
-            type_field: None,
-            presentation_hint: None,
-            variables_reference: 0,
-            named_variables: None,
-            indexed_variables: None,
-            memory_reference: None,
-        })),
+        Command::Evaluate(args) => match state.evaluate_on_frame(args.frame_id, &args.expression) {
+            Ok(value) => req.success(ResponseBody::Evaluate(evaluate_response_from_value(
+                state, value,
+            ))),
+            Err(err) => req.error(&err.to_string()),
+        },
         _ => req.error("Unsupported command"),
     };
 
@@ -435,7 +577,11 @@ fn handle_set_breakpoints(
         let id = state.next_breakpoint_id;
         state.next_breakpoint_id += 1;
 
-        source_breakpoints.push(SourceBreakpointInfo { id, line: bp.line });
+        source_breakpoints.push(SourceBreakpointInfo {
+            id,
+            line: bp.line,
+            condition: bp.condition.clone(),
+        });
         breakpoints.push(Breakpoint {
             id: Some(id),
             verified: true,
@@ -516,27 +662,28 @@ fn handle_configuration_done(
         .pending_breakpoints
         .values()
         .any(|breakpoints| !breakpoints.is_empty());
+    // Match VS Code's startup flow: after configuration completes the adapter itself
+    // must advance to the first interesting stop and report it as Entry unless a
+    // stronger reason (breakpoint / exception / termination) wins first.
     let step_mode = if has_breakpoints {
         StepMode::RunUntilBreakpoint
     } else {
         StepMode::StepOver
     };
-    let finished = state.do_step(step_mode);
-
-    if finished {
-        send_terminated(server)?;
-    } else if let Some(exc) = state.replayer.as_ref().and_then(|r| r.last_exception()) {
-        let overview = exception_overview(exc);
-        send_stopped_exception(server, &overview.stop_description, &overview.stop_text)?;
-    } else if let Some(ids) = state.current_breakpoint_ids() {
-        send_stopped(
-            server,
-            StoppedEventReason::Breakpoint,
-            Some("Breakpoint hit".to_string()),
-            Some(ids),
-        )?;
-    } else {
-        send_stopped(server, StoppedEventReason::Entry, None, None)?;
+    match advance_to_next_stop(state, step_mode) {
+        AdvanceStop::Terminated => send_terminated(server)?,
+        AdvanceStop::Exception { description, text } => {
+            send_stopped_exception(server, &description, &text)?
+        }
+        AdvanceStop::Breakpoint(stop) => {
+            send_stopped(
+                server,
+                StoppedEventReason::Breakpoint,
+                Some(stop.description),
+                Some(stop.ids),
+            )?;
+        }
+        AdvanceStop::Step => send_stopped(server, StoppedEventReason::Entry, None, None)?,
     }
     Ok(req.success(ResponseBody::ConfigurationDone))
 }
@@ -629,6 +776,7 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
     // Now allocate frame IDs (mutable borrow of state — no conflict with replayer)
     state.frame_to_depth.clear();
     state.vars_debug_values.clear();
+    state.runtime_register_scope_requests.clear();
     let total = 1 + parents.len();
     let mut frames: Vec<StackFrame> = Vec::with_capacity(total);
 
@@ -680,8 +828,8 @@ fn handle_stack_trace(state: &mut DapState, req: Request) -> Response {
     }))
 }
 
-fn handle_scopes(_state: &DapState, args: &requests::ScopesArguments, req: Request) -> Response {
-    let scopes = vec![Scope {
+fn handle_scopes(state: &mut DapState, args: &requests::ScopesArguments, req: Request) -> Response {
+    let mut scopes = vec![Scope {
         name: "Locals".to_string(),
         variables_reference: args.frame_id,
         named_variables: None,
@@ -694,6 +842,29 @@ fn handle_scopes(_state: &DapState, args: &requests::ScopesArguments, req: Reque
         end_column: None,
         presentation_hint: Some(ScopePresentationhint::Locals),
     }];
+
+    if state
+        .replayer
+        .as_ref()
+        .is_some_and(|r| r.runtime_backend_kind() == replayer::RuntimeBackendKind::LiveVm)
+    {
+        let registers_ref = state.alloc_req_id();
+        state.runtime_register_scope_requests.insert(registers_ref);
+        scopes.push(Scope {
+            name: "Registers".to_string(),
+            variables_reference: registers_ref,
+            named_variables: None,
+            indexed_variables: None,
+            expensive: false,
+            source: None,
+            line: None,
+            column: None,
+            end_line: None,
+            end_column: None,
+            presentation_hint: Some(ScopePresentationhint::Registers),
+        });
+    }
+
     req.success(ResponseBody::Scopes(ScopesResponse { scopes }))
 }
 
@@ -718,6 +889,18 @@ fn handle_variables(
         return req.success(ResponseBody::Variables(VariablesResponse { variables }));
     }
 
+    if state.runtime_register_scope_requests.contains(&req_id) {
+        let variables = state
+            .replayer
+            .as_ref()
+            .map(|r| r.runtime_registers())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|lv| debug_value_to_variable(state, lv.var_name, &lv.value))
+            .collect();
+        return req.success(ResponseBody::Variables(VariablesResponse { variables }));
+    }
+
     // Path B: drill-down into a structured RenderedValue
     if let Some(dv) = state.vars_debug_values.get(&req_id).cloned() {
         let variables = expand_debug_value(state, &dv);
@@ -731,7 +914,12 @@ fn handle_variables(
 
 fn expand_debug_value(state: &mut DapState, dv: &RenderedValue) -> Vec<Variable> {
     match dv {
-        RenderedValue::Struct { fields, .. } | RenderedValue::Address { fields, .. } => fields
+        RenderedValue::Struct { fields, .. }
+        | RenderedValue::Address { fields, .. }
+        | RenderedValue::CellLike { fields, .. }
+        | RenderedValue::EnumValue { fields, .. }
+        | RenderedValue::UnionCase { fields, .. }
+        | RenderedValue::CellOf { fields, .. } => fields
             .iter()
             .map(|(name, val)| debug_value_to_variable(state, name.clone(), val))
             .collect(),

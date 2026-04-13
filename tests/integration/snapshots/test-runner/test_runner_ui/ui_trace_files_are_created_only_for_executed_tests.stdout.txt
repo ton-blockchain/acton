@@ -10,6 +10,6 @@
  > tests/ui.test.tolk (3 tests)
   ○ ui-skipped skipped
   □ ui-todo [TODO]
-  ✓ ui-executed [TIME]
+  ✓ ui executed [TIME]
 
  ✓ 1 passed, ○ 1 skipped, □ 1 todo in 1 file

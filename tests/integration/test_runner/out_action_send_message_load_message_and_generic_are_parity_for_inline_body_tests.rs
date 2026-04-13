@@ -42,7 +42,7 @@ fn out_action_send_message_load_message_and_generic_are_parity_for_inline_body()
     run_project_builder_case(
         "cv-stdlib-out-action-inline-parity",
         r#"
-get fun `test-cv-out-action-inline-parity`() {
+get fun `test cv out action inline parity`() {
     val dest = net.randomAddress("cv_inline_parity_dest");
     createMessage({
         bounce: false,
@@ -91,7 +91,7 @@ fn out_action_send_message_load_message_and_generic_are_parity_for_ref_body_in_f
     let test_path = "tests/cv_out_action_ref_parity.test.tolk";
     let source = format!(
         r#"{CV_OUT_ACTION_IMPORTS}
-get fun `test-cv-out-action-ref-parity`() {{
+get fun `test cv out action ref parity`() {{
     val dest = net.randomAddress("cv_ref_parity_dest");
     createMessage({{
         bounce: false,

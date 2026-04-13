@@ -12,7 +12,7 @@ Execute a standalone Tolk script.
 .sp
 Scripts are useful for experimentation, deployment flows, blockchain queries,
 and one\-off operational tasks. Unlike tests, scripts use a \fBmain()\fR entry point
-and can send real transactions when \fB\-\-broadcast\fR is enabled.
+and can send real transactions when \fB\-\-net\fR is provided.
 .SH "OPTIONS"
 .SS "Script Options"
 .sp
@@ -54,7 +54,7 @@ Clear the compilation cache before running.
 \fB\-\-fork\-net\fR \fInetwork\fR
 .RS 4
 Fork blockchain state from a remote network for local execution.
-With \fB\-\-broadcast\fR, omitted \fB\-\-fork\-net\fR defaults to the selected broadcast
+When \fB\-\-net\fR is set, omitted \fB\-\-fork\-net\fR defaults to the selected broadcast
 network.
 .RE
 .sp
@@ -69,15 +69,10 @@ TonCenter API key for blockchain queries.
 .RE
 .SS "Broadcasting Options"
 .sp
-\fB\-\-broadcast\fR
-.RS 4
-Send transactions to the selected blockchain network instead of emulating them.
-Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
-.RE
-.sp
 \fB\-\-net\fR \fInetwork\fR
 .RS 4
-Network to use for broadcasting.
+Broadcast to the selected network. If omitted, the script runs in emulation
+mode. Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
 .RE
 .sp
 \fB\-\-explorer\fR \fIname\fR
@@ -133,7 +128,7 @@ A Tolk script defines a \fBmain()\fR function and runs as an isolated execution.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-broadcast\fR sends real transactions using configured wallets
+\h'-04'\(bu\h'+03'\fB\-\-net\fR sends real transactions using configured wallets
 .RE
 .sp
 Wallet names referenced by the script are resolved from the merged wallet
@@ -152,8 +147,8 @@ acton script scripts/query.tolk \-\- \-\-net\-like\-value
 .RE
 .SH "SIDE EFFECTS"
 \fBacton script\fR always compiles and executes the selected script. With
-\fB\-\-broadcast\fR, it can send real blockchain transactions; without
-\fB\-\-broadcast\fR, execution stays local even when \fB\-\-fork\-net\fR is used.
+\fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution
+stays local even when \fB\-\-fork\-net\fR is used.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -176,11 +171,11 @@ When a script can affect on\-chain state, the usual safe sequence is:
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'\fBacton script <path>\fR without \fB\-\-broadcast\fR
+\h'-04' 3.\h'+01'\fBacton script <path>\fR without \fB\-\-net\fR
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'only then \fBacton script <path> \-\-broadcast\fR
+\h'-04' 4.\h'+01'only then \fBacton script <path> \-\-net testnet\fR
 .RE
 .SH "EXAMPLES"
 .sp
@@ -199,7 +194,7 @@ acton script scripts/deploy.tolk
 .sp
 .RS 4
 .nf
-acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet
+acton script scripts/deploy.tolk \-\-net testnet
 .fi
 .RE
 .RE
@@ -219,7 +214,7 @@ acton script query.tolk \-\-fork\-net mainnet \-\-api\-key YOUR_API_KEY
 .sp
 .RS 4
 .nf
-acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet \-\-explorer tonviewer
+acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonviewer
 .fi
 .RE
 .RE

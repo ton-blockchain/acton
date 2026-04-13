@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/aj_vm_helpers.test.tolk (1 test)
-  ✓ aj-stdlib-vm-set-config-root-slot-9 [TIME]
+  ✓ aj stdlib vm set config root slot 9 [TIME]
 
  ✓ 1 passed in 1 file

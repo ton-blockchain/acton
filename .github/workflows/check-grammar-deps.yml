@@ -1,0 +1,66 @@
+name: Check Grammar Dependencies
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-grammar-deps.yml"
+      - "crates/tree-sitter-**/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-grammar-deps.yml"
+      - "crates/tree-sitter-**/**"
+  workflow_dispatch:
+
+concurrency:
+  group: check-grammar-deps-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  grammar-audit:
+    name: Yarn audit
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22.x
+
+      - name: Run Yarn audits
+        shell: bash
+        # language=Bash
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+
+          for dir in crates/tree-sitter-*; do
+            [ -d "$dir" ] || continue
+            [ -f "$dir/yarn.lock" ] || continue
+
+            echo "::group::yarn npm audit (${dir})"
+            if ! (
+              cd "$dir"
+              yarn npm audit --all --recursive --severity=moderate
+            ); then
+              echo "::endgroup::"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done

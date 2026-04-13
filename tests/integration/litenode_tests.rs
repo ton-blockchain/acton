@@ -16,7 +16,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const DEPLOYER_CONTRACT: &str = r#"
-import "../gen/child_code.tolk"
+import "../gen/child.code.tolk"
 
 fun onInternalMessage(_: InMessage) {
     val childInit = ContractState {
@@ -62,7 +62,7 @@ fun main() {
     });
     net.send(wallet.address, deployDeployer);
 
-    println1("DEPLOYER_CONTRACT={}", deployerAddress);
+    println("DEPLOYER_CONTRACT={}", deployerAddress);
 }
 "#;
 
@@ -131,7 +131,7 @@ fun main() {
     });
     net.send(wallet.address, deployGetter);
 
-    println1("GETTER_CONTRACT={}", getterAddress);
+    println("GETTER_CONTRACT={}", getterAddress);
 }
 "#;
 
@@ -164,7 +164,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const LIBRARY_MANAGER_CONTRACT: &str = r#"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun workerStateInit(): ContractState {
     return ContractState {
@@ -207,7 +207,7 @@ const DEPLOY_MANAGER_AND_WORKER_SCRIPT: &str = r#"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/io"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun main() {
     val wallet = net.wallet("deployer");
@@ -243,8 +243,8 @@ fun main() {
     });
     net.send(wallet.address, deployWorkerViaManagerMsg);
 
-    println1("MANAGER_CONTRACT={}", managerAddress);
-    println1("WORKER_CONTRACT={}", workerAddress);
+    println("MANAGER_CONTRACT={}", managerAddress);
+    println("WORKER_CONTRACT={}", workerAddress);
 }
 "#;
 
@@ -252,7 +252,7 @@ const DESTROY_WORKER_VIA_MANAGER_SCRIPT: &str = r#"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/io"
-import "../gen/worker_code.tolk"
+import "../gen/worker.code.tolk"
 
 fun main() {
     val wallet = net.wallet("deployer");
@@ -279,8 +279,8 @@ fun main() {
     });
     net.send(wallet.address, triggerDestroyMsg);
 
-    println1("MANAGER_CONTRACT={}", managerAddress);
-    println1("WORKER_CONTRACT={}", workerAddress);
+    println("MANAGER_CONTRACT={}", managerAddress);
+    println("WORKER_CONTRACT={}", workerAddress);
 }
 "#;
 
@@ -340,7 +340,6 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let script_result = project
         .acton()
         .script("scripts/deploy.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
@@ -476,7 +475,6 @@ fn litenode_script_println_net_send_in_broadcast_shows_synthetic_hint() {
     let output = project
         .acton()
         .script("scripts/deploy.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run()
         .success();
@@ -512,7 +510,6 @@ fn litenode_supports_try_locate_transaction_endpoints() {
     let script_result = project
         .acton()
         .script("scripts/deploy.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
@@ -858,7 +855,6 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
     let deploy_result = project
         .acton()
         .script("scripts/deploy_manager_and_worker.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let deploy_stdout = String::from_utf8(deploy_result.output.get_output().stdout.clone())
@@ -925,7 +921,6 @@ fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
     let destroy_result = project
         .acton()
         .script("scripts/destroy_worker_via_manager.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let destroy_stdout = String::from_utf8(destroy_result.output.get_output().stdout.clone())
@@ -1363,7 +1358,6 @@ fn litenode_supports_v3_address_information_endpoint() {
     let script_result = project
         .acton()
         .script("scripts/deploy_getter.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
@@ -1899,7 +1893,6 @@ fn litenode_supports_v3_run_get_method() {
     let script_result = project
         .acton()
         .script("scripts/deploy_getter.tolk")
-        .broadcast()
         .verify_network("localnet")
         .run();
     let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())

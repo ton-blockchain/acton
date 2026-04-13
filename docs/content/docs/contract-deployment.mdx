@@ -44,12 +44,12 @@ fun main() {
 
     // 2. Prepare the contract
     // We create the contract instance locally with its initial state
-    val counter = Counter.fromStorage(Storage {
+    val counter = Counter.fromStorage({
         id: 123,       // Unique ID to randomize address
         counter: 0,    // Initial counter value
     });
 
-    println1("Deploying counter to {}", counter.address);
+    println("Deploying counter to {}", counter.address);
 
     // 3. Deploy the contract
     // This sends a transaction from the deployer wallet with the stateInit
@@ -60,8 +60,8 @@ fun main() {
         return;
     }
 
-    println1("Deployment complete: {}", counter.address);
-    println1("On-chain counter is {}", counter.currentCounter());
+    println("Deployment complete: {}", counter.address);
+    println("On-chain counter is {}", counter.currentCounter());
 }
 ```
 
@@ -84,32 +84,34 @@ fun main() {
     });
 
     val minter = JettonMinter.fromStorage({
-        totalSupply: 1000000000,
+        totalSupply: 1_000_000_000,
         adminAddress: deployer.address,
         content: content,
-        jettonWalletCode: build("jetton_wallet"),
+        jettonWalletCode: build("JettonWallet"),
     });
 
     // Deploy
     minter.deploy(deployer.address, { value: ton("0.05") }).wait();
 
-    println1("Jetton deployed at {}", minter.address);
+    println("Jetton deployed at {}", minter.address);
 }
 ```
 
 ## Running the Deployment
 
-To execute your deployment script on the real blockchain, use the `acton script` command with the `--broadcast` flag.
+To execute your deployment script on the real blockchain, use the `acton script` command with `--net <network>`.
+
+<Callout>
+  Executing scripts in real blockchain is often called "broadcasting", opposed to local "emulation".
+</Callout>
 
 ### Testnet
 
-By default, Acton targets the testnet when broadcasting.
-
 ```bash
-acton script scripts/deploy.tolk --broadcast
+acton script scripts/deploy.tolk --net testnet
 ```
 
-In `--broadcast` mode, read-only calls such as `counter.currentCounter()` use
+In broadcast mode, read-only calls such as `counter.currentCounter()` use
 the same network by default, so deploy scripts can verify on-chain state
 without an extra `--fork-net`.
 
@@ -120,7 +122,7 @@ To deploy to testnet, your wallet must have testnet TONs. You can get them for f
 To deploy to the mainnet, specify the network flag:
 
 ```bash
-acton script scripts/deploy.tolk --broadcast --net mainnet
+acton script scripts/deploy.tolk --net mainnet
 ```
 
 <Callout type="warning">
@@ -132,7 +134,7 @@ When deploying to mainnet, real value is transferred. Ensure your contract logic
 Deployment to a local network allows you to get closer to real networks than tests, but at the same time not depend on the external network and remain completely local.
 
 ```bash
-acton script scripts/deploy.tolk --broadcast --net localnet
+acton script scripts/deploy.tolk --net localnet
 ```
 
 <Callout type="warning">
@@ -144,7 +146,7 @@ acton script scripts/deploy.tolk --broadcast --net localnet
 For faster and more reliable interactions, especially on mainnet, it is recommended to use an API key from [TonCenter](https://toncenter.com/).
 
 ```bash
-acton script scripts/deploy.tolk --broadcast --net mainnet --api-key YOUR_API_KEY
+acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
 ```
 
 You can also set the `TONCENTER_API_KEY` environment variable to avoid passing it every time.
@@ -153,7 +155,7 @@ You can also set the `TONCENTER_API_KEY` environment variable to avoid passing i
 
 One of the biggest advantages of using scripts is that you can test the exact same deployment logic locally before spending money.
 
-Simply run the script **without** the `--broadcast` flag:
+Simply run the script **without** `--net`:
 
 ```bash
 acton script scripts/deploy.tolk
@@ -161,4 +163,4 @@ acton script scripts/deploy.tolk
 
 In this mode, `net.wallet("deployer")` creates a virtual wallet, and the deployment happens in the local emulator. This allows you to verify that your state initialization and logic are correct before spending any money.
 The same script can still call wrapper getters after deploy: in emulation they
-read emulator state, and in `--broadcast` they read the selected real network.
+read emulator state, and in broadcast mode they read the selected real network.

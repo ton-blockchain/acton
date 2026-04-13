@@ -48,7 +48,7 @@ fn net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path() {
                 return Probe { address, init }
             }
 
-            get fun `test-cp-net-is-deployed-deterministic-transition`() {
+            get fun `test cp net is deployed deterministic transition`() {
                 val probe = Probe.withSeed(17);
                 expect(net.isDeployed(probe.address)).toBeFalse();
 
@@ -89,7 +89,7 @@ fn net_is_deployed_stays_false_after_read_only_lookups_on_missing_address() {
             "is_deployed_read_only_cache_miss",
             &with_cp_imports(
                 r#"
-            get fun `test-cp-net-is-deployed-read-only-cache-miss`() {
+            get fun `test cp net is deployed read only cache miss`() {
                 val target = net.randomAddress("cp_is_deployed_cache_only_target");
 
                 expect(net.isDeployed(target)).toBeFalse();
@@ -127,7 +127,7 @@ fn net_is_deployed_stays_false_for_explicit_null_shard_account() {
             "is_deployed_null_shard_account",
             &with_cp_imports(
                 r#"
-            get fun `test-cp-net-is-deployed-explicit-null-shard-account`() {
+            get fun `test cp net is deployed explicit null shard account`() {
                 val target = net.randomAddress("cp_is_deployed_null_shard_target");
 
                 net.setShardAccount(target, null);
@@ -174,7 +174,7 @@ fn net_is_deployed_transitions_false_to_true_in_fixture_project() {
             return Counter { address, init }
         }
 
-        get fun `test-cp-net-is-deployed-fixture-transition`() {
+        get fun `test cp net is deployed fixture transition`() {
             val counter = Counter.fromStorage({ id: 77, counter: 0 });
             expect(net.isDeployed(counter.address)).toBeFalse();
 

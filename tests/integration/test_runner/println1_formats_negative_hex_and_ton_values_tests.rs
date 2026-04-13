@@ -30,11 +30,11 @@ fn println1_formats_negative_hex_and_ton_values() {
     run_stdlib_io_case(
         "as-stdlib-println1-negative-formatters",
         r#"
-get fun `test-as-stdlib-println1-negative-formatters`() {
-    println1("hex_neg_one={:x}", -1);
-    println1("hex_neg_255={:x}", -255);
-    println1("ton_neg_nano={:ton}", -1);
-    println1("ton_neg_one_and_half={:ton}", -1500000000);
+get fun `test as stdlib println1 negative formatters`() {
+    println("hex_neg_one={:x}", -1);
+    println("hex_neg_255={:x}", -255);
+    println("ton_neg_nano={:ton}", -1);
+    println("ton_neg_one_and_half={:ton}", -1500000000);
 }
 "#,
         "integration/snapshots/test-runner/println1_formats_negative_hex_and_ton_values/println1_formats_negative_hex_and_ton_values.stdout.txt",
@@ -46,11 +46,11 @@ fn println1_formats_edge_hex_and_ton_values() {
     run_stdlib_io_case(
         "as-stdlib-println1-edge-formatters",
         r#"
-get fun `test-as-stdlib-println1-edge-formatters`() {
-    println1("hex_zero={:x}", 0);
-    println1("hex_i64_max={:x}", 9223372036854775807);
-    println1("ton_zero={:ton}", 0);
-    println1("ton_i64_max={:ton}", 9223372036854775807);
+get fun `test as stdlib println1 edge formatters`() {
+    println("hex_zero={:x}", 0);
+    println("hex_i64_max={:x}", 9223372036854775807);
+    println("ton_zero={:ton}", 0);
+    println("ton_i64_max={:ton}", 9223372036854775807);
 }
 "#,
         "integration/snapshots/test-runner/println1_formats_negative_hex_and_ton_values/println1_formats_edge_hex_and_ton_values.stdout.txt",

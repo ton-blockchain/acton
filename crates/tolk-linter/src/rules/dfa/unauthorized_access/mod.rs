@@ -18,17 +18,17 @@ pub mod analysis;
 /// ### Example
 /// ```tolk
 /// fun onInternalMessage(in: InMessage) {
-///   val storage = lazy Storage.fromCell(contract.getData());
-///   storage.save();
+///     val storage = lazy Storage.fromCell(contract.getData());
+///     storage.save();
 /// }
 /// ```
 ///
 /// Use instead:
 /// ```tolk
 /// fun onInternalMessage(in: InMessage) {
-///   val storage = lazy Storage.fromCell(contract.getData());
-///   assert (in.senderAddress == storage.adminAddress) throw ERR_UNAUTHORIZED;
-///   storage.save();
+///     val storage = lazy Storage.fromCell(contract.getData());
+///     assert (in.senderAddress == storage.adminAddress) throw ERR_UNAUTHORIZED;
+///     storage.save();
 /// }
 /// ```
 #[derive(ViolationMetadata)]

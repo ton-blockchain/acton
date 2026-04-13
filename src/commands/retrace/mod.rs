@@ -21,6 +21,7 @@ struct ContractTraceArtifacts {
 }
 
 #[allow(unsafe_code)]
+#[allow(clippy::too_many_arguments)]
 pub fn retrace_cmd(
     hash: String,
     net: Option<String>,
@@ -28,7 +29,8 @@ pub fn retrace_cmd(
     verbose: bool,
     logs_dir: Option<String>,
     contract: Option<String>,
-    dap_port: Option<u16>,
+    debug: bool,
+    debug_port: Option<u16>,
 ) -> anyhow::Result<()> {
     if let Some(key) = api_key {
         // SAFETY: this is a single thread program
@@ -37,10 +39,16 @@ pub fn retrace_cmd(
         }
     }
 
-    if dap_port.is_some() && contract.is_none() {
+    let debug_port = if debug {
+        Some(debug_port.unwrap_or(12345))
+    } else {
+        None
+    };
+
+    if debug && contract.is_none() {
         anyhow::bail!(
             "{} requires {}",
-            "--dap-port".yellow(),
+            "--debug".yellow(),
             "--contract <NAME>".yellow()
         );
     }
@@ -85,7 +93,7 @@ pub fn retrace_cmd(
                 {
                     ensure_contract_matches_transaction(contract_name, &result, artifacts)?;
 
-                    if let Some(port) = dap_port {
+                    if let Some(port) = debug_port {
                         let vm_logs = &result.emulated_tx.vm_logs;
                         let vm_lines = vmlogs::parser::parse_lines(vm_logs);
                         let replayer = TolkReplayer::new(&artifacts.source_map, &vm_lines)

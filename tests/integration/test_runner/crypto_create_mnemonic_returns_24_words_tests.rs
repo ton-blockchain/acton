@@ -24,7 +24,7 @@ fn crypto_create_mnemonic_returns_24_words() {
     run_crypto_case(
         "an-stdlib-create-mnemonic-returns-24-words",
         r"
-get fun `test-an-stdlib-create-mnemonic-returns-24-words`() {
+get fun `test an stdlib create mnemonic returns 24 words`() {
     val words = crypto.createMnemonic();
     expect(words.size()).toEqual(24);
 }
@@ -38,7 +38,7 @@ fn crypto_to_keypair_is_deterministic_for_same_mnemonic() {
     run_crypto_case(
         "an-stdlib-to-keypair-deterministic",
         r"
-get fun `test-an-stdlib-to-keypair-deterministic`() {
+get fun `test an stdlib to keypair deterministic`() {
     val words = crypto.createMnemonic();
     val kp1 = words.toKeyPair();
     val kp2 = words.toKeyPair();
@@ -58,7 +58,7 @@ fn crypto_sign_matches_raw_sign_and_verifies() {
     run_crypto_case(
         "an-stdlib-sign-matches-raw-sign",
         r"
-get fun `test-an-stdlib-sign-matches-raw-sign`() {
+get fun `test an stdlib sign matches raw sign`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
     val data = beginCell().storeUint(0xA1B2C3D4, 32).storeUint(77, 8).endCell();
@@ -81,7 +81,7 @@ fn crypto_raw_sign_is_deterministic_and_hash_sensitive() {
     run_crypto_case(
         "an-stdlib-raw-sign-deterministic-hash-sensitive",
         r"
-get fun `test-an-stdlib-raw-sign-deterministic-hash-sensitive`() {
+get fun `test an stdlib raw sign deterministic hash sensitive`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
 
@@ -105,7 +105,7 @@ fn crypto_fast_random_bytes_seeded_are_deterministic() {
     run_crypto_case(
         "an-stdlib-fast-random-seeded-deterministic",
         r"
-get fun `test-an-stdlib-fast-random-seeded-deterministic`() {
+get fun `test an stdlib fast random seeded deterministic`() {
     val seeded127a = crypto.getFastRandomBytes(127, 42);
     val seeded127b = crypto.getFastRandomBytes(127, 42);
     // BUG: getFastRandomBytes should be deterministic for the same seed; expected equal slices, got different values.
@@ -121,7 +121,7 @@ fn crypto_fast_random_bytes_rejects_128_bytes() {
     run_crypto_case(
         "an-stdlib-fast-random-rejects-128-bytes",
         r"
-get fun `test-an-stdlib-fast-random-rejects-128-bytes`() {
+get fun `test an stdlib fast random rejects 128 bytes`() {
     expectToEndWithExitCode(567);
     crypto.getFastRandomBytes(128, 1);
 }
@@ -135,7 +135,7 @@ fn crypto_fast_random_bytes_supports_zero_bytes() {
     run_crypto_case(
         "an-stdlib-fast-random-supports-zero-bytes",
         r"
-get fun `test-an-stdlib-fast-random-supports-zero-bytes`() {
+get fun `test an stdlib fast random supports zero bytes`() {
     val seeded = crypto.getFastRandomBytes(0, 42);
     val noSeed = crypto.getFastRandomBytes(0);
 
@@ -154,7 +154,7 @@ fn crypto_secure_random_bytes_supports_1_and_127() {
     run_crypto_case(
         "an-stdlib-secure-random-supports-1-and-127",
         r"
-get fun `test-an-stdlib-secure-random-supports-1-and-127`() {
+get fun `test an stdlib secure random supports 1 and 127`() {
     val b1 = crypto.getSecureRandomBytes(1);
     val b127 = crypto.getSecureRandomBytes(127);
 
@@ -173,7 +173,7 @@ fn crypto_secure_random_bytes_rejects_128_bytes() {
     run_crypto_case(
         "an-stdlib-secure-random-rejects-128-bytes",
         r"
-get fun `test-an-stdlib-secure-random-rejects-128-bytes`() {
+get fun `test an stdlib secure random rejects 128 bytes`() {
     expectToEndWithExitCode(567);
     crypto.getSecureRandomBytes(128);
 }

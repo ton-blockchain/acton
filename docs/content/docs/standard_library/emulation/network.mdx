@@ -33,7 +33,7 @@ val seqno = net.runGetMethod<int>(contract.address, "seqno");
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L35" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L36" />
 
 ## `CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE`
 
@@ -41,7 +41,7 @@ const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L37" />
 
 ## `net`
 
@@ -51,7 +51,7 @@ struct net
 
 Abstraction representing a blockchain and methods of interacting with it.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L39" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L40" />
 
 ## `SendParams`
 
@@ -66,7 +66,7 @@ struct SendParams {
 
 Represents a set of parameters for creating a message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L42" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L43" />
 
 ## `ExtOutMsgInfo`
 
@@ -85,7 +85,7 @@ struct ExtOutMsgInfo {
 
 Information about external outgoing message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L50" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L51" />
 
 ## `ChildTxsIds`
 
@@ -95,7 +95,7 @@ type ChildTxsIds = array<int>
 
 Represents a list of child transactions IDs (LT) for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L62" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L63" />
 
 ## `OutMessages`
 
@@ -105,7 +105,7 @@ type OutMessages = array<cell>
 
 Represents a list of out messages for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L65" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L66" />
 
 ## `ExtOutList`
 
@@ -115,7 +115,7 @@ type ExtOutList = array<cell>
 
 Represents a list of external outgoing messages for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L68" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L69" />
 
 ## `ExtOutList.at`
 
@@ -128,7 +128,7 @@ Returns the external outgoing message at the given index with given type.
 If the message is not of the requested type, loading fails with exit code 63.
 Use [ExtOutList.atOrNull](#extoutlistatornull) to handle this case without throwing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L75" />
 
 ## `ExtOutList.atOrNull`
 
@@ -143,7 +143,7 @@ If message is not of the requested type, `index < 0`, or `index >= self.size()`,
 this method returns `null` instead of throwing.
 Use [ExtOutList.at](#extoutlistat) if you do not want to handle the `null` case.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L85" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L86" />
 
 ## `OutMessages.atCell`
 
@@ -155,7 +155,7 @@ Returns the out message at the given index as a raw cell.
 
 To get parsed message, use [OutMessages.at](#outmessagesat) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L107" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L108" />
 
 ## `OutMessages.at`
 
@@ -169,7 +169,7 @@ To get raw cell, use [OutMessages.atCell](#outmessagesatcell) method.
 
 If actual message body has a different type, loading will fail.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L116" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L117" />
 
 ## `SendResult`
 
@@ -196,7 +196,7 @@ struct SendResult {
 
 Represents a single send result obtained from [net.send](#netsend) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L149" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L150" />
 
 ## `SendResult.allOutActions`
 
@@ -206,7 +206,7 @@ fun SendResult.allOutActions(self): OutActionList
 
 Returns all out actions produced by this transaction as a list.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L169" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L170" />
 
 ## `SendResultList`
 
@@ -220,7 +220,7 @@ This list represent all transactions produced by a [net.send](#netsend) call.
 
 To get a single send result, use [SendResultList.at](#sendresultlistat) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L178" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L179" />
 
 ## `SendResultList.at`
 
@@ -230,7 +230,7 @@ fun SendResultList.at(self, index: int): SendResult
 
 Returns the send result at the given index.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L181" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L182" />
 
 ## `TxCursor`
 
@@ -245,7 +245,7 @@ Opaque cursor for step-by-step transaction execution.
 Use [net.sendIter](#netsenditer) to create it, then drain it in parts with [TxCursor.executeN](#txcursorexecuten),
 [TxCursor.executeTill](#txcursorexecutetill), or [TxCursor.executeFrom](#txcursorexecutefrom).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L189" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L190" />
 
 ## `TxCursor.isDone`
 
@@ -255,7 +255,7 @@ fun TxCursor.isDone(self): bool
 
 Returns `true` when the cursor has no more pending transactions to execute.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L194" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L195" />
 
 ## `TxCursor.close`
 
@@ -265,7 +265,7 @@ fun TxCursor.close(self): void
 
 Discards any remaining pending transactions for this cursor.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L199" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L200" />
 
 ## `TxCursor.executeN`
 
@@ -278,7 +278,7 @@ Executes up to [n](#txcursorexecuten) transactions from the cursor and returns o
 This is useful when you need to inspect the first few hops of a long chain without
 draining the whole queue.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L207" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L208" />
 
 ## `TxCursor.executeTill`
 
@@ -291,7 +291,7 @@ Executes transactions until one of them matches [params](#txcursorexecutetill), 
 The matching transaction is included in the returned list. If no matching transaction is found
 before the queue is exhausted, this function fails the test.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L215" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L216" />
 
 ## `TxCursor.executeFrom`
 
@@ -301,7 +301,7 @@ fun TxCursor.executeFrom(self): SendResultList
 
 Executes all remaining pending transactions and returns only this executed segment.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L231" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L232" />
 
 ## `SendResultList.wait`
 
@@ -319,7 +319,7 @@ Wait for the transaction to be applied on the blockchain.
 This method is useful when broadcasting transactions to the real network.
 It polls the network until the transaction is applied or the maximum number of attempts is reached.
 
-In emulation mode (without `--broadcast`), this method returns immediately with `true`.
+In emulation mode (without `--net`), this method returns immediately with `true`.
 
 Returns `true` if transaction is found and `false` otherwise.
 
@@ -338,7 +338,7 @@ val result = net.send(wallet.address, message);
 val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L258" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L259" />
 
 ## `SearchParams`
 
@@ -377,7 +377,7 @@ struct SearchParams {
 
 Represents a set of parameters to search for a transaction in the transaction list.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L286" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L287" />
 
 ## `ExternalOutSearchParams`
 
@@ -390,7 +390,7 @@ struct ExternalOutSearchParams {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L317" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L318" />
 
 ## `Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches`
 
@@ -401,7 +401,7 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = unknow
 ): bool
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L324" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L325" />
 
 ## `SendResultList.findExternalOutMessage`
 
@@ -434,7 +434,7 @@ tx.findExternalOutMessage<IncrementEvent>({ from: counter.address });
 
 If the message is not found, returns None.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L374" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L375" />
 
 ## `SendResultList.findTransaction`
 
@@ -454,7 +454,7 @@ expect(result).toBeDefined();
 val tx = result.unwrap();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L415" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L416" />
 
 ## `net.send`
 
@@ -471,7 +471,7 @@ emulator execution, even when [net.isBroadcasting](#netisbroadcasting) is `true`
 
 Example:
 ```tolk
-get fun `test-send-message`() {
+get fun `test send message`() {
     // ...
     val message = createMessage({
         bounce: false,
@@ -486,7 +486,7 @@ Returns a list of send results representing all transactions produced by this se
 
 See [net.sendSingle](#netsendsingle) if you need to send a single message without out message processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L453" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L454" />
 
 ## `net.sendIter`
 
@@ -504,7 +504,7 @@ such as large cascades and interleaving multiple message chains.
 
 Step-by-step execution is not available in broadcast mode or test-runner debug mode.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L471" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L472" />
 
 ## `net.sendSingle`
 
@@ -521,19 +521,19 @@ This method is useful for bounce testing where you want to simulate a bounced me
 
 Example:
 ```tolk
-val bounced_msg = createMessage({
+val bouncedMsg = createMessage({
     bounce: false,
     value: ton("0.95"),
-    dest: deployer_jetton_wallet.address,
+    dest: deployer.address,
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
 
-net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+net.sendSingle(notDeployer.address, bouncedMsg);
 ```
 
 See [net.send](#netsend) if you need to send a message and process out messages.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L497" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L498" />
 
 ## `createExternalMessage`
 
@@ -558,7 +558,7 @@ message$_ {X:Type} info:CommonMsgInfo
   body:(Either X ^X) = Message X;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L513" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L514" />
 
 ## `net.sendExternal`
 
@@ -570,7 +570,7 @@ Sends an external incoming message to the specified destination address.
 Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 Returns `null` if external message was not accepted or destination account does not exist.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L551" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L552" />
 
 ## `net.runTickTock`
 
@@ -589,7 +589,7 @@ val results = net.runTickTock(electorAddress, false); // run tick
 val results = net.runTickTock(electorAddress, true);  // run tock
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L569" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L570" />
 
 ## `OutMessage.bounced`
 
@@ -613,17 +613,17 @@ This is useful for testing single messages with [net.sendSingle](#netsendsingle)
 
 Example:
 ```tolk
-val bounced_msg = createMessage({
+val bouncedMsg = createMessage({
     bounce: false,
     value: ton("0.95"),
-    dest: deployer_jetton_wallet.address,
+    dest: deployer.address,
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
 
-net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+net.sendSingle(notDeployer.address, bouncedMsg);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L598" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L599" />
 
 ## `Treasury`
 
@@ -637,7 +637,7 @@ Treasury is a special contract that is used to deploy other contracts.
 
 To create a treasury, use the [net.treasury](#nettreasury) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L607" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L608" />
 
 ## `net.treasury`
 
@@ -651,7 +651,7 @@ Calling this method with same name will return the same treasury.
 
 Example:
 ```tolk
-get fun `test-mint`() {
+get fun `test mint`() {
     val treasury = net.treasury("treasury");
     // ...
 }
@@ -659,7 +659,7 @@ get fun `test-mint`() {
 
 Note: in scripts always use [net.wallet](#netwallet) instead.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L624" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L625" />
 
 ## `Wallet`
 
@@ -669,7 +669,7 @@ struct Wallet {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L648" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L649" />
 
 ## `net.wallet`
 
@@ -679,9 +679,9 @@ fun net.wallet(name: string): Wallet
 
 Creates a new wallet for use in scripts. Unlike `net.treasury`, the wallet
 can refer to a real wallet described in Acton.toml, and therefore can be used
-in scripts with `--broadcast` to execute transactions on the real blockchain.
+in scripts launched with `--net` to execute transactions on the real blockchain.
 
-Without `--broadcast`, the wallet refers to an internal wallet, created in the
+Without `--net`, the wallet refers to an internal wallet, created in the
 same way as in `net.treasury`.
 
 Note: in tests, use [net.treasury](#nettreasury).
@@ -690,20 +690,87 @@ Example:
 ```tolk
 /// Script that deploys a counter contract using a wallet to real blockchain.
 fun main() {
-   val deployer = net.wallet("deployer");
-   val counter = Counter.fromStorage(Storage {
-       id: 8,
-       counter: 0,
-   });
+    val deployer = net.wallet("deployer");
+    val counter = Counter.fromStorage({
+        id: 8,
+        counter: 0,
+    });
 
-   val result = counter.deploy(deployer.address, ton("0.05"));
-   result.wait();
+    val result = counter.deploy(deployer.address, ton("0.05"));
+    result.wait();
 
-   println1("Deployed counter to {}", counter.address);
+    println("Deployed counter to {}", counter.address);
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L677" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L678" />
+
+## `Wallet.toKeyPair`
+
+```tolk
+fun Wallet.toKeyPair(self): KeyPair
+```
+
+Returns the key pair for a wallet configured in wallets.toml or global.wallets.toml.
+
+The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign](../../crypto/crypto/#cryptosign)
+and [crypto.rawSign](../../crypto/crypto/#cryptorawsign). This is available only for wallets opened by
+[net.wallet](#netwallet) when the script was started with `--net`.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L697" />
+
+## `Wallet.privateKey`
+
+```tolk
+fun Wallet.privateKey(self): int
+```
+
+Returns the wallet private key as a 32-byte Ed25519 seed.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L709" />
+
+## `Wallet.publicKey`
+
+```tolk
+fun Wallet.publicKey(self): int
+```
+
+Returns the wallet public key.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L714" />
+
+## `Wallet.walletId`
+
+```tolk
+fun Wallet.walletId(self): int
+```
+
+Returns the wallet id used by the opened wallet contract.
+
+For wallet v5 this is the wallet_id stored in wallet data and used for
+signed requests.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L722" />
+
+## `Wallet.sign`
+
+```tolk
+fun Wallet.sign(self, data: cell): slice
+```
+
+Hashes and signs a cell with the wallet private key.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L733" />
+
+## `Wallet.rawSign`
+
+```tolk
+fun Wallet.rawSign(self, data: int): slice
+```
+
+Signs an already computed 256-bit hash with the wallet private key.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L738" />
 
 ## `net.isBroadcasting`
 
@@ -713,7 +780,7 @@ fun net.isBroadcasting(): bool
 
 Check if the script is running in broadcasting mode.
 
-Returns `true` if the script was run with `--broadcast` flag, `false` otherwise.
+Returns `true` if the script was run with `--net`, `false` otherwise.
 
 This is useful for writing scripts that behave differently in emulation and broadcasting modes.
 
@@ -726,7 +793,7 @@ if (net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L705" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L756" />
 
 ## `net.enableBroadcast`
 
@@ -740,7 +807,7 @@ This function allows scripts to manually enable broadcasting behavior.
 Useful for testing broadcasting logic in emulation mode.
 It toggles only the runtime broadcast flag.
 
-Wallets are loaded once at startup (when the script is launched with CLI `--broadcast`).
+Wallets are loaded once at startup (when the script is launched with CLI `--net`).
 Calling [net.enableBroadcast](#netenablebroadcast) later does not load wallets, so [net.wallet](#netwallet) can still fail
 and wallet-backed real sends can remain unavailable.
 
@@ -753,7 +820,7 @@ if (net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L727" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L778" />
 
 ## `net.disableBroadcast`
 
@@ -775,7 +842,7 @@ if (!net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L744" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L795" />
 
 ## `net.runGetMethod`
 
@@ -831,14 +898,14 @@ If get method returns a tensor, specify tuple as a first type argument:
 get fun get_all_data(): (int, slice) { ... }
 ```
 ```tolk
-val data: tuple = net.runGetMethod(wallet.address, "get_all_data");
+val data = net.runGetMethod<tuple>(wallet.address, "get_all_data");
 val first = data.get(0) as int;
 val second = data.get(1) as int;
 ```
 
 If you need to run a get method by its ID, use [net.runGetMethodById](#netrungetmethodbyid) instead.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L802" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L853" />
 
 ## `net.runGetMethodById`
 
@@ -857,7 +924,7 @@ val data = net.runGetMethodById<JettonDataReply>(wallet.address, 0x17b02);
 
 See [net.runGetMethod](#netrungetmethod) for more information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L817" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L868" />
 
 ## `net.isDeployed`
 
@@ -873,16 +940,16 @@ Example:
 ```tolk
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0 // return 0 if contract is not deployed
+        return 0; // return 0 if contract is not deployed
     }
 
     // and if deployed, actually run get method
-    val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+    return result.jettonBalance;
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L837" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L888" />
 
 ## `net.getDeployedCode`
 
@@ -894,7 +961,7 @@ Get the code of a deployed contract by its address.
 
 If the contract is not deployed, returns null.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L844" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L895" />
 
 ## `net.waitForTransaction`
 
@@ -937,7 +1004,7 @@ val ok = net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 20, 1000);
 
 See [SendResultList.wait](#sendresultlistwait) for high-level API.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L876" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L927" />
 
 ## `net.randomAddress`
 
@@ -953,10 +1020,10 @@ This allows test runner to show the name instead of the address in the test outp
 Example:
 ```tolk
 val address = net.randomAddress("random_user");
-val masterchain_address = net.randomAddress("random_user", -1);
+val masterchainAddress = net.randomAddress("random_user", -1);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L902" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L953" />
 
 ## `net.registerAddress`
 
@@ -977,7 +1044,7 @@ Example:
 net.registerAddress(address, "my_address");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L943" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L994" />
 
 ## `net.registerCodeCell`
 
@@ -995,7 +1062,7 @@ Example:
 net.registerCodeCell(code, "my_code");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L956" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1007" />
 
 ## `net.getAccountState`
 
@@ -1013,13 +1080,13 @@ Example:
 ```tolk
 val state = net.getAccountState(contract.address);
 if (state != null) {
-    println1("Balance: {:ton}", state.storage.balance.grams);
+    println("Balance: {:ton}", state.storage.balance.grams);
 } else {
     println("Account not found");
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L975" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1026" />
 
 ## `net.getAccountStorageFee`
 
@@ -1033,13 +1100,13 @@ Returns `null` if the contract with given address is not deployed.
 
 Example:
 ```tolk
-val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
-if (storage_fee != null) {
-    println1("Daily storage fee: {:ton}", storage_fee);
+val storageFee = net.getAccountStorageFee(contract.address, 86400); // 1 day
+if (storageFee != null) {
+    println("Daily storage fee: {:ton}", storageFee);
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L995" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1046" />
 
 ## `net.loadLibrary`
 
@@ -1051,7 +1118,7 @@ Load library from the real blockchain by hash.
 
 Returns null if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1007" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1058" />
 
 ## `net.fetchAndRegisterLibrary`
 
@@ -1063,7 +1130,7 @@ Load library from the real blockchain by hash and register it in current blockch
 
 Returns false if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1014" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1065" />
 
 ## `net.setNow`
 
@@ -1077,11 +1144,11 @@ This is useful for testing time-dependent contracts.
 
 Example:
 ```tolk
-val future_time = net.now() + 1000; // 1000 seconds from now
-net.setNow(future_time);
+val futureTime = net.now() + 1000; // 1000 seconds from now
+net.setNow(futureTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1032" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1083" />
 
 ## `net.now`
 
@@ -1095,11 +1162,11 @@ Returns the current time in the emulated blockchain.
 
 Example:
 ```tolk
-val current_time = net.now();
-println1("Current emulation time: {}", current_time);
+val currentTime = net.now();
+println("Current emulation time: {}", currentTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1048" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1099" />
 
 ## `net.topUp`
 
@@ -1117,7 +1184,7 @@ net.topUp(address, ton("10"));
 Note: This function for tests only!
 For testnet TON airdrop use `acton wallet airdrop command.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1061" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1112" />
 
 ## `net.balance`
 
@@ -1132,10 +1199,10 @@ Returns 0 if the address is not deployed.
 Example:
 ```tolk
 val balance = net.balance(address);
-println1("{:ton}", balance);
+println("{:ton}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1080" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1131" />
 
 ## `net.getAccount`
 
@@ -1156,7 +1223,7 @@ if (acc is AccountInfo) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1100" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1151" />
 
 ## `net.setAccount`
 
@@ -1175,7 +1242,7 @@ val acc = net.getAccount(addr);
 net.setAccount(addr, acc);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1115" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1166" />
 
 ## `net.getShardAccount`
 
@@ -1191,11 +1258,11 @@ Example:
 ```tolk
 val shard = net.getShardAccount(addr);
 if (shard != null) {
-    println1("Last LT: {}", shard.lastTransLt);
+    println("Last LT: {}", shard.lastTransLt);
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1142" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1193" />
 
 ## `net.setShardAccount`
 
@@ -1215,7 +1282,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1161" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1212" />
 
 ## `net.saveSnapshot`
 
@@ -1234,7 +1301,7 @@ val saved = net.saveSnapshot("world-state.json");
 expect(saved).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1179" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1230" />
 
 ## `net.loadSnapshot`
 
@@ -1253,7 +1320,7 @@ val loaded = net.loadSnapshot("world-state.json");
 expect(loaded).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1193" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1244" />
 
 ## `net.setConfig`
 
@@ -1294,7 +1361,7 @@ if (success) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1229" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1280" />
 
 ## `net.getConfig`
 
@@ -1323,10 +1390,10 @@ val gasPrice = config.getGasPrices(BASECHAIN);
 val storagePrices = config.getStoragePrices();
 val globalVersion = config.getGlobalVersion();
 
-println(format1("Network version: {}", globalVersion.version));
+println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1282" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1333" />
 
 ## `crc16`
 
@@ -1334,14 +1401,15 @@ println(format1("Network version: {}", globalVersion.version));
 fun crc16(data: string): int
 ```
 
-Calculate the CRC16 checksum of a slice.
+Calculate the CRC16 checksum of a string.
+Unlike a compile-time `"str".crc16()` method, it works with non-constant strings.
 
 Example:
 ```tolk
-val crc = crc16("hello");
+val crc = crc16(someStr);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1292" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1344" />
 
 ## `tuple.fromTuple`
 
@@ -1349,7 +1417,7 @@ val crc = crc16("hello");
 fun tuple.fromTuple(data: tuple): tuple
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1294" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1346" />
 
 ## `T.externalOutPrefix`
 
@@ -1357,7 +1425,7 @@ fun tuple.fromTuple(data: tuple): tuple
 fun T.externalOutPrefix(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1298" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1350" />
 
 ## `T.externalOutPrefixLen`
 
@@ -1365,7 +1433,7 @@ fun T.externalOutPrefix(): int
 fun T.externalOutPrefixLen(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1306" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1358" />
 
 ## `T.decodeExternalOutBody`
 
@@ -1373,7 +1441,7 @@ fun T.externalOutPrefixLen(): int
 fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1314" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1366" />
 
 ## `T.getDeclaredPackPrefix2`
 
@@ -1381,5 +1449,5 @@ fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
 fun T.getDeclaredPackPrefix2(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1370" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1422" />
 

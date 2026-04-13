@@ -80,7 +80,7 @@ verification and release tooling.
   submission, surface clearer failure diagnostics for missing wallet state,
   insufficient balance, stale `seqno`, expired messages, and Toncenter
   `send_boc` failures, and reject `net.treasury` in broadcast mode.
-- `acton script --broadcast` now defaults remote state reads to the selected
+- `acton script --net <network>` now defaults remote state reads to the selected
   broadcast network when `--fork-net` is omitted, and rejects conflicting
   `--net` / `--fork-net` combinations.
 

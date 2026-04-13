@@ -26,7 +26,7 @@ fn outlist_to_be_non_empty_empty_list_reports_failure_message() {
     run_outlist_failure(
         "cd-stdlib-outlist-to-be-non-empty-empty-list",
         r"
-get fun `test-cd-stdlib-outlist-to-be-non-empty-empty-list`() {
+get fun `test cd stdlib outlist to be non empty empty list`() {
     val out_actions = [];
     expect(out_actions).toBeNonEmpty();
 }

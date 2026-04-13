@@ -23,7 +23,7 @@ fn expect_nan_matchers_accept_nan_and_non_nan_values() {
     let source = format!(
         r"{EXPECT_IMPORTS}
 
-get fun `test-bx-expect-nan-pass`() {{
+get fun `test bx expect nan pass`() {{
     val value = ffi.nan();
     expect(value).toBeNaN();
     expect(0).toBeNonNaN();
@@ -45,11 +45,11 @@ fn expect_nan_matchers_report_mismatch_for_nan_and_non_nan_edges() {
     let source = format!(
         r"{EXPECT_IMPORTS}
 
-get fun `test-bx-expect-nan-fail-regular-int`() {{
+get fun `test bx expect nan fail regular int`() {{
     expect(0).toBeNaN();
 }}
 
-get fun `test-bx-expect-non-nan-fail-nan`() {{
+get fun `test bx expect non nan fail nan`() {{
     expect(ffi.nan()).toBeNonNaN();
 }}
 "

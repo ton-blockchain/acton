@@ -3,9 +3,9 @@
 No contracts section found in Acton.toml. Add at least one contract.
 To add a contract add the following section to Acton.toml:
 
-[contracts.my-contract]
-name = "MyContract"
-src = "contracts/my-contract.tolk"
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
 depends = []
 
 See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for more information
@@ -14,6 +14,6 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  TEST  [ROOT]
 
  > tests/change_library_decode.test.tolk (1 test)
-  ✓ cz-change-library-mode-preserved-remove [TIME]
+  ✓ cz change library mode preserved remove [TIME]
 
  ✓ 1 passed in 1 file

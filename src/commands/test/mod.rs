@@ -47,6 +47,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
 use tolk_syntax::{AstNode, HasName, SourceFile};
 use tolkc::TolkSourceMap;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -245,14 +246,31 @@ impl<'a> TestRunner<'a> {
         code_cell: &Cell,
         dest_address: &str,
         abi: Arc<ContractAbi>,
+        compiler_abi: Option<Arc<CompilerContractABI>>,
         source_map: Arc<TolkSourceMap>,
     ) -> anyhow::Result<TestResult> {
         if let Some(fuzz) = test.fuzz {
-            return self.execute_fuzz_test(test, code_cell, dest_address, abi, source_map, fuzz);
+            return self.execute_fuzz_test(
+                test,
+                code_cell,
+                dest_address,
+                abi,
+                compiler_abi,
+                source_map,
+                fuzz,
+            );
         }
 
         let stack = &Tuple::empty();
-        self.execute_test_case(test, code_cell, dest_address, abi, source_map, stack)
+        self.execute_test_case(
+            test,
+            code_cell,
+            dest_address,
+            abi,
+            compiler_abi,
+            source_map,
+            stack,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -262,6 +280,7 @@ impl<'a> TestRunner<'a> {
         code_cell: &Cell,
         dest_address: &str,
         abi: Arc<ContractAbi>,
+        compiler_abi: Option<Arc<CompilerContractABI>>,
         source_map: Arc<TolkSourceMap>,
         stack: &Tuple,
     ) -> anyhow::Result<TestResult> {
@@ -361,8 +380,9 @@ impl<'a> TestRunner<'a> {
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
-                let replayer =
+                let mut replayer =
                     TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+                replayer.set_compiler_abi(compiler_abi);
                 let mut dbg_session =
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);
@@ -1113,8 +1133,14 @@ fn run_file_tests(
         }
 
         let start_time = Instant::now();
-        let result =
-            runner.execute_test(test, code, &dest_address, abi.clone(), source_map.clone());
+        let result = runner.execute_test(
+            test,
+            code,
+            &dest_address,
+            abi.clone(),
+            compiler_abi.clone(),
+            source_map.clone(),
+        );
         let result = match result {
             Ok(result) => result,
             Err(err) => {
@@ -1368,7 +1394,7 @@ fn find_all_test(
             let name_node = method.name()?;
             let name = name_node.normalized_name(content);
 
-            // get fun `test-foo`() or get fun test_foo() or get fun `test foo`()
+            // Preferred style: get fun `test foo`() (legacy dash/underscore forms stay supported)
             if name.starts_with("test-") || name.starts_with("test_") || name.starts_with("test ") {
                 let id = i32::from(CRC16.checksum(name.as_bytes())) | 0x1_00_00;
                 let test_annotations = annotations::find_test_annotations(content, method);

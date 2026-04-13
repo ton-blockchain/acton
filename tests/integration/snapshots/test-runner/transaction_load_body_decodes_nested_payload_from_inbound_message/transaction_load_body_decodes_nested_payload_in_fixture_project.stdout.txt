@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/db_transaction_load_body_nested_fixture.test.tolk (1 test)
-  ✓ db-stdlib-transaction-load-body-nested-fixture [TIME]
+  ✓ db stdlib transaction load body nested fixture [TIME]
 
  ✓ 1 passed in 1 file

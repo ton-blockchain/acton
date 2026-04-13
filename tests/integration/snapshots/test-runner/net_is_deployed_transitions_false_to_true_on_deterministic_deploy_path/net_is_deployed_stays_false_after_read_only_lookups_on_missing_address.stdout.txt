@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/is_deployed_read_only_cache_miss.test.tolk (1 test)
-  ✓ cp-net-is-deployed-read-only-cache-miss [TIME]
+  ✓ cp net is deployed read only cache miss [TIME]
 
  ✓ 1 passed in 1 file

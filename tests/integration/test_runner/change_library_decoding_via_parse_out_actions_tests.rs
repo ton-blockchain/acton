@@ -26,7 +26,7 @@ fn change_library_decoding_via_parse_out_actions() {
     run_success(
         "cx-stdlib-change-library-decoding-via-parse-out-actions",
         r#"
-get fun `test-cx-change-library-decoding-via-parse-out-actions`() {
+get fun `test cx change library decoding via parse out actions`() {
     val libraryCell = beginCell().storeUint(0xC0DECAFE, 32).endCell();
     changeLib(libraryCell, 2);
 

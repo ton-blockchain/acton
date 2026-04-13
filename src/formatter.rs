@@ -18,7 +18,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
-use tolkc::abi::{ABIType as CompilerAbiType, ContractABI as CompilerContractABI};
+use tolkc::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};

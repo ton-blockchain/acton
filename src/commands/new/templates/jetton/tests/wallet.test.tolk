@@ -25,7 +25,7 @@ fun setupTest(): (JettonMinter, Treasury, Treasury) {
         totalSupply: 1000000,
         adminAddress: deployer.address,
         content: createEmptyCell(),
-        jettonWalletCode: build("jetton_wallet"),
+        jettonWalletCode: build("JettonWallet"),
     });
 
     val transactions = minter.sendDeploy(deployer.address, { value: ton("10") });

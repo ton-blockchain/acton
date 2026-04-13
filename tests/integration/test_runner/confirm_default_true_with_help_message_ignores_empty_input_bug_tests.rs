@@ -10,7 +10,7 @@ fn confirm_default_true_with_help_message_ignores_empty_input_bug() {
             import "../../lib/promts/prompts"
             import "../../lib/testing/expect"
 
-            get fun `test-confirm-empty-input-defaults`() {
+            get fun `test confirm empty input defaults`() {
                 expect(confirm("Abort deployment?", false, "Press enter to keep false.")).toEqual(false);
 
                 val accepted = confirm("Proceed with deployment?", true, "Press enter to accept default.");

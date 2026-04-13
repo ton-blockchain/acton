@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/tx_expect.test.tolk (1 test)
-  ✗ ae-emit-external-message-missing [TIME]
+  ✗ ae emit external message missing [TIME]
     └─ Error: expect(actual).toEmitExternalMessage<ExternalNotice>(): Cannot find external message ExternalNotice (opcode: 0xae110003)
       └─ at tests/tx_expect.test[LINE]
 

@@ -147,7 +147,7 @@ fn transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints() {
     run_success_case(
         "am-stdlib-transaction-load-body-and-load-in-msg",
         r"
-get fun `test-am-transaction-load-body-and-load-in-msg`() {
+get fun `test am transaction load body and load in msg`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 11, 7);
 
@@ -177,7 +177,7 @@ fn transaction_load_body_reports_exit_code63_for_mismatched_message_type() {
     run_success_case(
         "am-stdlib-transaction-load-body-mismatch",
         r"
-get fun `test-am-transaction-load-body-mismatch`() {
+get fun `test am transaction load body mismatch`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 21, 9);
     val tx = txs.findTransaction<Ping>({
@@ -198,7 +198,7 @@ fn transaction_load_in_msg_reports_exit_code63_for_mismatched_message_type() {
     run_success_case(
         "am-stdlib-transaction-load-in-msg-mismatch",
         r"
-get fun `test-am-transaction-load-in-msg-mismatch`() {
+get fun `test am transaction load in msg mismatch`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 31, 5);
     val tx = txs.findTransaction<Ping>({
@@ -219,7 +219,7 @@ fn transaction_get_used_gas_matches_send_result_for_root_and_child_transactions(
     run_success_case(
         "am-stdlib-transaction-get-used-gas-for-root-and-child",
         r"
-get fun `test-am-transaction-get-used-gas-for-root-and-child`() {
+get fun `test am transaction get used gas for root and child`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 41, 10);
 
@@ -250,7 +250,7 @@ fn transaction_get_used_gas_reports_skipped_compute_phase_for_undeployed_destina
     run_success_case(
         "am-stdlib-transaction-get-used-gas-skipped-compute",
         r#"
-get fun `test-am-transaction-get-used-gas-skipped-compute`() {
+get fun `test am transaction get used gas skipped compute`() {
     val sender = net.treasury("sender");
     val undeployed = net.randomAddress("am_skip_compute_target");
 
@@ -303,7 +303,7 @@ fun expectedActionFee(tx: Transaction): Maybe<coins> {
     return None{};
 }
 
-get fun `test-am-transaction-get-action-fee-match-and-none`() {
+get fun `test am transaction get action fee match and none`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
 
     val withAction = sendPing(sender, workerAddress, receiverAddress, 61, 4);
@@ -331,7 +331,7 @@ fn transaction_get_account_address_defaults_to_basechain_and_supports_masterchai
     run_success_case(
         "am-stdlib-transaction-get-account-address-workchain-override",
         r"
-get fun `test-am-transaction-get-account-address-workchain-override`() {
+get fun `test am transaction get account address workchain override`() {
     val (sender, workerAddress, receiverAddress) = deployAmHarness();
     val txs = sendPing(sender, workerAddress, receiverAddress, 71, 3);
 
@@ -354,7 +354,7 @@ fn transaction_varuint7_roundtrip_for_storage_used_large_values_bug() {
     run_success_case(
         "am-stdlib-transaction-varuint7-roundtrip-bug",
         r"
-get fun `test-am-transaction-varuint7-roundtrip-bug`() {
+get fun `test am transaction varuint7 roundtrip bug`() {
     val original = StorageUsed {
         cells: 1024,
         bits: 511,

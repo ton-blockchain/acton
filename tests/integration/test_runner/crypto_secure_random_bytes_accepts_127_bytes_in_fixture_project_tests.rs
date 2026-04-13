@@ -46,7 +46,7 @@ fn crypto_secure_random_bytes_accepts_127_bytes_in_fixture_project() {
     let source = format!(
         r"
 {CRYPTO_IMPORTS}
-get fun `test-ay-stdlib-secure-random-accepts-127-bytes`() {{
+get fun `test ay stdlib secure random accepts 127 bytes`() {{
     val bytes = crypto.getSecureRandomBytes(127);
     expect(bytes.remainingBitsCount()).toEqual(127 * 8);
     expect(bytes.remainingRefsCount()).toEqual(0);
@@ -79,7 +79,7 @@ fn crypto_secure_random_bytes_rejects_zero_bytes() {
     run_secure_random_failure_case(
         "ay-stdlib-secure-random-rejects-zero-bytes",
         r"
-get fun `test-ay-stdlib-secure-random-rejects-zero-bytes`() {
+get fun `test ay stdlib secure random rejects zero bytes`() {
     crypto.getSecureRandomBytes(0);
 }
 ",
@@ -93,7 +93,7 @@ fn crypto_secure_random_bytes_rejects_128_bytes_with_exit_567() {
     run_secure_random_success_case(
         "ay-stdlib-secure-random-rejects-128-bytes",
         r"
-get fun `test-ay-stdlib-secure-random-rejects-128-bytes`() {
+get fun `test ay stdlib secure random rejects 128 bytes`() {
     expectToEndWithExitCode(567);
     crypto.getSecureRandomBytes(128);
 }

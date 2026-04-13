@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/transaction_helpers.test.tolk (1 test)
-  ✓ am-transaction-get-used-gas-for-root-and-child [TIME]
+  ✓ am transaction get used gas for root and child [TIME]
 
  ✓ 1 passed in 1 file

@@ -18,15 +18,15 @@ pub mod analysis;
 /// ### Example
 /// ```tolk
 /// fun main() {
-///   val x = random.uint256();
+///     val x = random.uint256();
 /// }
 /// ```
 ///
 /// Use instead:
 /// ```tolk
 /// fun main() {
-///   random.initializeBy(123);
-///   val x = random.uint256();
+///     random.initializeBy(123);
+///     val x = random.uint256();
 /// }
 /// ```
 ///

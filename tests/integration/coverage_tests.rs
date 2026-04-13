@@ -10,11 +10,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const COUNTER_TEMPLATE_CONTRACT: &str =
-    include_str!("../../src/commands/new/templates/counter/contracts/counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/contracts/Counter.tolk");
 const COUNTER_TEMPLATE_TYPES: &str =
     include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
 const COUNTER_TEMPLATE_WRAPPER: &str =
-    include_str!("../../src/commands/new/templates/counter/tests/wrappers/Counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
 
@@ -58,13 +58,11 @@ fun setupTest(): (Counter, Treasury, Treasury) {
 
 fn build_counter_template_project(name: &str, test_source: &str) -> Project {
     let project = ProjectBuilder::new(name)
-        .contract("counter", COUNTER_TEMPLATE_CONTRACT)
+        .without_acton_toml()
+        .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
-        .file("tests/wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
+        .file("wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
-        .mapping("acton", "./.acton")
-        .mapping("contracts", "contracts")
-        .mapping("wrappers", "tests/wrappers")
         .build();
     project.acton().init().run().success();
     project
@@ -72,13 +70,14 @@ fn build_counter_template_project(name: &str, test_source: &str) -> Project {
 
 fn build_jetton_template_project(name: &str) -> Project {
     let project = ProjectBuilder::new(name)
-        .contract_from_path(
-            "jetton_minter",
-            "src/commands/new/templates/jetton/contracts/jetton-minter-contract.tolk",
+        .without_acton_toml()
+        .file_from_path(
+            "contracts/JettonMinter",
+            "src/commands/new/templates/jetton/contracts/JettonMinter.tolk",
         )
-        .contract_from_path(
-            "jetton_wallet",
-            "src/commands/new/templates/jetton/contracts/jetton-wallet-contract.tolk",
+        .file_from_path(
+            "contracts/JettonWallet",
+            "src/commands/new/templates/jetton/contracts/JettonWallet.tolk",
         )
         .file_from_path(
             "contracts/errors",
@@ -101,20 +100,17 @@ fn build_jetton_template_project(name: &str) -> Project {
             "src/commands/new/templates/jetton/contracts/storage.tolk",
         )
         .file_from_path(
-            "tests/wrappers/JettonMinter",
-            "src/commands/new/templates/jetton/tests/wrappers/JettonMinter.tolk",
+            "wrappers/JettonMinter",
+            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
         )
         .file_from_path(
-            "tests/wrappers/JettonWallet",
-            "src/commands/new/templates/jetton/tests/wrappers/JettonWallet.tolk",
+            "wrappers/JettonWallet",
+            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
         )
         .test_file_from_path(
             "wallet",
             "src/commands/new/templates/jetton/tests/wallet.test.tolk",
         )
-        .mapping("acton", "./.acton")
-        .mapping("contracts", "contracts")
-        .mapping("wrappers", "tests/wrappers")
         .build();
     project.acton().init().run().success();
     project
@@ -147,7 +143,7 @@ fn build_coverage_scope_project(name: &str) -> Project {
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
 
-            get fun `test-coverage-scope`() {
+            get fun `test coverage scope`() {
                 expect(callThroughWrapper(5)).toEqual(6);
             }
         "#,
@@ -177,7 +173,7 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
             import "../../lib/testing/expect"
             import "../code/math"
 
-            get fun `test-partial-coverage`() {
+            get fun `test partial coverage`() {
                 expect(classify(2)).toEqual(1);
             }
         "#,
@@ -210,7 +206,7 @@ fn test_coverage_basic_output() {
             import "../../lib/testing/expect"
             import "../code/math"
 
-            get fun `test-coverage-example`() {
+            get fun `test coverage example`() {
                 val result = add(1, 2);
                 expect(result).toEqual(3);
 
@@ -266,12 +262,12 @@ fn test_coverage_multiple_tests() {
             import "../../lib/testing/expect"
             import "../code/calculator"
 
-            get fun `test-multiply`() {
+            get fun `test multiply`() {
                 val result = multiply(3, 4);
                 expect(result).toEqual(12);
             }
 
-            get fun `test-divide`() {
+            get fun `test divide`() {
                 val result = divide(10, 2);
                 expect(result).toEqual(5);
             }
@@ -317,12 +313,12 @@ fn test_coverage_with_failing_tests() {
             import "../../lib/testing/expect"
             import "../code/validator"
 
-            get fun `test-passing`() {
+            get fun `test passing`() {
                 val result = validate(10);
                 expect(result).toEqual(true);
             }
 
-            get fun `test-failing`() {
+            get fun `test failing`() {
                 val result = validate(10);
                 expect(result).toEqual(false); // This will fail
             }
@@ -372,12 +368,12 @@ fn test_coverage_with_filter() {
             import "../../lib/testing/expect"
             import "../code/helpers"
 
-            get fun `test-unit-double`() {
+            get fun `test unit double`() {
                 val result = double(5);
                 expect(result).toEqual(10);
             }
 
-            get fun `test-integration-triple`() {
+            get fun `test integration triple`() {
                 val result = triple(5);
                 expect(result).toEqual(15);
             }
@@ -404,7 +400,7 @@ fn test_coverage_with_filter() {
     project
         .acton()
         .test()
-        .filter("test-unit-.*")
+        .filter("test unit .*")
         .with_coverage()
         .with_coverage_format("text")
         .run()
@@ -441,7 +437,7 @@ fn test_coverage_lcov_snapshot() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-lcov-snapshot`() {
+            get fun `test lcov snapshot`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -500,12 +496,12 @@ fn test_coverage_exports_files_with_zero_hits() {
             import "../code/main"
             import "../code/unused"
 
-            get fun `test-used-only`() {
+            get fun `test used only`() {
                 val result = used(2);
                 expect(result).toEqual(3);
             }
 
-            get fun `test-unused-helper-reference`() {
+            get fun `test unused helper reference`() {
                 val result = neverCalled(10);
                 expect(result).toEqual(20);
             }
@@ -516,7 +512,7 @@ fn test_coverage_exports_files_with_zero_hits() {
     project
         .acton()
         .test()
-        .filter("test-used-only")
+        .filter("test used only")
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("zero-hit-coverage.txt")
@@ -533,7 +529,7 @@ fn test_coverage_exports_files_with_zero_hits() {
     let output = project
         .acton()
         .test()
-        .filter("test-used-only")
+        .filter("test used only")
         .with_coverage()
         .with_coverage_format("lcov")
         .with_coverage_file("zero-hit-lcov.info")
@@ -573,7 +569,7 @@ fn test_coverage_does_not_mark_function_closing_braces_as_executable() {
             import "../../lib/testing/expect"
             import "../code/helpers"
 
-            get fun `test-touch`() {
+            get fun `test touch`() {
                 touch(5);
                 expect(1).toEqual(1);
             }
@@ -634,7 +630,7 @@ fn test_coverage_empty_functions_snapshot() {
             import "../../lib/testing/expect"
             import "../code/empty_functions"
 
-            get fun `test-empty-functions-coverage`() {
+            get fun `test empty functions coverage`() {
                 singleLineTouched();
                 multiLineTouched();
                 nonEmptyTouched();
@@ -1145,7 +1141,7 @@ fn test_coverage_text_custom_filename() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-custom-filename`() {
+            get fun `test custom filename`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -1203,7 +1199,7 @@ fn test_coverage_text_custom_filename_from_config() {
             import "../../lib/testing/expect"
             import "../code/logic"
 
-            get fun `test-custom-filename`() {
+            get fun `test custom filename`() {
                 val result1 = and(true, true);
                 expect(result1).toEqual(true);
 
@@ -1320,7 +1316,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
             "integration/snapshots/test_coverage_scope_with_tests.txt",
         )
         .assert_file_contains("with-tests.txt", "tests/test.test.tolk")
-        .assert_file_contains("with-tests.txt", "test-coverage-scope");
+        .assert_file_contains("with-tests.txt", "test coverage scope");
 }
 
 #[test]
@@ -1351,7 +1347,7 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
 
-            get fun `test-config-coverage-scope`() {
+            get fun `test config coverage scope`() {
                 expect(callThroughWrapper(5)).toEqual(6);
             }
         "#,
@@ -1391,7 +1387,7 @@ fn test_coverage_text_output_write_error_is_non_zero() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-coverage-text-write-error`() {
+            get fun `test coverage text write error`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -1502,7 +1498,7 @@ fn test_coverage_lcov_output_write_error_is_non_zero() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-coverage-lcov-write-error`() {
+            get fun `test coverage lcov write error`() {
                 expect(1).toEqual(1);
             }
         "#,

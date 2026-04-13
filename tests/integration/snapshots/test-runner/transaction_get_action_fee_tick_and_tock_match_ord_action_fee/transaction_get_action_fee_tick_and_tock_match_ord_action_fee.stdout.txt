@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/transaction_tick_tock.test.tolk (1 test)
-  ✓ ck-transaction-get-action-fee-tick-and-tock [TIME]
+  ✓ ck transaction get action fee tick and tock [TIME]
 
  ✓ 1 passed in 1 file

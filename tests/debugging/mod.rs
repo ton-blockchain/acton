@@ -22,6 +22,7 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
+use tolkc::abi::ContractABI as CompilerContractABI;
 use tolkc::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
@@ -169,7 +170,7 @@ pub(crate) fn run_script_file(
 ) -> anyhow::Result<String> {
     let script_path = Path::new(file_path);
 
-    let (abi, code_cell, source_map) = {
+    let (abi, compiler_abi, code_cell, source_map) = {
         let _compile_guard = DEBUG_COMPILER_LOCK
             .lock()
             .expect("debug compiler lock poisoned");
@@ -193,8 +194,9 @@ pub(crate) fn run_script_file(
                     &code,
                     result.debug_mark_base64.as_deref(),
                 )?);
+                let compiler_abi: Option<Arc<CompilerContractABI>> = result.abi.map(Arc::new);
 
-                (abi, code_cell, source_map)
+                (abi, compiler_abi, code_cell, source_map)
             }
             CompilerResult::Error(error) => {
                 anyhow::bail!("Cannot compile script file {}", error.message)
@@ -207,6 +209,7 @@ pub(crate) fn run_script_file(
         &code_cell,
         &data_cell,
         abi.into(),
+        compiler_abi,
         source_map,
         debug_port,
         debug_listener,
@@ -221,6 +224,7 @@ fn execute_script<'a>(
     code_cell: &'a TonCell,
     data_cell: &'a TonCell,
     abi: Arc<ContractAbi>,
+    compiler_abi: Option<Arc<CompilerContractABI>>,
     source_map: Arc<TolkSourceMap>,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
@@ -320,7 +324,8 @@ fn execute_script<'a>(
         start_dap_server(debug_port)?
     };
     executor.prepare(0, &stack)?;
-    let replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+    let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
+    replayer.set_compiler_abi(compiler_abi);
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 

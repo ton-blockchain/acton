@@ -130,7 +130,7 @@ fn test_check_acton_import_rule_is_disabled_for_test_files() {
             r#"
                 import "../.acton/tlb/maybe.tolk";
 
-                fun test_noop() {
+                get fun `test noop`() {
                     val maybeValue = Maybe<int>.none();
                     maybeValue.unwrapOr(0);
                 }

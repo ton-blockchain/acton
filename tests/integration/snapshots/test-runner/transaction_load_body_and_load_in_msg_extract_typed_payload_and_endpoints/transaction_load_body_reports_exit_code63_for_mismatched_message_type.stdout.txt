@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/transaction_helpers.test.tolk (1 test)
-  ✓ am-transaction-load-body-mismatch [TIME]
+  ✓ am transaction load body mismatch [TIME]
 
  ✓ 1 passed in 1 file

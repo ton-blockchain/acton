@@ -5,6 +5,6 @@
  TEST  [ROOT]
 
  > tests/replace_world_state_snapshot.test.tolk (1 test)
-  ✓ load-world-state-snapshot-replaces-current-state [TIME]
+  ✓ load world state snapshot replaces current state [TIME]
 
  ✓ 1 passed in 1 file

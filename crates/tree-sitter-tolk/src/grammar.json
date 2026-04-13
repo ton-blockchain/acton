@@ -4339,7 +4339,7 @@
               },
               {
                 "type": "PATTERN",
-                "value": "[0-9a-fA-F]+"
+                "value": "[0-9a-fA-F_]+"
               }
             ]
           },
@@ -4352,13 +4352,13 @@
               },
               {
                 "type": "PATTERN",
-                "value": "[01]+"
+                "value": "[01_]+"
               }
             ]
           },
           {
             "type": "PATTERN",
-            "value": "[0-9]+"
+            "value": "[0-9][0-9_]*"
           }
         ]
       }

@@ -20,8 +20,10 @@ val point = Point { x: 10, y: 20 };
 println(point); // Output: Point { x: 10, y: 20 }
 
 // Formatted output
-println1("Iteration: {}", 5);
-println2("Transfer {} to {}", amount, myAddress);
+println("Iteration: {}", 5);
+println("Transfer {} to {}", amount, myAddress);
+println("hello", "world");
+println(1, 2);
 
 // Error logging
 eprintln("Critical failure in setup!");
@@ -32,10 +34,22 @@ eprintln("Critical failure in setup!");
 ## `println`
 
 ```tolk
-fun println<T>(value: T): void
+fun println<T1, T2 = void, T3 = void, T4 = void, T5 = void, T6 = void>(
+    value1: T1,
+    value2: T2,
+    value3: T3,
+    value4: T4,
+    value5: T5,
+    value6: T6,
+): void
 ```
 
-Prints the given value to the standard output.
+Prints up to 6 values to the standard output.
+
+If the first argument is a `string`, `println` tries to interpret it as a format string.
+Placeholder-consumed arguments are rendered into that string, and any remaining arguments
+are appended separated by spaces. If the string is not a valid format string, it is printed
+literally and the remaining arguments are still appended separated by spaces.
 
 Example:
 ```tolk
@@ -44,116 +58,29 @@ println("Hello, world!");
 println((1, 2, 3));
 println(Data {
     value: 10,
-    is_set: true
+    isSet: true
 });
+
+println("Hello, 0x{:x}", 10);
+println("{} -> {}", "from", "to");
+println("value {}", 42);
+println(1, 2);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L39" />
-
-## `println1`
-
-```tolk
-fun println1<T>(fmt: string, value: T): void
-```
-
-Prints the given value to the standard output formatted according to format string.
-
-Example:
-```tolk
-println1("Hello, 0x{:x}", 10);
-```
-
-Format supports the following placeholders:
+Format supports the following placeholders when the first argument is a string:
 - `{}` - default formatter output
 - `{:x}` - formats an int as lowercase hexadecimal without `0x` prefix
 - `{:ton}` - formats an int amount in nanotons as `<value> TON`
 
 Notes:
 - Escape literal braces with `{{` and `}}`.
-- Invalid format strings fail at runtime with parser errors that include byte positions
-  (for example: unknown modifiers, unsupported placeholder payload, unclosed `{`,
-  unmatched `}`).
+- If the first string is an invalid format string, it is printed literally.
 - If placeholders outnumber arguments, unmatched placeholders stay in output as text.
-- If arguments outnumber placeholders, extra arguments are ignored.
+- If arguments outnumber placeholders, extra arguments are appended after the formatted text.
 - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
 - `{:ton}` uses floating-point conversion, so very large values can be rounded.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L64" />
-
-## `println2`
-
-```tolk
-fun println2<T1, T2>(fmt: string, value1: T1, value2: T2): void
-```
-
-Prints the given values to the standard output formatted according to format string.
-
-Uses the same placeholder rules and edge-case behavior as [println1](#println1).
-
-Example:
-```tolk
-println2("{} -> {}", "from", "to");
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L76" />
-
-## `println3`
-
-```tolk
-fun println3<T1, T2, T3>(fmt: string, value1: T1, value2: T2, value3: T3): void
-```
-
-Prints the given values to the standard output formatted according to format string.
-
-Uses the same placeholder rules and edge-case behavior as [println1](#println1).
-
-Example:
-```tolk
-println3("{} + {} = {}", 2, 3, 5);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L88" />
-
-## `println4`
-
-```tolk
-fun println4<T1, T2, T3, T4>(fmt: string, value1: T1, value2: T2, value3: T3, value4: T4): void
-```
-
-Prints the given values to the standard output formatted according to format string.
-
-Uses the same placeholder rules and edge-case behavior as [println1](#println1).
-
-Example:
-```tolk
-println4("{} {} {} {}", "a", "b", "c", "d");
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L100" />
-
-## `println5`
-
-```tolk
-fun println5<T1, T2, T3, T4, T5>(
-    fmt: string,
-    value1: T1,
-    value2: T2,
-    value3: T3,
-    value4: T4,
-    value5: T5,
-): void
-```
-
-Prints the given values to the standard output formatted according to format string.
-
-Uses the same placeholder rules and edge-case behavior as [println1](#println1).
-
-Example:
-```tolk
-println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L112" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L63" />
 
 ## `eprintln`
 
@@ -161,12 +88,12 @@ println5("{} {} {} {} {}", 1, 2, 3, 4, 5);
 fun eprintln(str: string): void
 ```
 
-Prints the given slice string to the standard error output.
+Prints the given string to the standard error output.
 
 Example:
 ```tolk
 eprintln("Something went wrong");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L129" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L93" />
 

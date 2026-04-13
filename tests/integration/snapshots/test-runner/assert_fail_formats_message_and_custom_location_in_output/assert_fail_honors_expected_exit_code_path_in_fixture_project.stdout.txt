@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/bv_assert_fail_expected_exit_path.test.tolk (1 test)
-  ✓ bv-assert-fail-expected-exit [TIME]
+  ✓ bv assert fail expected exit [TIME]
 
  ✓ 1 passed in 1 file

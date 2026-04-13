@@ -38,7 +38,7 @@ fn maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics() {
     run_maybe_success(
         "aa-stdlib-maybe-some-none-unwrap-semantics",
         r"
-get fun `test-maybe-some-none-unwrap-semantics`() {
+get fun `test maybe some none unwrap semantics`() {
     val empty = Maybe<int>.none();
     val present = Maybe<int>.some(17);
 

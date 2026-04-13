@@ -520,7 +520,11 @@ fn check_contract(
     }
 
     if options.is_plain_report {
-        println!("    {} {}", "Checking".green().bold(), config.name,);
+        println!(
+            "    {} {}",
+            "Checking".green().bold(),
+            config.display_name(contract_id),
+        );
     }
 
     let source_path = Path::new(&config.src);

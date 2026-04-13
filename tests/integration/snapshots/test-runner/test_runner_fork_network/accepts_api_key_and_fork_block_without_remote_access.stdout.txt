@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/smoke.test.tolk (1 test)
-  ✓ local-smoke [TIME]
+  ✓ local smoke [TIME]
 
  ✓ 1 passed in 1 file

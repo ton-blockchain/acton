@@ -44,7 +44,7 @@ CONFIGURATION
        Scripts are defined in Acton.toml:
 
            [scripts]
-           deploy = "acton script scripts/deploy.tolk --broadcast"
+           deploy = "acton script scripts/deploy.tolk --net testnet"
            test-unit = "acton test tests/unit"
            custom-task = "echo 'Running custom task...'"
 
@@ -66,6 +66,9 @@ BEHAVIOR
        o  arguments after _script_ are forwarded even when they start with -;
           use -- only as an optional visual separator if you prefer
 
+       o  forwarded arguments are appended literally, so avoid passing the same
+          single-use flag twice if the configured command already includes it
+
        o  Acton does not guard against recursive script aliases; avoid scripts
           that call themselves through acton run
 
@@ -83,7 +86,7 @@ EXAMPLES
 
        2. Append extra arguments:
 
-              acton run deploy --net mainnet
+              acton run deploy --explorer tonviewer
 
        3. Run a custom shell task:
 
@@ -91,7 +94,7 @@ EXAMPLES
 
        4. Use -- as an explicit separator if you prefer:
 
-              acton run deploy -- --net testnet
+              acton run deploy -- --show-bodies
 
 SEE ALSO
        o  acton help script

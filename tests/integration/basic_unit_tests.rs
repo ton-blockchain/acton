@@ -15,7 +15,7 @@ fn test_passing_test() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-pass`() {
+            get fun `test pass`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -38,7 +38,7 @@ fn test_failing_test() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-fail`() {
+            get fun `test fail`() {
                 expect(1).toEqual(2);
             }
         "#,
@@ -61,11 +61,11 @@ fn test_multiple_passing_tests() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-pass-1`() {
+            get fun `test pass 1`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-pass-2`() {
+            get fun `test pass 2`() {
                 expect(2).toEqual(2);
             }
         "#,

@@ -6,7 +6,7 @@
 /// Examples:
 /// ```tolk
 /// // Mock time
-/// vm.setTime(1700000000);
+/// vm.setTime(1_700_000_000);
 ///
 /// // Register a mock library
 /// vm.registerLibrary(myLibCell);
@@ -15,6 +15,7 @@
 /// val rawActions = vm.getC5();
 /// ```
 import "../ffi/ffi"
+import "../testing/assert"
 
 /// Holds the methods to change the VM state.
 struct vm
@@ -170,6 +171,25 @@ fun vm.cellFromHex(cellHex: string): cell {
     return ffi.cellFromHex(cellHex);
 }
 
+
+/// Parse a decimal string into an int value.
+///
+/// Accepts optional leading `-` sign followed by decimal digits.
+/// Invalid input (non-numeric characters, empty string) fails with an error.
+///
+/// Example:
+/// ```tolk
+/// val n = vm.parseInt("12345");
+/// val negative = vm.parseInt("-42");
+/// ```
+fun vm.parseInt(x: string): int {
+    val n = ffi.parseInt(x);
+    if (n == null) {
+        throw ASSERTION_FAILED;
+    }
+    return n;
+}
+
 fun ffi.registerLibrary(cell: cell): void
     asm "18 EXTCALL"
 
@@ -178,3 +198,6 @@ fun ffi.convertAddress(addr: string): cell
 
 fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"
+
+fun ffi.parseInt(x: string): int?
+    asm "47 EXTCALL"

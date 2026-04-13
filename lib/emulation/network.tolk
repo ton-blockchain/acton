@@ -20,6 +20,7 @@
 
 import "@stdlib/gas-payments"
 import "@stdlib/reflection"
+import "../crypto/crypto"
 import "../fmt"
 import "../ffi/ffi"
 import "../testing/assert"
@@ -131,7 +132,7 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
             val opcodeTypeName = ffi.typeNameByOpcode(opcode);
 
             Assert.fail(
-                format4(
+                format(
                     "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
                     reflect.typeNameOf<Msg>(),
                     reflect.serializationPrefixOf<Msg>().0,
@@ -237,7 +238,7 @@ fun TxCursor.executeFrom(self): SendResultList {
 /// This method is useful when broadcasting transactions to the real network.
 /// It polls the network until the transaction is applied or the maximum number of attempts is reached.
 ///
-/// In emulation mode (without `--broadcast`), this method returns immediately with `true`.
+/// In emulation mode (without `--net`), this method returns immediately with `true`.
 ///
 /// Returns `true` if transaction is found and `false` otherwise.
 ///
@@ -505,7 +506,7 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
 ///
 /// Example:
 /// ```tolk
-/// get fun `test-send-message`() {
+/// get fun `test send message`() {
 ///     // ...
 ///     val message = createMessage({
 ///         bounce: false,
@@ -552,14 +553,14 @@ fun net.sendIter(from: address, message: OutMessage): TxCursor {
 ///
 /// Example:
 /// ```tolk
-/// val bounced_msg = createMessage({
+/// val bouncedMsg = createMessage({
 ///     bounce: false,
 ///     value: ton("0.95"),
-///     dest: deployer_jetton_wallet.address,
+///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
 ///
-/// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+/// net.sendSingle(notDeployer.address, bouncedMsg);
 /// ```
 ///
 /// See [net.send] if you need to send a message and process out messages.
@@ -655,14 +656,14 @@ fun net.runTickTock(onAccount: address, isTock: bool): SendResultList {
 ///
 /// Example:
 /// ```tolk
-/// val bounced_msg = createMessage({
+/// val bouncedMsg = createMessage({
 ///     bounce: false,
 ///     value: ton("0.95"),
-///     dest: deployer_jetton_wallet.address,
+///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
 ///
-/// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
+/// net.sendSingle(notDeployer.address, bouncedMsg);
 /// ```
 fun OutMessage.bounced(self): OutMessage {
     var msg = (self.messageCell as Cell<MessageRelaxedGeneric>).load();
@@ -683,7 +684,7 @@ struct Treasury {
 ///
 /// Example:
 /// ```tolk
-/// get fun `test-mint`() {
+/// get fun `test mint`() {
 ///     val treasury = net.treasury("treasury");
 ///     // ...
 /// }
@@ -720,9 +721,9 @@ struct Wallet {
 
 /// Creates a new wallet for use in scripts. Unlike `net.treasury`, the wallet
 /// can refer to a real wallet described in Acton.toml, and therefore can be used
-/// in scripts with `--broadcast` to execute transactions on the real blockchain.
+/// in scripts launched with `--net` to execute transactions on the real blockchain.
 ///
-/// Without `--broadcast`, the wallet refers to an internal wallet, created in the
+/// Without `--net`, the wallet refers to an internal wallet, created in the
 /// same way as in `net.treasury`.
 ///
 /// Note: in tests, use [net.treasury].
@@ -731,16 +732,16 @@ struct Wallet {
 /// ```tolk
 /// /// Script that deploys a counter contract using a wallet to real blockchain.
 /// fun main() {
-///    val deployer = net.wallet("deployer");
-///    val counter = Counter.fromStorage(Storage {
-///        id: 8,
-///        counter: 0,
-///    });
+///     val deployer = net.wallet("deployer");
+///     val counter = Counter.fromStorage({
+///         id: 8,
+///         counter: 0,
+///     });
 ///
-///    val result = counter.deploy(deployer.address, ton("0.05"));
-///    result.wait();
+///     val result = counter.deploy(deployer.address, ton("0.05"));
+///     result.wait();
 ///
-///    println1("Deployed counter to {}", counter.address);
+///     println("Deployed counter to {}", counter.address);
 /// }
 /// ```
 fun net.wallet(name: string): Wallet {
@@ -757,9 +758,59 @@ fun net.wallet(name: string): Wallet {
     return Wallet { address: net.treasury(name).address };
 }
 
+/// Returns the key pair for a wallet configured in wallets.toml or global.wallets.toml.
+///
+/// The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign]
+/// and [crypto.rawSign]. This is available only for wallets opened by
+/// [net.wallet] when the script was started with `--net`.
+fun Wallet.toKeyPair(self): KeyPair {
+    val keyPair = ffi.getWalletKeyPair(self.address);
+    if (keyPair == null) {
+        Assert.fail("Wallet keys are available only for configured wallets opened with `net.wallet()` in scripts started with `--net`");
+        throw 1;
+    }
+
+    val [privateKey, publicKey] = keyPair;
+    return KeyPair { privateKey, publicKey };
+}
+
+/// Returns the wallet private key as a 32-byte Ed25519 seed.
+fun Wallet.privateKey(self): int {
+    return self.toKeyPair().privateKey;
+}
+
+/// Returns the wallet public key.
+fun Wallet.publicKey(self): int {
+    return self.toKeyPair().publicKey;
+}
+
+/// Returns the wallet id used by the opened wallet contract.
+///
+/// For wallet v5 this is the wallet_id stored in wallet data and used for
+/// signed requests.
+fun Wallet.walletId(self): int {
+    val walletId = ffi.getWalletId(self.address);
+    if (walletId == null) {
+        Assert.fail("Wallet id is available only for configured wallets opened with `net.wallet()` in scripts started with `--net`");
+        throw 1;
+    }
+
+    return walletId;
+}
+
+/// Hashes and signs a cell with the wallet private key.
+fun Wallet.sign(self, data: cell): slice {
+    return crypto.sign(self.privateKey(), data);
+}
+
+/// Signs an already computed 256-bit hash with the wallet private key.
+fun Wallet.rawSign(self, data: int): slice {
+    return crypto.rawSign(self.privateKey(), data);
+}
+
 /// Check if the script is running in broadcasting mode.
 ///
-/// Returns `true` if the script was run with `--broadcast` flag, `false` otherwise.
+/// Returns `true` if the script was run with `--net`, `false` otherwise.
 ///
 /// This is useful for writing scripts that behave differently in emulation and broadcasting modes.
 ///
@@ -781,7 +832,7 @@ fun net.isBroadcasting(): bool {
 /// Useful for testing broadcasting logic in emulation mode.
 /// It toggles only the runtime broadcast flag.
 ///
-/// Wallets are loaded once at startup (when the script is launched with CLI `--broadcast`).
+/// Wallets are loaded once at startup (when the script is launched with CLI `--net`).
 /// Calling [net.enableBroadcast] later does not load wallets, so [net.wallet] can still fail
 /// and wallet-backed real sends can remain unavailable.
 ///
@@ -862,7 +913,7 @@ fun net.disableBroadcast(): void {
 /// get fun get_all_data(): (int, slice) { ... }
 /// ```
 /// ```tolk
-/// val data: tuple = net.runGetMethod(wallet.address, "get_all_data");
+/// val data = net.runGetMethod<tuple>(wallet.address, "get_all_data");
 /// val first = data.get(0) as int;
 /// val second = data.get(1) as int;
 /// ```
@@ -895,12 +946,12 @@ fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? 
 /// ```tolk
 /// fun JettonWallet.getJettonBalance(self): coins {
 ///     if (!net.isDeployed(self.address)) {
-///         return 0 // return 0 if contract is not deployed
+///         return 0; // return 0 if contract is not deployed
 ///     }
 ///
 ///     // and if deployed, actually run get method
-///     val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
-///     return result.jettonBalance
+///     val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+///     return result.jettonBalance;
 /// }
 /// ```
 fun net.isDeployed(addr: address): bool {
@@ -966,7 +1017,7 @@ fun net.waitForTransaction(
 /// Example:
 /// ```tolk
 /// val address = net.randomAddress("random_user");
-/// val masterchain_address = net.randomAddress("random_user", -1);
+/// val masterchainAddress = net.randomAddress("random_user", -1);
 /// ```
 fun net.randomAddress(name: string? = null, wc: int = 0): address {
     var builder = beginCell();
@@ -1036,7 +1087,7 @@ fun net.registerCodeCell(code: cell, name: string): void {
 /// ```tolk
 /// val state = net.getAccountState(contract.address);
 /// if (state != null) {
-///     println1("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:ton}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -1056,9 +1107,9 @@ fun net.getAccountState(addr: address): AccountInfo? {
 ///
 /// Example:
 /// ```tolk
-/// val storage_fee = net.getAccountStorageFee(contract.address, 86400); // 1 day
-/// if (storage_fee != null) {
-///     println1("Daily storage fee: {:ton}", storage_fee);
+/// val storageFee = net.getAccountStorageFee(contract.address, 86400); // 1 day
+/// if (storageFee != null) {
+///     println("Daily storage fee: {:ton}", storageFee);
 /// }
 /// ```
 fun net.getAccountStorageFee(addr: address, seconds: int): coins? {
@@ -1095,8 +1146,8 @@ fun net.fetchAndRegisterLibrary(hash: string): bool {
 ///
 /// Example:
 /// ```tolk
-/// val future_time = net.now() + 1000; // 1000 seconds from now
-/// net.setNow(future_time);
+/// val futureTime = net.now() + 1000; // 1000 seconds from now
+/// net.setNow(futureTime);
 /// ```
 fun net.setNow(now: uint32): void {
     // Update C7[0][3] (unixtime) FIRST so blockchain.now() stays in sync
@@ -1111,8 +1162,8 @@ fun net.setNow(now: uint32): void {
 ///
 /// Example:
 /// ```tolk
-/// val current_time = net.now();
-/// println1("Current emulation time: {}", current_time);
+/// val currentTime = net.now();
+/// println("Current emulation time: {}", currentTime);
 /// ```
 fun net.now(): uint32 {
     return ffi.getNow();
@@ -1144,7 +1195,7 @@ fun net.topUp(to: address, amount: coins): void {
 /// Example:
 /// ```tolk
 /// val balance = net.balance(address);
-/// println1("{:ton}", balance);
+/// println("{:ton}", balance);
 /// ```
 fun net.balance(of: address): coins {
     val state = net.getAccountState(of);
@@ -1205,7 +1256,7 @@ fun net.setAccount(addr: address, acc: Account): void {
 /// ```tolk
 /// val shard = net.getShardAccount(addr);
 /// if (shard != null) {
-///     println1("Last LT: {}", shard.lastTransLt);
+///     println("Last LT: {}", shard.lastTransLt);
 /// }
 /// ```
 fun net.getShardAccount(addr: address): ShardAccount? {
@@ -1346,17 +1397,18 @@ fun net.setConfig(config: Config): bool {
 /// val storagePrices = config.getStoragePrices();
 /// val globalVersion = config.getGlobalVersion();
 ///
-/// println(format1("Network version: {}", globalVersion.version));
+/// println("Network version: {}", globalVersion.version);
 /// ```
 fun net.getConfig(): Config {
     return createMapFromLowLevelDict(ffi.getConfig());
 }
 
-/// Calculate the CRC16 checksum of a slice.
+/// Calculate the CRC16 checksum of a string.
+/// Unlike a compile-time `"str".crc16()` method, it works with non-constant strings.
 ///
 /// Example:
 /// ```tolk
-/// val crc = crc16("hello");
+/// val crc = crc16(someStr);
 /// ```
 fun crc16(data: string): int asm "13 EXTCALL"
 
@@ -1423,7 +1475,7 @@ fun impl.runGetMethodById<Ret, Args = tuple>(
     } catch (e) {
         if (e == 7) {
             Assert.fail(
-                format3(
+                format(
                     "Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.",
                     name,
                     res,
@@ -1475,6 +1527,8 @@ fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
 fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
 fun ffi.getWalletByName(name: string): cell? asm "24 EXTCALL"
+fun ffi.getWalletKeyPair(addr: address): [int, int]? asm "45 EXTCALL"
+fun ffi.getWalletId(addr: address): int? asm "46 EXTCALL"
 fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
 fun ffi.enableBroadcast(): void asm "26 EXTCALL"
 fun ffi.disableBroadcast(): void asm "27 EXTCALL"

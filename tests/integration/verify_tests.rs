@@ -113,7 +113,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.contract]
-name = "contract"
+display-name = "contract"
 src = "contracts/contract.boc"
 depends = []
 "#;
@@ -140,7 +140,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.contract]
-name = "contract"
+display-name = "contract"
 src = "contracts/contract.fc"
 depends = []
 "#;
@@ -272,7 +272,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "Simple"
+display-name = "Simple"
 src = "contracts/simple.tolk"
 "#;
     std::fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");

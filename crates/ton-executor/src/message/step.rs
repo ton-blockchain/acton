@@ -11,7 +11,7 @@
 //! use ton_executor::ExecutorVerbosity;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let exec = StepExecutor::new()?;
+//! let exec = StepExecutor::new(None)?;
 //!
 //! let msg = "te6ccg..."; // Base64 message BoC
 //! let shard_account = "te6ccg..."; // Base64 shard account BoC
@@ -71,9 +71,11 @@ pub struct PrepareResult {
 
 impl StepExecutor {
     /// Creates a new `StepExecutor` instance.
-    pub fn new() -> anyhow::Result<Self> {
-        let config_cstr =
-            CString::new(DEFAULT_CONFIG).context("DEFAULT_CONFIG contains null bytes")?;
+    ///
+    /// If `config_b64` is `None`, the default config is used.
+    pub fn new(config_b64: Option<&str>) -> anyhow::Result<Self> {
+        let config_b64 = config_b64.unwrap_or(DEFAULT_CONFIG);
+        let config_cstr = CString::new(config_b64).context("config contains null bytes")?;
         // SAFETY: `create_emulator` is safe function
         let emulator_ptr = unsafe { create_emulator(config_cstr.as_ptr(), 5) };
         let inner = NonNull::new(emulator_ptr).context("create_emulator returned null")?;

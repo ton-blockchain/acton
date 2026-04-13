@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/aj_vm_helpers.test.tolk (1 test)
-  ✗ aj-stdlib-vm-cell-from-hex-invalid [TIME]
+  ✗ aj stdlib vm cell from hex invalid [TIME]
     └─ Error: Failed to decode cell hex deadbeef: unexpected EOF
 
  ✗ 1 failed in 1 file

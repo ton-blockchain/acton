@@ -233,7 +233,7 @@ fn load_local_contract_candidate(
             .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
         return Ok(LocalContractCandidate {
             contract_id: contract_id.to_owned(),
-            contract_name: contract.name.clone(),
+            contract_name: contract.display_name_owned(contract_id),
             code_hash: *code.repr_hash(),
             abi: None,
             compiler_abi: None,
@@ -270,7 +270,7 @@ fn load_local_contract_candidate(
 
     Ok(LocalContractCandidate {
         contract_id: contract_id.to_owned(),
-        contract_name: contract.name.clone(),
+        contract_name: contract.display_name_owned(contract_id),
         code_hash: *code.repr_hash(),
         abi: Some(abi),
         compiler_abi,

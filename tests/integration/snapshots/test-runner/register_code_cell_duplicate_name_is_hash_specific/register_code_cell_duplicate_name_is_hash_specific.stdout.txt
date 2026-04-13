@@ -10,7 +10,7 @@
  TEST  [ROOT]
 
  > tests/cr_register_code_duplicate_name.test.tolk (1 test)
-  ✓ cr-register-code-cell-duplicate-name-hash-specific [TIME]
+  ✓ cr register code cell duplicate name hash specific [TIME]
     └─ Test output:
        N/A -> cr_duplicate_name_deployer A
        └── empty 0.2 TON -> cr_duplicate_name B                                        gas=253

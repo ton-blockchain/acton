@@ -6,8 +6,8 @@
      Running tests
 xx
 
-FAIL test-should-increase-counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
+FAIL test should increase counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
   tests/counter.test[LINE]
 
-FAIL test-should-reset-counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
+FAIL test should reset counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
   tests/counter.test[LINE]

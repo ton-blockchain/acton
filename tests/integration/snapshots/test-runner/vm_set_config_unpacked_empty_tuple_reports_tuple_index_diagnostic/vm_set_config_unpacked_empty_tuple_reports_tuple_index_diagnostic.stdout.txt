@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/dl_vm_set_config_unpacked_malformed.test.tolk (1 test)
-  ✗ dl-vm-set-config-unpacked-empty-tuple-diagnostic [TIME]
+  ✗ dl vm set config unpacked empty tuple diagnostic [TIME]
     └─ exit_code=5
       ├─ Re-run with --backtrace full to get more information
       ├─ Range check error — an integer is out of its expected range

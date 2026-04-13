@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/cu_out_messages_consistency.test.tolk (1 test)
-  ✓ cu-fixture-out-messages-atcell-at-consistency [TIME]
+  ✓ cu fixture out messages atcell at consistency [TIME]
 
  ✓ 1 passed in 1 file

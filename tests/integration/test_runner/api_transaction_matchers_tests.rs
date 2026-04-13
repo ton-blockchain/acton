@@ -75,7 +75,7 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
         r#"
             {TEST_IMPORTS}
 
-            get fun `test-compute-phase-skipped-filter`() {{
+            get fun `test compute phase skipped filter`() {{
                 val sender = net.treasury("sender");
                 val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
@@ -120,7 +120,7 @@ fn to_have_and_not_have_tx_by_body() {
         r#"
             {TEST_IMPORTS}
 
-            get fun `test-body-filter`() {{
+            get fun `test body filter`() {{
                 val init = ContractState {{
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -178,7 +178,7 @@ fn to_have_and_not_have_tx_by_opcode() {
         r#"
             {TEST_IMPORTS}
 
-            get fun `test-opcode-filter`() {{
+            get fun `test opcode filter`() {{
                 val init = ContractState {{
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -227,7 +227,7 @@ fn find_transaction_by_explicit_opcode_without_generic() {
         r#"
             {TEST_IMPORTS}
 
-            get fun `test-find-transaction-opcode-filter`() {{
+            get fun `test find transaction opcode filter`() {{
                 val init = ContractState {{
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -279,7 +279,7 @@ fn to_have_tx_with_bounced_opcode_prefix() {
         r#"
             {TEST_IMPORTS}
 
-            get fun `test-bounced-opcode-filter`() {{
+            get fun `test bounced opcode filter`() {{
                 val init = ContractState {{
                     code: build("simple"),
                     data: createEmptyCell(),

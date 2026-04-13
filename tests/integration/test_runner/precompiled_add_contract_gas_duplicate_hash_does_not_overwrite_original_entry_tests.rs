@@ -25,7 +25,7 @@ fn precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry
     run_config_success_case(
         "du-stdlib-precompiled-duplicate-hash-no-overwrite",
         r"
-get fun `test-du-stdlib-precompiled-duplicate-hash-no-overwrite`() {
+get fun `test du stdlib precompiled duplicate hash no overwrite`() {
     var precompiled = PrecompiledContractsConfig {
         list: createEmptyMap<uint256, PrecompiledSmartContract>(),
     };

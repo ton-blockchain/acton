@@ -63,11 +63,11 @@ fn test_unknown_get_method_call() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -89,11 +89,11 @@ fn test_unknown_get_method_call_with_backtrace_full() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -119,11 +119,11 @@ fn test_get_method_call_return_type_mismatch() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<address, tuple>(counter.address, "getCell");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -147,11 +147,11 @@ fn test_no_arg_get_method_call() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter2");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -173,11 +173,11 @@ fn test_no_arg_get_method_call_2() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -199,11 +199,11 @@ fn test_no_arg_get_method_call_2_with_backtrace_full() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -228,11 +228,11 @@ fn test_get_method_call_shows_exit_code_variant() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
             .as_str(),
@@ -256,11 +256,11 @@ fn test_get_method_call_shows_backtrace_with_full_mode() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
                 .as_str(),
@@ -289,11 +289,11 @@ fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
             (TEST_PREPARE.to_string()
                 + r#"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
                 val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
-                println(format1("Counter: {}", counterRes));
+                println("Counter: {}", counterRes);
             }
         "#)
                 .as_str(),
@@ -315,7 +315,7 @@ fn test_debug_dump_stack_output() {
         .test_file(
             "test",
             r"
-            get fun `test-debug-dump-stack-output`() {
+            get fun `test debug dump stack output`() {
                 debug.dumpStack();
             }
         ",
@@ -341,7 +341,7 @@ fn test_debug_dump_stack_output_mixed_with_stdout_and_stderr() {
             r#"
             import "../../lib/io"
 
-            get fun `test-debug-dump-stack-mixed-output`() {
+            get fun `test debug dump stack mixed output`() {
                 println("before");
                 debug.dumpStack();
                 println("after");
@@ -371,7 +371,7 @@ fn test_debug_dump_stack_output_multiple_debug_lines() {
         .test_file(
             "test",
             r#"
-            get fun `test-debug-dump-stack-multiple-debug-lines`() {
+            get fun `test debug dump stack multiple debug lines`() {
                 debug.printString("dbg-line");
                 debug.dumpStack();
             }
@@ -446,7 +446,7 @@ fn test_test_invalid_filter_regex() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 // test
             }
         ",
@@ -471,7 +471,7 @@ fn test_test_invalid_exclude_pattern() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 // test
             }
         ",
@@ -496,7 +496,7 @@ fn test_test_invalid_include_pattern() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 // test
             }
         ",
@@ -521,7 +521,7 @@ fn test_test_invalid_coverage_format() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 // test
             }
         ",
@@ -547,7 +547,7 @@ fn test_test_invalid_reporter() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 // test
             }
         ",
@@ -572,7 +572,7 @@ fn test_invalid_test_file_syntax() {
         .test_file(
             "test",
             r"
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 let a = 10;
             }
         ",
@@ -598,7 +598,7 @@ fn test_build_unknown_file() {
             r#"
             import "../../lib/build/build"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val cell = build("counter", "unknown.tolk")
             }
         "#,
@@ -622,7 +622,7 @@ fn test_build_unknown_contract() {
             r#"
             import "../../lib/build/build"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val cell = build("counter")
             }
         "#,
@@ -648,7 +648,7 @@ fn test_run_get_method_of_not_deployed_contract() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
                 val res: int = net.runGetMethod(address, "counter");
                 println(res);
@@ -678,7 +678,7 @@ fn test_run_get_method_of_not_deployed_contract_with_backtrace_full() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
                 val res: int = net.runGetMethod(address, "counter");
                 println(res);
@@ -709,7 +709,7 @@ fn test_send_message_to_not_deployed_contract() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val sender = net.treasury("treasury");
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
@@ -747,7 +747,7 @@ fn test_send_message_to_not_deployed_contract_with_register() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val sender = net.treasury("treasury");
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
                 net.registerAddress(address, "some unknown contract");
@@ -786,7 +786,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val deployer = net.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
@@ -833,7 +833,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full()
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val deployer = net.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
@@ -881,7 +881,7 @@ fn test_send_invalid_message() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val deployer = net.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
@@ -928,7 +928,7 @@ fn test_debug_logs_in_contract() {
             import "../../lib/build/build"
             import "../../lib/emulation/network"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -966,8 +966,8 @@ fn test_filter_all_test() {
         .test_file(
             "test",
             r"
-                get fun `test-foo`() {}
-                get fun `test-bar`() {}
+                get fun `test foo`() {}
+                get fun `test bar`() {}
             ",
         )
         .build()
@@ -986,15 +986,15 @@ fn test_filter_all_test_with_several_test_files() {
         .test_file(
             "test",
             r"
-                get fun `test-foo`() {}
-                get fun `test-bar`() {}
+                get fun `test foo`() {}
+                get fun `test bar`() {}
             ",
         )
         .test_file(
             "test2",
             r"
-                get fun `test-baz`() {}
-                get fun `test-qux`() {}
+                get fun `test baz`() {}
+                get fun `test qux`() {}
             ",
         )
         .build()
@@ -1015,7 +1015,7 @@ fn test_auto_register_refs_if_any() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/lib_code.tolk"
+            import "../gen/lib.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                  val address = AutoDeployAddress {
@@ -1044,7 +1044,7 @@ fn test_auto_register_refs_if_any() {
             import "../../lib/emulation/network"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-action-fail`() {
+            get fun `test action fail`() {
                 val deployer = net.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: ContractState {
@@ -1098,7 +1098,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
         .contract_with_detailed_deps(
             "main",
             r#"
-            import "../gen/lib_code.tolk"
+            import "../gen/lib.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 if (in.body.isEmpty()) {
@@ -1132,7 +1132,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
             import "../../lib/io"
             import "../../lib/emulation/network"
 
-            get fun `test-missing-library-ref-is-reported`() {
+            get fun `test missing library ref is reported`() {
                 val deployer = net.treasury("deployer");
                 val mainStateInit = ContractState {
                     code: build("main"),
@@ -1170,7 +1170,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
 
     project.acton().build().run().success();
 
-    let generated_dep_path = project.path().join("gen/lib_code.tolk");
+    let generated_dep_path = project.path().join("gen/lib.code.tolk");
     let generated_dep = fs::read_to_string(&generated_dep_path)
         .expect("must read generated dependency function for lib");
     let empty_cell_boc = Boc::encode_base64(Cell::default());
@@ -1180,7 +1180,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
     let main_contract =
         fs::read_to_string(&main_contract_path).expect("must read main contract source");
     let main_contract_without_import =
-        main_contract.replace("import \"../gen/lib_code.tolk\"\n", "");
+        main_contract.replace("import \"../gen/lib.code.tolk\"\n", "");
     fs::write(
         &main_contract_path,
         format!("{main_contract_without_import}\n{tampered_dep}\n"),
@@ -1226,7 +1226,7 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1277,7 +1277,7 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1329,7 +1329,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1380,7 +1380,7 @@ fn test_test_all_successful_tx_matcher_with_fail() {
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1433,7 +1433,7 @@ fn test_test_all_successful_tx_matcher_without_fail() {
             import "../../lib/testing/expect"
             import "../../lib/testing/transaction_expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1474,7 +1474,7 @@ fn test_expect_to_equal_decimal_success() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 expect(1500000000).toEqualDecimal(1500000000, 9);
                 expect(-1500000000).toEqualDecimal(-1500000000, 9);
                 expect(100).toEqualDecimal(100, 0);
@@ -1498,7 +1498,7 @@ fn test_expect_to_equal_decimal_failure() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-foo`() {
+            get fun `test foo`() {
                 expect(1500000000).toEqualDecimal(1600000000, 9);
             }
         "#,

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/bp_env_or_string_missing_fallback.test.tolk (1 test)
-  ✓ bp-stdlib-env-or-string-fallback [TIME]
+  ✓ bp stdlib env or string fallback [TIME]
 
  ✓ 1 passed in 1 file

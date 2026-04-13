@@ -92,6 +92,11 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn declarations(&self) -> &[Declaration] {
+        &self.declarations
+    }
+
+    #[must_use]
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
         self.structs
             .get(name)
@@ -132,16 +137,16 @@ impl SourceMap {
 
     #[must_use]
     pub fn path_to_file_id(&self, path: &str) -> Option<usize> {
-        let path_normalized = path
-            .trim_start_matches("file://")
-            .trim_start_matches("file:");
-        let name = path_normalized.rsplit('/').next()?;
-        for f in &self.files {
-            let sm_name = f.file_name.rsplit('/').next().unwrap_or(&f.file_name);
-            if sm_name == name {
-                return Some(f.file_id);
-            }
+        let normalized_path = Self::normalize_path(path);
+
+        if let Some(file) = self
+            .files
+            .iter()
+            .find(|file| Self::normalize_path(&file.file_name) == normalized_path)
+        {
+            return Some(file.file_id);
         }
+
         None
     }
 
@@ -193,6 +198,30 @@ impl SourceMap {
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.debug_marks.is_empty()
+    }
+
+    fn normalize_path(path: &str) -> String {
+        // DAP clients may send `file:///...` URIs, while the source map stores
+        // plain paths. We also normalize Windows separators to `/`.
+        let mut normalized = path
+            .trim_start_matches("file://")
+            .trim_start_matches("file:")
+            .replace('\\', "/");
+
+        if normalized.starts_with('/') {
+            let bytes = normalized.as_bytes();
+            // `file:///C:/...` becomes `/C:/...` after stripping the URI scheme.
+            // Drop that extra leading slash so it matches `C:/...` from source maps.
+            if bytes.len() >= 3
+                && bytes[0] == b'/'
+                && bytes[1].is_ascii_alphabetic()
+                && bytes[2] == b':'
+            {
+                normalized.remove(0);
+            }
+        }
+
+        normalized
     }
 }
 
@@ -326,7 +355,7 @@ pub enum Declaration {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PrefixInfo {
     pub prefix_str: String,
-    pub prefix_len: usize,
+    pub prefix_len: i32,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/cm_vm_set_c7_repeated_reads_writes.test.tolk (1 test)
-  ✓ cm-stdlib-vm-set-c7-repeated-reads-writes [TIME]
+  ✓ cm stdlib vm set c7 repeated reads writes [TIME]
 
  ✓ 1 passed in 1 file

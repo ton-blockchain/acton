@@ -14,6 +14,6 @@
  TEST  [ROOT]
 
  > tests/network_paths.test.tolk (1 test)
-  ✓ ag-find-transaction-body-hash [TIME]
+  ✓ ag find transaction body hash [TIME]
 
  ✓ 1 passed in 1 file

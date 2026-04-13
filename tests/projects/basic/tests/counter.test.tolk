@@ -63,7 +63,7 @@ fun setupTest(): (Counter, Treasury) {
 }
 
 // SLOT_1: @test({gas_limit: 100})
-get fun `test-should-increase-counter`() {
+get fun `test should increase counter`() {
     val (counter, deployer) = setupTest();
 
     val res = counter.sendIncrease(deployer.address, 100);
@@ -75,7 +75,7 @@ get fun `test-should-increase-counter`() {
 }
 
 // SLOT_3: @test({fail_with: 100})
-get fun `test-should-reset-counter`() {
+get fun `test should reset counter`() {
     // SLOT_4: if (true) { throw 9 }
     val (counter, deployer) = setupTest();
 

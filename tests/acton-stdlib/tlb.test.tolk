@@ -9,7 +9,7 @@ fun branchScore(choice: Either<int, int>): int {
     };
 }
 
-get fun `test-maybe-some-none-and-unwrap-or`() {
+get fun `test maybe some none and unwrap or`() {
     val someValue = Maybe<int>.some(42);
     val noneValue = Maybe<int>.none();
 
@@ -19,12 +19,12 @@ get fun `test-maybe-some-none-and-unwrap-or`() {
 }
 
 @test({ fail_with: 7 })
-get fun `test-maybe-unwrap-none-fails`() {
+get fun `test maybe unwrap none fails`() {
     val noneValue = Maybe<int>.none();
     noneValue.unwrap();
 }
 
-get fun `test-either-left-and-right-constructors`() {
+get fun `test either left and right constructors`() {
     expect(branchScore(Either<int, int>.left(7))).toEqual(1007);
     expect(branchScore(Either<int, int>.right(8))).toEqual(2008);
 }

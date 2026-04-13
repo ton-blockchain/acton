@@ -31,6 +31,13 @@
         }
       ]
     },
+    "import-mappings": {
+      "description": "Import path mappings for Tolk compiler imports, for example mapping `\"core\" = \"./foo/core\"` so imports can use `@core/...`",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "lint": {
       "description": "Linter configuration for the project",
       "allOf": [
@@ -46,13 +53,6 @@
           "$ref": "#/definitions/LitenodeSettings"
         }
       ]
-    },
-    "mappings": {
-      "description": "Path mappings for Tolk compiler imports, for example mapping `\"core\" = \"./foo/core\"` so imports can use `@core/...`",
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
     },
     "networks": {
       "description": "Custom network configurations",
@@ -168,7 +168,6 @@
       "description": "Definition of a contract in the project",
       "type": "object",
       "required": [
-        "name",
         "src"
       ],
       "properties": {
@@ -179,8 +178,8 @@
             "$ref": "#/definitions/ContractDependency"
           }
         },
-        "name": {
-          "description": "Human-readable name of the contract",
+        "display-name": {
+          "description": "Human-readable display name of the contract",
           "type": "string"
         },
         "output": {

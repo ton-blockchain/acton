@@ -80,7 +80,7 @@ fn assert_fail_wallet_not_found_direct_call_with_loaded_wallets_lists_available_
         .acton()
         .env("HOME", &home)
         .script("scripts/el_assert_fail_wallet_not_found.tolk")
-        .broadcast()
+        .with_net("testnet")
         .run()
         .failure();
 

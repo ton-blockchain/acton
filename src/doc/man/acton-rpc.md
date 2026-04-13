@@ -22,7 +22,7 @@ Query blockchain account state through a configured network endpoint.
 The command works without a project manifest for raw remote inspection.
 
 When Acton can resolve a local project and finds a contract with the same
-compiled `code_hash`, it also prints the matched contract ID and decodes the
+compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI.
 
 ## SUBCOMMANDS

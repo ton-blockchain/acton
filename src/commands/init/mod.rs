@@ -60,7 +60,11 @@ pub fn init_cmd() -> anyhow::Result<()> {
                 if contract_count == 1 { "" } else { "s" }
             );
             for (key, contract) in &discovered_contracts {
-                println!("             {} ({})", contract.name.cyan(), key);
+                println!(
+                    "             {} ({})",
+                    contract.display_name(key).cyan(),
+                    key
+                );
             }
             config.contracts = Some(ContractsConfig {
                 contracts: discovered_contracts,
@@ -232,7 +236,7 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
         let contract_name = format_contract_name(file_stem);
 
         let contract_config = ContractConfig {
-            name: contract_name,
+            name: Some(contract_name),
             src: relative_path,
             depends: Some(vec![]),
             output: None,

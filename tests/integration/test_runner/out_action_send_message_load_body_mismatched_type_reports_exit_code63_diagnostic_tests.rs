@@ -43,7 +43,7 @@ fn out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnos
     run_project_builder_load_body_mismatch_failure(
         "cw-stdlib-out-action-load-body-mismatch-diagnostic",
         r#"
-get fun `test-cw-out-action-load-body-mismatch-diagnostic`() {
+get fun `test cw out action load body mismatch diagnostic`() {
     val dest = net.randomAddress("cw_load_body_mismatch_dest");
     createMessage({
         bounce: false,
@@ -74,7 +74,7 @@ fn out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnos
     let test_path = "tests/cw_out_action_load_body_mismatch.test.tolk";
     let source = format!(
         r#"{CW_LOAD_BODY_IMPORTS}
-get fun `test-cw-out-action-load-body-mismatch-diagnostic-fixture`() {{
+get fun `test cw out action load body mismatch diagnostic fixture`() {{
     val dest = net.randomAddress("cw_load_body_mismatch_fixture_dest");
     createMessage({{
         bounce: false,

@@ -1,1 +1,1 @@
-Error: Provide --mutate-contract <CONTRACT_ID> to choose which contract to mutate
+Error: Provide --mutate-contract <CONTRACT_NAME> to choose which contract to mutate

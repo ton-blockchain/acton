@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ no-params [TIME]
-    └─ Test 'test-no-params' uses @test({ fuzz: ... }) but has no parameters
+  ✗ no params [TIME]
+    └─ Test 'test no params' uses @test({ fuzz: ... }) but has no parameters
 
  ✗ 1 failed in 1 file
 

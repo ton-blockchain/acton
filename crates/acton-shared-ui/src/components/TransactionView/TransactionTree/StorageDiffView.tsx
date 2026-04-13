@@ -124,11 +124,7 @@ function StorageDiffRow({
     <>
       <div className={`${styles.storageEntryKey} ${statusClassName}`}>{label}:</div>
       <div className={`${styles.storageEntryValue} ${statusClassName}`}>
-        <StorageDiffView
-          diff={diff}
-          contracts={contracts}
-          onContractClick={onContractClick}
-        />
+        <StorageDiffView diff={diff} contracts={contracts} onContractClick={onContractClick} />
       </div>
     </>
   )

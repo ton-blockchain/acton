@@ -69,8 +69,8 @@ fn test_retrace_localnet_is_rejected_before_logs_are_created() {
 }
 
 #[test]
-fn test_retrace_dap_port_requires_contract_before_logs_are_created() {
-    let project = ProjectBuilder::new("retrace-dap-port-requires-contract").build();
+fn test_retrace_debug_requires_contract_before_logs_are_created() {
+    let project = ProjectBuilder::new("retrace-debug-requires-contract").build();
     let logs_dir = project.path().join("retrace-logs");
 
     project
@@ -78,15 +78,44 @@ fn test_retrace_dap_port_requires_contract_before_logs_are_created() {
         .env("ACTON_LOG_DIR", ".acton/logs")
         .arg("retrace")
         .arg("deadbeef")
-        .arg("--dap-port")
-        .arg("5005")
+        .arg("--debug")
         .arg("--logs-dir")
         .arg("retrace-logs")
         .current_dir(project.path())
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/retrace/test_retrace_dap_port_requires_contract_before_logs_are_created.stderr.txt",
+            "integration/snapshots/retrace/test_retrace_debug_requires_contract_before_logs_are_created.stderr.txt",
+        );
+
+    assert!(
+        !logs_dir.exists(),
+        "logs directory should not be created on early retrace failure: {}",
+        logs_dir.display()
+    );
+}
+
+#[test]
+fn test_retrace_debug_port_without_debug_is_ignored_before_logs_are_created() {
+    let project = ProjectBuilder::new("retrace-debug-port-without-debug").build();
+    let logs_dir = project.path().join("retrace-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .arg("retrace")
+        .arg("deadbeef")
+        .arg("--debug-port")
+        .arg("5005")
+        .arg("--net")
+        .arg("localnet")
+        .arg("--logs-dir")
+        .arg("retrace-logs")
+        .current_dir(project.path())
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/retrace/test_retrace_debug_port_without_debug_is_ignored_before_logs_are_created.stderr.txt",
         );
 
     assert!(
@@ -139,7 +168,7 @@ version = "0.1.0"
 license = "MIT"
 
 [contracts.legacy]
-name = "legacy"
+display-name = "legacy"
 src = "contracts/legacy.fc"
 depends = []
 "#,

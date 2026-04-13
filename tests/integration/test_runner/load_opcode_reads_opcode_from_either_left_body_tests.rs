@@ -55,7 +55,7 @@ fn load_opcode_reads_opcode_from_either_left_body() {
     run_message_case(
         "ak-stdlib-load-opcode-left",
         r"
-get fun `test-ak-stdlib-load-opcode-left`() {
+get fun `test ak stdlib load opcode left`() {
     val body = beginCell()
         .storeBool(false)
         .storeUint(0x1234ABCD, 32)
@@ -81,7 +81,7 @@ fn load_opcode_reads_opcode_from_either_right_body_ref() {
     run_message_case(
         "ak-stdlib-load-opcode-right-ref",
         r"
-get fun `test-ak-stdlib-load-opcode-right-ref`() {
+get fun `test ak stdlib load opcode right ref`() {
     val body = beginCell()
         .storeBool(true)
         .storeRef(
@@ -111,7 +111,7 @@ fn load_opcode_returns_null_for_either_right_without_ref() {
     run_message_case(
         "ak-stdlib-load-opcode-right-without-ref",
         r"
-get fun `test-ak-stdlib-load-opcode-right-without-ref`() {
+get fun `test ak stdlib load opcode right without ref`() {
     val body = beginCell().storeBool(true).endCell().beginParse();
 
     val msg = MessageRelaxedGeneric {
@@ -132,7 +132,7 @@ fn load_opcode_returns_null_when_body_too_short() {
     run_message_case(
         "ak-stdlib-load-opcode-short-body",
         r"
-get fun `test-ak-stdlib-load-opcode-short-body`() {
+get fun `test ak stdlib load opcode short body`() {
     val body = beginCell().storeBool(false).storeUint(0b1010, 4).endCell().beginParse();
 
     val msg = MessageRelaxedGeneric {
@@ -153,7 +153,7 @@ fn load_opcode_without_skip_bounce_returns_bounce_prefix() {
     run_message_case(
         "ak-stdlib-load-opcode-bounce-prefix-without-skip",
         r"
-get fun `test-ak-stdlib-load-opcode-bounce-prefix-without-skip`() {
+get fun `test ak stdlib load opcode bounce prefix without skip`() {
     val body = beginCell()
         .storeBool(false)
         .storeUint(0xFFFFFFFF, 32)
@@ -179,7 +179,7 @@ fn load_opcode_with_skip_bounce_returns_nested_opcode() {
     run_message_case(
         "ak-stdlib-load-opcode-bounce-prefix-with-skip",
         r"
-get fun `test-ak-stdlib-load-opcode-bounce-prefix-with-skip`() {
+get fun `test ak stdlib load opcode bounce prefix with skip`() {
     val body = beginCell()
         .storeBool(false)
         .storeUint(0xFFFFFFFF, 32)
@@ -205,7 +205,7 @@ fn message_relaxed_load_body_returns_either_left_value() {
     run_message_case(
         "ak-stdlib-message-load-body-left",
         r"
-get fun `test-ak-stdlib-message-load-body-left`() {
+get fun `test ak stdlib message load body left`() {
     val payload = AkPayload {
         queryId: 11,
         amount: 22,
@@ -229,7 +229,7 @@ fn message_relaxed_load_body_returns_either_right_cell_value() {
     run_message_case(
         "ak-stdlib-message-load-body-right",
         r"
-get fun `test-ak-stdlib-message-load-body-right`() {
+get fun `test ak stdlib message load body right`() {
     val payload = AkPayload {
         queryId: 77,
         amount: 88,

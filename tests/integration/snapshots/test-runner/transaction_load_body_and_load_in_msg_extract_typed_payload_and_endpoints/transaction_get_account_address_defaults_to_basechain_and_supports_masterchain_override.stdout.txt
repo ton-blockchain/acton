@@ -10,6 +10,6 @@
  TEST  [ROOT]
 
  > tests/transaction_helpers.test.tolk (1 test)
-  ✓ am-transaction-get-account-address-workchain-override [TIME]
+  ✓ am transaction get account address workchain override [TIME]
 
  ✓ 1 passed in 1 file

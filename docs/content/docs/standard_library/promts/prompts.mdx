@@ -45,7 +45,7 @@ Non-interactive fallback:
 Example:
 ```tolk
 val name = prompt("What is your name?", "John");
-println(format1("Hello {}", name));
+println("Hello {}", name);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L37" />
@@ -67,7 +67,7 @@ Input and fallback behavior:
 Example:
 ```tolk
 val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
-println(format1("Hello {}", name));
+println("Hello {}", name);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L54" />
@@ -94,4 +94,28 @@ if (answer) {
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L72" />
+
+## `promptWallet`
+
+```tolk
+fun promptWallet(message: string): string
+```
+
+Prompts the user to select a wallet from the configured wallets.
+
+Behavior (broadcast mode, i.e. `--net` is set):
+- If no wallets are configured, fails with an error suggesting how to create one.
+- If only one wallet is configured, returns its name automatically.
+- If multiple wallets are configured, shows an interactive selection.
+- In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
+
+In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
+`net.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
+
+Example:
+```tolk
+val walletName = promptWallet("Select a wallet:");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L91" />
 

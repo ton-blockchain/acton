@@ -20,7 +20,7 @@ Acton resolves project root for each CLI invocation using global flags:
   does not change project root resolution.
 
 This matters for all relative paths from config sections (for example
-`[contracts].src`, `[build]`, `[test]`, and `[mappings]`), because they are
+`[contracts].src`, `[build]`, `[test]`, and `[import-mappings]`), because they are
 resolved relative to project root for the current invocation.
 
 ## Root Section
@@ -36,7 +36,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[lint]` — General linter configuration.
 - `[networks]` — Custom network definitions.
 - `[scripts]` — Custom shell commands or scripts.
-- `[mappings]` — Path mappings for Tolk compiler imports.
+- `[import-mappings]` — Path mappings for Tolk compiler imports.
 
 ---
 
@@ -66,14 +66,14 @@ license = "MIT"
 
 ## `[contracts]` Section
 
-This section is a map where each key is a unique contract identifier and the value is a contract configuration object.
+This section is a map where each key is a contract name and the value is a contract configuration object.
 
-| Field     | Type     | Required | Description                                                             |
-|:----------|:---------|:---------|:------------------------------------------------------------------------|
-| `name`    | `string` | **Yes**  | Human-readable name of the contract.                                    |
-| `src`     | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
-| `depends` | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
-| `output`  | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+| Field          | Type     | Required | Description                                                             |
+|:---------------|:---------|:---------|:------------------------------------------------------------------------|
+| `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.          |
+| `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
+| `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
+| `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
 
 ### Contract Dependencies
 
@@ -93,8 +93,8 @@ depends = ["AnotherContract"]
 Example:
 ```toml
 [contracts.MainContract]
-name = "Main Contract"
-src = "contracts/main.tolk"
+display-name = "Main Contract"
+src = "contracts/MainContract.tolk"
 depends = [
     "ChildContract",
     { name = "LibraryContract", kind = "library_ref", function = "get_lib_code" }
@@ -320,11 +320,11 @@ output-format = "sarif"
 ```
 
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
-When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
+When you pass an explicit target to `acton check` (contract name or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
 CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
 Use `acton check --output-file <PATH>` to write non-plain output into a file.
-For one-off line-level suppressions in source code, use `// acton-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
+For one-off line-level suppressions in source code, use `// check-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
 Suppressions use rule names (for example `unused-variable`) and do not affect compiler/parser diagnostics (`C001`).
 
 ### Global Configuration
@@ -346,19 +346,19 @@ mutable-variable-can-be-immutable = "warn"
 
 ### Contract Overrides
 
-You can override lint levels for specific contracts by creating a subsection with the contract's identifier (the key used in the `[contracts]` section).
+You can override lint levels for specific contracts by creating a subsection with the contract's name (the `NAME` from `[contracts.NAME]`).
 
 Example:
 ```toml
-[contracts.counter]
-name = "My Counter"
-src = "counter.tolk"
+[contracts.Counter]
+display-name = "My Counter"
+src = "contracts/Counter.tolk"
 
 [lint.rules]
 unused-variable = "deny"
 
-[lint.rules.counter]
-unused-variable = "allow" # Disable for counter contract only
+[lint.rules.Counter]
+unused-variable = "allow" # Disable for the Counter contract only
 ```
 
 ---
@@ -407,7 +407,7 @@ check = "acton test --filter=.*_check"
 
 ---
 
-## `[mappings]` Section
+## `[import-mappings]` Section
 
 Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These mappings let you import files using logical names instead of relative paths.
 
@@ -418,7 +418,7 @@ Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These 
 
 Example:
 ```toml
-[mappings]
+[import-mappings]
 utils = "./libs/utils" # Equivalent to "@utils" and prefered
 "@core" = "./libs/core"
 ```

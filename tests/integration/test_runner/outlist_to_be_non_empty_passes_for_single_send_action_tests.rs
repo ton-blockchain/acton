@@ -50,7 +50,7 @@ fn outlist_to_be_non_empty_passes_for_single_send_action() {
     run_outlist_success(
         "af-stdlib-outlist-to-be-non-empty",
         r#"
-get fun `test-af-outlist-to-be-non-empty`() {
+get fun `test af outlist to be non empty`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -75,7 +75,7 @@ fn outlist_to_be_empty_passes_without_actions() {
     run_outlist_success(
         "af-stdlib-outlist-to-be-empty",
         r"
-get fun `test-af-outlist-to-be-empty`() {
+get fun `test af outlist to be empty`() {
     val out_actions = [];
     expect(out_actions).toBeEmpty();
     expect(out_actions.size()).toEqual(0);
@@ -90,7 +90,7 @@ fn outlist_to_be_send_message_at_extracts_typed_body() {
     run_outlist_success(
         "af-stdlib-outlist-typed-send-message",
         r#"
-get fun `test-af-outlist-send-message-typed-body`() {
+get fun `test af outlist send message typed body`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -120,7 +120,7 @@ fn outlist_to_be_send_message_at_opcode_mismatch_reports_known_type() {
     run_outlist_failure(
         "af-stdlib-outlist-opcode-mismatch-known-type",
         r#"
-get fun `test-af-outlist-opcode-mismatch-known-type`() {
+get fun `test af outlist opcode mismatch known type`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -143,7 +143,7 @@ fn outlist_to_be_send_message_at_opcode_mismatch_without_known_type_name() {
     run_outlist_success(
         "af-stdlib-outlist-opcode-mismatch-unknown-type",
         r#"
-get fun `test-af-outlist-opcode-mismatch-unknown-type`() {
+get fun `test af outlist opcode mismatch unknown type`() {
     val dest = net.randomAddress("counter");
     val msg = createMessage({
         bounce: false,
@@ -166,7 +166,7 @@ fn outlist_to_be_send_message_at_bounced_prefix_opcode_mismatch_is_reported() {
     run_outlist_success(
         "af-stdlib-outlist-opcode-mismatch-bounced-prefix",
         r#"
-get fun `test-af-outlist-opcode-mismatch-bounced-prefix`() {
+get fun `test af outlist opcode mismatch bounced prefix`() {
     val dest = net.randomAddress("counter");
     val bounced_like_body = beginCell()
         .storeUint(0xFFFFFFFF, 32)

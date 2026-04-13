@@ -1,5 +1,5 @@
 error: unexpected argument 'beta' found
 
-Usage: acton[EXE] build [OPTIONS] [CONTRACT_ID]
+Usage: acton[EXE] build [OPTIONS] [CONTRACT_NAME]
 
 For more information, try '--help'.

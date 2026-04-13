@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-annotation-seed-overrides-cli [TIME] (1 run, seed 9)
+  ✗ fuzz annotation seed overrides cli [TIME] (1 run, seed 9)
     ├─ Fuzz case 1/1
     ├─ Inputs: value=102
     └─ Error: expect(actual).toBeTrue()

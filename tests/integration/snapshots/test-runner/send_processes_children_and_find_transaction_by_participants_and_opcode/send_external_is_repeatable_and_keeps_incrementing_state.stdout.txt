@@ -14,6 +14,6 @@
  TEST  [ROOT]
 
  > tests/network_paths.test.tolk (1 test)
-  ✓ ag-send-external-repeatable [TIME]
+  ✓ ag send external repeatable [TIME]
 
  ✓ 1 passed in 1 file

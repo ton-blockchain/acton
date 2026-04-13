@@ -4,10 +4,10 @@ NAME
        acton-wrapper — Generate Tolk or TypeScript wrappers for a contract
 
 SYNOPSIS
-       acton wrapper [options] contract-id
+       acton wrapper [options] contract-name
 
 DESCRIPTION
-       Generate a wrapper for the contract identified by _contract-id_ from
+       Generate a wrapper for the contract identified by _contract-name_ from
        Acton.toml.
 
        Wrapper generation uses the ABI emitted by the Tolk compiler. In
@@ -22,8 +22,8 @@ DESCRIPTION
 
 OPTIONS
    Wrapper Options
-       contract-id
-           Contract ID from Acton.toml to generate the wrapper for.
+       contract-name
+           Contract name from Acton.toml to generate the wrapper for.
 
        -o, --output path
            Write the generated wrapper to an exact path.
@@ -104,7 +104,7 @@ CONFIGURATION
        Project-wide defaults can be configured in Acton.toml:
 
            [wrappers.tolk]
-           output-dir = "tests/wrappers"
+           output-dir = "wrappers"
            generate-test = true
            test-output-dir = "tests"
            
@@ -123,25 +123,25 @@ EXIT STATUS
 EXAMPLES
        1. Generate the default Tolk wrapper:
 
-              acton wrapper counter
+              acton wrapper Counter
 
        2. Generate a wrapper and stub test:
 
-              acton wrapper counter --test
+              acton wrapper Counter --test
 
        3. Generate a TypeScript wrapper:
 
-              acton wrapper counter --ts
+              acton wrapper Counter --ts
 
        4. Generate into custom locations:
 
-              acton wrapper counter --output-dir tests/generated
-              acton wrapper counter --test --test-output-dir tests/generated
-              acton wrapper counter --ts --output-dir wrappers
+              acton wrapper Counter --output-dir tests/generated
+              acton wrapper Counter --test --test-output-dir tests/generated
+              acton wrapper Counter --ts --output-dir wrappers
 
        5. Generate a frontend-oriented TypeScript wrapper layout:
 
-              acton wrapper counter --ts --output-dir app/src/wrappers
+              acton wrapper Counter --ts --output-dir app/src/wrappers
 
 SEE ALSO
        o  acton help build

@@ -41,7 +41,7 @@ fn out_actions_list_traversal_preserves_reverse_order_and_kinds() {
     run_success(
         "al-stdlib-out-actions-list-traversal-order",
         r#"
-get fun `test-al-out-actions-list-traversal-order`() {
+get fun `test al out actions list traversal order`() {
     val dest = net.randomAddress("al_out_actions_order");
     val msg = createMessage({
         bounce: false,
@@ -80,7 +80,7 @@ fn parse_out_actions_from_raw_c5_matches_vm_out_actions() {
     run_success(
         "al-stdlib-parse-out-actions-from-c5",
         r#"
-get fun `test-al-parse-out-actions-from-c5`() {
+get fun `test al parse out actions from c5`() {
     val dest = net.randomAddress("al_out_actions_parse_c5");
 
     createMessage({
@@ -129,7 +129,7 @@ fn get_send_message_at_returns_null_for_non_send_entries() {
     run_success(
         "al-stdlib-get-send-message-at-null-non-send",
         r#"
-get fun `test-al-get-send-message-at-null-non-send`() {
+get fun `test al get send message at null non send`() {
     val dest = net.randomAddress("al_get_send_message_at");
 
     contract.setCodePostponed(beginCell().storeUint(1, 1).endCell());
@@ -164,7 +164,7 @@ fn get_send_message_body_at_reads_inline_body_left_branch() {
     run_success(
         "al-stdlib-get-send-message-body-inline-left",
         r#"
-get fun `test-al-get-send-message-body-inline-left`() {
+get fun `test al get send message body inline left`() {
     val dest = net.randomAddress("al_get_body_left");
 
     createMessage({
@@ -199,7 +199,7 @@ fn get_send_message_body_at_reads_ref_body_right_branch() {
     run_success(
         "al-stdlib-get-send-message-body-ref-right",
         r#"
-get fun `test-al-get-send-message-body-ref-right`() {
+get fun `test al get send message body ref right`() {
     val dest = net.randomAddress("al_get_body_right");
 
     createMessage({
@@ -238,7 +238,7 @@ fn get_send_message_body_at_returns_null_for_non_send_action() {
     run_success(
         "al-stdlib-get-send-message-body-null-non-send",
         r#"
-get fun `test-al-get-send-message-body-null-non-send`() {
+get fun `test al get send message body null non send`() {
     contract.setCodePostponed(beginCell().storeUint(0xCC, 8).endCell());
 
     val outActions = vm.outActions();
@@ -258,7 +258,7 @@ fn out_message_out_actions_helper_returns_send_action_with_mode_and_body() {
     run_success(
         "al-stdlib-out-message-out-actions-helper",
         r#"
-get fun `test-al-out-message-out-actions-helper`() {
+get fun `test al out message out actions helper`() {
     val dest = net.randomAddress("al_out_message_helper");
     val msg = createMessage({
         bounce: false,
@@ -292,7 +292,7 @@ fn get_send_message_helpers_return_null_for_reserve_and_change_library_actions()
     run_success(
         "al-stdlib-get-send-message-helpers-null-for-reserve-and-change-library",
         r#"
-get fun `test-al-get-send-message-helpers-null-for-reserve-and-change-library`() {
+get fun `test al get send message helpers null for reserve and change library`() {
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
     changeLib(beginCell().storeUint(0xEE, 8).endCell(), 2);
 

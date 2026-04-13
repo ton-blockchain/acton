@@ -18,7 +18,6 @@ export default defineConfig({
     alias: {
       "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
       "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
-      "@ton/core": path.resolve(import.meta.dirname, "../../node_modules/@ton/core"),
     },
   },
   build: {

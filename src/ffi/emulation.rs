@@ -15,9 +15,8 @@ use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
-use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -35,7 +34,7 @@ use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
-use ton_executor::message::{EmulationResult, RunTransactionArgs};
+use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{ContData, Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -54,6 +53,9 @@ fn run_nested_executor_until_finished(
     mut direct_step: impl FnMut() -> bool,
 ) -> anyhow::Result<()> {
     if child_debug_started {
+        // StepInto / instruction stepping bootstrap the child by stopping on its
+        // first user-visible location. "Continue"-style entry needs one explicit
+        // kick so the nested replayer starts driving the live executor.
         let child_was_bootstrapped = matches!(
             child_step_mode,
             StepMode::StepInto | StepMode::EachAsmInstruction
@@ -99,7 +101,7 @@ fn build_impl(
 
         if let Some(found_contract) = found_contract {
             debug!("Found contract with info: {found_contract:?}");
-            name = found_contract.name; // use actual name instead of id
+            name = found_contract.display_name_owned(&id);
             path = found_contract.src;
             path = dunce::canonicalize(&path)
                 .map(|p| p.to_string_lossy().to_string())
@@ -720,79 +722,70 @@ fn send_wallet_message(
     Ok(())
 }
 
-fn send_message_debug(
+fn send_transaction_debug(
     ctx: &mut Context,
     msg_cell: &Cell,
     libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
-) -> anyhow::Result<Vec<SendMessageResult>> {
-    let msg: RelaxedMessage = msg_cell
-        .parse()
-        .context("Failed to load message from cell")?;
+) -> anyhow::Result<Option<SendMessageResult>> {
+    let prepared = Emulator::prepare_send_transaction(
+        ctx.chain.world_state,
+        msg_cell.clone(),
+        libs,
+        src_addr,
+    )?;
+    let config_b64 = ctx.chain.world_state.get_config_b64();
 
-    let RelaxedMsgInfo::Int(int_message) = &msg.info else {
-        anyhow::bail!("Emulator only supports internal messages for now");
-    };
+    // Nested send-message debugging executes the recipient transaction through a
+    // live step executor. Compilation artifacts are reused only for source/ABI
+    // rendering; execution itself still comes from the prepared emulator state.
+    let mut step_executor =
+        StepExecutor::new(Some(&config_b64)).context("Failed to create executor")?;
+    let mut missing_libraries_ctx = MissingLibrariesContext::default();
+    step_executor
+        .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
+        .context("Failed to register missing library callback")?;
 
-    let dst = match &int_message.dst {
-        IntAddr::Std(addr) => addr,
-        IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported"),
-    };
-    let dest_account = ctx.chain.world_state.get_account(dst);
-    let code = Emulator::get_code_cell(&msg, &dest_account);
-
-    let step_executor = StepExecutor::new().expect("Failed to create executor");
     let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&code)
+        .result_for_code(&prepared.code)
         .map(|(_, result)| result);
     let source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
+    let compiler_abi = compilation_result
+        .as_ref()
+        .and_then(|result| result.compiler_abi.clone());
 
-    let msg_cell = Emulator::patch_message(
-        ctx.chain.world_state.get_config(),
-        msg_cell.clone(),
-        src_addr,
-    )?;
     let prepare_result = step_executor
-        .prepare_transaction(
-            &Boc::encode_base64(msg_cell),
-            &RunTransactionArgs {
-                libs: libs.clone().into_root().map(Boc::encode_base64),
-                shard_account: Boc::encode_base64(to_cell(&dest_account)),
-                now: ctx.chain.world_state.get_now(),
-                lt: ctx.chain.world_state.get_lt(),
-                random_seed: None,
-                ignore_chksig: false,
-                debug_enabled: true,
-                prev_blocks_info: None,
-                is_tick_tock: None,
-                is_tock: None,
-            },
-        )
-        .expect("Prepare transaction failed");
+        .prepare_transaction(&prepared.message_b64, &prepared.run_args)
+        .context("Prepare transaction failed")?;
     assert!(
         prepare_result.success,
         "Failed to prepare Emulator in debug mode"
     );
     if prepare_result.skipped {
-        return Ok(vec![]);
+        return Ok(None);
     }
 
     let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+    // Push the recipient transaction as a child debug context so a single DAP
+    // session can step across `net.send*` without losing the parent stack.
     let child_debug_started = ctx
         .debug
         .begin_child_context(ChildDebugContextSpec {
             thread_id: 2,
-            name: "Send internal message".to_string(),
+            name: "Send message".to_string(),
             executor: step_executor.clone().into(),
             source_map,
+            compiler_abi,
             stop_on_entry: need_to_stop_on_entry,
         })
         .context("Cannot start nested debug context")?;
 
+    // Step Into should stop on the first user-visible line in the child. Otherwise,
+    // let the nested runtime run until its own breakpoint / exception / completion.
     let child_step_mode = if need_to_stop_on_entry {
         match ctx.debug.performing_step() {
             Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
@@ -826,91 +819,25 @@ fn send_message_debug(
         }
     }
 
-    let result = match result {
-        EmulationResult::Success(result) => result,
-        EmulationResult::Error(_) => {
-            return Ok(vec![]);
-        }
-    };
+    Emulator::finalize_send_transaction(
+        ctx.chain.world_state,
+        prepared,
+        result,
+        None,
+        missing_libraries_ctx.into_set(),
+    )
+    .map(Some)
+}
 
-    let shard_account_after = &result.shard_account;
-    let shard_account_cell = Boc::decode_base64(shard_account_after.as_ref())
-        .context("Failed to decode shard account BoC")?;
-    let shard_account: ShardAccount = shard_account_cell
-        .parse()
-        .context("Failed to load shard account from cell")?;
-
-    ctx.chain.world_state.update_account(dst, &shard_account);
-
-    let tx_cell = Boc::decode_base64(result.transaction.as_ref())
-        .context("Failed to decode transaction BoC")?;
-    let transaction: Transaction = tx_cell
-        .parse()
-        .context("Failed to load transaction from cell")?;
-
-    let out_messages = transaction
-        .iter_out_msgs()
-        .filter_map(Result::ok)
-        .map(|it| to_cell(&it))
-        .collect::<Vec<_>>();
-
-    let send_result = SendMessageResultSuccess {
-        raw_transaction: result.transaction,
-        transaction: transaction.clone(),
-        parent_transaction: None,
-        child_transactions: vec![],
-        shard_account_before: dest_account,
-        shard_account,
-        out_messages,
-        vm_log: result.vm_log,
-        executor_logs: Arc::default(),
-        actions: result.actions,
-        code,
-        externals: vec![],
-        missing_libraries: FxHashSet::default(),
-    };
-
-    let mut externals: Vec<Cell> = vec![];
-
-    let mut all_results = std::iter::once(SendMessageResult::Success(send_result))
-        .chain(transaction.iter_out_msgs().flat_map(|msg| {
-            let Ok(msg) = msg else { return vec![] };
-
-            if let MsgInfo::ExtOut(_) = &msg.info {
-                externals.push(to_cell(&msg));
-                return vec![];
-            }
-
-            let mut send_results =
-                send_message_debug(ctx, &to_cell(&msg), libs, None).unwrap_or_default();
-            for result in &mut send_results {
-                match result {
-                    SendMessageResult::Success(result) => {
-                        result.parent_transaction = Some(transaction.lt);
-                    }
-                    SendMessageResult::Error(_) => {}
-                }
-            }
-
-            send_results
-        }))
-        .collect::<Vec<_>>();
-
-    let child_txs = all_results
-        .iter()
-        .skip(1)
-        .filter_map(|result| match result {
-            SendMessageResult::Success(result) => Some(result.transaction.lt),
-            SendMessageResult::Error(_) => None,
-        })
-        .collect();
-
-    if let Some(SendMessageResult::Success(result)) = all_results.get_mut(0) {
-        result.child_transactions = child_txs;
-        result.externals = externals;
-    }
-
-    Ok(all_results)
+fn send_message_debug(
+    ctx: &mut Context,
+    msg_cell: &Cell,
+    libs: &Dict<HashBytes, LibDescr>,
+    src_addr: Option<IntAddr>,
+) -> anyhow::Result<Vec<SendMessageResult>> {
+    Emulator::execute_send_message_flow(msg_cell.clone(), src_addr, &mut |message, from| {
+        send_transaction_debug(ctx, &message, libs, from)
+    })
 }
 
 extension!(send_single_message in (Context) with (src: IntAddr, msg: Cell) using send_single_message_impl);
@@ -1421,10 +1348,15 @@ fn run_get_method_impl(
         .build_cache
         .result_for_code(&Some(code))
         .map(|(_, result)| result);
+    // Remote/forked contracts may have no local debug info. We still run the live
+    // executor, but the child replayer will then fall back to a synthetic source map.
     let source_map = compilation_result.as_ref().map_or_else(
         || Arc::new(TolkSourceMap::without_debug_info()),
         |result| result.source_map.clone(),
     );
+    let compiler_abi = compilation_result
+        .as_ref()
+        .and_then(|result| result.compiler_abi.clone());
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -1439,6 +1371,8 @@ fn run_get_method_impl(
             .context("Cannot prepare get method")?;
 
         let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+        // Nested get methods reuse the same DAP session via a child context, exactly
+        // like nested message sends do, so Step Into can cross the runtime boundary.
         let child_debug_started = ctx
             .debug
             .begin_child_context(ChildDebugContextSpec {
@@ -1446,10 +1380,13 @@ fn run_get_method_impl(
                 name: "Run get method".to_string(),
                 executor: step_executor.clone().into(),
                 source_map: Some(source_map.clone()),
+                compiler_abi,
                 stop_on_entry: need_to_stop_on_entry,
             })
             .context("Cannot send response")?;
 
+        // Keep the child aligned with the parent stepping intent: stop on entry when
+        // stepping into the call, otherwise continue until the child stops or ends.
         let child_step_mode = if need_to_stop_on_entry {
             match ctx.debug.performing_step() {
                 Some(StepMode::EachAsmInstruction) => StepMode::EachAsmInstruction,
@@ -1700,6 +1637,19 @@ fn cell_from_hex_impl(_: &mut Context, stack: &mut Tuple, cell_hex: String) -> a
     Ok(())
 }
 
+extension!(parse_int in (Context) with (x: String) using parse_int_impl);
+fn parse_int_impl(ctx: &mut Context, stack: &mut Tuple, x: String) -> anyhow::Result<()> {
+    match x.trim().parse::<BigInt>() {
+        Ok(value) => stack.push(TupleItem::Int(value)),
+        Err(e) => {
+            ctx.asserts
+                .fail(format!("Failed to parse integer from '{x}': {e}"));
+            stack.push(TupleItem::Null);
+        }
+    }
+    Ok(())
+}
+
 extension!(load_library_by_hash in (Context) with (hash: String) using load_library_by_hash_impl);
 fn load_library_by_hash_impl(
     ctx: &mut Context,
@@ -1772,6 +1722,48 @@ fn get_wallet_by_name_impl(
     stack.push(TupleItem::Cell(to_cell(&addr)));
 
     Ok(())
+}
+
+extension!(get_wallet_key_pair in (Context) with (addr: StdAddr) using get_wallet_key_pair_impl);
+fn get_wallet_key_pair_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: StdAddr,
+) -> anyhow::Result<()> {
+    let Some(wallet) = find_open_wallet_by_address(ctx, &addr) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    // Match lib/crypto/crypto.tolk: privateKey is the 32-byte Ed25519 seed.
+    let private_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.secret_key[..32]);
+    let public_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.public_key);
+
+    let mut result = Tuple::empty();
+    result.push(TupleItem::Int(private_key));
+    result.push(TupleItem::Int(public_key));
+    stack.push(TupleItem::Tuple(result));
+
+    Ok(())
+}
+
+extension!(get_wallet_id in (Context) with (addr: StdAddr) using get_wallet_id_impl);
+fn get_wallet_id_impl(ctx: &mut Context, stack: &mut Tuple, addr: StdAddr) -> anyhow::Result<()> {
+    let Some(wallet) = find_open_wallet_by_address(ctx, &addr) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    stack.push(TupleItem::Int(BigInt::from(wallet.wallet.wallet_id)));
+
+    Ok(())
+}
+
+fn find_open_wallet_by_address<'a>(ctx: &'a Context, addr: &StdAddr) -> Option<&'a Wallet> {
+    ctx.env
+        .open_wallets
+        .values()
+        .find(|wallet| wallet.address() == *addr)
 }
 
 const WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS: u64 = 1000;
@@ -2211,6 +2203,9 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         42 => execute_message_iter_from : 1,
         43 => is_message_iter_done : 1,
         44 => close_message_iter : 1,
+        45 => get_wallet_key_pair : 1,
+        46 => get_wallet_id : 1,
+        47 => parse_int : 1,
         501 => call_tolk_function : 3,
     });
 }
@@ -2219,6 +2214,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use rustc_hash::FxHashSet;
     use std::sync::Arc;
 
     fn test_hash(byte: u8) -> HashBytes {

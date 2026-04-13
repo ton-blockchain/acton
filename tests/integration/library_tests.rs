@@ -378,7 +378,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "Simple"
+display-name = "Simple"
 src = "contracts/simple.tolk"
 "#;
     fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
@@ -592,7 +592,7 @@ description = ""
 version = "0.1.0"
 
 [contracts.simple]
-name = "Simple"
+display-name = "Simple"
 src = "contracts/simple.fif"
 "#;
     fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");

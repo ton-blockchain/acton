@@ -10,7 +10,7 @@
  TEST  [ROOT]
 
  > tests/formatter_action.test.tolk (1 test)
-  ✓ formatter-action-phase-failure-println-with-backtrace-full [TIME]
+  ✓ formatter action phase failure println with backtrace full [TIME]
     └─ Test output:
        N/A -> sender A
        └── empty 0.2 TON -> fm_action_fail B                                           gas=2347 aborted action_result_code=37

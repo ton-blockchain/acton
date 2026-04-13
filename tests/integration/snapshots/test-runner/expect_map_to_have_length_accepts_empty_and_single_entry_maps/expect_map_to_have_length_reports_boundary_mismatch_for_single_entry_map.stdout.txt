@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/map.test.tolk (1 test)
-  ✗ ee-stdlib-map-to-have-length-boundary-mismatch [TIME]
+  ✗ ee stdlib map to have length boundary mismatch [TIME]
     └─ Error: expect(actual).toHaveLength(expected)
         (
             0,

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz-bool [TIME] (256 runs, seed 42)
+  ✗ fuzz bool [TIME] (256 runs, seed 42)
     ├─ Fuzz case 2/256
     ├─ Inputs: flag=true
     └─ Error: expect(actual).toBeFalse()

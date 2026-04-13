@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/map.test.tolk (1 test)
-  ✗ map-missing-key-fails [TIME]
+  ✗ map missing key fails [TIME]
     └─ Error: expect(actual).toContainKey(expected): Key '404' not found in the map
       └─ at tests/map.test[LINE]
 

@@ -88,7 +88,7 @@ license = "MIT"
 width = 100
 ignore = []
 
-[mappings]
+[import-mappings]
 tests = "custom-tests"
 "#,
     )
@@ -127,12 +127,12 @@ license = "MIT"
 width = 100
 ignore = []
 
-[mappings]
+[import-mappings]
 acton = ".acton"
 contracts = "contracts"
 gen = "gen"
 tests = "tests"
-wrappers = "tests/wrappers"
+wrappers = "wrappers"
 "#,
     )
     .unwrap();

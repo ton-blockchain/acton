@@ -5,6 +5,6 @@ version = "0.1.0"
 license = "MIT"
 
 [contracts.counter]
-name = "Counter"
+display-name = "Counter"
 src = "contracts/counter.tolk"
 depends = []

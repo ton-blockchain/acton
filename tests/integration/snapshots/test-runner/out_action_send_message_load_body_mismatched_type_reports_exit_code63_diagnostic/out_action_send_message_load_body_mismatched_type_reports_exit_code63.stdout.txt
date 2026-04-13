@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/cw_out_action_load_body_mismatch.test.tolk (1 test)
-  ✗ cw-out-action-load-body-mismatch-diagnostic-fixture [TIME]
+  ✗ cw out action load body mismatch diagnostic fixture [TIME]
     └─ exit_code=63
       ├─ Re-run with --backtrace full to get more information
       ├─ Unable to load data from cell because prefix does not match

@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/tx_expect.test.tolk (1 test)
-  ✓ ae-successful-tx-search-filters [TIME]
+  ✓ ae successful tx search filters [TIME]
 
  ✓ 1 passed in 1 file

@@ -1,9 +1,9 @@
 {{#options}}
 
-{{#option "_contract-id_" }}
+{{#option "_contract-name_" }}
 Build only the specified contract and its transitive dependencies.
 
-The value must match a `[contracts.<id>]` key in `Acton.toml`.
+The value must match a `[contracts.<name>]` key in `Acton.toml`.
 {{/option}}
 
 {{#option "`--clear-cache`" }}
@@ -22,7 +22,7 @@ Defaults to `[build].out-dir` when configured, otherwise `build/`.
 
 {{#option "`--gen-dir` _dir_" }}
 Directory for generated dependency helper files such as
-`gen/<dependency>_code.tolk`.
+`gen/<dependency>.code.tolk`.
 
 Defaults to `[build].gen-dir` when configured, otherwise `gen/`.
 {{/option}}

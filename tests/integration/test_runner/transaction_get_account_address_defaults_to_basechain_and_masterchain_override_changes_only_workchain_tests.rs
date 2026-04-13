@@ -50,7 +50,7 @@ fn transaction_get_account_address_defaults_to_basechain_and_masterchain_overrid
     run_transaction_success(
         "dc-stdlib-transaction-get-account-address-default-vs-masterchain",
         r#"
-get fun `test-dc-stdlib-transaction-get-account-address-default-vs-masterchain`() {
+get fun `test dc stdlib transaction get account address default vs masterchain`() {
     val sender = net.treasury("dc_sender_default");
     val destination = net.randomAddress("dc_destination_default");
 
@@ -104,7 +104,7 @@ fn transaction_get_account_address_masterchain_override_is_stable_in_fixture_pro
     let test_path = "tests/dc_transaction_get_account_address_fixture.test.tolk";
     let source = format!(
         r#"{DC_TRANSACTION_IMPORTS}
-get fun `test-dc-stdlib-transaction-get-account-address-masterchain-stable`() {{
+get fun `test dc stdlib transaction get account address masterchain stable`() {{
     val sender = net.treasury("dc_sender_fixture");
     val destination = net.randomAddress("dc_destination_fixture");
 

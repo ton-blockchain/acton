@@ -22,5 +22,5 @@ Simple extension to support Tolk, TASM, Fift and TL-B languages using `acton`.
 
 Set the path to the `acton` binary in your settings:
 ```json
-"tolk.serverPath": "/path/to/emulator-rs/target/debug/acton"
+"tolk.serverPath": "/path/to/acton/target/debug/acton"
 ```

@@ -4,14 +4,14 @@
         <properties>
             <property name="file.path" value="[ROOT]/tests/a/shared.test.tolk"/>
         </properties>
-        <testcase name="test-shared-a" classname="shared.test.tolk" [TIME]>
+        <testcase name="test shared a" classname="shared.test.tolk" [TIME]>
         </testcase>
     </testsuite>
     <testsuite name="shared.test.tolk" tests="1" disabled="0" errors="0" failures="0" timestamp="[DATE]" [TIME]>
         <properties>
             <property name="file.path" value="[ROOT]/tests/b/shared.test.tolk"/>
         </properties>
-        <testcase name="test-shared-b" classname="shared.test.tolk" [TIME]>
+        <testcase name="test shared b" classname="shared.test.tolk" [TIME]>
         </testcase>
     </testsuite>
 </testsuites>

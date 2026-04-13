@@ -26,7 +26,7 @@ fn set_c5_roundtrip_restores_single_and_double_action_out_lists() {
     run_success(
         "cn-stdlib-set-c5-roundtrip-non-empty-transitions",
         r#"
-get fun `test-cn-set-c5-roundtrip-non-empty-transitions`() {
+get fun `test cn set c5 roundtrip non empty transitions`() {
     val dest = net.randomAddress("cn_set_c5_roundtrip_dest");
     createMessage({
         bounce: false,
@@ -83,7 +83,7 @@ fn set_c5_to_empty_cell_breaks_vm_out_actions_bug() {
     run_success(
         "cn-stdlib-set-c5-empty-cell-out-actions-bug",
         r"
-get fun `test-cn-set-c5-empty-cell-out-actions-bug`() {
+get fun `test cn set c5 empty cell out actions bug`() {
     val emptyC5 = vm.getC5();
     vm.setC5(emptyC5);
 
@@ -100,7 +100,7 @@ fn parse_out_actions_direct_empty_cell_returns_empty_list() {
     run_success(
         "cn-stdlib-parse-out-actions-direct-empty-cell",
         r"
-get fun `test-cn-parse-out-actions-direct-empty-cell`() {
+get fun `test cn parse out actions direct empty cell`() {
     val parsed = vm.parseOutActions(createEmptyCell());
     expect(parsed.size()).toEqual(0);
 }

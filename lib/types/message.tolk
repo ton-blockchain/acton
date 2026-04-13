@@ -10,7 +10,7 @@
 /// if (action != null) {
 ///     val msg = action.loadMessage<Transfer>();
 ///     val body = msg.loadBody();
-///     println1("Transfer amount: {:ton}", body.amount);
+///     println("Transfer amount: {:ton}", body.amount);
 /// }
 ///
 /// // Parsing a generic message to check opcode
@@ -30,8 +30,8 @@ import "../tlb/maybe"
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode();
@@ -56,8 +56,8 @@ struct MessageRelaxedGeneric {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode(true);
@@ -94,8 +94,8 @@ fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();
@@ -119,8 +119,8 @@ struct MessageRelaxed<X> {
 ///
 /// Example:
 /// ```tolk
-/// val out_actions = vm.outActions();
-/// val action = out_actions.at(0);
+/// val outActions = vm.outActions();
+/// val action = outActions.at(0);
 /// if (action is OutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();

@@ -20,6 +20,6 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✓ send-iter-interleaving [TIME]
+  ✓ send iter interleaving [TIME]
 
  ✓ 1 passed in 1 file

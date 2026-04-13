@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/find_external_out_message_compile_failure.test.tolk (1 test)
-  ✓ en-find-external-out-message-typed-branch-bug [TIME]
+  ✓ en find external out message typed branch bug [TIME]
 
  ✓ 1 passed in 1 file

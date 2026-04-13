@@ -43,8 +43,7 @@ Namespace for file system operations.
 fun fs.readFile(path: string): string?
 ```
 
-Reads the entire contents of a file at the given path as a string slice
-with snake-string encoding.
+Reads the entire contents of a file at the given path.
 
 Behavior details:
 - The file is read as UTF-8 text.
@@ -60,13 +59,13 @@ Example:
 ```tolk
 val content = fs.readFile("config.txt");
 if (content != null) {
-    println1("File content: {}", content);
+    println("File content: {}", content);
 } else {
     println("File not found");
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L46" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L45" />
 
 ## `fs.readBytes`
 
@@ -80,7 +79,7 @@ Returns:
 - `slice` with file bytes on success.
 - `null` on read failure (missing file, permission error, etc).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L53" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L52" />
 
 ## `fs.writeString`
 
@@ -94,7 +93,7 @@ Returns:
 - `true` if the file was written successfully.
 - `false` on any host I/O error.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L60" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L59" />
 
 ## `fs.writeBytes`
 
@@ -108,7 +107,7 @@ Returns:
 - `true` if the file was written successfully.
 - `false` on invalid byte slice input or host I/O error.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L67" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L66" />
 
 ## `fs.exists`
 
@@ -122,5 +121,5 @@ Returns:
 - `true` when the path exists.
 - `false` when missing or if existence check fails.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fs.tolk#L73" />
 

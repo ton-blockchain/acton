@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/cl_vm_helpers.test.tolk (1 test)
-  ✓ cl-stdlib-get-config-param-tuple-read-bug [TIME]
+  ✓ cl stdlib get config param tuple read bug [TIME]
 
  ✓ 1 passed in 1 file

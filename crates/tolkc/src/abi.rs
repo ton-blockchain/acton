@@ -1,170 +1,7 @@
+pub use crate::types_kernel::{Ty, UnionVariant};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OneOrMany<T> {
-    One(Box<T>),
-    Many(Vec<T>),
-}
-
-/// =======================
-/// Types: `TypePtr::as_abi_json()`
-/// =======================
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum ABIType {
-    // ---- primitives ----
-    #[serde(rename = "int")]
-    Int,
-
-    #[serde(rename = "bool")]
-    Bool,
-
-    #[serde(rename = "cell")]
-    Cell,
-
-    #[serde(rename = "slice")]
-    Slice,
-
-    #[serde(rename = "builder")]
-    Builder,
-
-    // TypeDataContinuation + TypeDataFunCallable
-    #[serde(rename = "callable", alias = "continuation")]
-    Callable,
-
-    // TypeDataString
-    #[serde(rename = "string")]
-    String,
-
-    // TypeDataCoins
-    #[serde(rename = "coins")]
-    Coins,
-
-    // TypeDataVoid + TypeDataNever
-    #[serde(rename = "void")]
-    Void,
-
-    // ---- addresses ----
-    // TypeDataAddress::is_internal() ? address : addressAny
-    #[serde(rename = "address")]
-    Address,
-
-    #[serde(rename = "addressAny")]
-    AddressAny,
-
-    // Special-case in TypeDataUnion for AddressAlias?
-    #[serde(rename = "addressOpt")]
-    AddressOpt,
-
-    // ---- ints with width / variadic ----
-    #[serde(rename = "uintN")]
-    UintN { n: usize },
-
-    #[serde(rename = "intN")]
-    IntN { n: usize },
-
-    #[serde(rename = "varuintN")]
-    VarUintN { n: usize },
-
-    #[serde(rename = "varintN")]
-    VarIntN { n: usize },
-
-    // TypeDataBitsN
-    #[serde(rename = "bitsN")]
-    BitsN { n: usize },
-
-    // ---- composite / container ----
-    // TypeDataArray
-    #[serde(rename = "arrayOf")]
-    ArrayOf { inner: Box<ABIType> },
-
-    // TypeDataTensor
-    #[serde(rename = "tensor")]
-    Tensor { items: Vec<ABIType> },
-
-    // TypeDataShapedTuple (TYPE)
-    #[serde(rename = "shapedTuple")]
-    ShapedTuple { items: Vec<ABIType> },
-
-    // TypeDataNullLiteral (TYPE)
-    #[serde(rename = "nullLiteral")]
-    NullLiteral,
-
-    // ---- generics ----
-    // TypeDataGenericT
-    #[serde(rename = "genericT")]
-    GenericT { name_t: String },
-
-    // ---- references to declarations ----
-    // TypeDataStruct
-    #[serde(rename = "StructRef")]
-    StructRef {
-        struct_name: String,
-
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        type_args: Vec<ABIType>,
-    },
-
-    // TypeDataEnum
-    #[serde(rename = "EnumRef")]
-    EnumRef { enum_name: String },
-
-    // TypeDataAlias / GenericTypeWithTs (alias_ref)
-    #[serde(rename = "AliasRef")]
-    AliasRef {
-        alias_name: String,
-
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        type_args: Vec<ABIType>,
-    },
-
-    // ---- special aliases / builtins ----
-    // TypeDataAlias special-cases RemainingBitsAndRefs -> remaining
-    #[serde(rename = "remaining")]
-    Remaining,
-
-    // TypeDataGenericTypeWithTs / TypeDataStruct special-case Cell / LispList
-    #[serde(rename = "cellOf")]
-    CellOf { inner: OneOrMany<ABIType> },
-
-    #[serde(rename = "lispListOf")]
-    LispListOf { inner: OneOrMany<ABIType> },
-
-    // TypeDataUnion
-    #[serde(rename = "union")]
-    Union { variants: Vec<ABIUnionVariant> },
-
-    // TypeDataUnion (or_null != null) -> nullable
-    #[serde(rename = "nullable")]
-    Nullable { inner: Box<ABIType> },
-
-    // TypeDataMapKV
-    #[serde(rename = "mapKV")]
-    MapKV { k: Box<ABIType>, v: Box<ABIType> },
-
-    // TypeDataUnknown
-    #[serde(rename = "unknown")]
-    Unknown,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ABIUnionVariant {
-    pub variant_ty: ABIType,
-    pub prefix_str: String,
-    pub prefix_len: i32,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_prefix_implicit: Option<bool>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stack_type_id: Option<i32>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stack_width: Option<i32>,
-}
 
 /// =======================
 /// Const values: `ConstValExpression` -> constants[].value
@@ -202,7 +39,7 @@ pub enum ABIConstValue {
     #[serde(rename = "castTo")]
     CastTo {
         inner: Box<ABIConstValue>,
-        cast_to: ABIType,
+        cast_to: Ty,
     },
 
     #[serde(rename = "null")]
@@ -229,7 +66,7 @@ pub struct ABICustomPackUnpack {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIStructField {
     pub name: String,
-    pub ty: ABIType,
+    pub ty: Ty,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<ABIConstValue>,
@@ -269,7 +106,7 @@ pub enum ABIDeclaration {
     Alias {
         name: String,
 
-        target_ty: ABIType,
+        target_ty: Ty,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         type_params: Option<Vec<String>>,
@@ -281,7 +118,7 @@ pub enum ABIDeclaration {
     #[serde(rename = "enum")]
     Enum {
         name: String,
-        encoded_as: ABIType,
+        encoded_as: Ty,
         members: Vec<ABIEnumMember>,
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
@@ -294,7 +131,7 @@ pub enum ABIDeclaration {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIFunctionParameter {
     pub name: String,
-    pub ty: ABIType,
+    pub ty: Ty,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<ABIConstValue>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -306,14 +143,14 @@ pub struct ABIGetMethod {
     pub tvm_method_id: i32,
     pub name: String,
     pub parameters: Vec<ABIFunctionParameter>,
-    pub return_ty: ABIType,
+    pub return_ty: Ty,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIInternalMessage {
-    pub body_ty: ABIType,
+    pub body_ty: Ty,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
@@ -327,25 +164,25 @@ pub struct ABIInternalMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIExternalMessage {
-    pub body_ty: ABIType,
+    pub body_ty: Ty,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIOutgoingMessage {
-    pub body_ty: ABIType,
+    pub body_ty: Ty,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ABIStorage {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_ty: Option<ABIType>,
+    pub storage_ty: Option<Ty>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_at_deployment_ty: Option<ABIType>,
+    pub storage_at_deployment_ty: Option<Ty>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -373,7 +210,7 @@ pub struct ABIConstant {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractABI {
     pub abi_schema_version: String,
 
@@ -441,7 +278,7 @@ impl ContractABI {
 
     pub fn resolve_single_struct(
         &self,
-        ty: &ABIType,
+        ty: &Ty,
         context: &str,
     ) -> anyhow::Result<ABIResolvedStruct> {
         let mut resolved = Vec::new();
@@ -477,86 +314,28 @@ impl ContractABI {
     }
 }
 
-impl ABIType {
+impl Ty {
     #[must_use]
     pub fn render_param_type(&self) -> String {
-        if let ABIType::CellOf { inner } = self {
-            render_one_or_many_type(inner)
-        } else {
-            self.render_type()
+        match self {
+            Ty::CellOf { inner } => inner.render_type(),
+            _ => self.render_type(),
         }
     }
 
     pub fn render_type(&self) -> String {
-        match self {
-            ABIType::Int => "int".to_owned(),
-            ABIType::Bool => "bool".to_owned(),
-            ABIType::Cell => "cell".to_owned(),
-            ABIType::Slice => "slice".to_owned(),
-            ABIType::Builder => "builder".to_owned(),
-            ABIType::Callable => "continuation".to_owned(),
-            ABIType::String => "string".to_owned(),
-            ABIType::Coins => "coins".to_owned(),
-            ABIType::Void => "void".to_owned(),
-            ABIType::Address => "address".to_owned(),
-            ABIType::AddressAny => "any_address".to_owned(),
-            ABIType::AddressOpt => "address?".to_owned(),
-            ABIType::UintN { n } => format!("uint{n}"),
-            ABIType::IntN { n } => format!("int{n}"),
-            ABIType::VarUintN { n } => format!("varuint{n}"),
-            ABIType::VarIntN { n } => format!("varint{n}"),
-            ABIType::BitsN { n } => format!("bits{n}"),
-            ABIType::ArrayOf { inner } => format!("array<{}>", inner.render_type()),
-            ABIType::Tensor { items } => format!(
-                "({})",
-                items
-                    .iter()
-                    .map(ABIType::render_type)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            ABIType::ShapedTuple { items } => format!(
-                "[{}]",
-                items
-                    .iter()
-                    .map(ABIType::render_type)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            ABIType::NullLiteral => "null".to_owned(),
-            ABIType::GenericT { name_t } => name_t.clone(),
-            ABIType::StructRef {
-                struct_name,
-                type_args,
-            } => render_named_type(struct_name, type_args),
-            ABIType::EnumRef { enum_name } => enum_name.clone(),
-            ABIType::AliasRef {
-                alias_name,
-                type_args,
-            } => render_named_type(alias_name, type_args),
-            ABIType::Remaining => "RemainingBitsAndRefs".to_owned(),
-            ABIType::CellOf { inner } => format!("Cell<{}>", render_one_or_many_type(inner)),
-            ABIType::LispListOf { inner } => {
-                format!("lisp_list<{}>", render_one_or_many_type(inner))
-            }
-            ABIType::Union { variants } => render_union_type(variants),
-            ABIType::Nullable { inner } => render_nullable_type(inner),
-            ABIType::MapKV { k, v } => {
-                format!("map<{}, {}>", k.render_type(), v.render_type())
-            }
-            ABIType::Unknown => "unknown".to_owned(),
-        }
+        self.to_string()
     }
 
     #[must_use]
     pub const fn is_typed_cell(&self) -> bool {
-        matches!(self, ABIType::CellOf { .. })
+        matches!(self, Ty::CellOf { .. })
     }
 
     #[must_use]
     pub fn typed_cell_payload_default_value(&self, abi: &ContractABI) -> Option<String> {
         match self {
-            ABIType::CellOf { inner } => Some(default_value_for_one_or_many(
+            Ty::CellOf { inner } => Some(default_value_impl(
                 abi,
                 inner,
                 &BTreeMap::new(),
@@ -574,13 +353,13 @@ impl ABIType {
 
 fn collect_structs_from_type(
     abi: &ContractABI,
-    ty: &ABIType,
+    ty: &Ty,
     visited_aliases: &mut HashSet<String>,
     seen_structs: &mut HashSet<String>,
     resolved: &mut Vec<ABIResolvedStruct>,
 ) -> anyhow::Result<()> {
     match ty {
-        ABIType::StructRef { struct_name, .. } => {
+        Ty::StructRef { struct_name, .. } => {
             let fields = find_struct_decl(abi, struct_name)
                 .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
             if seen_structs.insert(struct_name.clone()) {
@@ -588,7 +367,7 @@ fn collect_structs_from_type(
             }
             Ok(())
         }
-        ABIType::AliasRef { alias_name, .. } => {
+        Ty::AliasRef { alias_name, .. } => {
             if !visited_aliases.insert(alias_name.clone()) {
                 anyhow::bail!("Cyclic ABI alias reference detected for {alias_name}");
             }
@@ -608,7 +387,7 @@ fn collect_structs_from_type(
             visited_aliases.remove(alias_name);
             result
         }
-        ABIType::Union { variants } => {
+        Ty::Union { variants, .. } => {
             for variant in variants {
                 collect_structs_from_type(
                     abi,
@@ -620,36 +399,16 @@ fn collect_structs_from_type(
             }
             Ok(())
         }
-        ABIType::Nullable { inner } => {
+        Ty::Nullable { inner, .. } => {
             collect_structs_from_type(abi, inner, visited_aliases, seen_structs, resolved)
         }
-        ABIType::CellOf { inner } | ABIType::LispListOf { inner } => {
-            collect_structs_from_one_or_many(abi, inner, visited_aliases, seen_structs, resolved)
+        Ty::CellOf { inner } | Ty::LispListOf { inner } => {
+            collect_structs_from_type(abi, inner, visited_aliases, seen_structs, resolved)
         }
         _ => anyhow::bail!(
             "Unsupported ABI type {} while resolving contract wrapper types",
             ty.render_type()
         ),
-    }
-}
-
-fn collect_structs_from_one_or_many(
-    abi: &ContractABI,
-    types: &OneOrMany<ABIType>,
-    visited_aliases: &mut HashSet<String>,
-    seen_structs: &mut HashSet<String>,
-    resolved: &mut Vec<ABIResolvedStruct>,
-) -> anyhow::Result<()> {
-    match types {
-        OneOrMany::One(inner) => {
-            collect_structs_from_type(abi, inner, visited_aliases, seen_structs, resolved)
-        }
-        OneOrMany::Many(items) => {
-            for item in items {
-                collect_structs_from_type(abi, item, visited_aliases, seen_structs, resolved)?;
-            }
-            Ok(())
-        }
     }
 }
 
@@ -662,7 +421,7 @@ fn find_struct_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a [
     })
 }
 
-fn find_alias_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a ABIType> {
+fn find_alias_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a Ty> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Alias {
             name, target_ty, ..
@@ -696,7 +455,7 @@ fn find_struct_decl_full<'a>(
 fn find_alias_decl_full<'a>(
     abi: &'a ContractABI,
     target_name: &str,
-) -> Option<(Option<&'a [String]>, &'a ABIType)> {
+) -> Option<(Option<&'a [String]>, &'a Ty)> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Alias {
             name,
@@ -711,7 +470,7 @@ fn find_alias_decl_full<'a>(
 fn find_enum_decl<'a>(
     abi: &'a ContractABI,
     target_name: &str,
-) -> Option<(&'a ABIType, &'a [ABIEnumMember])> {
+) -> Option<(&'a Ty, &'a [ABIEnumMember])> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Enum {
             name,
@@ -723,7 +482,8 @@ fn find_enum_decl<'a>(
     })
 }
 
-fn render_named_type(name: &str, type_args: &[ABIType]) -> String {
+fn render_named_type(name: &str, type_args: Option<&[Ty]>) -> String {
+    let type_args = type_args.unwrap_or(&[]);
     if type_args.is_empty() {
         name.to_owned()
     } else {
@@ -731,88 +491,39 @@ fn render_named_type(name: &str, type_args: &[ABIType]) -> String {
             "{name}<{}>",
             type_args
                 .iter()
-                .map(ABIType::render_type)
+                .map(Ty::render_type)
                 .collect::<Vec<_>>()
                 .join(", ")
         )
     }
 }
 
-fn render_one_or_many_type(types: &OneOrMany<ABIType>) -> String {
-    match types {
-        OneOrMany::One(inner) => inner.render_type(),
-        OneOrMany::Many(items) if items.len() == 1 => items[0].render_type(),
-        OneOrMany::Many(items) => format!(
-            "({})",
-            items
-                .iter()
-                .map(ABIType::render_type)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-    }
-}
-
-fn render_union_type(variants: &[ABIUnionVariant]) -> String {
-    let null_variants = variants
-        .iter()
-        .filter(|variant| matches!(variant.variant_ty, ABIType::NullLiteral))
-        .count();
-    let non_null_variants = variants
-        .iter()
-        .filter(|variant| !matches!(variant.variant_ty, ABIType::NullLiteral))
-        .collect::<Vec<_>>();
-
-    if null_variants == 1 && non_null_variants.len() == 1 {
-        return render_nullable_type(&non_null_variants[0].variant_ty);
-    }
-
-    variants
-        .iter()
-        .map(|variant| variant.variant_ty.render_type())
-        .collect::<Vec<_>>()
-        .join(" | ")
-}
-
-fn render_nullable_type(inner: &ABIType) -> String {
-    let inner_text = inner.render_type();
-    if matches!(inner, ABIType::Callable | ABIType::Union { .. }) {
-        format!("({inner_text})?")
-    } else {
-        format!("{inner_text}?")
-    }
-}
-
 fn default_value_impl(
     abi: &ContractABI,
-    ty: &ABIType,
-    bindings: &BTreeMap<String, ABIType>,
+    ty: &Ty,
+    bindings: &BTreeMap<String, Ty>,
     visited_defs: &mut HashSet<String>,
 ) -> String {
     match ty {
-        ABIType::Int
-        | ABIType::Coins
-        | ABIType::UintN { .. }
-        | ABIType::IntN { .. }
-        | ABIType::VarUintN { .. }
-        | ABIType::VarIntN { .. } => "0".to_owned(),
-        ABIType::Bool => "false".to_owned(),
-        ABIType::Cell => "createEmptyCell()".to_owned(),
-        ABIType::Slice | ABIType::Remaining => "createEmptySlice()".to_owned(),
-        ABIType::Builder => "beginCell()".to_owned(),
-        ABIType::Callable => "fun () {}".to_owned(),
-        ABIType::String => "\"\"".to_owned(),
-        ABIType::Void => "()".to_owned(),
-        ABIType::Address => {
-            "address(\"EQD__________________________________________0vo\")".to_owned()
-        }
-        ABIType::AddressAny => "createAddressNone()".to_owned(),
-        ABIType::AddressOpt | ABIType::NullLiteral | ABIType::Nullable { .. } => "null".to_owned(),
-        ABIType::BitsN { n } => format!("\"\" as bits{n}"),
-        ABIType::ArrayOf { .. } | ABIType::LispListOf { .. } | ABIType::MapKV { .. } => {
-            "[]".to_owned()
-        }
-        ABIType::Tensor { items } => format!(
+        Ty::Int
+        | Ty::Coins
+        | Ty::UintN { .. }
+        | Ty::IntN { .. }
+        | Ty::VaruintN { .. }
+        | Ty::VarintN { .. } => "0".to_owned(),
+        Ty::Bool => "false".to_owned(),
+        Ty::Cell => "createEmptyCell()".to_owned(),
+        Ty::Slice | Ty::Remaining => "createEmptySlice()".to_owned(),
+        Ty::Builder => "beginCell()".to_owned(),
+        Ty::Callable => "fun () {}".to_owned(),
+        Ty::String => "\"\"".to_owned(),
+        Ty::Void => "()".to_owned(),
+        Ty::Address => "address(\"EQD__________________________________________0vo\")".to_owned(),
+        Ty::AddressAny => "createAddressNone()".to_owned(),
+        Ty::AddressOpt | Ty::NullLiteral | Ty::Nullable { .. } => "null".to_owned(),
+        Ty::BitsN { n } => format!("\"\" as bits{n}"),
+        Ty::ArrayOf { .. } | Ty::LispListOf { .. } | Ty::MapKV { .. } => "[]".to_owned(),
+        Ty::Tensor { items } => format!(
             "({})",
             items
                 .iter()
@@ -820,7 +531,7 @@ fn default_value_impl(
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        ABIType::ShapedTuple { items } => format!(
+        Ty::ShapedTuple { items } => format!(
             "[{}]",
             items
                 .iter()
@@ -828,32 +539,33 @@ fn default_value_impl(
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        ABIType::GenericT { .. } => "{}".to_owned(),
-        ABIType::StructRef {
+        Ty::GenericT { .. } => "{}".to_owned(),
+        Ty::StructRef {
             struct_name,
             type_args,
         } => default_struct_value(abi, struct_name, type_args, visited_defs),
-        ABIType::EnumRef { enum_name } => default_enum_value(abi, enum_name),
-        ABIType::AliasRef {
+        Ty::EnumRef { enum_name } => default_enum_value(abi, enum_name),
+        Ty::AliasRef {
             alias_name,
             type_args,
         } => default_alias_value(abi, alias_name, type_args, visited_defs),
-        ABIType::CellOf { inner } => format!(
+        Ty::CellOf { inner } => format!(
             "{}.toCell()",
-            default_value_for_one_or_many(abi, inner, bindings, visited_defs)
+            default_value_impl(abi, inner, bindings, visited_defs)
         ),
-        ABIType::Union { variants } => default_union_value(abi, variants, bindings, visited_defs),
-        ABIType::Unknown => "null".to_owned(),
+        Ty::Union { variants, .. } => default_union_value(abi, variants, bindings, visited_defs),
+        Ty::AddressExt => "createAddressNone()".to_owned(),
+        Ty::Unknown => "null".to_owned(),
     }
 }
 
 fn default_struct_value(
     abi: &ContractABI,
     struct_name: &str,
-    type_args: &[ABIType],
+    type_args: &Option<Vec<Ty>>,
     visited_defs: &mut HashSet<String>,
 ) -> String {
-    let qualified_name = render_named_type(struct_name, type_args);
+    let qualified_name = render_named_type(struct_name, type_args.as_deref());
     let visit_key = format!("struct:{qualified_name}");
     if !visited_defs.insert(visit_key.clone()) {
         return "null".to_owned();
@@ -861,7 +573,9 @@ fn default_struct_value(
 
     let result = find_struct_decl_full(abi, struct_name)
         .map(|(type_params, fields)| {
-            if !type_args.is_empty() || type_params.is_some_and(|params| !params.is_empty()) {
+            if type_args.as_ref().is_some_and(|args| !args.is_empty())
+                || type_params.is_some_and(|params| !params.is_empty())
+            {
                 return "{}".to_owned();
             }
 
@@ -891,10 +605,10 @@ fn default_struct_value(
 fn default_alias_value(
     abi: &ContractABI,
     alias_name: &str,
-    type_args: &[ABIType],
+    type_args: &Option<Vec<Ty>>,
     visited_defs: &mut HashSet<String>,
 ) -> String {
-    let qualified_name = render_named_type(alias_name, type_args);
+    let qualified_name = render_named_type(alias_name, type_args.as_deref());
     let visit_key = format!("alias:{qualified_name}");
     if !visited_defs.insert(visit_key.clone()) {
         return "null".to_owned();
@@ -902,7 +616,9 @@ fn default_alias_value(
 
     let result = find_alias_decl_full(abi, alias_name)
         .map(|(type_params, target_ty)| {
-            if !type_args.is_empty() || type_params.is_some_and(|params| !params.is_empty()) {
+            if type_args.as_ref().is_some_and(|args| !args.is_empty())
+                || type_params.is_some_and(|params| !params.is_empty())
+            {
                 return "{}".to_owned();
             }
 
@@ -930,8 +646,8 @@ fn default_enum_value(abi: &ContractABI, enum_name: &str) -> String {
 
 fn default_union_value(
     abi: &ContractABI,
-    variants: &[ABIUnionVariant],
-    bindings: &BTreeMap<String, ABIType>,
+    variants: &[UnionVariant],
+    bindings: &BTreeMap<String, Ty>,
     visited_defs: &mut HashSet<String>,
 ) -> String {
     let Some(first_variant) = variants.first() else {
@@ -940,34 +656,12 @@ fn default_union_value(
 
     if variants
         .iter()
-        .any(|variant| matches!(variant.variant_ty, ABIType::NullLiteral))
+        .any(|variant| matches!(variant.variant_ty, Ty::NullLiteral))
     {
         return "null".to_owned();
     }
 
     default_value_impl(abi, &first_variant.variant_ty, bindings, visited_defs)
-}
-
-fn default_value_for_one_or_many(
-    abi: &ContractABI,
-    types: &OneOrMany<ABIType>,
-    bindings: &BTreeMap<String, ABIType>,
-    visited_defs: &mut HashSet<String>,
-) -> String {
-    match types {
-        OneOrMany::One(inner) => default_value_impl(abi, inner, bindings, visited_defs),
-        OneOrMany::Many(items) if items.len() == 1 => {
-            default_value_impl(abi, &items[0], bindings, visited_defs)
-        }
-        OneOrMany::Many(items) => format!(
-            "({})",
-            items
-                .iter()
-                .map(|item| default_value_impl(abi, item, bindings, visited_defs))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-    }
 }
 
 fn render_const_value(abi: &ContractABI, value: &ABIConstValue) -> String {
@@ -1038,8 +732,8 @@ fn render_const_object_value(
 mod tests {
     use super::{
         ABIConstValue, ABIDeclaration, ABIEnumMember, ABIGetMethod, ABIInternalMessage, ABIOpcode,
-        ABIStorage, ABIStructField, ABIThrownError, ABIThrownErrorKind, ABIType, ABIUnionVariant,
-        ContractABI, OneOrMany,
+        ABIStorage, ABIStructField, ABIThrownError, ABIThrownErrorKind, ContractABI, Ty,
+        UnionVariant,
     };
 
     fn empty_abi() -> ContractABI {
@@ -1125,7 +819,7 @@ mod tests {
                 }),
                 fields: vec![ABIStructField {
                     name: "value".to_owned(),
-                    ty: ABIType::IntN { n: 32 },
+                    ty: Ty::IntN { n: 32 },
                     default_value: None,
                     description: String::new(),
                 }],
@@ -1143,12 +837,12 @@ mod tests {
             },
             ABIDeclaration::Alias {
                 name: "Incoming".to_owned(),
-                target_ty: ABIType::Union {
+                target_ty: Ty::Union {
                     variants: vec![
-                        ABIUnionVariant {
-                            variant_ty: ABIType::StructRef {
+                        UnionVariant {
+                            variant_ty: Ty::StructRef {
                                 struct_name: "MsgA".to_owned(),
-                                type_args: Vec::new(),
+                                type_args: None,
                             },
                             prefix_str: "0x1".to_owned(),
                             prefix_len: 32,
@@ -1156,10 +850,10 @@ mod tests {
                             stack_type_id: None,
                             stack_width: None,
                         },
-                        ABIUnionVariant {
-                            variant_ty: ABIType::StructRef {
+                        UnionVariant {
+                            variant_ty: Ty::StructRef {
                                 struct_name: "MsgB".to_owned(),
-                                type_args: Vec::new(),
+                                type_args: None,
                             },
                             prefix_str: "0x2".to_owned(),
                             prefix_len: 32,
@@ -1168,15 +862,16 @@ mod tests {
                             stack_width: None,
                         },
                     ],
+                    stack_width: None,
                 },
                 type_params: None,
                 custom_pack_unpack: None,
             },
         ];
         abi.incoming_messages = vec![ABIInternalMessage {
-            body_ty: ABIType::AliasRef {
+            body_ty: Ty::AliasRef {
                 alias_name: "Incoming".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             },
             description: String::new(),
             minimal_msg_value: None,
@@ -1212,13 +907,13 @@ mod tests {
             },
         ];
         abi.storage = ABIStorage {
-            storage_ty: Some(ABIType::StructRef {
+            storage_ty: Some(Ty::StructRef {
                 struct_name: "Storage".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             }),
-            storage_at_deployment_ty: Some(ABIType::StructRef {
+            storage_at_deployment_ty: Some(Ty::StructRef {
                 struct_name: "DeploymentStorage".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             }),
         };
 
@@ -1235,17 +930,17 @@ mod tests {
         let mut abi = empty_abi();
         abi.declarations = vec![ABIDeclaration::Alias {
             name: "Incoming".to_owned(),
-            target_ty: ABIType::AliasRef {
+            target_ty: Ty::AliasRef {
                 alias_name: "Incoming".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             },
             type_params: None,
             custom_pack_unpack: None,
         }];
         abi.incoming_messages = vec![ABIInternalMessage {
-            body_ty: ABIType::AliasRef {
+            body_ty: Ty::AliasRef {
                 alias_name: "Incoming".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             },
             description: String::new(),
             minimal_msg_value: None,
@@ -1266,8 +961,8 @@ mod tests {
     #[test]
     fn abi_type_helpers_render_and_default_values() {
         let abi = empty_abi();
-        let ty = ABIType::CellOf {
-            inner: OneOrMany::One(Box::new(ABIType::IntN { n: 32 })),
+        let ty = Ty::CellOf {
+            inner: Box::new(Ty::IntN { n: 32 }),
         };
         assert_eq!(ty.render_type(), "Cell<int32>");
         assert_eq!(ty.render_param_type(), "int32");
@@ -1278,18 +973,18 @@ mod tests {
         );
         assert_eq!(ty.default_value(&abi), "0.toCell()");
 
-        let nullable_union = ABIType::Union {
+        let nullable_union = Ty::Union {
             variants: vec![
-                ABIUnionVariant {
-                    variant_ty: ABIType::NullLiteral,
+                UnionVariant {
+                    variant_ty: Ty::NullLiteral,
                     prefix_str: String::new(),
                     prefix_len: 0,
                     is_prefix_implicit: None,
                     stack_type_id: None,
                     stack_width: None,
                 },
-                ABIUnionVariant {
-                    variant_ty: ABIType::Callable,
+                UnionVariant {
+                    variant_ty: Ty::Callable,
                     prefix_str: String::new(),
                     prefix_len: 0,
                     is_prefix_implicit: None,
@@ -1297,30 +992,25 @@ mod tests {
                     stack_width: None,
                 },
             ],
+            stack_width: None,
         };
-        assert_eq!(nullable_union.render_type(), "(continuation)?");
+        assert_eq!(nullable_union.render_type(), "null, continuation");
+        assert_eq!(Ty::AddressAny.default_value(&abi), "createAddressNone()");
+        assert_eq!(Ty::BitsN { n: 32 }.default_value(&abi), "\"\" as bits32");
+        assert_eq!(Ty::Callable.default_value(&abi), "fun () {}");
         assert_eq!(
-            ABIType::AddressAny.default_value(&abi),
-            "createAddressNone()"
-        );
-        assert_eq!(
-            ABIType::BitsN { n: 32 }.default_value(&abi),
-            "\"\" as bits32"
-        );
-        assert_eq!(ABIType::Callable.default_value(&abi), "fun () {}");
-        assert_eq!(
-            ABIType::Union {
+            Ty::Union {
                 variants: vec![
-                    ABIUnionVariant {
-                        variant_ty: ABIType::IntN { n: 8 },
+                    UnionVariant {
+                        variant_ty: Ty::IntN { n: 8 },
                         prefix_str: String::new(),
                         prefix_len: 0,
                         is_prefix_implicit: None,
                         stack_type_id: None,
                         stack_width: None,
                     },
-                    ABIUnionVariant {
-                        variant_ty: ABIType::Bool,
+                    UnionVariant {
+                        variant_ty: Ty::Bool,
                         prefix_str: String::new(),
                         prefix_len: 0,
                         is_prefix_implicit: None,
@@ -1328,13 +1018,14 @@ mod tests {
                         stack_width: None,
                     },
                 ],
+                stack_width: None,
             }
             .default_value(&abi),
             "0"
         );
         assert_eq!(
-            ABIType::LispListOf {
-                inner: OneOrMany::One(Box::new(ABIType::Bool)),
+            Ty::LispListOf {
+                inner: Box::new(Ty::Bool),
             }
             .default_value(&abi),
             "[]"
@@ -1347,7 +1038,7 @@ mod tests {
         abi.declarations = vec![
             ABIDeclaration::Enum {
                 name: "Color".to_owned(),
-                encoded_as: ABIType::UintN { n: 2 },
+                encoded_as: Ty::UintN { n: 2 },
                 members: vec![
                     ABIEnumMember {
                         name: "Red".to_owned(),
@@ -1368,7 +1059,7 @@ mod tests {
                 prefix: None,
                 fields: vec![ABIStructField {
                     name: "item".to_owned(),
-                    ty: ABIType::GenericT {
+                    ty: Ty::GenericT {
                         name_t: "T".to_owned(),
                     },
                     default_value: None,
@@ -1378,19 +1069,21 @@ mod tests {
             },
             ABIDeclaration::Alias {
                 name: "UserId".to_owned(),
-                target_ty: ABIType::IntN { n: 32 },
+                target_ty: Ty::IntN { n: 32 },
                 type_params: None,
                 custom_pack_unpack: None,
             },
             ABIDeclaration::Alias {
                 name: "MaybeBoxed".to_owned(),
-                target_ty: ABIType::StructRef {
+                target_ty: Ty::StructRef {
                     struct_name: "Boxed".to_owned(),
-                    type_args: vec![ABIType::Nullable {
-                        inner: Box::new(ABIType::GenericT {
+                    type_args: Some(vec![Ty::Nullable {
+                        inner: Box::new(Ty::GenericT {
                             name_t: "T".to_owned(),
                         }),
-                    }],
+                        stack_type_id: None,
+                        stack_width: None,
+                    }]),
                 },
                 type_params: Some(vec!["T".to_owned()]),
                 custom_pack_unpack: None,
@@ -1402,16 +1095,16 @@ mod tests {
                 fields: vec![
                     ABIStructField {
                         name: "owner".to_owned(),
-                        ty: ABIType::AliasRef {
+                        ty: Ty::AliasRef {
                             alias_name: "UserId".to_owned(),
-                            type_args: Vec::new(),
+                            type_args: None,
                         },
                         default_value: None,
                         description: String::new(),
                     },
                     ABIStructField {
                         name: "color".to_owned(),
-                        ty: ABIType::EnumRef {
+                        ty: Ty::EnumRef {
                             enum_name: "Color".to_owned(),
                         },
                         default_value: None,
@@ -1419,18 +1112,18 @@ mod tests {
                     },
                     ABIStructField {
                         name: "maybeItem".to_owned(),
-                        ty: ABIType::AliasRef {
+                        ty: Ty::AliasRef {
                             alias_name: "MaybeBoxed".to_owned(),
-                            type_args: vec![ABIType::Bool],
+                            type_args: Some(vec![Ty::Bool]),
                         },
                         default_value: None,
                         description: String::new(),
                     },
                     ABIStructField {
                         name: "nested".to_owned(),
-                        ty: ABIType::StructRef {
+                        ty: Ty::StructRef {
                             struct_name: "Boxed".to_owned(),
-                            type_args: Vec::new(),
+                            type_args: None,
                         },
                         default_value: Some(ABIConstValue::Object {
                             struct_name: "Boxed".to_owned(),
@@ -1440,10 +1133,10 @@ mod tests {
                     },
                     ABIStructField {
                         name: "opcode".to_owned(),
-                        ty: ABIType::UintN { n: 32 },
+                        ty: Ty::UintN { n: 32 },
                         default_value: Some(ABIConstValue::CastTo {
                             inner: Box::new(ABIConstValue::Int { v: "7".to_owned() }),
-                            cast_to: ABIType::UintN { n: 32 },
+                            cast_to: Ty::UintN { n: 32 },
                         }),
                         description: String::new(),
                     },
@@ -1452,9 +1145,9 @@ mod tests {
             },
         ];
 
-        let storage_default = ABIType::StructRef {
+        let storage_default = Ty::StructRef {
             struct_name: "Storage".to_owned(),
-            type_args: Vec::new(),
+            type_args: None,
         }
         .default_value(&abi);
 
@@ -1469,17 +1162,17 @@ mod tests {
         let mut abi = empty_abi();
         abi.declarations = vec![ABIDeclaration::Alias {
             name: "Loop".to_owned(),
-            target_ty: ABIType::AliasRef {
+            target_ty: Ty::AliasRef {
                 alias_name: "Loop".to_owned(),
-                type_args: Vec::new(),
+                type_args: None,
             },
             type_params: None,
             custom_pack_unpack: None,
         }];
 
-        let value = ABIType::AliasRef {
+        let value = Ty::AliasRef {
             alias_name: "Loop".to_owned(),
-            type_args: Vec::new(),
+            type_args: None,
         }
         .default_value(&abi);
 

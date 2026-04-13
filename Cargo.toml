@@ -130,7 +130,7 @@ tempfile = "3.10.1" # testing
 dotenvy = "0.15.7"
 pathdiff = "0.2.3"
 strsim = "0.11.1"
-clap_complete = { version = "4.5.61", features = ["unstable-dynamic"] }
+clap_complete = { version = "4.6.1", features = ["unstable-dynamic"] }
 human-panic = "2.0.5" # better panic handling
 crash-handler = "0.7.0" # low-level fatal signal/exception handling
 ctrlc = "3.4.5" # graceful Ctrl+C handling

@@ -7,7 +7,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 use std::sync::Arc;
 use tolkc::TolkSourceMap;
-use tolkc::abi::{ABIFunctionParameter, ABIType, ContractABI as CompilerContractABI};
+use tolkc::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
 use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
@@ -62,6 +62,7 @@ impl TestRunner<'_> {
         code_cell: &Cell,
         dest_address: &str,
         abi: Arc<ContractAbi>,
+        compiler_abi: Option<Arc<CompilerContractABI>>,
         source_map: Arc<TolkSourceMap>,
         fuzz: FuzzConfig,
     ) -> anyhow::Result<TestResult> {
@@ -110,6 +111,7 @@ impl TestRunner<'_> {
                 code_cell,
                 dest_address,
                 abi.clone(),
+                compiler_abi.clone(),
                 source_map.clone(),
                 &generated.stack,
             )?;
@@ -413,44 +415,44 @@ fn map_compiler_parameter(parameter: &ABIFunctionParameter) -> FuzzParameter {
     }
 }
 
-fn map_compiler_type(ty: &ABIType) -> FuzzParameterKind {
+fn map_compiler_type(ty: &Ty) -> FuzzParameterKind {
     match ty {
-        ABIType::Int => FuzzParameterKind::Int {
+        Ty::Int => FuzzParameterKind::Int {
             signed: true,
             bits: None,
         },
-        ABIType::Coins => FuzzParameterKind::Int {
+        Ty::Coins => FuzzParameterKind::Int {
             signed: false,
             bits: Some(120),
         },
-        ABIType::UintN { n } => FuzzParameterKind::Int {
+        Ty::UintN { n } => FuzzParameterKind::Int {
             signed: false,
-            bits: Some(*n),
+            bits: Some(*n as usize),
         },
-        ABIType::VarUintN { n } => match variadic_integer_payload_bits(*n) {
+        Ty::VaruintN { n } => match variadic_integer_payload_bits(*n as usize) {
             Some(bits) => FuzzParameterKind::Int {
                 signed: false,
                 bits: Some(bits),
             },
             None => FuzzParameterKind::Unsupported,
         },
-        ABIType::IntN { n } => FuzzParameterKind::Int {
+        Ty::IntN { n } => FuzzParameterKind::Int {
             signed: true,
-            bits: Some(*n),
+            bits: Some(*n as usize),
         },
-        ABIType::VarIntN { n } => match variadic_integer_payload_bits(*n) {
+        Ty::VarintN { n } => match variadic_integer_payload_bits(*n as usize) {
             Some(bits) => FuzzParameterKind::Int {
                 signed: true,
                 bits: Some(bits),
             },
             None => FuzzParameterKind::Unsupported,
         },
-        ABIType::Bool => FuzzParameterKind::Bool,
-        ABIType::String => FuzzParameterKind::String,
-        ABIType::Address => FuzzParameterKind::Address,
-        ABIType::AddressAny => FuzzParameterKind::AnyAddress,
-        ABIType::AddressOpt => FuzzParameterKind::Nullable(Box::new(FuzzParameterKind::Address)),
-        ABIType::Nullable { inner } => match map_compiler_type(inner) {
+        Ty::Bool => FuzzParameterKind::Bool,
+        Ty::String => FuzzParameterKind::String,
+        Ty::Address => FuzzParameterKind::Address,
+        Ty::AddressAny => FuzzParameterKind::AnyAddress,
+        Ty::AddressOpt => FuzzParameterKind::Nullable(Box::new(FuzzParameterKind::Address)),
+        Ty::Nullable { inner, .. } => match map_compiler_type(inner) {
             FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
             inner => FuzzParameterKind::Nullable(Box::new(inner)),
         },

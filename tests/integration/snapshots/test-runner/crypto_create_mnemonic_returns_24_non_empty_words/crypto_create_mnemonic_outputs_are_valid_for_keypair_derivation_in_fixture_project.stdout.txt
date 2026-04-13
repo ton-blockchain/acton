@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/dw_crypto_create_mnemonic_keypair_shape.test.tolk (1 test)
-  ✓ dw-stdlib-create-mnemonic-keypair-shape [TIME]
+  ✓ dw stdlib create mnemonic keypair shape [TIME]
 
  ✓ 1 passed in 1 file

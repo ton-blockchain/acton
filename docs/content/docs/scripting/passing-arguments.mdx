@@ -17,8 +17,7 @@ For example, consider a script that adds two numbers:
 import "@acton/io"
 
 fun main(a: int, b: int) {
-    println("The sum is:")
-    println(a + b)
+    println("The sum is: {}", a + b);
 }
 ```
 
@@ -39,7 +38,7 @@ The sum is:
 
 It's important to understand that when you pass arguments to a script, Acton creates a **stack** of values and passes this stack to the TVM executor. The Tolk compiler then generates code that takes these values from the stack and assigns them to your function parameters.
 
-This means you are not limited to simple integers. You can pass any valid TVM stack value, including tuples, cells, and slices.
+This means you are not limited to simple integers. You can pass any valid TVM stack value, including tuples, cells, and strings.
 
 <Callout type="info">
     Be careful when passing complex types like structs, as they may consume
@@ -59,7 +58,7 @@ You can pass null values to work with optional types:
 import "@acton/io"
 
 fun main(value: int?) {
-    println1("Value: {}", value);
+    println("Value: {}", value);
 }
 ```
 
@@ -85,10 +84,10 @@ You can pass tuples by enclosing the values in `[ ... ]` or `( ... )`.
 import "@acton/io"
 
 fun main(data: tuple) {
-    val a: int = data.get(0)
-    val b: int = data.get(1)
-    println1("First element: {}", a)
-    println1("Second element: {}", b)
+    val a: int = data.get(0);
+    val b: int = data.get(1);
+    println("First element: {}", a);
+    println("Second element: {}", b);
 }
 ```
 
@@ -118,8 +117,8 @@ struct Point {
 }
 
 fun main(p: Point) {
-    println1("Point x: {}", p.x)
-    println1("Point y: {}", p.y)
+    println("Point x: {}", p.x);
+    println("Point y: {}", p.y);
 }
 ```
 
@@ -132,13 +131,13 @@ The stack `[10 20]` will be passed to `main` and automatically converted to a `P
 
 ### Strings
 
-To pass a string, you need to wrap it in double quotes both for the shell and for Acton's argument parser. This results in a `'"..."'` syntax. The string will be converted into a `slice` containing the UTF-8 bytes of the string.
+To pass a string, you need to wrap it in double quotes both for the shell and for Acton's argument parser. This results in a `'"..."'` syntax.
 
 ```tolk title="hello_string.tolk"
 import "@acton/io"
 
-fun main(name: slice) {
-    println1("Hello, {}", name.beginParse())
+fun main(name: string) {
+    println("Hello, {}", name);
 }
 ```
 
@@ -169,9 +168,9 @@ You can also pass raw cells and slices using the `C{...}` and `CS{...}` syntax, 
 import "@acton/io"
 
 fun main(data: cell) {
-    val s = data.beginParse()
-    val value = s.loadUint(32)
-    println1("Value from cell: {}", value)
+    val s = data.beginParse();
+    val value = s.loadUint(32);
+    println("Value from cell: {}", value);
 }
 ```
 
@@ -193,7 +192,7 @@ Here's a complete reference of all supported argument types:
 | Null    | `null` or `()`    | `null`              | For optional types                   |
 | Tuple   | `(value1 value2)` | `(10 20)`           | Requires quoting                     |
 | Tensor  | `[value1 value2]` | `[10 20 30]`        | Auto-unpacked from tuple             |
-| String  | `"text"`          | `"hello"`           | Converted to slice, requires quoting |
+| String  | `"text"`          | `"hello"`           | Long strings encoded as snaked cells |
 | Cell    | `C{hex}`          | `C{b5ee9c7201...}`  | Hex-encoded BoC                      |
 | Slice   | `CS{hex}`         | `CS{b5ee9c7201...}` | Hex-encoded BoC                      |
 

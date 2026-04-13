@@ -6,7 +6,7 @@ description: "Practical examples and code snippets for common testing scenarios 
 ## Basic assertions
 
 ```tolk
-fun `test-some`() {
+get fun `test some`() {
     expect(1 + 2).toEqual(3);
 }
 ```
@@ -14,7 +14,7 @@ fun `test-some`() {
 ## Sending internal message from one contract to another
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
     val msg = createMessage({ // same createMessage as in contracts
         bounce: false,
@@ -22,7 +22,7 @@ fun `test-mint`() {
         dest: address,
         body: ChangeMinterAdmin {
             queryId: 0,
-            newAdminAddress: new_owner,
+            newAdminAddress: newOwner,
         },
     });
     val result = net.send(from, msg);
@@ -45,14 +45,14 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 
 ```tolk
 fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", owner)
+    return net.runGetMethod(self.address, "get_wallet_address", owner);
 }
 ```
 
 ## Creating a treasury
 
 ```tolk
-fun `test-some`() {
+get fun `test some`() {
     val treasury = net.treasury("trasury");
     // ..
     net.send(treasury.address, msg);
@@ -62,7 +62,7 @@ fun `test-some`() {
 ## Asserting successful deploy
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
     expect(transactions).toHaveSuccessfulDeploy({ to: minter.address });
 }
@@ -71,10 +71,10 @@ fun `test-mint`() {
 ## Asserting successful transaction in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveSuccessfulTx({
-        rom: minter.address,
+    expect(mintResult).toHaveSuccessfulTx({
+        from: minter.address,
         to: wallet.address,
     });
 }
@@ -83,10 +83,10 @@ fun `test-mint`() {
 ## Asserting successful transaction with specific message in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveSuccessfulTx<MintNewJettons>({
-        rom: minter.address,
+    expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
+        from: minter.address,
         to: wallet.address,
     });
 }
@@ -99,7 +99,7 @@ You can also specify the message type in some of the methods described below.
 ## Asserting transaction in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
     expect(transactions).toHaveTx({
         from: deployer.address,
@@ -111,10 +111,10 @@ fun `test-mint`() {
 ## Asserting bounced transaction in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
-    expect(send_result).toHaveBouncedTx({
-        from: deployer_jetton_wallet.address,
+    expect(sendResult).toHaveBouncedTx({
+        from: deployerJettonWallet.address,
         to: deployer.address,
     });
 }
@@ -123,12 +123,12 @@ fun `test-mint`() {
 ## Asserting fail transaction in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
-    expect(mint_result).toHaveFailedTx({
-        from: not_deployer.address,
+    expect(mintResult).toHaveFailedTx({
+        from: notDeployer.address,
         to: minter.address,
-        exit_code: ERR_NOT_FROM_ADMIN,
+        exitCode: ERR_NOT_FROM_ADMIN,
     });
 }
 ```
@@ -136,11 +136,11 @@ fun `test-mint`() {
 ## Asserting transaction absence in the result
 
 ```tolk
-fun `test-mint`() {
+get fun `test mint`() {
     // ...
-    expect(send_result).toNotHaveTx({
-        from: not_deployer_jetton_wallet.address,
-        to: not_deployer.address
+    expect(sendResult).toNotHaveTx({
+        from: notDeployerJettonWallet.address,
+        to: notDeployer.address
     });
 }
 ```
@@ -148,7 +148,7 @@ fun `test-mint`() {
 ## Asserting external message transaction in the result
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     // ...
     expect(result).toEmitExternalMessage<SellEvent>();
 }
@@ -157,27 +157,27 @@ fun `test-something`() {
 ## Asserting gas consumption
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     // ...
-    expect(send_result.at(0)).toConsumeLessThan(1500);
+    expect(sendResult.at(0)).toConsumeLessThan(1500);
 }
 ```
 
 ## Getting out actions of the result
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     // ...
-    val out_actions = send_result.at(0).allOutActions();
-    val first = out_actions.at(0);
-    println(first.kind())
+    val outActions = sendResult.at(0).allOutActions();
+    val first = outActions.at(0);
+    println(first.kind());
 }
 ```
 
 ## Creating a random address
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     val addr = net.randomAddress("name-to-display");
 }
 ```
@@ -187,19 +187,18 @@ fun `test-something`() {
 ```tolk
 fun JettonWallet.getJettonBalance(self): coins {
     if (!net.isDeployed(self.address)) {
-        return 0
+        return 0;
     }
 
-    val result: JettonWalletDataReply =
-        net.runGetMethod(self.address, "get_wallet_data");
-    return result.jettonBalance
+    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
+    return result.jettonBalance;
 }
 ```
 
 ## Get deployed contract code
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     val code = net.getDeployedCode(addr);
     // ...
 }
@@ -208,7 +207,7 @@ fun `test-something`() {
 ## Register a library
 
 ```tolk
-fun `test-something`() {
+get fun `test something`() {
     vm.registerLibrary(lib_cell);
     // ...
 }

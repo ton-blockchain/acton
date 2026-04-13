@@ -41,7 +41,7 @@ fun deployReceiver() {{
     return (sender, receiverAddress);
 }}
 
-get fun `test-bh-stdlib-wait-for-transaction-positive-known-body-hash`() {{
+get fun `test bh stdlib wait for transaction positive known body hash`() {{
     val (sender, receiverAddress) = deployReceiver();
 
     val payload = beginCell().storeUint(0xBEEF, 16).storeUint(77, 8).endCell();

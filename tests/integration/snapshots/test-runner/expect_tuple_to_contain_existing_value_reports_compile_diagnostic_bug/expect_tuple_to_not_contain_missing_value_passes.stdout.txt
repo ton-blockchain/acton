@@ -8,6 +8,6 @@
  TEST  [ROOT]
 
  > tests/expect_tuple_membership.test.tolk (1 test)
-  ✓ ca-stdlib-to-not-contain-missing-value [TIME]
+  ✓ ca stdlib to not contain missing value [TIME]
 
  ✓ 1 passed in 1 file

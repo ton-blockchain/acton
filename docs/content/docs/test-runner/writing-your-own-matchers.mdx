@@ -18,7 +18,7 @@ fun checkIfValueIsEqualWithFlags(left: int, right: int, param1: bool, param2: bo
     Assert.equal(left, right);
 }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     checkIfValueIsEqualWithFlags(5 + 5, 10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }
@@ -39,7 +39,7 @@ fun Expectation<int>.toEqualWithFlags(self, right: int, param1: bool, param2: bo
     Assert.equal(self.value, right);
 }
 
-get fun `test-unit`() {
+get fun `test unit`() {
     expect(5 + 5).toEqualWithFlags(10, false, true);
     expect(2 + 2).toEqual(1 + 3);
 }
@@ -82,13 +82,13 @@ import "@acton/fmt"
 fun Expectation<int>.toBeEven(self) {
     if (self.value % 2 != 0) {
         Assert.fail(
-            format1("Expected {} to be even", self.value),
+            format("Expected {} to be even", self.value),
             self.location
         );
     }
 }
 
-get fun `test-even-number`() {
+get fun `test even number`() {
     expect(10).toBeEven();
     // expect(9).toBeEven(); // This would fail
 }
@@ -108,7 +108,7 @@ fun Expectation<address>.toHaveWorkchain(self, expectedWorkchain: int) {
     val actualWorkchain = self.value.getWorkchain();
     if (actualWorkchain != expectedWorkchain) {
         Assert.fail(
-            format2(
+            format(
                 "Expected address to have workchain {}, but got {}",
                 expectedWorkchain,
                 actualWorkchain
@@ -118,36 +118,37 @@ fun Expectation<address>.toHaveWorkchain(self, expectedWorkchain: int) {
     }
 }
 
-get fun `test-address-workchain`() {
+get fun `test address workchain`() {
     val myAddress = address("0:527964d55cfa6eb731f4bfc07e9d025098097ef8505519e853986279bd8400d8");
     expect(myAddress).toHaveWorkchain(0);
 }
 ```
 
-#### Example: `slice` Matcher
+#### Example: `string` Matcher
 
-Here is how you can write a matcher for a `slice` to check if it starts with a specific prefix.
+Here is how you can write a matcher for a `string` to check if it has desired length.
 
 ```tolk
 import "@acton/testing/expect"
 import "@acton/testing/assert"
 import "@acton/fmt"
+import "@stdlib/strings"
 
-fun Expectation<slice>.toStartWith(self, prefix: slice) {
-    if (!self.value.getFirstBits(prefix.remainingBitsCount()).bitsEqual(prefix)) {
+fun Expectation<string>.toHaveLength(self, expectedLen: int) {
+    if (self.value.calculateLength() != expectedLen) {
         Assert.fail(
-            format2(
-                "Expected slice '{}' to start with prefix '{}'",
+            format(
+                "Expected string '{}' to have length '{}'",
                 self.value,
-                prefix
+                expectedLen
             ),
             self.location
         );
     }
 }
 
-get fun `test-slice-prefix`() {
-    expect("hello world").toStartWith("hello");
+get fun `test string len`() {
+    expect("hello world").toHaveLength(11);
 }
 ```
 
@@ -160,7 +161,7 @@ Let's say you have a `User` struct:
 ```tolk
 struct User {
     id: int
-    name: slice
+    name: string
     isActive: bool
 }
 ```
@@ -177,13 +178,13 @@ import "@acton/fmt"
 fun Expectation<User>.toBeActive(self) {
     if (!self.value.isActive) {
         Assert.fail(
-            format1("Expected user {} to be active", self.value.name),
+            format("Expected user {} to be active", self.value.name),
             self.location
         );
     }
 }
 
-get fun `test-user-status`() {
+get fun `test user status`() {
     val activeUser = User { id: 1, name: "Alice", isActive: true };
     val inactiveUser = User { id: 2, name: "Bob", isActive: false };
 
@@ -202,7 +203,7 @@ The `Assert.fail()` function is particularly useful for providing custom error m
 fun Expectation<int>.toBePositive(self) {
     if (self.value <= 0) {
         Assert.fail(
-            format1("Expected {} to be a positive number", self.value),
+            format("Expected {} to be a positive number", self.value),
             self.location // Pass the location for better error reporting
         );
     }
@@ -227,7 +228,7 @@ Assert.fail("Value is not even");
 **Good:**
 ```tolk
 Assert.fail(
-    format1("Expected {} to be even, but it was odd.", self.value),
+    format("Expected {} to be even, but it was odd.", self.value),
     self.location
 );
 ```
@@ -255,7 +256,7 @@ Then, you can import them in your test files where needed:
 ```tolk
 import "./matchers"
 
-get fun `my-test`() {
+get fun `test my`() {
     expect(42).toBeEven();
 }
 ```

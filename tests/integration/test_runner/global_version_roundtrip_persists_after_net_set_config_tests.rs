@@ -25,7 +25,7 @@ fn global_version_roundtrip_persists_after_net_set_config() {
     run_config_success_case(
         "bb-stdlib-config-global-version-roundtrip",
         r"
-get fun `test-bb-stdlib-config-global-version-roundtrip`() {
+get fun `test bb stdlib config global version roundtrip`() {
     var config = net.getConfig();
     val before = config.getGlobalVersion();
 
@@ -53,7 +53,7 @@ fn global_version_typed_and_raw_reads_match_after_roundtrip() {
     run_config_success_case(
         "bb-stdlib-config-global-version-raw-typed-consistency",
         r"
-get fun `test-bb-stdlib-config-global-version-raw-typed-consistency`() {
+get fun `test bb stdlib config global version raw typed consistency`() {
     var config = net.getConfig();
     val target = GlobalVersion {
         version: 424243,

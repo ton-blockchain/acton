@@ -32,7 +32,7 @@ fn net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder()
     run_network_success_case(
         "di-stdlib-net-set-now-overwrite-project-builder",
         r"
-get fun `test-di-net-set-now-overwrite-project-builder`() {
+get fun `test di net set now overwrite project builder`() {
     net.setNow(1700023001);
     expect(net.now()).toEqual(1700023001);
 
@@ -54,7 +54,7 @@ fn net_set_now_handles_boundary_and_followup_overwrite_in_fixture_project() {
     let source = format!(
         r"
 {NETWORK_IMPORTS}
-get fun `test-di-net-set-now-boundary-overwrite`() {{
+get fun `test di net set now boundary overwrite`() {{
     net.setNow(1);
     expect(net.now()).toEqual(1);
 

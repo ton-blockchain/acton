@@ -60,7 +60,7 @@ fun Maybe<X>.unwrap(self): X {
 ///
 /// Example:
 /// ```tolk
-/// val maybeValue = Maybe<slice>.none();
+/// val maybeValue = Maybe<string>.none();
 /// val name = maybeValue.unwrapOr("default"); // Returns "default"
 /// ```
 fun Maybe<X>.unwrapOr(self, default: X): X {

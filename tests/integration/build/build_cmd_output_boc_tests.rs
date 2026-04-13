@@ -6,10 +6,10 @@ use std::fs;
 use std::path::Path;
 use tycho_types::boc::Boc;
 
-fn artifact_boc_bytes(project_path: &Path, contract_key: &str) -> Vec<u8> {
+fn artifact_boc_bytes(project_path: &Path, contract_name: &str) -> Vec<u8> {
     let artifact_path = project_path
         .join("build")
-        .join(format!("{contract_key}.json"));
+        .join(format!("{contract_name}.json"));
     let artifact = fs::read_to_string(&artifact_path)
         .unwrap_or_else(|e| panic!("read {artifact_path:?}: {e}"));
     let json: Value =
@@ -23,16 +23,16 @@ fn artifact_boc_bytes(project_path: &Path, contract_key: &str) -> Vec<u8> {
     )
 }
 
-fn assert_output_matches_artifact(project_path: &Path, output_path: &str, contract_key: &str) {
+fn assert_output_matches_artifact(project_path: &Path, output_path: &str, contract_name: &str) {
     let full_output_path = project_path.join(output_path);
     let output =
         fs::read(&full_output_path).unwrap_or_else(|e| panic!("read {full_output_path:?}: {e}"));
     Boc::decode(output.clone()).expect("output file must contain valid boc");
 
-    let expected = artifact_boc_bytes(project_path, contract_key);
+    let expected = artifact_boc_bytes(project_path, contract_name);
     assert_eq!(
         output, expected,
-        "output file `{output_path}` must match build artifact `build/{contract_key}.json` code"
+        "output file `{output_path}` must match build artifact `build/{contract_name}.json` code"
     );
 }
 

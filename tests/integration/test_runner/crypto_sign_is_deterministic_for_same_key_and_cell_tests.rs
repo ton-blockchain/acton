@@ -26,7 +26,7 @@ fn crypto_sign_is_deterministic_for_same_key_and_cell() {
     run_crypto_success_case(
         "dz-stdlib-sign-deterministic-same-key-cell",
         r"
-get fun `test-dz-stdlib-sign-deterministic-same-key-cell`() {
+get fun `test dz stdlib sign deterministic same key cell`() {
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
     val data = beginCell().storeUint(0xD3, 8).storeUint(0x7A, 8).storeUint(2026, 16).endCell();
@@ -49,7 +49,7 @@ fn crypto_sign_has_512bit_slice_shape_and_matches_raw_sign_in_fixture_project() 
     let source = format!(
         r"
 {CRYPTO_IMPORTS}
-get fun `test-dz-stdlib-sign-shape-and-raw-sign-parity`() {{
+get fun `test dz stdlib sign shape and raw sign parity`() {{
     val words = crypto.createMnemonic();
     val kp = words.toKeyPair();
     val payload = beginCell()

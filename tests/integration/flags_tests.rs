@@ -12,7 +12,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const PASSING_TEST: &str = r#"
 import "../../lib/testing/expect"
 
-get fun `test-manifest-path-works`() {
+get fun `test manifest path works`() {
     expect(1).toEqual(1);
 }
 "#;
@@ -103,7 +103,7 @@ const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build/build"
 import "../../lib/testing/expect"
 
-get fun `test-build-path-from-project-root`() {
+get fun `test build path from project root`() {
     val byName = build("counter");
     val byPath = build("counter", "tests/acton-stdlib/contracts/counter.tolk");
     expect(byPath).toEqual(byName);
@@ -166,7 +166,7 @@ import "../../lib/io"
 import "../../lib/testing/expect"
 import "../contracts/test_body_messages"
 
-get fun `test-show-bodies-prints-decoded-transaction-body`() {
+get fun `test show bodies prints decoded transaction body`() {
     val sender = net.treasury("sender");
     val init = ContractState {
         code: build("test_body_sink"),
@@ -209,7 +209,7 @@ fn test_run_specific_test_file() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-in-file-1`() {
+            get fun `test in file 1`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -219,7 +219,7 @@ fn test_run_specific_test_file() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-in-file-2`() {
+            get fun `test in file 2`() {
                 expect(2).toEqual(2);
             }
         "#,
@@ -234,8 +234,8 @@ fn test_run_specific_test_file() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("in-file-1")
-        .assert_not_contains("in-file-2");
+        .assert_contains("in file 1")
+        .assert_not_contains("in file 2");
 }
 
 #[test]
@@ -247,15 +247,15 @@ fn test_filter_by_name() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-unit-1`() {
+            get fun `test unit 1`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-unit-2`() {
+            get fun `test unit 2`() {
                 expect(2).toEqual(2);
             }
 
-            get fun `test-other`() {
+            get fun `test other`() {
                 expect(3).toEqual(3);
             }
         "#,
@@ -263,12 +263,12 @@ fn test_filter_by_name() {
         .build()
         .acton()
         .test()
-        .filter("test-unit-.*")
+        .filter("test unit .*")
         .run()
         .success()
         .assert_passed(2)
-        .assert_contains("unit-1")
-        .assert_contains("unit-2")
+        .assert_contains("unit 1")
+        .assert_contains("unit 2")
         .assert_not_contains("other");
 }
 
@@ -281,15 +281,15 @@ fn test_filter_single_test() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-alpha`() {
+            get fun `test alpha`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-beta`() {
+            get fun `test beta`() {
                 expect(2).toEqual(2);
             }
 
-            get fun `test-gamma`() {
+            get fun `test gamma`() {
                 expect(3).toEqual(3);
             }
         "#,
@@ -297,7 +297,7 @@ fn test_filter_single_test() {
         .build()
         .acton()
         .test()
-        .filter("test-beta")
+        .filter("test beta")
         .run()
         .success()
         .assert_passed(1)
@@ -315,11 +315,11 @@ fn test_combined_path_and_filter() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-unit-counter-test`() {
+            get fun `test unit counter test`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-unit-wallet-test`() {
+            get fun `test unit wallet test`() {
                 expect(2).toEqual(2);
             }
         "#,
@@ -329,7 +329,7 @@ fn test_combined_path_and_filter() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-integration-counter-test`() {
+            get fun `test integration counter test`() {
                 expect(3).toEqual(3);
             }
         "#,
@@ -345,9 +345,9 @@ fn test_combined_path_and_filter() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("unit-counter-test")
-        .assert_not_contains("unit-wallet-test")
-        .assert_not_contains("integration-counter-test");
+        .assert_contains("unit counter test")
+        .assert_not_contains("unit wallet test")
+        .assert_not_contains("integration counter test");
 }
 
 #[test]
@@ -359,7 +359,7 @@ fn test_filter_with_no_matches() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-alpha`() {
+            get fun `test alpha`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -379,11 +379,11 @@ fn test_include_flag_filters_test_files() {
         .contract("simple", SIMPLE_CONTRACT)
         .raw_file(
             "tests/smoke/alpha.test.tolk",
-            &passing_test_file(NESTED_TEST_IMPORT, "test-alpha-file", 1),
+            &passing_test_file(NESTED_TEST_IMPORT, "test alpha file", 1),
         )
         .raw_file(
             "tests/slow/beta.test.tolk",
-            &passing_test_file(NESTED_TEST_IMPORT, "test-beta-file", 2),
+            &passing_test_file(NESTED_TEST_IMPORT, "test beta file", 2),
         )
         .build();
 
@@ -395,8 +395,8 @@ fn test_include_flag_filters_test_files() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("alpha-file")
-        .assert_not_contains("beta-file")
+        .assert_contains("alpha file")
+        .assert_not_contains("beta file")
         .assert_snapshot_matches(
             "integration/snapshots/flags/test_include_flag_filters_test_files.stdout.txt",
         );
@@ -408,11 +408,11 @@ fn test_exclude_flag_filters_test_files() {
         .contract("simple", SIMPLE_CONTRACT)
         .raw_file(
             "tests/smoke/alpha.test.tolk",
-            &passing_test_file(NESTED_TEST_IMPORT, "test-alpha-file", 1),
+            &passing_test_file(NESTED_TEST_IMPORT, "test alpha file", 1),
         )
         .raw_file(
             "tests/slow/beta.test.tolk",
-            &passing_test_file(NESTED_TEST_IMPORT, "test-beta-file", 2),
+            &passing_test_file(NESTED_TEST_IMPORT, "test beta file", 2),
         )
         .build();
 
@@ -424,8 +424,8 @@ fn test_exclude_flag_filters_test_files() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("alpha-file")
-        .assert_not_contains("beta-file")
+        .assert_contains("alpha file")
+        .assert_not_contains("beta file")
         .assert_snapshot_matches(
             "integration/snapshots/flags/test_exclude_flag_filters_test_files.stdout.txt",
         );
@@ -440,15 +440,15 @@ fn test_fail_fast() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-first-pass`() {
+            get fun `test first pass`() {
                 expect(1).toEqual(1);
             }
 
-            get fun `test-second-fail`() {
+            get fun `test second fail`() {
                 expect(1).toEqual(2);
             }
 
-            get fun `test-third-pass`() {
+            get fun `test third pass`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -458,7 +458,7 @@ fn test_fail_fast() {
             r#"
             import "../../lib/testing/expect"
 
-            get fun `test-fourth-pass`() {
+            get fun `test fourth pass`() {
                 expect(1).toEqual(1);
             }
         "#,
@@ -473,10 +473,10 @@ fn test_fail_fast() {
         .failure() // exit code 1 because of failure
         .assert_passed(3) // first, third, fourth
         .assert_failed(1) // second
-        .assert_contains("first-pass")
-        .assert_contains("second-fail")
-        .assert_contains("third-pass")
-        .assert_contains("fourth-pass")
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_contains("third pass")
+        .assert_contains("fourth pass")
         .assert_snapshot_matches("integration/snapshots/flags/test_without_fail_fast.stdout.txt");
 
     // With fail-fast: should stop after second test
@@ -488,10 +488,10 @@ fn test_fail_fast() {
         .failure()
         .assert_passed(1) // only first
         .assert_failed(1) // second
-        .assert_contains("first-pass")
-        .assert_contains("second-fail")
-        .assert_not_contains("third-pass")
-        .assert_not_contains("fourth-pass")
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
         .assert_snapshot_matches("integration/snapshots/flags/test_with_fail_fast.stdout.txt");
 }
 
@@ -516,7 +516,7 @@ fn test_junit_path_flag_writes_report_to_custom_directory() {
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
             "test",
-            &passing_test_file(ROOT_TEST_IMPORT, "test-junit-custom-path", 1),
+            &passing_test_file(ROOT_TEST_IMPORT, "test junit custom path", 1),
         )
         .build();
 
@@ -885,7 +885,7 @@ fn test_project_root_full_flow_from_sibling_directory_on_new_project() {
     );
 
     assert!(
-        project_dir.join("build/empty.json").exists(),
+        project_dir.join("build/Empty.json").exists(),
         "build output should be created under project root when using --project-root"
     );
 

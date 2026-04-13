@@ -106,7 +106,6 @@ jobs:
           ref: ${{ needs.prepare.outputs.ton_commit }}
           fetch-depth: 1
           submodules: true
-          path: ton-repo
 
       - name: Build TON static libraries
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -116,7 +115,6 @@ jobs:
           AR: llvm-ar-16
           RANLIB: llvm-ranlib-16
         run: |
-          cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
           ./build-ubuntu-static.sh -a -c
@@ -125,21 +123,14 @@ jobs:
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: ccache -s
 
-      - name: Collect TON objects
-        if: steps.archive-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
-
       - name: Generate TON artifacts lock file
         if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         # language=Bash
         run: |
-          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
-          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+          libemulator_sha256=$(sha256sum artifacts/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum artifacts/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
@@ -151,16 +142,16 @@ jobs:
               rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
-            }' > objs/ton-artifacts.lock
+            }' > artifacts/ton-artifacts.lock
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          ls -lh objs
-          test -f objs/libemulator.a
-          test -f objs/libtolk.a
-          test -f objs/ton-artifacts.lock
-          cat objs/ton-artifacts.lock
+          ls -lh artifacts
+          test -f artifacts/libemulator.a
+          test -f artifacts/libtolk.a
+          test -f artifacts/ton-artifacts.lock
+          cat artifacts/ton-artifacts.lock
 
       - name: Pack TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -169,7 +160,7 @@ jobs:
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
 
           mkdir -p dist
-          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
@@ -234,22 +225,13 @@ jobs:
           ref: ${{ needs.prepare.outputs.ton_commit }}
           fetch-depth: 1
           submodules: true
-          path: ton-repo
 
       - name: Build TON static libraries
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          cd ton-repo
           cp assembly/native/build-macos-static.sh .
           chmod +x build-macos-static.sh
           ./build-macos-static.sh -a
-
-      - name: Collect TON objects
-        if: steps.archive-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Generate TON artifacts lock file
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -257,8 +239,8 @@ jobs:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         # language=Bash
         run: |
-          libemulator_sha256=$(shasum -a 256 objs/libemulator.a | awk '{ print $1 }')
-          libtolk_sha256=$(shasum -a 256 objs/libtolk.a | awk '{ print $1 }')
+          libemulator_sha256=$(shasum -a 256 artifacts/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(shasum -a 256 artifacts/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
@@ -270,16 +252,16 @@ jobs:
               rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
-            }' > objs/ton-artifacts.lock
+            }' > artifacts/ton-artifacts.lock
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
-          ls -lh objs
-          test -f objs/libemulator.a
-          test -f objs/libtolk.a
-          test -f objs/ton-artifacts.lock
-          cat objs/ton-artifacts.lock
+          ls -lh artifacts
+          test -f artifacts/libemulator.a
+          test -f artifacts/libtolk.a
+          test -f artifacts/ton-artifacts.lock
+          cat artifacts/ton-artifacts.lock
 
       - name: Pack TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -288,7 +270,7 @@ jobs:
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
 
           mkdir -p dist
-          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
@@ -425,7 +407,6 @@ jobs:
         run: |
           qemu-x86_64 -cpu qemu64,avx=off,avx2=off ./acton-mock
 
-
   generate-release-objs-manifest:
     name: Generate Release Objs Manifest
     needs: [ build-objs-linux, build-objs-macos ]
@@ -479,9 +460,70 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  package-stdlib-sources:
+    name: Package TON stdlib sources
+    needs: [ prepare ]
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone TON repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          repository: ${{ env.TON_REPOSITORY }}
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+
+      - name: Collect TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifacts
+          cp -R crypto/smartcont/tolk-stdlib artifacts/
+          cp -R crypto/fift/lib artifacts/fift-stdlib
+
+      - name: Validate TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          test -d artifacts/tolk-stdlib
+          test -d artifacts/fift-stdlib
+          ls -lh artifacts artifacts/tolk-stdlib artifacts/fift-stdlib
+
+      - name: Pack TON stdlib sources
+        shell: bash
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_NAME="ton-stdlib.tar.gz"
+
+          mkdir -p dist
+          tar -C artifacts -czf "dist/${ARCHIVE_NAME}" \
+            tolk-stdlib \
+            fift-stdlib
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
+
+      - name: Upload TON stdlib artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ton-stdlib
+          path: |
+            dist/ton-stdlib.tar.gz
+            dist/ton-stdlib.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
   create-release-objs-release:
     name: Create Release Objs Release
-    needs: [ prepare, check-objs, generate-release-objs-manifest ]
+    needs: [ prepare, check-objs, generate-release-objs-manifest, package-stdlib-sources ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 
@@ -497,11 +539,17 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Download TON stdlib artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ton-stdlib
+          path: dist
+
       - name: Delete previous release-objs release and tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete release-objs --repo "${GITHUB_REPOSITORY}" -y || true
+          gh release delete release-objs --repo "${GITHUB_REPOSITORY}" --cleanup-tag -y || true
 
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/release-objs \

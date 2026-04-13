@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/build_empty_contract_inputs.test.tolk (1 test)
-  ✗ ax-build-empty-contract-inputs [TIME]
+  ✗ ax build empty contract inputs [TIME]
     └─ Error: Contract  not found in Acton.toml
 Available contracts:
  simple

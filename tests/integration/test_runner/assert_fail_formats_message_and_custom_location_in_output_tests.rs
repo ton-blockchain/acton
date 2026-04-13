@@ -16,7 +16,7 @@ fn wrap_assert_source(test_body: &str) -> String {
 fn assert_fail_formats_message_and_custom_location_in_output() {
     let source = wrap_assert_source(
         r#"
-get fun `test-bv-assert-fail-custom-location`() {
+get fun `test bv assert fail custom location`() {
     Assert.fail(
         "bv explicit fail message",
         "tests/custom_assert_fail_output.test.tolk:42:7"
@@ -46,7 +46,7 @@ fn assert_fail_honors_expected_exit_code_path_in_fixture_project() {
     let test_path = "tests/bv_assert_fail_expected_exit_path.test.tolk";
     let source = wrap_assert_source(
         r#"
-get fun `test-bv-assert-fail-expected-exit`() {
+get fun `test bv assert fail expected exit`() {
     expectToEndWithExitCode(567);
     Assert.fail(
         "bv expected exit path message",

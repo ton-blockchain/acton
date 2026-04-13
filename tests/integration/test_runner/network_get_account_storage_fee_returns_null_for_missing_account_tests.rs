@@ -41,7 +41,7 @@ fn network_get_account_storage_fee_returns_null_for_missing_account() {
     run_network_success_case(
         "bk-stdlib-network-get-account-storage-fee-missing-account",
         r#"
-get fun `test-bk-stdlib-network-get-account-storage-fee-missing-account`() {
+get fun `test bk stdlib network get account storage fee missing account`() {
     val missing = net.randomAddress("bk_missing_storage_fee_account");
     expect(net.getAccountState(missing) == null).toBeTrue();
     expect(net.getAccountStorageFee(missing, 86400) == null).toBeTrue();
@@ -59,7 +59,7 @@ fn network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixt
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 
-get fun `test-bk-stdlib-network-get-account-storage-fee-existing-account`() {
+get fun `test bk stdlib network get account storage fee existing account`() {
     val seconds = 86400;
     val treasury = net.treasury("bk_storage_fee_sender");
 
@@ -99,7 +99,7 @@ fn account_state_variants_uninit_and_active_are_parsed_from_accounts() {
         NETWORK_IMPORTS_WITH_TRANSACTION,
         "bk-stdlib-account-state-uninit-and-active-variants",
         r#"
-get fun `test-bk-stdlib-account-state-uninit-and-active-variants`() {
+get fun `test bk stdlib account state uninit and active variants`() {
     val uninitAddr = net.randomAddress("bk_state_variant_uninit_addr");
     net.topUp(uninitAddr, ton("1"));
 
@@ -127,7 +127,7 @@ fn account_state_frozen_local_roundtrip_cell_works() {
         NETWORK_IMPORTS_WITH_TRANSACTION,
         "bk-stdlib-account-state-frozen-local-roundtrip",
         r"
-get fun `test-bk-stdlib-account-state-frozen-local-roundtrip`() {
+get fun `test bk stdlib account state frozen local roundtrip`() {
     val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
     val frozen = AccountStateFrozen { stateHash: frozenHash };
     val parsed = AccountState.fromCell(frozen.toCell());
@@ -148,7 +148,7 @@ fn account_state_frozen_roundtrip_via_set_account_bug() {
         NETWORK_IMPORTS_WITH_TRANSACTION,
         "bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug",
         r#"
-get fun `test-bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug`() {
+get fun `test bk stdlib account state frozen roundtrip via set account bug`() {
     val baseAddr = net.randomAddress("bk_state_variant_frozen_base_addr");
     net.topUp(baseAddr, ton("1"));
 

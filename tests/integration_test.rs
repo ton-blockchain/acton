@@ -66,6 +66,26 @@ fn test_acton_help_without_flag() {
 }
 
 #[test]
+fn test_acton_lint_shows_check_replacement() {
+    snapbox::cmd::Command::acton_ui()
+        .arg("lint")
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""])
+        .stderr_eq(snapbox::file!["snapshots/lint/stderr.txt"]);
+}
+
+#[test]
+fn test_acton_lint_with_args_shows_check_replacement() {
+    snapbox::cmd::Command::acton_ui()
+        .args(["lint", "counter", "--fix"])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""])
+        .stderr_eq(snapbox::file!["snapshots/lint/stderr_with_args.txt"]);
+}
+
+#[test]
 fn test_acton_build_help() {
     snapbox::cmd::Command::acton_ui()
         .arg("build")
@@ -127,6 +147,27 @@ fn test_acton_rpc_info_help() {
         .assert()
         .success()
         .stdout_eq(snapbox::file!["snapshots/rpc_info/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
+fn test_acton_retrace_help() {
+    snapbox::cmd::Command::acton_ui()
+        .args(["retrace", "--help"])
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/retrace/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
+fn test_acton_help_retrace() {
+    snapbox::cmd::Command::acton_ui()
+        .arg("help")
+        .arg("retrace")
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/help_retrace/stdout.txt"])
         .stderr_eq(snapbox::str![""]);
 }
 

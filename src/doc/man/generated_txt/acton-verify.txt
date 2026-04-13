@@ -4,7 +4,7 @@ NAME
        acton-verify — Verify contract source code on the TON verifier service
 
 SYNOPSIS
-       acton verify [options] [contract-id]
+       acton verify [options] [contract-name]
 
 DESCRIPTION
        Verify that a deployed contract address matches the local source code
@@ -16,8 +16,8 @@ DESCRIPTION
 
 OPTIONS
    Verify Options
-       contract-id
-           Contract ID to verify.
+       contract-name
+           Contract name to verify.
 
            If omitted, Acton prompts when the project contains multiple
            contracts.
@@ -97,7 +97,7 @@ PREREQUISITES
        o  reproducible compiler settings that match the deployed contract
 
 CONTRACT AND WALLET SELECTION
-       o  if _contract-id_ is omitted and exactly one contract is configured,
+       o  if _contract-name_ is omitted and exactly one contract is configured,
           Acton selects it automatically
 
        o  if multiple contracts are configured, Acton prompts for the contract
@@ -147,23 +147,23 @@ EXIT STATUS
 EXAMPLES
        1. Verify on testnet:
 
-              acton verify counter --address EQDt7LL...
+              acton verify Counter --address EQDt7LL...
 
        2. Verify on mainnet:
 
-              acton verify counter --address UQDt7LL... --net mainnet
+              acton verify Counter --address UQDt7LL... --net mainnet
 
        3. Use a specific wallet:
 
-              acton verify counter --address EQDt7LL... --wallet deployer
+              acton verify Counter --address EQDt7LL... --wallet deployer
 
        4. Test the flow without sending the final transaction:
 
-              acton verify counter --address EQDt7LL... --dry-run
+              acton verify Counter --address EQDt7LL... --dry-run
 
        5. Verify with an explicit compiler version:
 
-              acton verify counter --address EQDt7LL... --compiler-version 1.1.0
+              acton verify Counter --address EQDt7LL... --compiler-version 1.1.0
 
 SEE ALSO
        o  Contract verification guide

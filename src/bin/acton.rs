@@ -348,7 +348,7 @@ enum Commands {
             long,
             help = "Contract to mutate during mutation testing",
             help_heading = "Mutation Testing",
-            value_name = "CONTRACT_ID"
+            value_name = "CONTRACT_NAME"
         )]
         mutate_contract: Option<String>,
         #[arg(
@@ -441,7 +441,7 @@ enum Commands {
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract ID to generate wrapper", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to generate wrapper", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(
             long,
@@ -546,14 +546,7 @@ enum Commands {
         // Broadcasting
         #[arg(
             long,
-            help = "Send transactions to the blockchain instead of emulating them",
-            help_heading = "Broadcasting"
-        )]
-        broadcast: bool,
-
-        #[arg(
-            long,
-            help = "Network to use for broadcasting",
+            help = "Broadcast to the selected network; if omitted, run in emulation mode",
             help_heading = "Broadcasting"
         )]
         net: Option<String>,
@@ -578,7 +571,7 @@ enum Commands {
         after_help = detailed_help_pointer("build")
     )]
     Build {
-        #[arg(help = "Contract ID to build (defaults to all if not specified)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to build (defaults to all if not specified)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Clear compilation cache before building")]
         clear_cache: bool,
@@ -684,7 +677,7 @@ enum Commands {
         after_help = detailed_help_pointer("verify")
     )]
     Verify {
-        #[arg(help = "Contract ID to verify (prompts if not provided)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to verify (prompts if not provided)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
@@ -708,7 +701,7 @@ enum Commands {
         after_help = detailed_help_pointer("check")
     )]
     Check {
-        #[arg(help = "Contract ID to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
+        #[arg(help = "Contract name to check or path to a .tolk file", add = ArgValueCompleter::new(complete_contracts_or_paths))]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
@@ -737,6 +730,15 @@ enum Commands {
         #[arg(long, hide = true)]
         list_lint_rules: bool,
     },
+    #[command(hide = true, disable_help_flag = true, disable_help_subcommand = true)]
+    Lint {
+        #[arg(
+            value_name = "ARG",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
+        args: Vec<String>,
+    },
     #[command(
         about = "Retrace a transaction by its hash",
         after_help = detailed_help_pointer("retrace")
@@ -764,9 +766,12 @@ enum Commands {
         contract: Option<String>,
         #[arg(
             long,
-            help = "Expose the retraced execution as a DAP server on the given TCP port; requires --contract"
+            help = "Enable source-level debugging for the retraced transaction; requires --contract",
+            help_heading = "Debugging"
         )]
-        dap_port: Option<u16>,
+        debug: bool,
+        #[arg(long, help = "Debug server port", help_heading = "Debugging")]
+        debug_port: Option<u16>,
     },
     #[command(
         about = "Manage TON libraries",
@@ -899,7 +904,7 @@ enum Commands {
     InternalRegisterContract {
         #[arg(help = "Path to the contract file")]
         path: String,
-        #[arg(long, help = "Contract ID")]
+        #[arg(long, help = "Contract name")]
         id: Option<String>,
     },
 }
@@ -972,7 +977,7 @@ pub enum LitenodeCommand {
 pub enum LibraryCommand {
     #[command(about = "Publish a library to the blockchain")]
     Publish {
-        #[arg(help = "Contract ID to publish (see --code to pass arbitrary code)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to publish (see --code to pass arbitrary code)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Code to use instead of compiling contract")]
         code: Option<String>,
@@ -1205,7 +1210,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let core_commands = vec![("new", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
-        ("build", "[CONTRACT_ID]"),
+        ("build", "[CONTRACT_NAME]"),
         ("check", "[TARGET]"),
         ("script", "<PATH> [ARGS...]"),
         ("fmt", "[PATHS...]"),
@@ -1213,7 +1218,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let blockchain_commands = vec![
         ("wallet", "<COMMAND>"),
         ("rpc", "<COMMAND>"),
-        ("verify", "[CONTRACT_ID]"),
+        ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         ("litenode", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
@@ -1221,7 +1226,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let tooling_commands = vec![
         ("run", "<SCRIPT> [ARGS...]"),
         ("compile", "<PATH>"),
-        ("wrapper", "<CONTRACT_ID>"),
+        ("wrapper", "<CONTRACT_NAME>"),
         ("disasm", "[BOC_FILE]"),
         ("doc", "tvm <QUERY...>"),
     ];
@@ -1571,15 +1576,21 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Init | Commands::New { .. } | Commands::Help { .. } | Commands::Rpc { .. }
+        Commands::Init
+            | Commands::New { .. }
+            | Commands::Help { .. }
+            | Commands::Rpc { .. }
+            | Commands::Lint { .. }
     ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. } | Commands::Help { .. })
-        && let Err(err) = setup_logging()
+    if !matches!(
+        command,
+        Commands::Ls { .. } | Commands::Help { .. } | Commands::Lint { .. }
+    ) && let Err(err) = setup_logging()
     {
         eprintln!(
             "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
@@ -1729,8 +1740,11 @@ fn main() {
             verbose,
             logs_dir,
             contract,
-            dap_port,
-        } => retrace_cmd(hash, net, api_key, verbose, logs_dir, contract, dap_port),
+            debug,
+            debug_port,
+        } => retrace_cmd(
+            hash, net, api_key, verbose, logs_dir, contract, debug, debug_port,
+        ),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -1758,7 +1772,6 @@ fn main() {
             fork_net,
             api_key,
             fork_block_number,
-            broadcast,
             net,
             explorer,
             show_bodies,
@@ -1772,7 +1785,6 @@ fn main() {
             fork_net,
             api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
             fork_block_number,
-            broadcast,
             net,
             explorer,
             show_bodies,
@@ -1956,6 +1968,7 @@ fn main() {
             list_lint_rules,
             target,
         ),
+        Commands::Lint { args } => Err(lint_command_error(&args)),
         Commands::Up {
             version,
             trunk,
@@ -2077,6 +2090,16 @@ fn print_error(err: &anyhow::Error) {
             eprintln!("  {line}");
         }
     }
+}
+
+fn lint_command_error(args: &[String]) -> anyhow::Error {
+    let suffix = if args.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", args.join(" "))
+    };
+
+    anyhow::anyhow!("`acton lint` is not supported. Use `acton check{suffix}` instead.")
 }
 
 struct ResolvedLitenodeSettings {

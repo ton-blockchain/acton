@@ -52,7 +52,7 @@ fn wallet_missing_in_broadcast_without_wallets_config_reports_setup_instructions
     run_wallet_missing_failure(
         "bw-stdlib-wallet-missing-no-wallets-config",
         r#"
-get fun `test-bw-wallet-missing-no-wallets-config`() {
+get fun `test bw wallet missing no wallets config`() {
     net.enableBroadcast();
     net.wallet("bw_missing_wallet");
 }
@@ -67,7 +67,7 @@ fn wallet_missing_in_broadcast_with_wallets_config_lists_available_wallets() {
     run_wallet_missing_failure(
         "bw-stdlib-wallet-missing-with-wallets-config",
         r#"
-get fun `test-bw-wallet-missing-with-wallets-config`() {
+get fun `test bw wallet missing with wallets config`() {
     net.enableBroadcast();
     net.wallet("bw_missing_wallet");
 }

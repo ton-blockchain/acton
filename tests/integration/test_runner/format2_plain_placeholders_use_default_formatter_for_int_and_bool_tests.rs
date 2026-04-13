@@ -28,8 +28,8 @@ fn format2_plain_placeholders_use_default_formatter_for_int_and_bool() {
     run_fmt_success(
         "bs-stdlib-format2-default-formatter",
         r#"
-get fun `test-bs-stdlib-format2-default-formatter`() {
-    val rendered = format2("left={} right={}", -42, true);
+get fun `test bs stdlib format2 default formatter`() {
+    val rendered = format("left={} right={}", -42, true);
     expect(rendered).toEqual("left=-42 right=true");
 }
 "#,
@@ -42,8 +42,8 @@ fn format2_escaped_braces_around_placeholder_should_collapse_bug() {
     run_fmt_success(
         "bs-stdlib-format2-escaped-braces-bug",
         r#"
-get fun `test-bs-stdlib-format2-escaped-braces-bug`() {
-    val rendered = format2("open={{{}}} close={}", "inner", "done");
+get fun `test bs stdlib format2 escaped braces bug`() {
+    val rendered = format("open={{{}}} close={}", "inner", "done");
     expect(rendered).toEqual("open={inner} close=done");
 }
 "#,
