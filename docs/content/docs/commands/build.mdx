@@ -96,7 +96,7 @@ Defaults to `[build].out-dir` when configured, otherwise `build/`.
 </CommandOptionTitle>
 
 Directory for generated dependency helper files such as
-`gen/<dependency>_code.tolk`.
+`gen/<dependency>.code.tolk`.
 
 Defaults to `[build].gen-dir` when configured, otherwise `gen/`.
 
@@ -219,7 +219,7 @@ Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
 - the configured contract `output` `.boc` file
-- `<gen-dir>/<dependency>_code.tolk` helper files for dependencies
+- `<gen-dir>/<dependency>.code.tolk` helper files for dependencies
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
@@ -279,5 +279,5 @@ built successfully, the successful artifacts remain on disk.
 ## SEE ALSO
 
 - `acton help wrapper`
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
-- [Acton.toml reference](https://ton-blockchain.github.io/acton/docs/acton-toml)
+- [Build system configuration reference](/docs/build-system/configuration-reference)
+- [Acton.toml reference](/docs/acton-toml)

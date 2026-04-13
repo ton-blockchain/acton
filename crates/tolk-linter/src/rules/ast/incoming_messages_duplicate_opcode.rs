@@ -9,6 +9,7 @@ use tolk_resolver::file_index::{FileId, Span, SymbolId};
 use tolk_resolver::resolve_index::{FileResolveIndex, Resolved};
 use tolk_syntax::{
     AstNode, ContractField, ContractFieldValue, HasName, TopLevel, Type, TypeAliasUnderlyingType,
+    parse_tolk_int_literal,
 };
 
 /// ### What it does
@@ -269,26 +270,20 @@ fn emit_duplicate_opcode_diagnostic(
 }
 
 fn parse_struct_opcode_literal(raw: &str) -> Option<OpcodeKey> {
-    let literal = raw.replace('_', "");
-    if let Some(hex_digits) = literal
-        .strip_prefix("0x")
-        .or_else(|| literal.strip_prefix("0X"))
-    {
-        let value = u64::from_str_radix(hex_digits, 16).ok()?;
-        let bit_len: u16 = (hex_digits.len() * 4).try_into().ok()?;
-        return Some(OpcodeKey { value, bit_len });
+    let literal = parse_tolk_int_literal(raw)?;
+    match literal.radix() {
+        16 => {
+            let value = literal.parse_u64()?;
+            let bit_len: u16 = (literal.digit_len() * 4).try_into().ok()?;
+            Some(OpcodeKey { value, bit_len })
+        }
+        2 => {
+            let value = literal.parse_u64()?;
+            let bit_len: u16 = literal.digit_len().try_into().ok()?;
+            Some(OpcodeKey { value, bit_len })
+        }
+        _ => None,
     }
-
-    if let Some(bin_digits) = literal
-        .strip_prefix("0b")
-        .or_else(|| literal.strip_prefix("0B"))
-    {
-        let value = u64::from_str_radix(bin_digits, 2).ok()?;
-        let bit_len: u16 = bin_digits.len().try_into().ok()?;
-        return Some(OpcodeKey { value, bit_len });
-    }
-
-    None
 }
 
 fn format_opcode(opcode: OpcodeKey) -> String {
@@ -302,4 +297,47 @@ fn format_opcode(opcode: OpcodeKey) -> String {
     out.push_str("0b");
     let _ = write!(&mut out, "{:0width$b}", opcode.value, width = width);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OpcodeKey, parse_struct_opcode_literal};
+    use tolk_syntax::{AstNode, TopLevel, parse};
+
+    fn parse_pack_prefix(code: &str) -> String {
+        let file = parse(code).expect("parse failed");
+        let strukt = file
+            .top_levels()
+            .find_map(|top_level| match top_level {
+                TopLevel::Struct(strukt) => Some(strukt),
+                _ => None,
+            })
+            .expect("struct should exist");
+        let prefix = strukt.pack_prefix().expect("pack prefix should exist");
+        prefix.text(file.source.as_ref()).to_string()
+    }
+
+    #[test]
+    fn parse_struct_opcode_literal_supports_hex_separators() {
+        let prefix = parse_pack_prefix("struct (0xFF_FF) Msg {}");
+        assert_eq!(
+            parse_struct_opcode_literal(&prefix),
+            Some(OpcodeKey {
+                value: 0xFFFF,
+                bit_len: 16,
+            })
+        );
+    }
+
+    #[test]
+    fn parse_struct_opcode_literal_supports_binary_separators() {
+        let prefix = parse_pack_prefix("struct (0b_0____1_) Msg {}");
+        assert_eq!(
+            parse_struct_opcode_literal(&prefix),
+            Some(OpcodeKey {
+                value: 1,
+                bit_len: 2,
+            })
+        );
+    }
 }

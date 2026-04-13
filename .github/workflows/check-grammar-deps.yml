@@ -7,6 +7,12 @@ on:
     paths:
       - ".github/workflows/check-grammar-deps.yml"
       - "crates/tree-sitter-**/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-grammar-deps.yml"
+      - "crates/tree-sitter-**/**"
   workflow_dispatch:
 
 concurrency:

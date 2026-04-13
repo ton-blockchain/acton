@@ -89,7 +89,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         )
         .contract_with_deps(
             "parent",
-            r#"import "../gen/child_code.tolk"
+            r#"import "../gen/child.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     val code = childCompiledCode();
@@ -218,7 +218,7 @@ fn build_sorts_multi_error_sections_by_contract_name_and_keeps_messages_consiste
     let project = ProjectBuilder::new("build-diagnostics-multi-error-ordering-consistency")
         .contract_with_deps(
             "a_parent",
-            r#"import "../gen/child_code.tolk"
+            r#"import "../gen/child.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     val code = childCompiledCode();

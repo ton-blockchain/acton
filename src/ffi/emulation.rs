@@ -17,7 +17,6 @@ use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
-use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -35,7 +34,7 @@ use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
-use ton_executor::message::{EmulationResult, RunTransactionArgs};
+use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -871,35 +870,34 @@ fn send_wallet_message(
     Ok(())
 }
 
-fn send_message_debug(
+fn send_transaction_debug(
     ctx: &mut Context,
     msg_cell: &Cell,
     libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
-) -> anyhow::Result<Vec<SendMessageResult>> {
-    let msg: RelaxedMessage = msg_cell
-        .parse()
-        .context("Failed to load message from cell")?;
-
-    let RelaxedMsgInfo::Int(int_message) = &msg.info else {
-        anyhow::bail!("Emulator only supports internal messages for now");
-    };
-
-    let dst = match &int_message.dst {
-        IntAddr::Std(addr) => addr,
-        IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported"),
-    };
-    let dest_account = ctx.chain.world_state.get_account(dst);
-    let code = Emulator::get_code_cell(&msg, &dest_account);
+) -> anyhow::Result<Option<SendMessageResult>> {
+    let prepared = Emulator::prepare_send_transaction(
+        ctx.chain.world_state,
+        msg_cell.clone(),
+        libs,
+        src_addr,
+    )?;
+    let config_b64 = ctx.chain.world_state.get_config_b64();
 
     // Nested send-message debugging executes the recipient transaction through a
     // live step executor. Compilation artifacts are reused only for source/ABI
     // rendering; execution itself still comes from the prepared emulator state.
-    let step_executor = StepExecutor::new().expect("Failed to create executor");
+    let mut step_executor =
+        StepExecutor::new(Some(&config_b64)).context("Failed to create executor")?;
+    let mut missing_libraries_ctx = MissingLibrariesContext::default();
+    step_executor
+        .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
+        .context("Failed to register missing library callback")?;
+
     let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&code)
+        .result_for_code(&prepared.code)
         .map(|(_, result)| result);
     let source_map = compilation_result
         .as_ref()
@@ -908,34 +906,15 @@ fn send_message_debug(
         .as_ref()
         .and_then(|result| result.compiler_abi.clone());
 
-    let msg_cell = Emulator::patch_message(
-        ctx.chain.world_state.get_config(),
-        msg_cell.clone(),
-        src_addr,
-    )?;
     let prepare_result = step_executor
-        .prepare_transaction(
-            &Boc::encode_base64(msg_cell),
-            &RunTransactionArgs {
-                libs: libs.clone().into_root().map(Boc::encode_base64),
-                shard_account: Boc::encode_base64(to_cell(&dest_account)),
-                now: ctx.chain.world_state.get_now(),
-                lt: ctx.chain.world_state.get_lt(),
-                random_seed: None,
-                ignore_chksig: false,
-                debug_enabled: true,
-                prev_blocks_info: None,
-                is_tick_tock: None,
-                is_tock: None,
-            },
-        )
-        .expect("Prepare transaction failed");
+        .prepare_transaction(&prepared.message_b64, &prepared.run_args)
+        .context("Prepare transaction failed")?;
     assert!(
         prepare_result.success,
         "Failed to prepare Emulator in debug mode"
     );
     if prepare_result.skipped {
-        return Ok(vec![]);
+        return Ok(None);
     }
 
     let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
@@ -945,7 +924,7 @@ fn send_message_debug(
         .debug
         .begin_child_context(ChildDebugContextSpec {
             thread_id: 2,
-            name: "Send internal message".to_string(),
+            name: "Send message".to_string(),
             executor: step_executor.clone().into(),
             source_map,
             compiler_abi,
@@ -988,91 +967,25 @@ fn send_message_debug(
         }
     }
 
-    let result = match result {
-        EmulationResult::Success(result) => result,
-        EmulationResult::Error(_) => {
-            return Ok(vec![]);
-        }
-    };
+    Emulator::finalize_send_transaction(
+        ctx.chain.world_state,
+        prepared,
+        result,
+        None,
+        missing_libraries_ctx.into_set(),
+    )
+    .map(Some)
+}
 
-    let shard_account_after = &result.shard_account;
-    let shard_account_cell = Boc::decode_base64(shard_account_after.as_ref())
-        .context("Failed to decode shard account BoC")?;
-    let shard_account: ShardAccount = shard_account_cell
-        .parse()
-        .context("Failed to load shard account from cell")?;
-
-    ctx.chain.world_state.update_account(dst, &shard_account);
-
-    let tx_cell = Boc::decode_base64(result.transaction.as_ref())
-        .context("Failed to decode transaction BoC")?;
-    let transaction: Transaction = tx_cell
-        .parse()
-        .context("Failed to load transaction from cell")?;
-
-    let out_messages = transaction
-        .iter_out_msgs()
-        .filter_map(Result::ok)
-        .map(|it| to_cell(&it))
-        .collect::<Vec<_>>();
-
-    let send_result = SendMessageResultSuccess {
-        raw_transaction: result.transaction,
-        transaction: transaction.clone(),
-        parent_transaction: None,
-        child_transactions: vec![],
-        shard_account_before: dest_account,
-        shard_account,
-        out_messages,
-        vm_log: result.vm_log,
-        executor_logs: Arc::default(),
-        actions: result.actions,
-        code,
-        externals: vec![],
-        missing_libraries: FxHashSet::default(),
-    };
-
-    let mut externals: Vec<Cell> = vec![];
-
-    let mut all_results = std::iter::once(SendMessageResult::Success(send_result))
-        .chain(transaction.iter_out_msgs().flat_map(|msg| {
-            let Ok(msg) = msg else { return vec![] };
-
-            if let MsgInfo::ExtOut(_) = &msg.info {
-                externals.push(to_cell(&msg));
-                return vec![];
-            }
-
-            let mut send_results =
-                send_message_debug(ctx, &to_cell(&msg), libs, None).unwrap_or_default();
-            for result in &mut send_results {
-                match result {
-                    SendMessageResult::Success(result) => {
-                        result.parent_transaction = Some(transaction.lt);
-                    }
-                    SendMessageResult::Error(_) => {}
-                }
-            }
-
-            send_results
-        }))
-        .collect::<Vec<_>>();
-
-    let child_txs = all_results
-        .iter()
-        .skip(1)
-        .filter_map(|result| match result {
-            SendMessageResult::Success(result) => Some(result.transaction.lt),
-            SendMessageResult::Error(_) => None,
-        })
-        .collect();
-
-    if let Some(SendMessageResult::Success(result)) = all_results.get_mut(0) {
-        result.child_transactions = child_txs;
-        result.externals = externals;
-    }
-
-    Ok(all_results)
+fn send_message_debug(
+    ctx: &mut Context,
+    msg_cell: &Cell,
+    libs: &Dict<HashBytes, LibDescr>,
+    src_addr: Option<IntAddr>,
+) -> anyhow::Result<Vec<SendMessageResult>> {
+    Emulator::execute_send_message_flow(msg_cell.clone(), src_addr, &mut |message, from| {
+        send_transaction_debug(ctx, &message, libs, from)
+    })
 }
 
 extension!(send_single_message in (Context) with (src: IntAddr, msg: Cell) using send_single_message_impl);
@@ -2124,6 +2037,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use rustc_hash::FxHashSet;
     use std::sync::Arc;
 
     fn test_hash(byte: u8) -> HashBytes {

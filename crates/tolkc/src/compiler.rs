@@ -41,6 +41,25 @@ pub fn compile_fast(path: &Path, debug: bool) -> CompilerResult {
     Compiler::new(0).compile(path, debug)
 }
 
+pub fn prime_debug_cp0() -> anyhow::Result<()> {
+    // SAFETY: `tolk_prime_debug_cp0` is a pure native initializer that returns
+    // either null on success or a malloc-allocated error string on failure.
+    let raw = unsafe { tolk_prime_debug_cp0() };
+    if raw.is_null() {
+        return Ok(());
+    }
+
+    // SAFETY: `raw` was checked for null above and points to a valid
+    // null-terminated string allocated by `strdup`, so freeing it with libc
+    // `free` is correct after copying it into owned Rust memory.
+    let message = unsafe {
+        let message = CStr::from_ptr(raw).to_string_lossy().into_owned();
+        free(raw.cast_mut().cast::<c_void>());
+        message
+    };
+    anyhow::bail!(message)
+}
+
 #[repr(u32)]
 enum FsReadCallbackKind {
     Realpath = 0,
@@ -444,7 +463,7 @@ pub struct CompilerErrorRange {
 
 /// We embed the whole standard library of Tolk and Fift in binary for easier distribution.
 pub static TOLK_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/tolk-stdlib");
-static FIFT_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/fift");
+static FIFT_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/fift-stdlib");
 
 fn read_stdlib_file(path: &str) -> Option<&'static str> {
     TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
@@ -457,11 +476,13 @@ fn read_fift_stdlib_file(path: &str) -> Option<&'static str> {
 // C FFI declarations
 
 unsafe extern "C" {
+    pub fn tolk_prime_debug_cp0() -> *const ::std::os::raw::c_char;
     pub fn tolk_compile(
         config_json: *const ::std::os::raw::c_char,
         callback: WasmFsReadCallback,
         callback_payload: *mut c_void,
     ) -> *const ::std::os::raw::c_char;
+    pub fn free(ptr: *mut c_void);
 }
 
 type WasmFsReadCallback = Option<

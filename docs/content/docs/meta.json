@@ -16,6 +16,7 @@
     "scripting",
     "linting",
     "local-development-node",
+    "debugging.mdx",
     "acton-toml.mdx",
     "ci-setup.mdx",
     "--- Advanced ---",

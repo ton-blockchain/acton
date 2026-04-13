@@ -51,7 +51,7 @@ $ acton new my-project
 ? Include AGENTS.md guidance? Yes
 ```
 
-If a template supports a UI scaffold, you can skip that prompt by passing
+If a template supports a UI scaffold (TypeScript dApp), you can skip that prompt by passing
 `--app`. In non-interactive mode, Acton keeps the contract-only layout unless
 you pass `--app` explicitly.
 
@@ -126,7 +126,7 @@ A typical contract-only template project starts with the following structure:
 - **`contracts/`**: This is where your `.tolk` smart contract source files live.
 - **`scripts/`**: Contains auxiliary Tolk scripts for deployment, administration, and interaction with your contracts.
 - **`tests/`**: Contains your unit and integration tests.
-- **`wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
+- **`wrappers/`**: Contains contract wrappers that provide an interface for testing and scripting.
 - **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
 - **`.env`**: Local environment variables template (includes commented `TONCENTER_API_KEY` hint).
 - **`.editorconfig`**: Shared formatting defaults for the generated project.

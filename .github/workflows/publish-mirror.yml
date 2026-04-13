@@ -1,4 +1,4 @@
-name: publish-mirror
+name: Publish Mirror
 
 on:
   workflow_call:

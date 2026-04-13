@@ -27,7 +27,9 @@ pub mod tolk_source_map;
 pub mod types_kernel;
 mod version;
 
-pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};
+pub use compiler::{
+    Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast, prime_debug_cp0,
+};
 pub use source_map::SourceMap;
 pub use tolk_source_map::TolkSourceMap;
 pub use version::{NativeTolkVersion, native_tolk_version};

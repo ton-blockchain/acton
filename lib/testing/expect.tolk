@@ -289,24 +289,28 @@ fun Expectation<Maybe<T>>.toBeNone(self): void {
     }
 }
 
-/// Asserts that actual value is not empty.
+/// Asserts that actual value is not empty (contains some bits of refs).
 ///
 /// Example:
 /// ```tolk
-/// expect("hello").toBeNonEmpty();
+/// expect(someSlice).toBeNonEmpty();
 /// ```
 fun Expectation<slice>.toBeNonEmpty(self): void {
-    Assert.notEqual(self.value, "", "expect(<actual>).toBeNonEmpty()", self.location);
+    if (self.value.isEmpty()) {
+        Assert.fail("expect(<actual>).toBeNonEmpty()", self.location);
+    }
 }
 
-/// Asserts that actual value is empty.
+/// Asserts that actual value is empty (contains 0 bits and 0 refs).
 ///
 /// Example:
 /// ```tolk
-/// expect("").toBeEmpty();
+/// expect(someSlice).toBeEmpty();
 /// ```
 fun Expectation<slice>.toBeEmpty(self): void {
-    Assert.equal(self.value, "", "expect(<actual>).toBeEmpty()", self.location);
+    if (!self.value.isEmpty()) {
+        Assert.fail("expect(<actual>).toBeEmpty()", self.location);
+    }
 }
 
 /// Asserts that actual value is NaN.

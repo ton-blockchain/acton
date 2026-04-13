@@ -21,8 +21,7 @@
 /// Namespace for file system operations.
 struct fs
 
-/// Reads the entire contents of a file at the given path as a string slice
-/// with snake-string encoding.
+/// Reads the entire contents of a file at the given path.
 ///
 /// Behavior details:
 /// - The file is read as UTF-8 text.

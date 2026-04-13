@@ -9,6 +9,14 @@ on:
       - "bun.lock"
       - "package.json"
       - "crates/acton-**-ui/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui-deps.yml"
+      - "bun.lock"
+      - "package.json"
+      - "crates/acton-**-ui/**"
   workflow_dispatch:
 
 concurrency:

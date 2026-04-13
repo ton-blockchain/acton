@@ -1334,11 +1334,12 @@ fun net.getConfig(): Config {
     return createMapFromLowLevelDict(ffi.getConfig());
 }
 
-/// Calculate the CRC16 checksum of a slice.
+/// Calculate the CRC16 checksum of a string.
+/// Unlike a compile-time `"str".crc16()` method, it works with non-constant strings.
 ///
 /// Example:
 /// ```tolk
-/// val crc = crc16("hello");
+/// val crc = crc16(someStr);
 /// ```
 fun crc16(data: string): int asm "13 EXTCALL"
 

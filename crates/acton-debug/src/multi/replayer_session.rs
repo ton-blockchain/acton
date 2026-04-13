@@ -3,6 +3,7 @@
 //! (`send_message`, `run_get_method`) temporarily push child contexts backed by
 //! live executors and later pop back to the parent.
 
+use crate::core::evaluate::{evaluate_condition_expression, evaluate_expression};
 use crate::multi::dap_transport::{DapMessage, DapTransport};
 use crate::multi::session::ChildDebugContextSpec;
 use crate::replayer::{
@@ -50,6 +51,24 @@ const fn resolve_step_mode(
 struct SourceBreakpointInfo {
     id: i64,
     line: i64,
+    condition: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct BreakpointStopInfo {
+    ids: Vec<i64>,
+    description: String,
+}
+
+enum BreakpointCheck {
+    None,
+    Skip,
+    Hit(BreakpointStopInfo),
+}
+
+enum AdvanceOutcome {
+    Terminated,
+    Stopped(StopReason),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -63,7 +82,7 @@ struct ReplayerContext {
     replayer: TolkReplayer,
     /// Breakpoints resolve against the child replayer's own source map, which may
     /// differ from the parent contract when a nested call crosses contract boundaries.
-    resolved_breakpoints: HashMap<(usize, usize), Vec<i64>>,
+    resolved_breakpoints: HashMap<(usize, usize), Vec<SourceBreakpointInfo>>,
     /// Snapshot of the parent-visible frames captured when this child context starts.
     /// Appended after child frames so stack traces preserve the runtime call chain.
     outer_frames: Vec<CollectedFrame>,
@@ -217,6 +236,40 @@ impl ReplayerDebugSession {
         id
     }
 
+    fn evaluate_on_frame(
+        &self,
+        frame_id: Option<i64>,
+        expression: &str,
+    ) -> anyhow::Result<RenderedValue> {
+        match frame_id {
+            Some(frame_id) => {
+                let locator = self
+                    .frame_to_depth
+                    .get(&frame_id)
+                    .copied()
+                    .ok_or_else(|| anyhow!("Unknown frame id {frame_id}"))?;
+                let Some(ctx) = self.contexts.get(locator.context_idx) else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let Ok(ctx) = ctx.try_borrow() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let locals = ctx.replayer.locals_for_frame(locator.depth_from_top);
+                evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            }
+            None => {
+                let Some(ctx) = self.active_context() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let Ok(ctx) = ctx.try_borrow() else {
+                    return evaluate_expression(&[], None, expression);
+                };
+                let locals = ctx.replayer.locals_for_frame(0);
+                evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            }
+        }
+    }
+
     fn alloc_frame_id(&mut self, locator: FrameLocator) -> i64 {
         let id = self.frame_to_depth.len() as i64 + 1;
         self.frame_to_depth.insert(id, locator);
@@ -254,7 +307,7 @@ impl ReplayerDebugSession {
                 ctx.resolved_breakpoints
                     .entry((file_id, resolved_line))
                     .or_default()
-                    .push(bp.id);
+                    .push(bp);
             }
         }
     }
@@ -274,12 +327,20 @@ impl ReplayerDebugSession {
         }
     }
 
-    fn current_breakpoint_ids(&self) -> Option<Vec<i64>> {
-        let ctx = self.active_context()?;
-        let ctx = ctx.try_borrow().ok()?;
+    fn current_breakpoint_check(&self) -> BreakpointCheck {
+        let Some(ctx) = self.active_context() else {
+            return BreakpointCheck::None;
+        };
+        let Ok(ctx) = ctx.try_borrow() else {
+            return BreakpointCheck::None;
+        };
         let file_id = ctx.replayer.current_file_id();
         let line = ctx.replayer.current_line();
-        ctx.resolved_breakpoints.get(&(file_id, line)).cloned()
+        let Some(breakpoints) = ctx.resolved_breakpoints.get(&(file_id, line)) else {
+            return BreakpointCheck::None;
+        };
+
+        evaluate_breakpoint_conditions(&ctx.replayer.locals_for_frame(0), breakpoints)
     }
 
     fn resolve_breakpoint_lines_for_path(
@@ -327,6 +388,36 @@ impl ReplayerDebugSession {
         ctx.replayer.is_finished()
     }
 
+    fn advance_active_context(&mut self, mode: StepMode) -> AdvanceOutcome {
+        self.performing_step = Some(mode);
+
+        loop {
+            let is_end = self.step_active_context(mode, true);
+            if is_end {
+                return AdvanceOutcome::Terminated;
+            }
+
+            if let Some(exc) = self
+                .active_context()
+                .and_then(|ctx| ctx.try_borrow().ok()?.replayer.last_exception().cloned())
+            {
+                return AdvanceOutcome::Stopped(StopReason::Exception(exc));
+            }
+
+            match self.current_breakpoint_check() {
+                BreakpointCheck::Hit(stop) => {
+                    return AdvanceOutcome::Stopped(StopReason::Breakpoint(stop));
+                }
+                BreakpointCheck::Skip if matches!(mode, StepMode::RunUntilBreakpoint) => {
+                    continue;
+                }
+                BreakpointCheck::Skip | BreakpointCheck::None => {
+                    return AdvanceOutcome::Stopped(StopReason::Step);
+                }
+            }
+        }
+    }
+
     fn stop_reason_for_active_context(&self) -> StopReason {
         if let Some(exc) = self
             .active_context()
@@ -335,8 +426,8 @@ impl ReplayerDebugSession {
             return StopReason::Exception(exc);
         }
 
-        if let Some(ids) = self.current_breakpoint_ids() {
-            return StopReason::Breakpoint(ids);
+        if let BreakpointCheck::Hit(stop) = self.current_breakpoint_check() {
+            return StopReason::Breakpoint(stop);
         }
 
         StopReason::Step
@@ -345,10 +436,10 @@ impl ReplayerDebugSession {
     fn send_stop_reason(&self, reason: StopReason) -> anyhow::Result<()> {
         match reason {
             StopReason::Step => self.send_stopped(StoppedEventReason::Step, None, None),
-            StopReason::Breakpoint(ids) => self.send_stopped(
+            StopReason::Breakpoint(stop) => self.send_stopped(
                 StoppedEventReason::Breakpoint,
-                Some("Breakpoint hit".to_string()),
-                Some(ids),
+                Some(stop.description),
+                Some(stop.ids),
             ),
             StopReason::Exception(exc) => self.send_exception_stop(&exc),
         }
@@ -629,6 +720,25 @@ impl ReplayerDebugSession {
         }
     }
 
+    fn evaluate_response_from_value(&mut self, value: RenderedValue) -> EvaluateResponse {
+        let (result, type_field) = value.dap_parts_for_client();
+        let variables_reference = if value.has_children() {
+            self.store_debug_value(value)
+        } else {
+            0
+        };
+
+        EvaluateResponse {
+            result,
+            type_field,
+            presentation_hint: None,
+            variables_reference,
+            named_variables: None,
+            indexed_variables: None,
+            memory_reference: None,
+        }
+    }
+
     fn handle_request(&mut self, req: Request, terminate_at_end: bool) -> anyhow::Result<bool> {
         let command = req.command.clone();
         match command {
@@ -749,15 +859,13 @@ impl ReplayerDebugSession {
                 return Ok(true);
             }
             Command::Evaluate(args) => {
-                self.send_response(req.success(ResponseBody::Evaluate(EvaluateResponse {
-                    result: args.expression,
-                    type_field: None,
-                    presentation_hint: None,
-                    variables_reference: 0,
-                    named_variables: None,
-                    indexed_variables: None,
-                    memory_reference: None,
-                })))?;
+                let response = match self.evaluate_on_frame(args.frame_id, &args.expression) {
+                    Ok(value) => req.success(ResponseBody::Evaluate(
+                        self.evaluate_response_from_value(value),
+                    )),
+                    Err(err) => req.error(&err.to_string()),
+                };
+                self.send_response(response)?;
             }
             _ => {
                 return Err(anyhow!("Unhandled command: {:?}", req.command));
@@ -788,27 +896,24 @@ impl ReplayerDebugSession {
         } else {
             StepMode::StepOver
         };
-        self.performing_step = Some(step_mode);
-        let is_end = self.step_active_context(step_mode, true);
-        if is_end {
-            if terminate_at_end {
-                self.send_terminated()?;
+        match self.advance_active_context(step_mode) {
+            AdvanceOutcome::Terminated => {
+                if terminate_at_end {
+                    self.send_terminated()?;
+                }
+                return Ok(true);
             }
-            return Ok(true);
-        }
-
-        match self.stop_reason_for_active_context() {
-            StopReason::Breakpoint(ids) => {
+            AdvanceOutcome::Stopped(StopReason::Breakpoint(stop)) => {
                 self.send_stopped(
                     StoppedEventReason::Breakpoint,
-                    Some("Breakpoint hit".to_string()),
-                    Some(ids),
+                    Some(stop.description),
+                    Some(stop.ids),
                 )?;
             }
-            StopReason::Exception(exc) => {
+            AdvanceOutcome::Stopped(StopReason::Exception(exc)) => {
                 self.send_exception_stop(&exc)?;
             }
-            StopReason::Step => {
+            AdvanceOutcome::Stopped(StopReason::Step) => {
                 self.send_stopped(StoppedEventReason::Entry, None, None)?;
             }
         }
@@ -845,7 +950,11 @@ impl ReplayerDebugSession {
             let id = self.next_breakpoint_id;
             self.next_breakpoint_id += 1;
 
-            file_breakpoints.push(SourceBreakpointInfo { id, line: bp.line });
+            file_breakpoints.push(SourceBreakpointInfo {
+                id,
+                line: bp.line,
+                condition: bp.condition.clone(),
+            });
             breakpoints.push(Breakpoint {
                 id: Some(id),
                 verified: true,
@@ -1023,28 +1132,28 @@ impl ReplayerDebugSession {
 
         if spec.stop_on_entry {
             let step_mode = self.child_stop_on_entry_step_mode();
-            self.performing_step = Some(step_mode);
-            let is_end = self.step_active_context(step_mode, true);
-
-            if is_end {
-                self.send_terminated()?;
-                return Ok(true);
-            }
-
-            if let Some(ids) = self.current_breakpoint_ids() {
-                self.send_stopped(
-                    StoppedEventReason::Breakpoint,
-                    Some("Breakpoint hit".to_string()),
-                    Some(ids),
-                )?;
-            } else if let StopReason::Exception(exc) = self.stop_reason_for_active_context() {
-                self.send_exception_stop(&exc)?;
-            } else {
-                self.send_stopped(
-                    StoppedEventReason::Entry,
-                    Some(self.contexts[new_idx].borrow().label.to_string()),
-                    None,
-                )?;
+            match self.advance_active_context(step_mode) {
+                AdvanceOutcome::Terminated => {
+                    self.send_terminated()?;
+                    return Ok(true);
+                }
+                AdvanceOutcome::Stopped(StopReason::Breakpoint(stop)) => {
+                    self.send_stopped(
+                        StoppedEventReason::Breakpoint,
+                        Some(stop.description),
+                        Some(stop.ids),
+                    )?;
+                }
+                AdvanceOutcome::Stopped(StopReason::Exception(exc)) => {
+                    self.send_exception_stop(&exc)?;
+                }
+                AdvanceOutcome::Stopped(StopReason::Step) => {
+                    self.send_stopped(
+                        StoppedEventReason::Entry,
+                        Some(self.contexts[new_idx].borrow().label.to_string()),
+                        None,
+                    )?;
+                }
             }
         }
 
@@ -1059,17 +1168,17 @@ impl ReplayerDebugSession {
     }
 
     pub fn step(&mut self, mode: StepMode) -> bool {
-        self.performing_step = Some(mode);
-        let is_end = self.step_active_context(mode, true);
-
-        if !is_end && mode == StepMode::RunUntilBreakpoint {
-            let reason = self.stop_reason_for_active_context();
-            if !matches!(reason, StopReason::Step) {
-                let _ = self.send_stop_reason(reason);
+        match self.advance_active_context(mode) {
+            AdvanceOutcome::Terminated => true,
+            AdvanceOutcome::Stopped(reason) => {
+                if matches!(mode, StepMode::RunUntilBreakpoint)
+                    && !matches!(reason, StopReason::Step)
+                {
+                    let _ = self.send_stop_reason(reason);
+                }
+                false
             }
         }
-
-        is_end
     }
 
     pub fn active_context_is_terminated(&self) -> bool {
@@ -1106,7 +1215,7 @@ struct CollectedFrame {
 #[derive(Debug, Clone)]
 enum StopReason {
     Step,
-    Breakpoint(Vec<i64>),
+    Breakpoint(BreakpointStopInfo),
     Exception(ExceptionInfo),
 }
 
@@ -1114,6 +1223,8 @@ fn make_capabilities() -> dap::types::Capabilities {
     dap::types::Capabilities {
         supports_configuration_done_request: Some(true),
         supports_exception_info_request: Some(true),
+        supports_evaluate_for_hovers: Some(true),
+        supports_conditional_breakpoints: Some(true),
         exception_breakpoint_filters: Some(vec![
             ExceptionBreakpointsFilter {
                 filter: "uncaught".to_string(),
@@ -1133,5 +1244,46 @@ fn make_capabilities() -> dap::types::Capabilities {
             },
         ]),
         ..Default::default()
+    }
+}
+
+fn evaluate_breakpoint_conditions(
+    locals: &[LocalVarRendered],
+    breakpoints: &[SourceBreakpointInfo],
+) -> BreakpointCheck {
+    let mut hit_ids = Vec::new();
+    let mut error_ids = Vec::new();
+    let mut first_error = None;
+
+    for breakpoint in breakpoints {
+        let Some(condition) = breakpoint.condition.as_deref() else {
+            hit_ids.push(breakpoint.id);
+            continue;
+        };
+
+        match evaluate_condition_expression(locals, condition) {
+            Ok(true) => hit_ids.push(breakpoint.id),
+            Ok(false) => {}
+            Err(err) => {
+                error_ids.push(breakpoint.id);
+                if first_error.is_none() {
+                    first_error = Some(err.to_string());
+                }
+            }
+        }
+    }
+
+    if !hit_ids.is_empty() {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: hit_ids,
+            description: "Breakpoint hit".to_string(),
+        })
+    } else if let Some(err) = first_error {
+        BreakpointCheck::Hit(BreakpointStopInfo {
+            ids: error_ids,
+            description: format!("Conditional breakpoint evaluation failed: {err}"),
+        })
+    } else {
+        BreakpointCheck::Skip
     }
 }

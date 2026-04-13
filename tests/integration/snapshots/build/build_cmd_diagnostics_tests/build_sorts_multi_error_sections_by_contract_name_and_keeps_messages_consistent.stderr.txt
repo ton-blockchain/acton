@@ -1,7 +1,7 @@
 Error: In a_parent:
 
 [ROOT]/contracts/a_parent[LINE]: error: Failed to import: [NOT_FOUND]
-   1 | import "../gen/child_code.tolk"
+   1 | import "../gen/child.code.tolk"
      |        ^^^^^^^^^^^^^^^^^^^^^^^^
 
 In child:

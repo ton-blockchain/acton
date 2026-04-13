@@ -118,7 +118,7 @@ depends = ["child.lib"]
         "build artifact should use hyphenated contract name for parent contract"
     );
 
-    let generated_dep = fs::read_to_string(project.path().join("gen/child.lib_code.tolk"))
+    let generated_dep = fs::read_to_string(project.path().join("gen/child.lib.code.tolk"))
         .expect("read generated dependency file");
     assert!(
         generated_dep.contains("fun childLibCompiledCode(): cell"),
@@ -217,7 +217,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .contract_with_deps(
             "parent",
             r#"
-            import "../gen/child_code.tolk"
+            import "../gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -238,7 +238,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .assert_contains("Finished");
 
     assert!(
-        project.path().join("gen/child_code.tolk").exists(),
+        project.path().join("gen/child.code.tolk").exists(),
         "empty [build].gen-dir should fall back to default generated dependency directory"
     );
 }
@@ -255,7 +255,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .contract_with_deps(
             "parent",
             r#"
-            import "../cli-gen/child_code.tolk"
+            import "../cli-gen/child.code.tolk"
 
             fun onInternalMessage(in: InMessage) {
                 val code = childCompiledCode();
@@ -277,7 +277,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .assert_contains("Finished");
 
     assert!(
-        project.path().join("cli-gen/child_code.tolk").exists(),
+        project.path().join("cli-gen/child.code.tolk").exists(),
         "CLI --gen-dir should take precedence over empty config gen-dir"
     );
 }
@@ -527,7 +527,7 @@ depends = ["base"]
         "root contract should build when depending on base"
     );
     assert!(
-        project.path().join("gen/base_code.tolk").exists(),
+        project.path().join("gen/base.code.tolk").exists(),
         "dependency code should still be generated for root -> base dependency"
     );
 }
@@ -713,7 +713,7 @@ depends = [{ name = "child" }]
         .assert_contains("Compiling Child")
         .assert_contains("Compiling Root");
 
-    let generated_dep = fs::read_to_string(project.path().join("gen/child_code.tolk"))
+    let generated_dep = fs::read_to_string(project.path().join("gen/child.code.tolk"))
         .expect("read generated dependency file");
     assert!(
         generated_dep.contains("fun childCompiledCode(): cell asm"),

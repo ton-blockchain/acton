@@ -916,7 +916,7 @@ fn test_script_invalid_message_exit_code_shows_description_and_phase() {
 
             fun main() {
                 println("Exiting with code 65535");
-                throw 65535
+                throw 0xFF_FF
             }
         "#,
         )

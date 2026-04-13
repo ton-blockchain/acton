@@ -124,30 +124,31 @@ get fun `test address workchain`() {
 }
 ```
 
-#### Example: `slice` Matcher
+#### Example: `string` Matcher
 
-Here is how you can write a matcher for a `slice` to check if it starts with a specific prefix.
+Here is how you can write a matcher for a `string` to check if it has desired length.
 
 ```tolk
 import "@acton/testing/expect"
 import "@acton/testing/assert"
 import "@acton/fmt"
+import "@stdlib/strings"
 
-fun Expectation<slice>.toStartWith(self, prefix: slice) {
-    if (!self.value.getFirstBits(prefix.remainingBitsCount()).bitsEqual(prefix)) {
+fun Expectation<string>.toHaveLength(self, expectedLen: int) {
+    if (self.value.calculateLength() != expectedLen) {
         Assert.fail(
             format(
-                "Expected slice '{}' to start with prefix '{}'",
+                "Expected string '{}' to have length '{}'",
                 self.value,
-                prefix
+                expectedLen
             ),
             self.location
         );
     }
 }
 
-get fun `test slice prefix`() {
-    expect("hello world").toStartWith("hello");
+get fun `test string len`() {
+    expect("hello world").toHaveLength(11);
 }
 ```
 
@@ -160,7 +161,7 @@ Let's say you have a `User` struct:
 ```tolk
 struct User {
     id: int
-    name: slice
+    name: string
     isActive: bool
 }
 ```
