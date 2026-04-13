@@ -1160,8 +1160,15 @@ fn transaction_matches_predicates(
                 return Ok(false);
             };
             if !call_predicate(executor, &field.predicate, int_item(opcode as i64))? {
-                // For bounced messages, the real opcode follows the 0xFFFFFFFF prefix
-                if info.bounced {
+                // For bounced messages, the real opcode follows the 0xFFFFFFFF prefix.
+                // Only retry against the second word if the caller actually asked to
+                // match bounced transactions (bounced predicate exists and accepts true);
+                // otherwise we'd produce false positives on any tx with a 0xFFFFFFFF prefix.
+                let caller_wants_bounced = match &predicates.bounced {
+                    Some(bf) => call_predicate(executor, &bf.predicate, bool_item(true))?,
+                    None => false,
+                };
+                if info.bounced && caller_wants_bounced {
                     let Ok(bounced_opcode) = slice.load_u32() else {
                         return Ok(false);
                     };

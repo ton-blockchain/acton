@@ -374,10 +374,12 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
 
                 if fourth_bit {
                     // vmc_pushint$1111 value:int32 next:^VmCont
-                    parser.load_uint(32)?; // value
+                    let int_to_push = parser.load_uint(32)?; // value
                     let next = parser.load_reference_cloned()?;
                     let mut np = next.as_slice_allow_exotic();
-                    parse_vm_cont(&mut np)
+                    let mut cont = parse_vm_cont(&mut np)?;
+                    cont.stack = Some(Tuple(vec![TupleItem::Int(BigInt::from(int_to_push))]));
+                    Ok(cont)
                 } else {
                     // Tags starting with 1110 — undefined
                     Err(anyhow!("Unsupported VmCont tag starting with 1110"))
