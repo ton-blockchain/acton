@@ -98,3 +98,19 @@ keys = { mnemonic-file = "other.txt" }
 
     output.assert_contains("Cannot prompt for wallet selection in a non-interactive environment");
 }
+
+#[test]
+fn prompt_wallet_in_emulate_mode_returns_placeholder() {
+    // Without `verify_network` (i.e. plain `acton script` / emulate mode) `net.wallet(name)`
+    // accepts any name, so `promptWallet` should return a stable placeholder instead of
+    // failing — even when no wallets.toml is present.
+    let output = ProjectBuilder::new("prompt-wallet-emulate")
+        .script_file("use_prompt_wallet", PROMPT_WALLET_SCRIPT)
+        .build()
+        .acton()
+        .script("scripts/use_prompt_wallet.tolk")
+        .run()
+        .success();
+
+    output.assert_contains("selected=emulated-wallet");
+}

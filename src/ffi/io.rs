@@ -346,6 +346,14 @@ fn confirm_impl(
 
 extension!(prompt_wallet in (Context) with (message: String) using prompt_wallet_impl);
 fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> anyhow::Result<()> {
+    // In emulate mode `net.wallet(name)` accepts any name, so there is nothing real to choose
+    // from. Return a stable placeholder so scripts that call `promptWallet` keep working when
+    // run without `--net` (e.g. plain `acton script`).
+    if !ctx.is_broadcasting {
+        stack.push_string("emulated-wallet");
+        return Ok(());
+    }
+
     let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
 
     if wallet_names.is_empty() {

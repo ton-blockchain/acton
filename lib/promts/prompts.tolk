@@ -75,11 +75,14 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 
 /// Prompts the user to select a wallet from the configured wallets.
 ///
-/// Behavior:
+/// Behavior (broadcast mode, i.e. `--net` is set):
 /// - If no wallets are configured, fails with an error suggesting how to create one.
 /// - If only one wallet is configured, returns its name automatically.
 /// - If multiple wallets are configured, shows an interactive selection.
 /// - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
+///
+/// In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
+/// `net.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
 ///
 /// Example:
 /// ```tolk
