@@ -640,8 +640,7 @@ where
             step.externals = externals;
 
             if let IterationStop::UntilMatch(predicates, executor) = &stop
-                && transaction_matches_predicates(&step.transaction, predicates, executor)
-                    .unwrap_or(false)
+                && transaction_matches_predicates(&step.transaction, predicates, executor)?
             {
                 matched = true;
             }
@@ -1057,6 +1056,11 @@ fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> an
         .run_continuation(&cont_boc, &stack_boc)
         .context("Cannot run predicate")?;
 
+    // Matcher predicates are expected to be pure boolean functions that always return a
+    // value — they must never throw or end with a non-success VM exit code. If they do,
+    // the offending transaction would be silently treated as "not matching" which hides
+    // real runtime errors behind misleading "data mismatch" diagnostics. Surface the
+    // failure instead so the caller reports it as a predicate error.
     match result {
         GetMethodResult::Success(r) if r.vm_exit_code == 0 || r.vm_exit_code == 1 => {
             let cell =
@@ -1064,10 +1068,24 @@ fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> an
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize result")?;
             match tuple.first() {
                 Some(TupleItem::Int(n)) => Ok(*n != BigInt::from(0)),
-                _ => Ok(false),
+                other => anyhow::bail!(
+                    "Matcher predicate returned an unexpected stack value: {other:?}. \
+                     Matchers must return an int (bool), not throw or produce other types."
+                ),
             }
         }
-        _ => Ok(false),
+        GetMethodResult::Success(r) => anyhow::bail!(
+            "Matcher predicate failed with VM exit code {}. \
+             Matchers must never throw — they should return a boolean value.\n\
+             VM log:\n{}",
+            r.vm_exit_code,
+            r.vm_log,
+        ),
+        GetMethodResult::Error(err) => anyhow::bail!(
+            "Matcher predicate execution error: {}. \
+             Matchers must never throw — they should return a boolean value.",
+            err.error
+        ),
     }
 }
 
@@ -1280,7 +1298,7 @@ fn find_transaction_by_params_impl(
     let predicates = parse_search_params_tuple(&params);
     let executor = make_predicate_executor(ctx)?;
 
-    let found = txs
+    let parsed_txs = txs
         .iter()
         .filter_map(|el| match el {
             TupleItem::Tuple(tuple) => match tuple.first() {
@@ -1289,10 +1307,18 @@ fn find_transaction_by_params_impl(
             },
             _ => None,
         })
-        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
-        .find(|(tx, _)| {
-            transaction_matches_predicates(tx, &predicates, &executor).unwrap_or(false)
-        });
+        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)));
+
+    // Iterate imperatively so predicate-execution errors surface to the caller instead of
+    // being silently coerced into "no match" (which hides real matcher bugs behind
+    // misleading "transaction not found" diagnostics).
+    let mut found = None;
+    for (tx, cell) in parsed_txs {
+        if transaction_matches_predicates(&tx, &predicates, &executor)? {
+            found = Some((tx, cell));
+            break;
+        }
+    }
 
     match found {
         Some((_, cell)) => stack.push(TupleItem::Cell(cell.clone())),
