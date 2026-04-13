@@ -4,7 +4,6 @@ use crate::context::{
     ParsedSearchParams, PendingMessageStep, SearchField, Wallet, to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
-use crate::ffi::assert::parse_search_params;
 use crate::paths;
 use crate::retrace;
 use acton_config::color::OwoColorize;
