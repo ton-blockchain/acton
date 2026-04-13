@@ -308,15 +308,14 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
 
                 if !fourth_bit {
                     // vmc_repeat$10100 count:uint63 body:^VmCont after:^VmCont
-                    let fifth_bit = parser.load_bit()?;
-                    if fifth_bit {
-                        return Err(anyhow!("Unsupported VmCont tag starting with 10101"));
-                    }
-                    parser.load_uint(63)?; // count
-                    let body = parser.load_reference_cloned()?;
-                    parser.load_reference_cloned()?; // after
-                    let mut bp = body.as_slice_allow_exotic();
-                    parse_vm_cont(&mut bp)
+                    //
+                    // We can't round-trip control-flow continuations through `vmc_std`
+                    // without losing the loop semantics (count, after-cont), so refuse
+                    // to parse them rather than silently collapsing to the body.
+                    Err(anyhow!(
+                        "Unsupported VmCont variant `vmc_repeat`: control-flow continuations \
+                         cannot be round-tripped through FFI"
+                    ))
                 } else {
                     Err(anyhow!("Unsupported VmCont tag starting with 1011"))
                 }
@@ -330,40 +329,21 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
                 let fourth_bit = parser.load_bit()?;
 
                 if !fourth_bit {
-                    // Tags starting with 1100
+                    // Tags starting with 1100. All four variants encode loops that cannot
+                    // be re-emitted as `vmc_std` without losing semantics, so reject them
+                    // up-front rather than collapsing them to their `body` continuation.
                     let sub_tag = parser.load_uint(2)?;
-                    match sub_tag {
-                        0b00 => {
-                            // vmc_until$110000 body:^VmCont after:^VmCont
-                            let body = parser.load_reference_cloned()?;
-                            parser.load_reference_cloned()?; // after
-                            let mut bp = body.as_slice_allow_exotic();
-                            parse_vm_cont(&mut bp)
-                        }
-                        0b01 => {
-                            // vmc_again$110001 body:^VmCont
-                            let body = parser.load_reference_cloned()?;
-                            let mut bp = body.as_slice_allow_exotic();
-                            parse_vm_cont(&mut bp)
-                        }
-                        0b10 => {
-                            // vmc_while_cond$110010 cond:^VmCont body:^VmCont after:^VmCont
-                            parser.load_reference_cloned()?; // cond
-                            let body = parser.load_reference_cloned()?;
-                            parser.load_reference_cloned()?; // after
-                            let mut bp = body.as_slice_allow_exotic();
-                            parse_vm_cont(&mut bp)
-                        }
-                        0b11 => {
-                            // vmc_while_body$110011 cond:^VmCont body:^VmCont after:^VmCont
-                            parser.load_reference_cloned()?; // cond
-                            let body = parser.load_reference_cloned()?;
-                            parser.load_reference_cloned()?; // after
-                            let mut bp = body.as_slice_allow_exotic();
-                            parse_vm_cont(&mut bp)
-                        }
+                    let name = match sub_tag {
+                        0b00 => "vmc_until",
+                        0b01 => "vmc_again",
+                        0b10 => "vmc_while_cond",
+                        0b11 => "vmc_while_body",
                         _ => unreachable!(),
-                    }
+                    };
+                    Err(anyhow!(
+                        "Unsupported VmCont variant `{name}`: control-flow continuations \
+                         cannot be round-tripped through FFI"
+                    ))
                 } else {
                     // Tags starting with 1101 — undefined
                     Err(anyhow!("Unsupported VmCont tag starting with 1101"))
