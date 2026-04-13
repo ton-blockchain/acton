@@ -324,8 +324,8 @@ fun T.__eq(self, other: T): bool {
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
-fun createEqFun<T, R>(arg: T): (T -> R) {
-    return fun(snd: T) {
+fun createEqFun<T>(arg: T): (T -> bool) {
+    return fun(snd) {
         return arg.__eq(snd);
     }
 }

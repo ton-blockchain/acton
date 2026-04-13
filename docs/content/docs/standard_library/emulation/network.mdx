@@ -382,7 +382,7 @@ Represents a set of parameters to search for a transaction in the transaction li
 ## `createEqFun`
 
 ```tolk
-fun createEqFun<T, R>(arg: T): (T -> R)
+fun createEqFun<T>(arg: T): (T -> bool)
 ```
 
 Bind first argument to a 2-arg function, producing a 1-arg function.
