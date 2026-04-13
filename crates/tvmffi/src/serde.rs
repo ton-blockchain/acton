@@ -291,17 +291,20 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
             let third_bit = parser.load_bit()?;
 
             if !third_bit {
-                // Tags starting with 100
+                // Tags starting with 100. Both variants are control-flow terminators
+                // (`vmc_quit` with an exit code, `vmc_quit_exc`) that cannot be re-emitted
+                // as a plain `vmc_std` without losing their semantics. Reject them rather
+                // than silently collapsing to an empty `ContData`.
                 let fourth_bit = parser.load_bit()?;
-
-                if !fourth_bit {
-                    // vmc_quit$1000 exit_code:int32
-                    parser.load_uint(32)?;
-                    Ok(ContData::default())
+                let name = if fourth_bit {
+                    "vmc_quit_exc"
                 } else {
-                    // vmc_quit_exc$1001
-                    Ok(ContData::default())
-                }
+                    "vmc_quit"
+                };
+                Err(anyhow!(
+                    "Unsupported VmCont variant `{name}`: control-flow continuations \
+                     cannot be round-tripped through FFI"
+                ))
             } else {
                 // Tags starting with 101
                 let fourth_bit = parser.load_bit()?;
@@ -358,12 +361,16 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
                     let next = parser.load_reference_cloned()?;
                     let mut np = next.as_slice_allow_exotic();
                     let mut cont = parse_vm_cont(&mut np)?;
-                    // `vmc_pushint` pushes `value` onto the stack before running `next`, so the
-                    // pushed int has to be appended (becoming the new top) onto whatever stack
-                    // `next` already carries rather than replacing it. In this representation
-                    // index 0 is the bottom of the stack and the last element is the top.
+                    // `vmc_pushint` pushes `value` BEFORE running `next`. When nested
+                    // (outer pushes A, inner pushes B, ...), the outer push happens first
+                    // temporally, so in the flattened captured stack `value` must end up
+                    // BELOW everything `next` contributed. In this representation index 0
+                    // is the bottom of the stack and the last element is the top, so the
+                    // outer value has to be inserted at index 0 rather than pushed at end —
+                    // otherwise nested `vmc_pushint` continuations end up with their
+                    // captured arguments in reverse order.
                     let mut stack = cont.stack.unwrap_or_else(Tuple::empty);
-                    stack.0.push(TupleItem::Int(int_to_push));
+                    stack.0.insert(0, TupleItem::Int(int_to_push));
                     cont.stack = Some(stack);
                     Ok(cont)
                 } else {
