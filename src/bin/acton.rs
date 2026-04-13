@@ -1384,48 +1384,6 @@ fn completion_command() -> clap::Command {
     cli_command(true)
 }
 
-/// clap_complete's default zsh registration script pipes candidates through
-/// `_describe`, which unconditionally appends a space — that breaks continued
-/// path completion for directory candidates (e.g. `src/` + TAB). Its bash
-/// registration already handles this via `compopt -o nospace` when a candidate
-/// ends in `/`, `=`, or `:`; we mirror that for zsh by shipping our own
-/// registration script and routing matching candidates through `compadd -S ''`.
-const ZSH_COMPLETION_REGISTRATION: &str = r#"#compdef acton
-_acton() {
-    local cs
-    cs=("${(@f)$(_CLAP_IFS=$'\n' _CLAP_COMPLETE_INDEX=$((CURRENT-1)) COMPLETE=zsh '__COMPLETER__' -- "${words[@]}" 2>/dev/null)}")
-    local c; local -a nospace normal
-    for c in "${cs[@]}"; do
-        [[ $c == *[=/:] ]] && nospace+=("$c") || normal+=("$c")
-    done
-    (( ${#nospace} )) && _describe 'values' nospace -- -S ''
-    (( ${#normal} )) && _describe 'values' normal
-}
-compdef _acton acton
-"#;
-
-/// Intercept the zsh registration request (`COMPLETE=zsh acton` with no `--`)
-/// and emit our patched script. Completion dispatch itself (`COMPLETE=zsh
-/// acton -- ...`) still goes through `CompleteEnv`, which handles it correctly.
-fn maybe_emit_zsh_completion_registration() -> bool {
-    if env::var_os("COMPLETE").as_deref() != Some(std::ffi::OsStr::new("zsh")) {
-        return false;
-    }
-    if env::args_os().any(|a| a == "--") {
-        return false;
-    }
-    let argv0 = env::args_os().next().unwrap_or_else(|| "acton".into());
-    let completer = Path::new(&argv0)
-        .display()
-        .to_string()
-        .replace('\'', "'\\''");
-    print!(
-        "{}",
-        ZSH_COMPLETION_REGISTRATION.replace("__COMPLETER__", &completer)
-    );
-    true
-}
-
 fn root_help_has_explicit_help_flag() -> bool {
     env::args_os()
         .skip(1)
@@ -1590,9 +1548,6 @@ fn configure_project_roots(
 }
 
 fn main() {
-    if maybe_emit_zsh_completion_registration() {
-        return;
-    }
     CompleteEnv::with_factory(completion_command).complete();
 
     setup_panic!(
