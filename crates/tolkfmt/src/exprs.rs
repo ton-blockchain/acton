@@ -669,8 +669,7 @@ pub fn print_object_literal<'a>(ctx: &Context<'_>, obj: &ObjectLit) -> Option<Rc
         docs.push(RcDoc::space());
     }
 
-    let args: Vec<_> = obj.arguments().collect();
-    let args_doc = print_object_literal_body(ctx, &args, has_type_name)?;
+    let args_doc = print_object_literal_body(ctx, obj, has_type_name)?;
     docs.push(args_doc);
 
     Some(RcDoc::group(RcDoc::concat(docs)))
@@ -678,14 +677,29 @@ pub fn print_object_literal<'a>(ctx: &Context<'_>, obj: &ObjectLit) -> Option<Rc
 
 pub fn print_object_literal_body<'a>(
     ctx: &Context,
-    args: &[InstanceArg],
+    obj: &ObjectLit,
     has_type_name: bool,
 ) -> Option<RcDoc<'a>> {
-    let multiline_threshold = object_literal_multiline_threshold(ctx, args, has_type_name);
+    let node = obj.syntax();
+    let args: Vec<_> = obj.arguments().collect();
+
+    let (multiline_threshold, never_break_if_items_lt) =
+        if is_single_typeless_object_call_argument(node, has_type_name) {
+            if node.start_position().row < node.end_position().row {
+                (0, 0)
+            } else {
+                (usize::MAX, args.len() + 1)
+            }
+        } else {
+            (
+                object_literal_multiline_threshold(ctx, &args, has_type_name),
+                0,
+            )
+        };
 
     common::print_list(
         ctx,
-        args,
+        &args,
         print_instance_argument,
         |arg| arg.0,
         |_| vec![],
@@ -693,6 +707,7 @@ pub fn print_object_literal_body<'a>(
             brackets: (RcDoc::text("{"), RcDoc::text("}")),
             multiline_threshold,
             single_line_edge_space: true,
+            never_break_if_items_lt,
             ..Default::default()
         },
     )
@@ -721,6 +736,19 @@ fn object_literal_multiline_threshold(
         // For 2+ args, only all-shorthand literals may stay one-line.
         0
     }
+}
+
+fn is_single_typeless_object_call_argument(node: Node<'_>, has_type_name: bool) -> bool {
+    if has_type_name {
+        return false;
+    }
+
+    node.parent()
+        .filter(|node| node.kind() == "call_argument")
+        .and_then(|node| node.parent())
+        .filter(|node| node.kind() == "argument_list")
+        .map(ArgumentList)
+        .is_some_and(|args| args.arguments().count() == 1)
 }
 
 fn is_shorthand_instance_argument(ctx: &Context<'_>, arg: &InstanceArg) -> bool {

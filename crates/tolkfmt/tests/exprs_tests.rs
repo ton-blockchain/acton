@@ -316,6 +316,57 @@ fn test_object_literal_without_type_mixed_two_fields_stays_single_line() {
 }
 
 #[test]
+fn test_single_typeless_object_call_argument_preserves_multiline_layout() {
+    check(
+        r"
+            fun test() {
+                val counter = Counter.fromStorage({
+                    id: 0,
+                    counter: 0,
+                });
+            }",
+        expect![[r"
+                fun test() {
+                    val counter = Counter.fromStorage({
+                        id: 0,
+                        counter: 0,
+                    });
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_typeless_object_call_argument_preserves_partial_multiline_layout() {
+    check(
+        r"
+            fun test() {
+                val contract = Counter.fromStorage({
+                    id: 0, counter: 0,
+                });
+            }",
+        expect![[r"
+                fun test() {
+                    val contract = Counter.fromStorage({
+                        id: 0,
+                        counter: 0,
+                    });
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_typeless_object_call_argument_preserves_single_line_layout() {
+    check_with_width(
+        "fun test() { val counter = Counter.fromStorage({ id: 0, counter: 0 }); }",
+        expect![[r"
+                fun test() {
+                    val counter = Counter.fromStorage({ id: 0, counter: 0 });
+                }"]],
+        40,
+    );
+}
+
+#[test]
 fn test_object_literal_without_type_shorthand_all_uses_default_threshold() {
     check(
         "fun test() { x = { x, y, z }; }",
