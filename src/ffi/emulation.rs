@@ -10,7 +10,7 @@ use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use acton_debug::ChildDebugContextSpec;
 use acton_debug::replayer::StepMode;
-use anyhow::Context as AnyhowContext;
+use anyhow::{Context as AnyhowContext, anyhow};
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
@@ -1229,12 +1229,19 @@ fn transaction_matches_predicates(
 
 /// Create a GetExecutor suitable for running predicate continuations.
 fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
-    let code = ctx
-        .env
-        .test_code
-        .as_ref()
-        .map(Boc::encode_base64)
-        .unwrap_or_else(|| Boc::encode_base64(Cell::default()));
+    // Predicate continuations reference code defined in the test/script that built them
+    // (e.g. `T.__eq` instantiations). Without that code cell the secondary executor cannot
+    // resolve those references and every match silently fails. Test mode populates
+    // `test_code` with the compiled test code; script mode leaves it `None`, so bail early
+    // with a clear error rather than producing a misleading "no transaction matched" result.
+    let code = ctx.env.test_code.as_ref().map(Boc::encode_base64).ok_or_else(|| {
+        anyhow!(
+            "Predicate-based transaction matchers (e.g. `expect(...).toHaveSuccessfulDeploy({{ to: addr }})`) \
+             are not supported in `acton script`. \
+             They require the compiled test code to evaluate predicate continuations, \
+             which is only available under `acton test`."
+        )
+    })?;
 
     let now = std::time::SystemTime::now();
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");

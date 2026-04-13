@@ -269,6 +269,10 @@ fn execute_script<'a>(
 
     let config = ActonConfig::load()?;
 
+    // `code_cell` is a `TonCell` (from `ton::ton_core::cell`) but `Env.test_code` expects a
+    // `tycho_types::cell::Cell`. The two cell libraries don't interop directly, so we round-trip
+    let test_code_cell = Boc::decode_base64(code_cell.to_boc_base64()?)?;
+
     let mut ctx = Context {
         env: Env {
             config: &config,
@@ -283,7 +287,7 @@ fn execute_script<'a>(
             fork_net: None,
             api_key: None,
             running_id: "script".into(),
-            test_code: None,
+            test_code: Some(test_code_cell),
         },
         io: IoContext {
             stdout_buffer: String::new(),

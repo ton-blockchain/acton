@@ -30,7 +30,7 @@ fun ffi.__executeInSeparateLibemulator<Ret, Args = array<unknown>>(
         } catch (e) {
             if (e == 7) {
                 Assert.fail(
-                    format2(
+                    format(
                         "Calling for cont returned '{}' that cannot be deserialized to '{}'.",
                         res,
                         reflect.typeNameOf<Ret>(),
