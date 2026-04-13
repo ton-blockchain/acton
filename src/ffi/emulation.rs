@@ -2122,10 +2122,13 @@ fn call_tolk_function_impl(
 
     match result {
         GetMethodResult::Success(result) => {
-            ctx.chain
-                .emulations
-                .save_get_method(&ctx.env.running_id, result.clone());
-
+            // NOTE: Intentionally not saving this result into `emulations.get_methods`.
+            // `GetMethodResultSuccess.code` is `#[serde(skip)]` and is only populated by
+            // `run_get_method` (which has the contract code at hand). `run_continuation`
+            // cannot fill it, so stored continuation results would have an empty `code`
+            // and break downstream consumers that look it up (coverage + failed-get-method
+            // exception source-map resolution in `src/formatter.rs`). Continuation
+            // executions are out of scope for coverage anyway.
             let cell =
                 Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
