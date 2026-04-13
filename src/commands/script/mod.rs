@@ -292,7 +292,10 @@ fn execute_script(
             fork_net,
             api_key,
             running_id: "script".into(),
-            test_code: None,
+            // The script's own compiled code contains any user-defined predicate
+            // lambdas (e.g. those built by `expect(...).toHaveTx({ ... })`), so
+            // we reuse it as the code cell for evaluating predicate continuations.
+            test_code: Some(code_cell.clone()),
         },
         io: IoContext {
             stdout_buffer: String::new(),
