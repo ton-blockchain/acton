@@ -15,6 +15,7 @@
 /// val rawActions = vm.getC5();
 /// ```
 import "../ffi/ffi"
+import "../testing/assert"
 
 /// Holds the methods to change the VM state.
 struct vm
@@ -184,7 +185,7 @@ fun vm.cellFromHex(cellHex: string): cell {
 fun vm.parseInt(x: string): int {
     val n = ffi.parseInt(x);
     if (n == null) {
-        throw 1;
+        throw ASSERTION_FAILED;
     }
     return n;
 }

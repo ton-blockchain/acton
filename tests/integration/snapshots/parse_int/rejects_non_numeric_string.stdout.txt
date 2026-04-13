@@ -1,6 +1,2 @@
   Installing standard library [ACTON_VERSION]
-Script finished with [EXIT_STATUS] 1
-Re-run with --backtrace full to get more information
-Description: Alternative successful execution [EXIT_STATUS]. Reserved, but does not occur
-Phase: Compute phase
 Failed to parse integer from 'abc': invalid digit found in string
