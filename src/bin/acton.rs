@@ -1415,8 +1415,14 @@ fn maybe_emit_zsh_completion_registration() -> bool {
         return false;
     }
     let argv0 = env::args_os().next().unwrap_or_else(|| "acton".into());
-    let completer = Path::new(&argv0).display().to_string().replace('\'', "'\\''");
-    print!("{}", ZSH_COMPLETION_REGISTRATION.replace("__COMPLETER__", &completer));
+    let completer = Path::new(&argv0)
+        .display()
+        .to_string()
+        .replace('\'', "'\\''");
+    print!(
+        "{}",
+        ZSH_COMPLETION_REGISTRATION.replace("__COMPLETER__", &completer)
+    );
     true
 }
 
