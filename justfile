@@ -56,7 +56,7 @@ clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 check-deps:
-    cargo shear
+    cargo shear --deny-warnings
 
 typos:
     typos .
