@@ -117,6 +117,10 @@ pub struct ContData {
     /// Stored as raw hashmap cell for round-trip serialization.
     /// Key registers: c0 = return cont, c1 = alt return cont (RETALT), etc.
     pub savelist: Option<Cell>,
+    /// Arity metadata from VmControlData (set by SETCONTARGS). When present,
+    /// the continuation expects exactly this many arguments at invocation time;
+    /// must be preserved across parse/serialize or call semantics change.
+    pub nargs: Option<u16>,
 }
 
 impl ContData {
@@ -126,6 +130,7 @@ impl ContData {
             code,
             stack: None,
             savelist: None,
+            nargs: None,
         }
     }
 }

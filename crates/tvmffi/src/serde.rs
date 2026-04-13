@@ -174,6 +174,7 @@ fn serialize_vm_stack(builder: &mut CellBuilder, stack: &Tuple) -> anyhow::Resul
 
 /// Parsed VmControlData fields.
 struct VmControlData {
+    nargs: Option<u16>,
     stack: Option<Tuple>,
     savelist: Option<Cell>,
 }
@@ -187,9 +188,11 @@ struct VmControlData {
 /// ```
 fn parse_vm_control_data(parser: &mut CellSlice<'_>) -> Result<VmControlData, anyhow::Error> {
     // nargs:(Maybe uint13)
-    if parser.load_bit()? {
-        parser.load_uint(13)?;
-    }
+    let nargs = if parser.load_bit()? {
+        Some(parser.load_uint(13)? as u16)
+    } else {
+        None
+    };
 
     // stack:(Maybe VmStack)
     let stack = if parser.load_bit()? {
@@ -210,7 +213,11 @@ fn parse_vm_control_data(parser: &mut CellSlice<'_>) -> Result<VmControlData, an
         parser.load_uint(16)?;
     }
 
-    Ok(VmControlData { stack, savelist })
+    Ok(VmControlData {
+        nargs,
+        stack,
+        savelist,
+    })
 }
 
 /// Parse a VmCont from a cell slice.
@@ -244,6 +251,7 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
                 code,
                 stack: cdata.stack,
                 savelist: cdata.savelist,
+                nargs: cdata.nargs,
             })
         } else {
             // vmc_envelope$01 cdata:VmControlData next:^VmCont
@@ -276,10 +284,16 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
                 (None, None) => None,
             };
 
+            // vmc_envelope carries its own arity metadata. Prefer the envelope's
+            // nargs (it's the outer invocation), and fall back to the wrapped
+            // continuation's nargs if the envelope didn't set one.
+            let merged_nargs = cdata.nargs.or(inner.nargs);
+
             Ok(ContData {
                 code: inner.code,
                 stack: merged_stack,
                 savelist: merged_savelist,
+                nargs: merged_nargs,
             })
         }
     } else {
@@ -390,8 +404,15 @@ pub fn serialize_vm_cont(builder: &mut CellBuilder, cont: &ContData) -> anyhow::
     builder.store_uint(0b00, 2)?;
 
     // VmControlData:
-    // nargs:(Maybe uint13) — absent
-    builder.store_bit(false)?;
+    // nargs:(Maybe uint13) — preserve the continuation's arity metadata.
+    // SETCONTARGS-produced continuations carry this and it changes call semantics,
+    // so we must round-trip it rather than dropping it.
+    if let Some(nargs) = cont.nargs {
+        builder.store_bit(true)?;
+        builder.store_uint(nargs as u64, 13)?;
+    } else {
+        builder.store_bit(false)?;
+    }
 
     // stack:(Maybe VmStack)
     if let Some(stack) = &cont.stack {
