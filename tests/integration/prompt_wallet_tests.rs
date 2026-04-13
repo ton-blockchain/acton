@@ -18,21 +18,16 @@ fun main() {
 
 #[test]
 fn prompt_wallet_without_wallets_fails_with_setup_hint() {
-    let output = ProjectBuilder::new("prompt-wallet-no-wallets")
+    ProjectBuilder::new("prompt-wallet-no-wallets")
         .script_file("use_prompt_wallet", PROMPT_WALLET_SCRIPT)
         .build()
         .acton()
         .script("scripts/use_prompt_wallet.tolk")
         .verify_network("testnet")
         .run()
-        .failure();
-
-    output
-        .assert_contains("No wallets configured in")
-        .assert_contains("wallets.toml")
-        .assert_contains("acton wallet new")
-        .assert_contains(
-            "See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information",
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/prompt_wallet/without_wallets_fails_with_setup_hint.stdout.txt",
         );
 }
 
@@ -54,14 +49,15 @@ keys = { mnemonic-file = "mnemonic.txt" }
     )
     .expect("failed to write wallets.toml");
 
-    let output = project
+    project
         .acton()
         .script("scripts/use_prompt_wallet.tolk")
         .verify_network("testnet")
         .run()
-        .success();
-
-    output.assert_contains("selected=deployer");
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/prompt_wallet/with_single_wallet_returns_its_name.stdout.txt",
+        );
 }
 
 #[test]
@@ -89,14 +85,15 @@ keys = { mnemonic-file = "other.txt" }
     )
     .expect("failed to write wallets.toml");
 
-    let output = project
+    project
         .acton()
         .script("scripts/use_prompt_wallet.tolk")
         .verify_network("testnet")
         .run()
-        .failure();
-
-    output.assert_contains("Cannot prompt for wallet selection in a non-interactive environment");
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/prompt_wallet/with_multiple_wallets_fails_in_non_interactive_mode.stdout.txt",
+        );
 }
 
 #[test]
@@ -104,13 +101,14 @@ fn prompt_wallet_in_emulate_mode_returns_placeholder() {
     // Without `verify_network` (i.e. plain `acton script` / emulate mode) `net.wallet(name)`
     // accepts any name, so `promptWallet` should return a stable placeholder instead of
     // failing — even when no wallets.toml is present.
-    let output = ProjectBuilder::new("prompt-wallet-emulate")
+    ProjectBuilder::new("prompt-wallet-emulate")
         .script_file("use_prompt_wallet", PROMPT_WALLET_SCRIPT)
         .build()
         .acton()
         .script("scripts/use_prompt_wallet.tolk")
         .run()
-        .success();
-
-    output.assert_contains("selected=emulated-wallet");
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/prompt_wallet/in_emulate_mode_returns_placeholder.stdout.txt",
+        );
 }

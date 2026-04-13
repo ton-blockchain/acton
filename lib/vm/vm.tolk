@@ -182,7 +182,11 @@ fun vm.cellFromHex(cellHex: string): cell {
 /// val negative = vm.parseInt("-42");
 /// ```
 fun vm.parseInt(x: string): int {
-    return ffi.parseInt(x);
+    val n = ffi.parseInt(x);
+    if (n == null) {
+        throw 1;
+    }
+    return n;
 }
 
 fun ffi.registerLibrary(cell: cell): void
@@ -194,5 +198,5 @@ fun ffi.convertAddress(addr: string): cell
 fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"
 
-fun ffi.parseInt(x: string): int
+fun ffi.parseInt(x: string): int?
     asm "47 EXTCALL"

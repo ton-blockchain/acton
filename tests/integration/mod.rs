@@ -24,6 +24,7 @@ mod litenode_tests;
 mod logging_tests;
 mod mappings_tests;
 mod new_tests;
+mod parse_int_tests;
 mod println_tests;
 mod prompt_wallet_tests;
 mod reporters_tests;
