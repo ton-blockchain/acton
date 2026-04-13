@@ -1,5 +1,5 @@
 error: unexpected value 'false' for '--hooks' found; no more were expected
 
-Usage: acton new <PATH|--name <NAME>|--description <DESCRIPTION>|--template <TEMPLATE>|--license <LICENSE>|--app|--hooks|--agents>
+Usage: acton[EXE] new <PATH|--name <NAME>|--description <DESCRIPTION>|--template <TEMPLATE>|--license <LICENSE>|--app|--hooks|--agents>
 
 For more information, try '--help'.

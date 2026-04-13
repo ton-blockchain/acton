@@ -1,7 +1,0 @@
-error: unexpected argument '--disable-rule' found
-
-  tip: a similar argument exists: '--mutation-disable-rules'
-
-Usage: acton test --mutate --mutate-contract <CONTRACT_NAME> --mutation-disable-rules <RULE> [PATH]
-
-For more information, try '--help'.

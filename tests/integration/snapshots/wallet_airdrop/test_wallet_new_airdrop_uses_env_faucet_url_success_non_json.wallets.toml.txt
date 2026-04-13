@@ -1,7 +1,0 @@
-[wallets.new-airdrop-wallet]
-kind = "v5r1"
-workchain = 0
-keys = { [MNEMONIC] }
-
-[wallets.new-airdrop-wallet.expected]
-[WALLET_ADDRESS_TESTNET]

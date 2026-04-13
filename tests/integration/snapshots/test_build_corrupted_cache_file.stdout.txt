@@ -1,2 +1,0 @@
-   Compiling contracts
-    Finished in [TIME]

@@ -1,6 +1,6 @@
 Lookup reference documentation
 
-Usage: acton doc [OPTIONS] <COMMAND>
+Usage: acton[EXE] doc [OPTIONS] <COMMAND>
 
 Commands:
   tvm  Lookup an instruction in the TVM specification

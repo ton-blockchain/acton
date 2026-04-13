@@ -1,6 +1,6 @@
 Create a new project in a specified directory. This will create a new directory with a basic project template.
 
-Usage: acton new [OPTIONS] <PATH>
+Usage: acton[EXE] new [OPTIONS] <PATH>
 
 Arguments:
   <PATH>

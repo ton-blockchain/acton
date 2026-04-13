@@ -1,6 +1,6 @@
 Inspect remote account and contract state
 
-Usage: acton rpc [OPTIONS] <COMMAND>
+Usage: acton[EXE] rpc [OPTIONS] <COMMAND>
 
 Commands:
   info  Show remote account information and decode storage when ABI is known

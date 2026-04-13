@@ -1,6 +1,6 @@
 Show remote account information and decode storage when ABI is known
 
-Usage: acton rpc info [OPTIONS] <ADDRESS>
+Usage: acton[EXE] rpc info [OPTIONS] <ADDRESS>
 
 Arguments:
   <ADDRESS>  Contract address in friendly or raw format
