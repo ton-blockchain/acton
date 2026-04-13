@@ -378,7 +378,13 @@ fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> 
                     let next = parser.load_reference_cloned()?;
                     let mut np = next.as_slice_allow_exotic();
                     let mut cont = parse_vm_cont(&mut np)?;
-                    cont.stack = Some(Tuple(vec![TupleItem::Int(int_to_push)]));
+                    // `vmc_pushint` pushes `value` onto the stack before running `next`, so the
+                    // pushed int has to be appended (becoming the new top) onto whatever stack
+                    // `next` already carries rather than replacing it. In this representation
+                    // index 0 is the bottom of the stack and the last element is the top.
+                    let mut stack = cont.stack.unwrap_or_else(Tuple::empty);
+                    stack.0.push(TupleItem::Int(int_to_push));
+                    cont.stack = Some(stack);
                     Ok(cont)
                 } else {
                     // Tags starting with 1110 — undefined
