@@ -43,17 +43,23 @@
   align-items: center;
   background-color: var(--tonscan-card-bg);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xs);
+  border-radius: 20px;
+  padding: 0 var(--spacing-sm);
   transition:
+    background-color var(--transition-duration-fast) ease,
     border-color var(--transition-duration-fast) ease,
-    box-shadow var(--transition-duration-fast) ease;
+    box-shadow var(--transition-duration-fast) ease,
+    transform var(--transition-duration-fast) ease;
   position: relative;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
 .inputWrapper.focused {
   border-color: var(--tonscan-accent);
-  box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.2);
+  background-color: color-mix(in srgb, var(--tonscan-card-bg) 92%, white);
+  box-shadow:
+    0 0 0 3px rgba(0, 136, 204, 0.16),
+    0 20px 44px rgba(15, 23, 42, 0.1);
 }
 
 .inputWrapper.inputError {
@@ -68,8 +74,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 var(--spacing-sm);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
   color: var(--text-secondary);
+  background-color: var(--tonscan-row-hover);
+  flex-shrink: 0;
 }
 
 .input {
@@ -79,7 +89,8 @@
   font-size: var(--font-size-base);
   color: var(--text-primary);
   outline: none;
-  padding: var(--spacing-mds) 0;
+  min-width: 0;
+  padding: 1rem var(--spacing-sm);
 }
 
 .input::placeholder {
@@ -102,45 +113,48 @@
 
 .historyDropdown {
   list-style: none;
-  padding: 0;
+  padding: var(--spacing-xs);
   margin: var(--spacing-sm) 0 0 0;
   position: absolute;
-  width: 100%;
+  width: 99%;
   background-color: var(--tonscan-card-bg);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
   z-index: 1000;
   max-height: 250px;
   overflow-y: auto;
+  backdrop-filter: blur(12px);
 }
 
 .historyItem {
   display: flex;
   align-items: center;
   transition: background-color var(--transition-duration-fast);
-  border-bottom: 1px solid var(--border-color);
   width: 100%;
+  border-radius: 14px;
 }
 
 .historyItemButton {
   display: flex;
   align-items: center;
   flex-grow: 1;
-  padding: var(--spacing-mds) var(--spacing-md);
+  min-width: 0;
+  padding: 0.875rem var(--spacing-md);
   cursor: pointer;
   background: none;
   border: none;
   text-align: left;
   width: 100%;
+  border-radius: 14px;
 }
 
-.historyItemButton:hover {
+.historyItem:hover:hover {
   background-color: var(--hover-bg);
 }
 
-.historyItem:last-child {
-  border-bottom: none;
+.historyItem:not(:last-child) {
+  margin-bottom: 2px;
 }
 
 .historyItemIcon {
@@ -164,17 +178,26 @@
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: var(--spacing-xs);
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--border-radius-sm);
-  margin-left: var(--spacing-sm);
+  border-radius: 999px;
+  margin: 0 var(--spacing-sm) 0 0;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
+  opacity: 0.72;
 }
 
 .historyItemDeleteButton:hover {
-  background-color: var(--hover-bg);
+  background-color: rgba(239, 68, 68, 0.12);
   color: var(--color-failed);
+  opacity: 1;
 }
 
 .footer {

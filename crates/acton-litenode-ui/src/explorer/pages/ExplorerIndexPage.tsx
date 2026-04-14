@@ -42,6 +42,7 @@ export const ExplorerIndexPage: React.FC = () => {
       const newHistory = history.filter(a => a !== address)
       setHistory(newHistory)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+      setShowHistoryDropdown(newHistory.length > 0)
     },
     [history],
   )
@@ -91,6 +92,9 @@ export const ExplorerIndexPage: React.FC = () => {
               onKeyDown={e => e.key === "Enter" && handleSearch(input)}
               onFocus={() => {
                 setIsFocused(true)
+                if (!error && history.length > 0) {
+                  setShowHistoryDropdown(true)
+                }
               }}
               onBlur={() => {
                 setIsFocused(false)
@@ -119,6 +123,7 @@ export const ExplorerIndexPage: React.FC = () => {
                   <button
                     type="button"
                     className={styles.historyItemDeleteButton}
+                    onMouseDown={e => e.preventDefault()}
                     onClick={e => removeFromHistory(e, addr)}
                     title="Remove from history"
                   >
