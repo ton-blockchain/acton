@@ -1490,7 +1490,7 @@ fn debug_format(
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => match try_parse_address(cs) {
                 Some(raw) => match raw.parse::<StdAddr>() {
-                    Ok(addr) => render_std_address(ty.to_string(), render_slice(cs), &addr),
+                    Ok(addr) => render_std_address(ty.to_string(), addr.to_string(), &addr),
                     Err(_) => typed_leaf_for_ty(ty, raw),
                 },
                 None => typed_leaf_for_ty(ty, render_slice(cs)),
@@ -2475,7 +2475,7 @@ fn render_runtime_in_msg_sender_address_field(value: &VmStackValue) -> RenderedV
     match value {
         VmStackValue::CellSlice(cs) => match try_parse_address(cs) {
             Some(raw) => match raw.parse::<StdAddr>() {
-                Ok(addr) => render_std_address("address".to_owned(), render_slice(cs), &addr),
+                Ok(addr) => render_std_address("address".to_owned(), addr.to_string(), &addr),
                 Err(_) => RenderedValue::typed_leaf(raw, "address"),
             },
             None => RenderedValue::typed_leaf(render_slice(cs), "address"),
@@ -2766,6 +2766,37 @@ mod tests {
         assert_eq!(fields[5].0, "createdAt");
         assert_eq!(fields[5].1.dap_parts().0, "1710000000");
         assert_eq!(fields[5].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_address_from_slice_keeps_legacy_value_as_address() {
+        let addr = StdAddr::new(0, HashBytes([0x22; 32]));
+        let mut builder = CellBuilder::new();
+        IntAddr::Std(addr.clone())
+            .store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let addr_cell = builder.build().unwrap();
+        let stack_values = [VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(&addr_cell),
+            bits: None,
+            refs: None,
+        })];
+        let slots = [SlotValue::Live(&stack_values[0])];
+
+        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &Ty::Address);
+
+        let RenderedValue::Address {
+            legacy_value,
+            value,
+            type_name,
+            ..
+        } = rendered
+        else {
+            panic!("expected address");
+        };
+        assert_eq!(type_name, "address");
+        assert_eq!(value, addr.to_string());
+        assert_eq!(legacy_value, addr.to_string());
     }
 
     #[test]
