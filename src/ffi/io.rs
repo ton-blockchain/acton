@@ -282,18 +282,20 @@ fn format_args(
     Ok((out, consumed))
 }
 
-extension!(prompt in (Context) with (placeholder: String, message: String) using prompt_impl);
+extension!(prompt in (Context) with (default: String, placeholder: String, message: String) using prompt_impl);
 fn prompt_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
+    default: String,
     placeholder: String,
     message: String,
 ) -> anyhow::Result<()> {
     let text = if stdin().is_terminal() {
-        Text::new(&message)
-            .with_placeholder(&placeholder)
-            .prompt()
-            .unwrap_or_default()
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+        text.prompt().unwrap_or_default()
     } else {
         String::new()
     };
@@ -302,16 +304,21 @@ fn prompt_impl(
     Ok(())
 }
 
-extension!(select in (Context) with (variants: Vec<String>, message: String) using select_impl);
+extension!(select in (Context) with (default_index: BigInt, variants: Vec<String>, message: String) using select_impl);
 fn select_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
+    default_index: BigInt,
     variants: Vec<String>,
     message: String,
 ) -> anyhow::Result<()> {
     let result = if stdin().is_terminal() {
+        let cursor = default_index
+            .to_usize()
+            .unwrap_or(0)
+            .min(variants.len().saturating_sub(1));
         Select::new(&message, variants)
-            .with_starting_cursor(0)
+            .with_starting_cursor(cursor)
             .prompt()
             .unwrap_or_default()
     } else {
@@ -397,8 +404,8 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         1 => println : 12,
         2 => eprintln : 1,
         200 => format : 11,
-        205 => prompt : 2,
-        206 => select : 2,
+        205 => prompt : 3,
+        206 => select : 3,
         207 => confirm : 3,
         208 => prompt_wallet : 1,
     });
