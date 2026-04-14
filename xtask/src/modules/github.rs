@@ -208,6 +208,8 @@ pub(crate) struct WorkflowRun {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GithubCacheEntry {
     pub(crate) id: u64,
+    #[serde(rename = "ref")]
+    pub(crate) branch: String,
     pub(crate) key: String,
     pub(crate) size_in_bytes: u64,
     pub(crate) created_at: DateTime<Utc>,

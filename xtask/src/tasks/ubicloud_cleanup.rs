@@ -72,6 +72,7 @@ fn resolve_api_token(api_token: Option<&str>) -> Result<String> {
 fn to_actions_cache_entry(entry: GithubCacheEntry) -> ActionsCacheEntry {
     ActionsCacheEntry {
         id: entry.id,
+        branch: entry.scope,
         key: entry.key,
         size: entry.size,
         created_at: entry.created_at,
