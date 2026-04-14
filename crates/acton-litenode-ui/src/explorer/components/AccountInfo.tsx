@@ -161,18 +161,18 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Assets</div>
-          <div className={styles.assetRow}>
-            {firstMaster?.jetton_content?.image ? (
-              <img
-                src={firstMaster.jetton_content.image}
-                alt={firstMaster.jetton_content.symbol || "Jetton"}
-                className={styles.assetIconImage}
-              />
-            ) : (
-              <div className={styles.assetIcon}></div>
-            )}
-            <div className={styles.value}>
-              {jettonWallets.length > 0 ? (
+          {jettonWallets.length > 0 ? (
+            <div className={styles.assetRow}>
+              {firstMaster?.jetton_content?.image ? (
+                <img
+                  src={firstMaster.jetton_content.image}
+                  alt={firstMaster.jetton_content.symbol || "Jetton"}
+                  className={styles.assetIconImage}
+                />
+              ) : (
+                <div className={styles.assetIcon}></div>
+              )}
+              <div className={styles.value}>
                 <>
                   {(
                     Number(jettonWallets[0].balance) /
@@ -197,11 +197,11 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                     </span>
                   )}
                 </>
-              ) : (
-                <span className={styles.subValue}>No assets</span>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={styles.noAssets}>No assets</div>
+          )}
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Details</div>

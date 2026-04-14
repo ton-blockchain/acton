@@ -34,6 +34,12 @@
   gap: 8px;
 }
 
+.noAssets {
+  margin-top: 3px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+}
+
 .addressTitle {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);

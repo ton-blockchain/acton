@@ -40,7 +40,7 @@
 }
 
 .tab {
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-md) 0 calc(var(--spacing-md) - 2px);
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -71,6 +71,10 @@
 
 .row {
   border-bottom: 1px solid var(--tonscan-border) !important;
+}
+
+.row:last-child {
+  border-bottom: none !important;
 }
 
 .row:hover {
