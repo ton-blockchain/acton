@@ -1874,6 +1874,265 @@ fn litenode_supports_v3_transactions_endpoints() {
 }
 
 #[test]
+fn litenode_supports_v3_account_states_endpoint() {
+    let project = ProjectBuilder::new("litenode-v3-account-states")
+        .without_acton_toml()
+        .file_from_path(
+            "contracts/JettonMinter",
+            "src/commands/new/templates/jetton/contracts/JettonMinter.tolk",
+        )
+        .file_from_path(
+            "contracts/JettonWallet",
+            "src/commands/new/templates/jetton/contracts/JettonWallet.tolk",
+        )
+        .file_from_path(
+            "contracts/errors",
+            "src/commands/new/templates/jetton/contracts/errors.tolk",
+        )
+        .file_from_path(
+            "contracts/fees-management",
+            "src/commands/new/templates/jetton/contracts/fees-management.tolk",
+        )
+        .file_from_path(
+            "contracts/jetton-utils",
+            "src/commands/new/templates/jetton/contracts/jetton-utils.tolk",
+        )
+        .file_from_path(
+            "contracts/messages",
+            "src/commands/new/templates/jetton/contracts/messages.tolk",
+        )
+        .file_from_path(
+            "contracts/storage",
+            "src/commands/new/templates/jetton/contracts/storage.tolk",
+        )
+        .file_from_path(
+            "wrappers/JettonMinter",
+            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
+        )
+        .file_from_path(
+            "wrappers/JettonWallet",
+            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
+        )
+        .file_from_path(
+            "scripts/deploy",
+            "src/commands/new/templates/jetton/scripts/deploy.tolk",
+        )
+        .build();
+    project.acton().init().run().success();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_result = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("localnet")
+        .run();
+    let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
+        .expect("Failed to decode deploy script stdout");
+    let script_stderr = String::from_utf8(script_result.output.get_output().stderr.clone())
+        .expect("Failed to decode deploy script stderr");
+    let script_status = script_result.output.get_output().status.code().unwrap_or(1);
+
+    assert_eq!(
+        script_status, 0,
+        "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
+    );
+
+    let minter_address = extract_prefixed_line_value(&script_stdout, "Deployed Jetton minter to ");
+    let owner_address = extract_prefixed_line_value(
+        &script_stdout,
+        "Successfully minted and transferred 1000000000 tokens to ",
+    );
+    wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
+
+    let wallets_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/jetton/wallets?owner_address={owner_address}&limit=10"),
+        Duration::from_secs(12),
+    );
+    let wallets = response_payload(&wallets_response)["jetton_wallets"]
+        .as_array()
+        .expect("jetton_wallets must be an array");
+    let jetton_wallet_address = wallets
+        .first()
+        .and_then(|wallet| wallet["address"].as_str())
+        .expect("deployer must have a jetton wallet after mint")
+        .to_owned();
+
+    let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+    let response = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/accountStates?address={minter_address}&address={jetton_wallet_address}&address={missing_address}&include_boc=false"
+        ),
+        Duration::from_secs(12),
+    );
+    let payload = response_payload(&response);
+
+    let accounts = payload["accounts"]
+        .as_array()
+        .expect("accountStates must return accounts array");
+    assert_eq!(
+        accounts.len(),
+        3,
+        "Expected one response row per requested address:\n{}",
+        serde_json::to_string_pretty(payload).unwrap_or_default()
+    );
+
+    let minter_state = accounts
+        .iter()
+        .find(|account| {
+            account["interfaces"].as_array().is_some_and(|interfaces| {
+                interfaces
+                    .iter()
+                    .any(|value| value.as_str() == Some("jetton_master"))
+            })
+        })
+        .expect("jetton master account row missing");
+    assert!(
+        minter_state.get("code_boc").is_none(),
+        "code_boc must be omitted when include_boc=false:\n{}",
+        serde_json::to_string_pretty(minter_state).unwrap_or_default()
+    );
+    assert!(
+        minter_state.get("data_boc").is_none(),
+        "data_boc must be omitted when include_boc=false:\n{}",
+        serde_json::to_string_pretty(minter_state).unwrap_or_default()
+    );
+
+    let wallet_state = accounts
+        .iter()
+        .find(|account| {
+            account["interfaces"].as_array().is_some_and(|interfaces| {
+                interfaces
+                    .iter()
+                    .any(|value| value.as_str() == Some("jetton_wallet"))
+            })
+        })
+        .expect("jetton wallet account row missing");
+    assert!(
+        wallet_state.get("code_boc").is_none(),
+        "code_boc must be omitted when include_boc=false:\n{}",
+        serde_json::to_string_pretty(wallet_state).unwrap_or_default()
+    );
+    assert!(
+        wallet_state.get("data_boc").is_none(),
+        "data_boc must be omitted when include_boc=false:\n{}",
+        serde_json::to_string_pretty(wallet_state).unwrap_or_default()
+    );
+
+    let missing_state = accounts
+        .iter()
+        .find(|account| account["address"].as_str() == Some(missing_address))
+        .expect("missing account row missing");
+    assert_eq!(missing_state["status"].as_str(), Some("nonexist"));
+    assert!(
+        missing_state.get("code_hash").is_none(),
+        "missing account must omit code_hash:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+    assert!(
+        missing_state.get("data_hash").is_none(),
+        "missing account must omit data_hash:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+    assert!(
+        missing_state.get("frozen_hash").is_none(),
+        "missing account must omit frozen_hash:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+    assert!(
+        missing_state.get("code_boc").is_none(),
+        "missing account must omit code_boc:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+    assert!(
+        missing_state.get("data_boc").is_none(),
+        "missing account must omit data_boc:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+    assert_eq!(
+        missing_state["interfaces"].as_array().map(Vec::len),
+        Some(0),
+        "Missing account must not have interfaces:\n{}",
+        serde_json::to_string_pretty(missing_state).unwrap_or_default()
+    );
+
+    let address_book = payload["address_book"]
+        .as_object()
+        .expect("accountStates must include address_book");
+    let metadata = payload["metadata"]
+        .as_object()
+        .expect("accountStates must include metadata");
+
+    let minter_row = address_book
+        .get(
+            minter_state["address"]
+                .as_str()
+                .expect("minter row must expose canonical address"),
+        )
+        .expect("jetton master address book row missing");
+    assert!(
+        minter_row["interfaces"]
+            .as_array()
+            .is_some_and(|interfaces| interfaces
+                .iter()
+                .any(|value| value.as_str() == Some("jetton_master"))),
+        "jetton master address book row must expose interfaces:\n{}",
+        serde_json::to_string_pretty(minter_row).unwrap_or_default()
+    );
+
+    let minter_metadata = metadata
+        .get(
+            minter_state["address"]
+                .as_str()
+                .expect("minter row must expose canonical address"),
+        )
+        .expect("jetton master metadata missing");
+    assert!(
+        minter_metadata["token_info"]
+            .as_array()
+            .is_some_and(|items| items
+                .iter()
+                .any(|item| item["type"].as_str() == Some("jetton_masters"))),
+        "jetton master metadata must expose token_info.type:\n{}",
+        serde_json::to_string_pretty(minter_metadata).unwrap_or_default()
+    );
+
+    let wallet_metadata = metadata
+        .get(
+            wallet_state["address"]
+                .as_str()
+                .expect("wallet row must expose canonical address"),
+        )
+        .expect("jetton wallet metadata missing");
+    assert!(
+        wallet_metadata["token_info"]
+            .as_array()
+            .is_some_and(|items| items
+                .iter()
+                .any(|item| item["type"].as_str() == Some("jetton_wallets"))),
+        "jetton wallet metadata must expose token_info.type:\n{}",
+        serde_json::to_string_pretty(wallet_metadata).unwrap_or_default()
+    );
+    assert!(
+        !metadata.contains_key(missing_address),
+        "Missing account must not have metadata:\n{}",
+        serde_json::to_string_pretty(metadata).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
 fn litenode_supports_v3_run_get_method() {
     let project = ProjectBuilder::new("litenode-v3-run-get-method")
         .contract("getter", V3_GETTER_CONTRACT)
@@ -2032,6 +2291,15 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
         .map(str::trim)
         .find_map(|line| line.strip_prefix(marker).map(ToOwned::to_owned))
         .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"))
+}
+
+fn extract_prefixed_line_value(output: &str, prefix: &str) -> String {
+    let cleaned = strip_ansi(output);
+    cleaned
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix(prefix).map(ToOwned::to_owned))
+        .unwrap_or_else(|| panic!("Line starting with `{prefix}` not found in output:\n{cleaned}"))
 }
 
 fn is_success_response(response: &Value) -> bool {

@@ -18,10 +18,16 @@ fun main() {
 
 #[test]
 fn prompt_wallet_without_wallets_fails_with_setup_hint() {
-    ProjectBuilder::new("prompt-wallet-no-wallets")
+    let project = ProjectBuilder::new("prompt-wallet-no-wallets")
         .script_file("use_prompt_wallet", PROMPT_WALLET_SCRIPT)
-        .build()
+        .build();
+
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    project
         .acton()
+        .env("HOME", home_path.to_str().unwrap())
         .script("scripts/use_prompt_wallet.tolk")
         .verify_network("testnet")
         .run()

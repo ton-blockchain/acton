@@ -58,6 +58,7 @@ pub fn create_router(node: Arc<LiteNode>, rate_limit_rps: Option<u32>) -> Router
 
     let api_v3_router = Router::new()
         .route("/v3/traces", get(get_traces))
+        .route("/v3/accountStates", get(get_account_states_v3))
         .route("/v3/addressInformation", get(get_address_information_v3))
         .route("/v3/transactions", get(get_transactions_v3))
         .route(
