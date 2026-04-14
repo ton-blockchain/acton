@@ -34,6 +34,12 @@
   gap: 8px;
 }
 
+.noAssets {
+  margin-top: 3px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+}
+
 .addressTitle {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
@@ -182,11 +188,15 @@
 }
 
 .tag {
-  background-color: #1a1a1a;
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(160, 160, 160, 0.1);
   color: var(--tonscan-text-secondary);
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: var(--spacing-xss) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
   font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
 }
 
 .tooltip {

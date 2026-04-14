@@ -5220,6 +5220,7 @@ dependencies = [
  "tracing",
  "tvmffi",
  "tycho-types",
+ "url",
 ]
 
 [[package]]

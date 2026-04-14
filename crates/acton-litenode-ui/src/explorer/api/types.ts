@@ -82,6 +82,46 @@ export interface FullAccountState {
   readonly state: "active" | "uninitialized" | "frozen" | "nonexist"
 }
 
+export interface AccountStateTokenInfo {
+  readonly type: string
+  readonly [key: string]: unknown
+}
+
+export interface AccountStatesAddressBookRow {
+  readonly user_friendly: string
+  readonly domain?: string | null
+  readonly interfaces: readonly string[]
+}
+
+export interface V3AccountState {
+  readonly account_state_hash: string
+  readonly address: string
+  readonly balance: string
+  readonly code_boc?: string
+  readonly code_hash?: string
+  readonly contract_methods: readonly number[]
+  readonly data_boc?: string
+  readonly data_hash?: string
+  readonly extra_currencies: Record<string, string>
+  readonly frozen_hash?: string
+  readonly interfaces: readonly string[]
+  readonly last_transaction_hash: string
+  readonly last_transaction_lt: string
+  readonly status: string
+}
+
+export interface AccountStatesResponse {
+  readonly accounts: readonly V3AccountState[]
+  readonly address_book: Record<string, AccountStatesAddressBookRow>
+  readonly metadata: Record<
+    string,
+    {
+      readonly is_indexed: boolean
+      readonly token_info: readonly AccountStateTokenInfo[]
+    }
+  >
+}
+
 export interface V3TracesResponse {
   readonly address_book: Record<string, unknown>
   readonly metadata: Record<string, unknown>

@@ -2540,3 +2540,106 @@ fn test_println_map_struct_value_falls_back_to_raw_hex() {
             "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
         );
 }
+
+#[test]
+fn test_script_allows_predicate_based_transaction_matchers() {
+    // `expect(...).toHaveTx({ ... })` builds predicate continuations that the matcher
+    // runtime evaluates against the compiled code cell of the currently running script.
+    // Previously `acton script` left `test_code` unset, so this matcher bailed with an
+    // "only available under `acton test`" error. This test pins down that the matcher
+    // now works in script mode for both the positive and the negative path.
+    let project = ProjectBuilder::new("script-predicate-matchers")
+        .file(
+            "contracts/types",
+            r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "expect_in_script",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
+import "../contracts/types"
+
+fun main() {
+    val deployer = net.treasury("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage { id: 0, counter: 0 }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+
+    val increaseRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: counterAddress,
+        body: IncreaseCounter { increaseBy: 42 },
+    }));
+    expect(increaseRes).toHaveTx({ to: counterAddress });
+    expect(increaseRes).toHaveSuccessfulTx({
+        from: deployer.address,
+        to: counterAddress,
+    });
+
+    println("EXPECT_IN_SCRIPT_OK");
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/expect_in_script.tolk")
+        .run()
+        .success()
+        .assert_contains("EXPECT_IN_SCRIPT_OK");
+}

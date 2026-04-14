@@ -36,6 +36,12 @@ pub struct GetAddressInformationV3Request {
 }
 
 #[derive(Deserialize)]
+pub struct GetAccountStatesV3Request {
+    pub address: Option<Vec<String>>,
+    pub include_boc: Option<bool>,
+}
+
+#[derive(Deserialize)]
 pub struct AddressRequest {
     pub address: String,
 }

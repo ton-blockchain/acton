@@ -1,4 +1,5 @@
 import type {
+  AccountStatesResponse,
   ApiResponse,
   FullAccountState,
   JettonMaster,
@@ -32,6 +33,15 @@ export class TonClient {
       url.searchParams.append("seqno", seqno.toString())
     }
     return this.request(url, "Failed to fetch address information")
+  }
+
+  async getAccountStates(addresses: string[], includeBoc = true): Promise<AccountStatesResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/accountStates")
+    for (const address of addresses) {
+      url.searchParams.append("address", address)
+    }
+    url.searchParams.append("include_boc", includeBoc ? "true" : "false")
+    return this.request(url, "Failed to fetch account states")
   }
 
   async getTransactions(address: string, limit = 20): Promise<Transaction[]> {

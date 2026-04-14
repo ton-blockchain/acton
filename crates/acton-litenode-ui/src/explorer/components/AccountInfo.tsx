@@ -13,6 +13,7 @@ import {formatAddress, formatNano} from "./utils"
 interface AccountInfoProps {
   readonly address: string
   readonly state: FullAccountState
+  readonly contractInterfaces?: readonly string[]
   readonly jettonWallets: JettonWallet[]
   readonly client: TonClient
   readonly onMoreAssetsClick?: () => void
@@ -21,6 +22,7 @@ interface AccountInfoProps {
 export const AccountInfo: React.FC<AccountInfoProps> = ({
   address,
   state,
+  contractInterfaces,
   jettonWallets,
   client,
   onMoreAssetsClick,
@@ -86,6 +88,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
     void navigator.clipboard.writeText(address)
     setCopied(true)
   }
+
+  const contractTypeLabel = getContractTypeLabel(contractInterfaces)
 
   return (
     <Card className={styles.card}>
@@ -157,18 +161,18 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Assets</div>
-          <div className={styles.assetRow}>
-            {firstMaster?.jetton_content?.image ? (
-              <img
-                src={firstMaster.jetton_content.image}
-                alt={firstMaster.jetton_content.symbol || "Jetton"}
-                className={styles.assetIconImage}
-              />
-            ) : (
-              <div className={styles.assetIcon}></div>
-            )}
-            <div className={styles.value}>
-              {jettonWallets.length > 0 ? (
+          {jettonWallets.length > 0 ? (
+            <div className={styles.assetRow}>
+              {firstMaster?.jetton_content?.image ? (
+                <img
+                  src={firstMaster.jetton_content.image}
+                  alt={firstMaster.jetton_content.symbol || "Jetton"}
+                  className={styles.assetIconImage}
+                />
+              ) : (
+                <div className={styles.assetIcon}></div>
+              )}
+              <div className={styles.value}>
                 <>
                   {(
                     Number(jettonWallets[0].balance) /
@@ -193,11 +197,11 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                     </span>
                   )}
                 </>
-              ) : (
-                <span className={styles.subValue}>No assets</span>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={styles.noAssets}>No assets</div>
+          )}
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Details</div>
@@ -207,10 +211,38 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
             >
               {state.state}
             </span>
-            <span className={styles.tag}>unknown</span>
+            <span className={styles.tag}>{contractTypeLabel}</span>
           </div>
         </div>
       </CardContent>
     </Card>
   )
+}
+
+function getContractTypeLabel(interfaces?: readonly string[]): string {
+  const primaryInterface = interfaces?.find(iface => iface.length > 0)
+
+  if (!primaryInterface) {
+    return "unknown"
+  }
+
+  const normalizedInterface = primaryInterface.trim().toLowerCase()
+
+  switch (normalizedInterface) {
+    case "jetton_master": {
+      return "jetton master"
+    }
+    case "jetton_wallet": {
+      return "jetton wallet"
+    }
+    case "nft_item": {
+      return "nft item"
+    }
+    case "nft_collection": {
+      return "nft collection"
+    }
+    default: {
+      return normalizedInterface.replaceAll("_", " ")
+    }
+  }
 }

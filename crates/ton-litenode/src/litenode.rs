@@ -48,9 +48,12 @@ impl LiteNodeBlockId {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeAccountState {
     pub address: Addr,
+    pub account_state_hash: Hash256,
     pub balance: u128,
     pub code: Option<BocBytes>,
+    pub code_hash: Option<Hash256>,
     pub data: Option<BocBytes>,
+    pub data_hash: Option<Hash256>,
     pub last_transaction_id: LiteNodeTransactionId,
     pub block_id: LiteNodeBlockId,
     pub state: AccountStatus,
@@ -62,9 +65,12 @@ impl LiteNodeAccountState {
     pub fn empty(address: Addr, block_id: LiteNodeBlockId, sync_utime: u64) -> Self {
         Self {
             address,
+            account_state_hash: Hash256([0; 32]),
             balance: 0,
             code: None,
+            code_hash: None,
             data: None,
+            data_hash: None,
             last_transaction_id: LiteNodeTransactionId::default(),
             block_id,
             state: AccountStatus::Nonexist,
@@ -1095,9 +1101,12 @@ fn handle_get_address_info(
 
     Ok(LiteNodeAccountState {
         address,
+        account_state_hash: meta.account_hash,
         balance: meta.cached_balance.unwrap_or(0),
         code,
+        code_hash: meta.code_hash,
         data,
+        data_hash: meta.data_hash,
         last_transaction_id,
         block_id,
         state: meta.status,

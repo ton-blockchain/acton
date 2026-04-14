@@ -1,4 +1,7 @@
 .container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
   padding: var(--spacing-md);
   background-color: var(--tonscan-card-bg);
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
@@ -7,9 +10,9 @@
 .tabs {
   display: flex;
   gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-md);
-  padding: 2px;
-  background-color: rgba(0, 0, 0, 0.2);
+  padding: 3px;
+  background-color: var(--tonscan-row-hover);
+  border: 1px solid var(--tonscan-border);
   border-radius: var(--border-radius-md);
   width: fit-content;
 }
@@ -26,15 +29,20 @@
   border: none;
 }
 
-.tabActive {
-  background-color: var(--tonscan-bg);
+.tab:hover {
   color: var(--tonscan-text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 136, 204, 0.08);
+}
+
+.tabActive {
+  background-color: var(--tonscan-card-bg);
+  color: var(--tonscan-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .codeBlock {
   position: relative;
-  background-color: #0a0a0a;
+  background-color: var(--tonscan-bg);
   border-radius: var(--border-radius-md);
   border: 1px solid var(--tonscan-border);
   overflow: hidden;
@@ -43,10 +51,10 @@
 .code {
   font-family: var(--font-mono);
   font-size: 13px;
-  line-height: 1.5;
-  color: var(--tonscan-text-secondary); /* Muted text */
-  white-space: pre-wrap;
-  word-break: break-all;
+  line-height: 1.6;
+  color: var(--tonscan-text-primary);
+  white-space: pre;
+  word-break: normal;
   padding: var(--spacing-md);
   margin: 0;
   overflow-x: auto;
@@ -57,4 +65,7 @@
   text-align: center;
   padding: var(--spacing-xl);
   color: var(--tonscan-text-secondary);
+  background-color: var(--tonscan-row-hover);
+  border: 1px solid var(--tonscan-border);
+  border-radius: var(--border-radius-md);
 }

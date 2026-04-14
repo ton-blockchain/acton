@@ -3,7 +3,14 @@ import {useEffect, useMemo, useState} from "react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
-import type {FullAccountState, JettonMaster, JettonWallet, NftItem, Transaction} from "../api/types"
+import type {
+  FullAccountState,
+  JettonMaster,
+  JettonWallet,
+  NftItem,
+  Transaction,
+  V3AccountState,
+} from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
@@ -21,6 +28,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const navigate = useNavigate()
   const location = useLocation()
   const [accountState, setAccountState] = useState<FullAccountState | undefined>()
+  const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWallets, setJettonWallets] = useState<JettonWallet[]>([])
@@ -36,6 +44,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     const load = async () => {
       if (!formattedAddress) {
         setAccountState(undefined)
+        setAccountStateV3(undefined)
         setTransactions([])
         setJettonMaster(undefined)
         setJettonWallets([])
@@ -46,8 +55,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       setLoading(true)
       setError(undefined)
       try {
-        const [state, txs, masters, wallets, nfts, masterHolders] = await Promise.all([
+        const [state, stateV3, txs, masters, wallets, nfts, masterHolders] = await Promise.all([
           client.getAddressInformation(formattedAddress),
+          client.getAccountStates([formattedAddress], false).catch(() => {}),
           client.getTransactions(formattedAddress),
           client.getJettonMasters([formattedAddress]),
           client.getJettonWallets([formattedAddress]),
@@ -60,6 +70,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         ])
         if (!isActive) return
         setAccountState(state)
+        setAccountStateV3(stateV3?.accounts[0])
         setTransactions(txs)
         setJettonMaster(masters[0])
         setJettonWallets(wallets)
@@ -69,6 +80,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         if (!isActive) return
         setError(error instanceof Error ? error.message : "An error occurred")
         setAccountState(undefined)
+        setAccountStateV3(undefined)
         setTransactions([])
         setJettonMaster(undefined)
         setJettonWallets([])
@@ -118,6 +130,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
             <AccountInfo
               address={formattedAddress}
               state={accountState}
+              contractInterfaces={accountStateV3?.interfaces}
               jettonWallets={jettonWallets}
               client={client}
               onMoreAssetsClick={() => handleTabChange("tokens")}

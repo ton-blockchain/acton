@@ -6,6 +6,7 @@ use crate::storage::{
     AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta, MsgMeta, NftItemMeta,
     TraceNode, TransactionInfo,
 };
+use crate::types::Addr;
 use base64::Engine;
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -44,7 +45,7 @@ pub fn map_jetton_wallets(wallets: &Vec<JettonWalletMeta>) -> Value {
 
 pub fn map_jetton_wallets_with_metadata(
     wallets: &Vec<JettonWalletMeta>,
-    masters_by_jetton: &HashMap<crate::types::Addr, JettonMasterMeta>,
+    masters_by_jetton: &HashMap<Addr, JettonMasterMeta>,
 ) -> Value {
     let mut token_info_by_address: HashMap<String, Vec<Value>> = HashMap::new();
     let mut master_info_added = std::collections::HashSet::new();
@@ -127,6 +128,61 @@ pub fn map_nft_items_with_metadata(items: &Vec<NftItemMeta>) -> Value {
     })
 }
 
+pub struct AccountStateContext {
+    pub interfaces: Vec<String>,
+    pub token_info: Vec<Value>,
+    pub user_friendly: String,
+}
+
+pub fn map_account_states(
+    states: &[LiteNodeAccountState],
+    context_by_address: &HashMap<Addr, AccountStateContext>,
+    include_boc: bool,
+) -> Value {
+    let mut address_book = serde_json::Map::new();
+    let mut metadata = serde_json::Map::new();
+
+    for state in states {
+        let default_user_friendly = state.address.to_string();
+        let context = context_by_address.get(&state.address);
+        let interfaces = context
+            .map(|ctx| ctx.interfaces.clone())
+            .unwrap_or_default();
+
+        address_book.insert(
+            state.address.to_string(),
+            serde_json::json!({
+                "user_friendly": context
+                    .map(|ctx| ctx.user_friendly.clone())
+                    .unwrap_or(default_user_friendly),
+                "domain": Value::Null,
+                "interfaces": interfaces,
+            }),
+        );
+
+        if let Some(ctx) = context
+            && !ctx.token_info.is_empty()
+        {
+            metadata.insert(
+                state.address.to_string(),
+                serde_json::json!({
+                    "is_indexed": true,
+                    "token_info": ctx.token_info.clone(),
+                }),
+            );
+        }
+    }
+
+    serde_json::json!({
+        "accounts": states
+            .iter()
+            .map(|state| map_account_state_full(state, context_by_address.get(&state.address), include_boc))
+            .collect::<Vec<_>>(),
+        "address_book": address_book,
+        "metadata": metadata,
+    })
+}
+
 #[must_use]
 pub fn map_address_information(state: &LiteNodeAccountState) -> Value {
     serde_json::json!({
@@ -136,7 +192,7 @@ pub fn map_address_information(state: &LiteNodeAccountState) -> Value {
         "frozen_hash": state.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
         "last_transaction_hash": state.last_transaction_id.hash.to_base64(),
         "last_transaction_lt": state.last_transaction_id.lt.to_string(),
-        "status": map_account_status(&state.state),
+        "status": map_address_information_status(&state.state),
     })
 }
 
@@ -290,7 +346,7 @@ fn map_jetton_wallet(w: &JettonWalletMeta) -> Value {
     })
 }
 
-fn map_jetton_wallet_token_info(wallet: &JettonWalletMeta) -> Value {
+pub(crate) fn map_jetton_wallet_token_info(wallet: &JettonWalletMeta) -> Value {
     serde_json::json!({
         "valid": true,
         "type": "jetton_wallets",
@@ -302,7 +358,7 @@ fn map_jetton_wallet_token_info(wallet: &JettonWalletMeta) -> Value {
     })
 }
 
-fn map_jetton_master_token_info(master: &JettonMasterMeta) -> Value {
+pub(crate) fn map_jetton_master_token_info(master: &JettonMasterMeta) -> Value {
     let mut mapped = serde_json::Map::new();
     mapped.insert("valid".to_string(), Value::Bool(true));
     mapped.insert(
@@ -375,7 +431,7 @@ fn map_nft_item(item: &NftItemMeta) -> Value {
     })
 }
 
-fn map_nft_item_token_info(item: &NftItemMeta) -> Value {
+pub(crate) fn map_nft_item_token_info(item: &NftItemMeta) -> Value {
     let mut mapped = serde_json::Map::new();
     mapped.insert("valid".to_string(), Value::Bool(true));
     mapped.insert("type".to_string(), Value::String("nft_items".to_string()));
@@ -398,7 +454,7 @@ fn map_nft_item_token_info(item: &NftItemMeta) -> Value {
     Value::Object(mapped)
 }
 
-fn map_nft_collection_token_info(item: &NftItemMeta) -> Value {
+pub(crate) fn map_nft_collection_token_info(item: &NftItemMeta) -> Value {
     let mut mapped = serde_json::Map::new();
     mapped.insert("valid".to_string(), Value::Bool(true));
     mapped.insert(
@@ -417,6 +473,84 @@ fn map_nft_collection_token_info(item: &NftItemMeta) -> Value {
     }
 
     mapped.insert("extra".to_string(), serde_json::json!({}));
+    Value::Object(mapped)
+}
+
+fn map_account_state_full(
+    state: &LiteNodeAccountState,
+    context: Option<&AccountStateContext>,
+    include_boc: bool,
+) -> Value {
+    let mut mapped = serde_json::Map::new();
+    mapped.insert(
+        "account_state_hash".to_string(),
+        Value::String(state.account_state_hash.to_base64()),
+    );
+    mapped.insert(
+        "address".to_string(),
+        Value::String(state.address.to_string()),
+    );
+    mapped.insert(
+        "balance".to_string(),
+        Value::String(state.balance.to_string()),
+    );
+    mapped.insert("contract_methods".to_string(), serde_json::json!([]));
+    mapped.insert("extra_currencies".to_string(), serde_json::json!({}));
+    mapped.insert(
+        "interfaces".to_string(),
+        serde_json::json!(
+            context
+                .map(|ctx| ctx.interfaces.clone())
+                .unwrap_or_default()
+        ),
+    );
+    mapped.insert(
+        "last_transaction_hash".to_string(),
+        Value::String(state.last_transaction_id.hash.to_base64()),
+    );
+    mapped.insert(
+        "last_transaction_lt".to_string(),
+        Value::String(state.last_transaction_id.lt.to_string()),
+    );
+    mapped.insert(
+        "status".to_string(),
+        Value::String(map_account_state_status(&state.state).to_string()),
+    );
+
+    if include_boc {
+        if let Some(code) = state.code.as_ref() {
+            mapped.insert(
+                "code_boc".to_string(),
+                Value::String(base64::engine::general_purpose::STANDARD.encode(code)),
+            );
+        }
+        if let Some(data) = state.data.as_ref() {
+            mapped.insert(
+                "data_boc".to_string(),
+                Value::String(base64::engine::general_purpose::STANDARD.encode(data)),
+            );
+        }
+    }
+
+    if let Some(code_hash) = state.code_hash.as_ref() {
+        mapped.insert(
+            "code_hash".to_string(),
+            Value::String(code_hash.to_base64()),
+        );
+    }
+    if let Some(data_hash) = state.data_hash.as_ref() {
+        mapped.insert(
+            "data_hash".to_string(),
+            Value::String(data_hash.to_base64()),
+        );
+    }
+    if let Some(frozen_hash) = state.frozen_hash.as_ref() {
+        mapped.insert(
+            "frozen_hash".to_string(),
+            Value::String(frozen_hash.to_base64()),
+        );
+    }
+
     Value::Object(mapped)
 }
 
@@ -742,11 +876,81 @@ fn zero_hash_base64() -> String {
     crate::types::Hash256([0; 32]).to_base64()
 }
 
-const fn map_account_status(status: &AccountStatus) -> &'static str {
+const fn map_address_information_status(status: &AccountStatus) -> &'static str {
     match status {
         AccountStatus::Active => "active",
         AccountStatus::Uninit => "uninitialized",
         AccountStatus::Frozen => "frozen",
         AccountStatus::Nonexist => "uninitialized",
+    }
+}
+
+const fn map_account_state_status(status: &AccountStatus) -> &'static str {
+    match status {
+        AccountStatus::Active => "active",
+        AccountStatus::Uninit => "uninit",
+        AccountStatus::Frozen => "frozen",
+        AccountStatus::Nonexist => "nonexist",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{map_nft_collection_token_info, map_nft_item_token_info};
+    use crate::storage::NftItemMeta;
+    use crate::types::Hash256;
+    use serde_json::json;
+
+    fn sample_nft_item() -> NftItemMeta {
+        NftItemMeta {
+            address: "0:1111111111111111111111111111111111111111111111111111111111111111"
+                .parse()
+                .expect("valid item address"),
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            collection_address: Some(
+                "0:2222222222222222222222222222222222222222222222222222222222222222"
+                    .parse()
+                    .expect("valid collection address"),
+            ),
+            owner_address: Some(
+                "0:3333333333333333333333333333333333333333333333333333333333333333"
+                    .parse()
+                    .expect("valid owner address"),
+            ),
+            content: json!({
+                "name": "Sample NFT",
+                "description": "Sample NFT description",
+                "image": "https://example.com/nft.png",
+                "symbol": "SNFT",
+                "collection_name": "Sample Collection",
+                "collection_description": "Collection description",
+                "collection_image": "https://example.com/collection.png",
+            }),
+            index: "7".to_string(),
+            init: true,
+            last_transaction_lt: 42,
+        }
+    }
+
+    #[test]
+    fn nft_item_token_info_uses_nft_items_type() {
+        let token_info = map_nft_item_token_info(&sample_nft_item());
+
+        assert_eq!(token_info["type"].as_str(), Some("nft_items"));
+        assert_eq!(token_info["nft_index"].as_str(), Some("7"));
+        assert_eq!(token_info["name"].as_str(), Some("Sample NFT"));
+    }
+
+    #[test]
+    fn nft_collection_token_info_uses_nft_collections_type() {
+        let token_info = map_nft_collection_token_info(&sample_nft_item());
+
+        assert_eq!(token_info["type"].as_str(), Some("nft_collections"));
+        assert_eq!(token_info["name"].as_str(), Some("Sample Collection"));
+        assert_eq!(
+            token_info["description"].as_str(),
+            Some("Collection description")
+        );
     }
 }

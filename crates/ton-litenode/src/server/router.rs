@@ -3,7 +3,7 @@ use super::handlers::*;
 use crate::litenode::LiteNode;
 use axum::{
     Json, Router,
-    http::{HeaderValue, Method, StatusCode, header, request::Parts},
+    http::{HeaderValue, Method, StatusCode, request::Parts},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 pub fn create_router(node: Arc<LiteNode>, rate_limit_rps: Option<u32>) -> Router {
@@ -58,6 +58,7 @@ pub fn create_router(node: Arc<LiteNode>, rate_limit_rps: Option<u32>) -> Router
 
     let api_v3_router = Router::new()
         .route("/v3/traces", get(get_traces))
+        .route("/v3/accountStates", get(get_account_states_v3))
         .route("/v3/addressInformation", get(get_address_information_v3))
         .route("/v3/transactions", get(get_transactions_v3))
         .route(
@@ -116,7 +117,7 @@ fn loopback_cors() -> CorsLayer {
             |origin: &HeaderValue, _request_parts: &Parts| is_loopback_origin(origin),
         ))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers([header::ACCEPT, header::CONTENT_TYPE])
+        .allow_headers(Any)
 }
 
 fn is_loopback_origin(origin: &HeaderValue) -> bool {

@@ -2,16 +2,17 @@ use super::utils::parse_method_name;
 use crate::api::toncenter_v3;
 use crate::litenode::{LiteNode, LiteNodeTransaction};
 use crate::server::models::{
-    EmulateTraceRequest, GetAddressInformationV3Request, GetJettonMastersRequest,
-    GetJettonWalletsRequest, GetNftItemsRequest, GetPendingTransactionsV3Query, GetTracesQuery,
-    GetTransactionsByMessageV3Query, GetTransactionsV3Query, RunGetMethodRequest, SendBocRequest,
+    EmulateTraceRequest, GetAccountStatesV3Request, GetAddressInformationV3Request,
+    GetJettonMastersRequest, GetJettonWalletsRequest, GetNftItemsRequest,
+    GetPendingTransactionsV3Query, GetTracesQuery, GetTransactionsByMessageV3Query,
+    GetTransactionsV3Query, RunGetMethodRequest, SendBocRequest,
 };
 use crate::storage::{JettonMasterMeta, TraceNode};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
     body::Bytes,
-    extract::{Query, State},
+    extract::{Query, RawQuery, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -21,9 +22,12 @@ use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
+use ton_indexer::categorize_wallet;
 use toncenter_v3 as v3;
+use tycho_types::cell::HashBytes as CellHashBytes;
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
 use tycho_types::prelude::HashBytes;
+use url::form_urlencoded;
 
 pub async fn get_traces(
     State(node): State<Arc<LiteNode>>,
@@ -43,6 +47,57 @@ pub async fn get_address_information_v3(
         toncenter_v3::map_address_information,
     )
     .await
+}
+
+pub async fn get_account_states_v3(
+    State(node): State<Arc<LiteNode>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = match parse_account_states_request(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let parsed = match parse_account_states_v3_query(payload) {
+        Ok(parsed) => parsed,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+
+    let mut states = Vec::with_capacity(parsed.addresses.len());
+    let mut context_by_address = HashMap::with_capacity(parsed.addresses.len());
+
+    for address in parsed.addresses {
+        let state = match node
+            .get_address_information(address.to_string(), None)
+            .await
+        {
+            Ok(state) => state,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+        let info = match collect_address_info(node.as_ref(), address).await {
+            Ok(info) => info,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+
+        context_by_address.insert(
+            address,
+            v3::AccountStateContext {
+                interfaces: info.interfaces.into_iter().collect(),
+                token_info: info.token_info,
+                user_friendly: as_user_friendly(address),
+            },
+        );
+        states.push(state);
+    }
+
+    (
+        StatusCode::OK,
+        Json(v3::map_account_states(
+            &states,
+            &context_by_address,
+            parsed.include_boc,
+        )),
+    )
+        .into_response()
 }
 
 pub async fn get_transactions_v3(
@@ -339,6 +394,11 @@ struct ParsedPendingTransactionsV3Query {
     trace_ids: Option<HashSet<Hash256>>,
 }
 
+struct ParsedAccountStatesV3Query {
+    addresses: Vec<Addr>,
+    include_boc: bool,
+}
+
 fn parse_transactions_v3_query(
     payload: GetTransactionsV3Query,
 ) -> anyhow::Result<ParsedTransactionsV3Query> {
@@ -410,6 +470,56 @@ fn parse_pending_transactions_v3_query(
     Ok(ParsedPendingTransactionsV3Query {
         account: parse_optional_address(payload.account)?,
         trace_ids: parse_optional_hash(payload.trace_id)?,
+    })
+}
+
+fn parse_account_states_v3_query(
+    payload: GetAccountStatesV3Request,
+) -> anyhow::Result<ParsedAccountStatesV3Query> {
+    let addresses = payload
+        .address
+        .ok_or_else(|| anyhow::anyhow!("`address` is required"))?;
+    if addresses.is_empty() {
+        anyhow::bail!("`address` must not be empty");
+    }
+    if addresses.len() > 1000 {
+        anyhow::bail!("Maximum 1000 addresses allowed");
+    }
+
+    Ok(ParsedAccountStatesV3Query {
+        addresses: addresses
+            .into_iter()
+            .map(|address| parse_std_addr(&address))
+            .collect::<anyhow::Result<Vec<_>>>()?,
+        include_boc: payload.include_boc.unwrap_or(true),
+    })
+}
+
+fn parse_account_states_request(
+    raw_query: Option<&str>,
+) -> anyhow::Result<GetAccountStatesV3Request> {
+    let mut address = Vec::new();
+    let mut include_boc = None;
+
+    if let Some(raw_query) = raw_query {
+        for (key, value) in form_urlencoded::parse(raw_query.as_bytes()) {
+            match key.as_ref() {
+                "address" => address.push(value.into_owned()),
+                "include_boc" => {
+                    include_boc = Some(value.parse::<bool>().map_err(|_| {
+                        anyhow::anyhow!(
+                            "Invalid `include_boc`: {value}. Supported values: true, false"
+                        )
+                    })?);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(GetAccountStatesV3Request {
+        address: (!address.is_empty()).then_some(address),
+        include_boc,
     })
 }
 
@@ -615,7 +725,7 @@ fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
 }
 
 #[derive(Default)]
-struct EmulateAddressInfo {
+struct AddressInfo {
     interfaces: BTreeSet<String>,
     token_info: Vec<Value>,
     extra_jetton_masters: BTreeSet<Addr>,
@@ -639,7 +749,7 @@ async fn build_emulate_v1_extra_data(
     let mut pending_jetton_masters = BTreeSet::new();
 
     for address in &addresses {
-        let info = collect_emulate_address_info(node, *address).await?;
+        let info = collect_address_info(node, *address).await?;
         pending_jetton_masters.extend(info.extra_jetton_masters.iter().copied());
 
         if include_address_book {
@@ -670,7 +780,7 @@ async fn build_emulate_v1_extra_data(
             if metadata.contains_key(&key) {
                 continue;
             }
-            let info = collect_emulate_address_info(node, master_address).await?;
+            let info = collect_address_info(node, master_address).await?;
             if info.token_info.is_empty() {
                 continue;
             }
@@ -713,12 +823,20 @@ fn collect_trace_addresses(trace: &TraceNode, out: &mut BTreeSet<Addr>) {
     }
 }
 
-async fn collect_emulate_address_info(
-    node: &LiteNode,
-    address: Addr,
-) -> anyhow::Result<EmulateAddressInfo> {
-    let mut out = EmulateAddressInfo::default();
+async fn collect_address_info(node: &LiteNode, address: Addr) -> anyhow::Result<AddressInfo> {
+    let mut out = AddressInfo::default();
     let address_str = address.to_string();
+
+    if let Ok(state) = node
+        .get_address_information(address_str.clone(), None)
+        .await
+        && let Some(code_hash) = state.code_hash
+    {
+        let wallet_type = categorize_wallet(CellHashBytes(code_hash.0));
+        if let Some(interface_name) = wallet_type.interface_name() {
+            out.interfaces.insert(interface_name.to_string());
+        }
+    }
 
     let wallets = node
         .get_jetton_wallets(
@@ -732,15 +850,8 @@ async fn collect_emulate_address_info(
         .await?;
     if let Some(wallet) = wallets.first() {
         out.interfaces.insert("jetton_wallet".to_string());
-        out.token_info.push(json!({
-            "valid": true,
-            "type": "jetton_wallets",
-            "extra": {
-                "owner": wallet.owner_address.to_string(),
-                "jetton": wallet.jetton_address.to_string(),
-                "balance": wallet.balance.to_string(),
-            },
-        }));
+        out.token_info
+            .push(v3::map_jetton_wallet_token_info(wallet));
         out.extra_jetton_masters.insert(wallet.jetton_address);
     }
 
@@ -749,14 +860,13 @@ async fn collect_emulate_address_info(
         .await?;
     if let Some(master) = masters.first() {
         out.interfaces.insert("jetton_master".to_string());
-        out.token_info.push(map_emulate_jetton_master_token_info(
-            master.jetton_content.clone(),
-        ));
+        out.token_info
+            .push(v3::map_jetton_master_token_info(master));
     }
 
     let items = node
         .get_nft_items(
-            Some(address_str),
+            Some(address_str.clone()),
             None,
             None,
             None,
@@ -767,69 +877,26 @@ async fn collect_emulate_address_info(
         .await?;
     if let Some(item) = items.first() {
         out.interfaces.insert("nft_item".to_string());
-        out.token_info.push(map_emulate_nft_item_token_info(
-            item.index.clone(),
-            item.content.clone(),
-        ));
+        out.token_info.push(v3::map_nft_item_token_info(item));
+    }
+
+    let collections = node
+        .get_nft_items(
+            None,
+            None,
+            Some(address_str),
+            None,
+            Some(false),
+            Some(1),
+            Some(0),
+        )
+        .await?;
+    if let Some(item) = collections.first() {
+        out.interfaces.insert("nft_collection".to_string());
+        out.token_info.push(v3::map_nft_collection_token_info(item));
     }
 
     Ok(out)
-}
-
-fn map_emulate_jetton_master_token_info(content: Value) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert("valid".to_string(), Value::Bool(true));
-    mapped.insert(
-        "type".to_string(),
-        Value::String("jetton_masters".to_string()),
-    );
-
-    if let Some(name) = token_content_string(&content, "name") {
-        mapped.insert("name".to_string(), Value::String(name));
-    }
-    if let Some(symbol) = token_content_string(&content, "symbol") {
-        mapped.insert("symbol".to_string(), Value::String(symbol));
-    }
-    if let Some(description) = token_content_string(&content, "description") {
-        mapped.insert("description".to_string(), Value::String(description));
-    }
-    if let Some(image) = token_content_string(&content, "image") {
-        mapped.insert("image".to_string(), Value::String(image));
-    }
-
-    mapped.insert("extra".to_string(), content);
-    Value::Object(mapped)
-}
-
-fn map_emulate_nft_item_token_info(index: String, content: Value) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert("valid".to_string(), Value::Bool(true));
-    mapped.insert("type".to_string(), Value::String("nft_items".to_string()));
-    mapped.insert("nft_index".to_string(), Value::String(index));
-
-    if let Some(name) = token_content_string(&content, "name") {
-        mapped.insert("name".to_string(), Value::String(name));
-    }
-    if let Some(symbol) = token_content_string(&content, "symbol") {
-        mapped.insert("symbol".to_string(), Value::String(symbol));
-    }
-    if let Some(description) = token_content_string(&content, "description") {
-        mapped.insert("description".to_string(), Value::String(description));
-    }
-    if let Some(image) = token_content_string(&content, "image") {
-        mapped.insert("image".to_string(), Value::String(image));
-    }
-
-    mapped.insert("extra".to_string(), content);
-    Value::Object(mapped)
-}
-
-fn token_content_string(content: &Value, key: &str) -> Option<String> {
-    content
-        .as_object()
-        .and_then(|map| map.get(key))
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
 }
 
 fn as_user_friendly(address: Addr) -> String {

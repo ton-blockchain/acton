@@ -1248,18 +1248,19 @@ fn transaction_matches_predicates(
 /// Create a GetExecutor suitable for running predicate continuations.
 fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
     // Predicate continuations reference code defined in the test/script that built them
-    // (e.g. `T.__eq` instantiations). Without that code cell the secondary executor cannot
-    // resolve those references and every match silently fails. Test mode populates
-    // `test_code` with the compiled test code; script mode leaves it `None`, so bail early
-    // with a clear error rather than producing a misleading "no transaction matched" result.
-    let code = ctx.env.test_code.as_ref().map(Boc::encode_base64).ok_or_else(|| {
-        anyhow!(
-            "Predicate-based transaction matchers (e.g. `expect(...).toHaveSuccessfulDeploy({{ to: addr }})`) \
-             are not supported in `acton script`. \
-             They require the compiled test code to evaluate predicate continuations, \
-             which is only available under `acton test`."
-        )
-    })?;
+    // (e.g. `T.__eq` instantiations). Both `acton test` and `acton script` populate
+    // `test_code` with the compiled code that owns those predicates.
+    let code = ctx
+        .env
+        .test_code
+        .as_ref()
+        .map(Boc::encode_base64)
+        .ok_or_else(|| {
+            anyhow!(
+                "Predicate-based transaction matchers require a compiled code cell to \
+                 evaluate predicate continuations, but none was provided."
+            )
+        })?;
 
     let now = std::time::SystemTime::now();
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -1280,7 +1281,15 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
         prev_blocks_info: None,
     };
 
-    GetExecutor::new(&params).context("Cannot create predicate executor")
+    let mut executor = GetExecutor::new(&params).context("Cannot create predicate executor")?;
+    // Predicate lambdas used inside matchers may call regular FFI helpers
+    // (e.g. `build(...)`, `ffi.*`, io helpers). The executor that runs them must
+    // have the same ffi surface registered as the outer test/script executor.
+    // Registration stores `ctx` as a raw pointer, mirroring what
+    // `script_cmd` / `test_cmd` do for their top-level executors, so re-registering
+    // here on the same context is safe.
+    crate::ffi::register(&mut executor, ctx);
+    Ok(executor)
 }
 
 extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>) using find_transaction_by_params_impl);

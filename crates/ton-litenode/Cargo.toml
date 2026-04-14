@@ -30,6 +30,7 @@ tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
 ton-indexer = { workspace = true }
+url = { workspace = true }
 
 [lints]
 workspace = true
