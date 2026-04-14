@@ -31,29 +31,31 @@ val network = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
 ## `prompt`
 
 ```tolk
-fun prompt(message: string, placeholder: string = ""): string
+fun prompt(message: string, placeholder: string = "", default: string = ""): string
 ```
 
 Prompts the user for input.
 
-Placeholder is the text that will be displayed in the input field as
-a hint to the user.
+- `placeholder` is a grey hint shown inside the empty input field. It is not
+  returned as the result and disappears as soon as the user starts typing.
+- `default` is the value returned when the user presses Enter without typing
+  anything. It is displayed next to the question (e.g. `(John)`).
 
 Non-interactive fallback:
 - Returns `""` when user input cannot be collected (for example, non-interactive runner).
 
 Example:
 ```tolk
-val name = prompt("What is your name?", "John");
+val name = prompt("What is your name?", "type your name", "John");
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L37" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L39" />
 
 ## `select`
 
 ```tolk
-fun select(message: string, variants: tuple): string
+fun select(message: string, variants: tuple, defaultIndex: int = 0): string
 ```
 
 Prompts the user to select an option from a list of variants.
@@ -62,15 +64,18 @@ Input and fallback behavior:
 - `variants` is expected to be a tuple of strings.
 - If `variants` is not a tuple, returns `""`.
 - Non-string tuple items are silently ignored.
+- `defaultIndex` positions the cursor on the given option when the prompt
+  opens, so the user can accept it by pressing Enter. Out-of-range values
+  are clamped to a valid index (defaults to `0`).
 - If prompt execution fails (including non-interactive mode), returns `""`.
 
 Example:
 ```tolk
-val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
+val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple, 1);
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L54" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L59" />
 
 ## `confirm`
 
@@ -93,7 +98,7 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L72" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L77" />
 
 ## `promptWallet`
 
@@ -117,5 +122,5 @@ Example:
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L91" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L96" />
 

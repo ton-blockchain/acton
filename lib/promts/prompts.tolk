@@ -23,19 +23,21 @@ import "../ffi/ffi"
 
 /// Prompts the user for input.
 ///
-/// Placeholder is the text that will be displayed in the input field as
-/// a hint to the user.
+/// - `placeholder` is a grey hint shown inside the empty input field. It is not
+///   returned as the result and disappears as soon as the user starts typing.
+/// - `default` is the value returned when the user presses Enter without typing
+///   anything. It is displayed next to the question (e.g. `(John)`).
 ///
 /// Non-interactive fallback:
 /// - Returns `""` when user input cannot be collected (for example, non-interactive runner).
 ///
 /// Example:
 /// ```tolk
-/// val name = prompt("What is your name?", "John");
+/// val name = prompt("What is your name?", "type your name", "John");
 /// println("Hello {}", name);
 /// ```
-fun prompt(message: string, placeholder: string = ""): string {
-    return ffi.prompt(message, placeholder);
+fun prompt(message: string, placeholder: string = "", default: string = ""): string {
+    return ffi.prompt(message, placeholder, default);
 }
 
 /// Prompts the user to select an option from a list of variants.
@@ -44,15 +46,18 @@ fun prompt(message: string, placeholder: string = ""): string {
 /// - `variants` is expected to be a tuple of strings.
 /// - If `variants` is not a tuple, returns `""`.
 /// - Non-string tuple items are silently ignored.
+/// - `defaultIndex` positions the cursor on the given option when the prompt
+///   opens, so the user can accept it by pressing Enter. Out-of-range values
+///   are clamped to a valid index (defaults to `0`).
 /// - If prompt execution fails (including non-interactive mode), returns `""`.
 ///
 /// Example:
 /// ```tolk
-/// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
+/// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple, 1);
 /// println("Hello {}", name);
 /// ```
-fun select(message: string, variants: tuple): string {
-    return ffi.select(message, variants);
+fun select(message: string, variants: tuple, defaultIndex: int = 0): string {
+    return ffi.select(message, variants, defaultIndex);
 }
 
 /// Prompts the user to confirm an action.
@@ -96,7 +101,7 @@ fun promptWallet(message: string): string {
     return name;
 }
 
-fun ffi.prompt(message: string, placeholder: string = ""): string asm "205 EXTCALL"
-fun ffi.select(message: string, variants: tuple): string asm "206 EXTCALL"
+fun ffi.prompt(message: string, placeholder: string = "", default: string = ""): string asm "205 EXTCALL"
+fun ffi.select(message: string, variants: tuple, defaultIndex: int = 0): string asm "206 EXTCALL"
 fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
 fun ffi.promptWallet(message: string): string? asm "208 EXTCALL"
