@@ -1,6 +1,6 @@
 Coverage Summary:
-Lines: 92/170 (54.12%)
-Total Hits: 186
+Lines: 90/168 (53.57%)
+Total Hits: 176
 
 File: [ROOT]/contracts/JettonMinter.tolk
 Annotated Code:
@@ -351,7 +351,7 @@ Annotated Code:
 12   | }                                                               |
 13   |                                                                 |
 14   | fun MinterStorage.load(): MinterStorage {                       |
-15 ✓ |     return MinterStorage.fromCell(contract.getData());          | hits:4
+15   |     return MinterStorage.fromCell(contract.getData());          |
 16   | }                                                               |
 17   |                                                                 |
 18   | fun MinterStorage.save(self) {                                  |
@@ -359,7 +359,7 @@ Annotated Code:
 20   | }                                                               |
 21   |                                                                 |
 22   | fun WalletStorage.load(): WalletStorage {                       |
-23 ✓ |     return WalletStorage.fromCell(contract.getData());          | hits:6
+23   |     return WalletStorage.fromCell(contract.getData());          |
 24   | }                                                               |
 25   |                                                                 |
 26   | fun WalletStorage.save(self) {                                  |
