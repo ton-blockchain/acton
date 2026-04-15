@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
 use tolkc::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
-use tolkc::source_map::{Declaration, SourceMap};
+use tolkc::source_map::{AbiStruct, Declaration, SourceMap};
 use tolkc::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
@@ -73,7 +73,10 @@ pub enum RenderedValue {
         inner: Box<RenderedValue>,
     },
     OptimizedOut,
-    NotYetLoaded,
+    LazyNotYetLoaded {
+        preview: Box<RenderedValue>,
+    },
+    LazyCantParseSlice,
     LazyUnresolved {
         type_name: String,
     },
@@ -134,7 +137,16 @@ impl RenderedValue {
                 (value, type_field)
             }
             RenderedValue::OptimizedOut => ("<optimized out>".to_string(), None),
-            RenderedValue::NotYetLoaded => ("<not loaded>".to_string(), None),
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                let (value, type_field) = preview.dap_parts();
+                let value = if value.is_empty() {
+                    "<not loaded>".to_string()
+                } else {
+                    format!("{value} (not loaded)")
+                };
+                (value, type_field)
+            }
+            RenderedValue::LazyCantParseSlice => ("<not loaded>".to_string(), None),
             RenderedValue::LazyUnresolved { type_name } => {
                 ("(lazy, unresolved)".to_string(), Some(type_name.clone()))
             }
@@ -158,7 +170,10 @@ impl RenderedValue {
                 format!("{} (last seen)", inner.legacy_dap_value())
             }
             RenderedValue::OptimizedOut => "<optimized out>".to_string(),
-            RenderedValue::NotYetLoaded => "<not loaded>".to_string(),
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                format!("{} (not loaded)", preview.legacy_dap_value())
+            }
+            RenderedValue::LazyCantParseSlice => "<not loaded>".to_string(),
             RenderedValue::LazyUnresolved { type_name } => {
                 format!("{type_name} (lazy, unresolved)")
             }
@@ -288,7 +303,8 @@ impl fmt::Display for RenderedValue {
             }
             RenderedValue::LastSeen { inner } => write!(f, "{inner} (last seen)"),
             RenderedValue::OptimizedOut => write!(f, "<optimized out>"),
-            RenderedValue::NotYetLoaded => write!(f, "<not loaded>"),
+            RenderedValue::LazyNotYetLoaded { preview } => write!(f, "{preview} (not loaded)"),
+            RenderedValue::LazyCantParseSlice => write!(f, "<not loaded>"),
             RenderedValue::LazyUnresolved { type_name } => {
                 write!(f, "{type_name} (lazy, unresolved)")
             }
@@ -991,7 +1007,8 @@ fn debugger_value_kind(value: &RenderedValue) -> String {
         | RenderedValue::LazyUnresolved { type_name } => format!("`{type_name}`"),
         RenderedValue::LastSeen { inner } => debugger_value_kind(inner),
         RenderedValue::OptimizedOut => "<optimized out>".to_owned(),
-        RenderedValue::NotYetLoaded => "<not loaded>".to_owned(),
+        RenderedValue::LazyNotYetLoaded { preview } => debugger_value_kind(preview),
+        RenderedValue::LazyCantParseSlice => "<not loaded>".to_owned(),
     }
 }
 
@@ -1729,6 +1746,68 @@ pub(crate) fn debug_print_from_stack(
     debug_format(symbols, &mut r, ty, false)
 }
 
+fn render_lazy_struct_fields(
+    symbols: &SourceMap,
+    struct_ref: &AbiStruct,
+    type_args: Option<&[Ty]>,
+    slot_values: &[SlotValue],
+    ir_slots: &[usize],
+    last_seen: &HashMap<usize, VmStackValue>,
+    lazy_cell_abi: Option<(&Cell, &ContractABI)>,
+) -> Vec<(String, RenderedValue)> {
+    let mut lazy_s = lazy_cell_abi.as_ref().map(|(cell, _)| {
+        let mut s = cell.as_slice_allow_exotic();
+        if let Some(ref prefix) = struct_ref.prefix {
+            let _ = s.skip_first(prefix.prefix_len as u16, 0);
+        }
+        s
+    });
+    let abi = lazy_cell_abi.as_ref().map(|(_, a)| *a);
+
+    let mut fields = Vec::new();
+    let mut offset = 0;
+    for f in &struct_ref.fields {
+        let f_ty = match type_args {
+            Some(type_args) => instantiate_generics(
+                &f.ty,
+                struct_ref.type_params.as_deref().unwrap_or(&[]),
+                type_args,
+            ),
+            None => f.ty.clone(),
+        };
+        let f_width = calc_width_on_stack(symbols, &f_ty);
+        let field_ir_slots = &ir_slots[offset..offset + f_width];
+        let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
+
+        let preview = match (lazy_s.as_mut(), abi) {
+            (Some(lazy_s), Some(abi)) => {
+                if let Ok(parsed) = compiler_abi_serde::decode(lazy_s, abi, &f_ty) {
+                    Some(render_abi_data(parsed, &f_ty))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let field_val = if field_ever_seen {
+            let field_slot_values = &slot_values[offset..offset + f_width];
+            let mut r = StackReader::new(field_slot_values);
+            debug_format(symbols, &mut r, &f_ty, false)
+        } else {
+            match preview {
+                None => RenderedValue::LazyCantParseSlice,
+                Some(preview) => RenderedValue::LazyNotYetLoaded {
+                    preview: Box::new(preview),
+                },
+            }
+        };
+        fields.push((f.name.clone(), field_val));
+        offset += f_width;
+    }
+    fields
+}
+
 // ---------------------------------------------------------------------------
 // debug_format_lazy — renders a lazy variable, showing <not loaded> for
 // fields whose ir_slots have never been observed on the stack.
@@ -1742,6 +1821,7 @@ pub(crate) fn debug_format_lazy(
     ir_slots: &[usize],
     ty: &Ty,
     last_seen: &HashMap<usize, VmStackValue>,
+    lazy_original_slice: &VmStackValue,
 ) -> RenderedValue {
     match ty {
         Ty::Union { .. } => {
@@ -1768,7 +1848,14 @@ pub(crate) fn debug_format_lazy(
                     type_name: alias_name.clone(),
                 };
             }
-            debug_format_lazy(symbols, slot_values, ir_slots, &resolved, last_seen)
+            debug_format_lazy(
+                symbols,
+                slot_values,
+                ir_slots,
+                &resolved,
+                last_seen,
+                lazy_original_slice,
+            )
         }
 
         Ty::StructRef {
@@ -1776,31 +1863,36 @@ pub(crate) fn debug_format_lazy(
             type_args,
         } => {
             let struct_ref = symbols.get_struct(struct_name);
-            let mut fields: Vec<(String, RenderedValue)> = Vec::new();
-            let mut offset = 0;
-            for f in &struct_ref.fields {
-                let f_ty = match type_args {
-                    Some(type_args) => instantiate_generics(
-                        &f.ty,
-                        struct_ref.type_params.as_deref().unwrap_or(&[]),
-                        type_args,
-                    ),
-                    None => f.ty.clone(),
-                };
-                let f_width = calc_width_on_stack(symbols, &f_ty);
-                let field_ir_slots = &ir_slots[offset..offset + f_width];
-                let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
+            let slice_as_cell = match lazy_original_slice {
+                VmStackValue::CellSlice(cs) => exact_slice_cell(cs),
+                _ => None,
+            };
 
-                let field_val = if field_ever_seen {
-                    let field_slot_values = &slot_values[offset..offset + f_width];
-                    let mut r = StackReader::new(field_slot_values);
-                    debug_format(symbols, &mut r, &f_ty, false)
-                } else {
-                    RenderedValue::NotYetLoaded
-                };
-                fields.push((f.name.clone(), field_val));
-                offset += f_width;
-            }
+            let ty_args = type_args.as_deref();
+            let fields = match &slice_as_cell {
+                Some(cell) => {
+                    let tmp_abi = build_compiler_abi(symbols).expect("always not None");
+                    render_lazy_struct_fields(
+                        symbols,
+                        struct_ref,
+                        ty_args,
+                        slot_values,
+                        ir_slots,
+                        last_seen,
+                        Some((cell, &tmp_abi)),
+                    )
+                }
+                None => render_lazy_struct_fields(
+                    symbols,
+                    struct_ref,
+                    ty_args,
+                    slot_values,
+                    ir_slots,
+                    last_seen,
+                    None,
+                ),
+            };
+
             RenderedValue::Struct {
                 type_name: format!("{struct_name} (lazy)"),
                 fields,

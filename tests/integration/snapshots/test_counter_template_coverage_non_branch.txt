@@ -1,6 +1,6 @@
 Coverage Summary:
-Lines: 16/16 (100.00%)
-Total Hits: 67
+Lines: 15/15 (100.00%)
+Total Hits: 58
 
 File: [ROOT]/contracts/Counter.tolk
 Annotated Code:
@@ -52,7 +52,7 @@ Annotated Code:
  8   | }                                                         |
  9   |                                                           |
 10   | fun Storage.load(): Storage {                             |
-11 ✓ |     return Storage.fromCell(contract.getData());          | hits:9
+11   |     return Storage.fromCell(contract.getData());          |
 12   | }                                                         |
 13   |                                                           |
 14   | fun Storage.save(self) {                                  |

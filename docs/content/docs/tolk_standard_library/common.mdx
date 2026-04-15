@@ -1273,7 +1273,7 @@ Ensure you've called [random.initialize](#randominitialize) in advance to make i
 fun random.range(limit: int): int
 ```
 
-Generates a new pseudo-random integer z in the range 0..limit−1 (or limit..−1, if upto \< 0).
+Generates a new pseudo-random integer z in the range 0..limit−1 (or limit..−1, if limit \< 0).
 More precisely, an unsigned random value x is generated as in random; then z := x * limit / 2^256 is computed.
 Ensure you've called [random.initialize](#randominitialize) in advance to make it unpredictable!
 
@@ -2527,7 +2527,7 @@ Checks whether a slice has no references.
 fun slice.bitsEqual(self, b: slice): bool
 ```
 
-Checks whether data parts of two slices coinside.
+Checks whether data parts of two slices coincide.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/common.tolk#L1414" />
 
@@ -2766,7 +2766,7 @@ const RESERVE_MODE_AT_MOST = 2
 const RESERVE_MODE_INCREASE_BY_ORIGINAL_BALANCE = 4
 ```
 
-+4: amount is increased by the _original_ balance of the current account (before the compute phase).
++4: `amount` is increased by the _original_ balance of the current account (before the compute phase).
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/common.tolk#L1538" />
 
@@ -2818,7 +2818,7 @@ with extra currencies. In this way currencies other than Toncoin can be reserved
 const SEND_MODE_REGULAR = 0
 ```
 
-mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phaes should NOT be ignored.
+mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phases should NOT be ignored.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/common.tolk#L1565" />
 
@@ -3397,7 +3397,7 @@ struct InMessageBounced {
     senderAddress: address          // an internal address from which the message was bounced
     valueCoins: coins               // ton amount attached to a message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to a message
-    originalForwardFee: coins       // comission that the sender has payed to send this message
+    originalForwardFee: coins       // comission that the sender has paid to send this message
     createdLt: uint64               // logical time when a message was created (and bounced)
     createdAt: uint32               // unixtime when a message was created (and bounced)
     bouncedBody: slice              // populated depending on `BounceMode` for `createMessage`

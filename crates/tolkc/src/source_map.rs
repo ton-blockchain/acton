@@ -432,7 +432,8 @@ pub enum DebugMark {
         is_parameter: bool,
         ty_idx: usize,
         ir_slots: Vec<usize>,
-        is_lazy: Option<bool>,
+        #[serde(default)]
+        ir_lazy_slice: Option<usize>,
     },
     #[serde(rename = "scope_start")]
     ScopeStart { mark_id: usize, range: SrcRange },
