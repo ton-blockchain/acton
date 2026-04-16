@@ -80,6 +80,7 @@ check-security:
     cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+    cd crates/ton-ls/editors/code && yarn npm audit --all --recursive --severity=moderate
 
 check-ci: fmt-check check-docgen check-deps clippy typos check-schema
 
