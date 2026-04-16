@@ -227,12 +227,22 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  custom-check-release:
+  custom-check-release-binary:
     needs:
       - plan
       - build-global-artifacts
       - custom-build-docker-image
-    uses: ./.github/workflows/check-release.yml
+    uses: ./.github/workflows/check-release-binary.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
+  custom-check-installer-file:
+    needs:
+      - plan
+      - build-global-artifacts
+      - custom-build-docker-image
+    uses: ./.github/workflows/check-installer-file.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -242,11 +252,12 @@ jobs:
     needs:
       - plan
       - host
-      - custom-check-release
+      - custom-check-release-binary
+      - custom-check-installer-file
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release-binary.result == 'success' && needs.custom-check-installer-file.result == 'success' }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -50,5 +50,5 @@ jobs:
     permissions:
       contents: read
 
-    uses: ./.github/workflows/check-release.yml
+    uses: ./.github/workflows/check-release-binary.yml
     secrets: inherit
