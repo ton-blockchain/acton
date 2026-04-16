@@ -1,0 +1,56 @@
+name: Build VS Code Extension
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-ton-ls-vscode.yml"
+      - "crates/ton-ls/editors/code/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-ton-ls-vscode.yml"
+      - "crates/ton-ls/editors/code/**"
+  workflow_dispatch:
+
+concurrency:
+  group: build-vscode-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build:
+    name: Build VS Code Extension
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22.x
+
+      - name: Audit dependencies
+        working-directory: crates/ton-ls/editors/code
+        run: yarn npm audit --all --recursive --severity=moderate
+
+      - name: Install dependencies
+        working-directory: crates/ton-ls/editors/code
+        run: yarn install --immutable --check-cache --check-resolutions
+
+      - name: Build extension
+        working-directory: crates/ton-ls/editors/code
+        run: yarn run build
