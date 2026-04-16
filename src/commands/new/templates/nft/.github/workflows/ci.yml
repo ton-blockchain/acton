@@ -1,0 +1,51 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Acton
+        uses: ton-blockchain/setup-acton@master
+        with:
+          github-token: ${{ secrets.ACTON_TOKEN }}
+          acton-version: 'trunk'
+
+      - name: Version
+        run: acton --version
+
+      - name: Build
+        run: acton build
+
+      - name: Test
+        run: acton test
+
+      - name: Linter
+        run: acton check --output-format github
+
+      - name: Formatter
+        run: acton fmt --check
