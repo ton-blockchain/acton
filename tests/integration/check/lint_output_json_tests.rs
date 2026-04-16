@@ -15,6 +15,15 @@ const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r"
             }
         ";
 
+const DEPRECATED_FUNCTION_CONTRACT: &str = r#"
+            @deprecated("use bar instead")
+            fun foo() {}
+
+            fun main() {
+                foo();
+            }
+        "#;
+
 #[test]
 #[named]
 fn check_lint_json_cli_overrides_config_output_format() {
@@ -158,6 +167,39 @@ fn check_lint_json_includes_secondary_annotations_help_and_applicability() {
         ))
         .assert_file_snapshot_matches(
             ".acton/reports/metadata.json",
+            &format!(
+                "integration/snapshots/check/lint_output_json_format/{}.report.json",
+                function_name!()
+            ),
+        );
+}
+
+#[test]
+#[named]
+fn check_lint_json_includes_deprecated_annotation_tags() {
+    let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
+        .contract("main", DEPRECATED_FUNCTION_CONTRACT)
+        .with_lint_level("deprecated-symbol-use", "warn")
+        .with_lint_level("explicit-return-type", "allow")
+        .build();
+
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .check()
+        .arg("--output-format")
+        .arg("json")
+        .arg("--output-file")
+        .arg(".acton/reports/deprecated.json")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(&format!(
+            "integration/snapshots/check/lint_output_json_format/{}.stderr.txt",
+            function_name!()
+        ))
+        .assert_file_snapshot_matches(
+            ".acton/reports/deprecated.json",
             &format!(
                 "integration/snapshots/check/lint_output_json_format/{}.report.json",
                 function_name!()

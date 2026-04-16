@@ -1,6 +1,6 @@
 use crate::commands::check::pos;
 use std::io::Write;
-use tolk_linter::diagnostic::{Applicability, Diagnostic, Severity};
+use tolk_linter::diagnostic::{Applicability, Diagnostic, DiagnosticTag, Severity};
 use tolk_resolver::{FileDb, Span};
 
 pub(crate) fn write_report(
@@ -37,11 +37,16 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
     let mut annotations_json = Vec::new();
     for annotation in &diag.annotations {
         if let Some(range) = create_range_json(source, &annotation.span) {
-            annotations_json.push(serde_json::json!({
+            let mut annotation_json = serde_json::json!({
                 "range": range,
                 "message": annotation.message,
-                "is_primary": annotation.is_primary
-            }));
+                "is_primary": annotation.is_primary,
+            });
+            let tags = annotation_tags(annotation);
+            if !tags.is_empty() {
+                annotation_json["tags"] = serde_json::json!(tags);
+            }
+            annotations_json.push(annotation_json);
         }
     }
 
@@ -84,6 +89,17 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
         "fixes": fixes_json,
         "source": "tolk"
     })
+}
+
+fn annotation_tags(annotation: &tolk_linter::diagnostic::Annotation) -> Vec<&'static str> {
+    annotation
+        .tags
+        .iter()
+        .map(|tag| match tag {
+            DiagnosticTag::Unnecessary => "unnecessary",
+            DiagnosticTag::Deprecated => "deprecated",
+        })
+        .collect()
 }
 
 fn create_range_json(source: &str, span: &Span) -> Option<serde_json::Value> {
