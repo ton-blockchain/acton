@@ -452,13 +452,6 @@ fn format_nonzero_script_exit_code_details<'a>(
         if !info.description.is_empty() {
             writeln!(details, "Description: {}", info.description.dimmed()).ok();
         }
-    } else if formatter.backtrace.is_none() {
-        writeln!(
-            details,
-            "Re-run with {} to get more information",
-            "--backtrace full".yellow()
-        )
-        .ok();
     }
 
     if let Some(info) = exit_codes::find(exit_code) {
@@ -482,7 +475,25 @@ fn format_nonzero_script_exit_code_details<'a>(
         writeln!(details, "Cannot run method of contract without code").ok();
     }
 
-    details.trim().to_string()
+    if formatter.backtrace.is_none() {
+        writeln!(
+            details,
+            "Re-run with {} to get more information",
+            "--backtrace full".yellow()
+        )
+        .ok();
+    }
+
+    let details = details.trim();
+    if details.is_empty() {
+        String::new()
+    } else {
+        details
+            .lines()
+            .map(|line| format!("  {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 fn contract_address(code: &Cell) -> anyhow::Result<StdAddr> {
