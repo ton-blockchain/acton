@@ -237,32 +237,16 @@ jobs:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
 
-  custom-publish-docker-image:
-    needs:
-      - plan
-      - host
-      - custom-check-release
-    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-docker-image.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
-    # publish jobs get escalated permissions
-    permissions:
-      "id-token": "write"
-      "packages": "write"
-
   # Create a GitHub Release while uploading all files to it
   announce:
     needs:
       - plan
       - host
-      - custom-publish-docker-image
       - custom-check-release
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release.result == 'success' && needs.custom-publish-docker-image.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -292,6 +276,17 @@ jobs:
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
           gh release create "${{ needs.plan.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" --verify-tag $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+
+  custom-publish-docker-image:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/publish-docker-image.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+    permissions:
+      "packages": "write"
 
   custom-publish-mirror:
     needs:
