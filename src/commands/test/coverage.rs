@@ -686,6 +686,8 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
             }
 
             let mut branch_idx = 0usize;
+            let mut branches_found = 0u64;
+            let mut branches_hit = 0u64;
             for (line, mut sites) in branch_sites_by_line {
                 sites.sort_by(compare_branch_sites);
                 let line = line + 1;
@@ -700,6 +702,9 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
                             "BRDA:{line},{branch_idx},1,{}\n",
                             info.condition_false
                         ));
+                        branches_found += 2;
+                        branches_hit += u64::from(info.condition_true > 0)
+                            + u64::from(info.condition_false > 0);
                         branch_idx += 1;
                     }
                     if info.has_guard_branch() {
@@ -711,10 +716,17 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
                             "BRDA:{line},{branch_idx},1,{}\n",
                             info.guard_continue
                         ));
+                        branches_found += 2;
+                        branches_hit += u64::from(info.guard_throw > 0)
+                            + u64::from(info.guard_continue > 0);
                         branch_idx += 1;
                     }
                 }
             }
+
+            // BRF: branches found, BRH: branches hit
+            lcov_content.push_str(&format!("BRF:{branches_found}\n"));
+            lcov_content.push_str(&format!("BRH:{branches_hit}\n"));
         }
 
         lcov_content.push_str("end_of_record\n");
