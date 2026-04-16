@@ -717,8 +717,8 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
                             info.guard_continue
                         ));
                         branches_found += 2;
-                        branches_hit += u64::from(info.guard_throw > 0)
-                            + u64::from(info.guard_continue > 0);
+                        branches_hit +=
+                            u64::from(info.guard_throw > 0) + u64::from(info.guard_continue > 0);
                         branch_idx += 1;
                     }
                 }
