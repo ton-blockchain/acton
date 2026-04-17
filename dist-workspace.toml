@@ -25,8 +25,6 @@ build-local-artifacts = false
 local-artifacts-jobs = ["./build-release-binaries", "./attach-objs-to-releases"]
 # Global artifacts jobs to run in CI
 global-artifacts-jobs = ["./build-docker-image"]
-# Publish jobs to run in CI
-publish-jobs = ["./publish-docker-image"]
 # Which phase dist should use to create the GitHub release
 github-release = "announce"
 # Whether to enable GitHub Attestations
@@ -36,9 +34,9 @@ pr-run-mode = "skip"
 # Plan jobs to run in CI
 plan-jobs = ["./verify-version"]
 # Post-announce jobs to run in CI
-post-announce-jobs = ["./publish-mirror"]
+post-announce-jobs = ["./publish-docker-image", "./publish-mirror"]
 # Host jobs to run in CI
-host-jobs = ["./check-release"]
+host-jobs = ["./check-release-binary", "./check-installer-file"]
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Whether to install an updater program

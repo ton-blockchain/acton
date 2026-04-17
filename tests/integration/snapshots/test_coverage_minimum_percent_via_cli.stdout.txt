@@ -14,11 +14,11 @@
 
  COVERAGE  
 
-────────────────────────────────────────────────────────
- File             Covered Lines   Total Lines   % Lines 
-────────────────────────────────────────────────────────
- All files                    2             3     66.7% 
- code/math.tolk               2             3     66.7% 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ File             Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                    2             3     66.7%                  1                2        50.0%   60.0% 
+ code/math.tolk               2             3     66.7%                  1                2        50.0%   60.0% 
 
 Text coverage file saved in threshold.txt
 

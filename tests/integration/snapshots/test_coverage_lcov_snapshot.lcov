@@ -5,4 +5,6 @@ LF:2
 LH:2
 BRDA:3,0,0,1
 BRDA:3,0,1,0
+BRF:2
+BRH:1
 end_of_record

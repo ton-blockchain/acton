@@ -36,7 +36,7 @@ version = "0.1.0"
 backtrace = "full"
 
 [test.fuzz]
-# Use 512 accepted inputs for fuzz tests marked with @test({ fuzz: true })
+# Use 512 accepted inputs for fuzz tests marked with @test.fuzz
 runs = 512
 # Fix the seed for reproducible fuzz runs
 seed = 42
@@ -173,10 +173,10 @@ include-tests = true
 
 ### Fuzz Options
 
-These defaults apply only to parameterized tests with an explicit fuzz
-annotation such as `@test({ fuzz: true })`.
+These defaults apply only to parameterized tests that explicitly opt in with
+`@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`.
 Per-test annotations can override them with
-`@test({ fuzz: { runs: ..., max_test_rejects: ..., seed: ... } })`.
+`@test.fuzz({ runs: ..., max_test_rejects: ..., seed: ... })`.
 When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
 See [Fuzz Testing](/docs/test-runner/fuzz-testing) for annotation syntax,

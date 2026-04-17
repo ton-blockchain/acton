@@ -1,0 +1,34 @@
+{
+  "diagnostics": [
+    {
+      "annotations": [
+        {
+          "is_primary": true,
+          "message": "foo is deprecated and should not be used. use bar instead",
+          "range": {
+            "end": {
+              "character": 19,
+              "line": 5
+            },
+            "start": {
+              "character": 16,
+              "line": 5
+            }
+          },
+          "tags": [
+            "deprecated"
+          ]
+        }
+      ],
+      "code": "E004",
+      "file": "[ROOT]/contracts/main.tolk",
+      "fixes": [],
+      "help": "deprecated symbols may be removed in future versions",
+      "message": "usage of deprecated symbol",
+      "name": "deprecated-symbol-use",
+      "severity": "warning",
+      "source": "tolk"
+    }
+  ],
+  "success": true
+}

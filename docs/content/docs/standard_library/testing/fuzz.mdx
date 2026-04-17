@@ -8,14 +8,15 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 Module for fuzz-testing helpers.
 
 This module contains helpers intended specifically for parameterized tests
-annotated with `@test({ fuzz: ... })`.
+annotated with dotted `@test.fuzz` annotations: `@test.fuzz`,
+`@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`.
 
 Examples:
 ```tolk
 import "@acton/testing/expect"
 import "@acton/testing/fuzz"
 
-@test({ fuzz: true })
+@test.fuzz
 get fun `test balance stays bounded`(value: int) {
     val bounded = fuzz.bound(value, 0, 100);
     fuzz.assume(bounded != 13);
@@ -36,7 +37,7 @@ Root module for fuzz-testing helpers.
 This structure groups fuzz-specific helpers under a
 dedicated namespace.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L28" />
 
 ## `fuzz.assume`
 
@@ -52,7 +53,7 @@ Rejects the current fuzz input when condition is false.
 
 Outside fuzz tests this is reported as a regular failure.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L32" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L33" />
 
 ## `fuzz.bound`
 
@@ -70,7 +71,7 @@ Maps an integer-like value into the inclusive range `[minValue, maxValue]`.
 Values already in range stay unchanged, while out-of-range values wrap back
 into the target interval.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L45" />
 
 ## `formatFuzzLocation`
 
@@ -78,5 +79,5 @@ into the target interval.
 fun formatFuzzLocation(loc: SourceLocation): string
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L86" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L87" />
 

@@ -249,7 +249,8 @@ pub struct TestCoverageSettings {
     pub include_tests: Option<bool>,
 }
 
-/// Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`
+/// Fuzz settings for parameterized tests marked with dotted `@test.fuzz`
+/// annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct TestFuzzSettings {

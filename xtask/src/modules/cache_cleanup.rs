@@ -55,6 +55,7 @@ pub(crate) struct CleanupPolicy {
 
 pub(crate) struct ActionsCacheEntry {
     pub(crate) id: String,
+    pub(crate) branch: String,
     pub(crate) key: String,
     pub(crate) size: u64,
     pub(crate) created_at: DateTime<Utc>,
@@ -101,7 +102,7 @@ where
 
     for entry in &to_delete {
         delete_entry(entry)?;
-        println!("Deleted {}  {}", entry.id, entry.key);
+        println!("Deleted {}  {}  {}", entry.id, entry.branch, entry.key);
     }
 
     let deleted_size = to_delete.iter().map(|entry| entry.size).sum::<u64>();
@@ -189,6 +190,12 @@ fn print_entries_table(title: &str, entries: &[ActionsCacheEntry]) {
         .max()
         .unwrap_or(10)
         .max("Created At".len());
+    let branch_width = entries
+        .iter()
+        .map(|entry| entry.branch.len())
+        .max()
+        .unwrap_or(6)
+        .max("Branch".len());
     let last_accessed_at_width = entries
         .iter()
         .map(|entry| format_optional_timestamp(entry.last_accessed_at.as_ref()))
@@ -198,19 +205,20 @@ fn print_entries_table(title: &str, entries: &[ActionsCacheEntry]) {
         .max("Last Accessed At".len());
 
     println!(
-        "{:<id_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  Key",
-        "ID", "Size", "Created At", "Last Accessed At",
+        "{:<id_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  {:<branch_width$}  Key",
+        "ID", "Size", "Created At", "Last Accessed At", "Branch",
     );
 
     for entry in entries {
         let created_at = format_timestamp(&entry.created_at);
         let last_accessed_at = format_optional_timestamp(entry.last_accessed_at.as_ref());
         println!(
-            "{:<id_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  {}",
+            "{:<id_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  {:<branch_width$}  {}",
             entry.id,
             human_size(entry.size),
             created_at,
             last_accessed_at,
+            entry.branch,
             entry.key,
         );
     }

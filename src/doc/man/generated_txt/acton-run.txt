@@ -86,7 +86,7 @@ EXAMPLES
 
        2. Append extra arguments:
 
-              acton run deploy --explorer tonviewer
+              acton run deploy --explorer tonscan
 
        3. Run a custom shell task:
 

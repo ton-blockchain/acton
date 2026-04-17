@@ -11,10 +11,10 @@
 
  COVERAGE  
 
-───────────────────────────────────────────────────────────
- File                Covered Lines   Total Lines   % Lines 
-───────────────────────────────────────────────────────────
- All files                       1             2     50.0% 
- code/helpers.tolk               1             2     50.0% 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                       1             2     50.0%                  0                0          n/a   50.0% 
+ code/helpers.tolk               1             2     50.0%                  0                0          n/a   50.0% 
 
 Text coverage file saved in coverage.txt

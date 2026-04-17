@@ -682,7 +682,7 @@
       }
     },
     "TestFuzzSettings": {
-      "description": "Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`",
+      "description": "Fuzz settings for parameterized tests marked with dotted `@test.fuzz` annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`",
       "type": "object",
       "properties": {
         "max-test-rejects": {

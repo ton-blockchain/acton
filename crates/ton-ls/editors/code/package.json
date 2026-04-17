@@ -11,7 +11,7 @@
   "publisher": "petrmakhnev",
   "main": "./out/extension",
   "scripts": {
-    "compile": "tsc -p ./",
+    "build": "tsc -p ./",
     "watch": "tsc -watch -p ./"
   },
   "contributes": {

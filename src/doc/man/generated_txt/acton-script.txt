@@ -147,7 +147,7 @@ EXAMPLES
 
        4. Broadcast a deploy flow and print explorer links:
 
-              acton script scripts/deploy.tolk --net testnet --explorer tonviewer
+              acton script scripts/deploy.tolk --net testnet --explorer tonscan
 
 SEE ALSO
        o  acton help run

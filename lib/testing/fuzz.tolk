@@ -1,14 +1,15 @@
 /// Module for fuzz-testing helpers.
 ///
 /// This module contains helpers intended specifically for parameterized tests
-/// annotated with `@test({ fuzz: ... })`.
+/// annotated with dotted `@test.fuzz` annotations: `@test.fuzz`,
+/// `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`.
 ///
 /// Examples:
 /// ```tolk
 /// import "@acton/testing/expect"
 /// import "@acton/testing/fuzz"
 ///
-/// @test({ fuzz: true })
+/// @test.fuzz
 /// get fun `test balance stays bounded`(value: int) {
 ///     val bounded = fuzz.bound(value, 0, 100);
 ///     fuzz.assume(bounded != 13);

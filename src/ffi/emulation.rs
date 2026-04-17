@@ -1934,7 +1934,7 @@ fn get_transaction_link(
     } else {
         ""
     };
-    let explorer = ctx.env.explorer.unwrap_or(Explorer::Tonviewer);
+    let explorer = ctx.env.explorer.unwrap_or(Explorer::Tonscan);
     match explorer {
         Explorer::Tonscan => {
             format!("https://{network_prefix}tonscan.org/tx/{hex}")

@@ -3,51 +3,41 @@ title: "Test Attributes"
 description: "Learn how to use test attributes to control test behavior, skip tests, and set expectations"
 ---
 
-Test runner supports various attributes that allow you to control test behavior, set expectations, and organize your test suite. Attributes are specified using the `@test` annotation syntax and can be applied to any test function.
+Test runner supports various attributes that allow you to control test behavior, set expectations, and organize your test suite. Attributes are specified using dotted `@test.*` annotations and can be applied to any test function.
+
+Only dotted `@test.*` syntax is supported by the test runner. Legacy `@test(...)` forms are ignored.
 
 ## The @test Annotation
 
-Test attributes are specified using the `@test` annotation. You can use it in two ways:
-
-### String Literals
-
-For simple attributes like `skip` and `todo`:
+Test attributes are specified using the `@test` annotation namespace:
 
 ```tolk
-@test("skip")
+@test.skip
 get fun `test should be skipped`() {
     // This test will be skipped
 }
 
-@test("todo")
+@test.todo
 get fun `test not implemented yet`() {
     // This test will be marked as TODO
 }
-```
 
-### Object Literals
-
-For attributes that require parameters:
-
-```tolk
-@test({ fail_with: 42 })
+@test.fail_with(42)
 get fun `test expects exit code 42`() {
     // This test expects exit code 42
 }
 
-@test({ gas_limit: 1000 })
+@test.gas_limit(1000)
 get fun `test with gas limit`() {
     // This test will fail if it uses more than 1000 gas
 }
 ```
 
-You can combine multiple attributes in a single object:
+You can combine multiple attributes by stacking annotations:
 
 ```tolk
-@test({
-    fail_with: 13,
-    gas_limit: 5000
-})
+@test.fail_with(13)
+@test.gas_limit(5000)
 get fun `test complex validation`() {
     // This test expects exit code 13,
     // and has a gas limit of 5000
@@ -63,14 +53,12 @@ Skips the test execution. The test won't run but will be counted in the test sum
 
 **Syntax:**
 ```tolk
-@test("skip")
-// or
-@test({ skip: true })
+@test.skip
 ```
 
 **Example:**
 ```tolk
-@test("skip")
+@test.skip
 get fun `test broken for now`() {
     expect(1 + 1).toEqual(3); // This won't execute
 }
@@ -87,22 +75,19 @@ Marks the test as a work-in-progress item. The test won't run and will be counte
 
 **Syntax:**
 ```tolk
-@test("todo")
-// or
-@test({ todo: true })
-// or
-@test({ todo: "Custom description" })
+@test.todo
+@test.todo("Custom description")
 ```
 
 **Examples:**
 
 ```tolk
-@test("todo")
+@test.todo
 get fun `test new feature`() {
     // Will show "TODO" as description
 }
 
-@test({ todo: "Waiting for API changes" })
+@test.todo("Waiting for API changes")
 get fun `test depends on external api`() {
     // Will show custom description
 }
@@ -120,12 +105,12 @@ Sets the expected exit code for the test. By default, tests expect exit code 0 (
 
 **Syntax:**
 ```tolk
-@test({ fail_with: <number> })
+@test.fail_with(<number>)
 ```
 
 **Example:**
 ```tolk
-@test({ fail_with: 42 })
+@test.fail_with(42)
 get fun `test expects failure`() {
     throw 42; // Test will pass because it expects exit code 42
 }
@@ -142,12 +127,12 @@ Sets a maximum gas limit for the test. If the test consumes more gas than specif
 
 **Syntax:**
 ```tolk
-@test({ gas_limit: <number> })
+@test.gas_limit(<number>)
 ```
 
 **Example:**
 ```tolk
-@test({ gas_limit: 1000 })
+@test.gas_limit(1000)
 get fun `test efficient algorithm`() {
     // If this test uses more than 1000 gas, it will fail
     val result = expensive_computation();
@@ -167,26 +152,26 @@ the test ABI and executes the same test multiple times.
 
 **Syntax:**
 ```tolk
-@test({ fuzz: true })
+@test.fuzz
 // or
-@test({ fuzz: <runs> })
+@test.fuzz(<runs>)
 // or
-@test({ fuzz: { runs: <runs>, max_test_rejects: <number>, seed: <number> } })
+@test.fuzz({ runs: <runs>, max_test_rejects: <number>, seed: <number> })
 ```
 
 **Examples:**
 ```tolk
-@test({ fuzz: true })
+@test.fuzz
 get fun `test default fuzz runs`(value: int) {
     expect(value).toEqual(value);
 }
 
-@test({ fuzz: 64 })
+@test.fuzz(64)
 get fun `test custom fuzz runs`(flag: bool) {
     expect(flag).toEqual(flag);
 }
 
-@test({ fuzz: { runs: 64, max_test_rejects: 1024, seed: 42 } })
+@test.fuzz({ runs: 64, max_test_rejects: 1024, seed: 42 })
 get fun `test custom fuzz budget`(value: int) {
     fuzz.assume(value != 0);
     expect(value != 0).toBeTrue();
@@ -196,9 +181,10 @@ get fun `test custom fuzz budget`(value: int) {
 **Notes:**
 - `fuzz` is valid only for tests with parameters
 - parameterized tests require explicit fuzz opt-in
-- `@test({ fuzz: true })` uses defaults from `[test.fuzz]` in `Acton.toml`
-- `@test({ fuzz: { ... } })` overrides individual fuzz settings for that test
-- `seed` can be set in `[test.fuzz]` or in `@test({ fuzz: { seed: ... } })`
+- `@test.fuzz` uses defaults from `[test.fuzz]` in `Acton.toml`
+- `@test.fuzz({ ... })` overrides individual fuzz settings for that test
+- `seed` can be set in `[test.fuzz]` or in `@test.fuzz({ seed: ... })`
+- legacy `@test({ fuzz: ... })` is ignored by the runner
 - for assumptions and bounds, import `@acton/testing/fuzz` and use
   `fuzz.assume(...)` / `fuzz.bound(...)`
 

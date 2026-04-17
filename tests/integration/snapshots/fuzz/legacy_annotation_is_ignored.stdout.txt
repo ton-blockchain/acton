@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/test.test.tolk (1 test)
-  ✗ fuzz false does not enable [TIME]
-    └─ Parameterized test 'test fuzz false does not enable' requires @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
+  ✗ legacy fuzz [TIME]
+    └─ Parameterized test 'test legacy fuzz' requires @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
 
  ✗ 1 failed in 1 file
 

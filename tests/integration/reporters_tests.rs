@@ -105,7 +105,7 @@ get fun `test map diff`() {
 const FUZZ_FAILURE_TESTS: &str = r#"
 import "../../lib/testing/expect"
 
-@test({ fuzz: { runs: 2, seed: 17 } })
+@test.fuzz({ runs: 2, seed: 17 })
 get fun `test fuzz fails with inputs`(value: int) {
     expect(value).toEqual(1);
 }

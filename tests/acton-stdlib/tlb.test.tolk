@@ -18,7 +18,7 @@ get fun `test maybe some none and unwrap or`() {
     expect(noneValue.unwrapOr(10)).toEqual(10);
 }
 
-@test({ fail_with: 7 })
+@test.fail_with(7)
 get fun `test maybe unwrap none fails`() {
     val noneValue = Maybe<int>.none();
     noneValue.unwrap();

@@ -710,11 +710,11 @@ expectToEndWithExitCode(10);
 throw 10; // Test will end with exit code 10 and be considered as passed
 ```
 
-Alternatively, you can use `@test({ fail_with: 10 })` annotation to set
+Alternatively, you can use `@test.fail_with(10)` annotation to set
 the expected exit code for the whole test.
 
 ```tolk
-@test({ fail_with: 10 })
+@test.fail_with(10)
 get fun `test fail with`() {
     throw 10; // ok
 }

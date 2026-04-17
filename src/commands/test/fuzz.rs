@@ -523,14 +523,14 @@ pub(super) fn validate_test_configuration(
 ) -> anyhow::Result<()> {
     if test.fuzz.is_some() && test.declared_parameter_count == 0 {
         anyhow::bail!(
-            "Test '{}' uses @test({{ fuzz: ... }}) but has no parameters",
+            "Test '{}' uses @test.fuzz(...) but has no parameters",
             test.name
         );
     }
 
     if test.declared_parameter_count > 0 && test.fuzz.is_none() {
         anyhow::bail!(
-            "Parameterized test '{}' requires @test({{ fuzz: true }}), @test({{ fuzz: <runs> }}), or @test({{ fuzz: {{ ... }} }})",
+            "Parameterized test '{}' requires @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({{ ... }})",
             test.name
         );
     }

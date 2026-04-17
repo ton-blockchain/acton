@@ -9,7 +9,7 @@
 
  > tests/test.test.tolk (1 test)
   ✗ missing fuzz [TIME]
-    └─ Parameterized test 'test missing fuzz' requires @test({ fuzz: true }), @test({ fuzz: <runs> }), or @test({ fuzz: { ... } })
+    └─ Parameterized test 'test missing fuzz' requires @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
 
  ✗ 1 failed in 1 file
 

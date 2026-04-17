@@ -24,21 +24,24 @@ test-workspace:
     cargo test --workspace --doc
     cargo run -- test
 
-test-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+_tree-sitter-test grammar:
+    cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+
+test-tree-sitter-tolk:
+    just _tree-sitter-test tolk
 
 test-tree-sitter-fift:
-    cd crates/tree-sitter-fift && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+    just _tree-sitter-test fift
 
 test-tree-sitter-tasm:
-    cd crates/tree-sitter-tasm && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+    just _tree-sitter-test tasm
 
 test-tree-sitter-tlb:
-    cd crates/tree-sitter-tlb && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+    just _tree-sitter-test tlb
 
-test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter
+test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter-tolk
 
-update-test-tree-sitter:
+update-test-tree-sitter-tolk:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
 
 test: test-workspace
@@ -69,6 +72,15 @@ check-schema:
 
 check-deny:
     cargo deny check
+
+check-security:
+    cargo deny check
+    bun audit --audit-level=moderate
+    cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
+    cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
+    cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
+    cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+    cd crates/ton-ls/editors/code && yarn npm audit --all --recursive --severity=moderate
 
 check-ci: fmt-check check-docgen check-deps clippy typos check-schema
 

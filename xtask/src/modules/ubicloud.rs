@@ -158,6 +158,7 @@ pub(crate) struct GithubCacheEntries {
 #[derive(Debug, Deserialize)]
 pub(crate) struct GithubCacheEntry {
     pub(crate) id: String,
+    pub(crate) scope: String,
     pub(crate) key: String,
     pub(crate) size: u64,
     pub(crate) created_at: DateTime<Utc>,

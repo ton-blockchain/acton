@@ -7,8 +7,8 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 #[test]
-fn test_skip_annotation_string_literal() {
-    ProjectBuilder::new("skip-string")
+fn test_legacy_annotation_forms_are_ignored() {
+    ProjectBuilder::new("legacy-annotations")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
             "test",
@@ -16,6 +16,35 @@ fn test_skip_annotation_string_literal() {
             import "../../lib/testing/expect"
 
             @test("skip")
+            get fun `test legacy first`() {
+                expect(1).toEqual(2); // This should not run
+            }
+
+            @test({ fail_with: 42 })
+            get fun `test legacy second`() {
+                throw 42;
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(2)
+        .assert_not_contains("skipped");
+}
+
+#[test]
+fn test_skip_annotation_dotted() {
+    ProjectBuilder::new("skip-string")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test.skip
             get fun `test skipped string`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -36,7 +65,7 @@ fn test_skip_annotation_string_literal() {
 }
 
 #[test]
-fn test_skip_annotation_object_literal() {
+fn test_skip_annotation_dotted_repeated() {
     ProjectBuilder::new("skip-object")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -44,7 +73,7 @@ fn test_skip_annotation_object_literal() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ skip: true })
+            @test.skip
             get fun `test skipped object`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -65,7 +94,7 @@ fn test_skip_annotation_object_literal() {
 }
 
 #[test]
-fn test_todo_annotation_string_literal() {
+fn test_todo_annotation_dotted() {
     ProjectBuilder::new("todo-string")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -73,7 +102,7 @@ fn test_todo_annotation_string_literal() {
             r#"
             import "../../lib/testing/expect"
 
-            @test("todo")
+            @test.todo
             get fun `test todo string`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -102,7 +131,7 @@ fn test_todo_annotation_with_description() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ todo: "Implement this later" })
+            @test.todo("Implement this later")
             get fun `test todo described`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -123,7 +152,7 @@ fn test_todo_annotation_with_description() {
 }
 
 #[test]
-fn test_todo_annotation_boolean() {
+fn test_todo_annotation_dotted_without_description() {
     ProjectBuilder::new("todo-boolean")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -131,7 +160,7 @@ fn test_todo_annotation_boolean() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ todo: true })
+            @test.todo
             get fun `test todo boolean`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -151,7 +180,7 @@ fn test_todo_annotation_boolean() {
         .assert_contains("TODO");
 }
 
-/// Test @test({ `gas_limit`: 100 }) annotation
+/// Test @test.gas_limit(100) annotation
 #[test]
 fn test_gas_limit_annotation() {
     ProjectBuilder::new("gas-limit")
@@ -161,7 +190,7 @@ fn test_gas_limit_annotation() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ gas_limit: 100 })
+            @test.gas_limit(100)
             get fun `test gas limit exceeded`() {
                 // This loop should exceed the gas limit
                 var i = 0;
@@ -186,7 +215,7 @@ fn test_gas_limit_annotation() {
         .assert_contains("Gas limit exceeded");
 }
 
-/// Test @test({ `fail_with`: 42 }) annotation
+/// Test @test.fail_with(42) annotation
 #[test]
 fn test_fail_with_annotation() {
     ProjectBuilder::new("fail-with")
@@ -196,7 +225,7 @@ fn test_fail_with_annotation() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ fail_with: 42 })
+            @test.fail_with(42)
             get fun `test expected failure`() {
                 throw 42; // This is expected
             }
@@ -215,7 +244,7 @@ fn test_fail_with_annotation() {
         .assert_not_contains("Expected exit_code");
 }
 
-/// Test @test({ `fail_with`: 42 }) annotation with wrong exit code
+/// Test @test.fail_with(42) annotation with wrong exit code
 #[test]
 fn test_fail_with_annotation_wrong_code() {
     ProjectBuilder::new("fail-with-wrong")
@@ -225,7 +254,7 @@ fn test_fail_with_annotation_wrong_code() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ fail_with: 42 })
+            @test.fail_with(42)
             get fun `test wrong exit code`() {
                 throw 99; // Expected 42, got 99
             }
@@ -250,7 +279,9 @@ fn test_multiple_annotations() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ skip: true, gas_limit: 1000, fail_with: 10 })
+            @test.skip
+            @test.gas_limit(1000)
+            @test.fail_with(10)
             get fun `test multiple annotations`() {
                 // This should be skipped, so these annotations don't matter
                 throw 10;
@@ -282,12 +313,12 @@ fn test_annotations_with_filter() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ skip: true })
+            @test.skip
             get fun `test skipped 1`() {
                 expect(1).toEqual(2);
             }
 
-            @test({ skip: true })
+            @test.skip
             get fun `test skipped 2`() {
                 expect(1).toEqual(2);
             }

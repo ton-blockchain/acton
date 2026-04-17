@@ -259,7 +259,7 @@ REPORTING AND ARTIFACTS
           --snapshot or --baseline-snapshot
 
        o  [test.fuzz] applies only to parameterized tests that explicitly opt
-          in with @test({ fuzz: true }) or @test({ fuzz: ... })
+          in with @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
 
        o  --fuzz-seed overrides [test.fuzz].seed for the current run
 

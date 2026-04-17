@@ -86,7 +86,7 @@ custom-task = "echo 'Running custom task...'"
 2. Append extra arguments:
 
    ```bash
-   acton run deploy --explorer tonviewer
+   acton run deploy --explorer tonscan
    ```
 
 3. Run a custom shell task:

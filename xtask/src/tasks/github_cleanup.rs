@@ -28,6 +28,7 @@ pub(crate) fn run(args: GithubCleanupArgs) -> Result<()> {
 fn to_actions_cache_entry(entry: GithubCacheEntry) -> ActionsCacheEntry {
     ActionsCacheEntry {
         id: entry.id.to_string(),
+        branch: entry.branch,
         key: entry.key,
         size: entry.size_in_bytes,
         created_at: entry.created_at,

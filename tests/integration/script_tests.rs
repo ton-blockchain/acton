@@ -367,6 +367,39 @@ fn test_script_with_args() {
 }
 
 #[test]
+fn test_script_missing_args_uses_main_definition_for_backtrace() {
+    let project = ProjectBuilder::new("script-missing-args")
+        .script_file(
+            "args",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: int, b: int) {
+                println("Arg A:");
+                println(a);
+                println("Arg B:");
+                println(b);
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .script("scripts/args.tolk")
+        .with_backtrace("full")
+        .run()
+        .failure();
+
+    output
+        .assert_contains("Script finished with exit code 2")
+        .assert_contains("at scripts/args.tolk:")
+        .assert_contains("Backtrace:")
+        .assert_contains("main")
+        .assert_not_contains("unknown-file");
+}
+
+#[test]
 fn test_script_with_tuple_args() {
     let project = ProjectBuilder::new("script-tuple-args")
         .script_file(

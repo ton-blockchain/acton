@@ -1,4 +1,4 @@
-name: Check Release
+name: Check Release Binary
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ on:
         type: string
 
 concurrency:
-  group: check-release-${{ github.ref }}
+  group: check-release-binary-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
