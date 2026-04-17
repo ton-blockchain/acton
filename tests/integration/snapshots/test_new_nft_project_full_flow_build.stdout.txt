@@ -1,0 +1,6 @@
+   Compiling contracts
+   Compiling NftCollection
+    Finished in [TIME]
+   Compiling NftItem
+    Finished in [TIME]
+    Finished in [TIME]

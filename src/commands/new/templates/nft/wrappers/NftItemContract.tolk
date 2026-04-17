@@ -1,10 +1,8 @@
-import "@acton/io"
 import "@acton/build/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
-import "../contracts/messages"
-import "../contracts/types"
-import "../contracts/types"
+import "@contracts/messages"
+import "@contracts/types"
 
 struct NftItemContract {
     address: address
@@ -12,7 +10,7 @@ struct NftItemContract {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun NftItemContract.fromStorage(storage: NftItemStorage) {
+fun NftItemContract.fromStorage(storage: NftItemStorage): NftItemContract {
     val init = ContractState {
         code: build("NftItem"),
         data: storage.toCell(),
@@ -22,7 +20,7 @@ fun NftItemContract.fromStorage(storage: NftItemStorage) {
 }
 
 /// Creates a contract wrapper instance from the address
-fun NftItemContract.fromAddress(address: address) {
+fun NftItemContract.fromAddress(address: address): NftItemContract {
     return NftItemContract { address };
 }
 

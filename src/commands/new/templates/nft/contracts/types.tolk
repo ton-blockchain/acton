@@ -37,7 +37,7 @@ struct NftDataReply {
     content: string? = null
 }
 
-fun NftCollectionStorage.load() {
+fun NftCollectionStorage.load(): NftCollectionStorage {
     return NftCollectionStorage.fromCell(contract.getData());
 }
 
@@ -45,7 +45,7 @@ fun NftCollectionStorage.save(self) {
     contract.setData(self.toCell());
 }
 
-fun NftItemStorage.startLoading() {
+fun NftItemStorage.startLoading(): NftItemStorageLoader {
     return NftItemStorageLoader.fromCell(contract.getData());
 }
 
@@ -64,7 +64,7 @@ struct NftItemStorageLoader {
     private rest: RemainingBitsAndRefs
 }
 
-fun NftItemStorageLoader.isNotInitialized(self) {
+fun NftItemStorageLoader.isNotInitialized(self): bool {
     return self.rest.isEmpty();
 }
 

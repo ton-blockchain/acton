@@ -1,5 +1,4 @@
 import "@acton/emulation/network"
-import "@acton/promts/prompts"
 import "utils/common"
 
 fun main() {

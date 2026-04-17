@@ -1,12 +1,11 @@
 import "@stdlib/tvm-dicts"
-import "@acton/build/build"
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
-import "./nft-collection.test"
-import "../contracts/messages"
-import "../wrappers/NftCollectionContract"
-import "../wrappers/NftItemContract"
+import "@contracts/messages"
+import "@tests/nft-collection.test"
+import "@wrappers/NftCollectionContract"
+import "@wrappers/NftItemContract"
 
 get fun `test nft: should transfer ownership`() {
     val (nftCollection, _, _) = setupTest();

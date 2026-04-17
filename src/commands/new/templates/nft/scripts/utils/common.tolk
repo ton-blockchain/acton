@@ -6,10 +6,10 @@ import "@acton/emulation/network"
 import "@acton/promts/prompts"
 import "@acton/testing/assert"
 import "@acton/vm/vm"
-import "../../contracts/messages"
-import "../../contracts/types"
-import "../../wrappers/NftCollectionContract"
-import "../../wrappers/NftItemContract"
+import "@contracts/messages"
+import "@contracts/types"
+import "@wrappers/NftCollectionContract"
+import "@wrappers/NftItemContract"
 
 const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00

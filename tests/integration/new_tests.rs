@@ -1429,6 +1429,18 @@ fn test_new_jetton_project_localnet_deploy_snapshot() {
 }
 
 #[test]
+fn test_new_nft_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-nft-localnet-deploy",
+        "nft",
+        false,
+        "deployer",
+        "scripts/deployCollection.tolk",
+        "integration/snapshots/test_new_nft_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
 fn test_new_empty_project_in_existed_directory() {
     let project = ProjectBuilder::new("foobar")
         .contract("foo", "")
@@ -2083,6 +2095,92 @@ fn test_new_jetton_project_full_flow() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/test_new_jetton_project_full_flow_fmt.stdout.txt",
+        );
+}
+
+#[test]
+fn test_new_nft_project_full_flow() {
+    let project = ProjectBuilder::new("new-nft-full")
+        .without_acton_toml()
+        .build();
+
+    let dir = project.path();
+    let project_dir = project.path().join("foobar");
+
+    // 1. Create project
+    project
+        .acton()
+        .arg("new")
+        .arg(&dir.join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("nft")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_new.stdout.txt",
+        );
+
+    // 2. Build project
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_build.stdout.txt",
+        );
+
+    // 3. Run tests
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("test")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_test.stdout.txt",
+        );
+
+    // 4. Run deploy script in emulation mode
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/deployCollection.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_script.stdout.txt",
+        );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_fmt.stdout.txt",
         );
 }
 
