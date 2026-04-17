@@ -439,6 +439,8 @@ fn test_new_nft_project_non_interactive() {
     assert!(content.contains(r#"name = "nft-project""#));
     assert!(content.contains(r"[contracts.NftCollection]"));
     assert!(content.contains(r"[contracts.NftItem]"));
+    assert!(content.contains("acton script scripts/deployCollection.tolk"));
+    assert!(content.contains("acton script scripts/deployCollection.tolk --net testnet"));
 
     assert!(project_dir.join("contracts/NftCollection.tolk").exists());
     assert!(project_dir.join("contracts/NftItem.tolk").exists());

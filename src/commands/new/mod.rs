@@ -208,13 +208,13 @@ pub fn new_cmd(
     let mut scripts = BTreeMap::new();
     scripts.insert(
         "deploy-emulation".to_owned(),
-        format!("acton script {}", scaffold.layout().deploy_script_path()),
+        format!("acton script {}", scaffold.deploy_script_path()),
     );
     scripts.insert(
         "deploy-testnet".to_owned(),
         format!(
             "acton script {} --net testnet",
-            scaffold.layout().deploy_script_path()
+            scaffold.deploy_script_path()
         ),
     );
     config.scripts = Some(scripts);

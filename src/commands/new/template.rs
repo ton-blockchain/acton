@@ -29,14 +29,6 @@ pub(super) enum ProjectLayout {
 
 impl ProjectLayout {
     #[must_use]
-    pub(super) const fn deploy_script_path(self) -> &'static str {
-        match self {
-            Self::Standard => "scripts/deploy.tolk",
-            Self::App => "contracts/scripts/deploy.tolk",
-        }
-    }
-
-    #[must_use]
     pub(super) const fn contracts_mapping(self) -> &'static str {
         match self {
             Self::Standard => "contracts",
@@ -78,6 +70,7 @@ pub(super) struct ProjectScaffold {
     dir: &'static Dir<'static>,
     layout: ProjectLayout,
     contracts: &'static [ContractTemplate],
+    deploy_script: &'static str,
 }
 
 impl ProjectScaffold {
@@ -89,6 +82,11 @@ impl ProjectScaffold {
     #[must_use]
     pub(super) const fn contracts(self) -> &'static [ContractTemplate] {
         self.contracts
+    }
+
+    #[must_use]
+    pub(super) const fn deploy_script_path(self) -> &'static str {
+        self.deploy_script
     }
 }
 
@@ -146,30 +144,35 @@ const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &EMPTY_TEMPLATE_DIR,
     layout: ProjectLayout::Standard,
     contracts: &EMPTY_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
 };
 
 const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &COUNTER_TEMPLATE_DIR,
     layout: ProjectLayout::Standard,
     contracts: &COUNTER_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
 };
 
 const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &COUNTER_APP_TEMPLATE_DIR,
     layout: ProjectLayout::App,
     contracts: &COUNTER_APP_CONTRACTS,
+    deploy_script: "contracts/scripts/deploy.tolk",
 };
 
 const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &JETTON_TEMPLATE_DIR,
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
 };
 
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &NFT_TEMPLATE_DIR,
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
+    deploy_script: "scripts/deployCollection.tolk",
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
