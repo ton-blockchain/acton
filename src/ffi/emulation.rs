@@ -1281,7 +1281,7 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
             )
         })?;
 
-    let unixtime = resolve_get_method_unixtime(&ctx.chain.world_state)?;
+    let unixtime = resolve_get_method_unixtime(ctx.chain.world_state)?;
 
     let params = RunGetMethodArgs {
         code,
@@ -2264,7 +2264,7 @@ fn call_tolk_function_impl(
     let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
     let libs_root = libs.into_root();
 
-    let unixtime = resolve_get_method_unixtime(&ctx.chain.world_state)?;
+    let unixtime = resolve_get_method_unixtime(ctx.chain.world_state)?;
 
     let params = RunGetMethodArgs {
         code,
