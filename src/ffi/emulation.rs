@@ -29,6 +29,7 @@ use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
+use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
@@ -45,7 +46,6 @@ use tycho_types::models::{
     LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
-use ton_emulator::world_state::WorldState;
 
 /// Resolve the unix time to use for a get method invocation.
 ///
