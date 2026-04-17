@@ -412,9 +412,7 @@ fn test_new_counter_project_non_interactive() {
 
 #[test]
 fn test_new_nft_project_non_interactive() {
-    let project = ProjectBuilder::new("new-nft")
-        .without_acton_toml()
-        .build();
+    let project = ProjectBuilder::new("new-nft").without_acton_toml().build();
 
     let output = project
         .acton()
@@ -444,7 +442,11 @@ fn test_new_nft_project_non_interactive() {
 
     assert!(project_dir.join("contracts/NftCollection.tolk").exists());
     assert!(project_dir.join("contracts/NftItem.tolk").exists());
-    assert!(project_dir.join("wrappers/NftCollectionContract.tolk").exists());
+    assert!(
+        project_dir
+            .join("wrappers/NftCollectionContract.tolk")
+            .exists()
+    );
     assert!(project_dir.join("wrappers/NftItemContract.tolk").exists());
     assert!(project_dir.join("scripts/deployCollection.tolk").exists());
     assert!(project_dir.join("scripts/deployItem.tolk").exists());
