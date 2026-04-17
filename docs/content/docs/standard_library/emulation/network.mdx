@@ -1171,7 +1171,7 @@ if (storageFee != null) {
 fun net.loadLibrary(hash: string): cell?
 ```
 
-Load library from the real blockchain by hash.
+Load library by hash, first from the current emulated blockchain and then from the configured network.
 
 Returns null if library is not found.
 
@@ -1183,11 +1183,12 @@ Returns null if library is not found.
 fun net.fetchAndRegisterLibrary(hash: string): bool
 ```
 
-Load library from the real blockchain by hash and register it in current blockchain.
+Load library by hash from emulated blockchain or real network and register it
+in the current emulated blockchain.
 
 Returns false if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1134" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1135" />
 
 ## `net.setNow`
 
@@ -1205,7 +1206,7 @@ val futureTime = net.now() + 1000; // 1000 seconds from now
 net.setNow(futureTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1152" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1153" />
 
 ## `net.now`
 
@@ -1223,7 +1224,7 @@ val currentTime = net.now();
 println("Current emulation time: {}", currentTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1168" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1169" />
 
 ## `net.topUp`
 
@@ -1241,7 +1242,7 @@ net.topUp(address, ton("10"));
 Note: This function for tests only!
 For testnet TON airdrop use `acton wallet airdrop command.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1181" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1182" />
 
 ## `net.balance`
 
@@ -1259,7 +1260,7 @@ val balance = net.balance(address);
 println("{:ton}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1200" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1201" />
 
 ## `net.getAccount`
 
@@ -1280,7 +1281,7 @@ if (acc is AccountInfo) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1220" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1221" />
 
 ## `net.setAccount`
 
@@ -1299,7 +1300,7 @@ val acc = net.getAccount(addr);
 net.setAccount(addr, acc);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1235" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1236" />
 
 ## `net.getShardAccount`
 
@@ -1319,7 +1320,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1262" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1263" />
 
 ## `net.setShardAccount`
 
@@ -1339,7 +1340,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1281" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1282" />
 
 ## `net.saveSnapshot`
 
@@ -1358,7 +1359,7 @@ val saved = net.saveSnapshot("world-state.json");
 expect(saved).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1299" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1300" />
 
 ## `net.loadSnapshot`
 
@@ -1377,7 +1378,7 @@ val loaded = net.loadSnapshot("world-state.json");
 expect(loaded).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1313" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1314" />
 
 ## `net.setConfig`
 
@@ -1418,7 +1419,7 @@ if (success) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1349" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1350" />
 
 ## `net.getConfig`
 
@@ -1430,7 +1431,8 @@ Retrieves the current blockchain configuration.
 
 Returns a map of all blockchain configuration parameters indexed from 0-90.
 The configuration includes gas prices, storage costs, validator settings, and other
-network parameters. Use specialized getter functions like [Config.getGasPrices](../config/#configgetgasprices),
+network parameters. In broadcast mode, it is fetched from the selected real network.
+Use specialized getter functions like [Config.getGasPrices](../config/#configgetgasprices),
 [Config.getStoragePrices](../config/#configgetstorageprices), or [Config.getGlobalVersion](../config/#configgetglobalversion) to access specific parameters.
 
 For detailed information about blockchain configuration parameters, see the
@@ -1450,7 +1452,7 @@ val globalVersion = config.getGlobalVersion();
 println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1402" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1404" />
 
 ## `crc16`
 
@@ -1466,7 +1468,7 @@ Example:
 val crc = crc16(someStr);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1413" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1415" />
 
 ## `tuple.fromTuple`
 
@@ -1474,7 +1476,7 @@ val crc = crc16(someStr);
 fun tuple.fromTuple(data: tuple): tuple
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1415" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1417" />
 
 ## `T.externalOutPrefix`
 
@@ -1482,7 +1484,7 @@ fun tuple.fromTuple(data: tuple): tuple
 fun T.externalOutPrefix(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1419" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1421" />
 
 ## `T.externalOutPrefixLen`
 
@@ -1490,7 +1492,7 @@ fun T.externalOutPrefix(): int
 fun T.externalOutPrefixLen(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1427" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1429" />
 
 ## `T.decodeExternalOutBody`
 
@@ -1498,7 +1500,7 @@ fun T.externalOutPrefixLen(): int
 fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1435" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1437" />
 
 ## `T.getDeclaredPackPrefix2`
 
@@ -1506,5 +1508,5 @@ fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
 fun T.getDeclaredPackPrefix2(): int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1491" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1493" />
 
