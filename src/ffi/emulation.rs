@@ -45,6 +45,24 @@ use tycho_types::models::{
     LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
+use ton_emulator::world_state::WorldState;
+
+/// Resolve the unix time to use for a get method invocation.
+///
+/// Prefers the emulated time set via `net.setNow(...)` so `blockchain.now()` inside
+/// getters matches `net.now()` and the time used for transactions. Falls back to the
+/// real wall clock when the user has never called `setNow` (default `current_now = 0`),
+/// preserving existing behavior for tests that don't mock time.
+fn resolve_get_method_unixtime(world_state: &WorldState) -> anyhow::Result<i64> {
+    let emulated = world_state.get_now();
+    if emulated != 0 {
+        return Ok(emulated.into());
+    }
+    let duration_since_epoch = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    Ok(duration_since_epoch.as_secs().try_into()?)
+}
 
 fn run_nested_executor_until_finished(
     ctx: &mut Context,
@@ -1263,8 +1281,7 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
             )
         })?;
 
-    let now = std::time::SystemTime::now();
-    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let unixtime = resolve_get_method_unixtime(&ctx.chain.world_state)?;
 
     let params = RunGetMethodArgs {
         code,
@@ -1272,7 +1289,7 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
         verbosity: ctx.env.default_log_level,
         libs: Default::default(),
         address: "0:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
-        unixtime: duration_since_epoch.as_secs().try_into()?,
+        unixtime,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
@@ -1373,8 +1390,7 @@ fn run_get_method_impl(
 
     let method_id = id.to_i32().unwrap_or(0);
 
-    let now = std::time::SystemTime::now();
-    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let unixtime = resolve_get_method_unixtime(world_state)?;
 
     let params = RunGetMethodArgs {
         code: Boc::encode_base64(&code),
@@ -1382,7 +1398,7 @@ fn run_get_method_impl(
         verbosity: ctx.env.default_log_level,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
-        unixtime: duration_since_epoch.as_secs().try_into()?,
+        unixtime,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
@@ -2248,8 +2264,7 @@ fn call_tolk_function_impl(
     let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
     let libs_root = libs.into_root();
 
-    let now = std::time::SystemTime::now();
-    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let unixtime = resolve_get_method_unixtime(&ctx.chain.world_state)?;
 
     let params = RunGetMethodArgs {
         code,
@@ -2257,7 +2272,7 @@ fn call_tolk_function_impl(
         verbosity: ctx.env.default_log_level,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
-        unixtime: duration_since_epoch.as_secs().try_into()?,
+        unixtime,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
