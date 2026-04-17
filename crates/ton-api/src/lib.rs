@@ -501,6 +501,49 @@ impl TonApiClient {
         Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
     }
 
+    pub fn get_config_all(&self) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getConfigAll",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
+        );
+
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter for blockchain config",
+        )?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigAllResponse {
+            ok: bool,
+            result: TonCenterConfigInfo,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigInfo {
+            config: TonCenterConfigCell,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigCell {
+            bytes: String,
+        }
+
+        let data: TonCenterConfigAllResponse = response
+            .json()
+            .context("Failed to parse TonCenter getConfigAll response")?;
+
+        if !data.ok {
+            anyhow::bail!("TonCenter returned ok=false for getConfigAll");
+        }
+
+        Boc::decode_base64(&data.result.config.bytes)
+            .context("Failed to decode blockchain config BOC data")
+    }
+
     pub fn decode_optional_cell(cell_data: &String) -> anyhow::Result<Option<Cell>> {
         if cell_data.is_empty() {
             return Ok(None);

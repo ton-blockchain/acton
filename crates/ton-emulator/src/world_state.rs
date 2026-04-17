@@ -468,6 +468,15 @@ impl WorldState {
         self.libraries.clone()
     }
 
+    /// Finds a registered global library by its representation hash.
+    #[must_use]
+    pub fn find_lib_by_hash(&self, hash: &HashBytes) -> Option<Cell> {
+        self.libraries
+            .iter()
+            .find(|lib| *lib.repr_hash() == *hash)
+            .cloned()
+    }
+
     /// Registers a new global library cell.
     pub fn register_lib(&mut self, lib: Cell) {
         self.libraries.push(lib);

@@ -230,6 +230,22 @@ fn world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()> {
 }
 
 #[test]
+fn world_state_find_lib_by_hash_returns_registered_library() -> anyhow::Result<()> {
+    let mut state = new_world_state()?;
+    let first = body_with_u32(0xcafe_babe)?;
+    let second = body_with_u32(0xface_feed)?;
+    let second_hash = *second.repr_hash();
+
+    state.register_lib(first);
+    state.register_lib(second.clone());
+
+    assert_eq!(state.find_lib_by_hash(&second_hash), Some(second));
+    assert!(state.find_lib_by_hash(&HashBytes([0xff; 32])).is_none());
+
+    Ok(())
+}
+
+#[test]
 fn world_state_load_snapshot_replaces_existing_state() -> anyhow::Result<()> {
     let mut source = new_world_state()?;
     source.set_now(77);

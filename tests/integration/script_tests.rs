@@ -1,17 +1,65 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    append_custom_network, append_localnet_network, spawn_toncenter_v2_mock,
-    toncenter_v2_error_response, toncenter_v2_seqno_ok_response,
+    ToncenterV2MockResponse, append_custom_network, append_localnet_network,
+    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
+    toncenter_v2_seqno_ok_response,
 };
 
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
+use ton_executor::DEFAULT_CONFIG_DICT;
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const REMOTE_GLOBAL_VERSION: u32 = 777;
+const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+fn build_global_version_cell(version: u32, capabilities: u64) -> Cell {
+    let mut builder = CellBuilder::new();
+    builder
+        .store_u8(0xc4)
+        .expect("must store GlobalVersion tag");
+    builder
+        .store_u32(version)
+        .expect("must store GlobalVersion version");
+    builder
+        .store_u64(capabilities)
+        .expect("must store GlobalVersion capabilities");
+    builder.build().expect("must build GlobalVersion cell")
+}
+
+fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
+    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
+    config
+        .set(8, build_global_version_cell(version, capabilities))
+        .expect("must update global version config param");
+    let root = config
+        .root()
+        .clone()
+        .expect("default blockchain config must have a root");
+    Boc::encode_base64(root)
+}
+
+fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "configInfo",
+                "config": {
+                    "@type": "tvm.cell",
+                    "bytes": config_boc64
+                },
+                "@extra": "mocked-live-shape"
+            }
+        })
+        .to_string(),
+    }
+}
 
 fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
     let project = ProjectBuilder::new(project_name)
@@ -2675,4 +2723,57 @@ fun main() {
         .run()
         .success()
         .assert_contains("EXPECT_IN_SCRIPT_OK");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn script_broadcast_get_config_uses_remote_network() {
+    let config_boc64 = mocked_config_boc64(REMOTE_GLOBAL_VERSION, REMOTE_GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock_with_capture(vec![toncenter_v2_get_config_all_ok_response(
+            &config_boc64,
+        )]);
+
+    let project = ProjectBuilder::new("script-broadcast-get-config-uses-remote-network")
+        .script_file(
+            "show_config",
+            r#"
+import "../../lib/emulation/config"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {
+    val version = net.getConfig().getGlobalVersion();
+    println("remote-version={}, remote-capabilities={}", version.version, version.capabilities);
+}
+"#,
+        )
+        .build();
+
+    append_custom_network(project.path(), "mock-v2-config", &mock_url);
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/show_config.tolk")
+        .verify_network("custom:mock-v2-config")
+        .run()
+        .success();
+
+    output.assert_contains(&format!(
+        "remote-version={REMOTE_GLOBAL_VERSION}, remote-capabilities={REMOTE_GLOBAL_CAPABILITIES}"
+    ));
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured[0].method, "GET");
+    assert!(
+        captured[0].path.starts_with("/getConfigAll"),
+        "expected getConfigAll request, got {}",
+        captured[0].path
+    );
 }

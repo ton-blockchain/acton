@@ -1121,14 +1121,15 @@ fun net.getAccountStorageFee(addr: address, seconds: int): coins? {
     return calculateStorageFee(BASECHAIN, seconds, usedStorage.bits, usedStorage.cells);
 }
 
-/// Load library from the real blockchain by hash.
+/// Load library by hash, first from the current emulated blockchain and then from the configured network.
 ///
 /// Returns null if library is not found.
 fun net.loadLibrary(hash: string): cell? {
     return ffi.loadLibrary(hash);
 }
 
-/// Load library from the real blockchain by hash and register it in current blockchain.
+/// Load library by hash from emulated blockchain or real network and register it
+/// in the current emulated blockchain.
 ///
 /// Returns false if library is not found.
 fun net.fetchAndRegisterLibrary(hash: string): bool {
@@ -1380,7 +1381,8 @@ fun net.setConfig(config: Config): bool {
 ///
 /// Returns a map of all blockchain configuration parameters indexed from 0-90.
 /// The configuration includes gas prices, storage costs, validator settings, and other
-/// network parameters. Use specialized getter functions like [Config.getGasPrices],
+/// network parameters. In broadcast mode, it is fetched from the selected real network.
+/// Use specialized getter functions like [Config.getGasPrices],
 /// [Config.getStoragePrices], or [Config.getGlobalVersion] to access specific parameters.
 ///
 /// For detailed information about blockchain configuration parameters, see the
