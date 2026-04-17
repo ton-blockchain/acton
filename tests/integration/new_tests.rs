@@ -411,6 +411,51 @@ fn test_new_counter_project_non_interactive() {
 }
 
 #[test]
+fn test_new_nft_project_non_interactive() {
+    let project = ProjectBuilder::new("new-nft")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("nft-project")
+        .arg("--description")
+        .arg("nft description")
+        .arg("--template")
+        .arg("nft")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: nft");
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "nft-project""#));
+    assert!(content.contains(r"[contracts.NftCollection]"));
+    assert!(content.contains(r"[contracts.NftItem]"));
+
+    assert!(project_dir.join("contracts/NftCollection.tolk").exists());
+    assert!(project_dir.join("contracts/NftItem.tolk").exists());
+    assert!(project_dir.join("wrappers/NftCollectionContract.tolk").exists());
+    assert!(project_dir.join("wrappers/NftItemContract.tolk").exists());
+    assert!(project_dir.join("scripts/deployCollection.tolk").exists());
+    assert!(project_dir.join("scripts/deployItem.tolk").exists());
+    assert!(project_dir.join("scripts/deployBatch.tolk").exists());
+    assert!(project_dir.join("scripts/transferItem.tolk").exists());
+    assert!(project_dir.join("scripts/changeAdmin.tolk").exists());
+    assert!(project_dir.join("tests/nft-collection.test.tolk").exists());
+    assert!(project_dir.join("tests/nft-item.test.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+}
+
+#[test]
 fn test_new_counter_project_with_app_flag() {
     let project = ProjectBuilder::new("new-counter-app")
         .without_acton_toml()
