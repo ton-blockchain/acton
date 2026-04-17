@@ -4,6 +4,7 @@ import "@acton/io"
 import "@acton/build/build"
 import "@acton/emulation/network"
 import "@acton/promts/prompts"
+import "@acton/testing/assert"
 import "@acton/vm/vm"
 import "../../contracts/messages"
 import "../../contracts/types"
@@ -12,6 +13,9 @@ import "../../wrappers/NftItemContract"
 
 const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00
+
+// Matches the `counter < 250` guard in NftCollection.tolk BatchDeployNfts handler.
+const NFT_MAX_BATCH_SIZE = 249
 
 const NFT_DEFAULT_COLLECTION_NAME = "SomeNFT"
 const NFT_DEFAULT_COLLECTION_DESCRIPTION = "Some NFT collection"
@@ -124,6 +128,19 @@ fun deployNftBatch(
     owner: address,
     count: int,
 ): SendResultList {
+    if (count <= 0) {
+        Assert.fail(format("Batch size must be positive, got {}", count));
+    }
+    if (count > NFT_MAX_BATCH_SIZE) {
+        Assert.fail(
+            format(
+                "Batch size {} exceeds NftCollection limit of {}; the on-chain transaction would fail and burn fees.",
+                count,
+                NFT_MAX_BATCH_SIZE,
+            ),
+        );
+    }
+
     var deployList: map<uint64, BatchDeployDictItem> = [];
     var i = 0;
     val nextItemIndex = collection.getCollectionData().nextItemIndex;
