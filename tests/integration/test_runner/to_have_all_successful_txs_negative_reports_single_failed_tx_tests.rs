@@ -121,7 +121,7 @@ fn to_have_all_successful_txs_treats_compute_skipped_transaction_as_failure() {
         "ce-stdlib-all-successful-compute-skipped",
         r#"
 get fun `test ce all successful compute skipped tx`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
     val results = net.send(sender.address, createMessage({

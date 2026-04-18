@@ -3005,15 +3005,15 @@ fun onBouncedMessage(_in: InMessageBounced) {}
         .script_file(
             "predicate_vm_exit",
             r#"
-import "../../lib/build/build"
-import "../../lib/emulation/network"
-import "../../lib/io"
-import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../contracts/types"
+	import "../../lib/build"
+	import "../../lib/emulation/network"
+	import "../../lib/emulation/testing"
+	import "../../lib/io"
+	import "../../lib/testing/expect"
+	import "../contracts/types"
 
 fun main() {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val init = ContractState {
         code: build("counter"),
         data: Storage { id: 0, counter: 0 }.toCell(),
@@ -3045,13 +3045,18 @@ fun main() {
         )
         .build();
 
-    project
+    let output = project
         .acton()
         .script("scripts/predicate_vm_exit.tolk")
         .run()
-        .failure()
+        .failure();
+
+    output
         .assert_snapshot_matches(
             "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
         );
 }
 

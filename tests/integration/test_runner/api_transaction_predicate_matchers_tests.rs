@@ -447,7 +447,7 @@ fn predicate_matchers_treat_compute_skipped_as_unsuccessful_and_exit_code_less()
         "ae-predicate-compute-skipped-success-semantics",
         r#"
 get fun `test predicate compute skipped success semantics`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
     val res = net.send(sender.address, createMessage({
@@ -486,7 +486,7 @@ get fun `test predicate compute skipped success semantics`() {
             return ok;
         },
     });
-    expect(impossible).toBeNone();
+    expect(impossible).toBeNull();
 }
 "#,
         "predicate_matchers_treat_compute_skipped_as_unsuccessful_and_exit_code_less",
@@ -516,13 +516,13 @@ get fun `test predicate mixed scalar and predicate fields`() {
 
     val found = res.findTransaction({
         to: harness.address,
-        opcode: Ping.getDeclaredPackPrefix2(),
+        opcode: Ping.__getDeclaredPackPrefix(),
         success: fun(ok: bool): bool {
             println("mixed.success={}", ok);
             return ok;
         },
     });
-    expect(found).toBeDefined();
+    expect(found).toBeNotNull();
 
     expect(res).toNotHaveTx({
         from: fun(addr: address): bool {
@@ -550,17 +550,17 @@ get fun `test predicate bounced opcode requires explicit flag`() {
     expect(res).toNotHaveTx({
         opcode: fun(op: uint32): bool {
             println("bounced.missing-flag.opcode=0x{:x}", op);
-            return op == BounceNotice.getDeclaredPackPrefix2();
+            return op == BounceNotice.__getDeclaredPackPrefix();
         },
     });
 
     val missing = res.findTransaction({
         opcode: fun(op: uint32): bool {
             println("bounced.missing-flag.find.opcode=0x{:x}", op);
-            return op == BounceNotice.getDeclaredPackPrefix2();
+            return op == BounceNotice.__getDeclaredPackPrefix();
         },
     });
-    expect(missing).toBeNone();
+    expect(missing).toBeNull();
 }
 "#,
         "predicate_bounced_opcode_requires_explicit_bounced_matcher",

@@ -121,7 +121,7 @@ fn compute_skipped_success_and_exit_code_filters_have_consistent_scalar_semantic
             {TEST_IMPORTS}
 
             get fun `test compute skipped success and exit code semantics`() {{
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
                 val txs = net.send(sender.address, createMessage({{
@@ -157,14 +157,14 @@ fn compute_skipped_success_and_exit_code_filters_have_consistent_scalar_semantic
                     to: missingAddress,
                     success: false,
                 }});
-                expect(failed).toBeDefined();
+                expect(failed).toBeNotNull();
 
                 val impossible = txs.findTransaction({{
                     from: sender.address,
                     to: missingAddress,
                     success: true,
                 }});
-                expect(impossible).toBeNone();
+                expect(impossible).toBeNull();
             }}
         "#,
     );
@@ -420,7 +420,7 @@ fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
@@ -461,7 +461,7 @@ fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
                     to: target,
                     opcode: 0x12345678,
                 }});
-                expect(missing).toBeNone();
+                expect(missing).toBeNull();
             }}
         "#,
     );
