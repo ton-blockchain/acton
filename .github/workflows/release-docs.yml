@@ -17,7 +17,7 @@ on:
 
 concurrency:
   group: release-docs
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions: { }
 
@@ -43,6 +43,7 @@ jobs:
         with:
           node-version: 22.x
           cache: yarn
+          package-manager-cache: ${{ github.ref == 'refs/heads/master' }}
           cache-dependency-path: docs/yarn.lock
 
       - name: Install docs dependencies
