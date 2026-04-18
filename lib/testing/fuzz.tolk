@@ -33,9 +33,9 @@ struct fuzz
 fun fuzz.assume(
     condition: bool,
     message: string = "",
-    loc: SourceLocation = reflect.sourceLocation(),
+    loc: string = reflect.sourceLocationAsString(),
 ): void {
-    Assert.assume(condition, message, formatFuzzLocation(loc));
+    Assert.assume(condition, message, loc);
 }
 
 /// Maps an integer-like value into the inclusive range `[minValue, maxValue]`.
@@ -46,7 +46,7 @@ fun fuzz.bound<T>(
     value: T,
     minValue: T,
     maxValue: T,
-    loc: SourceLocation = reflect.sourceLocation(),
+    loc: string = reflect.sourceLocationAsString(),
 ): T {
     val minInt = minValue as int;
     val maxInt = maxValue as int;
@@ -57,7 +57,7 @@ fun fuzz.bound<T>(
                 minInt,
                 maxInt,
             ),
-            formatFuzzLocation(loc),
+            loc,
         );
     }
 
@@ -82,8 +82,4 @@ fun fuzz.bound<T>(
         return maxValue;
     }
     return (minInt + rem - 1) as T;
-}
-
-fun formatFuzzLocation(loc: SourceLocation): string {
-    return format("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
 }

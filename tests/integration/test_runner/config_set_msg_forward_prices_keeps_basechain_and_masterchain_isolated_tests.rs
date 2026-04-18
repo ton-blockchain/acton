@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -26,7 +27,7 @@ fn config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated() {
         "be-stdlib-config-msg-forward-prices-branch-isolation",
         r"
 get fun `test be stdlib config msg forward prices branch isolation`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var basechain = config.getMsgForwardPrices(BASECHAIN);
     var masterchain = config.getMsgForwardPrices(MASTERCHAIN);
@@ -47,9 +48,9 @@ get fun `test be stdlib config msg forward prices branch isolation`() {
     val expectedBaseCellAfterBaseUpdate = basechain.cellPrice;
 
     config.setMsgForwardPrices(basechain, BASECHAIN);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val afterBaseUpdate = net.getConfig();
+    val afterBaseUpdate = testing.getConfig();
     val baseAfterBaseUpdate = afterBaseUpdate.getMsgForwardPrices(BASECHAIN);
     val masterAfterBaseUpdate = afterBaseUpdate.getMsgForwardPrices(MASTERCHAIN);
 
@@ -60,7 +61,7 @@ get fun `test be stdlib config msg forward prices branch isolation`() {
     expect(masterAfterBaseUpdate.bitPrice).toEqual(masterBeforeBit);
     expect(masterAfterBaseUpdate.cellPrice).toEqual(masterBeforeCell);
 
-    var configMasterUpdate = net.getConfig();
+    var configMasterUpdate = testing.getConfig();
     var masterchainUpdated = configMasterUpdate.getMsgForwardPrices(MASTERCHAIN);
 
     masterchainUpdated.lumpPrice += 2002;
@@ -72,9 +73,9 @@ get fun `test be stdlib config msg forward prices branch isolation`() {
     val expectedMasterCellAfterMasterUpdate = masterchainUpdated.cellPrice;
 
     configMasterUpdate.setMsgForwardPrices(masterchainUpdated, MASTERCHAIN);
-    expect(net.setConfig(configMasterUpdate)).toBeTrue();
+    expect(testing.setConfig(configMasterUpdate)).toBeTrue();
 
-    val finalConfig = net.getConfig();
+    val finalConfig = testing.getConfig();
     val baseFinal = finalConfig.getMsgForwardPrices(BASECHAIN);
     val masterFinal = finalConfig.getMsgForwardPrices(MASTERCHAIN);
 

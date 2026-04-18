@@ -1,12 +1,12 @@
 ---
 title: "Step-by-step Execution"
-description: "Use net.sendIter() and TxCursor to execute transaction chains in parts, stop at a matching hop, and interleave multiple cursors"
+description: "Use testing.createTraceIterationCursor() and TxCursor to execute transaction chains in parts, stop at a matching hop, and interleave multiple cursors"
 ---
 
 [`net.send()`](/docs/standard_library/emulation/network/#netsend) eagerly executes the whole transaction chain produced by a message.
 That is the right default for most tests.
 
-Use [`net.sendIter()`](/docs/standard_library/emulation/network/#netsenditer) when you need control over *when* later hops execute:
+Use [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) when you need control over *when* later hops execute:
 
 - inspect the first few transactions of a long cascade
 - assert intermediate state before downstream messages run
@@ -18,13 +18,15 @@ Prefer [`net.send()`](/docs/standard_library/emulation/network/#netsend) unless 
 tests shorter and easier to read.
 </Callout>
 
+Import `@acton/emulation/testing` in test files that use the cursor APIs from the `testing` namespace.
+
 ## Mental Model
 
-[`net.sendIter(from, message)`](/docs/standard_library/emulation/network/#netsenditer) starts a cursor for one root message and returns a
-[`TxCursor`](/docs/standard_library/emulation/network/#txcursor).
+[`testing.createTraceIterationCursor(from, message)`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) starts a cursor for one root message and returns a
+[`TxCursor`](/docs/standard_library/emulation/testing/#txcursor).
 
 ```tolk
-val iter = net.sendIter(sender.address, msg);
+val iter = testing.createTraceIterationCursor(sender.address, msg);
 ```
 
 The cursor owns the pending tail of that message chain. Every `execute...()`
@@ -36,11 +38,11 @@ call:
 
 The main cursor methods are:
 
-- [`executeN(n)`](/docs/standard_library/emulation/network/#txcursorexecuten) — execute up to `n` transactions
-- [`executeTill<Msg>(params)`](/docs/standard_library/emulation/network/#txcursorexecutetill) — execute until a matching transaction is reached
-- [`executeFrom()`](/docs/standard_library/emulation/network/#txcursorexecutefrom) — execute everything that is still pending
-- [`isDone()`](/docs/standard_library/emulation/network/#txcursorisdone) — check whether the cursor has no more pending transactions
-- [`close()`](/docs/standard_library/emulation/network/#txcursorclose) — discard the remaining tail
+- [`executeN(n)`](/docs/standard_library/emulation/testing/#txcursorexecuten) — execute up to `n` transactions
+- [`executeTill<Msg>(params)`](/docs/standard_library/emulation/testing/#txcursorexecutetill) — execute until a matching transaction is reached
+- [`executeAllRemaining()`](/docs/standard_library/emulation/testing/#txcursorexecuteallremaining) — execute everything that is still pending
+- [`isDone()`](/docs/standard_library/emulation/testing/#txcursorisdone) — check whether the cursor has no more pending transactions
+- [`close()`](/docs/standard_library/emulation/testing/#txcursorclose) — discard the remaining tail
 
 ## Execute the First Hop, Then Drain the Rest
 
@@ -58,7 +60,7 @@ val forwardMessage = createMessage({
     },
 });
 
-val iter = net.sendIter(sender.address, forwardMessage);
+val iter = testing.createTraceIterationCursor(sender.address, forwardMessage);
 
 val first = iter.executeN(1);
 expect(first).toHaveLength(1);
@@ -71,7 +73,7 @@ expect(first).toHaveSuccessfulTx<TriggerForward>({
 expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
 expect(iter.isDone()).toBeFalse();
 
-val tail = iter.executeFrom();
+val tail = iter.executeAllRemaining();
 expect(tail).toHaveLength(1);
 expect(tail).toHaveSuccessfulTx<Notify>({
     from: forwarderAddress,
@@ -81,13 +83,13 @@ expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
 expect(iter.isDone()).toBeTrue();
 ```
 
-This is the main difference from [`net.send()`](/docs/standard_library/emulation/network/#netsend): after [`executeN(1)`](/docs/standard_library/emulation/network/#txcursorexecuten), the
+This is the main difference from [`net.send()`](/docs/standard_library/emulation/network/#netsend): after [`executeN(1)`](/docs/standard_library/emulation/testing/#txcursorexecuten), the
 emulator state already reflects the first transaction, while the child message
 is still queued inside the cursor.
 
 ## Stop When a Specific Hop Appears
 
-Use [`executeTill<Msg>(...)`](/docs/standard_library/emulation/network/#txcursorexecutetill) when you want to run a chain until a particular
+Use [`executeTill<Msg>(...)`](/docs/standard_library/emulation/testing/#txcursorexecutetill) when you want to run a chain until a particular
 transaction is reached.
 
 ```tolk
@@ -102,7 +104,7 @@ val routeMessage = createMessage({
     },
 });
 
-val iter = net.sendIter(sender.address, routeMessage);
+val iter = testing.createTraceIterationCursor(sender.address, routeMessage);
 
 val untilRelay = iter.executeTill<Relay>({
     from: routerAddress,
@@ -129,11 +131,11 @@ part of the search from that message type. You can still narrow the match with
 regular [`SearchParams`](/docs/standard_library/emulation/network/#searchparams) filters.
 
 If no matching transaction is found before the queue is exhausted,
-[`executeTill()`](/docs/standard_library/emulation/network/#txcursorexecutetill) fails the test.
+[`executeTill()`](/docs/standard_library/emulation/testing/#txcursorexecutetill) fails the test.
 
 ## Interleave Two Message Chains
 
-Each [`net.sendIter()`](/docs/standard_library/emulation/network/#netsenditer) call creates its own cursor, so you can interleave two
+Each [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) call creates its own cursor, so you can interleave two
 chains against shared world state.
 
 ```tolk
@@ -151,8 +153,8 @@ val attackMessage = createMessage({
     body: Attack { queryId: 2 },
 });
 
-val beginIter = net.sendIter(sender.address, beginMessage);
-val attackIter = net.sendIter(attacker.address, attackMessage);
+val beginIter = testing.createTraceIterationCursor(sender.address, beginMessage);
+val attackIter = testing.createTraceIterationCursor(attacker.address, attackMessage);
 
 val beginFirst = beginIter.executeN(1);
 expect(beginFirst).toHaveSuccessfulTx<Begin>({
@@ -161,14 +163,14 @@ expect(beginFirst).toHaveSuccessfulTx<Begin>({
 });
 expect(net.runGetMethod<int>(raceAddress, "stage")).toEqual(1);
 
-val attackAll = attackIter.executeFrom();
+val attackAll = attackIter.executeAllRemaining();
 expect(attackAll).toHaveSuccessfulTx<Attack>({
     from: attacker.address,
     to: raceAddress,
 });
 expect(net.runGetMethod<int>(raceAddress, "attacked")).toEqual(1);
 
-val beginTail = beginIter.executeFrom();
+val beginTail = beginIter.executeAllRemaining();
 expect(beginTail).toHaveSuccessfulTx<Finish>({
     from: raceAddress,
     to: raceAddress,
@@ -181,7 +183,7 @@ This pattern is useful for race conditions, ordering-sensitive flows, and
 
 ## Discard the Remaining Tail
 
-Use [`close()`](/docs/standard_library/emulation/network/#txcursorclose) when the rest of the chain is irrelevant for the test and you want
+Use [`close()`](/docs/standard_library/emulation/testing/#txcursorclose) when the rest of the chain is irrelevant for the test and you want
 to drop it explicitly.
 
 ```tolk
@@ -195,14 +197,14 @@ val forwardMessage = createMessage({
     },
 });
 
-val iter = net.sendIter(sender.address, forwardMessage);
+val iter = testing.createTraceIterationCursor(sender.address, forwardMessage);
 
 val first = iter.executeN(1);
 expect(first).toHaveLength(1);
 
 iter.close();
 expect(iter.isDone()).toBeTrue();
-expect(iter.executeFrom()).toBeEmpty();
+expect(iter.executeAllRemaining()).toBeEmpty();
 ```
 
 Closing the cursor discards any pending internal tail that has not been executed
@@ -215,7 +217,7 @@ Every `execute...()` call returns the same result shape you already know from
 
 That means you can keep using the usual tools:
 
-- transaction matchers such as [`toHaveTx()`](/docs/standard_library/testing/transaction_expect/#expectationsendresultlisttohavetx) and [`toHaveSuccessfulTx()`](/docs/standard_library/testing/transaction_expect/#expectationsendresultlisttohavesuccessfultx)
+- transaction matchers such as [`toHaveTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavetx) and [`toHaveSuccessfulTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavesuccessfultx)
 - direct access to `tx`, `parentLt`, `childTxs`, `outMessages`, and `externals`
 - `println(segment)` to inspect the executed batch in the terminal
 
@@ -224,16 +226,16 @@ without inventing a second assertion API just for step-by-step execution.
 
 ## Limits and Caveats
 
-- [`net.sendIter()`](/docs/standard_library/emulation/network/#netsenditer) is available only in emulation mode. It is not a broadcast
+- [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) is available only in emulation mode. It is not a broadcast
   workflow.
 - Step-by-step execution is not supported in debug mode yet.
-- [`executeN(0)`](/docs/standard_library/emulation/network/#txcursorexecuten) is a no-op and leaves the cursor untouched.
-- [`executeTill()`](/docs/standard_library/emulation/network/#txcursorexecutetill) fails if the queue is exhausted before a match is found.
-- [`close()`](/docs/standard_library/emulation/network/#txcursorclose) discards pending work; it does not roll the state back.
+- [`executeN(0)`](/docs/standard_library/emulation/testing/#txcursorexecuten) is a no-op and leaves the cursor untouched.
+- [`executeTill()`](/docs/standard_library/emulation/testing/#txcursorexecutetill) fails if the queue is exhausted before a match is found.
+- [`close()`](/docs/standard_library/emulation/testing/#txcursorclose) discards pending work; it does not roll the state back.
 
 If you need rollback or checkpoints together with partial execution, combine
-[`sendIter()`](/docs/standard_library/emulation/network/#netsenditer) with
-[`net.saveSnapshot()`](/docs/standard_library/emulation/network/#netsavesnapshot) and [`net.loadSnapshot()`](/docs/standard_library/emulation/network/#netloadsnapshot), or see [World State Snapshots](/docs/test-runner/world-state-snapshots/).
+[`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) with
+[`testing.saveSnapshot()`](/docs/standard_library/emulation/testing/#testingsavesnapshot) and [`testing.loadSnapshot()`](/docs/standard_library/emulation/testing/#testingloadsnapshot), or see [World State Snapshots](/docs/test-runner/world-state-snapshots/).
 
 ## SEE ALSO
 

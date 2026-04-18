@@ -4,7 +4,7 @@
 // Do not edit manually — changes will be overwritten
 
 import "@stdlib/gas-payments"
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
@@ -153,5 +153,5 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 }
 
 fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", ownerAddress);
+    return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
 }

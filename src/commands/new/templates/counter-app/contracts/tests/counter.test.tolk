@@ -1,6 +1,6 @@
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 
 import "@contracts/types"
 import "@wrappers/Counter"
@@ -78,8 +78,8 @@ get fun `test unknown message`() {
 }
 
 fun setupTest(): (Counter, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("not_deployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
     val contract = Counter.fromStorage({ id: 0, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });

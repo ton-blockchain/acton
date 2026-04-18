@@ -150,13 +150,14 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         ```tolk title="scripts/deploy.tolk"
         import "@acton/io"
         import "@acton/emulation/network"
-        import "@acton/build/build"
+        import "@acton/emulation/scripts"
+        import "@acton/build"
 
         import "@wrappers/Counter"
         import "@contracts/types"
 
         fun main() {
-            val deployer = net.wallet("deployer");
+            val deployer = scripts.wallet("deployer");
 
             val counter = Counter.fromStorage({
                 id: 0,

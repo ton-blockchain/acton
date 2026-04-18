@@ -6,6 +6,7 @@ use std::fs;
 const DB_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/tlb/maybe"
 import "../../lib/types/message"
@@ -43,8 +44,8 @@ fn transaction_load_body_decodes_nested_payload_from_inbound_message() {
         "db-stdlib-transaction-load-body-nested-inline",
         r#"
 get fun `test db stdlib transaction load body nested inline`() {
-    val sender = net.treasury("db_sender_inline");
-    val destination = net.randomAddress("db_destination_inline");
+    val sender = testing.treasury("db_sender_inline");
+    val destination = randomAddress("db_destination_inline");
     val payload = DbNestedPayload {
         queryId: 901,
         amount: 77,
@@ -99,8 +100,8 @@ fn transaction_load_body_decodes_nested_payload_in_fixture_project() {
         imports = DB_TRANSACTION_IMPORTS,
         body = r#"
 get fun `test db stdlib transaction load body nested fixture`() {
-    val sender = net.treasury("db_sender_fixture");
-    val destination = net.randomAddress("db_destination_fixture");
+    val sender = testing.treasury("db_sender_fixture");
+    val destination = randomAddress("db_destination_fixture");
     val payload = DbNestedPayload {
         queryId: 902,
         amount: 88,

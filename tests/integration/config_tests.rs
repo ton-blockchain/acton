@@ -10,8 +10,9 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const PROFILED_TEST: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
@@ -21,7 +22,7 @@ get fun `test-profiled-transaction`() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMessage = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -44,8 +45,9 @@ get fun `test-profiled-transaction`() {
 
 const PROFILED_TEST_WITH_DRIFT: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
@@ -55,7 +57,7 @@ get fun `test-profiled-transaction`() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMessage = createMessage({
         bounce: false,
         value: ton("1.0"),

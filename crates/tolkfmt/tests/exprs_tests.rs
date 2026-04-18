@@ -1654,19 +1654,19 @@ fn test_complex_expression_combination_with_breaking() {
     check_with_width(
         r"
         fun test() {
-             expect(containsMessageWithOpcode(secondActions, ApproveAccepted.getDeclaredPackPrefix2()))
+             expect(containsMessageWithOpcode(secondActions, ApproveAccepted.__getDeclaredPackPrefix()))
                 .toEqual(true);
-             expect(containsMessageWithOpcode(secondActions, ExecuteOrderRequest.getDeclaredPackPrefix2()))
+             expect(containsMessageWithOpcode(secondActions, ExecuteOrderRequest.__getDeclaredPackPrefix()))
                 .toEqual(true);
         }
         ",
         expect![[r"
             fun test() {
                 expect(
-                    containsMessageWithOpcode(secondActions, ApproveAccepted.getDeclaredPackPrefix2()),
+                    containsMessageWithOpcode(secondActions, ApproveAccepted.__getDeclaredPackPrefix()),
                 ).toEqual(true);
                 expect(
-                    containsMessageWithOpcode(secondActions, ExecuteOrderRequest.getDeclaredPackPrefix2()),
+                    containsMessageWithOpcode(secondActions, ExecuteOrderRequest.__getDeclaredPackPrefix()),
                 ).toEqual(true);
             }"]],
         100,
@@ -1675,7 +1675,7 @@ fn test_complex_expression_combination_with_breaking() {
         r#"
         fun test() {
               val changedOrder = singleActionOrder(makeTransferAction(
-                  net.randomAddress("changed_order"),
+                  randomAddress("changed_order"),
                   DEFAULT_TRANSFER_VALUE,
                   777777
               ) as GenericOrderAction);
@@ -1685,7 +1685,7 @@ fn test_complex_expression_combination_with_breaking() {
             fun test() {
                 val changedOrder = singleActionOrder(
                     makeTransferAction(
-                        net.randomAddress("changed_order"),
+                        randomAddress("changed_order"),
                         DEFAULT_TRANSFER_VALUE,
                         777777,
                     ) as GenericOrderAction,

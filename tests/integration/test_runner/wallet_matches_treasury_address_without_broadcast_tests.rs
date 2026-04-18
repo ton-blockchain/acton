@@ -3,8 +3,9 @@ use crate::support::project::ProjectBuilder;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 fn run_wallet_success(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -28,8 +29,8 @@ fn wallet_matches_treasury_address_without_broadcast() {
 get fun `test bf wallet fallback matches treasury address`() {
     expect(net.isBroadcasting()).toEqual(false);
 
-    val wallet = net.wallet("bf_fallback_owner");
-    val treasury = net.treasury("bf_fallback_owner");
+    val wallet = scripts.wallet("bf_fallback_owner");
+    val treasury = testing.treasury("bf_fallback_owner");
 
     expect(wallet.address).toEqual(treasury.address);
 }
@@ -46,9 +47,9 @@ fn wallet_unknown_name_uses_treasury_and_sends_in_non_broadcast_mode() {
 get fun `test bf wallet fallback unknown name non broadcast`() {
     expect(net.isBroadcasting()).toEqual(false);
 
-    val wallet = net.wallet("bf_wallet_missing_from_wallets_config");
-    val treasury = net.treasury("bf_wallet_missing_from_wallets_config");
-    val receiver = net.treasury("bf_wallet_receiver");
+    val wallet = scripts.wallet("bf_wallet_missing_from_wallets_config");
+    val treasury = testing.treasury("bf_wallet_missing_from_wallets_config");
+    val receiver = testing.treasury("bf_wallet_receiver");
 
     expect(wallet.address).toEqual(treasury.address);
 

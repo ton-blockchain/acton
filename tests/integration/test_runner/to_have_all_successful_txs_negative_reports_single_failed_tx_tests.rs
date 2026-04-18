@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const TX_EXPECT_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 const FAILING_CONTRACT: &str = r"
@@ -46,7 +46,7 @@ get fun `test ce all successful negative single failing tx`() {
         stateInit: init,
     };
 
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -77,7 +77,7 @@ get fun `test ce all successful negative fixture single failing tx`() {{
     }};
     val counterAddress = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMsg = createMessage({{
         bounce: false,
         value: ton("1"),

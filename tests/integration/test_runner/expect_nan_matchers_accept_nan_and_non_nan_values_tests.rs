@@ -3,7 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const EXPECT_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/ffi/ffi"
+import "../../lib/ffi"
 "#;
 
 fn run_expect_suite(
@@ -24,7 +24,7 @@ fn expect_nan_matchers_accept_nan_and_non_nan_values() {
         r"{EXPECT_IMPORTS}
 
 get fun `test bx expect nan pass`() {{
-    val value = ffi.nan();
+    val value = __acton_impl_nan();
     expect(value).toBeNaN();
     expect(0).toBeNonNaN();
     expect(-1).toBeNonNaN();
@@ -50,7 +50,7 @@ get fun `test bx expect nan fail regular int`() {{
 }}
 
 get fun `test bx expect non nan fail nan`() {{
-    expect(ffi.nan()).toBeNonNaN();
+    expect(__acton_impl_nan()).toBeNonNaN();
 }}
 "
     );

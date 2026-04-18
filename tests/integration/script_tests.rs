@@ -67,9 +67,11 @@ fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
             "deploy",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 net.send(wallet.address, createMessage({
                     bounce: false,
                     value: ton("0.05"),
@@ -130,13 +132,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .script_file(
             "print_txs",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../contracts/script_body_messages"
 
 fun main() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("script_body_sink"),
         data: createEmptyCell(),
@@ -1133,13 +1137,14 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
         .script_file(
             "tx_not_found",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             fun main() {
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1180,9 +1185,11 @@ fn test_script_run_get_method_on_undeployed_contract_shows_actionable_error() {
             "get_undeployed",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val target = net.randomAddress("target");
+                val target = randomAddress("target");
                 val _: int = net.runGetMethod(target, "seqno");
             }
         "#,
@@ -1206,9 +1213,11 @@ fn test_script_run_get_method_on_contract_without_code_shows_actionable_error() 
             "get_null_code",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
                         .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
@@ -1421,11 +1430,13 @@ fn test_script_broadcast_with_nonexistent_wallet_with_wallets() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1474,11 +1485,13 @@ fn test_script_broadcast_with_nonexistent_wallet_no_config() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1517,11 +1530,13 @@ fn test_script_broadcast_with_nonexistent_wallet_empty_config() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1560,10 +1575,12 @@ fn test_script_broadcast_wallet_exposes_key_helpers_for_v5() {
             "wallet_keys",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
             import "../../lib/io"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 val keyPair = wallet.toKeyPair();
 
                 if (keyPair.privateKey == 0) {
@@ -1626,9 +1643,11 @@ fn test_script_wallet_key_pair_requires_open_broadcast_wallet() {
             "wallet_keys_error",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 wallet.toKeyPair();
             }
         "#,
@@ -1653,9 +1672,11 @@ fn test_script_wallet_id_requires_open_broadcast_wallet() {
             "wallet_id_error",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 wallet.walletId();
             }
         "#,
@@ -1680,9 +1701,11 @@ fn test_script_broadcast_treasury_recommends_wallet_api() {
             "deploy",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                net.treasury("deployer");
+                testing.treasury("deployer");
             }
         "#,
         )
@@ -1865,13 +1888,15 @@ get fun currentCounter(): int {
         .script_file(
             "deploy_counter",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../contracts/types"
 
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     val init = ContractState {
         code: build("counter"),
         data: Storage {
@@ -2305,7 +2330,7 @@ fn test_script_env_vars_support_coins() {
                     println("coins: {:ton}", amount);
                 }
 
-                val fallback = envOr<coins>("TEST_COINS_MISSING", ton("0.75"));
+                val fallback = env<coins>("TEST_COINS_MISSING") ?? ton("0.75");
                 println("coins_default: {:ton}", fallback);
             }
         "#,
@@ -2333,16 +2358,16 @@ fn test_script_env_or_vars() {
             import "../../lib/env"
 
             fun main() {
-                val i = envOr<int>("TEST_INT", 42);
+                val i = env<int>("TEST_INT") ?? 42;
                 println("int: {}", i);
 
-                val b = envOr<bool>("TEST_BOOL", false);
+                val b = env<bool>("TEST_BOOL") ?? false;
                 println("bool: {}", b);
 
-                val s = envOr<string>("TEST_SLICE", "default");
+                val s = env<string>("TEST_SLICE") ?? "default";
                 println("string: {}", s);
 
-                val a = envOr<address>("TEST_ADDRESS", address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
+                val a = env<address>("TEST_ADDRESS") ?? address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 println("address: {}", a);
             }
         "#,
@@ -2750,15 +2775,16 @@ fun onBouncedMessage(_in: InMessageBounced) {}
         .script_file(
             "expect_in_script",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/types"
 
 fun main() {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val init = ContractState {
         code: build("counter"),
         data: Storage { id: 0, counter: 0 }.toCell(),
@@ -2848,15 +2874,15 @@ fun onBouncedMessage(_in: InMessageBounced) {}
         .script_file(
             "predicate_snapshot",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/types"
 
 fun main() {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val init = ContractState {
         code: build("counter"),
         data: Storage { id: 0, counter: 0 }.toCell(),
@@ -2897,14 +2923,14 @@ fun main() {
         },
         opcode: fun(op: uint32): bool {
             println("script.opcode=0x{:x}", op);
-            return op == IncreaseCounter.getDeclaredPackPrefix2();
+            return op == IncreaseCounter.__getDeclaredPackPrefix();
         },
         body: fun(body: cell): bool {
             println("script.bodyHash=0x{:x}", body.hash());
             return body.hash() == expectedBody.hash();
         },
     });
-    expect(found).toBeDefined();
+    expect(found).toBeNotNull();
 
     expect(increaseRes).toNotHaveTx({
         to: fun(addr: address): bool {
@@ -3043,11 +3069,11 @@ fn script_broadcast_get_config_uses_remote_network() {
             "show_config",
             r#"
 import "../../lib/emulation/config"
-import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 
 fun main() {
-    val version = net.getConfig().getGlobalVersion();
+    val version = testing.getConfig().getGlobalVersion();
     println("remote-version={}, remote-capabilities={}", version.version, version.capabilities);
 }
 "#,

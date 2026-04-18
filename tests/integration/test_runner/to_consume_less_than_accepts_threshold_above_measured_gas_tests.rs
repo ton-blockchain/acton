@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const CF_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 const CF_RECEIVER_CONTRACT: &str = r"
@@ -35,7 +35,7 @@ fn to_consume_less_than_accepts_threshold_above_measured_gas() {
         "cf-stdlib-to-consume-less-than-pass",
         r#"
 fun deployReceiver() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val stateInit = ContractState {
         code: build("receiver"),
@@ -90,14 +90,14 @@ fn to_consume_less_than_fails_on_equal_threshold_boundary() {
     fs::write(
         fixture.path().join(test_path),
         r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/counter_messages"
 
 get fun `test cf stdlib to consume less than equal threshold`() {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
 
     val stateInit = ContractState {
         code: build("counter"),

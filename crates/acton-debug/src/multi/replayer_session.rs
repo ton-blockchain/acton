@@ -135,7 +135,9 @@ impl ReplayerDebugSession {
     /// context or reach a genuinely user-visible stop.
     fn is_transparent_step_into_function(path: &str, function_name: &str) -> bool {
         let normalized = path.replace('\\', "/");
-        if !normalized.ends_with("/emulation/network.tolk") {
+        if !normalized.ends_with("/emulation/network.tolk")
+            && !normalized.ends_with("/emulation/testing.tolk")
+        {
             return false;
         }
 
@@ -143,14 +145,13 @@ impl ReplayerDebugSession {
             function_name,
             "send"
                 | "net.send"
-                | "sendSingle"
-                | "net.sendSingle"
-                | "sendIter"
-                | "net.sendIter"
+                | "processSingleTraceStep"
+                | "testing.processSingleTraceStep"
+                | "createTraceIterationCursor"
+                | "testing.createTraceIterationCursor"
                 | "sendExternal"
                 | "net.sendExternal"
-                | "net.isDeployed"
-                | "net.getDeployedCode"
+                | "testing.isDeployed"
         ) || function_name.contains("runGetMethod")
     }
 

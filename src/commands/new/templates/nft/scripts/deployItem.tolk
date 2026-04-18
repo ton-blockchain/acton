@@ -1,4 +1,4 @@
-import "@acton/promts/prompts"
+import "@acton/prompts"
 import "utils/common"
 
 fun main() {

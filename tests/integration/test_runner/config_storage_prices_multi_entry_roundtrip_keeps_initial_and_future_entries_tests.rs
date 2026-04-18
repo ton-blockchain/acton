@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -27,7 +28,7 @@ fn config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries(
         r"
 get fun `test bc stdlib config storage prices multi entry roundtrip`() {
     val extraTs: uint32 = 1000000;
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var prices = createEmptyMap<uint32, StoragePrices>();
     prices.setInitial(StoragePrices {
@@ -46,9 +47,9 @@ get fun `test bc stdlib config storage prices multi entry roundtrip`() {
     });
 
     config.setStoragePrices(prices);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig().getStoragePrices();
+    val updated = testing.getConfig().getStoragePrices();
     expect(updated).toHaveLength(2);
     expect(updated).toContainKey(0);
     expect(updated).toContainKey(extraTs);
@@ -80,7 +81,7 @@ fn config_storage_prices_set_initial_overwrites_index_zero_only() {
         r"
 get fun `test bc stdlib config storage prices set initial overwrites index zero`() {
     val extraTs: uint32 = 2000000;
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var prices = createEmptyMap<uint32, StoragePrices>();
     prices.setInitial(StoragePrices {
@@ -107,9 +108,9 @@ get fun `test bc stdlib config storage prices set initial overwrites index zero`
     });
 
     config.setStoragePrices(prices);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig().getStoragePrices();
+    val updated = testing.getConfig().getStoragePrices();
     expect(updated).toHaveLength(2);
     expect(updated).toContainKey(0);
     expect(updated).toContainKey(extraTs);

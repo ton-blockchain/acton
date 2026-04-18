@@ -2,16 +2,16 @@ import "@local-acton/testing/expect"
 import "@local-acton/tlb/either"
 import "@local-acton/tlb/maybe"
 
-fun branchScore(choice: Either<int, int>): int {
+fun branchScore(choice: TlbEither<int, int>): int {
     return match (choice) {
-        EitherLeft => 1000 + choice.value,
-        EitherRight => 2000 + choice.value,
+        TlbEitherLeft => 1000 + choice.value,
+        TlbEitherRight => 2000 + choice.value,
     };
 }
 
 get fun `test maybe some none and unwrap or`() {
-    val someValue = Maybe<int>.some(42);
-    val noneValue = Maybe<int>.none();
+    val someValue: TlbMaybe<int> = TlbMaybe.just(42);
+    val noneValue: TlbMaybe<int> = TlbMaybe.none();
 
     expect(someValue.unwrap()).toEqual(42);
     expect(someValue.unwrapOr(10)).toEqual(42);
@@ -20,11 +20,11 @@ get fun `test maybe some none and unwrap or`() {
 
 @test.fail_with(7)
 get fun `test maybe unwrap none fails`() {
-    val noneValue = Maybe<int>.none();
+    val noneValue = TlbMaybe<int>.none();
     noneValue.unwrap();
 }
 
 get fun `test either left and right constructors`() {
-    expect(branchScore(Either<int, int>.left(7))).toEqual(1007);
-    expect(branchScore(Either<int, int>.right(8))).toEqual(2008);
+    expect(branchScore(TlbEither<int, int>.left(7))).toEqual(1007);
+    expect(branchScore(TlbEither<int, int>.right(8))).toEqual(2008);
 }

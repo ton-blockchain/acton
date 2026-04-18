@@ -1,7 +1,7 @@
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 import "@contracts/messages"
 import "@contracts/types"
 import "@wrappers/NftCollectionContract"
@@ -15,7 +15,7 @@ struct Royalty {
 
 get fun `test nft: report royalty params`() {
     val (nftCollection, _, royaltyParams) = setupTest();
-    val randomTreasury = net.treasury("random treasury");
+    val randomTreasury = testing.treasury("random treasury");
     val queryId = 42;
     val result = nftCollection.sendRequestRoyaltyParams(
         randomTreasury.address,
@@ -37,7 +37,7 @@ get fun `test nft: report royalty params`() {
 }
 
 fun shouldNotAllowAnyOtherOpcodeNotFromOwner(opcode: int): void {
-    val randomTreasury = net.treasury("random-treasury");
+    val randomTreasury = testing.treasury("random-treasury");
 
     val (nftCollection, _, _) = setupTest();
 
@@ -67,7 +67,7 @@ get fun `test nft: should not allow any other opcode not from owner`() {
 }
 
 fun nftFixture(nftCollection: NftCollectionContract, nftOwnerAddress: address): NftItemContract {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
     val nftDeployResult = nftCollection.sendDeployNft(
         deployer.address,
@@ -93,12 +93,12 @@ fun nftFixture(nftCollection: NftCollectionContract, nftOwnerAddress: address): 
 /// Initializes the test environment, creating a fresh instance of the contract.
 /// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).
 fun setupTest(): (NftCollectionContract, Treasury, RoyaltyParams) {
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
 
     val royaltyParams = RoyaltyParams {
         numerator: 16,
         denominator: 2,
-        royaltyAddress: net.randomAddress(),
+        royaltyAddress: randomAddress(),
     };
 
     // Initialize and deploy the contract with default values
@@ -123,7 +123,7 @@ fun setupTest(): (NftCollectionContract, Treasury, RoyaltyParams) {
 get fun `test nft: should deploy nft`() {
     val (nftCollection, deployer, _) = setupTest();
     val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
-    val nftOwnerAddress = net.randomAddress();
+    val nftOwnerAddress = randomAddress();
     val content: string = "Content";
 
     val nftDeployResult = nftCollection.sendDeployNft(
@@ -241,7 +241,7 @@ get fun `test nft: should not increment item index if not last`() {
 get fun `test nft: should deploy some nfts via batch deploy`() {
     val (nftCollection, deployer, _) = setupTest();
     val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
-    val nftOwnerAddress = net.randomAddress();
+    val nftOwnerAddress = randomAddress();
     val content: string = "Content";
 
     var deployList: map<uint64, BatchDeployDictItem> = [];
@@ -301,7 +301,7 @@ get fun `test nft: should deploy some nfts via batch deploy`() {
 get fun `test nft: should change owner`() {
     val (nftCollection, deployer, _) = setupTest();
     val oldOwnerAddress = nftCollection.getCollectionData().adminAddress;
-    val newOwner = net.treasury("new-owner");
+    val newOwner = testing.treasury("new-owner");
 
     val result = nftCollection.sendChangeCollectionAdmin(
         deployer.address,

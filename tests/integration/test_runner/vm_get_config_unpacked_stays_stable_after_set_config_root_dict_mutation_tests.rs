@@ -4,8 +4,8 @@ use crate::support::project::ProjectBuilder;
 const DK_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -28,10 +28,10 @@ fn vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation() {
         "dk-stdlib-vm-config-unpacked-after-root-dict-mutation",
         r"
 get fun `test dk stdlib vm config unpacked after root dict mutation`() {
-    val unpackedBefore = vm.getConfigUnpacked();
+    val unpackedBefore = (testing.getC7OutsideContract().get(0) as tuple).get(14) as tuple;
     val beforeStorage = StoragePrices.fromSlice(unpackedBefore.get(0) as slice);
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     var storagePrices = config.getStoragePrices();
     var updatedStorage = storagePrices.getInitial();
 
@@ -42,11 +42,11 @@ get fun `test dk stdlib vm config unpacked after root dict mutation`() {
     storagePrices.setInitial(updatedStorage);
     config.setStoragePrices(storagePrices);
 
-    vm.setConfigRootDict(config.toLowLevelDict());
+    __acton_impl_setConfigParam(config.toLowLevelDict(), 9);
 
-    val c7 = vm.getC7();
+    val c7 = testing.getC7OutsideContract();
     val params = c7.get(0) as tuple;
-    val rootConfig = params.get(9) as Config;
+    val rootConfig = params.get(9) as BlockchainConfigMap;
     val rootStorage = rootConfig.getStoragePrices().getInitial();
 
     expect(rootStorage.bitPrice).toEqual(updatedStorage.bitPrice);
@@ -54,7 +54,7 @@ get fun `test dk stdlib vm config unpacked after root dict mutation`() {
     expect(rootStorage.masterchainBitPrice).toEqual(updatedStorage.masterchainBitPrice);
     expect(rootStorage.masterchainCellPrice).toEqual(updatedStorage.masterchainCellPrice);
 
-    val unpackedAfter = vm.getConfigUnpacked();
+    val unpackedAfter = (testing.getC7OutsideContract().get(0) as tuple).get(14) as tuple;
     val afterStorage = StoragePrices.fromSlice(unpackedAfter.get(0) as slice);
 
     expect(unpackedAfter.size()).toEqual(unpackedBefore.size());

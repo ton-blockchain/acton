@@ -41,15 +41,15 @@ fn test_action_fail() {
             "test",
             r#"
             import "../../lib/testing/expect"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/io"
             import "../../lib/emulation/network"
-            import "../../lib/testing/transaction_expect"
+            import "../../lib/emulation/testing"
 
             import "../gen/child.code.tolk"
 
             get fun `test action fail`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
 
                 {
                     val addr = AutoDeployAddress {
@@ -108,13 +108,13 @@ fn test_invalid_action_fail() {
             "test",
             r#"
             import "../../lib/testing/expect"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/io"
             import "../../lib/emulation/network"
-            import "../../lib/testing/transaction_expect"
+            import "../../lib/emulation/testing"
 
             get fun `test action fail`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
 
                  val addr = AutoDeployAddress {
                      stateInit: ContractState {
@@ -163,13 +163,13 @@ fn test_invalid_action_fail_without_backtrace() {
             "test",
             r#"
             import "../../lib/testing/expect"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/io"
             import "../../lib/emulation/network"
-            import "../../lib/testing/transaction_expect"
+            import "../../lib/emulation/testing"
 
             get fun `test action fail`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
 
                  val addr = AutoDeployAddress {
                      stateInit: ContractState {

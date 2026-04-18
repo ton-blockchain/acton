@@ -332,7 +332,7 @@ fn node_range_for_display(leaf: Node<'_>, error_node: Node<'_>) -> Span {
 ///
 /// Logic:
 /// - if `missing_node` has non-zero range: use it
-/// - иначе:
+/// - else:
 ///    * if there is next non-extra leaf (starting from `missing_node)`: position = `start(next_leaf)`
 ///    * otherwise if there is prev leaf: position = `end(prev_leaf)`
 ///    * otherwise: `start_position(missing_node)`

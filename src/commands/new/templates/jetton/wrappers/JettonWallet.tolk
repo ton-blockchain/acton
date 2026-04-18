@@ -4,6 +4,7 @@
 // Do not edit manually — changes will be overwritten
 
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@contracts/messages"
 
 struct JettonWallet {
@@ -11,7 +12,7 @@ struct JettonWallet {
 }
 
 fun JettonWallet.getJettonBalance(self): coins {
-    if (!net.isDeployed(self.address)) {
+    if (!testing.isDeployed(self.address)) {
         return 0;
     }
 

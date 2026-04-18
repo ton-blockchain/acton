@@ -23,7 +23,7 @@
 /// ```
 
 import "@stdlib/reflection"
-import "ffi/ffi"
+import "ffi"
 
 /// Prints up to 6 values to the standard output.
 ///

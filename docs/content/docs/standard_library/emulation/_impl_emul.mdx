@@ -1,0 +1,19 @@
+---
+title: "_impl_emul"
+description: "_impl_emul.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module with common implementations between `testing.xxx` and `scripts.xxx`.
+
+Purpose: we want to expose namespaces `testing` and `scripts` for writing tests / scripts.
+They have common functionality, but:
+- in tests, it's always emulated
+- in scripts, it's either emulated of operates on a real blockchain (with `--net` flag)
+
+For example: `testing.getAccountState` and `scripts.fetchAccountState` have absolutely
+identical implementation, but are intentionally named differently.
+
+This "identical implementation" for such functions are in this module.
+

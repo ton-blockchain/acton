@@ -148,5 +148,5 @@ acton library fetch <LIBRARY_HASH> --disasm -o library.tasm
 Acton provides handy functions for working with libraries:
 
 - [`net.loadLibrary(...)`](/docs/standard_library/emulation/network/#netloadlibrary) loads a library by hash and returns its code as a cell, or `null` if the library is not found.
-- [`vm.registerLibrary(...)`](/docs/standard_library/vm/vm/#vmregisterlibrary) registers a library in the current test blockchain so contracts can use it.
-- [`net.fetchAndRegisterLibrary(...)`](/docs/standard_library/emulation/network/#netfetchandregisterlibrary) fetches a library by hash and registers it in the current test blockchain, returning `true` on success and `false` otherwise.
+- [`testing.registerLibrary(...)`](/docs/standard_library/emulation/testing/#testingregisterlibrary) registers a library in the current test blockchain so contracts can use it.
+- [`testing.loadAndRegisterLibrary(...)`](/docs/standard_library/emulation/testing/#testingloadandregisterlibrary) fetches a library by hash and registers it in the current test blockchain, returning `true` on success and `false` otherwise.

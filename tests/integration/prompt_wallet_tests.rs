@@ -7,7 +7,7 @@ const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unkno
 const SECOND_MNEMONIC: &str = "section garden tomato dinner season dice renew length useful spin trade intact use universe what post spike keen mandate behind concert egg doll rug";
 
 const PROMPT_WALLET_SCRIPT: &str = r#"
-import "../../lib/promts/prompts"
+import "../../lib/prompts"
 import "../../lib/io"
 
 fun main() {
@@ -104,7 +104,7 @@ keys = { mnemonic-file = "other.txt" }
 
 #[test]
 fn prompt_wallet_in_emulate_mode_returns_placeholder() {
-    // Without `verify_network` (i.e. plain `acton script` / emulate mode) `net.wallet(name)`
+    // Without `verify_network` (i.e. plain `acton script` / emulate mode) `scripts.wallet(name)`
     // accepts any name, so `promptWallet` should return a stable placeholder instead of
     // failing — even when no wallets.toml is present.
     ProjectBuilder::new("prompt-wallet-emulate")

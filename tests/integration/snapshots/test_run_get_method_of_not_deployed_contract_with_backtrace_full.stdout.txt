@@ -11,9 +11,8 @@
   ✗ foo [TIME]
     └─ exit_code=678
       ├─ at ../lib/emulation/network[LINE]
-      │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
-      │     net.runGetMethod<int,tuple>        at ../lib/emulation/network[LINE]
-      │     test foo                           at tests/test.test[LINE]
+      │     net.runGetMethod<int>   at ../lib/emulation/network[LINE]
+      │     test foo                at tests/test.test[LINE]
       ├─ custom THROW
       └─ Cannot run method of not deployed contract, make sure you're deployed contract first or passed --fork-net
 

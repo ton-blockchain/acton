@@ -5,7 +5,7 @@ description: "fmt.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
-Module for string formatting.
+Module for string parsing and formatting.
 
 This module provides a universal `format` function for creating formatted strings.
 It accepts up to 5 typed arguments.
@@ -43,6 +43,9 @@ val partial = format("{} {}", "left"); // "left {}"
 
 // Multiple arguments
 val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1_000_000_000);
+
+// Parse an integer from a string
+val num = parseInt("42");
 ```
 
 ## Definitions
@@ -78,5 +81,59 @@ format("{:x}", "abc");   // "abc"
 format("{:ton}", true);  // "true"
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L61" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L64" />
+
+## `parseInt`
+
+```tolk
+fun parseInt(x: string): int
+```
+
+Parse a decimal string into an int value.
+
+Accepts optional leading `-` sign followed by decimal digits.
+Invalid input (non-numeric characters, empty string) fails with an error.
+
+Example:
+```tolk
+val n = parseInt("12345");
+val negative = parseInt("-42");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L97" />
+
+## `parseAddress`
+
+```tolk
+fun parseAddress(addr: string): address
+```
+
+Convert a string representation of address to an internal [address](../../tolk_standard_library/common/#address) value.
+
+Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+(base64/base64url with flags).
+The returned value is normalized as an internal address; rendered formatting may
+differ from input flags, while representing the same account.
+Invalid input fails with an error like `Failed to convert address from <input>`.
+
+Example:
+```tolk
+val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L115" />
+
+## `parseCellFromHex`
+
+```tolk
+fun parseCellFromHex(cellHex: string): cell
+```
+
+Decode a root cell from hex-encoded BOC bytes.
+
+`cellHex` must be a valid BOC serialized as hex.
+Invalid or malformed input (including non-BOC payloads) fails with an error like
+`Failed to decode cell hex <input>`.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L125" />
 

@@ -2,10 +2,10 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 const DEPLOY_EXPECT_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 const RECEIVER_CONTRACT: &str = r"
@@ -35,7 +35,7 @@ fn to_have_successful_deploy_rejects_non_deploy_success_transaction() {
         "cg-stdlib-to-have-successful-deploy-rejects-non-deploy-success-transaction",
         r#"
 get fun `test cg to have successful deploy rejects non deploy success transaction`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val deployState = ContractState {
         code: build("receiver"),
@@ -81,7 +81,7 @@ fn to_have_successful_deploy_failure_format_includes_expected_search_params() {
         "cg-stdlib-to-have-successful-deploy-formatting-expected-search-params",
         r#"
 get fun `test cg to have successful deploy formatting expected search params`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val deployState = ContractState {
         code: build("receiver"),

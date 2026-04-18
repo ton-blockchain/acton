@@ -4,8 +4,8 @@ use tycho_types::cell::CellBuilder;
 
 const IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
 "#;
 
 const DUMMY_CONTRACT: &str = r"
@@ -33,7 +33,7 @@ fn load_library_prefers_world_state_library_before_network() {
 
 get fun `test load library prefers world state library before network`() {{
     val libraryCode = beginCell().storeUint(0xcafe_babe, 32).endCell();
-    vm.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
 
     val loaded = net.loadLibrary("{library_hash}");
     expect(loaded).toBeNotNull();

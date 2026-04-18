@@ -22,19 +22,19 @@ Annotated Code:
 16   |             }                                              |
 17   |                                                            |
 18   |             fun both(a: bool, b: bool): bool {             |
-19 ✓ |                 return a && b;                             | hits:1 branches:true=1 false=0
+19 ✓ |                 return a && b;                             | hits:1
 20   |             }                                              |
 21   |                                                            |
 22   |             fun either(a: bool, b: bool): bool {           |
-23 ✓ |                 return a || b;                             | hits:1 branches:true=1 false=0
+23 ✓ |                 return a || b;                             | hits:1
 24   |             }                                              |
 25   |                                                            |
 26   |             fun ternary(flag: bool): int {                 |
-27 ✓ |                 return flag ? 1 : 2;                       | hits:1 branches:true=1 false=0
+27 ✓ |                 return flag ? 1 : 2;                       | hits:1
 28   |             }                                              |
 29   |                                                            |
 30   |             fun nullableTernary(foo: int?): int {          |
-31 ✓ |                 return foo != null ? foo : 100;            | hits:1 branches:site0 true=0 false=1; site1 true=1 false=0; site2 true=1 false=0
+31 ✓ |                 return foo != null ? foo : 100;            | hits:1 branches:site0 true=0 false=1; site1 true=1 false=0
 32   |             }                                              |
 33   |                                                            |
 

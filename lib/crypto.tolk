@@ -16,8 +16,8 @@
 /// val randomBytes = crypto.getSecureRandomBytes(32);
 /// ```
 
-import "../ffi/ffi"
-import "../testing/assert"
+import "ffi"
+import "testing/assert"
 
 struct crypto
 
@@ -62,7 +62,7 @@ fun crypto.createMnemonic(): Mnemonic {
 /// // kp.publicKey  — 32-byte public key
 /// ```
 fun Mnemonic.toKeyPair(self): KeyPair {
-    val [privateKey, publicKey] = ffi.__mnemonicToKeyPair(self);
+    val [privateKey, publicKey] = ffi.mnemonicToKeyPair(self);
     return KeyPair { privateKey, publicKey };
 }
 
@@ -111,7 +111,7 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
     if (bytesNum >= 128) {
         Assert.fail("getSecureRandomBytes expects bytesNum less than 128");
     }
-    return ffi.__getSecureRandomBytes(bytesNum);
+    return ffi.getSecureRandomBytes(bytesNum);
 }
 
 /// Generates fast (non-cryptographic) deterministic random bytes using a seed.
@@ -168,12 +168,12 @@ fun crypto.generateKeyPair(): KeyPair {
 /// val kp = crypto.seedToKeyPair(mySeed);
 /// ```
 fun crypto.seedToKeyPair(seed: uint256): KeyPair {
-    val [privateKey, publicKey] = ffi.__seedToKeyPair(seed);
+    val [privateKey, publicKey] = ffi.seedToKeyPair(seed);
     return KeyPair { privateKey, publicKey };
 }
 
-fun ffi.__seedToKeyPair(seed: uint256): [int, int] asm "404 EXTCALL";
+fun ffi.seedToKeyPair(seed: uint256): [int, int] asm "404 EXTCALL";
 fun ffi.createMnemonic(): Mnemonic asm "401 EXTCALL"
-fun ffi.__mnemonicToKeyPair(words: Mnemonic): [int, int] asm "402 EXTCALL";
-fun ffi.__getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
+fun ffi.mnemonicToKeyPair(words: Mnemonic): [int, int] asm "402 EXTCALL";
+fun ffi.getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
 fun ffi.rawSign(privateKey: int, data: int): slice asm "403 EXTCALL";

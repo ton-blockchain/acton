@@ -3,10 +3,11 @@ use crate::support::project::ProjectBuilder;
 
 const OUT_ACTIONS_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/types/message"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
+import "../../lib/ffi"
 
 struct (0xA1100001) InlinePayload {
     queryId: uint64
@@ -42,7 +43,7 @@ fn out_actions_list_traversal_preserves_reverse_order_and_kinds() {
         "al-stdlib-out-actions-list-traversal-order",
         r#"
 get fun `test al out actions list traversal order`() {
-    val dest = net.randomAddress("al_out_actions_order");
+    val dest = randomAddress("al_out_actions_order");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -62,7 +63,7 @@ get fun `test al out actions list traversal order`() {
     );
     changeLib(createEmptyCell(), 2);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(4);
 
     expect(outActions.at(0).kind()).toEqual("change-library");
@@ -81,7 +82,7 @@ fn parse_out_actions_from_raw_c5_matches_vm_out_actions() {
         "al-stdlib-parse-out-actions-from-c5",
         r#"
 get fun `test al parse out actions from c5`() {
-    val dest = net.randomAddress("al_out_actions_parse_c5");
+    val dest = randomAddress("al_out_actions_parse_c5");
 
     createMessage({
         bounce: false,
@@ -103,8 +104,8 @@ get fun `test al parse out actions from c5`() {
         },
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
 
-    val viaVm = vm.outActions();
-    val viaRaw = vm.parseOutActions(vm.getC5());
+    val viaVm = testing.outActions();
+    val viaRaw = __acton_impl_parseOutActions(__acton_impl_getC5());
 
     expect(viaVm.size()).toEqual(2);
     expect(viaRaw.size()).toEqual(2);
@@ -130,7 +131,7 @@ fn get_send_message_at_returns_null_for_non_send_entries() {
         "al-stdlib-get-send-message-at-null-non-send",
         r#"
 get fun `test al get send message at null non send`() {
-    val dest = net.randomAddress("al_get_send_message_at");
+    val dest = randomAddress("al_get_send_message_at");
 
     contract.setCodePostponed(beginCell().storeUint(1, 1).endCell());
     createMessage({
@@ -143,7 +144,7 @@ get fun `test al get send message at null non send`() {
         },
     }).send(SEND_MODE_REGULAR);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(2);
 
     val sendAction = outActions.getSendMessageAt(0);
@@ -165,7 +166,7 @@ fn get_send_message_body_at_reads_inline_body_left_branch() {
         "al-stdlib-get-send-message-body-inline-left",
         r#"
 get fun `test al get send message body inline left`() {
-    val dest = net.randomAddress("al_get_body_left");
+    val dest = randomAddress("al_get_body_left");
 
     createMessage({
         bounce: false,
@@ -177,7 +178,7 @@ get fun `test al get send message body inline left`() {
         },
     }).send(SEND_MODE_REGULAR);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     val action = outActions.getSendMessageAt(0);
     expect(action).toBeNotNull();
 
@@ -200,7 +201,7 @@ fn get_send_message_body_at_reads_ref_body_right_branch() {
         "al-stdlib-get-send-message-body-ref-right",
         r#"
 get fun `test al get send message body ref right`() {
-    val dest = net.randomAddress("al_get_body_right");
+    val dest = randomAddress("al_get_body_right");
 
     createMessage({
         bounce: false,
@@ -214,7 +215,7 @@ get fun `test al get send message body ref right`() {
         },
     }).send(SEND_MODE_REGULAR);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     val action = outActions.getSendMessageAt(0);
     expect(action).toBeNotNull();
 
@@ -241,7 +242,7 @@ fn get_send_message_body_at_returns_null_for_non_send_action() {
 get fun `test al get send message body null non send`() {
     contract.setCodePostponed(beginCell().storeUint(0xCC, 8).endCell());
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(1);
     expect(outActions.at(0).kind()).toEqual("set-code");
 
@@ -259,7 +260,7 @@ fn out_message_out_actions_helper_returns_send_action_with_mode_and_body() {
         "al-stdlib-out-message-out-actions-helper",
         r#"
 get fun `test al out message out actions helper`() {
-    val dest = net.randomAddress("al_out_message_helper");
+    val dest = randomAddress("al_out_message_helper");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -296,7 +297,7 @@ get fun `test al get send message helpers null for reserve and change library`()
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
     changeLib(beginCell().storeUint(0xEE, 8).endCell(), 2);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(2);
     expect(outActions.at(0).kind()).toEqual("change-library");
     expect(outActions.at(1).kind()).toEqual("reserve-currency");

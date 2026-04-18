@@ -1,8 +1,8 @@
 // Acton library imports
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 import "@acton/types/message"
 // Jetton contract imports
 import "@contracts/errors"
@@ -18,8 +18,8 @@ fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
 }
 
 fun setupTest(): (JettonMinter, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("notDeployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
     val minter = JettonMinter.fromStorage(MinterStorage {
         totalSupply: 1000000,
@@ -755,7 +755,7 @@ get fun `test minter should only accept burn messages from jetton wallets`() {
         body: BurnNotificationForMinter {
             queryId: 0,
             jettonAmount: burnAmount,
-            burnInitiator: net.randomAddress("wrong-address"), // wrong address
+            burnInitiator: randomAddress("wrong-address"), // wrong address
             sendExcessesTo: deployer.address,
         },
     });
@@ -891,7 +891,7 @@ get fun `test wallet should restore balance on internal transfer bounce`() {
         }.toCell(),
     });
 
-    val transferResult = net.sendSingle(deployer.address, transferMsg);
+    val transferResult = testing.processSingleTraceStep(deployer.address, transferMsg);
     expect(transferResult.outMessages.size()).toEqual(1);
     val outMsgBody = transferResult.outMessages.at<InternalTransferStep>(0).loadBody();
 
@@ -909,7 +909,7 @@ get fun `test wallet should restore balance on internal transfer bounce`() {
             .endCell(),
     }).bounced();
 
-    net.sendSingle(notDeployerJettonWallet.address, bouncedMsg);
+    testing.processSingleTraceStep(notDeployerJettonWallet.address, bouncedMsg);
 
     // Balance should be restored
     expect(deployerJettonWallet.getJettonBalance()).toEqual(balanceBefore);
@@ -948,7 +948,7 @@ get fun `test wallet should restore balance on burn notification bounce`() {
         }.toCell(),
     });
 
-    val burnResult = net.sendSingle(deployer.address, burnMsg);
+    val burnResult = testing.processSingleTraceStep(deployer.address, burnMsg);
     expect(burnResult.outMessages.size()).toEqual(1);
     val outMsgBody = burnResult.outMessages.at<BurnNotificationForMinter>(0).loadBody();
 
@@ -966,7 +966,7 @@ get fun `test wallet should restore balance on burn notification bounce`() {
             .endCell(),
     }).bounced();
 
-    net.sendSingle(minter.address, bouncedMsg);
+    testing.processSingleTraceStep(minter.address, bouncedMsg);
 
     // Balance should be restored
     expect(deployerJettonWallet.getJettonBalance()).toEqual(balanceBefore);
@@ -976,7 +976,7 @@ get fun `test correctly handles not valid address in discovery`() {
     val (minter, deployer, _) = setupTest();
 
     // Create a bad address (workchain -1)
-    val badAddress = net.randomAddress("bad_addr", -1);
+    val badAddress = randomAddress("bad_addr", -1);
 
     // Test discovery with bad address and includeOwnerAddress = false
     val discoveryResultBadNoInclude = minter.sendDiscovery(deployer.address, badAddress, false);
@@ -1064,7 +1064,7 @@ get fun `test transfer to masterchain`() {
 
     val deployerJettonWallet = userWallet(minter, deployer.address);
 
-    val invalidAddress = net.randomAddress("invalid", -1);
+    val invalidAddress = randomAddress("invalid", -1);
 
     val transferMsg = createMessage({
         bounce: false,

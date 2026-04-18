@@ -49,8 +49,8 @@ use tycho_types::models::{
 
 /// Resolve the unix time to use for a get method invocation.
 ///
-/// Prefers the emulated time set via `net.setNow(...)` so `blockchain.now()` inside
-/// getters matches `net.now()` and the time used for transactions. Falls back to the
+/// Prefers the emulated time set via `testing.setNow(...)` so `blockchain.now()` inside
+/// getters matches `testing.getNow()` and the time used for transactions. Falls back to the
 /// real wall clock when the user has never called `setNow` (default `current_now = 0`),
 /// preserving existing behavior for tests that don't mock time.
 fn resolve_get_method_unixtime(world_state: &WorldState) -> anyhow::Result<i64> {
@@ -693,7 +693,7 @@ fn execute_message_iter_batch(
     stop: IterationStop,
 ) -> anyhow::Result<MessageIterBatch> {
     if ctx.is_broadcasting {
-        anyhow::bail!("net.sendIter() is available only in emulation mode")
+        anyhow::bail!("createTraceIterationCursor() is available only in emulation mode")
     }
 
     if ctx.debug.is_enabled() {
@@ -906,7 +906,7 @@ fn start_message_iter_impl(
     msg: Cell,
 ) -> anyhow::Result<()> {
     if ctx.is_broadcasting {
-        anyhow::bail!("net.sendIter() is available only in emulation mode")
+        anyhow::bail!("createTraceIterationCursor() is available only in emulation mode")
     }
 
     if ctx.debug.is_enabled() {
@@ -2173,7 +2173,7 @@ fn get_wallet_key_pair_impl(
         return Ok(());
     };
 
-    // Match lib/crypto/crypto.tolk: privateKey is the 32-byte Ed25519 seed.
+    // Match lib/crypto.tolk: privateKey is the 32-byte Ed25519 seed.
     let private_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.secret_key[..32]);
     let public_key = BigInt::from_bytes_be(Sign::Plus, &wallet.wallet.key_pair.public_key);
 

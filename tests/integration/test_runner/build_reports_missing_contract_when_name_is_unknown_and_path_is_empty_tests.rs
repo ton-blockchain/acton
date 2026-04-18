@@ -13,7 +13,7 @@ fn build_reports_missing_contract_when_name_is_unknown_and_path_is_empty() {
         .test_file(
             "build_missing_contract_empty_path",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
 
             get fun `test ax build missing contract empty path`() {
                 val _ = build("missing", "");
@@ -39,7 +39,7 @@ fn build_reports_missing_contract_when_name_and_path_are_empty() {
         .test_file(
             "build_empty_contract_inputs",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
 
             get fun `test ax build empty contract inputs`() {
                 val _ = build("", "");

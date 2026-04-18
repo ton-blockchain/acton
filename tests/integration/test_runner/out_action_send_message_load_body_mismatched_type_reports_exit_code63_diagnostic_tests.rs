@@ -5,9 +5,9 @@ use std::fs;
 
 const CW_LOAD_BODY_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
 
 struct (0xC0DEAA01) CwLoadBodyActual {
     queryId: uint64
@@ -44,7 +44,7 @@ fn out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnos
         "cw-stdlib-out-action-load-body-mismatch-diagnostic",
         r#"
 get fun `test cw out action load body mismatch diagnostic`() {
-    val dest = net.randomAddress("cw_load_body_mismatch_dest");
+    val dest = randomAddress("cw_load_body_mismatch_dest");
     createMessage({
         bounce: false,
         value: ton("1"),
@@ -55,7 +55,7 @@ get fun `test cw out action load body mismatch diagnostic`() {
         },
     }).send(SEND_MODE_REGULAR);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(1);
     val action = outActions.getSendMessageAt(0);
     expect(action).toBeNotNull();
@@ -75,7 +75,7 @@ fn out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnos
     let source = format!(
         r#"{CW_LOAD_BODY_IMPORTS}
 get fun `test cw out action load body mismatch diagnostic fixture`() {{
-    val dest = net.randomAddress("cw_load_body_mismatch_fixture_dest");
+    val dest = randomAddress("cw_load_body_mismatch_fixture_dest");
     createMessage({{
         bounce: false,
         value: ton("1.5"),
@@ -86,7 +86,7 @@ get fun `test cw out action load body mismatch diagnostic fixture`() {{
         }},
     }}).send(SEND_MODE_PAY_FEES_SEPARATELY);
 
-    val outActions = vm.outActions();
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(1);
     val action = outActions.getSendMessageAt(0);
     expect(action).toBeNotNull();

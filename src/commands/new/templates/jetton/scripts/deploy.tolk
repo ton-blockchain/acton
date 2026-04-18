@@ -1,7 +1,8 @@
+import "@acton/build"
 import "@acton/env"
 import "@acton/io"
-import "@acton/build/build"
 import "@acton/emulation/network"
+import "@acton/emulation/scripts"
 
 import "@wrappers/JettonMinter"
 
@@ -45,7 +46,7 @@ fun main() {
 
     val supply = env<int>("JETTON_SUPPLY") ?? 1000000000;
 
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     val minter = JettonMinter.fromStorage({
         totalSupply: 0,
         adminAddress: deployer.address,

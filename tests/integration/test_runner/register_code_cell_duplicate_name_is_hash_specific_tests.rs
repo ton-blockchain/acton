@@ -4,8 +4,9 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const CR_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 "#;
 
@@ -43,7 +44,7 @@ fn register_code_cell_duplicate_name_is_hash_specific() {
         "cr-stdlib-register-code-cell-duplicate-name-hash-specific",
         r#"
 get fun `test cr register code cell duplicate name hash specific`() {
-    val deployer = net.treasury("cr_duplicate_name_deployer");
+    val deployer = testing.treasury("cr_duplicate_name_deployer");
     val alphaCode = build("alpha");
     val betaCode = build("beta");
 
@@ -94,13 +95,14 @@ fn register_code_cell_duplicate_name_last_registration_wins_for_same_hash() {
     fs::write(
         fixture.path().join(test_path),
         r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../contracts/counter_messages"
 
 get fun `test cr register code cell duplicate name precedence`() {
-    val deployer = net.treasury("cr_precedence_deployer");
+    val deployer = testing.treasury("cr_precedence_deployer");
     val code = build("counter");
 
     net.registerCodeCell(code, "cr_duplicate_name_before");

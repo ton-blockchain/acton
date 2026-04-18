@@ -1,4 +1,4 @@
-import "@local-acton/crypto/crypto"
+import "@local-acton/crypto"
 import "@local-acton/testing/expect"
 
 get fun `test mnemonic new returns 24 words`() {

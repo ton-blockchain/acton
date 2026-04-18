@@ -5,7 +5,7 @@ const CZ_OUT_ACTIONS_IMPORTS: &str = r#"
 import "../../lib/testing/assert"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
 
 fun changeLib(code: cell, mode: int): void asm "SETLIBCODE"
 "#;
@@ -36,19 +36,19 @@ get fun `test cz change library decodes libref ref branch`() {
 
     changeLib(expectedCell, 2);
 
-    val outActions = vm.parseOutActions(vm.getC5());
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(1);
     val action = outActions.at(0);
     expect(action.kind()).toEqual("change-library");
-    expect(action is OutActionChangeLibrary).toBeTrue();
+    expect(action is TlbOutActionChangeLibrary).toBeTrue();
 
-    if (action is OutActionChangeLibrary) {
+    if (action is TlbOutActionChangeLibrary) {
         expect(action.mode).toEqual(2);
-        expect(action.libref is LibRefRef).toBeTrue();
-        if (action.libref is LibRefRef) {
+        expect(action.libref is TlbLibRefRef).toBeTrue();
+        if (action.libref is TlbLibRefRef) {
             expect(action.libref.library).toEqual(expectedCell);
         } else {
-            Assert.fail("expected LibRefRef");
+            Assert.fail("expected TlbLibRefRef");
         }
     }
 }
@@ -66,15 +66,15 @@ get fun `test cz change library mode preserved remove`() {
     val libCell = beginCell().storeUint(0xAA, 8).endCell();
     changeLib(libCell, 0);
 
-    val outActions = vm.parseOutActions(vm.getC5());
+    val outActions = testing.outActions();
     expect(outActions.size()).toEqual(1);
     val action = outActions.at(0);
     expect(action.kind()).toEqual("change-library");
 
-    if (action is OutActionChangeLibrary) {
+    if (action is TlbOutActionChangeLibrary) {
         expect(action.mode).toEqual(0);
     } else {
-        Assert.fail("expected OutActionChangeLibrary");
+        Assert.fail("expected TlbOutActionChangeLibrary");
     }
 }
 "#,

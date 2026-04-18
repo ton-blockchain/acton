@@ -9,7 +9,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const CRYPTO_IMPORTS: &str = r#"
-import "../../lib/crypto/crypto"
+import "../../lib/crypto"
 import "../../lib/testing/expect"
 "#;
 

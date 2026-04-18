@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -26,7 +27,7 @@ fn global_version_roundtrip_persists_after_net_set_config() {
         "bb-stdlib-config-global-version-roundtrip",
         r"
 get fun `test bb stdlib config global version roundtrip`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     val before = config.getGlobalVersion();
 
     val target = GlobalVersion {
@@ -35,9 +36,9 @@ get fun `test bb stdlib config global version roundtrip`() {
     };
 
     config.setGlobalVersion(target);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig().getGlobalVersion();
+    val updated = testing.getConfig().getGlobalVersion();
     expect(updated.version).toEqual(target.version);
     expect(updated.capabilities).toEqual(target.capabilities);
     expect(updated.version).toNotEqual(before.version);
@@ -54,19 +55,19 @@ fn global_version_typed_and_raw_reads_match_after_roundtrip() {
         "bb-stdlib-config-global-version-raw-typed-consistency",
         r"
 get fun `test bb stdlib config global version raw typed consistency`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     val target = GlobalVersion {
         version: 424243,
         capabilities: 1099511640121,
     };
 
     config.setGlobalVersion(target);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val refreshed = net.getConfig();
+    val refreshed = testing.getConfig();
     val typed = refreshed.getGlobalVersion();
     val fromRaw = GlobalVersion.fromCell(refreshed.getParamRaw(GLOBAL_VERSION_INDEX));
-    val secondRead = net.getConfig().getGlobalVersion();
+    val secondRead = testing.getConfig().getGlobalVersion();
 
     expect(typed.version).toEqual(target.version);
     expect(typed.capabilities).toEqual(target.capabilities);

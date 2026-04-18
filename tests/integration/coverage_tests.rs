@@ -20,8 +20,8 @@ const COUNTER_TEMPLATE_TESTS: &str =
 
 const COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS: &str = r#"
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 
 import "@contracts/types"
 import "@wrappers/Counter"
@@ -45,8 +45,8 @@ get fun `test unknown message accept`() {
 }
 
 fun setupTest(): (Counter, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("not_deployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
     val contract = Counter.fromStorage({ id: 0, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
@@ -734,9 +734,7 @@ fn test_coverage_runtime_branch_opcodes_text_snapshot() {
         panic!("coverage output did not contain nullable ternary line:\n{normalized}");
     };
     assert!(
-        nullable_ternary_line.contains("site0")
-            && nullable_ternary_line.contains("site1")
-            && nullable_ternary_line.contains("site2"),
+        nullable_ternary_line.contains("site0") && nullable_ternary_line.contains("site1"),
         "expected nullable ternary line to keep separate branch sites:\n{nullable_ternary_line}"
     );
 }

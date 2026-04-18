@@ -326,10 +326,10 @@ get fun attacked(): int {
 "#;
 
 const TEST_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/big_array"
 import "../../lib/types/message"
 import "../contracts/messages"
@@ -377,7 +377,7 @@ fn send_iter_execute_n_processes_first_hop_and_execute_from_drains_rest() {
         "n-lib-api-send-iter-execute-n",
         r#"
 get fun `test send iter execute n and from`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -413,7 +413,7 @@ get fun `test send iter execute n and from`() {
         },
     });
 
-    val iter = net.sendIter(sender.address, trigger);
+    val iter = testing.createTraceIterationCursor(sender.address, trigger);
     expect(iter.isDone()).toBeFalse();
 
     val first = iter.executeN(1);
@@ -430,7 +430,7 @@ get fun `test send iter execute n and from`() {
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
     expect(iter.isDone()).toBeFalse();
 
-    val rest = iter.executeFrom();
+    val rest = iter.executeAllRemaining();
     expect(rest.size()).toEqual(1);
     expect(rest).toHaveSuccessfulTx<Notify>({
         from: forwarderAddress,
@@ -440,10 +440,10 @@ get fun `test send iter execute n and from`() {
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
     expect(iter.isDone()).toBeTrue();
 
-    val discarded = net.sendIter(sender.address, trigger);
+    val discarded = testing.createTraceIterationCursor(sender.address, trigger);
     discarded.close();
     expect(discarded.isDone()).toBeTrue();
-    expect(discarded.executeFrom()).toBeEmpty();
+    expect(discarded.executeAllRemaining()).toBeEmpty();
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
 }
 "#,
@@ -459,7 +459,7 @@ fn send_iter_execute_till_supports_predicate_search_params() {
 import "../../lib/io"
 
 get fun `test send iter execute till predicate search params`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -485,7 +485,7 @@ get fun `test send iter execute till predicate search params`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: forwarderAddress,
@@ -506,7 +506,7 @@ get fun `test send iter execute till predicate search params`() {
         },
         opcode: fun(op: uint32): bool {
             println("executeTill.opcode=0x{:x}", op);
-            return op == Notify.getDeclaredPackPrefix2();
+            return op == Notify.__getDeclaredPackPrefix();
         },
         success: fun(ok: bool): bool {
             println("executeTill.success={}", ok);
@@ -536,7 +536,7 @@ fn send_iter_execute_till_can_stop_on_first_transaction_only() {
                 "{TEST_IMPORTS}\n{}\n",
                 r#"
 get fun `test send iter execute till first match`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -562,7 +562,7 @@ get fun `test send iter execute till first match`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: forwarderAddress,
@@ -588,10 +588,10 @@ get fun `test send iter execute till first match`() {
     expect(firstOnly.findTransaction<Notify>({
         from: forwarderAddress,
         to: receiverAddress,
-    })).toBeNone();
+    })).toBeNull();
     expect(iter.isDone()).toBeFalse();
 
-    val tail = iter.executeFrom();
+    val tail = iter.executeAllRemaining();
     expect(tail).toHaveLength(1);
     expect(tail).toHaveSuccessfulTx<Notify>({
         from: forwarderAddress,
@@ -600,7 +600,7 @@ get fun `test send iter execute till first match`() {
     expect(tail.findTransaction<Notify>({
         from: forwarderAddress,
         to: receiverAddress,
-    })).toBeDefined();
+    })).toBeNotNull();
 }
 "#
             ),
@@ -619,7 +619,7 @@ fn send_iter_execute_till_stops_at_matching_transaction_and_preserves_tail() {
         "n-lib-api-send-iter-execute-till",
         r#"
 get fun `test send iter execute till`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val routerInit = ContractState {
         code: build("router"),
@@ -666,7 +666,7 @@ get fun `test send iter execute till`() {
         },
     });
 
-    val iter = net.sendIter(sender.address, trigger);
+    val iter = testing.createTraceIterationCursor(sender.address, trigger);
     val untilRelay = iter.executeTill<Relay>({
         from: routerAddress,
         to: relayAddress,
@@ -688,7 +688,7 @@ get fun `test send iter execute till`() {
     expect(net.runGetMethod<int>(sinkAddress, "touches")).toEqual(0);
     expect(iter.isDone()).toBeFalse();
 
-    val tail = iter.executeFrom();
+    val tail = iter.executeAllRemaining();
     expect(tail.size()).toEqual(1);
     expect(tail).toHaveSuccessfulTx<Touch>({
         from: relayAddress,
@@ -711,7 +711,7 @@ fn send_iter_tail_search_repro_matches_transaction_from_earlier_trace_segment() 
                 "{TEST_IMPORTS}\n{}\n",
                 r#"
 get fun `test send iter tail search repro`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val routerInit = ContractState {
         code: build("router"),
@@ -758,14 +758,14 @@ get fun `test send iter tail search repro`() {
         },
     });
 
-    val iter = net.sendIter(sender.address, trigger);
+    val iter = testing.createTraceIterationCursor(sender.address, trigger);
     val untilRelay = iter.executeTill<Relay>({
         from: routerAddress,
         to: relayAddress,
     });
     expect(untilRelay.size()).toEqual(2);
 
-    val tail = iter.executeFrom();
+    val tail = iter.executeAllRemaining();
     expect(tail.size()).toEqual(1);
     expect(tail).toNotHaveTx<Relay>({
         from: routerAddress,
@@ -774,7 +774,7 @@ get fun `test send iter tail search repro`() {
     expect(tail.findTransaction<Relay>({
         from: routerAddress,
         to: relayAddress,
-    })).toBeNone();
+    })).toBeNull();
 }
 "#
             ),
@@ -793,8 +793,8 @@ fn send_iter_allows_interleaving_multiple_cursors_against_shared_world_state() {
         "n-lib-api-send-iter-interleaving",
         r#"
 get fun `test send iter interleaving`() {
-    val sender = net.treasury("sender");
-    val attacker = net.treasury("attacker");
+    val sender = testing.treasury("sender");
+    val attacker = testing.treasury("attacker");
 
     val raceInit = ContractState {
         code: build("race"),
@@ -808,7 +808,7 @@ get fun `test send iter interleaving`() {
         dest: { stateInit: raceInit },
     }))).toHaveSuccessfulDeploy({ to: raceAddress });
 
-    val beginIter = net.sendIter(sender.address, createMessage({
+    val beginIter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: raceAddress,
@@ -816,7 +816,7 @@ get fun `test send iter interleaving`() {
             queryId: 1,
         },
     }));
-    val attackIter = net.sendIter(attacker.address, createMessage({
+    val attackIter = testing.createTraceIterationCursor(attacker.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: raceAddress,
@@ -833,7 +833,7 @@ get fun `test send iter interleaving`() {
     });
     expect(net.runGetMethod<int>(raceAddress, "stage")).toEqual(1);
 
-    val attackAll = attackIter.executeFrom();
+    val attackAll = attackIter.executeAllRemaining();
     expect(attackAll.size()).toEqual(1);
     expect(attackAll).toHaveSuccessfulTx<Attack>({
         from: attacker.address,
@@ -845,7 +845,7 @@ get fun `test send iter interleaving`() {
     });
     expect(net.runGetMethod<int>(raceAddress, "attacked")).toEqual(1);
 
-    val beginTail = beginIter.executeFrom();
+    val beginTail = beginIter.executeAllRemaining();
     expect(beginTail.size()).toEqual(1);
     expect(beginTail).toHaveSuccessfulTx<Finish>({
         from: raceAddress,
@@ -869,7 +869,7 @@ fn send_iter_execute_n_zero_is_noop_and_overshoot_backfills_relationships() {
         "n-lib-api-send-iter-zero-and-overshoot",
         r#"
 get fun `test send iter zero and overshoot`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -895,7 +895,7 @@ get fun `test send iter zero and overshoot`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: forwarderAddress,
@@ -910,7 +910,7 @@ get fun `test send iter zero and overshoot`() {
     expect(zero.findTransaction<TriggerForward>({
         from: sender.address,
         to: forwarderAddress,
-    })).toBeNone();
+    })).toBeNull();
     expect(iter.isDone()).toBeFalse();
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
 
@@ -942,7 +942,7 @@ fn send_iter_collects_external_messages_and_keeps_internal_tail_queued() {
         "n-lib-api-send-iter-externals",
         r#"
 get fun `test send iter collects externals`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val emitterInit = ContractState {
         code: build("external_forwarder"),
@@ -968,7 +968,7 @@ get fun `test send iter collects externals`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: emitterAddress,
@@ -990,7 +990,7 @@ get fun `test send iter collects externals`() {
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
     expect(iter.isDone()).toBeFalse();
 
-    val tail = iter.executeFrom();
+    val tail = iter.executeAllRemaining();
     expect(tail).toHaveLength(1);
     expect(tail).toHaveSuccessfulTx<Notify>({
         from: emitterAddress,
@@ -1015,15 +1015,14 @@ fn send_iter_uses_live_registered_libraries_for_resumed_steps() {
         .test_file(
             "test",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/vm/vm"
 import "../gen/lib.code.tolk"
 
 get fun `test send iter live libraries`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val spawnerInit = ContractState {
         code: build("spawner"),
@@ -1043,7 +1042,7 @@ get fun `test send iter live libraries`() {
         dest: { stateInit: spawnerInit },
     }))).toHaveSuccessfulDeploy({ to: spawnerAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: spawnerAddress,
@@ -1057,9 +1056,9 @@ get fun `test send iter live libraries`() {
         to: spawnerAddress,
     });
 
-    vm.registerLibrary(build("lib"));
+    testing.registerLibrary(build("lib"));
 
-    val tail = iter.executeFrom();
+    val tail = iter.executeAllRemaining();
     expect(tail).toHaveLength(1);
     expect(tail).toHaveSuccessfulDeploy({ to: childAddress });
     expect(iter.isDone()).toBeTrue();
@@ -1083,7 +1082,7 @@ fn send_iter_close_after_partial_execution_discards_tail_and_bogus_cursor_is_emp
         "n-lib-api-send-iter-close-and-bogus",
         r#"
 get fun `test send iter close after partial execution`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -1109,7 +1108,7 @@ get fun `test send iter close after partial execution`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: forwarderAddress,
@@ -1124,23 +1123,23 @@ get fun `test send iter close after partial execution`() {
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
     iter.close();
     expect(iter.isDone()).toBeTrue();
-    val closedTail = iter.executeFrom();
+    val closedTail = iter.executeAllRemaining();
     expect(closedTail).toBeEmpty();
     expect(closedTail.findTransaction<Notify>({
         from: forwarderAddress,
         to: receiverAddress,
-    })).toBeNone();
+    })).toBeNull();
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
 
     val bogus = TxCursor { id: 999999 };
     expect(bogus.isDone()).toBeTrue();
     expect(bogus.executeN(3)).toBeEmpty();
-    val bogusTail = bogus.executeFrom();
+    val bogusTail = bogus.executeAllRemaining();
     expect(bogusTail).toBeEmpty();
     expect(bogusTail.findTransaction<Notify>({
         from: forwarderAddress,
         to: receiverAddress,
-    })).toBeNone();
+    })).toBeNull();
 }
 "#,
         "send_iter_close_after_partial_execution_discards_tail_and_bogus_cursor_is_empty",
@@ -1153,7 +1152,7 @@ fn send_iter_rejects_broadcast_mode_before_cursor_creation() {
         "n-lib-api-send-iter-broadcast-reject",
         r#"
 get fun `test send iter rejects broadcast mode`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val receiverInit = ContractState {
         code: build("receiver"),
         data: createEmptyCell(),
@@ -1162,7 +1161,7 @@ get fun `test send iter rejects broadcast mode`() {
 
     net.enableBroadcast();
 
-    net.sendIter(sender.address, createMessage({
+    testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: receiverAddress,
@@ -1179,14 +1178,14 @@ fn send_iter_invalid_message_reports_parse_error_before_execution() {
         "n-lib-api-send-iter-invalid-message",
         r#"
 get fun `test send iter invalid message`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val invalidAddress = AutoDeployAddress {
         stateInit: beginCell()
             .storeBool(false)
             .endCell(),
     };
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: invalidAddress,
@@ -1205,7 +1204,7 @@ fn send_iter_execute_till_without_match_fails_after_queue_exhaustion() {
         "n-lib-api-send-iter-execute-till-miss",
         r#"
 get fun `test send iter execute till miss`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -1231,7 +1230,7 @@ get fun `test send iter execute till miss`() {
         dest: { stateInit: receiverInit },
     }))).toHaveSuccessfulDeploy({ to: receiverAddress });
 
-    val iter = net.sendIter(sender.address, createMessage({
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
         bounce: false,
         value: ton("0.5"),
         dest: forwarderAddress,

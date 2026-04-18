@@ -10,7 +10,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -34,18 +34,18 @@ fn vm_set_c7_overwrites_slot_three_without_clobbering_neighbors() {
         "cm-stdlib-vm-set-c7-overwrite-slot-three",
         r"
 get fun `test cm stdlib vm set c7 overwrite slot three`() {
-    val c7Before = vm.getC7();
+    val c7Before = testing.getC7OutsideContract();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeBlockLogicalTime = paramsBefore.get(4) as int;
     val beforeLogicalTime = paramsBefore.get(5) as int;
 
-    var updatedC7 = vm.getC7();
+    var updatedC7 = testing.getC7OutsideContract();
     var updatedParams = updatedC7.get(0) as tuple;
     updatedParams.set(1700003000, 3);
     updatedC7.set(updatedParams, 0);
-    vm.setC7(updatedC7);
+    testing.setC7OutsideContract(updatedC7);
 
-    val c7After = vm.getC7();
+    val c7After = testing.getC7OutsideContract();
     val paramsAfter = c7After.get(0) as tuple;
 
     expect(paramsAfter.get(3) as int).toEqual(1700003000);
@@ -66,25 +66,25 @@ fn vm_set_c7_repeated_reads_and_writes_preserve_unmodified_slots() {
         r"
 {VM_IMPORTS}
 get fun `test cm stdlib vm set c7 repeated reads writes`() {{
-    val c7Initial = vm.getC7();
+    val c7Initial = testing.getC7OutsideContract();
     val paramsInitial = c7Initial.get(0) as tuple;
     val initialNow = paramsInitial.get(3) as int;
     val initialBlockLogicalTime = paramsInitial.get(4) as int;
     val initialLogicalTime = paramsInitial.get(5) as int;
 
-    var c7RoundOne = vm.getC7();
+    var c7RoundOne = testing.getC7OutsideContract();
     var paramsRoundOne = c7RoundOne.get(0) as tuple;
     paramsRoundOne.set(initialNow + 1111, 3);
     c7RoundOne.set(paramsRoundOne, 0);
-    vm.setC7(c7RoundOne);
+    testing.setC7OutsideContract(c7RoundOne);
 
-    var c7RoundTwo = vm.getC7();
+    var c7RoundTwo = testing.getC7OutsideContract();
     var paramsRoundTwo = c7RoundTwo.get(0) as tuple;
     paramsRoundTwo.set(initialBlockLogicalTime + 2222, 4);
     c7RoundTwo.set(paramsRoundTwo, 0);
-    vm.setC7(c7RoundTwo);
+    testing.setC7OutsideContract(c7RoundTwo);
 
-    val c7Final = vm.getC7();
+    val c7Final = testing.getC7OutsideContract();
     val paramsFinal = c7Final.get(0) as tuple;
 
     expect(paramsFinal.get(3) as int).toEqual(initialNow + 1111);

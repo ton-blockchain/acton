@@ -6,11 +6,11 @@
 /// Examples:
 /// ```tolk
 /// // Retrieve actions after contract execution
-/// val actions = vm.outActions();
+/// val actions = testing.outActions();
 ///
 /// // Check the first action
 /// val firstAction = actions.at(0);
-/// if (firstAction is OutActionSendMessage) {
+/// if (firstAction is TlbOutActionSendMessage) {
 ///     println("Sending message with mode: {}", firstAction.mode);
 /// }
 ///
@@ -21,30 +21,32 @@
 /// }
 /// ```
 
+import "@stdlib/reflection"
 import "message"
 import "../fmt"
+import "../ffi"
+import "../testing/expect"
 import "../testing/assert"
-import "../vm/vm"
 
 /// Represents a node in the out list.
 /// This is an internal linked-list node, you should not use it directly.
 ///
 /// `prev` is stored in the list node itself and points to the previous list node.
-/// It is not a field of any `OutAction*` payload.
-struct OutList {
+/// It is not a field of any `TlbOutAction*` payload.
+struct TlbOutList {
     /// Link to previous out-list node.
-    prev: Cell<OutList>
+    prev: Cell<TlbOutList>
     /// Serialized out action stored in this node.
-    action: OutAction
+    action: TlbOutAction
 }
 
 /// Represents send message action.
-struct (0x0ec3c86d) OutActionSendMessage {
+struct (0x0ec3c86d) TlbOutActionSendMessage {
     /// Mode of the send message. See `SEND_MODE_*` constants.
     mode: uint8
     /// Message to send.
     ///
-    /// To load the actual message, use [OutActionSendMessage.loadMessage] method.
+    /// To load the actual message, use [TlbOutActionSendMessage.loadMessage] method.
     outMsg: cell
 }
 
@@ -52,20 +54,20 @@ struct (0x0ec3c86d) OutActionSendMessage {
 ///
 /// Note that you should provide the message type as a generic parameter.
 ///
-/// If you want to access the body of the message, use [OutActionSendMessage.loadBody] method.
+/// If you want to access the body of the message, use [TlbOutActionSendMessage.loadBody] method.
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();
 ///     println(body.increaseBy);
 /// }
 /// ```
-fun OutActionSendMessage.loadMessage<Msg>(self): MessageRelaxed<Msg> {
-    return (self.outMsg as Cell<MessageRelaxed<Msg>>).load({ assertEndAfterReading: false });
+fun TlbOutActionSendMessage.loadMessage<Msg>(self): TlbMessageRelaxed<Msg> {
+    return (self.outMsg as Cell<TlbMessageRelaxed<Msg>>).load({ assertEndAfterReading: false });
 }
 
 /// Loads the body of the message.
@@ -74,99 +76,99 @@ fun OutActionSendMessage.loadMessage<Msg>(self): MessageRelaxed<Msg> {
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val body = action.loadBody<IncreaseCounter>();
 ///     println(body.increaseBy);
 /// }
 /// ```
-fun OutActionSendMessage.loadBody<Msg>(self): Msg {
+fun TlbOutActionSendMessage.loadBody<Msg>(self): Msg {
     return self.loadMessage<Msg>().loadBody();
 }
 
 /// Loads the generic message from the out message cell.
-/// Unlike [OutActionSendMessage.loadMessage], this method does not require type of the message to load.
+/// Unlike [TlbOutActionSendMessage.loadMessage], this method does not require type of the message to load.
 /// Instead it loads the message with body as a slice. Use this method if don't know the type of the message.
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode();
 ///     println(opcode);
 /// }
 /// ```
-fun OutActionSendMessage.loadGenericMessage(self): MessageRelaxedGeneric {
-    return (self.outMsg as Cell<MessageRelaxedGeneric>).load({ assertEndAfterReading: false });
+fun TlbOutActionSendMessage.loadGenericMessage(self): TlbMessageRelaxedGeneric {
+    return (self.outMsg as Cell<TlbMessageRelaxedGeneric>).load({ assertEndAfterReading: false });
 }
 
 /// Represents set code action.
-struct (0xad4de08e) OutActionSetCode {
+struct (0xad4de08e) TlbOutActionSetCode {
     /// New code to set.
     newCode: cell
 }
 
 /// Represents reserve currency action.
-struct (0x36e6b809) OutActionReserveCurrency {
+struct (0x36e6b809) TlbOutActionReserveCurrency {
     /// Mode of the reserve currency. See `RESERVE_MODE_*` constants.
     mode: uint8
     /// Currency to reserve.
-    currency: CurrencyCollection
+    currency: TlbCurrencyCollection
 }
 
 /// Represents change library action.
-struct (0x26fa1dd4) OutActionChangeLibrary {
+struct (0x26fa1dd4) TlbOutActionChangeLibrary {
     /// Mode of the change library.
     mode: uint7
     /// Library reference, either hash or cell reference.
-    libref: LibRef
+    libref: TlbLibRef
 }
 
 /// Represents library reference as a hash.
-struct (0b0) LibRefHash {
+struct (0b0) TlbLibRefHash {
     /// Hash of the library.
     libHash: bits256
 }
 
 /// Represents library reference as a cell reference.
-struct (0b1) LibRefRef {
+struct (0b1) TlbLibRefRef {
     /// Cell reference to the library.
     library: cell
 }
 
-/// Type alias for library reference used by [OutActionChangeLibrary.libref].
-/// Value is either a hash-only reference ([LibRefHash]) or an in-cell library ([LibRefRef]).
-type LibRef = LibRefHash | LibRefRef
+/// Type alias for library reference used by [TlbOutActionChangeLibrary.libref].
+/// Value is either a hash-only reference ([TlbLibRefHash]) or an in-cell library ([TlbLibRefRef]).
+type TlbLibRef = TlbLibRefHash | TlbLibRefRef
 
 /// Type alias for tagged union of all supported out action variants.
-type OutAction =
-    | OutActionSendMessage
-    | OutActionSetCode
-    | OutActionReserveCurrency
-    | OutActionChangeLibrary
+type TlbOutAction =
+    | TlbOutActionSendMessage
+    | TlbOutActionSetCode
+    | TlbOutActionReserveCurrency
+    | TlbOutActionChangeLibrary
 
 /// Returns the kind of the out action as a string.
 ///
 /// Exact return values:
-/// - `"send-message"` for [OutActionSendMessage]
-/// - `"set-code"` for [OutActionSetCode]
-/// - `"reserve-currency"` for [OutActionReserveCurrency]
-/// - `"change-library"` for [OutActionChangeLibrary]
-fun OutAction.kind(self): string {
+/// - `"send-message"` for [TlbOutActionSendMessage]
+/// - `"set-code"` for [TlbOutActionSetCode]
+/// - `"reserve-currency"` for [TlbOutActionReserveCurrency]
+/// - `"change-library"` for [TlbOutActionChangeLibrary]
+fun TlbOutAction.kind(self): string {
     match (self) {
-        OutActionSendMessage => {
+        TlbOutActionSendMessage => {
             return "send-message";
         }
-        OutActionSetCode => {
+        TlbOutActionSetCode => {
             return "set-code";
         }
-        OutActionReserveCurrency => {
+        TlbOutActionReserveCurrency => {
             return "reserve-currency";
         }
-        OutActionChangeLibrary => {
+        TlbOutActionChangeLibrary => {
             return "change-library";
         }
     }
@@ -174,22 +176,22 @@ fun OutAction.kind(self): string {
 
 /// Type alias for the out action list array.
 ///
-/// To get the out actions, use [vm.outActions] method.
-type OutActionList = array<Cell<OutAction>>
+/// To get the out actions, use [testing.outActions] method.
+type OutActionList = array<Cell<TlbOutAction>>
 
 /// Returns the out action at the given index.
 ///
 /// NOTE: this list is reversed, so the last action is at index 0.
 ///
-/// Fails with [Assert.fail] if the stored tuple element cannot be decoded as [OutAction].
+/// Fails with [Assert.fail] if the stored tuple element cannot be decoded as [TlbOutAction].
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
 /// println(action.kind());
 /// ```
-fun OutActionList.at(self, i: int): OutAction {
+fun OutActionList.at(self, i: int): TlbOutAction {
     val rawAction = self.get(i);
     try {
         return rawAction.load();
@@ -204,15 +206,15 @@ fun OutActionList.at(self, i: int): OutAction {
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.getSendMessageAt(0);
 /// if (action != null) {
 ///     println(action.mode);
 /// }
 /// ```
-fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
+fun OutActionList.getSendMessageAt(self, i: int): TlbOutActionSendMessage? {
     val action = self.at(i);
-    if (action is OutActionSendMessage) {
+    if (action is TlbOutActionSendMessage) {
         return action;
     }
     return null;
@@ -228,7 +230,7 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val body = outActions.getSendMessageBodyAt<IncreaseCounter>(0);
 /// if (body != null) {
 ///     println(body.increaseBy);
@@ -237,49 +239,32 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 fun OutActionList.getSendMessageBodyAt<Msg>(self, i: int): Msg? {
     val action = self.getSendMessageAt(i);
     if (action != null) {
-        return action!.loadBody<Msg>();
+        return action.loadBody<Msg>();
     }
     return null;
 }
 
 /// Returns the out actions for the message.
 fun OutMessage.outActions(self, mode: int): OutActionList {
-    // val prev_c5 = vm.getC5();
     self.send(mode);
-    val list = vm.outActions();
-    // vm.setC5(prev_c5);
-    return list;
+    return __acton_impl_parseOutActions(__acton_impl_getC5());
 }
 
-/// Returns the out actions from the control register C5 at that moment.
-///
-/// Example:
-/// ```tolk
-/// val outActions = vm.outActions();
-/// println(outActions.size());
-/// ```
-fun vm.outActions(): OutActionList {
-    return vm.parseOutActions(vm.getC5());
-}
+fun __acton_impl_getC5(): cell
+    asm "c5 PUSHCTR"
 
 /// Parses the out actions from the raw cell (like C5 register).
 ///
 /// If [cell] is empty (no bits and no refs), returns an empty tuple.
 /// Fails with [Assert.fail] if list node layout is malformed.
-///
-/// Example:
-/// ```tolk
-/// val outActions = vm.parseOutActions(vm.getC5());
-/// println(outActions.size());
-/// ```
-fun vm.parseOutActions(cell: cell): OutActionList {
+fun __acton_impl_parseOutActions(cell: cell): OutActionList {
     val rootSlice = cell.beginParse();
     if (rootSlice.remainingBitsCount() == 0 && rootSlice.remainingRefsCount() == 0) {
         return [];
     }
 
     var result = OutActionList [];
-    var next: Cell<OutList>? = cell as Cell<OutList>;
+    var next: Cell<TlbOutList>? = cell as Cell<TlbOutList>;
 
     while (next != null) {
         var nodeSlice = (next! as cell).beginParse();
@@ -287,9 +272,9 @@ fun vm.parseOutActions(cell: cell): OutActionList {
             Assert.fail("Malformed out action list node");
         }
 
-        val prev = nodeSlice.loadRef() as Cell<OutList>;
+        val prev = nodeSlice.loadRef() as Cell<TlbOutList>;
         val rawAction = beginCell().storeSlice(nodeSlice).endCell();
-        result.push(rawAction as Cell<OutAction>);
+        result.push(rawAction as Cell<TlbOutAction>);
 
         val prevSlice = prev.beginParse();
         if (prevSlice.remainingBitsCount() == 0 && prevSlice.remainingRefsCount() == 0) {
@@ -300,4 +285,71 @@ fun vm.parseOutActions(cell: cell): OutActionList {
     }
 
     return result;
+}
+
+/// Expect the out action at the given index to be a send message that can be loaded as `TlbMessageRelaxed<Msg>`.
+///
+/// Indexing is reverse-chronological (same as `OutActionList.at`): index `0` is the last produced action.
+///
+/// Example:
+/// ```tolk
+/// val outActions = testing.outActions();
+/// expect(outActions).toBeSendMessageAt<IncreaseCounter>(0);
+/// ```
+///
+/// Note that you should provide the message type as a generic parameter.
+///
+/// This matcher validates action kind and typed message loading only.
+/// It does not call `loadBody()`, so it does not validate message body fields.
+/// For body-level checks, load and validate the body separately.
+///
+/// Failure diagnostics:
+/// - if the action is not a send message, assertion fails with index information;
+/// - if typed load fails with opcode mismatch (exit code `63`), assertion includes expected type/prefix and actual opcode (plus known type name when available);
+/// - for other decode errors, assertion includes the decoder exit code.
+fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
+    val action = self.value.at(index);
+    if (action is TlbOutActionSendMessage) {
+        try {
+            action.loadMessage<Msg>();
+        } catch (e) {
+            if (e == 63) {
+                // prefix mismatch
+                val msg = action.loadGenericMessage();
+                val opcode = msg.loadOpcode(true);
+                if (opcode == null) {
+                    __acton_impl_failToFindOutMsg<Msg>(e, self.location);
+                    return;
+                }
+
+                val opcodeTypeName = ffi.typeNameByOpcode(opcode);
+
+                self.fail(
+                    format(
+                        "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
+                        reflect.typeNameOf<Msg>(),
+                        reflect.serializationPrefixOf<Msg>().0,
+                        opcode,
+                        opcodeTypeName == null ? "" : format(" ({})", opcodeTypeName),
+                    )
+                );
+                return;
+            }
+            __acton_impl_failToFindOutMsg<Msg>(e, self.location);
+        }
+        return;
+    }
+
+    self.fail(format("Out action at index {} is not a send message", index));
+}
+
+fun __acton_impl_failToFindOutMsg<Msg>(exitCode: int, location: string): never {
+    Assert.fail(
+        format(
+            "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
+            reflect.typeNameOf<Msg>(),
+            exitCode,
+        ),
+        location,
+    );
 }

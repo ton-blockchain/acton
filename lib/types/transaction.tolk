@@ -13,9 +13,9 @@
 ///
 /// // Inspect account status change
 /// val description = tx.description.load();
-/// if (description is TransOrd) {
+/// if (description is TlbTransOrd) {
 ///     val compute = description.computePh;
-///     if (compute is TrComputeVm) {
+///     if (compute is TlbTrComputeVm) {
 ///         println("VM exit code: {}", compute.exitCode);
 ///     }
 /// }
@@ -25,26 +25,23 @@ import "message"
 import "../testing/assert"
 import "../tlb/maybe"
 
-struct (0b00) Uninitialized
-
-struct (0b01) Frozen
-
-struct (0b10) Active
-
-struct (0b11) NonExisting
-
-/// Type alias for transaction account status values used by [Transaction.origStatus] and
-/// [Transaction.endStatus].
-type AccountStatus = Uninitialized | Frozen | Active | NonExisting
+/// Type alias for transaction account status values used by [TlbTransaction.origStatus] and
+/// [TlbTransaction.endStatus].
+enum TlbAccountStatus: uint2 {
+    Uninitialized,
+    Frozen,
+    Active,
+    NonExisting,
+}
 
 /// Represents depth and balance information for split accounts.
-struct DepthBalanceInfo {
+struct TlbDepthBalanceInfo {
     splitDepth: uint8 // #<= 30
-    balance: CurrencyCollection
+    balance: TlbCurrencyCollection
 }
 
 /// Represents a transaction in the TON blockchain.
-struct (0b0111) Transaction {
+struct (0b0111) TlbTransaction {
     /// Account address as 256-bit hash.
     accountAddr: bits256
     /// Logical time of the transaction.
@@ -58,22 +55,22 @@ struct (0b0111) Transaction {
     /// Number of outgoing messages.
     outmsgCnt: uint15
     /// Account status before transaction.
-    origStatus: AccountStatus
+    origStatus: TlbAccountStatus
     /// Account status after transaction.
-    endStatus: AccountStatus
+    endStatus: TlbAccountStatus
     /// In and out messages.
-    messages: Cell<TransactionMessages>
+    messages: Cell<TlbTransactionMessages>
     /// Total fees collected.
-    totalFees: CurrencyCollection
+    totalFees: TlbCurrencyCollection
     /// State update information.
-    stateUpdate: Cell<HashUpdate<Account>>
+    stateUpdate: Cell<TlbHashUpdate<TlbAccount>>
     /// Transaction description.
-    description: Cell<TransactionDescr>
+    description: Cell<TlbTransactionDescr>
 }
 
 /// Loads the in message body of the transaction with given type.
 ///
-/// Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+/// Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), because this
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
@@ -81,38 +78,38 @@ struct (0b0111) Transaction {
 ///
 /// Example:
 /// ```tolk
-/// val result = net.send(address, msg);
-/// val tx = result.findTransaction<IncreaseCounter>({ to: address }).unwrap();
+/// val txs = net.send(address, msg);
+/// val tx = txs.findTransaction<IncreaseCounter>({ to: address })!;
 /// val body = tx.loadBody<IncreaseCounter>();
 /// println(body.increaseBy);
 /// ```
-fun Transaction.loadBody<Msg>(self): Msg {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
+fun TlbTransaction.loadBody<Msg>(self): Msg {
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
     val inMsg = inMsgCell.load();
     return inMsg.loadBody();
 }
 
 /// Loads the in message of the transaction with given type.
 ///
-/// Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+/// Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), because this
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
 /// exit code 63.
-fun Transaction.loadInMsg<Msg>(self): MessageRelaxed<Msg> {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
+fun TlbTransaction.loadInMsg<Msg>(self): TlbMessageRelaxed<Msg> {
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
     return inMsgCell.load();
 }
 
 /// Returns consumed gas for ordinary transactions with VM compute phase.
 ///
 /// Fails with [Assert.fail]:
-/// - if `description` is not [TransOrd];
-/// - if `description.computePh` is [TrComputeSkipped].
-fun Transaction.getUsedGas(self): int {
+/// - if `description` is not [TlbTransOrd];
+/// - if `description.computePh` is [TlbTrComputeSkipped].
+fun TlbTransaction.getUsedGas(self): int {
     val description = self.description.load();
-    if (description is TransOrd) {
-        if (description.computePh is TrComputeVm) {
+    if (description is TlbTransOrd) {
+        if (description.computePh is TlbTrComputeVm) {
             return description.computePh.data.load().gasUsed as int;
         } else {
             Assert.fail("Cannot get used gas for transaction with skipped compute phase");
@@ -122,35 +119,35 @@ fun Transaction.getUsedGas(self): int {
     }
 }
 
-/// Returns action-phase fee based on [Transaction.description] variant.
+/// Returns action-phase fee based on [TlbTransaction.description] variant.
 ///
 /// Behavior by variant:
-/// - [TransOrd] and [TransTickTock] with `action = Some`: returns `action.totalActionFees`;
-/// - [TransOrd] and [TransTickTock] with `action = None`: returns `None`;
-/// - all other [TransactionDescr] variants: returns `None`.
-fun Transaction.getActionFee(self): Maybe<coins> {
+/// - [TlbTransOrd] and [TlbTransTickTock] with present `action`: returns `action.totalActionFees.unwrapOr(null)`;
+/// - [TlbTransOrd] and [TlbTransTickTock] with `action = TlbNone`: returns `null`;
+/// - all other [TlbTransactionDescr] variants: returns `null`.
+fun TlbTransaction.getActionFee(self): coins? {
     val descr = self.description.load();
-    if (descr is TransOrd) {
+    if (descr is TlbTransOrd) {
         val action = descr.action;
-        if (action is None) {
-            return None {};
+        if (action is TlbNone) {
+            return null;
         }
         val actionPh = action.value.load();
-        return actionPh.totalActionFees;
+        return actionPh.totalActionFees.unwrapOr(null);
     }
-    if (descr is TransTickTock) {
+    if (descr is TlbTransTickTock) {
         val action = descr.action;
-        if (action is None) {
-            return None {};
+        if (action is TlbNone) {
+            return null;
         }
         val actionPh = action.value.load();
-        return actionPh.totalActionFees;
+        return actionPh.totalActionFees.unwrapOr(null);
     }
-    return None {};
+    return null;
 }
 
 /// Return address of account of this transaction.
-fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN): address {
+fun TlbTransaction.getAccountAddress(self, workchain: int = BASECHAIN): address {
     return address.fromValidBuilder(
         beginCell()
             .storeUint(0b100, 3)
@@ -159,15 +156,15 @@ fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN): address {
     );
 }
 
-struct TransactionMessages {
+struct TlbTransactionMessages {
     /// In message.
-    inMsg: Maybe<Cell<MessageRelaxedGeneric>>
+    inMsg: TlbMaybe<Cell<TlbMessageRelaxedGeneric>>
     /// Out messages.
-    outMsgs: map<uint15, Cell<MessageRelaxedGeneric>>
+    outMsgs: map<uint15, Cell<TlbMessageRelaxedGeneric>>
 }
 
 /// Represents merkle update for proof-of-work.
-struct (0b0100) MerkleUpdate<X> {
+struct (0b0100) TlbMerkleUpdate<X> {
     /// Old hash.
     oldHash: bits256
     /// New hash.
@@ -183,7 +180,7 @@ struct (0b0100) MerkleUpdate<X> {
 }
 
 /// Represents simple hash update.
-struct (0b01110010) HashUpdate<X> {
+struct (0b01110010) TlbHashUpdate<X> {
     /// Old hash.
     oldHash: bits256
     /// New hash.
@@ -191,7 +188,7 @@ struct (0b01110010) HashUpdate<X> {
 }
 
 /// Represents merkle proof.
-struct (0b0011) MerkleProof<X> {
+struct (0b0011) TlbMerkleProof<X> {
     /// Virtual hash.
     virtualHash: bits256
     /// Depth.
@@ -201,142 +198,134 @@ struct (0b0011) MerkleProof<X> {
 }
 
 /// Union type for hash updates.
-type HashUpdateType<X> = MerkleUpdate<X> | HashUpdate<X> | MerkleProof<X>
+type TlbHashUpdateType<X> = TlbMerkleUpdate<X> | TlbHashUpdate<X> | TlbMerkleProof<X>
 
 /// Represents storage phase of transaction processing.
-struct TrStoragePhase {
+struct TlbTrStoragePhase {
     /// Storage fees collected.
     storageFeesCollected: coins
     /// Storage fees due (if any).
-    storageFeesDue: Maybe<coins>
+    storageFeesDue: TlbMaybe<coins>
     /// Account status change.
-    statusChange: AccStatusChange
+    statusChange: TlbAccStatusChange
 }
 
-/// Represents account status changes.
-struct (0b0) AccUnchanged // x -> x
+struct (0b0) TlbAccUnchanged
+struct (0b10) TlbAccFrozen
+struct (0b11) TlbAccDeleted
 
-struct (0b10) AccFrozen // init -> frozen
-
-struct (0b11) AccDeleted // frozen -> deleted
-
-/// Union type for account status changes.
-type AccStatusChange = AccUnchanged | AccFrozen | AccDeleted
+type TlbAccStatusChange = TlbAccUnchanged | TlbAccFrozen | TlbAccDeleted
 
 /// Represents credit phase of transaction processing.
-struct TrCreditPhase {
+struct TlbTrCreditPhase {
     /// Due fees collected (if any).
-    dueFeesCollected: Maybe<coins>
+    dueFeesCollected: TlbMaybe<coins>
     /// Credit amount.
-    credit: CurrencyCollection
+    credit: TlbCurrencyCollection
 }
 
 /// Represents compute phase of transaction processing.
-struct (0b0) TrComputeSkipped {
-    reason: ComputeSkipReason
+struct (0b0) TlbTrComputeSkipped {
+    reason: TlbComputeSkipReason
 }
 
-struct (0b1) TrComputeVm {
+struct (0b1) TlbTrComputeVm {
     success: bool
     msgStateUsed: bool
     accountActivated: bool
     gasFees: coins
-    data: Cell<TrComputeVmRef>
+    data: Cell<TlbTrComputeVmRef>
 }
 
-struct TrComputeVmRef {
-    gasUsed: VarUint7
-    gasLimit: VarUint7
-    gasCredit: Maybe<VarUint3>
+struct TlbTrComputeVmRef {
+    gasUsed: TlbVarUint7
+    gasLimit: TlbVarUint7
+    gasCredit: TlbMaybe<TlbVarUint3>
     mode: int8
     exitCode: int32
-    exitArg: Maybe<int32>
+    exitArg: TlbMaybe<int32>
     vmSteps: uint32
     vmInitStateHash: bits256
     vmFinalStateHash: bits256
 }
 
 /// Union type for compute phases.
-type TrComputePhase = TrComputeSkipped | TrComputeVm
+type TlbTrComputePhase = TlbTrComputeSkipped | TlbTrComputeVm
 
 /// Represents reasons for skipping computation.
-struct (0b00) CSkipNoState
+struct (0b00) TlbCSkipNoState
+struct (0b01) TlbCSkipBadState
+struct (0b10) TlbCSkipNoGas
+struct (0b110) TlbCSkipSuspended
 
-struct (0b01) CSkipBadState
-
-struct (0b10) CSkipNoGas
-
-struct (0b110) CSkipSuspended
-
-/// Union type for compute skip reasons.
-type ComputeSkipReason = CSkipNoState | CSkipBadState | CSkipNoGas | CSkipSuspended
+type TlbComputeSkipReason = TlbCSkipNoState | TlbCSkipBadState | TlbCSkipNoGas | TlbCSkipSuspended
 
 /// Represents action phase of transaction processing.
-struct TrActionPhase {
+struct TlbTrActionPhase {
     success: bool
     valid: bool
     noFunds: bool
-    statusChange: AccStatusChange
-    totalFwdFees: Maybe<coins>
-    totalActionFees: Maybe<coins>
+    statusChange: TlbAccStatusChange
+    totalFwdFees: TlbMaybe<coins>
+    totalActionFees: TlbMaybe<coins>
     resultCode: int32
-    resultArg: Maybe<int32>
+    resultArg: TlbMaybe<int32>
     totActions: uint16
     specActions: uint16
     skippedActions: uint16
     msgsCreated: uint16
     actionListHash: bits256
-    totMsgSize: StorageUsed
+    totMsgSize: TlbStorageUsed
 }
 
 /// Represents bounce phase of transaction processing.
-struct (0b00) TrBounceNegfunds
+struct (0b00) TlbTrBounceNegfunds
 
-struct (0b01) TrBounceNofunds {
-    msgSize: StorageUsed
+struct (0b01) TlbTrBounceNofunds {
+    msgSize: TlbStorageUsed
     reqFwdFees: coins
 }
 
-struct (0b1) TrBounceOk {
-    msgSize: StorageUsed
+struct (0b1) TlbTrBounceOk {
+    msgSize: TlbStorageUsed
     msgFees: coins
     fwdFees: coins
 }
 
 /// Union type for bounce phases.
-type TrBouncePhase = TrBounceNegfunds | TrBounceNofunds | TrBounceOk
+type TlbTrBouncePhase = TlbTrBounceNegfunds | TlbTrBounceNofunds | TlbTrBounceOk
 
 /// Represents ordinary transaction description.
 @overflow1023_policy("suppress")
-struct (0b0000) TransOrd {
+struct (0b0000) TlbTransOrd {
     creditFirst: bool
-    storagePh: Maybe<TrStoragePhase>
-    creditPh: Maybe<TrCreditPhase>
-    computePh: TrComputePhase
-    action: Maybe<Cell<TrActionPhase>>
+    storagePh: TlbMaybe<TlbTrStoragePhase>
+    creditPh: TlbMaybe<TlbTrCreditPhase>
+    computePh: TlbTrComputePhase
+    action: TlbMaybe<Cell<TlbTrActionPhase>>
     aborted: bool
-    bounce: Maybe<TrBouncePhase>
+    bounce: TlbMaybe<TlbTrBouncePhase>
     destroyed: bool
 }
 
 /// Represents storage transaction description.
-struct (0b0001) TransStorage {
-    storagePh: TrStoragePhase
+struct (0b0001) TlbTransStorage {
+    storagePh: TlbTrStoragePhase
 }
 
 /// Represents tick-tock transaction description.
 @overflow1023_policy("suppress")
-struct (0b001) TransTickTock {
+struct (0b001) TlbTransTickTock {
     isTock: bool
-    storagePh: TrStoragePhase
-    computePh: TrComputePhase
-    action: Maybe<Cell<TrActionPhase>>
+    storagePh: TlbTrStoragePhase
+    computePh: TlbTrComputePhase
+    action: TlbMaybe<Cell<TlbTrActionPhase>>
     aborted: bool
     destroyed: bool
 }
 
 /// Represents split-merge information.
-struct SplitMergeInfo {
+struct TlbSplitMergeInfo {
     curShardPfxLen: uint8 // ## 6
     accSplitDepth: uint8  // ## 6
     thisAddr: bits256
@@ -345,55 +334,55 @@ struct SplitMergeInfo {
 
 /// Represents split prepare transaction description.
 @overflow1023_policy("suppress")
-struct (0b0100) TransSplitPrepare {
-    splitInfo: SplitMergeInfo
-    storagePh: Maybe<TrStoragePhase>
-    computePh: TrComputePhase
-    action: Maybe<Cell<TrActionPhase>>
+struct (0b0100) TlbTransSplitPrepare {
+    splitInfo: TlbSplitMergeInfo
+    storagePh: TlbMaybe<TlbTrStoragePhase>
+    computePh: TlbTrComputePhase
+    action: TlbMaybe<Cell<TlbTrActionPhase>>
     aborted: bool
     destroyed: bool
 }
 
 /// Represents split install transaction description.
-struct (0b0101) TransSplitInstall {
-    splitInfo: SplitMergeInfo
-    prepareTransaction: Cell<Transaction>
+struct (0b0101) TlbTransSplitInstall {
+    splitInfo: TlbSplitMergeInfo
+    prepareTransaction: Cell<TlbTransaction>
     installed: bool
 }
 
 /// Represents merge prepare transaction description.
-struct (0b0110) TransMergePrepare {
-    splitInfo: SplitMergeInfo
-    storagePh: TrStoragePhase
+struct (0b0110) TlbTransMergePrepare {
+    splitInfo: TlbSplitMergeInfo
+    storagePh: TlbTrStoragePhase
     aborted: bool
 }
 
 /// Represents merge install transaction description.
 @overflow1023_policy("suppress")
-struct (0b0111) TransMergeInstall {
-    splitInfo: SplitMergeInfo
-    prepareTransaction: Cell<Transaction>
-    storagePh: Maybe<TrStoragePhase>
-    creditPh: Maybe<TrCreditPhase>
-    computePh: TrComputePhase
-    action: Maybe<Cell<TrActionPhase>>
+struct (0b0111) TlbTransMergeInstall {
+    splitInfo: TlbSplitMergeInfo
+    prepareTransaction: Cell<TlbTransaction>
+    storagePh: TlbMaybe<TlbTrStoragePhase>
+    creditPh: TlbMaybe<TlbTrCreditPhase>
+    computePh: TlbTrComputePhase
+    action: TlbMaybe<Cell<TlbTrActionPhase>>
     aborted: bool
     destroyed: bool
 }
 
 /// Union type for all transaction descriptions.
-type TransactionDescr =
-    | TransOrd
-    | TransStorage
-    | TransTickTock
-    | TransSplitPrepare
-    | TransSplitInstall
-    | TransMergePrepare
-    | TransMergeInstall
+type TlbTransactionDescr =
+    | TlbTransOrd
+    | TlbTransStorage
+    | TlbTransTickTock
+    | TlbTransSplitPrepare
+    | TlbTransSplitInstall
+    | TlbTransMergePrepare
+    | TlbTransMergeInstall
 
-type VarUint7 = int
+type TlbVarUint7 = int
 
-fun varUintSize(value: int, maxBytes: int): int {
+fun __acton_impl_varUintSize(value: int, maxBytes: int): int {
     if (value < 0) {
         Assert.fail("VarUInteger value must be non-negative");
     }
@@ -415,107 +404,104 @@ fun varUintSize(value: int, maxBytes: int): int {
     return size;
 }
 
-fun VarUint7.packToBuilder(self, mutate b: builder): void {
-    val size = varUintSize(self, 7);
+fun TlbVarUint7.packToBuilder(self, mutate b: builder): void {
+    val size = __acton_impl_varUintSize(self, 7);
     b.storeUint(size, 3);
     if (size > 0) {
         b.storeUint(self, size * 8);
     }
 }
 
-fun VarUint7.unpackFromSlice(mutate s: slice): VarUint7 {
+fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
     val size = s.loadUint(3);
     return s.loadUint(size * 8);
 }
 
-type VarUint3 = int
+type TlbVarUint3 = int
 
-fun VarUint3.packToBuilder(self, mutate b: builder): void {
-    val size = varUintSize(self, 3);
+fun TlbVarUint3.packToBuilder(self, mutate b: builder): void {
+    val size = __acton_impl_varUintSize(self, 3);
     b.storeUint(size, 2);
     if (size > 0) {
         b.storeUint(self, size * 8);
     }
 }
 
-fun VarUint3.unpackFromSlice(mutate s: slice): VarUint3 {
+fun TlbVarUint3.unpackFromSlice(mutate s: slice): TlbVarUint3 {
     val size = s.loadUint(2);
     return s.loadUint(size * 8);
 }
 
 /// Represents storage used information.
-struct StorageUsed {
-    cells: VarUint7
-    bits: VarUint7
+struct TlbStorageUsed {
+    cells: TlbVarUint7
+    bits: TlbVarUint7
 }
 
 /// Represents storage extra information.
-struct (0b000) StorageExtraNone
+struct (0b000) TlbStorageExtraNone
 
-struct (0b001) StorageExtraDict {
+struct (0b001) TlbStorageExtraDict {
     dictHash: uint256
 }
 
 /// Union type for storage extra information.
-type StorageExtraInfo = StorageExtraNone | StorageExtraDict
+type TlbStorageExtraInfo = TlbStorageExtraNone | TlbStorageExtraDict
 
 /// Represents storage information.
-struct StorageInfo {
+struct TlbStorageInfo {
     /// Storage used.
-    used: StorageUsed
+    used: TlbStorageUsed
     /// Storage extra information.
-    storageExtra: StorageExtraInfo
+    storageExtra: TlbStorageExtraInfo
     /// Last paid time.
     lastPaid: uint32
     /// Due payment (optional).
-    duePayment: Maybe<coins>
+    duePayment: TlbMaybe<coins>
 }
 
 /// Represents account.
-struct (0b0) AccountNone
+struct (0b0) TlbAccountNone
 
-struct (0b1) AccountInfo {
+struct (0b1) TlbAccountInfo {
     /// Account address.
     addr: address
     /// Storage statistics.
-    storageStat: StorageInfo
+    storageStat: TlbStorageInfo
     /// Account storage.
-    storage: AccountStorage
+    storage: TlbAccountStorage
 }
 
 /// Union type for account.
-type Account = AccountNone | AccountInfo
+type TlbAccount = TlbAccountNone | TlbAccountInfo
 
-/// Account state in AccountStorage (block.tlb `AccountState`).
-struct (0b00) AccountStateUninit
+/// Account state in [TlbAccountStorage] (block.tlb `AccountState`).
+struct (0b00) TlbAccountStateUninit
 
-struct (0b1) AccountStateActive {
+struct (0b1) TlbAccountStateActive {
     stateInit: StateInit
 }
 
-struct (0b01) AccountStateFrozen {
+struct (0b01) TlbAccountStateFrozen {
     stateHash: uint256
 }
 
 /// Union type for account storage state.
-type AccountState = AccountStateUninit | AccountStateActive | AccountStateFrozen
+type TlbAccountState = TlbAccountStateUninit | TlbAccountStateActive | TlbAccountStateFrozen
 
 /// Represents account storage.
-struct AccountStorage {
+struct TlbAccountStorage {
     /// Last transaction logical time.
     lastTransLt: uint64
     /// Account balance.
-    balance: CurrencyCollection
+    balance: TlbCurrencyCollection
     /// Account state.
-    state: AccountState
+    state: TlbAccountState
 }
 
 /// Represents a shard account state.
-struct ShardAccount {
-    account: Cell<Account>
+struct TlbShardAccount {
+    account: Cell<TlbAccount>
     lastTransHash: uint256
     lastTransLt: uint64
 }
-
-/// Represents a list of transactions.
-type TransactionList = tuple

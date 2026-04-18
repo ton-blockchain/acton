@@ -1,9 +1,8 @@
 import "@local-acton/emulation/network"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
-import "@local-acton/testing/outlist_expect"
 import "@local-acton/types/message"
 import "@local-acton/types/out_actions"
-import "@local-acton/vm/vm"
 
 struct (0x7e8764ef) IncreaseCounter {
     queryId: uint64
@@ -15,7 +14,7 @@ fun changeLib(code: cell, mode: int): void
 
 /// Tests that we can actually retrieve out actions and parse it correctly
 get fun `test out actions`() {
-    val dest = net.randomAddress("counter");
+    val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
         value: ton("1.9999"),
@@ -36,17 +35,17 @@ get fun `test out actions`() {
     );
     changeLib(createEmptyCell(), 2);
 
-    val out_actions = vm.outActions();
+    val out_actions = testing.outActions();
 
     val first_action = out_actions.at(0);
     expect(first_action.kind()).toEqual("change-library");
-    if (first_action is OutActionChangeLibrary) {
+    if (first_action is TlbOutActionChangeLibrary) {
         expect(first_action.mode).toEqual(2);
     }
 
     val second_action = out_actions.at(1);
     expect(second_action.kind()).toEqual("reserve-currency");
-    if (second_action is OutActionReserveCurrency) {
+    if (second_action is TlbOutActionReserveCurrency) {
         expect(second_action.mode).toEqual(
             RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
         );
@@ -55,12 +54,12 @@ get fun `test out actions`() {
 
     val third_action = out_actions.at(2);
     expect(third_action.kind()).toEqual("send-message");
-    if (third_action is OutActionSendMessage) {
+    if (third_action is TlbOutActionSendMessage) {
         expect(third_action.mode).toEqual(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
         expect(out_actions).toBeSendMessageAt<IncreaseCounter>(2);
 
         val message = third_action.loadMessage<IncreaseCounter>();
-        if (message.info is IntMsgInfoRelaxed) {
+        if (message.info is TlbIntMsgInfoRelaxed) {
             expect(message.info.value.grams).toEqual(ton("1.9999"));
             expect(message.info.dest).toEqual(dest);
         }
@@ -68,13 +67,13 @@ get fun `test out actions`() {
 
     val fourth_action = out_actions.at(3);
     expect(fourth_action.kind()).toEqual("set-code");
-    if (fourth_action is OutActionSetCode) {
+    if (fourth_action is TlbOutActionSetCode) {
         expect(fourth_action.newCode).toEqual(new_code);
     }
 }
 
 get fun `test out message out actions helper`() {
-    val dest = net.randomAddress("counter");
+    val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
         value: ton("0.5"),
@@ -104,12 +103,12 @@ get fun `test out message out actions helper`() {
 }
 
 get fun `test parse empty out actions`() {
-    val actions = vm.parseOutActions(createEmptyCell());
+    val actions = __acton_impl_parseOutActions(createEmptyCell());
     expect(actions).toHaveLength(0);
 }
 
 get fun `test get send message helpers return null for non send action`() {
-    val dest = net.randomAddress("counter");
+    val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -128,7 +127,7 @@ get fun `test get send message helpers return null for non send action`() {
     );
     changeLib(createEmptyCell(), 2);
 
-    val actions = vm.outActions();
+    val actions = testing.outActions();
     expect(actions.getSendMessageAt(0)).toBeNull();
     expect(actions.getSendMessageBodyAt<IncreaseCounter>(0)).toBeNull();
 }

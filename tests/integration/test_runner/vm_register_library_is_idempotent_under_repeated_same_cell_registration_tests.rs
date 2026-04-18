@@ -7,11 +7,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const DV_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/vm/vm"
+import "../../lib/types/out_actions"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -36,19 +36,19 @@ fn vm_register_library_is_idempotent_under_repeated_same_cell_registration() {
         r#"
 get fun `test dv stdlib vm register library repeated idempotent`() {
     val libraryCode = build("simple");
-    val c7Before = vm.getC7();
-    val c5Before = vm.getC5();
+    val c7Before = testing.getC7OutsideContract();
+    val c5Before = __acton_impl_getC5();
 
-    vm.registerLibrary(libraryCode);
-    vm.registerLibrary(libraryCode);
-    vm.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
 
-    val c7After = vm.getC7();
-    val c5After = vm.getC5();
+    val c7After = testing.getC7OutsideContract();
+    val c5After = __acton_impl_getC5();
     expect(c7After).toEqual(c7Before);
     expect(c5After).toEqual(c5Before);
 
-    val deployer = net.treasury("dv_register_library_idempotent_deployer");
+    val deployer = testing.treasury("dv_register_library_idempotent_deployer");
     val init = ContractState {
         code: build("simple"),
         data: createEmptyCell(),

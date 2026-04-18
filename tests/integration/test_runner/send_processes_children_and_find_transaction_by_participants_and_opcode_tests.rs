@@ -155,17 +155,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const NETWORK_TEST_PRELUDE: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/big_array"
 import "../../lib/types/message"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
 
 fun deployForwardHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val forwarderInit = ContractState {
         code: build("forwarder"),
@@ -201,7 +201,7 @@ fun deployForwardHarness() {
 }
 
 fun deployExternalHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val externalInit = ContractState {
         code: build("external"),
@@ -222,7 +222,7 @@ fun deployExternalHarness() {
 }
 
 fun deployEchoHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val echoInit = ContractState {
         code: build("echo"),
@@ -303,12 +303,12 @@ get fun `test ag send processes children and find transaction`() {
         from: sender.address,
         to: forwarderAddress,
         success: true,
-    })).toBeDefined();
+    })).toBeNotNull();
     expect(txs.findTransaction<Notify>({
         from: forwarderAddress,
         to: receiverAddress,
         success: true,
-    })).toBeDefined();
+    })).toBeNotNull();
     expect(receiverCount(receiverAddress)).toEqual(1);
 }
 "#,
@@ -324,7 +324,7 @@ fn send_single_keeps_child_list_empty_and_preserves_out_message() {
 get fun `test ag send single keeps child list empty`() {
     val (sender, forwarderAddress, receiverAddress) = deployForwardHarness();
 
-    val sendSingleRes = net.sendSingle(
+    val sendSingleRes = testing.processSingleTraceStep(
         sender.address,
         createMessage({
             bounce: false,
@@ -359,7 +359,7 @@ get fun `test ag send external runs handler`() {
     val (_, externalAddress) = deployExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }),
+        net.createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }),
     )!;
 
     expect(txs).toHaveLength(1);
@@ -384,10 +384,10 @@ get fun `test ag send external repeatable`() {
     val (_, externalAddress) = deployExternalHarness();
 
     val first = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }),
+        net.createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }),
     )!;
     val second = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }),
+        net.createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }),
     )!;
 
     expect(first).toHaveLength(1);
@@ -437,12 +437,12 @@ get fun `test ag find transaction body hash`() {
     expect(txs.findTransaction<TriggerForward>({
         to: forwarderAddress,
         body: expectedBody,
-    })).toBeDefined();
+    })).toBeNotNull();
     val notFound = txs.findTransaction<TriggerForward>({
         to: forwarderAddress,
         body: wrongBody,
     });
-    expect(notFound is None).toEqual(true);
+    expect(notFound == null).toEqual(true);
 }
 "#,
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/find_transaction_matches_body_hash_and_returns_null_for_mismatch.stdout.txt",
@@ -457,7 +457,7 @@ fn find_transaction_matches_bounced_opcode_after_prefix() {
 get fun `test ag find transaction bounced opcode`() {
     val (sender, echoAddress) = deployEchoHarness();
 
-    val initial = net.sendSingle(
+    val initial = testing.processSingleTraceStep(
         sender.address,
         createMessage({
             bounce: false,
@@ -489,13 +489,13 @@ get fun `test ag find transaction bounced opcode`() {
         from: sender.address,
         to: echoAddress,
         bounced: true,
-    })).toBeDefined();
+    })).toBeNotNull();
     val notBouncedMatch = bouncedRes.findTransaction<EchoNotice>({
         from: sender.address,
         to: echoAddress,
         bounced: false,
     });
-    expect(notBouncedMatch is None).toEqual(true);
+    expect(notBouncedMatch == null).toEqual(true);
 }
 "#,
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/find_transaction_matches_bounced_opcode_after_prefix.stdout.txt",

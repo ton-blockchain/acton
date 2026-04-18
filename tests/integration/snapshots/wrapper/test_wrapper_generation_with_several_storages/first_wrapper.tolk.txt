@@ -4,7 +4,7 @@
 // Do not edit manually — changes will be overwritten
 
 import "@stdlib/gas-payments"
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"

@@ -33,14 +33,15 @@ Here is an example of a script that deploys a simple Counter contract:
 ```tolk title="scripts/deploy.tolk"
 import "@acton/io"
 import "@acton/emulation/network"
-import "@acton/build/build"
+import "@acton/emulation/scripts"
+import "@acton/build"
 
 import "@wrappers/Counter"       // Import your contract wrapper
 import "@contracts/types"        // Import types if needed
 
 fun main() {
     // 1. Load the configured wallet (searches wallets.toml and global wallets)
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
 
     // 2. Prepare the contract
     // We create the contract instance locally with its initial state
@@ -71,9 +72,10 @@ For more complex contracts like Jettons, you can construct dictionaries and othe
 
 ```tolk
 // ... imports ...
+import "@acton/emulation/scripts"
 
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
 
     // Construct Jetton metadata
     val content = buildOnchainMetadata({
@@ -161,6 +163,6 @@ Simply run the script **without** `--net`:
 acton script scripts/deploy.tolk
 ```
 
-In this mode, `net.wallet("deployer")` creates a virtual wallet, and the deployment happens in the local emulator. This allows you to verify that your state initialization and logic are correct before spending any money.
+In this mode, `scripts.wallet("deployer")` creates a virtual wallet, and the deployment happens in the local emulator. This allows you to verify that your state initialization and logic are correct before spending any money.
 The same script can still call wrapper getters after deploy: in emulation they
 read emulator state, and in broadcast mode they read the selected real network.

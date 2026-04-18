@@ -13,7 +13,7 @@ fn build_accepts_contract_name_and_explicit_path() {
         .test_file(
             "build_paths",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/testing/expect"
 
             get fun `test build by name and path`() {
@@ -42,7 +42,7 @@ fn build_reports_missing_contract_when_path_is_omitted() {
         .test_file(
             "build_missing",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
 
             get fun `test build contract not found`() {
                 val _ = build("missing");

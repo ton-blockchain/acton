@@ -5,6 +5,7 @@ use std::fs;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -33,14 +34,14 @@ fn net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder()
         "di-stdlib-net-set-now-overwrite-project-builder",
         r"
 get fun `test di net set now overwrite project builder`() {
-    net.setNow(1700023001);
-    expect(net.now()).toEqual(1700023001);
+    testing.setNow(1700023001);
+    expect(testing.getNow()).toEqual(1700023001);
 
-    net.setNow(1700023333);
-    expect(net.now()).toEqual(1700023333);
+    testing.setNow(1700023333);
+    expect(testing.getNow()).toEqual(1700023333);
 
-    net.setNow(1700023111);
-    expect(net.now()).toEqual(1700023111);
+    testing.setNow(1700023111);
+    expect(testing.getNow()).toEqual(1700023111);
 }
 ",
         "integration/snapshots/test-runner/net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder/net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder.stdout.txt",
@@ -55,14 +56,14 @@ fn net_set_now_handles_boundary_and_followup_overwrite_in_fixture_project() {
         r"
 {NETWORK_IMPORTS}
 get fun `test di net set now boundary overwrite`() {{
-    net.setNow(1);
-    expect(net.now()).toEqual(1);
+    testing.setNow(1);
+    expect(testing.getNow()).toEqual(1);
 
-    net.setNow(4294967295);
-    expect(net.now()).toEqual(4294967295);
+    testing.setNow(4294967295);
+    expect(testing.getNow()).toEqual(4294967295);
 
-    net.setNow(77);
-    expect(net.now()).toEqual(77);
+    testing.setNow(77);
+    expect(testing.getNow()).toEqual(77);
 }}
 "
     );
