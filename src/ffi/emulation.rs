@@ -329,6 +329,7 @@ fn send_message_impl(
 
         let transaction_cells = vec![TupleItem::Tuple(Tuple(vec![
             TupleItem::Cell(tx_cell),
+            TupleItem::Int(BigInt::ZERO),
             TupleItem::Tuple(Tuple::empty()),
             TupleItem::Null,
             TupleItem::Cell(Cell::default()),
@@ -480,6 +481,7 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
 
     Some(TupleItem::Tuple(Tuple(vec![
         TupleItem::Cell(tx_cell),
+        TupleItem::Int(BigInt::from(parsed_tx.lt)),
         TupleItem::Tuple(child_txs),
         parent_lt,
         TupleItem::Cell(actions),
@@ -1038,11 +1040,10 @@ fn root_lt_from_send_results(txs: &[TupleItem]) -> Option<u64> {
     let TupleItem::Tuple(send_result) = first else {
         return None;
     };
-    let Some(TupleItem::Cell(tx_cell)) = send_result.first() else {
-        return None;
-    };
-    let tx = tx_cell.parse::<Transaction>().ok()?;
-    Some(tx.lt)
+    match send_result.get(1) {
+        Some(TupleItem::Int(lt)) => lt.to_u64(),
+        _ => None,
+    }
 }
 
 extension!(save_trace_name in (Context) with (trace_name: String, txs: Vec<TupleItem>) using save_trace_name_impl);
@@ -1427,13 +1428,29 @@ fn transaction_matches_predicates(
         }
     }
 
-    // Exit code and success: only check if compute phase was executed
-    if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
-        check!(predicates.exit_code, int_item(compute.exit_code as i64));
+    if let Some(ref field) = predicates.exit_code {
+        if let ComputePhase::Executed(compute) = &ord_info.compute_phase {
+            if !call_predicate(
+                executor,
+                &field.predicate,
+                int_item(compute.exit_code as i64),
+            )? {
+                return Ok(false);
+            }
+        } else {
+            return Ok(false);
+        }
+    }
 
+    if let Some(ref field) = predicates.success {
         let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
-        let is_success = action_success && compute.success;
-        check!(predicates.success, bool_item(is_success));
+        let is_success = match &ord_info.compute_phase {
+            ComputePhase::Executed(compute) => action_success && compute.success,
+            _ => false,
+        };
+        if !call_predicate(executor, &field.predicate, bool_item(is_success))? {
+            return Ok(false);
+        }
     }
 
     Ok(true)
@@ -1548,11 +1565,14 @@ fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchPara
         }
     }
 
-    if let ComputePhase::Executed(compute) = &info.compute_phase
-        && let Some(expected_exit_code) = params.exit_code
-        && compute.exit_code != expected_exit_code as i32
-    {
-        return false;
+    if let Some(expected_exit_code) = params.exit_code {
+        if let ComputePhase::Executed(compute) = &info.compute_phase {
+            if compute.exit_code != expected_exit_code as i32 {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
     if let Some(expected_success) = params.success {
@@ -1561,9 +1581,11 @@ fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchPara
             .as_ref()
             .is_some_and(|action| action.success);
 
-        if let ComputePhase::Executed(compute) = &info.compute_phase
-            && (action_phase_success && compute.success) != expected_success
-        {
+        let is_success = match &info.compute_phase {
+            ComputePhase::Executed(compute) => action_phase_success && compute.success,
+            _ => false,
+        };
+        if is_success != expected_success {
             return false;
         }
     }
@@ -1617,90 +1639,84 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
     Ok(executor)
 }
 
-fn find_transaction_by_params_impl(
-    _ctx: &mut Context,
-    stack: &mut Tuple,
-    params: Tuple,
-    txs: Vec<TupleItem>,
-) -> anyhow::Result<()> {
-    if txs.is_empty() {
-        stack.push(TupleItem::Null);
-        return Ok(());
+fn find_saved_trace_segment_by_tx_lt_range<'a>(
+    ctx: &'a Context<'_>,
+    first_tx_lt: u64,
+    last_tx_lt: u64,
+) -> Option<&'a [SendMessageResultSuccess]> {
+    ctx.chain.emulations.find_trace_segment_by_tx_lt_range(
+        ctx.env.running_id.as_ref(),
+        first_tx_lt,
+        last_tx_lt,
+    )
+}
+
+fn find_transaction_in_saved_trace(
+    ctx: &Context<'_>,
+    first_tx_lt: u64,
+    last_tx_lt: u64,
+    mut matches: impl FnMut(&Transaction) -> anyhow::Result<bool>,
+) -> anyhow::Result<Option<Cell>> {
+    let Some(trace) = find_saved_trace_segment_by_tx_lt_range(ctx, first_tx_lt, last_tx_lt) else {
+        return Ok(None);
+    };
+
+    for result in trace {
+        if matches(&result.transaction)? {
+            return Ok(Some(to_cell(&result.transaction)));
+        }
     }
 
-    let params = if let Some(value) = parse_scalar_search_params_tuple(&params) {
-        value
-    } else {
+    Ok(None)
+}
+
+extension!(find_transaction_by_params in (Context) with (params: Tuple, last_tx_lt: BigInt, first_tx_lt: BigInt) using find_transaction_by_params_impl);
+fn find_transaction_by_params_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    params: Tuple,
+    last_tx_lt: BigInt,
+    first_tx_lt: BigInt,
+) -> anyhow::Result<()> {
+    let (Some(first_tx_lt), Some(last_tx_lt)) = (first_tx_lt.to_u64(), last_tx_lt.to_u64()) else {
         stack.push(TupleItem::Null);
         return Ok(());
     };
 
-    let parsed_txs = txs
-        .iter()
-        .filter_map(|el| match el {
-            TupleItem::Tuple(tuple) => match tuple.first() {
-                Some(TupleItem::Cell(cell)) => Some(cell),
-                _ => None,
-            },
-            _ => None,
-        })
-        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)));
+    let Some(params) = parse_scalar_search_params_tuple(&params) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
 
-    let mut found = None;
-    for (tx, cell) in parsed_txs {
-        if transaction_matches_scalar_params(&tx, &params) {
-            found = Some((tx, cell));
-            break;
-        }
-    }
-
-    match found {
-        Some((_, cell)) => stack.push(TupleItem::Cell(cell.clone())),
+    match find_transaction_in_saved_trace(ctx, first_tx_lt, last_tx_lt, |tx| {
+        Ok(transaction_matches_scalar_params(tx, &params))
+    })? {
+        Some(cell) => stack.push(TupleItem::Cell(cell)),
         None => stack.push(TupleItem::Null),
     }
     Ok(())
 }
 
-extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>) using find_transaction_by_params_impl);
-extension!(find_transaction_by_predicate_params in (Context) with (params: Tuple, txs: Vec<TupleItem>) using find_transaction_by_predicate_params_impl);
+extension!(find_transaction_by_predicate_params in (Context) with (params: Tuple, last_tx_lt: BigInt, first_tx_lt: BigInt) using find_transaction_by_predicate_params_impl);
 fn find_transaction_by_predicate_params_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
     params: Tuple,
-    txs: Vec<TupleItem>,
+    last_tx_lt: BigInt,
+    first_tx_lt: BigInt,
 ) -> anyhow::Result<()> {
-    if txs.is_empty() {
+    let (Some(first_tx_lt), Some(last_tx_lt)) = (first_tx_lt.to_u64(), last_tx_lt.to_u64()) else {
         stack.push(TupleItem::Null);
         return Ok(());
-    }
+    };
 
     let predicates = parse_search_params_tuple(&params);
     let executor = make_predicate_executor(ctx)?;
 
-    let parsed_txs = txs
-        .iter()
-        .filter_map(|el| match el {
-            TupleItem::Tuple(tuple) => match tuple.first() {
-                Some(TupleItem::Cell(cell)) => Some(cell),
-                _ => None,
-            },
-            _ => None,
-        })
-        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)));
-
-    // Iterate imperatively so predicate-execution errors surface to the caller instead of
-    // being silently coerced into "no match" (which hides real matcher bugs behind
-    // misleading "transaction not found" diagnostics).
-    let mut found = None;
-    for (tx, cell) in parsed_txs {
-        if transaction_matches_predicates(&tx, &predicates, &executor)? {
-            found = Some((tx, cell));
-            break;
-        }
-    }
-
-    match found {
-        Some((_, cell)) => stack.push(TupleItem::Cell(cell.clone())),
+    match find_transaction_in_saved_trace(ctx, first_tx_lt, last_tx_lt, |tx| {
+        transaction_matches_predicates(tx, &predicates, &executor)
+    })? {
+        Some(cell) => stack.push(TupleItem::Cell(cell)),
         None => stack.push(TupleItem::Null),
     }
     Ok(())
@@ -2704,7 +2720,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         6 => build : 2,
         8 => run_get_method : 6,
         9 => send_message : 2,
-        10 => find_transaction_by_params : 2,
+        10 => find_transaction_by_params : 3,
         11 => is_deployed : 1,
         12 => get_deployed_code : 1,
         13 => crc16 : 1,
@@ -2741,7 +2757,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         45 => get_wallet_key_pair : 1,
         46 => get_wallet_id : 1,
         47 => parse_int : 1,
-        48 => find_transaction_by_predicate_params : 2,
+        48 => find_transaction_by_predicate_params : 3,
         501 => call_tolk_function : 3,
     });
 }

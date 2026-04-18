@@ -115,6 +115,75 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
 }
 
 #[test]
+fn compute_skipped_success_and_exit_code_filters_have_consistent_scalar_semantics() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test compute skipped success and exit code semantics`() {{
+                val sender = net.treasury("sender");
+                val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: missingAddress,
+                    body: beginCell().storeUint(0x21, 32).endCell(),
+                }}));
+
+                expect(txs).toHaveTx({{
+                    from: sender.address,
+                    to: missingAddress,
+                    success: false,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: missingAddress,
+                    success: true,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: missingAddress,
+                    exitCode: 0,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: missingAddress,
+                    exitCode: 77,
+                }});
+
+                val failed = txs.findTransaction({{
+                    from: sender.address,
+                    to: missingAddress,
+                    success: false,
+                }});
+                expect(failed).toBeDefined();
+
+                val impossible = txs.findTransaction({{
+                    from: sender.address,
+                    to: missingAddress,
+                    success: true,
+                }});
+                expect(impossible).toBeNone();
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-compute-skipped-success-semantics")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_compute_skipped_success_and_exit_code_semantics.stdout.txt",
+        );
+}
+
+#[test]
 fn to_have_and_not_have_tx_by_body() {
     let test_code = format!(
         r#"
@@ -336,5 +405,77 @@ fn to_have_tx_with_bounced_opcode_prefix() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/api_transaction_matchers/lib_api_to_have_tx_with_bounced_opcode_prefix.stdout.txt",
+        );
+}
+
+#[test]
+fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test bounced opcode requires explicit flag`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = net.treasury("sender");
+
+                net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                }}));
+
+                val payload = beginCell()
+                    .storeUint(0x12345678, 32)
+                    .storeUint(1, 32)
+                    .endCell();
+                val bouncedBody = beginCell()
+                    .storeUint(0xFFFFFFFF, 32)
+                    .storeSlice(payload.beginParse())
+                    .endCell();
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: target,
+                    body: bouncedBody,
+                }}).bounced());
+
+                expect(txs).toHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: 0x12345678,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    opcode: 0x12345678,
+                }});
+
+                val missing = txs.findTransaction({{
+                    from: sender.address,
+                    to: target,
+                    opcode: 0x12345678,
+                }});
+                expect(missing).toBeNone();
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-bounced-opcode-requires-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_opcode_requires_explicit_bounced_flag.stdout.txt",
         );
 }

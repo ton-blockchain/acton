@@ -356,10 +356,10 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                     Some(TupleItem::Tuple(externals)),
                 ) = (
                     tuple.first(),
-                    tuple.get(1),
-                    tuple.get(3),
+                    tuple.get(2),
                     tuple.get(4),
-                    tuple.get(6), // externals
+                    tuple.get(5),
+                    tuple.get(7), // externals
                 )
                 else {
                     return None;
@@ -375,7 +375,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                             _ => None,
                         })
                         .collect(),
-                    parent_lt: match tuple.get(2) {
+                    parent_lt: match tuple.get(3) {
                         Some(TupleItem::Null) => None,
                         Some(TupleItem::Int(int)) => int.to_i64(),
                         _ => None,

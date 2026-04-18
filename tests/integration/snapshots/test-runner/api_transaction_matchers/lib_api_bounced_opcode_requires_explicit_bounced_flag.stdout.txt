@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/search_params.test.tolk (1 test)
+  ✓ bounced opcode requires explicit flag [TIME]
+
+ ✓ 1 passed in 1 file

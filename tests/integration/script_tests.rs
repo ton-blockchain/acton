@@ -2929,6 +2929,106 @@ fun main() {
         );
 }
 
+#[test]
+fn test_script_predicate_transaction_matchers_vm_exit_snapshot() {
+    let project = ProjectBuilder::new("script-predicate-matchers-vm-exit")
+        .file(
+            "contracts/types",
+            r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "predicate_vm_exit",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
+import "../contracts/types"
+
+fun main() {
+    val deployer = net.treasury("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage { id: 0, counter: 0 }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+
+    val increaseRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: counterAddress,
+        body: IncreaseCounter { increaseBy: 42 },
+    }));
+
+    expect(increaseRes).toHaveTx({
+        to: fun(addr: address): bool {
+            println("script.vm-exit.to={}", addr);
+            throw 777;
+        },
+    });
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/predicate_vm_exit.tolk")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
+        );
+}
+
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn script_broadcast_get_config_uses_remote_network() {

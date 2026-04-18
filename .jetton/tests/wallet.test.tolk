@@ -1005,6 +1005,18 @@ get fun `test correctly handles not valid address in discovery`() {
 get fun `test can not send to masterchain`() {
     val (minter, deployer, _) = setup_test();
 
+    val mintResult = minter.sendMint(
+        deployer.address,
+        deployer.address,
+        ton("1"),
+        ton("0.05"),
+        ton("1"),
+    );
+    expect(mintResult).toHaveSuccessfulTx({
+        from: minter.address,
+        to: userWallet(minter, deployer.address).address,
+    });
+
     val deployerJettonWallet = userWallet(minter, deployer.address);
     val sentAmount = ton("0.5");
     val forwardAmount = ton("0.05");

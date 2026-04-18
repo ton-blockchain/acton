@@ -150,6 +150,8 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
 struct SendResult {
     /// Raw cell with encoded transaction.
     tx: Cell<Transaction>
+    /// Logical time of the transaction.
+    lt: int
     /// List of child transactions IDs.
     /// This transactions are directly produced by this transaction.
     childTxs: ChildTxsIds
@@ -181,6 +183,22 @@ type SendResultList = BigArray<SendResult>
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
+}
+
+/// Returns LT of the first transaction in the list.
+fun SendResultList.firstTxLt(self): int? {
+    if (self.size() == 0) {
+        return null;
+    }
+    return self.at(0).lt;
+}
+
+/// Returns LT of the last transaction in the list.
+fun SendResultList.lastTxLt(self): int? {
+    if (self.size() == 0) {
+        return null;
+    }
+    return self.at(self.size() - 1).lt;
 }
 
 /// Opaque cursor for step-by-step transaction execution.
@@ -1606,13 +1624,27 @@ fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
 fun ffi.registerAddress(address: cell, name: string): void asm "15 EXTCALL"
 fun ffi.registerCodeCell(cell: cell, name: string): void asm "16 EXTCALL"
-fun ffi.findTransactionByScalarParams(txs: SendResultList, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.findTransactionByPredicateParams(txs: SendResultList, params: tuple): cell? asm "48 EXTCALL"
+fun ffi.findTransactionByScalarParams(firstTxLt: int, lastTxLt: int, params: tuple): cell? asm "10 EXTCALL"
+fun ffi.findTransactionByPredicateParams(firstTxLt: int, lastTxLt: int, params: tuple): cell? asm "48 EXTCALL"
 fun ffi.findTransactionByParams(txs: SendResultList, params: SearchParams): cell? {
-    if (params.hasPredicates()) {
-        return ffi.findTransactionByPredicateParams(txs, params.toPredicateFFITuple());
+    val firstTxLt = txs.firstTxLt();
+    val lastTxLt = txs.lastTxLt();
+    if (firstTxLt == null || lastTxLt == null) {
+        return null;
     }
-    return ffi.findTransactionByScalarParams(txs, params.toScalarFFI().toTuple());
+
+    if (params.hasPredicates()) {
+        return ffi.findTransactionByPredicateParams(
+            firstTxLt,
+            lastTxLt,
+            params.toPredicateFFITuple(),
+        );
+    }
+    return ffi.findTransactionByScalarParams(
+        firstTxLt as int,
+        lastTxLt as int,
+        params.toScalarFFI().toTuple(),
+    );
 }
 fun ffi.failToFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "103 EXTCALL"
 fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "104 EXTCALL"

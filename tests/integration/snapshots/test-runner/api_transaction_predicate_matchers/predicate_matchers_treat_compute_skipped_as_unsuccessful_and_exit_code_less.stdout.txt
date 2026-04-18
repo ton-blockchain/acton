@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate compute skipped success semantics [TIME]
+    └─ Test output:
+       skipped.success.computePhaseSkipped=true
+       skipped.success.false=false
+       skipped.success.true=false
+       skipped.find.success.true=false
+
+ ✓ 1 passed in 1 file

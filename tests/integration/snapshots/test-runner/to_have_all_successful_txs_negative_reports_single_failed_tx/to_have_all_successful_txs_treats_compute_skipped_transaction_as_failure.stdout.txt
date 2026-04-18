@@ -1,0 +1,23 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling failing
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/tx_expect_all_successful.test.tolk (1 test)
+  ✗ ce all successful compute skipped tx [TIME]
+    └─ Error: expect(actual).toHaveAllSuccessfulTxs(expected)
+        N/A -> sender A
+        └── 0x1 1 TON -> EQC2je..T7AHot B                                               compute phase skipped aborted
+        
+        Unexpected transaction
+        with:
+          success=false
+      └─ at tests/tx_expect_all_successful.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

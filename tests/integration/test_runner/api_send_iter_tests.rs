@@ -422,6 +422,10 @@ get fun `test send iter execute n and from`() {
         from: sender.address,
         to: forwarderAddress,
     });
+    expect(first).toNotHaveTx<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    });
     expect(first.at(0).childTxs.size()).toEqual(0);
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
     expect(iter.isDone()).toBeFalse();
@@ -524,6 +528,92 @@ get fun `test send iter execute till predicate search params`() {
 }
 
 #[test]
+fn send_iter_execute_till_can_stop_on_first_transaction_only() {
+    build_send_iter_project("n-lib-api-send-iter-execute-till-first-match")
+        .test_file(
+            "test",
+            &format!(
+                "{TEST_IMPORTS}\n{}\n",
+                r#"
+get fun `test send iter execute till first match`() {
+    val sender = net.treasury("sender");
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress { stateInit: forwarderInit }.calculateAddress();
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: forwarderInit },
+    }))).toHaveSuccessfulDeploy({ to: forwarderAddress });
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: receiverInit },
+    }))).toHaveSuccessfulDeploy({ to: receiverAddress });
+
+    val iter = net.sendIter(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            queryId: 77,
+            target: receiverAddress,
+        },
+    }));
+
+    val firstOnly = iter.executeTill<TriggerForward>({
+        from: sender.address,
+        to: forwarderAddress,
+    });
+    expect(firstOnly).toHaveLength(1);
+    expect(firstOnly).toHaveSuccessfulTx<TriggerForward>({
+        from: sender.address,
+        to: forwarderAddress,
+    });
+    expect(firstOnly).toNotHaveTx<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    });
+    expect(firstOnly.findTransaction<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    })).toBeNone();
+    expect(iter.isDone()).toBeFalse();
+
+    val tail = iter.executeFrom();
+    expect(tail).toHaveLength(1);
+    expect(tail).toHaveSuccessfulTx<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    });
+    expect(tail.findTransaction<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    })).toBeDefined();
+}
+"#
+            ),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+}
+
+#[test]
 fn send_iter_execute_till_stops_at_matching_transaction_and_preserves_tail() {
     run_send_iter_success(
         "n-lib-api-send-iter-execute-till",
@@ -591,6 +681,10 @@ get fun `test send iter execute till`() {
         from: routerAddress,
         to: relayAddress,
     });
+    expect(untilRelay).toNotHaveTx<Touch>({
+        from: relayAddress,
+        to: sinkAddress,
+    });
     expect(net.runGetMethod<int>(sinkAddress, "touches")).toEqual(0);
     expect(iter.isDone()).toBeFalse();
 
@@ -606,6 +700,91 @@ get fun `test send iter execute till`() {
 "#,
         "send_iter_execute_till_stops_at_matching_transaction_and_preserves_tail",
     );
+}
+
+#[test]
+fn send_iter_tail_search_repro_matches_transaction_from_earlier_trace_segment() {
+    build_send_iter_project("n-lib-api-send-iter-tail-search-repro")
+        .test_file(
+            "test",
+            &format!(
+                "{TEST_IMPORTS}\n{}\n",
+                r#"
+get fun `test send iter tail search repro`() {
+    val sender = net.treasury("sender");
+
+    val routerInit = ContractState {
+        code: build("router"),
+        data: createEmptyCell(),
+    };
+    val routerAddress = AutoDeployAddress { stateInit: routerInit }.calculateAddress();
+
+    val relayInit = ContractState {
+        code: build("relay"),
+        data: createEmptyCell(),
+    };
+    val relayAddress = AutoDeployAddress { stateInit: relayInit }.calculateAddress();
+
+    val sinkInit = ContractState {
+        code: build("sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: sinkInit }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: routerInit },
+    }))).toHaveSuccessfulDeploy({ to: routerAddress });
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: relayInit },
+    }))).toHaveSuccessfulDeploy({ to: relayAddress });
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: sinkInit },
+    }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+    val trigger = createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest: routerAddress,
+        body: TriggerRoute {
+            queryId: 17,
+            relay: relayAddress,
+            sink: sinkAddress,
+        },
+    });
+
+    val iter = net.sendIter(sender.address, trigger);
+    val untilRelay = iter.executeTill<Relay>({
+        from: routerAddress,
+        to: relayAddress,
+    });
+    expect(untilRelay.size()).toEqual(2);
+
+    val tail = iter.executeFrom();
+    expect(tail.size()).toEqual(1);
+    expect(tail).toNotHaveTx<Relay>({
+        from: routerAddress,
+        to: relayAddress,
+    });
+    expect(tail.findTransaction<Relay>({
+        from: routerAddress,
+        to: relayAddress,
+    })).toBeNone();
+}
+"#
+            ),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
 }
 
 #[test]
@@ -660,12 +839,20 @@ get fun `test send iter interleaving`() {
         from: attacker.address,
         to: raceAddress,
     });
+    expect(attackAll).toNotHaveTx<Finish>({
+        from: raceAddress,
+        to: raceAddress,
+    });
     expect(net.runGetMethod<int>(raceAddress, "attacked")).toEqual(1);
 
     val beginTail = beginIter.executeFrom();
     expect(beginTail.size()).toEqual(1);
     expect(beginTail).toHaveSuccessfulTx<Finish>({
         from: raceAddress,
+        to: raceAddress,
+    });
+    expect(beginTail).toNotHaveTx<Attack>({
+        from: attacker.address,
         to: raceAddress,
     });
     expect(beginTail.at(0).parentLt).toEqual(beginFirst.at(0).tx.load().lt);
@@ -720,11 +907,23 @@ get fun `test send iter zero and overshoot`() {
 
     val zero = iter.executeN(0);
     expect(zero).toBeEmpty();
+    expect(zero.findTransaction<TriggerForward>({
+        from: sender.address,
+        to: forwarderAddress,
+    })).toBeNone();
     expect(iter.isDone()).toBeFalse();
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
 
     val all = iter.executeN(10);
     expect(all.size()).toEqual(2);
+    expect(all).toHaveSuccessfulTx<TriggerForward>({
+        from: sender.address,
+        to: forwarderAddress,
+    });
+    expect(all).toHaveSuccessfulTx<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    });
     expect(all.at(0).childTxs.size()).toEqual(1);
     expect(all.at(0).childTxs.get(0)).toEqual(all.at(1).tx.load().lt);
     expect(all.at(1).parentLt).toEqual(all.at(0).tx.load().lt);
@@ -925,13 +1124,23 @@ get fun `test send iter close after partial execution`() {
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
     iter.close();
     expect(iter.isDone()).toBeTrue();
-    expect(iter.executeFrom()).toBeEmpty();
+    val closedTail = iter.executeFrom();
+    expect(closedTail).toBeEmpty();
+    expect(closedTail.findTransaction<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    })).toBeNone();
     expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(0);
 
     val bogus = TxCursor { id: 999999 };
     expect(bogus.isDone()).toBeTrue();
     expect(bogus.executeN(3)).toBeEmpty();
-    expect(bogus.executeFrom()).toBeEmpty();
+    val bogusTail = bogus.executeFrom();
+    expect(bogusTail).toBeEmpty();
+    expect(bogusTail.findTransaction<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+    })).toBeNone();
 }
 "#,
         "send_iter_close_after_partial_execution_discards_tail_and_bogus_cursor_is_empty",

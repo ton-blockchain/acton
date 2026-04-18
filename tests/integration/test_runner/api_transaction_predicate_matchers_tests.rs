@@ -442,6 +442,132 @@ get fun `test predicate compute phase skipped true`() {
 }
 
 #[test]
+fn predicate_matchers_treat_compute_skipped_as_unsuccessful_and_exit_code_less() {
+    run_success_case(
+        "ae-predicate-compute-skipped-success-semantics",
+        r#"
+get fun `test predicate compute skipped success semantics`() {
+    val sender = net.treasury("sender");
+    val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
+
+    val res = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: missingAddress,
+        body: beginCell().storeUint(0x21, 32).endCell(),
+    }));
+
+    expect(res).toHaveTx({
+        success: fun(ok: bool): bool {
+            println("skipped.success.false={}", ok);
+            return !ok;
+        },
+        computePhaseSkipped: fun(flag: bool): bool {
+            println("skipped.success.computePhaseSkipped={}", flag);
+            return flag;
+        },
+    });
+    expect(res).toNotHaveTx({
+        success: fun(ok: bool): bool {
+            println("skipped.success.true={}", ok);
+            return ok;
+        },
+    });
+    expect(res).toNotHaveTx({
+        exitCode: fun(code: int32): bool {
+            println("skipped.exitCode={}", code);
+            return code == 0;
+        },
+    });
+
+    val impossible = res.findTransaction({
+        success: fun(ok: bool): bool {
+            println("skipped.find.success.true={}", ok);
+            return ok;
+        },
+    });
+    expect(impossible).toBeNone();
+}
+"#,
+        "predicate_matchers_treat_compute_skipped_as_unsuccessful_and_exit_code_less",
+    );
+}
+
+#[test]
+fn predicate_matchers_support_mixed_scalar_and_predicate_fields() {
+    run_success_case(
+        "ae-predicate-mixed-scalar-and-predicate-fields",
+        r#"
+get fun `test predicate mixed scalar and predicate fields`() {
+    val (sender, harness, _) = deployHarness();
+    val expectedBody = Ping { queryId: 1 }.toCell();
+    val res = sendPingWithBounce(sender, harness, 1, true);
+
+    expect(res).toHaveTx({
+        from: fun(addr: address): bool {
+            println("mixed.from={}", addr);
+            return addr == sender.address;
+        },
+        to: harness.address,
+        value: ton("0.5"),
+        bounce: true,
+        body: expectedBody,
+    });
+
+    val found = res.findTransaction({
+        to: harness.address,
+        opcode: Ping.getDeclaredPackPrefix2(),
+        success: fun(ok: bool): bool {
+            println("mixed.success={}", ok);
+            return ok;
+        },
+    });
+    expect(found).toBeDefined();
+
+    expect(res).toNotHaveTx({
+        from: fun(addr: address): bool {
+            println("mixed.negated.from={}", addr);
+            return false;
+        },
+        to: harness.address,
+        value: ton("0.5"),
+    });
+}
+"#,
+        "predicate_matchers_support_mixed_scalar_and_predicate_fields",
+    );
+}
+
+#[test]
+fn predicate_bounced_opcode_requires_explicit_bounced_matcher() {
+    run_success_case(
+        "ae-predicate-bounced-opcode-requires-flag",
+        r#"
+get fun `test predicate bounced opcode requires explicit flag`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendBouncedNotice(sender, harness);
+
+    expect(res).toNotHaveTx({
+        opcode: fun(op: uint32): bool {
+            println("bounced.missing-flag.opcode=0x{:x}", op);
+            return op == BounceNotice.getDeclaredPackPrefix2();
+        },
+    });
+
+    val missing = res.findTransaction({
+        opcode: fun(op: uint32): bool {
+            println("bounced.missing-flag.find.opcode=0x{:x}", op);
+            return op == BounceNotice.getDeclaredPackPrefix2();
+        },
+    });
+    expect(missing).toBeNone();
+}
+"#,
+        "predicate_bounced_opcode_requires_explicit_bounced_matcher",
+    );
+}
+
+#[test]
 fn predicate_failure_diagnostics_show_function_markers() {
     run_failure_case(
         "ae-predicate-function-marker-diagnostics",
@@ -493,5 +619,46 @@ get fun `test predicate runtime error`() {
 }
 "#,
         "predicate_runtime_error_surfaces_to_user",
+    );
+}
+
+#[test]
+fn predicate_vm_exit_code_surfaces_to_user() {
+    run_failure_case(
+        "ae-predicate-vm-exit-code",
+        r#"
+get fun `test predicate vm exit code`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 1);
+
+    expect(res).toHaveTx({
+        to: fun(addr: address): bool {
+            println("vm-exit.to={}", addr);
+            throw 777;
+        },
+    });
+}
+"#,
+        "predicate_vm_exit_code_surfaces_to_user",
+    );
+}
+
+#[test]
+fn predicate_unexpected_stack_value_surfaces_to_user() {
+    run_failure_case(
+        "ae-predicate-unexpected-stack-value",
+        r#"
+fun badReturnPredicate(_: address): bool asm "DROP PUSHNULL";
+
+get fun `test predicate unexpected stack value`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 1);
+
+    expect(res).toHaveTx({
+        to: badReturnPredicate,
+    });
+}
+"#,
+        "predicate_unexpected_stack_value_surfaces_to_user",
     );
 }

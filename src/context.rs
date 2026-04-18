@@ -262,8 +262,15 @@ pub struct Emulations {
     pub name: String,
     pub messages: Vec<Vec<SendMessageResultSuccess>>,
     pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
+    pub trace_position_by_tx_lt: FxHashMap<u64, TracePosition>,
     pub trace_names: FxHashMap<u64, String>,
     pub get_methods: Vec<GetMethodResultSuccess>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TracePosition {
+    pub trace_index: usize,
+    pub tx_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -323,7 +330,13 @@ impl EmulationsState {
         let emulations = self.emulations_mut(env_name);
         emulations.messages.push(successful_messages);
         emulations.failed_messages.push(failed_messages);
-        emulations.messages.len() - 1
+        let trace_index = emulations.messages.len() - 1;
+        let tx_lts = emulations.messages[trace_index]
+            .iter()
+            .map(|result| result.transaction.lt)
+            .collect::<Vec<_>>();
+        index_trace_transactions(emulations, trace_index, &tx_lts);
+        trace_index
     }
 
     pub fn append_message_to_trace(
@@ -340,12 +353,23 @@ impl EmulationsState {
         {
             emulations.messages.push(successful_messages);
             emulations.failed_messages.push(failed_messages);
-            return emulations.messages.len() - 1;
+            let trace_index = emulations.messages.len() - 1;
+            let tx_lts = emulations.messages[trace_index]
+                .iter()
+                .map(|result| result.transaction.lt)
+                .collect::<Vec<_>>();
+            index_trace_transactions(emulations, trace_index, &tx_lts);
+            return trace_index;
         }
 
         emulations.messages[trace_index].extend(successful_messages);
         emulations.failed_messages[trace_index].extend(failed_messages);
         recompute_trace_child_transactions(&mut emulations.messages[trace_index]);
+        let tx_lts = emulations.messages[trace_index]
+            .iter()
+            .map(|result| result.transaction.lt)
+            .collect::<Vec<_>>();
+        index_trace_transactions(emulations, trace_index, &tx_lts);
         trace_index
     }
 
@@ -356,6 +380,7 @@ impl EmulationsState {
                 name: env_name.to_owned(),
                 messages: vec![],
                 failed_messages: vec![],
+                trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })
@@ -369,13 +394,31 @@ impl EmulationsState {
         };
 
         let trace_root_lt = emulations
-            .messages
-            .iter()
-            .find(|trace| trace.iter().any(|tx| tx.transaction.lt == lt))
+            .trace_position_by_tx_lt
+            .get(&lt)
+            .and_then(|position| emulations.messages.get(position.trace_index))
             .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
             .unwrap_or(lt);
 
         emulations.trace_names.insert(trace_root_lt, trace_name);
+    }
+
+    #[must_use]
+    pub fn find_trace_segment_by_tx_lt_range(
+        &self,
+        env_name: &str,
+        first_tx_lt: u64,
+        last_tx_lt: u64,
+    ) -> Option<&[SendMessageResultSuccess]> {
+        let emulations = self.results.get(env_name)?;
+        let first = emulations.trace_position_by_tx_lt.get(&first_tx_lt)?;
+        let last = emulations.trace_position_by_tx_lt.get(&last_tx_lt)?;
+        if first.trace_index != last.trace_index || first.tx_index > last.tx_index {
+            return None;
+        }
+
+        let trace = emulations.messages.get(first.trace_index)?;
+        trace.get(first.tx_index..=last.tx_index)
     }
 
     #[must_use]
@@ -419,6 +462,7 @@ impl EmulationsState {
                 name: env_name.to_owned(),
                 messages: vec![],
                 failed_messages: vec![],
+                trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })
@@ -469,6 +513,18 @@ fn recompute_trace_child_transactions(trace: &mut [SendMessageResultSuccess]) {
         result.child_transactions = children_by_parent
             .remove(&result.transaction.lt)
             .unwrap_or_default();
+    }
+}
+
+fn index_trace_transactions(emulations: &mut Emulations, trace_index: usize, tx_lts: &[u64]) {
+    for (tx_index, tx_lt) in tx_lts.iter().copied().enumerate() {
+        emulations.trace_position_by_tx_lt.insert(
+            tx_lt,
+            TracePosition {
+                trace_index,
+                tx_index,
+            },
+        );
     }
 }
 

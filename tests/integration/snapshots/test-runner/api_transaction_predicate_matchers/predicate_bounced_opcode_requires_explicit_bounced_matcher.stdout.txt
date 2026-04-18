@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate bounced opcode requires explicit flag [TIME]
+    └─ Test output:
+       bounced.missing-flag.opcode=0xffffffff
+       bounced.missing-flag.find.opcode=0xffffffff
+
+ ✓ 1 passed in 1 file
