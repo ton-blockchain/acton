@@ -1,15 +1,16 @@
 import "../../contracts/messages"
 import "../../contracts/storage"
 
-import "../../../lib/build/build"
+import "../../../lib/build"
 import "../../../lib/emulation/network"
+import "../../../lib/emulation/testing"
 
 struct JettonWallet {
     address: address
 }
 
 fun JettonWallet.getJettonBalance(self): coins {
-    if (!net.isDeployed(self.address)) {
+    if (!testing.isDeployed(self.address)) {
         return 0;
     }
 
@@ -188,5 +189,5 @@ fun JettonMinter.getContent(self): cell {
 }
 
 fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", owner);
+    return net.runGetMethod(self.address, "get_wallet_address", [owner]);
 }

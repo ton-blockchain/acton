@@ -25,7 +25,7 @@ fn config_storage_prices_get_initial_prefers_zero_key_when_present() {
         "dp-stdlib-config-storage-prices-get-initial-prefers-zero-key",
         r"
 get fun `test dp stdlib config storage prices get initial prefers zero key`() {
-    var prices = createEmptyMap<uint32, StoragePrices>();
+    var prices = map<uint32, StoragePrices> [];
     prices.set(0, StoragePrices {
         initialUnixTime: 0,
         bitPrice: 101,

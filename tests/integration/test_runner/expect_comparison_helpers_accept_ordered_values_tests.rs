@@ -62,9 +62,17 @@ fn expect_maybe_helpers_handle_some_and_none() {
     run_expect_success(
         "ad-stdlib-expect-maybe-helpers",
         r"
+fun Expectation<TlbMaybe<T>>.toBeDefined(self): void {
+    assert (self.value !is TlbNone) throw 123;
+}
+
+fun Expectation<TlbMaybe<T>>.toBeNone(self): void {
+    assert (self.value is TlbNone) throw 123;
+}
+
 get fun `test ad stdlib maybe helpers`() {
-    val noneValue = Maybe<int>.none();
-    val someValue = Maybe<int>.some(21);
+    val noneValue = TlbMaybe<int>.none();
+    val someValue = TlbMaybe<int>.just(21);
 
     expect(noneValue).toBeNone();
     expect(someValue).toBeDefined();

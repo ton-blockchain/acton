@@ -50,12 +50,12 @@ val name = prompt("What is your name?", "type your name", "John");
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L39" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L39" />
 
 ## `select`
 
 ```tolk
-fun select(message: string, variants: tuple, defaultIndex: int = 0): string
+fun select(message: string, variants: array<string>, defaultIndex: int = 0): string
 ```
 
 Prompts the user to select an option from a list of variants.
@@ -71,11 +71,11 @@ Input and fallback behavior:
 
 Example:
 ```tolk
-val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple, 1);
+val name = select("What is your name?", ["John", "Jane", "Jim"], 1);
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L59" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L59" />
 
 ## `confirm`
 
@@ -98,7 +98,7 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L77" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L77" />
 
 ## `promptWallet`
 
@@ -115,12 +115,12 @@ Behavior (broadcast mode, i.e. `--net` is set):
 - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
 
 In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
-`net.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
+`scripts.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
 
 Example:
 ```tolk
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/promts/prompts.tolk#L96" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L96" />
 

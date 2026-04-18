@@ -3,7 +3,6 @@ use crate::support::project::ProjectBuilder;
 
 const OUTLIST_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/testing/outlist_expect"
 "#;
 
 fn run_outlist_failure(project_name: &str, test_body: &str, snapshot_path: &str) {

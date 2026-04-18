@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -25,8 +26,8 @@ fn run_wait_missing_hash_case(
 {NETWORK_IMPORTS}
 
 get fun `{get_method_name}`() {{
-    val sender = net.treasury("de_wait_sender");
-    val receiver = net.treasury("de_wait_receiver");
+    val sender = testing.treasury("de_wait_sender");
+    val receiver = testing.treasury("de_wait_receiver");
     val txs = net.send(
         sender.address,
         createMessage({{

@@ -1,19 +1,56 @@
 import "@stdlib/reflection"
 import "@local-acton/io"
-import "@local-acton/build/build"
+import "@local-acton/build"
+import "@local-acton/fmt"
 import "@local-acton/emulation/network"
-import "@local-acton/ffi/ffi"
-import "@local-acton/ffi/reverse-ffi"
+import "@local-acton/emulation/testing"
+import "@local-acton/ffi"
+import "@local-acton/testing/assert"
 import "@local-acton/testing/expect"
-import "@local-acton/testing/transaction_expect"
 import "contracts/types"
 
 fun x2(x: int): int {
     return x * 2;
 }
 
+fun __executeInSeparateLibemulatorInternal(
+    functionToCall: continuation,
+    args: array<unknown>,
+    on: address,
+): array<unknown>?
+    asm "501 EXTCALL"
+
+fun __executeInSeparateLibemulator<Ret, Args = array<unknown>>(
+    functionToCall: (Args) -> Ret,
+    args: Args? = null,
+): Ret {
+    val res = __executeInSeparateLibemulatorInternal(
+        functionToCall as unknown as continuation,
+        args == null ? [] : args.toTuple(),
+        contract.getAddress(),
+    );
+    if (res == null) {
+        Assert.fail("__executeInRust unexpectedly returned null");
+    } else {
+        try {
+            return Ret.fromTuple(res);
+        } catch (e) {
+            if (e == 7) {
+                Assert.fail(
+                    format(
+                        "Calling for cont returned '{}' that cannot be deserialized to '{}'.",
+                        res,
+                        reflect.typeNameOf<Ret>(),
+                    ),
+                );
+            }
+            throw e;
+        }
+    }
+}
+
 get fun `test executeInSeparateLibemulator`() {
-    val res = ffi.__executeInSeparateLibemulator(x2, 300);
+    val res = __executeInSeparateLibemulator(x2, 300);
     expect(res).toEqual(600);
 }
 
@@ -33,7 +70,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
 
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -74,7 +111,7 @@ get fun `test ffi in lambdas`() {
 
 get fun `test toHaveSuccessfulDeploy`() {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -93,7 +130,7 @@ get fun `test toHaveTx`() {
 get fun `test toNotHaveTx`() {
     val (counter, deployer) = setupTest();
     val res = counter.sendIncrease(deployer.address, 42);
-    val other = net.treasury("other");
+    val other = testing.treasury("other");
     expect(res).toNotHaveTx({ from: other.address, to: counter.address });
 }
 

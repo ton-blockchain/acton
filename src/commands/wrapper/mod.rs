@@ -465,7 +465,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     let mut code = String::new();
 
     code.push_str("import \"@stdlib/gas-payments\"\n");
-    code.push_str(&import_stdlib("build/build"));
+    code.push_str(&import_stdlib("build"));
     code.push_str(&import_stdlib("emulation/network"));
     code.push_str(&import_stdlib("testing/assert"));
     code.push_str(&import_stdlib("testing/expect"));
@@ -732,31 +732,22 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self): {return_type} {{\n"
         ));
-        code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
-        ));
     } else {
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self, {params}): {return_type} {{\n"
         ));
+    }
 
-        if args.is_empty() {
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
-            ));
-        } else if args.len() == 1 {
-            let arg_name = &args[0];
+    if args.is_empty() {
+        code.push_str(&format!(
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
+        ));
+    } else {
+        let args = args.join(", ");
 
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", {arg_name})\n"
-            ));
-        } else {
-            let args = args.join(", ");
-
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}] as tuple)\n"
-            ));
-        }
+        code.push_str(&format!(
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}])\n"
+        ));
     }
 
     code.push_str("}\n");
@@ -787,8 +778,8 @@ fn generate_test(model: &WrapperModel) -> String {
 
     code.push_str("import \"@stdlib/gas-payments\"\n");
     code.push_str(&import_stdlib("emulation/network"));
+    code.push_str(&import_stdlib("emulation/testing"));
     code.push_str(&import_stdlib("testing/expect"));
-    code.push_str(&import_stdlib("testing/transaction_expect"));
 
     for messages_path in &model.message_paths {
         let types_import = get_import_path(proot, root, messages_path, mappings);
@@ -915,11 +906,11 @@ fn generate_setup_test(
     code.push_str("fun setupTest() {\n");
 
     code.push_str("    // Create a treasury account for deployment (typically the owner)\n");
-    code.push_str("    val deployer = net.treasury(\"deployer\");\n");
+    code.push_str("    val deployer = testing.treasury(\"deployer\");\n");
     code.push_str(
         "    // Create another treasury account for testing interactions from other users\n",
     );
-    code.push_str("    val not_deployer = net.treasury(\"not_deployer\");\n");
+    code.push_str("    val not_deployer = testing.treasury(\"not_deployer\");\n");
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 

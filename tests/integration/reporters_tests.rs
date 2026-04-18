@@ -15,8 +15,9 @@ get fun currentCounterFail(): int { throw 10 }
 ";
 
 const GET_METHOD_FAILURE_TEST_PREPARE: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 
 struct Counter {
     address: address
@@ -35,7 +36,7 @@ fun Counter.fromStorage() {
 fun setupTest() {
     val counter = Counter.fromStorage();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),

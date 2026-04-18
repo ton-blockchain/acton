@@ -45,7 +45,7 @@ dedicated namespace.
 fun fuzz.assume(
     condition: bool,
     message: string = "",
-    loc: SourceLocation = reflect.sourceLocation(),
+    loc: string = reflect.sourceLocationAsString(),
 ): void
 ```
 
@@ -62,7 +62,7 @@ fun fuzz.bound<T>(
     value: T,
     minValue: T,
     maxValue: T,
-    loc: SourceLocation = reflect.sourceLocation(),
+    loc: string = reflect.sourceLocationAsString(),
 ): T
 ```
 
@@ -72,12 +72,4 @@ Values already in range stay unchanged, while out-of-range values wrap back
 into the target interval.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L45" />
-
-## `formatFuzzLocation`
-
-```tolk
-fun formatFuzzLocation(loc: SourceLocation): string
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/fuzz.tolk#L87" />
 

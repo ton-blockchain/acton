@@ -21,7 +21,7 @@ pick the lightest tool that can answer your question.
 | I need source locations, but not a live debugger     | `--backtrace full`                                 | Midweight source attribution                   |
 | I need breakpoints and stepping                      | `acton test --debug` or `acton script --debug`     | Live source-level debugging                    |
 | I need to debug a real historical transaction        | `acton retrace <HASH> --contract <NAME> [--debug]` | Highest-fidelity replay                        |
-| I need to stop a transaction chain between hops      | `net.sendIter()` and `TxCursor`                    | Transaction-chain control, not source stepping |
+| I need to stop a transaction chain between hops      | `testing.createTraceIterationCursor()` and `TxCursor` | Transaction-chain control, not source stepping |
 | I need real deployed state but local iteration speed | `--fork-net`                                       | Fetch remote accounts, execute locally         |
 | I need to freeze an expensive local setup            | world-state snapshots                              | Reuse prepared emulator state                  |
 | I need the richest offline test artifact             | `acton test --save-test-trace`                     | Reusable trace bundle for later inspection     |
@@ -322,13 +322,13 @@ This is the richest offline inspection path. Use it when:
 - you want to share a failure with teammates
 
 If you produce multiple traces in one test, name them with
-`tracing.save(...)` so exported artifacts stay readable.
+`txs.giveName(...)` so exported artifacts stay readable.
 
 ## 4. Step-by-step Transaction Control with `TxCursor`
 
 Acton also supports step-by-step transaction-chain control through
-[`net.sendIter()`](/docs/standard_library/emulation/network/#netsenditer) and
-[`TxCursor`](/docs/standard_library/emulation/network/#txcursor). This is
+[`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor) and
+[`TxCursor`](/docs/standard_library/emulation/testing/#txcursor). This is
 separate from the DAP debugger: it lets you decide when later hops in a
 transaction chain execute.
 
@@ -343,7 +343,7 @@ This mechanism is available in local emulation workflows and is useful in tests
 or locally emulated scripts.
 
 <Callout type="warn">
-`net.sendIter()` is not source-level debugging. It is transaction-chain
+`testing.createTraceIterationCursor()` is not source-level debugging. It is transaction-chain
 execution in local emulation. It is not available in broadcast mode. Under
 `--debug`, it still does not add source-level breakpoints or stepping.
 </Callout>

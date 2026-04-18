@@ -1,6 +1,6 @@
 ---
 title: "World State Snapshots"
-description: "Save and restore test runner world state as JSON fixtures with net.saveSnapshot() and net.loadSnapshot()"
+description: "Save and restore test runner world state as JSON fixtures with testing.saveSnapshot() and testing.loadSnapshot()"
 ---
 
 World state snapshots let you capture the current emulation state during a test and restore it later from a JSON file.
@@ -18,15 +18,16 @@ Save the current emulation state:
 
 ```tolk
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 get fun `test save snapshot`() {
-    val target = net.randomAddress("snapshot-target");
+    val target = randomAddress("snapshot-target");
 
-    net.topUp(target, ton("3"));
-    net.setNow(1_700_023_001);
+    testing.topUp(target, ton("3"));
+    testing.setNow(1_700_023_001);
 
-    expect(net.saveSnapshot("fixtures/world-state.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/world-state.json")).toBeTrue();
 }
 ```
 
@@ -34,14 +35,15 @@ Load it in another test run:
 
 ```tolk
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 get fun `test load snapshot`() {
-    val target = net.randomAddress("snapshot-target");
+    val target = randomAddress("snapshot-target");
 
-    expect(net.loadSnapshot("fixtures/world-state.json")).toBeTrue();
-    expect(net.now()).toEqual(1_700_023_001);
-    expect(net.balance(target)).toEqual(ton("3"));
+    expect(testing.loadSnapshot("fixtures/world-state.json")).toBeTrue();
+    expect(testing.getNow()).toEqual(1_700_023_001);
+    expect(testing.getAccountBalance(target)).toEqual(ton("3"));
 }
 ```
 
@@ -83,36 +85,37 @@ You can also use snapshots as checkpoints inside a single test:
 
 ```tolk
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 get fun `test checkpoint and restore`() {
-    val target = net.randomAddress("checkpoint-target");
+    val target = randomAddress("checkpoint-target");
 
-    net.topUp(target, ton("5"));
-    expect(net.saveSnapshot("fixtures/checkpoint.json")).toBeTrue();
+    testing.topUp(target, ton("5"));
+    expect(testing.saveSnapshot("fixtures/checkpoint.json")).toBeTrue();
 
-    net.topUp(target, ton("7"));
-    expect(net.balance(target)).toEqual(ton("12"));
+    testing.topUp(target, ton("7"));
+    expect(testing.getAccountBalance(target)).toEqual(ton("12"));
 
-    expect(net.loadSnapshot("fixtures/checkpoint.json")).toBeTrue();
-    expect(net.balance(target)).toEqual(ton("5"));
+    expect(testing.loadSnapshot("fixtures/checkpoint.json")).toBeTrue();
+    expect(testing.getAccountBalance(target)).toEqual(ton("5"));
 }
 ```
 
-`net.loadSnapshot(...)` replaces the current local emulation state instead of merging into it.
+`testing.loadSnapshot(...)` replaces the current local emulation state instead of merging into it.
 
 ## Failure handling
 
 Both APIs return `bool` instead of throwing:
 
-- `net.saveSnapshot(path)` returns `false` on serialization or file I/O failure
-- `net.loadSnapshot(path)` returns `false` if the file is missing, malformed, has unsupported version, or cannot be applied
+- `testing.saveSnapshot(path)` returns `false` on serialization or file I/O failure
+- `testing.loadSnapshot(path)` returns `false` if the file is missing, malformed, has unsupported version, or cannot be applied
 
 Example:
 
 ```tolk
-expect(net.loadSnapshot("fixtures/missing.json")).toBeFalse();
-expect(net.saveSnapshot("missing-dir/world-state.json")).toBeFalse();
+expect(testing.loadSnapshot("fixtures/missing.json")).toBeFalse();
+expect(testing.saveSnapshot("missing-dir/world-state.json")).toBeFalse();
 ```
 
 If loading fails, the current world state is left unchanged.

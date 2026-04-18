@@ -45,15 +45,17 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 
 ```tolk
 fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", owner);
+    return net.runGetMethod(self.address, "get_wallet_address", [owner]);
 }
 ```
 
 ## Creating a treasury
 
 ```tolk
+import "@acton/emulation/testing"
+
 get fun `test some`() {
-    val treasury = net.treasury("trasury");
+    val treasury = testing.treasury("treasury");
     // ..
     net.send(treasury.address, msg);
 }
@@ -177,16 +179,20 @@ get fun `test something`() {
 ## Creating a random address
 
 ```tolk
+import "@acton/emulation/network"
+
 get fun `test something`() {
-    val addr = net.randomAddress("name-to-display");
+    val addr = randomAddress("name-to-display");
 }
 ```
 
 ## Check if contract is deployed
 
 ```tolk
+import "@acton/emulation/testing"
+
 fun JettonWallet.getJettonBalance(self): coins {
-    if (!net.isDeployed(self.address)) {
+    if (!testing.isDeployed(self.address)) {
         return 0;
     }
 
@@ -195,20 +201,26 @@ fun JettonWallet.getJettonBalance(self): coins {
 }
 ```
 
-## Get deployed contract code
+## Inspect deployed account state
 
 ```tolk
+import "@acton/emulation/testing"
+
 get fun `test something`() {
-    val code = net.getDeployedCode(addr);
-    // ...
+    val state = testing.getAccountState(addr);
+    if (state != null) {
+        println("Balance: {:ton}", state.storage.balance.grams);
+    }
 }
 ```
 
 ## Register a library
 
 ```tolk
+import "@acton/emulation/testing"
+
 get fun `test something`() {
-    vm.registerLibrary(lib_cell);
+    testing.registerLibrary(lib_cell);
     // ...
 }
 ```

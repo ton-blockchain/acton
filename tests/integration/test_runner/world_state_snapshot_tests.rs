@@ -3,11 +3,11 @@ use crate::support::project::{Project, ProjectBuilder};
 use ton_emulator::WorldStateSnapshot;
 
 const NETWORK_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
 "#;
 
 const SIMPLE_CONTRACT: &str = r"
@@ -23,13 +23,13 @@ fn build_world_state_snapshot_project(project_name: &str) -> Project {
 {NETWORK_IMPORTS}
 
 get fun `test save world state snapshot`() {{
-    val target = net.randomAddress("snapshot-target");
+    val target = randomAddress("snapshot-target");
 
-    expect(net.balance(target)).toEqual(0);
-    net.topUp(target, ton("3"));
-    net.setNow(1700023001);
+    expect(testing.getAccountBalance(target)).toEqual(0);
+    testing.topUp(target, ton("3"));
+    testing.setNow(1700023001);
 
-    expect(net.saveSnapshot("world-state.json")).toBeTrue();
+    expect(testing.saveSnapshot("world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -39,17 +39,17 @@ get fun `test save world state snapshot`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot from disk`() {{
-    val target = net.randomAddress("snapshot-target");
+    val target = randomAddress("snapshot-target");
 
-    expect(net.balance(target)).toEqual(0);
-    expect(net.now()).toEqual(0);
+    expect(testing.getAccountBalance(target)).toEqual(0);
+    expect(testing.getNow()).toEqual(0);
 
-    expect(net.loadSnapshot("world-state.json")).toBeTrue();
+    expect(testing.loadSnapshot("world-state.json")).toBeTrue();
 
-    expect(net.now()).toEqual(1700023001);
-    expect(net.balance(target)).toEqual(ton("3"));
-    expect(net.getShardAccount(target)).toBeNotNull();
-    expect(net.saveSnapshot("roundtrip-world-state.json")).toBeTrue();
+    expect(testing.getNow()).toEqual(1700023001);
+    expect(testing.getAccountBalance(target)).toEqual(ton("3"));
+    expect(testing.getShardAccount(target)).toBeNotNull();
+    expect(testing.saveSnapshot("roundtrip-world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -59,17 +59,17 @@ get fun `test load world state snapshot from disk`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot replaces current state`() {{
-    val target = net.randomAddress("snapshot-target");
+    val target = randomAddress("snapshot-target");
 
-    net.topUp(target, ton("1"));
-    net.setNow(99);
-    expect(net.balance(target)).toEqual(ton("1"));
-    expect(net.now()).toEqual(99);
+    testing.topUp(target, ton("1"));
+    testing.setNow(99);
+    expect(testing.getAccountBalance(target)).toEqual(ton("1"));
+    expect(testing.getNow()).toEqual(99);
 
-    expect(net.loadSnapshot("world-state.json")).toBeTrue();
+    expect(testing.loadSnapshot("world-state.json")).toBeTrue();
 
-    expect(net.balance(target)).toEqual(ton("3"));
-    expect(net.now()).toEqual(1700023001);
+    expect(testing.getAccountBalance(target)).toEqual(ton("3"));
+    expect(testing.getNow()).toEqual(1700023001);
 }}
 "#
     );
@@ -79,13 +79,13 @@ get fun `test load world state snapshot replaces current state`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot invalid inputs`() {{
-    expect(net.loadSnapshot("missing-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("broken-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("unsupported-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("invalid-address-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("invalid-library-world-state.json")).toBeFalse();
-    expect(net.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("missing-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("broken-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("unsupported-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("invalid-address-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("invalid-library-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
 }}
 "#
     );
@@ -95,8 +95,8 @@ get fun `test load world state snapshot invalid inputs`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save empty world state snapshot`() {{
-    expect(net.now()).toEqual(0);
-    expect(net.saveSnapshot("empty-world-state.json")).toBeTrue();
+    expect(testing.getNow()).toEqual(0);
+    expect(testing.saveSnapshot("empty-world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -106,15 +106,15 @@ get fun `test save empty world state snapshot`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load empty world state snapshot`() {{
-    val target = net.randomAddress("snapshot-empty-target");
+    val target = randomAddress("snapshot-empty-target");
 
-    net.topUp(target, ton("1"));
-    net.setNow(77);
+    testing.topUp(target, ton("1"));
+    testing.setNow(77);
 
-    expect(net.loadSnapshot("empty-world-state.json")).toBeTrue();
+    expect(testing.loadSnapshot("empty-world-state.json")).toBeTrue();
 
-    expect(net.now()).toEqual(0);
-    expect(net.balance(target)).toEqual(0);
+    expect(testing.getNow()).toEqual(0);
+    expect(testing.getAccountBalance(target)).toEqual(0);
 }}
 "#
     );
@@ -124,11 +124,11 @@ get fun `test load empty world state snapshot`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save world state snapshot skips cached non existing accounts`() {{
-    val target = net.randomAddress("snapshot-cache-only-target");
+    val target = randomAddress("snapshot-cache-only-target");
 
-    expect(net.balance(target)).toEqual(0);
-    expect(net.isDeployed(target)).toBeFalse();
-    expect(net.saveSnapshot("cache-only-world-state.json")).toBeTrue();
+    expect(testing.getAccountBalance(target)).toEqual(0);
+    expect(testing.isDeployed(target)).toBeFalse();
+    expect(testing.saveSnapshot("cache-only-world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -138,25 +138,25 @@ get fun `test save world state snapshot skips cached non existing accounts`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save world state snapshot rich state`() {{
-    val primary = net.randomAddress("snapshot-rich-primary");
-    val secondary = net.randomAddress("snapshot-rich-secondary");
+    val primary = randomAddress("snapshot-rich-primary");
+    val secondary = randomAddress("snapshot-rich-secondary");
 
-    net.topUp(primary, ton("3"));
-    net.topUp(secondary, ton("5"));
-    net.setNow(1700023999);
+    testing.topUp(primary, ton("3"));
+    testing.topUp(secondary, ton("5"));
+    testing.setNow(1700023999);
 
     val libraryCode = build("simple");
-    vm.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     val targetVersion = GlobalVersion {{
         version: 424244,
         capabilities: 1099511640122,
     }};
     config.setGlobalVersion(targetVersion);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    expect(net.saveSnapshot("fixtures/../fixtures/rich-world-state.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/../fixtures/rich-world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -166,20 +166,20 @@ get fun `test save world state snapshot rich state`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot rich state`() {{
-    val primary = net.randomAddress("snapshot-rich-primary");
-    val secondary = net.randomAddress("snapshot-rich-secondary");
+    val primary = randomAddress("snapshot-rich-primary");
+    val secondary = randomAddress("snapshot-rich-secondary");
 
-    expect(net.loadSnapshot("./fixtures/rich-world-state.json")).toBeTrue();
+    expect(testing.loadSnapshot("./fixtures/rich-world-state.json")).toBeTrue();
 
-    expect(net.now()).toEqual(1700023999);
-    expect(net.balance(primary)).toEqual(ton("3"));
-    expect(net.balance(secondary)).toEqual(ton("5"));
+    expect(testing.getNow()).toEqual(1700023999);
+    expect(testing.getAccountBalance(primary)).toEqual(ton("3"));
+    expect(testing.getAccountBalance(secondary)).toEqual(ton("5"));
 
-    val version = net.getConfig().getGlobalVersion();
+    val version = testing.getConfig().getGlobalVersion();
     expect(version.version).toEqual(424244);
     expect(version.capabilities).toEqual(1099511640122);
 
-    expect(net.saveSnapshot("fixtures/rich-world-state-roundtrip.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/rich-world-state-roundtrip.json")).toBeTrue();
 }}
 "#
     );
@@ -189,44 +189,44 @@ get fun `test load world state snapshot rich state`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save mutate load world state snapshot in same run`() {{
-    val primary = net.randomAddress("snapshot-same-run-primary");
-    val secondary = net.randomAddress("snapshot-same-run-secondary");
+    val primary = randomAddress("snapshot-same-run-primary");
+    val secondary = randomAddress("snapshot-same-run-secondary");
 
-    net.topUp(primary, ton("8"));
-    net.topUp(secondary, ton("13"));
-    net.setNow(1700024555);
+    testing.topUp(primary, ton("8"));
+    testing.topUp(secondary, ton("13"));
+    testing.setNow(1700024555);
 
     val libraryCode = build("simple");
-    vm.registerLibrary(libraryCode);
+    testing.registerLibrary(libraryCode);
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setGlobalVersion(GlobalVersion {{
         version: 515151,
         capabilities: 2222222222,
     }});
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    expect(net.saveSnapshot("fixtures/same-run-before.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/same-run-before.json")).toBeTrue();
 
-    net.setNow(1);
+    testing.setNow(1);
 
-    var mutated = net.getConfig();
+    var mutated = testing.getConfig();
     mutated.setGlobalVersion(GlobalVersion {{
         version: 1,
         capabilities: 1,
     }});
-    expect(net.setConfig(mutated)).toBeTrue();
+    expect(testing.setConfig(mutated)).toBeTrue();
 
-    expect(net.loadSnapshot("fixtures/same-run-before.json")).toBeTrue();
-    expect(net.now()).toEqual(1700024555);
-    expect(net.balance(primary)).toEqual(ton("8"));
-    expect(net.balance(secondary)).toEqual(ton("13"));
+    expect(testing.loadSnapshot("fixtures/same-run-before.json")).toBeTrue();
+    expect(testing.getNow()).toEqual(1700024555);
+    expect(testing.getAccountBalance(primary)).toEqual(ton("8"));
+    expect(testing.getAccountBalance(secondary)).toEqual(ton("13"));
 
-    val version = net.getConfig().getGlobalVersion();
+    val version = testing.getConfig().getGlobalVersion();
     expect(version.version).toEqual(515151);
     expect(version.capabilities).toEqual(2222222222);
 
-    expect(net.saveSnapshot("fixtures/same-run-after.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/same-run-after.json")).toBeTrue();
 }}
 "#
     );
@@ -236,14 +236,14 @@ get fun `test save mutate load world state snapshot in same run`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot drops transient state`() {{
-    val transient = net.randomAddress("snapshot-transient-target");
+    val transient = randomAddress("snapshot-transient-target");
 
-    net.topUp(transient, ton("9"));
-    net.setNow(777);
-    expect(net.saveSnapshot("fixtures/transient-before-load.json")).toBeTrue();
+    testing.topUp(transient, ton("9"));
+    testing.setNow(777);
+    expect(testing.saveSnapshot("fixtures/transient-before-load.json")).toBeTrue();
 
-    expect(net.loadSnapshot("fixtures/../world-state.json")).toBeTrue();
-    expect(net.saveSnapshot("fixtures/after-load-world-state.json")).toBeTrue();
+    expect(testing.loadSnapshot("fixtures/../world-state.json")).toBeTrue();
+    expect(testing.saveSnapshot("fixtures/after-load-world-state.json")).toBeTrue();
 }}
 "#
     );
@@ -253,18 +253,18 @@ get fun `test load world state snapshot drops transient state`() {{
 {NETWORK_IMPORTS}
 
 get fun `test load world state snapshot failure keeps current state`() {{
-    val target = net.randomAddress("snapshot-preserve-target");
+    val target = randomAddress("snapshot-preserve-target");
 
-    net.topUp(target, ton("4"));
-    net.setNow(404);
+    testing.topUp(target, ton("4"));
+    testing.setNow(404);
 
-    expect(net.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
-    expect(net.balance(target)).toEqual(ton("4"));
-    expect(net.now()).toEqual(404);
+    expect(testing.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
+    expect(testing.getAccountBalance(target)).toEqual(ton("4"));
+    expect(testing.getNow()).toEqual(404);
 
-    expect(net.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
-    expect(net.balance(target)).toEqual(ton("4"));
-    expect(net.now()).toEqual(404);
+    expect(testing.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
+    expect(testing.getAccountBalance(target)).toEqual(ton("4"));
+    expect(testing.getNow()).toEqual(404);
 }}
 "#
     );
@@ -274,9 +274,9 @@ get fun `test load world state snapshot failure keeps current state`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save world state snapshot path failures`() {{
-    expect(net.saveSnapshot("missing-dir/world-state.json")).toBeFalse();
-    expect(net.saveSnapshot("fixtures")).toBeFalse();
-    expect(net.saveSnapshot("fixtures/ok-world-state.json")).toBeTrue();
+    expect(testing.saveSnapshot("missing-dir/world-state.json")).toBeFalse();
+    expect(testing.saveSnapshot("fixtures")).toBeFalse();
+    expect(testing.saveSnapshot("fixtures/ok-world-state.json")).toBeTrue();
 }}
 "#
     );

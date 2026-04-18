@@ -19,7 +19,7 @@
 /// val network = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
 /// ```
 
-import "../ffi/ffi"
+import "ffi"
 
 /// Prompts the user for input.
 ///
@@ -53,10 +53,10 @@ fun prompt(message: string, placeholder: string = "", default: string = ""): str
 ///
 /// Example:
 /// ```tolk
-/// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple, 1);
+/// val name = select("What is your name?", ["John", "Jane", "Jim"], 1);
 /// println("Hello {}", name);
 /// ```
-fun select(message: string, variants: tuple, defaultIndex: int = 0): string {
+fun select(message: string, variants: array<string>, defaultIndex: int = 0): string {
     return ffi.select(message, variants, defaultIndex);
 }
 
@@ -87,7 +87,7 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 /// - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
 ///
 /// In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
-/// `net.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
+/// `scripts.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.
 ///
 /// Example:
 /// ```tolk
@@ -101,7 +101,7 @@ fun promptWallet(message: string): string {
     return name;
 }
 
-fun ffi.prompt(message: string, placeholder: string = "", default: string = ""): string asm "205 EXTCALL"
-fun ffi.select(message: string, variants: tuple, defaultIndex: int = 0): string asm "206 EXTCALL"
+fun ffi.prompt(message: string, placeholder: string, default: string): string asm "205 EXTCALL"
+fun ffi.select(message: string, variants: array<string>, defaultIndex: int): string asm "206 EXTCALL"
 fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
 fun ffi.promptWallet(message: string): string? asm "208 EXTCALL"

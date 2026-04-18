@@ -1,11 +1,11 @@
 import "@stdlib/strings"
+import "@acton/build"
 import "@acton/fmt"
 import "@acton/io"
-import "@acton/build/build"
+import "@acton/prompts"
 import "@acton/emulation/network"
-import "@acton/promts/prompts"
+import "@acton/emulation/scripts"
 import "@acton/testing/assert"
-import "@acton/vm/vm"
 import "@contracts/messages"
 import "@contracts/types"
 import "@wrappers/NftCollectionContract"
@@ -46,13 +46,13 @@ fun buildOnchainMetadata(info: NftCollectionInfo): cell {
         .endCell();
 }
 
-fun promptNftWallet(message: string): Wallet {
-    return net.wallet(promptWallet(message));
+fun promptNftWallet(message: string): ActonWallet {
+    return scripts.wallet(promptWallet(message));
 }
 
 fun promptNftAddress(message: string, default: address): address {
     val s = prompt(message, "", format("{}", default));
-    return vm.convertAddress(s);
+    return parseAddress(s);
 }
 
 fun promptNftCollectionInfo(): NftCollectionInfo {
@@ -65,16 +65,16 @@ fun promptNftCollectionInfo(): NftCollectionInfo {
 
 fun promptNftCollectionContract(message: string): NftCollectionContract {
     val s = prompt(message, "EQ... / kQ...", "");
-    return NftCollectionContract.fromAddress(vm.convertAddress(s));
+    return NftCollectionContract.fromAddress(parseAddress(s));
 }
 
 fun promptNftItemContract(message: string): NftItemContract {
     val s = prompt(message, "EQ... / kQ...", "");
-    return NftItemContract.fromAddress(vm.convertAddress(s));
+    return NftItemContract.fromAddress(parseAddress(s));
 }
 
 fun promptInt(message: string, default: string): int {
-    return vm.parseInt(prompt(message, "", default));
+    return parseInt(prompt(message, "", default));
 }
 
 fun makeNftCollectionStorage(admin: address, info: NftCollectionInfo): NftCollectionStorage {
@@ -94,7 +94,10 @@ fun makeNftCollectionStorage(admin: address, info: NftCollectionInfo): NftCollec
     };
 }
 
-fun deployNftCollectionContract(deployer: Wallet, info: NftCollectionInfo): NftCollectionContract {
+fun deployNftCollectionContract(
+    deployer: ActonWallet,
+    info: NftCollectionInfo,
+): NftCollectionContract {
     val collection = NftCollectionContract.fromStorage(
         makeNftCollectionStorage(deployer.address, info),
     );
@@ -105,7 +108,7 @@ fun deployNftCollectionContract(deployer: Wallet, info: NftCollectionInfo): NftC
 
 fun deployNftItemContract(
     collection: NftCollectionContract,
-    deployer: Wallet,
+    deployer: ActonWallet,
     owner: address,
     itemContent: string,
 ): NftItemContract {
@@ -124,7 +127,7 @@ fun deployNftItemContract(
 
 fun deployNftBatch(
     collection: NftCollectionContract,
-    deployer: Wallet,
+    deployer: ActonWallet,
     owner: address,
     count: int,
 ): SendResultList {

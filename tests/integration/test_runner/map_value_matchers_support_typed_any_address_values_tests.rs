@@ -63,7 +63,7 @@ get fun `test ed stdlib map to contain value reports missing typed address`() {
     val alice = address("0:00000000000000000000000000000000000000000000000000000000000000AA") as any_address;
     val missing = address("0:00000000000000000000000000000000000000000000000000000000000000DD") as any_address;
 
-    var balances = createEmptyMap<int32, any_address>();
+    var balances = map<int32, any_address> [];
     balances.set(1, alice);
 
     expect(balances).toContainValue(missing);

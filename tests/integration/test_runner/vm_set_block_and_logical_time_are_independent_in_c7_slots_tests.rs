@@ -10,7 +10,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const DJ_VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -33,21 +33,21 @@ fn vm_set_block_and_logical_time_are_independent_in_c7_slots() {
         "dj-stdlib-vm-set-block-and-logical-time-independent-slots",
         r"
 get fun `test dj vm set block and logical time independent slots`() {
-    val c7Before = vm.getC7();
+    val c7Before = testing.getC7OutsideContract();
     val paramsBefore = c7Before.get(0) as tuple;
     val nowBefore = paramsBefore.get(3) as int;
     val blockLtBefore = paramsBefore.get(4) as int;
     val logicalLtBefore = paramsBefore.get(5) as int;
 
-    vm.setBlockLogicalTime(blockLtBefore + 101);
-    val c7AfterBlock = vm.getC7();
+    __acton_impl_setConfigParam(blockLtBefore + 101, 4);
+    val c7AfterBlock = testing.getC7OutsideContract();
     val paramsAfterBlock = c7AfterBlock.get(0) as tuple;
     expect(paramsAfterBlock.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterBlock.get(4) as int).toEqual(blockLtBefore + 101);
     expect(paramsAfterBlock.get(5) as int).toEqual(logicalLtBefore);
 
-    vm.setLogicalTime(logicalLtBefore + 202);
-    val c7AfterLogical = vm.getC7();
+    __acton_impl_setConfigParam(logicalLtBefore + 202, 5);
+    val c7AfterLogical = testing.getC7OutsideContract();
     val paramsAfterLogical = c7AfterLogical.get(0) as tuple;
     expect(paramsAfterLogical.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterLogical.get(4) as int).toEqual(blockLtBefore + 101);
@@ -66,21 +66,21 @@ fn vm_set_logical_then_block_time_preserves_slot_isolation_in_fixture_project() 
         r"
 {DJ_VM_IMPORTS}
 get fun `test dj vm set logical then block slot isolation`() {{
-    val c7Before = vm.getC7();
+    val c7Before = testing.getC7OutsideContract();
     val paramsBefore = c7Before.get(0) as tuple;
     val nowBefore = paramsBefore.get(3) as int;
     val blockLtBefore = paramsBefore.get(4) as int;
     val logicalLtBefore = paramsBefore.get(5) as int;
 
-    vm.setLogicalTime(logicalLtBefore + 303);
-    var c7AfterLogical = vm.getC7();
+    __acton_impl_setConfigParam(logicalLtBefore + 303, 5);
+    var c7AfterLogical = testing.getC7OutsideContract();
     var paramsAfterLogical = c7AfterLogical.get(0) as tuple;
     expect(paramsAfterLogical.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterLogical.get(4) as int).toEqual(blockLtBefore);
     expect(paramsAfterLogical.get(5) as int).toEqual(logicalLtBefore + 303);
 
-    vm.setBlockLogicalTime(blockLtBefore + 404);
-    val c7AfterBlock = vm.getC7();
+    __acton_impl_setConfigParam(blockLtBefore + 404, 4);
+    val c7AfterBlock = testing.getC7OutsideContract();
     val paramsAfterBlock = c7AfterBlock.get(0) as tuple;
     expect(paramsAfterBlock.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterBlock.get(4) as int).toEqual(blockLtBefore + 404);

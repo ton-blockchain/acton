@@ -29,15 +29,16 @@ This generates `tests/Counter.test.tolk` with a `setupTest()` helper and an exam
 
 ```tolk title="tests/Counter.test.tolk"
 import "wrappers/Counter"
+import "@acton/emulation/testing"
 // ... other imports
 
 /// Initializes the test environment, creating a fresh instance of the contract.
 /// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).
 fun setupTest() {
     // Create a treasury account for deployment (typically the owner)
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     // Create another treasury account for testing interactions from other users
-    val notDeployer = net.treasury("not_deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
     // Initialize and deploy the contract with default values
     val contract = Counter.fromStorage({
@@ -151,6 +152,7 @@ The wrapper provides a static `fromStorage` method to create the initial state a
 import "@wrappers/Counter"
 // Don't forget to import types for the storage struct!
 import "@contracts/types"
+import "@acton/emulation/testing"
 
 get fun `test example`() {
     // 1. Create contract instance from storage data
@@ -159,7 +161,7 @@ get fun `test example`() {
     });
 
     // 2. Deploy it
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     contract.deploy(deployer.address, { value: ton("1") });
 }
 ```

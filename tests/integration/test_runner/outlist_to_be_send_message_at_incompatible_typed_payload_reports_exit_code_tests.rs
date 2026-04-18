@@ -3,10 +3,9 @@ use crate::support::project::ProjectBuilder;
 
 const OUTLIST_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/outlist_expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
 
 struct (0x7e8764ef) IncreaseCounter {
     queryId: uint64
@@ -33,7 +32,7 @@ fn outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code() 
         "cb-stdlib-outlist-incompatible-typed-payload",
         r#"
 get fun `test cb outlist incompatible typed payload`() {
-    val dest = net.randomAddress("counter");
+    val dest = randomAddress("counter");
     val incompatible_payload = beginCell()
         .storeUint(0x7e8764ef, 32)
         .storeUint(42, 64)
@@ -47,7 +46,7 @@ get fun `test cb outlist incompatible typed payload`() {
     });
     msg.send(SEND_MODE_REGULAR);
 
-    val out_actions = vm.outActions();
+    val out_actions = testing.outActions();
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,
@@ -63,7 +62,7 @@ fn outlist_to_be_send_message_at_fails_for_non_send_action() {
 get fun `test cb outlist non send action`() {
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
-    val out_actions = vm.outActions();
+    val out_actions = testing.outActions();
     expect(out_actions.size()).toEqual(1);
     expect(out_actions.at(0).kind()).toEqual("reserve-currency");
 

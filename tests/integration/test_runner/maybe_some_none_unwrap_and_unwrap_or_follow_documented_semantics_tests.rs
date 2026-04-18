@@ -38,9 +38,17 @@ fn maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics() {
     run_maybe_success(
         "aa-stdlib-maybe-some-none-unwrap-semantics",
         r"
+fun Expectation<TlbMaybe<T>>.toBeDefined(self): void {
+    assert (self.value !is TlbNone) throw 123;
+}
+
+fun Expectation<TlbMaybe<T>>.toBeNone(self): void {
+    assert (self.value is TlbNone) throw 123;
+}
+
 get fun `test maybe some none unwrap semantics`() {
-    val empty = Maybe<int>.none();
-    val present = Maybe<int>.some(17);
+    val empty = TlbMaybe<int>.none();
+    val present = TlbMaybe<int>.just(17);
 
     expect(empty).toBeNone();
     expect(present).toBeDefined();
@@ -49,7 +57,7 @@ get fun `test maybe some none unwrap semantics`() {
     expect(present.unwrapOr(99)).toEqual(17);
     expect(present.unwrap()).toEqual(17);
 
-    val nested = Maybe<Maybe<int>>.some(Maybe<int>.none());
+    val nested = TlbMaybe<TlbMaybe<int>>.just(TlbMaybe.none());
     val nestedValue = nested.unwrap();
     expect(nestedValue).toBeNone();
     expect(nestedValue.unwrapOr(123)).toEqual(123);
@@ -65,7 +73,7 @@ fn maybe_unwrap_on_none_throws_exit_code_7() {
         "aa-stdlib-maybe-unwrap-none-exit7",
         r"
 get fun `test-maybe-unwrap-on-none-throws-exit-code-7`() {
-    val empty = Maybe<int>.none();
+    val empty = TlbMaybe<int>.none();
     empty.unwrap();
 }
 ",

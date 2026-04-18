@@ -18,9 +18,9 @@ get fun singleBalance(): map<int32, int32> {
 
 const EE_MAP_TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 
 struct Ledger {
     address: address
@@ -38,7 +38,7 @@ fun Ledger.fromStorage() {
 
 fun deployLedger(): Ledger {
     val ledger = Ledger.fromStorage();
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployTxs = net.send(
         deployer.address,
         createMessage({

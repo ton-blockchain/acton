@@ -1,8 +1,7 @@
-import "@local-acton/build/build"
+import "@local-acton/build"
 import "@local-acton/emulation/network"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
-import "@local-acton/testing/transaction_expect"
-import "@local-acton/tlb/maybe"
 import "@local-acton/types/message"
 import "contracts/types"
 
@@ -33,7 +32,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -92,13 +91,13 @@ get fun `test find external out message`() {
         from: counter.address,
         to: createAddressNone(),
     });
-    expect(first).toBeDefined();
-    expect(first.unwrap().loadBody()).toEqual(IncreaseCounter { increaseBy: 100 });
+    expect(first).toBeNotNull();
+    expect(first!.loadBody()).toEqual(IncreaseCounter { increaseBy: 100 });
 
     val addr = any_address.fromCell(
         beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16).endCell(),
     );
     val second = res.findExternalOutMessage<ResetCounter>({ from: counter.address, to: addr });
-    expect(second).toBeDefined();
-    expect(second.unwrap().loadBody()).toEqual(ResetCounter {});
+    expect(second).toBeNotNull();
+    expect(second!.loadBody()).toEqual(ResetCounter {});
 }

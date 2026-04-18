@@ -7,12 +7,12 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
         .test_file(
             "prompt_wrappers",
             r#"
-            import "../../lib/promts/prompts"
+            import "../../lib/prompts"
             import "../../lib/testing/expect"
 
             get fun `test prompt select confirm fallbacks`() {
                 expect(prompt("Enter your name:", "Guest")).toEqual("");
-                expect(select("Choose network:", ["Mainnet", "Testnet", "Local"] as tuple)).toEqual("");
+                expect(select("Choose network:", ["Mainnet", "Testnet", "Local"])).toEqual("");
                 expect(confirm("Proceed with deployment?", false, "Safe default should be false.")).toEqual(false);
             }
         "#,
@@ -34,7 +34,7 @@ fn confirm_default_true_is_ignored_in_non_interactive_mode_bug() {
         .test_file(
             "prompt_wrappers_bug",
             r#"
-            import "../../lib/promts/prompts"
+            import "../../lib/prompts"
             import "../../lib/testing/expect"
 
             get fun `test confirm default true in non interactive mode`() {

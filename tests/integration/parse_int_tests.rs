@@ -4,11 +4,11 @@ use crate::support::project::ProjectBuilder;
 fn parse_int_script(input: &str) -> String {
     format!(
         r#"
-import "../../lib/vm/vm"
+import "../../lib/fmt"
 import "../../lib/io"
 
 fun main() {{
-    val n = vm.parseInt("{input}");
+    val n = parseInt("{input}");
     println("parsed={{}}", n);
 }}
 "#,

@@ -121,16 +121,16 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const LINEAR_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/big_array"
 import "../contracts/fm_linear_messages"
 
 fun deployFmLinearHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val rootInit = ContractState {
         code: build("fm_linear_root"),
@@ -363,16 +363,16 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const KNOWN_ADDRESS_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_known_address_messages"
 
 fun deployFmKnownAddressHarness() {
-    val sender = net.treasury("sender");
-    val notDeployer = net.treasury("not_deployer");
+    val sender = testing.treasury("sender");
+    val notDeployer = testing.treasury("not_deployer");
 
     val init = ContractState {
         code: build("fm_known_address_sink"),
@@ -433,16 +433,16 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const WRAPPED_KNOWN_ADDRESS_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_wrapped_known_address_messages"
 
 fun deployFmWrappedKnownAddressHarness() {
-    val sender = net.treasury("sender");
-    val notDeployer = net.treasury("not_deployer");
+    val sender = testing.treasury("sender");
+    val notDeployer = testing.treasury("not_deployer");
 
     val init = ContractState {
         code: build("fm_wrapped_known_address_sink"),
@@ -463,17 +463,17 @@ fun deployFmWrappedKnownAddressHarness() {
 "#;
 
 const ABI_MEGA_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/transaction"
 import "../contracts/fm_abi_mega_messages"
 
 fun deployFmAbiMegaHarness() {
-    val sender = net.treasury("sender");
-    val friend = net.treasury("friend");
+    val sender = testing.treasury("sender");
+    val friend = testing.treasury("friend");
 
     val init = ContractState {
         code: build("fm_abi_mega_sink"),
@@ -585,15 +585,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const FANOUT_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_fanout_messages"
 
 fun deployFmFanoutHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val rootInit = ContractState {
         code: build("fm_fanout_root"),
@@ -712,11 +712,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const EXTERNAL_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_external_messages"
 
 fun fmExternalAddress(tag: uint32): any_address {
@@ -730,7 +730,7 @@ fun fmExternalAddress(tag: uint32): any_address {
 }
 
 fun deployFmExternalHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val extInit = ContractState {
         code: build("fm_external_root"),
@@ -768,11 +768,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const EXTERNAL_THROW_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_external_messages"
 
 fun fmExternalAddress(tag: uint32): any_address {
@@ -786,7 +786,7 @@ fun fmExternalAddress(tag: uint32): any_address {
 }
 
 fun deployFmExternalThrowHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val extInit = ContractState {
         code: build("fm_external_throw"),
@@ -844,15 +844,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const BOUNCE_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_bounce_messages"
 
 fun deployFmBounceHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("fm_bounce_echo"),
         data: createEmptyCell(),
@@ -900,11 +900,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const ACTION_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 
 fun fmActionInit() {
     val init = ContractState {
@@ -964,15 +964,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const FLAGS_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_flags_messages"
 
 fun deployFmFlagsHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val init = ContractState {
         code: build("fm_flags"),
@@ -1022,15 +1022,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const DEBUG_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_debug_messages"
 
 fun deployFmDebugHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("fm_debug"),
         data: createEmptyCell(),
@@ -1080,15 +1080,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const DESTROY_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../contracts/fm_destroy_messages"
 
 fun deployFmDestroyHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("fm_destroy"),
         data: createEmptyCell(),
@@ -1108,6 +1108,7 @@ fun deployFmDestroyHarness() {
 
 const LETTER_ROLLOVER_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
 import "../../lib/types/big_array"
@@ -1668,8 +1669,8 @@ fn formatter_exit_code63_from_cell_mismatch_is_reported_in_test_body() {
         "formatter-exit-code63-from-cell-mismatch-in-test-body",
         r#"
 get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body`() {
-    val mid = net.randomAddress("fm_mismatch_mid");
-    val sink = net.randomAddress("fm_mismatch_sink");
+    val mid = randomAddress("fm_mismatch_mid");
+    val sink = randomAddress("fm_mismatch_sink");
     val wrongCell = FmRoute {
         queryId: 999,
         mid,
@@ -1699,8 +1700,8 @@ fn formatter_exit_code63_from_cell_mismatch_in_test_body_with_backtrace_full() {
         "formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full",
         r#"
 get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full`() {
-    val mid = net.randomAddress("fm_mismatch_mid");
-    val sink = net.randomAddress("fm_mismatch_sink");
+    val mid = randomAddress("fm_mismatch_mid");
+    val sink = randomAddress("fm_mismatch_sink");
     val wrongCell = FmRoute {
         queryId: 1001,
         mid,
@@ -1753,7 +1754,7 @@ fn formatter_external_out_println_renders_none_and_external_destinations() {
 get fun `test formatter external out println destinations`() {
     val extAddress = deployFmExternalHarness();
     val txs = net.sendExternal(
-        createExternalMessage(
+        net.createExternalMessage(
             extAddress,
             FmExternalTrigger { queryId: 303 },
             null,
@@ -1778,7 +1779,7 @@ fn formatter_ext_in_exit_code_with_backtrace_full_println_renders_backtrace() {
 get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
     val extAddress = deployFmExternalThrowHarness();
     val txs = net.sendExternal(
-        createExternalMessage(
+        net.createExternalMessage(
             extAddress,
             FmExternalTrigger { queryId: 404 },
             null,
@@ -1887,7 +1888,7 @@ fn formatter_action_phase_failure_println_renders_retrace_and_backtrace_hint() {
             "formatter-action-failure-println-with-hint",
             r#"
 get fun `test formatter action phase failure println with hint`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val (init, actionAddress) = fmActionInit();
     val txs = net.send(
         sender.address,
@@ -1916,7 +1917,7 @@ fn formatter_action_phase_failure_println_with_backtrace_full_renders_action_loc
         ACTION_IMPORTS,
         r#"
 get fun `test formatter action phase failure println with backtrace full`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val (init, actionAddress) = fmActionInit();
     val txs = net.send(
         sender.address,
@@ -2098,7 +2099,7 @@ fn formatter_exit_code_println_with_backtrace_full_and_account_created_event() {
         FLAGS_IMPORTS,
         r#"
 get fun `test-formatter-exit-code-with-backtrace-full-and-account-created-event`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val init = ContractState {
         code: build("fm_flags"),
@@ -2254,7 +2255,7 @@ fn formatter_contract_letters_rollover_after_z_println_uses_a1_and_b1() {
     let body = format!(
         r#"
 get fun `test formatter contract letters rollover a1 b1`() {{
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     var merged: SendResultList = SendResultList.createEmpty();
 {sends}
     expect(merged).toHaveLength(27);

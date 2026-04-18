@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 "#;
 
@@ -29,7 +30,7 @@ fn register_address_duplicate_symbolic_name_rebind_visibility_in_output() {
         "cq-stdlib-register-address-duplicate-symbolic-name",
         r#"
 get fun `test cq register address duplicate symbolic name`() {
-    val sender = net.treasury("cq_register_sender");
+    val sender = testing.treasury("cq_register_sender");
     val first = address("0:0000000000000000000000000000000000000000000000000000000000000011");
     val second = address("0:0000000000000000000000000000000000000000000000000000000000000022");
 

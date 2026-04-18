@@ -5,10 +5,9 @@ use std::fs;
 
 const OUTLIST_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/outlist_expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
 "#;
 
 fn run_outlist_success(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -47,7 +46,7 @@ fn outlist_to_be_empty_fails_for_non_empty_out_actions() {
         "{OUTLIST_IMPORTS}\n{}\n",
         r#"
 get fun `test cc outlist to be empty non empty fail`() {
-    val dest = net.randomAddress("counter");
+    val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -56,7 +55,7 @@ get fun `test cc outlist to be empty non empty fail`() {
     });
     msg.send(SEND_MODE_REGULAR);
 
-    val out_actions = vm.outActions();
+    val out_actions = testing.outActions();
     expect(out_actions).toBeEmpty();
 }
 "#

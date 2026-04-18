@@ -8,10 +8,10 @@ format in two places:
 
 - after `println(txs)` or `println(result)` in a test
 - inside failure diagnostics from transaction matchers such as
-  [`toHaveTx()`](/docs/standard_library/testing/transaction_expect/#expectationsendresultlisttohavetx),
-  [`toHaveSuccessfulTx()`](/docs/standard_library/testing/transaction_expect/#expectationsendresultlisttohavesuccessfultx),
+  [`toHaveTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavetx),
+  [`toHaveSuccessfulTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavesuccessfultx),
   and
-  [`toHaveFailedTx()`](/docs/standard_library/testing/transaction_expect/#expectationsendresultlisttohavefailedtx)
+  [`toHaveFailedTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavefailedtx)
 
 Use this output when you want a quick terminal-native view of what happened in a
 trace without opening the browser UI.
@@ -158,9 +158,9 @@ Common extra lines:
 
 ## Making Traces More Readable
 
-- Give treasuries explicit names with `net.treasury("deployer")`.
+- Give treasuries explicit names with `testing.treasury("deployer")`.
 - Name arbitrary addresses with
-  [`net.randomAddress("name")`](/docs/standard_library/emulation/network/#netrandomaddress)
+  [`randomAddress("name")`](/docs/standard_library/emulation/network/#randomaddress)
   or
   [`net.registerAddress(...)`](/docs/standard_library/emulation/network/#netregisteraddress).
 - Label undeployed or dynamically-created contracts with

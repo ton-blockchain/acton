@@ -1432,7 +1432,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             ));
             extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "To manually register library use {} somewhere in {}-like function",
-                "vm.registerLibrary(code)".yellow(),
+                "testing.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
             )));
             extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));

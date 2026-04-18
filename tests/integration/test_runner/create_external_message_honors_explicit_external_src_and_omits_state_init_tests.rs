@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const DH_NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/tlb/either"
 import "../../lib/tlb/maybe"
@@ -42,23 +43,23 @@ fn create_external_message_honors_explicit_external_src_and_omits_state_init() {
         "dh-stdlib-create-external-src-override-no-init",
         r#"
 get fun `test dh create external message src override no state init`() {
-    val dest = net.randomAddress("dh_dest_src_override");
+    val dest = randomAddress("dh_dest_src_override");
     val src = dhExternalAddress(0xD1000001);
 
-    val msg = createExternalMessage(
+    val msg = net.createExternalMessage(
         dest,
         DhTriggerExternal { queryId: 41 },
         null,
         src,
     );
 
-    val parsed = (msg.messageCell as Cell<Message<DhTriggerExternal, ExternalInMessageInfo>>)
+    val parsed = (msg.messageCell as Cell<TlbMessage<DhTriggerExternal, TlbExternalInMessageInfo>>)
         .load({ assertEndAfterReading: false });
 
     expect(parsed.info.dest).toEqual(dest);
     expect(parsed.info.src).toEqual(src);
     expect(parsed.info.importFee).toEqual(ton("0.1"));
-    expect(parsed.init).toEqual(Maybe<Either<StateInit, Cell<StateInit>>>.none());
+    expect(parsed.init).toEqual(TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>.none());
     expect(parsed.loadBody()).toEqual(DhTriggerExternal { queryId: 41 });
 }
 "#,
@@ -72,20 +73,20 @@ fn create_external_message_defaults_src_to_none_and_keeps_state_init_absent() {
         "dh-stdlib-create-external-default-src-no-init",
         r#"
 get fun `test dh create external message default src no state init`() {
-    val dest = net.randomAddress("dh_dest_default_src");
+    val dest = randomAddress("dh_dest_default_src");
 
-    val msg = createExternalMessage(
+    val msg = net.createExternalMessage(
         dest,
         DhTriggerExternal { queryId: 99 },
     );
 
-    val parsed = (msg.messageCell as Cell<Message<DhTriggerExternal, ExternalInMessageInfo>>)
+    val parsed = (msg.messageCell as Cell<TlbMessage<DhTriggerExternal, TlbExternalInMessageInfo>>)
         .load({ assertEndAfterReading: false });
 
     expect(parsed.info.dest).toEqual(dest);
     expect(parsed.info.src).toEqual(createAddressNone());
     expect(parsed.info.importFee).toEqual(ton("0.1"));
-    expect(parsed.init).toEqual(Maybe<Either<StateInit, Cell<StateInit>>>.none());
+    expect(parsed.init).toEqual(TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>.none());
 
     val body = parsed.loadBody();
     expect(body.queryId).toEqual(99);

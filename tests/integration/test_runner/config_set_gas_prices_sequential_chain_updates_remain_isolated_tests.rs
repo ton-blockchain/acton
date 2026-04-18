@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -26,7 +27,7 @@ fn config_set_gas_prices_sequential_chain_updates_remain_isolated() {
         "ds-stdlib-config-gas-prices-sequential-isolation",
         r"
 get fun `test ds stdlib config gas prices sequential isolation`() {
-    var firstConfig = net.getConfig();
+    var firstConfig = testing.getConfig();
     val initialBase = firstConfig.getGasPrices(BASECHAIN);
     val initialMaster = firstConfig.getGasPrices(MASTERCHAIN);
 
@@ -45,15 +46,15 @@ get fun `test ds stdlib config gas prices sequential isolation`() {
     };
 
     firstConfig.setGasPrices(baseAfterFirstUpdate, BASECHAIN);
-    expect(net.setConfig(firstConfig)).toBeTrue();
+    expect(testing.setConfig(firstConfig)).toBeTrue();
 
-    val afterFirstWrite = net.getConfig();
+    val afterFirstWrite = testing.getConfig();
     val baseAfterFirstWrite = afterFirstWrite.getGasPrices(BASECHAIN);
     val masterAfterFirstWrite = afterFirstWrite.getGasPrices(MASTERCHAIN);
     expect(baseAfterFirstWrite.flatGasPrice).toEqual(baseAfterFirstUpdate.flatGasPrice);
     expect(masterAfterFirstWrite.flatGasPrice).toEqual(initialMaster.flatGasPrice);
 
-    var secondConfig = net.getConfig();
+    var secondConfig = testing.getConfig();
     val baseBeforeSecondWrite = secondConfig.getGasPrices(BASECHAIN);
     val masterBeforeSecondWrite = secondConfig.getGasPrices(MASTERCHAIN);
 
@@ -72,9 +73,9 @@ get fun `test ds stdlib config gas prices sequential isolation`() {
     };
 
     secondConfig.setGasPrices(masterAfterSecondUpdate, MASTERCHAIN);
-    expect(net.setConfig(secondConfig)).toBeTrue();
+    expect(testing.setConfig(secondConfig)).toBeTrue();
 
-    val afterSecondWrite = net.getConfig();
+    val afterSecondWrite = testing.getConfig();
     val baseAfterSecondWrite = afterSecondWrite.getGasPrices(BASECHAIN);
     val masterAfterSecondWrite = afterSecondWrite.getGasPrices(MASTERCHAIN);
 
@@ -83,7 +84,7 @@ get fun `test ds stdlib config gas prices sequential isolation`() {
     expect(masterAfterSecondWrite.flatGasPrice).toEqual(masterAfterSecondUpdate.flatGasPrice);
     expect(masterAfterSecondWrite.other.specialGasLimit).toEqual(masterAfterSecondUpdate.other.specialGasLimit);
 
-    var thirdConfig = net.getConfig();
+    var thirdConfig = testing.getConfig();
     val baseBeforeThirdWrite = thirdConfig.getGasPrices(BASECHAIN);
     val masterBeforeThirdWrite = thirdConfig.getGasPrices(MASTERCHAIN);
 
@@ -102,9 +103,9 @@ get fun `test ds stdlib config gas prices sequential isolation`() {
     };
 
     thirdConfig.setGasPrices(baseAfterThirdUpdate, BASECHAIN);
-    expect(net.setConfig(thirdConfig)).toBeTrue();
+    expect(testing.setConfig(thirdConfig)).toBeTrue();
 
-    val finalConfig = net.getConfig();
+    val finalConfig = testing.getConfig();
     val finalBase = finalConfig.getGasPrices(BASECHAIN);
     val finalMaster = finalConfig.getGasPrices(MASTERCHAIN);
 

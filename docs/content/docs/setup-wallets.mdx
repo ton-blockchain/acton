@@ -113,14 +113,15 @@ acton wallet remove deployer -y
 
 ## Using Wallets in Scripts
 
-Once configured, reference wallets by name in your scripts using `net.wallet()`:
+Once configured, reference wallets by name in your scripts using `scripts.wallet()`:
 
 ```tolk title="deploy.tolk"
 import "@acton/emulation/network"
+import "@acton/emulation/scripts"
 import "@acton/io"
 
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     println("Deployer address: {}", deployer.address);
 
     // Use deployer.address for contract deployment
@@ -134,7 +135,7 @@ Run the script with `--net <network>` to use the real wallet:
 acton script deploy.tolk --net testnet
 ```
 
-Without `--net`, `net.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
+Without `--net`, `scripts.wallet()` creates a local test wallet with the same name, perfect for testing scripts locally before running them on the real blockchain.
 When you do run with `--net`, script-side getters and account reads also
 default to the selected broadcast network, so deploy scripts can send a
 transaction and immediately verify live state without adding `--fork-net`.

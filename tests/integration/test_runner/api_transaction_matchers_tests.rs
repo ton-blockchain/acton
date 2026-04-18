@@ -14,10 +14,10 @@ fun onInternalMessage(_: InMessage) {
 
 const TEST_IMPORTS: &str = r#"
 import "../../lib/io"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 #[test]
@@ -32,7 +32,7 @@ fn to_have_and_not_have_tx_by_action_exit_code() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
@@ -76,7 +76,7 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
             {TEST_IMPORTS}
 
             get fun `test compute phase skipped filter`() {{
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
                 val txs = net.send(sender.address, createMessage({{
@@ -126,7 +126,7 @@ fn to_have_and_not_have_tx_by_body() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 val expectedBody = beginCell()
                     .storeUint(0xABCDEF01, 32)
@@ -184,7 +184,7 @@ fn to_have_and_not_have_tx_by_opcode() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
@@ -233,7 +233,7 @@ fn find_transaction_by_explicit_opcode_without_generic() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
@@ -247,14 +247,14 @@ fn find_transaction_by_explicit_opcode_without_generic() {
                     to: target,
                     opcode: 0x55667788,
                 }});
-                expect(found).toBeDefined();
+                expect(found).toBeNotNull();
 
                 val missing = txs.findTransaction({{
                     from: sender.address,
                     to: target,
                     opcode: 0x55667789,
                 }});
-                expect(missing).toBeNone();
+                expect(missing).toBeNull();
             }}
         "#,
     );
@@ -285,7 +285,7 @@ fn to_have_tx_with_bounced_opcode_prefix() {
                     data: createEmptyCell(),
                 }};
                 val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
 
                 net.send(sender.address, createMessage({{
                     bounce: false,

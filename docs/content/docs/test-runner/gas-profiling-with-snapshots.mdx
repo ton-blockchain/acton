@@ -138,15 +138,15 @@ If you pass both `--snapshot` and `--baseline-snapshot`, Acton runs in compare m
 
 Chain reports are much easier to read when traces have explicit names.
 
-Use [`tracing.save(...)`](/docs/standard_library/emulation/tracing/#tracingsave) after `net.send(...)`:
+Use [`SendResultList.giveName(...)`](/docs/standard_library/emulation/network/#sendresultlistgivename) after `net.send(...)`:
 
 ```tolk
-import "@acton/emulation/tracing"
+import "@acton/emulation/network"
 
 get fun `test transfer flow`() {
     // ...
     val txs = net.send(sender.address, msg);
-    tracing.save(txs, "transfer-wallet-to-wallet");
+    txs.giveName("transfer-wallet-to-wallet");
     expect(txs).toHaveAllSuccessfulTxs();
 }
 ```

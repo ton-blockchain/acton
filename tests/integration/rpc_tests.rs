@@ -22,20 +22,22 @@ keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region sh
 "#;
 const PRINT_DEPLOYER_ADDRESS_SCRIPT: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
     println("DEPLOYER_ADDRESS={}", wallet.address);
 }
 "#;
 const DEPLOY_COUNTER_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
     val counterData = beginCell()
         .storeUint(7, 32)
         .storeUint(42, 32)

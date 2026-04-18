@@ -1,7 +1,7 @@
-import "@local-acton/build/build"
+import "@local-acton/build"
 import "@local-acton/emulation/network"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
-import "@local-acton/testing/transaction_expect"
 import "contracts/types"
 
 struct (0x12345678) UnknownMessage {}
@@ -33,7 +33,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -78,10 +78,10 @@ get fun `test find transaction`() {
     expect(counter.getCounter()).toEqual(100);
 
     val tx = res.findTransaction({ to: counter.address });
-    expect(tx).toBeDefined();
+    expect(tx).toBeNotNull();
 
     val unknownTx = res.findTransaction({ to: deployer.address });
-    expect(unknownTx).toBeNone();
+    expect(unknownTx).toBeNull();
 }
 
 get fun `test find transaction with type`() {
@@ -93,10 +93,10 @@ get fun `test find transaction with type`() {
     expect(counter.getCounter()).toEqual(100);
 
     val tx = res.findTransaction<IncreaseCounter>({ to: counter.address });
-    expect(tx).toBeDefined();
+    expect(tx).toBeNotNull();
 
     val unknownTx = res.findTransaction<ResetCounter>({ to: counter.address });
-    expect(unknownTx).toBeNone();
+    expect(unknownTx).toBeNull();
 }
 
 get fun `test search by value`() {

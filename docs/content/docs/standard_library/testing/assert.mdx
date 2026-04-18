@@ -15,15 +15,10 @@ Examples:
 // Basic equality
 Assert.equal(2 + 2, 4, "Math check");
 
-// Gas usage check for a void function
+// Gas usage check for a function
 Assert.consumesLessThan(fun() {
     someExpensiveOperation();
 }, 10000);
-
-// Gas usage check for a function with arguments
-Assert.consumesLessThan2(fun(a: int, b: int) {
-    return a * b;
-}, 10, 20, 500);
 ```
 
 ## Definitions
@@ -34,7 +29,7 @@ Assert.consumesLessThan2(fun(a: int, b: int) {
 const ASSERTION_FAILED = 567
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L22" />
 
 ## `Assert`
 
@@ -58,7 +53,7 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L39" />
 
 ## `Assert.equal`
 
@@ -75,7 +70,7 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L54" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L49" />
 
 ## `Assert.notEqual`
 
@@ -97,12 +92,12 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L78" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L67" />
 
 ## `Assert.fail`
 
 ```tolk
-fun Assert.fail(message: string = "", location: string = ""): never
+fun Assert.fail(message: string, location: string = ""): never
 ```
 
 Fails the test with the given optional message.
@@ -111,7 +106,7 @@ Optional message can be provided to describe the failure.
 Optional location can be provided to specify the location of the failure to
 be printed in the error message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L104" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L87" />
 
 ## `Assert.assume`
 
@@ -123,7 +118,7 @@ Rejects the current fuzz input when condition is false.
 
 Outside fuzz tests this is reported as a normal test failure.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L112" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L95" />
 
 ## `Assert.consumesLessThan`
 
@@ -131,7 +126,7 @@ Outside fuzz tests this is reported as a normal test failure.
 fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int): Ret
 ```
 
-Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
+Asserts that the function consumes less than or equal to the expected amount of gas.
 Returns the callback result.
 
 Gas is compared using `end - start - 26`.
@@ -142,127 +137,14 @@ Example:
 get fun `test gas consumption`() {
     val result = Assert.consumesLessThan(fun() {
         // do something that consumes gas
+        // (capturing outer variables is allowed)
         return 42;
     }, 100);
     Assert.equal(result, 42);
 }
 ```
 
-If you need to pass arguments to the function, you can use the `consumesLessThan1`,
-`consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
-but accept arguments.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L141" />
-
-## `Assert.consumesLessThan1`
-
-```tolk
-fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int): Ret
-```
-
-Asserts that the function with a single argument consumes less than or equal to the expected amount of gas.
-Returns the callback result.
-
-Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
-
-Example:
-```tolk
-get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan1(fun(a: int) {
-        // do something that consumes gas
-        return a + 1;
-    }, 100, 100);
-//     ^^^  ^^^
-//     |    expected max gas (inclusive)
-//     callback argument `a`
-    Assert.equal(result, 101);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L167" />
-
-## `Assert.consumesLessThan2`
-
-```tolk
-fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
-    fn: (Arg1, Arg2) -> Ret,
-    arg1: Arg1,
-    arg2: Arg2,
-    expected: int,
-): Ret
-```
-
-Asserts that the function with two arguments consumes less than or equal to the expected amount of gas.
-Returns the callback result.
-
-Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
-
-Example:
-```tolk
-get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan2(fun(a: int, b: int) {
-        // do something that consumes gas
-        return a + b;
-    }, 10, 20, 100);
-//     ^^  ^^  ^^^
-//     |   |   expected max gas (inclusive)
-//     |   callback argument `b`
-//     callback argument `a`
-    Assert.equal(result, 30);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L194" />
-
-## `Assert.consumesLessThan3`
-
-```tolk
-fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
-    fn: (Arg1, Arg2, Arg3) -> Ret,
-    arg1: Arg1,
-    arg2: Arg2,
-    arg3: Arg3,
-    expected: int,
-): Ret
-```
-
-Asserts that the function with three arguments consumes less than or equal to the expected amount of gas.
-Returns the callback result.
-
-Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
-
-Example:
-```tolk
-get fun `test gas consumption`() {
-    val result = Assert.consumesLessThan3(fun(a: int, b: int, c: int) {
-        // do something that consumes gas
-        return a + b + c;
-    }, 10, 20, 30, 100);
-//     ^^  ^^  ^^  ^^^
-//     |   |   |   expected max gas (inclusive)
-//     |   |   callback argument `c`
-//     |   callback argument `b`
-//     callback argument `a`
-    Assert.equal(result, 60);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L227" />
-
-## `Assert.failWalletNotFound`
-
-```tolk
-fun Assert.failWalletNotFound(walletName: string, location: string = ""): never
-```
-
-Fails the test with wallet not found error.
-
-This function is used internally by the framework when a wallet is not found.
-It provides detailed information about available wallets and instructions on how to add them.
-
-NOT FOR PUBLIC USE.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L247" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L119" />
 
 ## `Assert.equalDecimal`
 
@@ -285,5 +167,5 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L260" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/assert.tolk#L146" />
 

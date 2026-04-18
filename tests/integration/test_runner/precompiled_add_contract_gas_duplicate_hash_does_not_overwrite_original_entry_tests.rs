@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -27,7 +28,7 @@ fn precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry
         r"
 get fun `test du stdlib precompiled duplicate hash no overwrite`() {
     var precompiled = PrecompiledContractsConfig {
-        list: createEmptyMap<uint256, PrecompiledSmartContract>(),
+        list: [],
     };
 
     val duplicateHash: uint256 = 0xD00D;
@@ -43,11 +44,11 @@ get fun `test du stdlib precompiled duplicate hash no overwrite`() {
     expect(localDuplicate.gasUsage).toNotEqual(999);
     expect(localOther.gasUsage).toEqual(333);
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setPrecompiledContractsConfig(precompiled);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val persisted = net.getConfig().getPrecompiledContractsConfig();
+    val persisted = testing.getConfig().getPrecompiledContractsConfig();
     expect(persisted.list).toHaveLength(2);
 
     val persistedDuplicate = persisted.list.get(duplicateHash).loadValue();

@@ -42,16 +42,16 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const CK_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/transaction"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
 
 fun deployCkHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val workerInit = ContractState {
         code: build("worker"),
         data: createEmptyCell(),
@@ -73,7 +73,7 @@ fun deployCkHarness() {
 }
 
 fun sendCkPing(sender: Treasury, workerAddress: address, queryId: uint64, amount: uint32): SendResultList {
-    val target = net.randomAddress("ck_tick_tock_target");
+    val target = randomAddress("ck_tick_tock_target");
     return net.send(
         sender.address,
         createMessage({
@@ -89,17 +89,17 @@ fun sendCkPing(sender: Treasury, workerAddress: address, queryId: uint64, amount
     );
 }
 
-fun defaultStoragePhase(): TrStoragePhase {
-    return TrStoragePhase {
+fun defaultStoragePhase(): TlbTrStoragePhase {
+    return TlbTrStoragePhase {
         storageFeesCollected: 0,
-        storageFeesDue: None{},
-        statusChange: AccUnchanged{},
+        storageFeesDue: TlbNone{},
+        statusChange: TlbAccUnchanged{},
     };
 }
 
-fun withDescription(tx: Transaction, descr: TransactionDescr): Transaction {
-    val descrCell: Cell<TransactionDescr> = descr.toCell();
-    return Transaction {
+fun withDescription(tx: TlbTransaction, descr: TlbTransactionDescr): TlbTransaction {
+    val descrCell: Cell<TlbTransactionDescr> = descr.toCell();
+    return TlbTransaction {
         accountAddr: tx.accountAddr,
         lt: tx.lt,
         prevTransHash: tx.prevTransHash,
@@ -115,22 +115,20 @@ fun withDescription(tx: Transaction, descr: TransactionDescr): Transaction {
     };
 }
 
-fun asTickTock(tx: Transaction, isTock: bool, withoutAction: bool): Transaction {
+fun asTickTock(tx: TlbTransaction, isTock: bool, withoutAction: bool): TlbTransaction {
     val descr = tx.description.load();
-    if (descr is TransOrd) {
+    if (descr is TlbTransOrd) {
         var storagePh = defaultStoragePhase();
-        if (descr.storagePh is None) {
-            storagePh = defaultStoragePhase();
-        } else {
-            storagePh = descr.storagePh.value;
+        if (descr.storagePh !is TlbNone) {
+            storagePh = descr.storagePh.unwrap();
         }
 
-        var action: Maybe<Cell<TrActionPhase>> = descr.action;
+        var action: TlbMaybe<Cell<TlbTrActionPhase>> = descr.action;
         if (withoutAction) {
-            action = None{};
+            action = TlbNone{};
         }
 
-        val tickTock = TransTickTock {
+        val tickTock = TlbTransTickTock {
             isTock,
             storagePh,
             computePh: descr.computePh,
@@ -171,11 +169,11 @@ get fun `test ck transaction get action fee tick and tock`() {
     val baseTx = txs.findTransaction<CkPing>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     val descr = baseTx.description.load();
-    if (descr is TransOrd) {
-        expect(descr.action is None).toEqual(false);
+    if (descr is TlbTransOrd) {
+        expect(descr.action is TlbNone).toEqual(false);
     }
 
     val expected = baseTx.getActionFee();
@@ -201,13 +199,13 @@ get fun `test ck transaction get action fee tick tock none`() {
     val baseTx = txs.findTransaction<CkPing>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     val tickNoAction = asTickTock(baseTx, false, true);
     val tockNoAction = asTickTock(baseTx, true, true);
 
-    expect(tickNoAction.getActionFee()).toBeNone();
-    expect(tockNoAction.getActionFee()).toBeNone();
+    expect(tickNoAction.getActionFee()).toBeNull();
+    expect(tockNoAction.getActionFee()).toBeNull();
 }
 ",
         "integration/snapshots/test-runner/transaction_get_action_fee_tick_and_tock_match_ord_action_fee/transaction_get_action_fee_tick_tock_without_action_returns_none.stdout.txt",

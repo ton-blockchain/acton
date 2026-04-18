@@ -18,9 +18,10 @@ get fun getCell(): cell { return beginCell().storeInt(32, 32).endCell() }
 
 const TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/io"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/fmt"
 
 struct Counter {
@@ -40,7 +41,7 @@ fun Counter.fromStorage() {
 fun setupTest() {
     val counter = Counter.fromStorage();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -66,7 +67,7 @@ fn test_unknown_get_method_call() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounter999");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -92,7 +93,7 @@ fn test_unknown_get_method_call_with_backtrace_full() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounter999");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -122,7 +123,7 @@ fn test_get_method_call_return_type_mismatch() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<address, tuple>(counter.address, "getCell");
+                val counterRes = net.runGetMethod<address>(counter.address, "getCell");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -150,7 +151,7 @@ fn test_no_arg_get_method_call() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter2");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounter2");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -176,7 +177,7 @@ fn test_no_arg_get_method_call_2() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounter3");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -202,7 +203,7 @@ fn test_no_arg_get_method_call_2_with_backtrace_full() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounter3");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -231,7 +232,7 @@ fn test_get_method_call_shows_exit_code_variant() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounterFail");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -259,11 +260,11 @@ fn test_get_method_call_shows_backtrace_with_full_mode() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounterFail");
                 println("Counter: {}", counterRes);
             }
         "#)
-                .as_str(),
+            .as_str(),
         )
         .build()
         .acton()
@@ -292,7 +293,7 @@ fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
             get fun `test foo`() {
                 val (counter, deployer) = setupTest();
 
-                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounterFail");
                 println("Counter: {}", counterRes);
             }
         "#)
@@ -650,7 +651,7 @@ fn test_build_unknown_file() {
         .test_file(
             "test",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
 
             get fun `test foo`() {
                 val cell = build("counter", "unknown.tolk")
@@ -674,7 +675,7 @@ fn test_build_unknown_contract() {
         .test_file(
             "test",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
 
             get fun `test foo`() {
                 val cell = build("counter")
@@ -699,8 +700,9 @@ fn test_run_get_method_of_not_deployed_contract() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
@@ -729,8 +731,9 @@ fn test_run_get_method_of_not_deployed_contract_with_backtrace_full() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
@@ -760,11 +763,12 @@ fn test_send_message_to_not_deployed_contract() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
-                val sender = net.treasury("treasury");
+                val sender = testing.treasury("treasury");
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
 
                 val msg = createMessage({
@@ -798,11 +802,12 @@ fn test_send_message_to_not_deployed_contract_with_register() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
-                val sender = net.treasury("treasury");
+                val sender = testing.treasury("treasury");
                 val address = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
                 net.registerAddress(address, "some unknown contract");
 
@@ -837,11 +842,12 @@ fn test_run_get_method_of_deployed_contract_with_null_code() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
                         .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
@@ -884,11 +890,12 @@ fn test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full()
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
                         .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
@@ -932,11 +939,12 @@ fn test_send_invalid_message() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
                         .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
@@ -979,8 +987,9 @@ fn test_debug_logs_in_contract() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -991,7 +1000,7 @@ fn test_debug_logs_in_contract() {
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -1093,13 +1102,13 @@ fn test_auto_register_refs_if_any() {
             "test",
             r#"
             import "../../lib/testing/expect"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/io"
             import "../../lib/emulation/network"
-            import "../../lib/testing/transaction_expect"
+            import "../../lib/emulation/testing"
 
             get fun `test action fail`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: ContractState {
                         code: build("main"),
@@ -1182,12 +1191,13 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
             "test",
             r#"
             import "../../lib/testing/expect"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
 
             get fun `test missing library ref is reported`() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val mainStateInit = ContractState {
                     code: build("main"),
                     data: createEmptyCell(),
@@ -1275,10 +1285,10 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -1289,7 +1299,7 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -1326,10 +1336,10 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -1340,7 +1350,7 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -1378,10 +1388,10 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -1392,7 +1402,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -1429,10 +1439,10 @@ fn test_test_all_successful_tx_matcher_with_fail() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -1443,7 +1453,7 @@ fn test_test_all_successful_tx_matcher_with_fail() {
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -1482,10 +1492,10 @@ fn test_test_all_successful_tx_matcher_without_fail() {
             "test",
             r#"
             import "../../lib/io"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test foo`() {
                 val init = ContractState {
@@ -1496,7 +1506,7 @@ fn test_test_all_successful_tx_matcher_without_fail() {
                     stateInit: init,
                 };
 
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
                     value: ton("1"),

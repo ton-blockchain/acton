@@ -1,4 +1,4 @@
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@contracts/messages"
@@ -128,7 +128,7 @@ fun NftCollectionContract.getCollectionData(self): CollectionDataReply {
 }
 
 fun NftCollectionContract.getNftAddressByIndex(self, itemIndex: int): address {
-    return net.runGetMethod(self.address, "get_nft_address_by_index", itemIndex);
+    return net.runGetMethod(self.address, "get_nft_address_by_index", [itemIndex]);
 }
 
 fun NftCollectionContract.royaltyParams(self): RoyaltyParams {
@@ -140,9 +140,5 @@ fun NftCollectionContract.getNftContent(
     itemIndex: int,
     individualNftContent: string,
 ): Cell<OffchainMetadataReply> {
-    return net.runGetMethod(
-        self.address,
-        "get_nft_content",
-        [itemIndex, individualNftContent] as tuple,
-    );
+    return net.runGetMethod(self.address, "get_nft_content", [itemIndex, individualNftContent]);
 }

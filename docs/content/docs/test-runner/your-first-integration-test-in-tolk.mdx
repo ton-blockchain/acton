@@ -99,7 +99,7 @@ get fun `test should deploy`() {
 First, we need to deploy our Counter contract in order to interact with it. But first let's create initial code for the contract.
 
 ```tolk
-import "@acton/build/build"
+import "@acton/build"
 
 import "@contracts/types"
 
@@ -127,13 +127,15 @@ We use `Storage` directly from **types.tolk**. If you add new fields in the futu
 Now let's write our first test in which we will deploy the contract.
 
 ```tolk
+import "@acton/emulation/testing"
+
 get fun `test should deploy`() {
     val counter = Counter.fromStorage({
         id: 0,
         counter: 0,
     });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -147,7 +149,7 @@ get fun `test should deploy`() {
 
 To create a message, we use the familiar `createMessage` function — the same one we use in contracts themselves.
 
-Since we need to deploy a contract, we need a deployer account with some TON coins. We create one using `net.treasury("name")` — this gives us a test account that's automatically funded with coins. `net` is a global namespace that contains functions for sending messages, calling getter methods, and managing the test network.
+Since we need to deploy a contract, we need a deployer account with some TON coins. We create one using `testing.treasury("name")` — this gives us a test account that's automatically funded with coins. `testing` is a global namespace for emulation-only helpers, while `net` contains functions for sending messages and calling getter methods.
 
 When the message is created, we call `net.send()` to send it.
 
@@ -179,13 +181,15 @@ acton test counter.test.tolk
 The complete test code looks like this:
 
 ````tolk
+import "@acton/emulation/testing"
+
 get fun `test should deploy`() {
     val counter = Counter.fromStorage({
         id: 0,
         counter: 0,
     });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -207,13 +211,15 @@ When you write tests, you want to check that in a certain state, your contracts 
 For our `Counter` tests, we need both `counter` and `deployer` contracts. Let's create a `setupTest` function to handle the deployment logic:
 
 ```tolk
+import "@acton/emulation/testing"
+
 fun setupTest() {
     val counter = Counter.fromStorage({
         id: 0,
         counter: 0,
     });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),

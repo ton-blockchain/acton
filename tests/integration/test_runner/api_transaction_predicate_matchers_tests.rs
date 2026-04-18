@@ -52,11 +52,11 @@ fun onBouncedMessage(_: InMessageBounced) {
 "#;
 
 const TEST_PRELUDE: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/message"
 import "../contracts/messages"
 
@@ -79,7 +79,7 @@ fun Harness.create() {
 }
 
 fun deployHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val harness = Harness.create();
 
     val deployMsg = createMessage({
@@ -116,7 +116,7 @@ fun sendBouncedNotice(sender: Treasury, harness: Harness) {
         dest: harness.address,
         body: Ping { queryId: 40 },
     });
-    val sendSingleRes = net.sendSingle(sender.address, trigger);
+    val sendSingleRes = testing.processSingleTraceStep(sender.address, trigger);
     expect(sendSingleRes.outMessages.size()).toEqual(1);
 
     val noticeBody = sendSingleRes.outMessages.at<BounceNotice>(0).loadBody().toCell();
@@ -219,7 +219,7 @@ get fun `test predicate regular transaction fields`() {
         },
         opcode: fun(op: uint32): bool {
             println("opcode=0x{:x}", op);
-            return op == Ping.getDeclaredPackPrefix2();
+            return op == Ping.__getDeclaredPackPrefix();
         },
         computePhaseSkipped: fun(flag: bool): bool {
             println("computePhaseSkipped={}", flag);
@@ -258,7 +258,7 @@ get fun `test predicate deploy and direct find transaction`() {
             return flag;
         },
     });
-    expect(found).toBeDefined();
+    expect(found).toBeNotNull();
 
     expect(deployRes).toNotHaveTx({
         deploy: fun(flag: bool): bool {
@@ -305,7 +305,7 @@ get fun `test predicate failed transaction fields`() {
         },
         opcode: fun(op: uint32): bool {
             println("failed.opcode=0x{:x}", op);
-            return op == Ping.getDeclaredPackPrefix2();
+            return op == Ping.__getDeclaredPackPrefix();
         },
         body: fun(body: cell): bool {
             println("failed.bodyHash=0x{:x}", body.hash());
@@ -387,7 +387,7 @@ get fun `test predicate bounced transaction fields`() {
         },
         opcode: fun(op: uint32): bool {
             println("bounced.opcode=0x{:x}", op);
-            return op == BounceNotice.getDeclaredPackPrefix2();
+            return op == BounceNotice.__getDeclaredPackPrefix();
         },
     });
 }
@@ -402,7 +402,7 @@ fn predicate_matchers_cover_compute_phase_skipped_true() {
         "ae-predicate-compute-phase-skipped-true",
         r#"
 get fun `test predicate compute phase skipped true`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
     val expectedBody = beginCell().storeUint(0x20, 32).endCell();
 

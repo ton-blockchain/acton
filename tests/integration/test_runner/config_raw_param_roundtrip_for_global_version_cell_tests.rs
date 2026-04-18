@@ -4,15 +4,16 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
 const CONFIG_IMPORTS_WITH_BUILD: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 const SIMPLE_CONTRACT: &str = r#"
@@ -58,7 +59,7 @@ fn config_raw_param_roundtrip_for_global_version_cell() {
         "ai-stdlib-config-raw-param-roundtrip",
         r"
 get fun `test ai stdlib config raw param roundtrip`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     val overrideVersion = GlobalVersion {
         version: 12345,
         capabilities: 0xABCD,
@@ -83,10 +84,10 @@ fn config_set_config_rejects_invalid_global_version_cell() {
         "ai-stdlib-config-invalid-global-version",
         r"
 get fun `test ai stdlib config invalid global version cell`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setParamRaw(GLOBAL_VERSION_INDEX, beginCell().endCell());
 
-    val result = net.setConfig(config);
+    val result = testing.setConfig(config);
     expect(result).toBeFalse();
 }
 ",
@@ -100,7 +101,7 @@ fn config_storage_prices_roundtrip_updates_initial_entry() {
         "ai-stdlib-config-storage-prices-roundtrip",
         r"
 get fun `test ai stdlib config storage prices roundtrip`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     var prices = config.getStoragePrices();
     var initial = prices.getInitial();
 
@@ -111,9 +112,9 @@ get fun `test ai stdlib config storage prices roundtrip`() {
 
     prices.setInitial(initial);
     config.setStoragePrices(prices);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig().getStoragePrices().getInitial();
+    val updated = testing.getConfig().getStoragePrices().getInitial();
     expect(updated.bitPrice).toEqual(expectedBitPrice);
     expect(updated.cellPrice).toEqual(expectedCellPrice);
 }
@@ -128,7 +129,7 @@ fn config_gas_prices_update_basechain_and_masterchain_independently() {
         "ai-stdlib-config-gas-prices-roundtrip",
         r"
 get fun `test ai stdlib config gas prices roundtrip`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var basechain = config.getGasPrices(BASECHAIN);
     var masterchain = config.getGasPrices(MASTERCHAIN);
@@ -144,9 +145,9 @@ get fun `test ai stdlib config gas prices roundtrip`() {
 
     config.setGasPrices(basechain, BASECHAIN);
     config.setGasPrices(masterchain, MASTERCHAIN);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig();
+    val updated = testing.getConfig();
     val actualBase = updated.getGasPrices(BASECHAIN);
     val actualMaster = updated.getGasPrices(MASTERCHAIN);
 
@@ -171,15 +172,15 @@ fun calculateForwardFeeLocal(workchain: int8, bits: int, cells: int): coins
 get fun `test ai stdlib config msg forward prices`() {
     val before = calculateForwardFeeLocal(BASECHAIN, 100, 100);
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     var basechainPrices = config.getMsgForwardPrices(BASECHAIN);
     basechainPrices.lumpPrice += 2000;
     val expectedLump = basechainPrices.lumpPrice;
 
     config.setMsgForwardPrices(basechainPrices, BASECHAIN);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updatedPrices = net.getConfig().getMsgForwardPrices(BASECHAIN);
+    val updatedPrices = testing.getConfig().getMsgForwardPrices(BASECHAIN);
     expect(updatedPrices.lumpPrice).toEqual(expectedLump);
 
     val after = calculateForwardFeeLocal(BASECHAIN, 100, 100);
@@ -207,11 +208,11 @@ get fun `test ai stdlib config precompiled contracts`() {
     expect(precompiled.addContractGas(hashA, 999)).toBeFalse();
     expect(precompiled.addContractGas(hashB, 555)).toBeTrue();
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setPrecompiledContractsConfig(precompiled);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val updated = net.getConfig().getPrecompiledContractsConfig();
+    val updated = testing.getConfig().getPrecompiledContractsConfig();
     expect(updated.list).toHaveLength(2);
 
     val first = updated.list.get(hashA).loadValue();
@@ -236,7 +237,7 @@ get fun `test ai stdlib config gas price affects run get method`() {
         stateInit: { code: simpleCode, data: beginCell().endCell() },
     };
 
-    val deployer = net.treasury("ai-config-gas-deployer");
+    val deployer = testing.treasury("ai-config-gas-deployer");
     val deployMsg = createMessage({
         dest: autoAddress,
         bounce: false,
@@ -251,11 +252,11 @@ get fun `test ai stdlib config gas price affects run get method`() {
 
     val before = net.runGetMethod(autoAddress.calculateAddress(), "getParam") as int;
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     var basechain = config.getGasPrices(BASECHAIN);
     basechain.flatGasPrice += 100;
     config.setGasPrices(basechain, BASECHAIN);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
     val after = net.runGetMethod(autoAddress.calculateAddress(), "getParam") as int;
     expect(after).toNotEqual(before);

@@ -4,7 +4,7 @@
 // Do not edit manually — changes will be overwritten
 
 import "@stdlib/gas-payments"
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
@@ -89,5 +89,5 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
 }
 
 fun MyContract.currentCounter(self, value: int32): void {
-    return net.runGetMethod(self.address, "currentCounter", value.toCell());
+    return net.runGetMethod(self.address, "currentCounter", [value.toCell()]);
 }

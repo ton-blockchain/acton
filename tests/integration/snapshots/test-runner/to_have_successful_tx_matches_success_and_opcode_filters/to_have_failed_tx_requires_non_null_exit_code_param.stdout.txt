@@ -9,7 +9,8 @@
 
  > tests/tx_expect.test.tolk (1 test)
   ✗ ae-failed-tx-missing-exit-code [TIME]
-    └─ Error: expect(actual).toHaveFailedTx(params) must have not null exitCode parameter in params
+    └─ Error: expect(actual).toHaveFailedTx(params) must have non zero exitCode parameter in params
+      └─ at tests/tx_expect.test[LINE]
 
  ✗ 1 failed in 1 file
 

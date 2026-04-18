@@ -70,9 +70,7 @@ fun BigArray<T>.last(self): T {
 fun BigArray<T>.push(mutate self, value: T): void {
     var [topLevel, itemsCount] = self.arr;
 
-    if (itemsCount >= 65025) {
-        throw VmExitCode.IntegerOutOfRange;
-    }
+    assert (itemsCount < 65025) throw VmExitCode.IntegerOutOfRange;
 
     val binIdx = itemsCount / 255;
     while (topLevel.size() <= binIdx) {

@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -18,10 +19,18 @@ fn wait_for_transaction_returns_true_in_emulation_mode() {
 {NETWORK_IMPORTS}
 
 get fun `test bi stdlib wait for transaction missing hash before send`() {{
-    val sender = net.treasury("bi_wait_sender");
-    val missingHashSlice = beginCell().storeUint(0xB1, 8).storeUint(0, 248).toSlice();
+    val sender = testing.treasury("bi_wait_sender");
+    val receiver = testing.treasury("bi_wait_receiver");
+    val txs = net.send(
+        sender.address,
+        createMessage({{
+            bounce: false,
+            value: ton("0.2"),
+            dest: receiver.address,
+        }}),
+    );
 
-    expect(net.waitForTransaction(sender.address, missingHashSlice, true, 1, 1)).toEqual(true);
+    expect(txs.wait(true, 1, 1)).toEqual(true);
 }}
 "#
     );

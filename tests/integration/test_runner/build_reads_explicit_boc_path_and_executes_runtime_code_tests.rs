@@ -18,17 +18,17 @@ fn build_reads_explicit_boc_path_and_executes_runtime_code() {
         .test_file(
             "build_boc_path_runtime",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             get fun `test aw build boc path runtime`() {
                 val fromSource = build("simple");
                 val fromBocPath = build("simple", "contracts/simple.boc");
                 expect(fromBocPath).toEqual(fromSource);
 
-                val sender = net.treasury("deployer");
+                val sender = testing.treasury("deployer");
                 val init = ContractState {
                     code: fromBocPath,
                     data: createEmptyCell(),

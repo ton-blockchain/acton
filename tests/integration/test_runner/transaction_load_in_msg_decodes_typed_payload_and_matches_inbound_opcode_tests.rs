@@ -6,6 +6,7 @@ use std::fs;
 const DA_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/tlb/maybe"
 import "../../lib/types/message"
@@ -37,8 +38,8 @@ fn transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode() {
         "da-stdlib-transaction-load-in-msg-inline-opcode",
         r#"
 get fun `test da stdlib transaction load in msg inline opcode`() {
-    val sender = net.treasury("da_sender_inline");
-    val destination = net.randomAddress("da_destination_inline");
+    val sender = testing.treasury("da_sender_inline");
+    val destination = randomAddress("da_destination_inline");
 
     val txs = net.send(
         sender.address,
@@ -86,8 +87,8 @@ fn transaction_load_in_msg_in_fixture_project_matches_inbound_opcode() {
         imports = DA_TRANSACTION_IMPORTS,
         body = r#"
 get fun `test da stdlib transaction load in msg fixture opcode`() {
-    val sender = net.treasury("da_sender_fixture");
-    val destination = net.randomAddress("da_destination_fixture");
+    val sender = testing.treasury("da_sender_fixture");
+    val destination = randomAddress("da_destination_fixture");
     val payload = DaInlinePayload { queryId: 77, amount: 99 };
 
     val txs = net.send(

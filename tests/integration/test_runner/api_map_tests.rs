@@ -6,15 +6,14 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 
 get fun balances(): map<int32, int32> {
-    var m = createEmptyMap<int32, int32>();
+    var m = map<int32, int32> [];
     m.set(1, 10);
     m.set(2, 20);
     return m;
 }
 
 get fun emptyBalances(): map<int32, int32> {
-    var m = createEmptyMap<int32, int32>();
-    return m;
+    return [];
 }
 
 get fun duplicateValues(): map<int32, int32> {
@@ -36,9 +35,9 @@ get fun updatedBalances(): map<int32, int32> {
 
 const MAP_TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 
 struct Ledger {
     address: address
@@ -56,7 +55,7 @@ fun Ledger.fromStorage() {
 
 fun deployLedger(): Ledger {
     val ledger = Ledger.fromStorage();
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMsg = createMessage({
         bounce: false,
         value: ton("1.0"),

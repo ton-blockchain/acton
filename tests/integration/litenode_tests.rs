@@ -40,12 +40,13 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const DEPLOY_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
 
     val deployerInit = ContractState {
         code: build("deployer"),
@@ -69,12 +70,13 @@ fun main() {
 "#;
 
 const PRINT_SEND_RESULT_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
 
     val childInit = ContractState {
         code: build("child"),
@@ -109,12 +111,13 @@ get fun addTen(value: int): int {
 ";
 
 const V3_DEPLOY_GETTER_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
 
     val getterInit = ContractState {
         code: build("getter"),
@@ -206,13 +209,14 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const DEPLOY_MANAGER_AND_WORKER_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../gen/worker.code.tolk"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
 
     val managerInit = ContractState {
         code: build("manager"),
@@ -251,13 +255,14 @@ fun main() {
 "#;
 
 const DESTROY_WORKER_VIA_MANAGER_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../gen/worker.code.tolk"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
 
     val managerAddress = AutoDeployAddress {
         stateInit: {

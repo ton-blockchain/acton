@@ -9,9 +9,9 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const UI_DEPLOY_TEST_TEMPLATE: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 
 get fun `__TEST_NAME__`() {
     val init = ContractState {
@@ -20,7 +20,7 @@ get fun `__TEST_NAME__`() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),

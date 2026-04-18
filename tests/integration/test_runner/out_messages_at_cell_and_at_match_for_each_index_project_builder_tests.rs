@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const CU_NETWORK_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/message"
 import "../contracts/cu_messages"
 "#;
@@ -62,15 +62,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const CU_FIXTURE_TEST: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/message"
 import "../contracts/cu_fixture_messages"
 
 get fun `test cu fixture out messages atcell at consistency`() {
-    val sender = net.treasury("cu_fixture_sender");
+    val sender = testing.treasury("cu_fixture_sender");
 
     val init = ContractState {
         code: build("cu_fixture_out_messages"),
@@ -87,7 +87,7 @@ get fun `test cu fixture out messages atcell at consistency`() {
     }));
     expect(deploy).toHaveSuccessfulDeploy({ to: contractAddress });
 
-    val sendRes = net.sendSingle(
+    val sendRes = testing.processSingleTraceStep(
         sender.address,
         createMessage({
             bounce: false,
@@ -100,7 +100,7 @@ get fun `test cu fixture out messages atcell at consistency`() {
 
     val raw = sendRes.outMessages.atCell(0);
     val parsed = sendRes.outMessages.at<CuFixtureNotice>(0);
-    val viaRaw = (raw as Cell<MessageRelaxed<CuFixtureNotice>>)
+    val viaRaw = (raw as Cell<TlbMessageRelaxed<CuFixtureNotice>>)
         .load({ assertEndAfterReading: false });
 
     expect(parsed.info.dest).toEqual(viaRaw.info.dest);
@@ -134,7 +134,7 @@ fn out_messages_at_cell_and_at_match_for_each_index_project_builder() {
         "cu-stdlib-out-messages-atcell-at-project-builder",
         r#"
 get fun `test cu out messages atcell at project builder`() {
-    val sender = net.treasury("cu_sender");
+    val sender = testing.treasury("cu_sender");
 
     val fanoutInit = ContractState {
         code: build("cu_fanout"),
@@ -151,7 +151,7 @@ get fun `test cu out messages atcell at project builder`() {
     }));
     expect(deploy).toHaveSuccessfulDeploy({ to: fanoutAddress });
 
-    val sendRes = net.sendSingle(
+    val sendRes = testing.processSingleTraceStep(
         sender.address,
         createMessage({
             bounce: false,
@@ -164,12 +164,12 @@ get fun `test cu out messages atcell at project builder`() {
 
     val raw0 = sendRes.outMessages.atCell(0);
     val parsed0 = sendRes.outMessages.at<CuNotice>(0);
-    val viaRaw0 = (raw0 as Cell<MessageRelaxed<CuNotice>>)
+    val viaRaw0 = (raw0 as Cell<TlbMessageRelaxed<CuNotice>>)
         .load({ assertEndAfterReading: false });
 
     val raw1 = sendRes.outMessages.atCell(1);
     val parsed1 = sendRes.outMessages.at<CuNotice>(1);
-    val viaRaw1 = (raw1 as Cell<MessageRelaxed<CuNotice>>)
+    val viaRaw1 = (raw1 as Cell<TlbMessageRelaxed<CuNotice>>)
         .load({ assertEndAfterReading: false });
 
     expect(parsed0.info.dest).toEqual(viaRaw0.info.dest);

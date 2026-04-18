@@ -4,7 +4,7 @@
 // Do not edit manually — changes will be overwritten
 
 import "@stdlib/gas-payments"
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
@@ -61,5 +61,5 @@ fun MyContract.isAllowed(self): bool {
 }
 
 fun MyContract.getTotalSupply(self, ownerAddress: address): int {
-    return net.runGetMethod(self.address, "get_total_supply", ownerAddress);
+    return net.runGetMethod(self.address, "get_total_supply", [ownerAddress]);
 }

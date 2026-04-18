@@ -1,6 +1,6 @@
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 
 import "@contracts/types"
 import "@wrappers/Empty"
@@ -59,8 +59,8 @@ get fun `test unknown message fails with named error`() {
 }
 
 fun setupTest(): (Empty, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("not_deployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
     val contract = Empty.fromStorage(Storage { owner: deployer.address });
     val res = contract.deploy(deployer.address, { value: ton("0.05") });

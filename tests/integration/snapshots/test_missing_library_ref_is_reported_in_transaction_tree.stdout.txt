@@ -15,7 +15,7 @@
                ├── Compute phase failed: Cell underflow
                ├── Library 96A296D224F285C67BEE93C30F8A309157F0DAA35DC5B87E410B78630A09CFC7 is missing, which is what causes this error
                ├── This most likely happened because the library is not registered in tests
-               ├── To manually register library use vm.registerLibrary(code) somewhere in setupTests()-like function
+               ├── To manually register library use testing.registerLibrary(code) somewhere in setupTests()-like function
                ├── Learn more about libraries in documentation: [ACTON_DOCS_URL]/advanced/libraries/
                └── account created
 

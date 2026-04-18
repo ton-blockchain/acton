@@ -5,43 +5,30 @@ description: "network.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
-Module for blockchain emulation.
+Module for sending messages to a real or emulated blockchain.
 
-This is the central module for interacting with the emulated blockchain environment.
-It provides capabilities to send messages, manage time, inspect account states, and perform other network-level operations.
+It provides capabilities to send messages to contracts, calling their getters,
+and performing other network-level operations.
+
+Note: while writing tests, also use `testing.xxx` methods.
+While writing scripts, also use `scripts.xxx` methods.
 
 Examples:
 ```tolk
 // Setup
-val deployer = net.wallet("deployer");
+val deployer = scripts.wallet("deployer");
 val contract = build("MyContract");
 
 // Interact
 val msg = createMessage({ ... });
-val results = net.send(deployer.address, msg);
+val txs = net.send(deployer.address, msg);
 
 // Check state
-val balance = net.balance(contract.address);
+val balance = scripts.fetchAccountBalance(contract.address);
 val seqno = net.runGetMethod<int>(contract.address, "seqno");
 ```
 
 ## Definitions
-
-## `CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT`
-
-```tolk
-const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L36" />
-
-## `CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE`
-
-```tolk
-const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L37" />
 
 ## `net`
 
@@ -49,7 +36,23 @@ const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 struct net
 ```
 
-Abstraction representing a blockchain and methods of interacting with it.
+Root module for sending messages to a real or emulated blockchain.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L37" />
+
+## `CANNOT_RUN_GET_METHOD_OF_UNDEPLOYED_CONTRACT`
+
+```tolk
+const CANNOT_RUN_GET_METHOD_OF_UNDEPLOYED_CONTRACT = 678
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L39" />
+
+## `CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE`
+
+```tolk
+const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
+```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L40" />
 
@@ -68,25 +71,6 @@ Represents a set of parameters for creating a message.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L43" />
 
-## `ExtOutMsgInfo`
-
-```tolk
-struct ExtOutMsgInfo {
-    /// Internal source address.
-    src: address
-    /// Optional external destination address.
-    dst: address
-    /// Logical time when the message was created.
-    createdLt: int64
-    /// Unix timestamp when the message was created.
-    createdAt: uint32
-}
-```
-
-Information about external outgoing message.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L51" />
-
 ## `ChildTxsIds`
 
 ```tolk
@@ -95,7 +79,7 @@ type ChildTxsIds = array<int>
 
 Represents a list of child transactions IDs (LT) for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L63" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L51" />
 
 ## `OutMessages`
 
@@ -105,7 +89,7 @@ type OutMessages = array<cell>
 
 Represents a list of out messages for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L66" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L54" />
 
 ## `ExtOutList`
 
@@ -115,12 +99,12 @@ type ExtOutList = array<cell>
 
 Represents a list of external outgoing messages for single send result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L69" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L57" />
 
 ## `ExtOutList.at`
 
 ```tolk
-fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg>
+fun ExtOutList.at<Msg>(self, index: int): TlbExtMessageRelaxed<Msg>
 ```
 
 Returns the external outgoing message at the given index with given type.
@@ -128,12 +112,12 @@ Returns the external outgoing message at the given index with given type.
 If the message is not of the requested type, loading fails with exit code 63.
 Use [ExtOutList.atOrNull](#extoutlistatornull) to handle this case without throwing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L75" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L63" />
 
 ## `ExtOutList.atOrNull`
 
 ```tolk
-fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>?
+fun ExtOutList.atOrNull<Msg>(self, index: int): TlbExtMessageRelaxed<Msg>?
 ```
 
 Returns the external outgoing message at the given index with given type or
@@ -143,7 +127,7 @@ If message is not of the requested type, `index < 0`, or `index >= self.size()`,
 this method returns `null` instead of throwing.
 Use [ExtOutList.at](#extoutlistat) if you do not want to handle the `null` case.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L86" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L74" />
 
 ## `OutMessages.atCell`
 
@@ -155,12 +139,12 @@ Returns the out message at the given index as a raw cell.
 
 To get parsed message, use [OutMessages.at](#outmessagesat) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L108" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L96" />
 
 ## `OutMessages.at`
 
 ```tolk
-fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg>
+fun OutMessages.at<Msg>(self, index: int): TlbMessageRelaxed<Msg>
 ```
 
 Returns the out message at the given index as a parsed message of given type.
@@ -169,14 +153,14 @@ To get raw cell, use [OutMessages.atCell](#outmessagesatcell) method.
 
 If actual message body has a different type, loading will fail.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L117" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L105" />
 
 ## `SendResult`
 
 ```tolk
 struct SendResult {
     /// Raw cell with encoded transaction.
-    tx: Cell<Transaction>
+    tx: Cell<TlbTransaction>
     /// List of child transactions IDs.
     /// This transactions are directly produced by this transaction.
     childTxs: ChildTxsIds
@@ -184,7 +168,7 @@ struct SendResult {
     parentLt: int?
     /// Raw cell with encoded out actions.
     /// Use [SendResult.allOutActions] to load all actions.
-    outActions: Cell<OutList>
+    outActions: Cell<TlbOutList>
     /// All out messages produced by this transaction.
     outMessages: OutMessages
     /// Amount of gas used by this transaction.
@@ -196,7 +180,7 @@ struct SendResult {
 
 Represents a single send result obtained from [net.send](#netsend) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L150" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L138" />
 
 ## `SendResult.allOutActions`
 
@@ -206,7 +190,7 @@ fun SendResult.allOutActions(self): OutActionList
 
 Returns all out actions produced by this transaction as a list.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L170" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L158" />
 
 ## `SendResultList`
 
@@ -220,7 +204,7 @@ This list represent all transactions produced by a [net.send](#netsend) call.
 
 To get a single send result, use [SendResultList.at](#sendresultlistat) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L179" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L167" />
 
 ## `SendResultList.at`
 
@@ -230,78 +214,26 @@ fun SendResultList.at(self, index: int): SendResult
 
 Returns the send result at the given index.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L182" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L170" />
 
-## `TxCursor`
-
-```tolk
-struct TxCursor {
-    id: int
-}
-```
-
-Opaque cursor for step-by-step transaction execution.
-
-Use [net.sendIter](#netsenditer) to create it, then drain it in parts with [TxCursor.executeN](#txcursorexecuten),
-[TxCursor.executeTill](#txcursorexecutetill), or [TxCursor.executeFrom](#txcursorexecutefrom).
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L190" />
-
-## `TxCursor.isDone`
+## `SendResultList.giveName`
 
 ```tolk
-fun TxCursor.isDone(self): bool
+fun SendResultList.giveName(self, nameForUI: string): void
 ```
 
-Returns `true` when the cursor has no more pending transactions to execute.
+Give a custom name for a trace chain produced by [net.send](#netsend).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L195" />
+The custom name is used in the Test UI and gas/fee profiling reports instead of "trace N".
 
-## `TxCursor.close`
-
+Example:
 ```tolk
-fun TxCursor.close(self): void
+val txs = net.send(deployer.address, msg);
+txs.giveName("deploy-counter");
+expect(txs).toHaveAllSuccessfulTxs();
 ```
 
-Discards any remaining pending transactions for this cursor.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L200" />
-
-## `TxCursor.executeN`
-
-```tolk
-fun TxCursor.executeN(self, n: int): SendResultList
-```
-
-Executes up to [n](#txcursorexecuten) transactions from the cursor and returns only this executed segment.
-
-This is useful when you need to inspect the first few hops of a long chain without
-draining the whole queue.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L208" />
-
-## `TxCursor.executeTill`
-
-```tolk
-fun TxCursor.executeTill<Msg = unknown>(self, params: SearchParams = {}): SendResultList
-```
-
-Executes transactions until one of them matches [params](#txcursorexecutetill), then returns the executed segment.
-
-The matching transaction is included in the returned list. If no matching transaction is found
-before the queue is exhausted, this function fails the test.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L216" />
-
-## `TxCursor.executeFrom`
-
-```tolk
-fun TxCursor.executeFrom(self): SendResultList
-```
-
-Executes all remaining pending transactions and returns only this executed segment.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L232" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L184" />
 
 ## `SendResultList.wait`
 
@@ -319,9 +251,9 @@ Wait for the transaction to be applied on the blockchain.
 This method is useful when broadcasting transactions to the real network.
 It polls the network until the transaction is applied or the maximum number of attempts is reached.
 
-In emulation mode (without `--net`), this method returns immediately with `true`.
-
 Returns `true` if transaction is found and `false` otherwise.
+
+In emulation mode (without `--net`), this method returns immediately with `true`.
 
 Example:
 ```tolk
@@ -338,7 +270,7 @@ val result = net.send(wallet.address, message);
 val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L259" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L211" />
 
 ## `SearchParams`
 
@@ -356,9 +288,7 @@ struct SearchParams {
     success: (bool -> bool) | bool | null = null
     /// Whether the compute phase of transaction was aborted and transaction was reverted.
     aborted: (bool -> bool) | bool | null = null
-    /// Whether the transaction is a deploy transaction.
-    ///
-    /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    /// Whether it's a deploy transaction (that changes the account status from "NonExisting" to "Active").
     deploy: (bool -> bool) | bool | null = null
     /// Whether the transaction message is bounceable.
     bounce: (bool -> bool) | bool | null = null
@@ -377,7 +307,38 @@ struct SearchParams {
 
 Represents a set of parameters to search for a transaction in the transaction list.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L287" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L246" />
+
+## `SearchParams.hasPredicates`
+
+```tolk
+fun SearchParams.hasPredicates(self): bool
+```
+
+Check if user-provided SearchParams has any lambdas.
+If not (most common), fast FFI path will be used.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L310" />
+
+## `SearchParams.toScalarFFITuple`
+
+```tolk
+fun SearchParams.toScalarFFITuple(self): tuple
+```
+
+Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L327" />
+
+## `SearchParams.toPredicateFFITuple`
+
+```tolk
+fun SearchParams.toPredicateFFITuple(self): tuple
+```
+
+Convert SearchParams to a tuple of [tag, predicate] pairs for FFI.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L346" />
 
 ## `ExternalOutSearchParams`
 
@@ -390,18 +351,20 @@ struct ExternalOutSearchParams {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L318" />
+Represents a set of parameters to search for an external-out message.
 
-## `Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches`
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L365" />
+
+## `TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches`
 
 ```tolk
-fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = unknown>(
+fun TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches<TBody>(
     self,
-    params: ExternalOutSearchParams = {},
+    params: ExternalOutSearchParams,
 ): bool
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L325" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L372" />
 
 ## `SendResultList.findExternalOutMessage`
 
@@ -409,17 +372,17 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = unknow
 fun SendResultList.findExternalOutMessage<TBody = unknown>(
     self,
     params: ExternalOutSearchParams = {},
-): Maybe<Message<TBody, ExternalOutMessageInfo>>
+): TlbMessage<TBody, TlbExternalOutMessageInfo>?
 ```
 
 Find a external-out message in the send result list by specified parameters.
 
 Example:
 ```tolk
-val tx = net.send(deployer.address, message);
-val result = tx.findExternalOutMessage({ from: counter.address });
-expect(result).toBeDefined();
-val tx = result.unwrap();
+val txs = net.send(deployer.address, message);
+val result = txs.findExternalOutMessage({ from: counter.address });
+expect(result).toBeNotNull();
+val tx = result!;
 ```
 
 You can specify an optional type argument, specifying the message type to search for;
@@ -432,29 +395,27 @@ tx.findExternalOutMessage<IncrementEvent>({ from: counter.address });
 //                        ^^^^^^^^^^^^^^ search for message with IncrementEvent opcode
 ```
 
-If the message is not found, returns None.
+If the message is not found, returns `null`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L375" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L422" />
 
 ## `SendResultList.findTransaction`
 
 ```tolk
-fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {}): Maybe<
-    Transaction,
->
+fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {}): TlbTransaction?
 ```
 
 Find a transaction in the send result list by specified parameters.
 
 Example:
 ```tolk
-val tx = net.send(deployer.address, message);
-val result = tx.findTransaction({ to: counter.address });
-expect(result).toBeDefined();
-val tx = result.unwrap();
+val txs = net.send(deployer.address, message);
+val result = txs.findTransaction({ to: counter.address });
+expect(result).toBeNotNull();
+val tx = result!;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L416" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L463" />
 
 ## `net.send`
 
@@ -464,7 +425,7 @@ fun net.send(from: address, message: OutMessage): SendResultList
 
 Send a message from a specified address.
 
-In broadcast mode, sending to the real network is attempted only when `from`
+In broadcast mode (with `--net`), sending to the real network is attempted only when `from`
 matches one of the wallets opened at script startup.
 If `from` is not an opened wallet address, this method falls back to normal
 emulator execution, even when [net.isBroadcasting](#netisbroadcasting) is `true`.
@@ -484,69 +445,35 @@ get fun `test send message`() {
 
 Returns a list of send results representing all transactions produced by this send call.
 
-See [net.sendSingle](#netsendsingle) if you need to send a single message without out message processing.
+See [testing.processSingleTraceStep](../testing/#testingprocesssingletracestep) if you need to send a single message without out message processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L454" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L499" />
 
-## `net.sendIter`
+## `ExternalInMessage`
 
 ```tolk
-fun net.sendIter(from: address, message: OutMessage): TxCursor
+struct ExternalInMessage {
+    messageCell: cell
+}
 ```
 
-Start step-by-step execution for a message sent from [from](#netsend).
+The response from `net.createExternalMessage`.
+It's an already composed message cell, ready to be sent by `net.sendExternal`.
 
-In contrast to [net.send](#netsend), this method does not execute the whole transaction chain eagerly.
-Instead it returns a cursor that can be advanced in batches.
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L510" />
 
-This API is emulation-only and is intended for programmable partial execution workflows
-such as large cascades and interleaving multiple message chains.
-
-Step-by-step execution is not available in broadcast mode or test-runner debug mode.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L472" />
-
-## `net.sendSingle`
+## `net.createExternalMessage`
 
 ```tolk
-fun net.sendSingle(from: address, message: OutMessage): SendResult
-```
-
-Send a single message from a specified address.
-
-In contrast to [net.send](#netsend), this method doesn't process out messages, but returns
-a single send result with this out messages.
-
-This method is useful for bounce testing where you want to simulate a bounced message.
-
-Example:
-```tolk
-val bouncedMsg = createMessage({
-    bounce: false,
-    value: ton("0.95"),
-    dest: deployer.address,
-    body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
-}).bounced();
-
-net.sendSingle(notDeployer.address, bouncedMsg);
-```
-
-See [net.send](#netsend) if you need to send a message and process out messages.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L498" />
-
-## `createExternalMessage`
-
-```tolk
-fun createExternalMessage<TBody>(
+fun net.createExternalMessage<TBody>(
     dest: address,
     body: TBody,
     stateInit: StateInit? = null,
     src: any_address? = null,
-): OutMessage
+): ExternalInMessage
 ```
 
-Creates an External-in message.
+Creates an external-in message.
 Body is always packed into the Either Right (in the reference).
 If `StateInit` is present it is also packed in the Either Right (in the reference).
 Full TL-B scheme of the message is.
@@ -558,38 +485,19 @@ message$_ {X:Type} info:CommonMsgInfo
   body:(Either X ^X) = Message X;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L514" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L525" />
 
 ## `net.sendExternal`
 
 ```tolk
-fun net.sendExternal(msg: OutMessage): SendResultList?
+fun net.sendExternal(msg: ExternalInMessage): SendResultList?
 ```
 
-Sends an external incoming message to the specified destination address.
+Sends an external-in message to the specified destination address.
 Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 Returns `null` if external message was not accepted or destination account does not exist.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L552" />
-
-## `net.runTickTock`
-
-```tolk
-fun net.runTickTock(onAccount: address, isTock: bool): SendResultList
-```
-
-Runs a tick or tock transaction on the specified account.
-
-Tick-tock transactions have no incoming message and are triggered by the blockchain
-on special accounts (e.g., elector, config).
-
-Example:
-```tolk
-val results = net.runTickTock(electorAddress, false); // run tick
-val results = net.runTickTock(electorAddress, true);  // run tock
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L570" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L561" />
 
 ## `OutMessage.bounced`
 
@@ -609,7 +517,7 @@ val msg = createMessage({
 val bouncedMsg = msg.bounced();
 ```
 
-This is useful for testing single messages with [net.sendSingle](#netsendsingle) method.
+This is useful for testing single messages with [testing.processSingleTraceStep](../testing/#testingprocesssingletracestep).
 
 Example:
 ```tolk
@@ -620,157 +528,10 @@ val bouncedMsg = createMessage({
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
 
-net.sendSingle(notDeployer.address, bouncedMsg);
+testing.processSingleTraceStep(notDeployer.address, bouncedMsg);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L599" />
-
-## `Treasury`
-
-```tolk
-struct Treasury {
-    address: address
-}
-```
-
-Treasury is a special contract that is used to deploy other contracts.
-
-To create a treasury, use the [net.treasury](#nettreasury) method.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L608" />
-
-## `net.treasury`
-
-```tolk
-fun net.treasury(name: string): Treasury
-```
-
-Create a treasury with a specified name.
-
-Calling this method with same name will return the same treasury.
-
-Example:
-```tolk
-get fun `test mint`() {
-    val treasury = net.treasury("treasury");
-    // ...
-}
-```
-
-Note: in scripts always use [net.wallet](#netwallet) instead.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L625" />
-
-## `Wallet`
-
-```tolk
-struct Wallet {
-    address: address
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L649" />
-
-## `net.wallet`
-
-```tolk
-fun net.wallet(name: string): Wallet
-```
-
-Creates a new wallet for use in scripts. Unlike `net.treasury`, the wallet
-can refer to a real wallet described in Acton.toml, and therefore can be used
-in scripts launched with `--net` to execute transactions on the real blockchain.
-
-Without `--net`, the wallet refers to an internal wallet, created in the
-same way as in `net.treasury`.
-
-Note: in tests, use [net.treasury](#nettreasury).
-
-Example:
-```tolk
-/// Script that deploys a counter contract using a wallet to real blockchain.
-fun main() {
-    val deployer = net.wallet("deployer");
-    val counter = Counter.fromStorage({
-        id: 8,
-        counter: 0,
-    });
-
-    val result = counter.deploy(deployer.address, ton("0.05"));
-    result.wait();
-
-    println("Deployed counter to {}", counter.address);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L678" />
-
-## `Wallet.toKeyPair`
-
-```tolk
-fun Wallet.toKeyPair(self): KeyPair
-```
-
-Returns the key pair for a wallet configured in wallets.toml or global.wallets.toml.
-
-The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign](../../crypto/crypto/#cryptosign)
-and [crypto.rawSign](../../crypto/crypto/#cryptorawsign). This is available only for wallets opened by
-[net.wallet](#netwallet) when the script was started with `--net`.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L697" />
-
-## `Wallet.privateKey`
-
-```tolk
-fun Wallet.privateKey(self): int
-```
-
-Returns the wallet private key as a 32-byte Ed25519 seed.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L709" />
-
-## `Wallet.publicKey`
-
-```tolk
-fun Wallet.publicKey(self): int
-```
-
-Returns the wallet public key.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L714" />
-
-## `Wallet.walletId`
-
-```tolk
-fun Wallet.walletId(self): int
-```
-
-Returns the wallet id used by the opened wallet contract.
-
-For wallet v5 this is the wallet_id stored in wallet data and used for
-signed requests.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L722" />
-
-## `Wallet.sign`
-
-```tolk
-fun Wallet.sign(self, data: cell): slice
-```
-
-Hashes and signs a cell with the wallet private key.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L733" />
-
-## `Wallet.rawSign`
-
-```tolk
-fun Wallet.rawSign(self, data: int): slice
-```
-
-Signs an already computed 256-bit hash with the wallet private key.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L738" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L594" />
 
 ## `net.isBroadcasting`
 
@@ -778,9 +539,7 @@ Signs an already computed 256-bit hash with the wallet private key.
 fun net.isBroadcasting(): bool
 ```
 
-Check if the script is running in broadcasting mode.
-
-Returns `true` if the script was run with `--net`, `false` otherwise.
+Returns `true` if the script is running in broadcasting mode (with `--net`), `false` otherwise.
 
 This is useful for writing scripts that behave differently in emulation and broadcasting modes.
 
@@ -793,7 +552,7 @@ if (net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L756" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L612" />
 
 ## `net.enableBroadcast`
 
@@ -808,7 +567,7 @@ Useful for testing broadcasting logic in emulation mode.
 It toggles only the runtime broadcast flag.
 
 Wallets are loaded once at startup (when the script is launched with CLI `--net`).
-Calling [net.enableBroadcast](#netenablebroadcast) later does not load wallets, so [net.wallet](#netwallet) can still fail
+Calling [net.enableBroadcast](#netenablebroadcast) later does not load wallets, so [scripts.wallet](../scripts/#scriptswallet) can still fail
 and wallet-backed real sends can remain unavailable.
 
 Example:
@@ -820,7 +579,7 @@ if (net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L778" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L634" />
 
 ## `net.disableBroadcast`
 
@@ -842,15 +601,15 @@ if (!net.isBroadcasting()) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L795" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L651" />
 
 ## `net.runGetMethod`
 
 ```tolk
-fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: string, args: Args? = null): Ret
+fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unknown> = []): Ret
 ```
 
-Run a get method of a contract by its name.
+Run a get method of a contract by its name or id.
 
 Imagine you have the following get method in the contract:
 ```tolk
@@ -870,20 +629,20 @@ If the get method accepts single argument, you can pass it as a third argument.
 get fun get_wallet_address(ownerAddress: address): address { ... }
 ```
 ```tolk
-val address = net.runGetMethod<address>(wallet.address, "get_wallet_address", deployer.address);
+val address = net.runGetMethod<address>(wallet.address, "get_wallet_address", [address("...")]);
 ```
 
-If the get method accepts several arguments, you can pass them as a third argument in tuple.
+If the get method accepts several arguments, you can pass them as a third argument as an array.
 ```tolk
 get fun do_smth(owner: address, id: int): address { ... }
 ```
 ```tolk
-val address = net.runGetMethod<address>(wallet.address, "do_smth", [deployer.address, 10] as tuple);
+val address = net.runGetMethod<address>(wallet.address, "do_smth", [deployer.address, 10]);
 ```
 
-## With struct return type
+## Specify the method's return type as a type parameter
 
-If get method returns a struct, specify the type of the struct as a first type argument:
+Specify the return type as a generic parameter:
 ```tolk
 get fun get_jetton_data(): JettonDataReply { ... }
 ```
@@ -891,125 +650,12 @@ get fun get_jetton_data(): JettonDataReply { ... }
 val data = net.runGetMethod<JettonDataReply>(wallet.address, "get_jetton_data");
 ```
 
-## With tensor return type
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L695" />
 
-If get method returns a tensor, specify tuple as a first type argument:
-```tolk
-get fun get_all_data(): (int, slice) { ... }
-```
-```tolk
-val data = net.runGetMethod<tuple>(wallet.address, "get_all_data");
-val first = data.get(0) as int;
-val second = data.get(1) as int;
-```
-
-If you need to run a get method by its ID, use [net.runGetMethodById](#netrungetmethodbyid) instead.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L853" />
-
-## `net.runGetMethodById`
+## `randomAddress`
 
 ```tolk
-fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? = null): Ret
-```
-
-Run a get method of a contract by its ID.
-
-If you need to run a get method by its name, use [net.runGetMethod](#netrungetmethod) instead.
-
-Example:
-```tolk
-val data = net.runGetMethodById<JettonDataReply>(wallet.address, 0x17b02);
-```
-
-See [net.runGetMethod](#netrungetmethod) for more information.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L868" />
-
-## `net.isDeployed`
-
-```tolk
-fun net.isDeployed(addr: address): bool
-```
-
-Check if a contract with a specified address is deployed.
-
-Returns `true` if the contract is deployed, `false` otherwise.
-
-Example:
-```tolk
-fun JettonWallet.getJettonBalance(self): coins {
-    if (!net.isDeployed(self.address)) {
-        return 0; // return 0 if contract is not deployed
-    }
-
-    // and if deployed, actually run get method
-    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
-    return result.jettonBalance;
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L888" />
-
-## `net.getDeployedCode`
-
-```tolk
-fun net.getDeployedCode(addr: address): cell?
-```
-
-Get the code of a deployed contract by its address.
-
-If the contract is not deployed, returns null.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L895" />
-
-## `net.waitForTransaction`
-
-```tolk
-fun net.waitForTransaction(
-    addr: address,
-    messageBodyHash: slice,
-    quiet: bool = false,
-    attempts: int = 20,
-    sleepDuration: int = 1000,
-): bool
-```
-
-Wait for a transaction with the specified message hash.
-
-This method polls the network until the transaction is applied or the
-maximum number of attempts is reached.
-
-Returns true if transaction is found and false otherwise.
-For `custom:<name>` and `localnet` networks, transaction links in output
-use `[networks.<name>].explorer` from `Acton.toml` as base URL.
-Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing).
-If `explorer` is not set, Acton derives link from `api.v2` as
-`<scheme>://<host>/explorer/tx/<hash>`.
-For default `localnet`, this becomes
-`http://localhost:<litenode.port-or-5411>/explorer/tx/<hash>`.
-
-Example:
-```tolk
-val txs = net.send(wallet.address, message);
-val tx = txs.at(0).tx.load();
-val inMsg = tx.messages.load().inMsg.unwrap().load();
-
-var body = inMsg.body;
-body.skipBits(1); // skip Either tag bit
-val bodyHashSlice = beginCell().storeUint(body.hash(), 256).toSlice();
-
-val ok = net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 20, 1000);
-```
-
-See [SendResultList.wait](#sendresultlistwait) for high-level API.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L927" />
-
-## `net.randomAddress`
-
-```tolk
-fun net.randomAddress(name: string? = null, wc: int = 0): address
+fun randomAddress(name: string? = null, wc: int = 0): address
 ```
 
 Generate a random address.
@@ -1019,11 +665,11 @@ This allows test runner to show the name instead of the address in the test outp
 
 Example:
 ```tolk
-val address = net.randomAddress("random_user");
-val masterchainAddress = net.randomAddress("random_user", -1);
+val address = randomAddress("random_user");
+val masterchainAddress = randomAddress("random_user", -1);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L953" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L745" />
 
 ## `net.registerAddress`
 
@@ -1044,7 +690,7 @@ Example:
 net.registerAddress(address, "my_address");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L994" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L784" />
 
 ## `net.registerCodeCell`
 
@@ -1062,51 +708,7 @@ Example:
 net.registerCodeCell(code, "my_code");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1007" />
-
-## `net.getAccountState`
-
-```tolk
-fun net.getAccountState(addr: address): AccountInfo?
-```
-
-Returns current account state for address or null if no information available or
-contract is not deployed.
-
-The account state includes balance, storage information, and other account data,
-see [AccountInfo](../../types/transaction/#accountinfo) type for more information.
-
-Example:
-```tolk
-val state = net.getAccountState(contract.address);
-if (state != null) {
-    println("Balance: {:ton}", state.storage.balance.grams);
-} else {
-    println("Account not found");
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1026" />
-
-## `net.getAccountStorageFee`
-
-```tolk
-fun net.getAccountStorageFee(addr: address, seconds: int): coins?
-```
-
-Returns storage fee for address for specified amount of seconds.
-
-Returns `null` if the contract with given address is not deployed.
-
-Example:
-```tolk
-val storageFee = net.getAccountStorageFee(contract.address, 86400); // 1 day
-if (storageFee != null) {
-    println("Daily storage fee: {:ton}", storageFee);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1046" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L797" />
 
 ## `net.loadLibrary`
 
@@ -1118,384 +720,7 @@ Load library by hash, first from the current emulated blockchain and then from t
 
 Returns null if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1058" />
-
-## `net.fetchAndRegisterLibrary`
-
-```tolk
-fun net.fetchAndRegisterLibrary(hash: string): bool
-```
-
-Load library by hash from emulated blockchain or real network and register it
-in the current emulated blockchain.
-
-Returns false if library is not found.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1066" />
-
-## `net.setNow`
-
-```tolk
-fun net.setNow(now: uint32): void
-```
-
-Set the current Unix timestamp for time forwarding emulation.
-
-This is useful for testing time-dependent contracts.
-
-Example:
-```tolk
-val futureTime = net.now() + 1000; // 1000 seconds from now
-net.setNow(futureTime);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1084" />
-
-## `net.now`
-
-```tolk
-fun net.now(): uint32
-```
-
-Get the current Unix timestamp used in emulation.
-
-Returns the current time in the emulated blockchain.
-
-Example:
-```tolk
-val currentTime = net.now();
-println("Current emulation time: {}", currentTime);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1100" />
-
-## `net.topUp`
-
-```tolk
-fun net.topUp(to: address, amount: coins): void
-```
-
-Topup an address with a specified amount of TON.
-
-Example:
-```tolk
-net.topUp(address, ton("10"));
-```
-
-Note: This function for tests only!
-For testnet TON airdrop use `acton wallet airdrop command.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1113" />
-
-## `net.balance`
-
-```tolk
-fun net.balance(of: address): coins
-```
-
-Get the balance of an address.
-
-Returns 0 if the address is not deployed.
-
-Example:
-```tolk
-val balance = net.balance(address);
-println("{:ton}", balance);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1132" />
-
-## `net.getAccount`
-
-```tolk
-fun net.getAccount(addr: address): Account
-```
-
-Returns the account state for an address in emulation.
-
-The returned value is either `AccountInfo` for an existing account
-or `AccountNone` if the account does not exist.
-
-Example:
-```tolk
-val acc = net.getAccount(addr);
-if (acc is AccountInfo) {
-    println("Account exists");
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1152" />
-
-## `net.setAccount`
-
-```tolk
-fun net.setAccount(addr: address, acc: Account): void
-```
-
-Sets the account state for an address in emulation.
-
-If the account already exists, preserves `lastTransHash` and `lastTransLt`
-from the existing shard account. Otherwise, initializes them to zero.
-
-Example:
-```tolk
-val acc = net.getAccount(addr);
-net.setAccount(addr, acc);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1167" />
-
-## `net.getShardAccount`
-
-```tolk
-fun net.getShardAccount(addr: address): ShardAccount?
-```
-
-Returns the shard account state for an address in emulation.
-
-The returned shard account can represent an uninitialized account.
-
-Example:
-```tolk
-val shard = net.getShardAccount(addr);
-if (shard != null) {
-    println("Last LT: {}", shard.lastTransLt);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1194" />
-
-## `net.setShardAccount`
-
-```tolk
-fun net.setShardAccount(addr: address, account: ShardAccount?): void
-```
-
-Sets the shard account state for an address in emulation.
-
-Pass `null` to reset the account to an empty state.
-
-Example:
-```tolk
-val shard = net.getShardAccount(addr);
-if (shard != null) {
-    net.setShardAccount(addr, shard);
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1213" />
-
-## `net.saveSnapshot`
-
-```tolk
-fun net.saveSnapshot(path: string): bool
-```
-
-Save the current emulation world state to a JSON snapshot file.
-
-Returns `true` on successful write and `false` on serialization or host I/O failure.
-
-Example:
-```tolk
-net.topUp(addr, ton("3"));
-val saved = net.saveSnapshot("world-state.json");
-expect(saved).toBeTrue();
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1231" />
-
-## `net.loadSnapshot`
-
-```tolk
-fun net.loadSnapshot(path: string): bool
-```
-
-Load an emulation world state from a JSON snapshot file.
-
-On success, replaces the current local emulation state with the snapshot contents.
-Returns `false` when the file is missing, malformed, or cannot be applied.
-
-Example:
-```tolk
-val loaded = net.loadSnapshot("world-state.json");
-expect(loaded).toBeTrue();
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1245" />
-
-## `net.setConfig`
-
-```tolk
-fun net.setConfig(config: Config): bool
-```
-
-Sets the blockchain configuration.
-
-This function updates the entire blockchain configuration with a new configuration dict.
-The configuration is validated before being applied. If validation fails, the function
-returns false and the configuration is not updated.
-
-For detailed information about blockchain configuration parameters, see the
-[TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
-
-Parameters:
-- `config`: The new [Config](../config/#config) map containing configuration parameters (indices 0-90)
-
-Returns: `true` if the configuration was successfully updated, `false` if validation failed.
-
-Example:
-```tolk
-var config = net.getConfig();
-val storagePrices = config.getStoragePrices();
-var pricesDict = storagePrices;
-pricesDict.setInitial(StoragePrices {
-    initialUnixTime: 0,
-    bitPrice: 1,
-    cellPrice: 1000,
-    masterchainBitPrice: 1,
-    masterchainCellPrice: 1000
-});
-config.setStoragePrices(pricesDict);
-val success = net.setConfig(config);
-if (success) {
-    println("Configuration updated successfully");
-}
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1281" />
-
-## `net.getConfig`
-
-```tolk
-fun net.getConfig(): Config
-```
-
-Retrieves the current blockchain configuration.
-
-Returns a map of all blockchain configuration parameters indexed from 0-90.
-The configuration includes gas prices, storage costs, validator settings, and other
-network parameters. In broadcast mode, it is fetched from the selected real network.
-Use specialized getter functions like [Config.getGasPrices](../config/#configgetgasprices),
-[Config.getStoragePrices](../config/#configgetstorageprices), or [Config.getGlobalVersion](../config/#configgetglobalversion) to access specific parameters.
-
-For detailed information about blockchain configuration parameters, see the
-[TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
-
-Returns: A [Config](../config/#config) map containing all current blockchain configuration parameters.
-
-Example:
-```tolk
-val config = net.getConfig();
-
-// Access specific configuration
-val gasPrice = config.getGasPrices(BASECHAIN);
-val storagePrices = config.getStoragePrices();
-val globalVersion = config.getGlobalVersion();
-
-println("Network version: {}", globalVersion.version);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1335" />
-
-## `crc16`
-
-```tolk
-fun crc16(data: string): int
-```
-
-Calculate the CRC16 checksum of a string.
-Unlike a compile-time `"str".crc16()` method, it works with non-constant strings.
-
-Example:
-```tolk
-val crc = crc16(someStr);
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1346" />
-
-## `ScalarSearchParamsForFFI`
-
-```tolk
-struct ScalarSearchParamsForFFI {
-    to: address? = null
-    from: address? = null
-    value: coins? = null
-    exitCode: int32? = null
-    success: bool? = null
-    aborted: bool? = null
-    deploy: bool? = null
-    bounce: bool? = null
-    bounced: bool? = null
-    opcode: uint32? = null
-    actionExitCode: int32? = null
-    computePhaseSkipped: bool? = null
-    body: cell? = null
-}
-```
-
-Wrapper struct for the fast FFI path — all fields are plain nullable scalars.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1410" />
-
-## `SearchParamsForFFI`
-
-```tolk
-struct SearchParamsForFFI {
-    to: tuple
-    from: tuple
-    value: tuple
-    exitCode: tuple
-    success: tuple
-    aborted: tuple
-    deploy: tuple
-    bounce: tuple
-    bounced: tuple
-    opcode: tuple
-    actionExitCode: tuple
-    computePhaseSkipped: tuple
-    body: tuple
-}
-```
-
-Wrapper struct for FFI — all fields are [tag, predicate] tuples.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1427" />
-
-## `SearchParams.hasPredicates`
-
-```tolk
-fun SearchParams.hasPredicates(self): bool
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1443" />
-
-## `SearchParams.toScalarFFI`
-
-```tolk
-fun SearchParams.toScalarFFI(self): ScalarSearchParamsForFFI
-```
-
-Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1460" />
-
-## `SearchParams.toFFI`
-
-```tolk
-fun SearchParams.toFFI(self): SearchParamsForFFI
-```
-
-Convert SearchParams to a tuple of [tag, predicate] pairs for FFI.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1479" />
-
-## `SearchParams.toPredicateFFITuple`
-
-```tolk
-fun SearchParams.toPredicateFFITuple(self): tuple
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1497" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L804" />
 
 ## `tuple.fromTuple`
 
@@ -1503,37 +728,195 @@ fun SearchParams.toPredicateFFITuple(self): tuple
 fun tuple.fromTuple(data: tuple): tuple
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1501" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L808" />
 
-## `T.externalOutPrefix`
-
-```tolk
-fun T.externalOutPrefix(): int
-```
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1505" />
-
-## `T.externalOutPrefixLen`
+## `Expectation<SendResultList>.toHaveSuccessfulDeploy`
 
 ```tolk
-fun T.externalOutPrefixLen(): int
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1513" />
+Expect the transaction list to have a successful deploy transaction.
 
-## `T.decodeExternalOutBody`
+Transaction is considered as "deploy" if previous status was "NonExisting" and end status was "Active".
+If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
+
+Example:
+```tolk
+expect(txs).toHaveSuccessfulDeploy({
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L844" />
+
+## `Expectation<SendResultList>.toHaveSuccessfulTx`
 
 ```tolk
-fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1521" />
+Expect the transaction list to have a successful transaction.
 
-## `T.getDeclaredPackPrefix2`
+Matcher sets `params.success = true`.
+Runtime "success" means both compute phase and action phase are successful.
+
+By default matcher also requires `params.exitCode = 0` when `exitCode` is not provided.
+This default can be overridden with explicit `params.exitCode`.
+
+If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
+
+Example:
+```tolk
+expect(txs).toHaveSuccessfulTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L875" />
+
+## `Expectation<SendResultList>.toHaveTx`
 
 ```tolk
-fun T.getDeclaredPackPrefix2(): int
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1577" />
+Expect the transaction list to have a transaction with specified parameters.
+
+All non-null `SearchParams` fields are applied as filters.
+
+If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
+
+Example:
+```tolk
+expect(txs).toHaveTx({
+    from: deployer.address,
+    to: counter.address,
+    actionExitCode: 37,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L905" />
+
+## `Expectation<SendResultList>.toNotHaveTx`
+
+```tolk
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}): void
+```
+
+Expect the transaction list to NOT have a transaction with specified parameters.
+
+Example:
+```tolk
+expect(txs).toNotHaveTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L923" />
+
+## `Expectation<SendResultList>.toHaveBouncedTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
+```
+
+Expect the transaction list to have a **bounced** transaction.
+
+Example:
+```tolk
+expect(txs).toHaveBouncedTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L941" />
+
+## `Expectation<SendResultList>.toHaveFailedTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
+```
+
+Expect the transaction list to have a **failed** transaction.
+
+This matcher sets `params.success = false`.
+`params.exitCode` is required and must be non-zero.
+If `exitCode` is null or `0`, matcher fails immediately before transaction search.
+
+Any additional non-null `SearchParams` fields further narrow the search.
+If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
+
+Example:
+```tolk
+expect(txs).toHaveFailedTx({
+    from: deployer.address,
+    to: counter.address,
+    exitCode: 123,
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L971" />
+
+## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
+
+```tolk
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void
+```
+
+Expect all transactions in the list to be successful.
+
+Example:
+```tolk
+val txs = net.send(wallet.address, msg);
+expect(txs).toHaveAllSuccessfulTxs();
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L996" />
+
+## `Expectation<SendResultList>.toEmitExternalMessage`
+
+```tolk
+fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void
+```
+
+Expect the transaction to emit an external message of given type.
+
+Example:
+```tolk
+expect(txs).toEmitExternalMessage<IncreaseCounter>();
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1009" />
+
+## `Expectation<SendResult>.toConsumeLessThan`
+
+```tolk
+fun Expectation<SendResult>.toConsumeLessThan(self, amount: int): void
+```
+
+Expect the transaction to consume less than the expected amount of gas.
+
+Example:
+```tolk
+val txs = net.send(deployer.address, message);
+expect(txs.at(0)).toConsumeLessThan(1000);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1044" />
 

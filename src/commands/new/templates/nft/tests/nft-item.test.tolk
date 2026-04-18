@@ -1,7 +1,7 @@
 import "@stdlib/tvm-dicts"
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 import "@contracts/messages"
 import "@tests/nft-collection.test"
 import "@wrappers/NftCollectionContract"
@@ -9,8 +9,8 @@ import "@wrappers/NftItemContract"
 
 get fun `test nft: should transfer ownership`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress();
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -46,9 +46,9 @@ get fun `test nft: should transfer ownership`() {
 get fun `test nft: should transfer ownership and return excesses`() {
     val (nftCollection, _, _) = setupTest();
 
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress();
-    val excessesAddress = net.randomAddress();
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
+    val excessesAddress = randomAddress();
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -83,9 +83,9 @@ get fun `test nft: should transfer ownership and return excesses`() {
 
 get fun `test nft: should not transfer ownership not from owner`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val notOwner = net.treasury("not-owner");
-    val nftReceiverAddress = net.randomAddress();
+    val nftOwner = testing.treasury("nft-owner");
+    val notOwner = testing.treasury("not-owner");
+    val nftReceiverAddress = randomAddress();
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -116,8 +116,8 @@ get fun `test nft: should not transfer ownership not from owner`() {
 
 get fun `test nft: should transfer ownership with notification`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress();
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -158,8 +158,8 @@ get fun `test nft: should transfer ownership with notification`() {
 
 get fun `test nft: should get static data`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val randomTreasury = net.treasury("random-treasury");
+    val nftOwner = testing.treasury("nft-owner");
+    val randomTreasury = testing.treasury("random-treasury");
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -191,8 +191,8 @@ get fun `test nft: should get static data`() {
 
 get fun `test nft: should fail when receiver in different workchain`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress("random_user", -1);
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress("random_user", -1);
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -216,8 +216,8 @@ get fun `test nft: should fail when receiver in different workchain`() {
 
 get fun `test nft: should fail when op not on list`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val randomTreasury = net.treasury("random-treasury");
+    val nftOwner = testing.treasury("nft-owner");
+    val randomTreasury = testing.treasury("random-treasury");
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -239,9 +239,9 @@ get fun `test nft: should fail when op not on list`() {
 
 get fun `test nft: should fail when response address in different workchain`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress();
-    val excessesAddress = net.randomAddress("excesses", -1); // masterchain
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
+    val excessesAddress = randomAddress("excesses", -1); // masterchain
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -265,8 +265,8 @@ get fun `test nft: should fail when response address in different workchain`() {
 
 get fun `test nft: should transfer ownership with forward payload in slice`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
-    val nftReceiverAddress = net.randomAddress();
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
     val queryId = 42;
@@ -306,7 +306,7 @@ get fun `test nft: should transfer ownership with forward payload in slice`() {
 
 get fun `test nft: should fail with incomplete transfer body`() {
     val (nftCollection, _, _) = setupTest();
-    val nftOwner = net.treasury("nft-owner");
+    val nftOwner = testing.treasury("nft-owner");
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -335,7 +335,7 @@ get fun `test nft: should fail with incomplete transfer body`() {
 
 get fun `test nft: bench should deploy 100 nfts via batch deploy`() {
     val (nftCollection, deployer, _) = setupTest();
-    val nftOwnerAddress = net.randomAddress();
+    val nftOwnerAddress = randomAddress();
     val content: string = "Content";
 
     var deployList: map<uint64, BatchDeployDictItem> = [];
