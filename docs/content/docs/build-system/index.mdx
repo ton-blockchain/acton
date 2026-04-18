@@ -125,12 +125,12 @@ dependencies.
 `acton build` and `acton compile` share the same compiler and cache, but they
 solve different problems:
 
-| Aspect | `acton build` | `acton compile` |
-|--------|----------------|-----------------|
-| Scope | Contract graph from `Acton.toml` | One explicit `.tolk` file |
-| Manifest | Required for normal operation | Optional; used for mappings/project context when available |
-| Outputs | Project build JSON, optional BoC, dependency helpers, optional Fift | Only the files explicitly requested via CLI flags |
-| Defaults | Uses `[build]` config and contract metadata | Does not use `[build]` output defaults or generate helper files |
+| Aspect   | `acton build`                                                       | `acton compile`                                                 |
+|----------|---------------------------------------------------------------------|-----------------------------------------------------------------|
+| Scope    | Contract graph from `Acton.toml`                                    | One explicit `.tolk` file                                       |
+| Manifest | Required for normal operation                                       | Optional; used for mappings/project context when available      |
+| Outputs  | Project build JSON, optional BoC, dependency helpers, optional Fift | Only the files explicitly requested via CLI flags               |
+| Defaults | Uses `[build]` config and contract metadata                         | Does not use `[build]` output defaults or generate helper files |
 
 Use `build` when you want project-aware artifact generation. Use `compile` when
 you want to inspect or export one file in isolation.
