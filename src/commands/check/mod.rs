@@ -208,7 +208,8 @@ pub fn check_cmd(
         let contract_roots = configured_contract_roots(&config, &project_root)?;
         let contracts = config.contracts().cloned().unwrap_or_default();
         for (contract_id, contract) in contracts {
-            if excludes.is_match(Path::new(&contract.src)) {
+            let source_path = contract.absolute_source_path(&project_root);
+            if excludes.is_match(&source_path) {
                 continue;
             }
             let contract_diagnostics =
@@ -477,16 +478,10 @@ fn configured_contract_roots(
         .into_iter()
         .flat_map(|contracts| contracts.values())
     {
-        if !contract.src.ends_with(".tolk") {
+        let source_path = contract.absolute_source_path(project_root);
+        if source_path.extension() != Some("tolk".as_ref()) {
             continue;
         }
-
-        let source_path = Path::new(&contract.src);
-        let source_path = if source_path.is_absolute() {
-            source_path.to_path_buf()
-        } else {
-            project_root.join(source_path)
-        };
 
         roots.insert(dunce::canonicalize(source_path)?);
     }
@@ -514,7 +509,8 @@ fn check_contract(
     file_db: &FileDb,
     options: &CheckRunOptions<'_>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
-    if !config.src.ends_with(".tolk") {
+    let source_path = config.absolute_source_path(options.project_root);
+    if source_path.extension() != Some("tolk".as_ref()) {
         // skip contracts with .boc sources
         return Ok(vec![]);
     }
@@ -527,12 +523,6 @@ fn check_contract(
         );
     }
 
-    let source_path = Path::new(&config.src);
-    let source_path = if source_path.is_absolute() {
-        source_path.to_path_buf()
-    } else {
-        options.project_root.join(source_path)
-    };
     let root = dunce::canonicalize(source_path)?;
     let lint_settings = Checker::build_settings(options.acton_config, Some(contract_id));
     let lint_settings = apply_rules_filter(lint_settings, options.only_rules);

@@ -777,10 +777,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
 
     let mut sources = Vec::new();
 
-    let main_path = Path::new(&contract.src)
-        .absolutize_from(&project_root)
-        .unwrap_or_else(|_| Path::new(&contract.src).into())
-        .to_path_buf();
+    let main_path = contract.absolute_source_path(&project_root);
     let main_path = dunce::canonicalize(&main_path).unwrap_or(main_path);
 
     let main_content = match fs::read_to_string(&main_path) {

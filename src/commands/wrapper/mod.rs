@@ -65,7 +65,7 @@ fn build_model(
         .get_contract(contract_id)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?;
 
-    let contract_path = project_root.join(&contract_config.src);
+    let contract_path = contract_config.absolute_source_path(&project_root);
 
     if !contract_path.exists() {
         anyhow::bail!(

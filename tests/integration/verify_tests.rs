@@ -54,6 +54,16 @@ fn write_multiple_wallets(project_path: &Path) {
         .expect("failed to write wallets.toml");
 }
 
+fn replace_contract_display_name(project_path: &Path, from: &str, to: &str) {
+    let acton_toml_path = project_path.join("Acton.toml");
+    let acton_toml = std::fs::read_to_string(&acton_toml_path).expect("failed to read Acton.toml");
+    let updated = acton_toml.replace(
+        &format!("display-name = \"{from}\""),
+        &format!("display-name = \"{to}\""),
+    );
+    std::fs::write(&acton_toml_path, updated).expect("failed to write Acton.toml");
+}
+
 fn build_verify_backend_project(name: &str) -> Project {
     let project = ProjectBuilder::new(name)
         .contract("simple", SIMPLE_CONTRACT)
@@ -98,6 +108,24 @@ fn test_verify_contract_not_found() {
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_verify_contract_not_found.stderr.txt",
+        );
+}
+
+#[test]
+fn test_verify_contract_display_name_shows_contract_id_hint() {
+    let project = ProjectBuilder::new("verify-contract-display-name-hint")
+        .contract("simple_id", SIMPLE_CONTRACT)
+        .build();
+    replace_contract_display_name(project.path(), "simple_id", "Visible Simple");
+
+    project
+        .acton()
+        .verify()
+        .verify_contract("Visible Simple")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_verify_contract_display_name_shows_contract_id_hint.stderr.txt",
         );
 }
 

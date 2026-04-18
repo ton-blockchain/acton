@@ -1,0 +1,11 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_precompiled_boc_runtime.test.tolk (1 test)
+  ✓ aw build precompiled boc runtime [TIME]
+
+ ✓ 1 passed in 1 file

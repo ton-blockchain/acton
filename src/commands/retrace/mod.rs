@@ -9,7 +9,6 @@ use anyhow::{Context, anyhow};
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -456,7 +455,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
         .get_contract(contract_name)
         .cloned()
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&acton_config, contract_name)))?;
-    let contract_path = resolve_project_config_path(configured_project_root(), &contract.src);
+    let contract_path = contract.absolute_source_path(configured_project_root());
 
     if contract_path.extension().and_then(|ext| ext.to_str()) != Some("tolk") {
         anyhow::bail!(
@@ -540,15 +539,6 @@ fn ensure_contract_matches_transaction(
         local_code_hash.to_string().yellow(),
         tx_code_hash.to_string().yellow()
     );
-}
-
-fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        project_root.join(path)
-    }
 }
 
 fn format_tokens(nanotons: u64) -> String {

@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling dummy
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_invalid_boc_path.test.tolk (1 test)
+  ✗ ax build invalid boc path [TIME]
+    └─ Error: Failed to decode code BoC for [ROOT]/contracts/invalid.boc: unknown BOC tag
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

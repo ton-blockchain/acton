@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling dummy
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_missing_boc_path.test.tolk (1 test)
+  ✗ ax build missing boc path [TIME]
+    └─ Error: Cannot read BoC file [ROOT]/contracts/missing.boc: [NOT_FOUND]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

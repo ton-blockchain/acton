@@ -7,7 +7,6 @@ use clap::Subcommand;
 use log::warn;
 use num_bigint::{BigInt, Sign};
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use tolkc::abi::ContractABI as CompilerContractABI;
@@ -225,24 +224,25 @@ fn load_local_contract_candidate(
     config: &ActonConfig,
     mut file_cache: Option<&mut FileBuildCache>,
 ) -> anyhow::Result<LocalContractCandidate> {
-    let contract_path = resolve_project_path(&contract.src);
-    if contract.src.ends_with(".boc") {
+    let contract_path = contract.absolute_source_path(configured_project_root());
+    if contract_path.extension().is_some_and(|ext| ext == "boc") {
         let boc = fs::read(&contract_path)
             .with_context(|| format!("Failed to read {}", contract_path.display()))?;
         let code = Boc::decode(boc)
             .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
         return Ok(LocalContractCandidate {
             contract_id: contract_id.to_owned(),
-            contract_name: contract.display_name_owned(contract_id),
+            contract_name: contract.display_name(contract_id).to_owned(),
             code_hash: *code.repr_hash(),
             abi: None,
             compiler_abi: None,
         });
     }
 
+    let contract_path_key = contract_path.to_string_lossy().to_string();
     let cached = file_cache
         .as_mut()
-        .and_then(|cache| cache.get(&contract.src, false, false, 2, "1.3"));
+        .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.3"));
     let (code_boc64, compiler_abi) = if let Some(cached) = cached {
         (cached.code_boc64, cached.abi.map(Arc::new))
     } else {
@@ -250,7 +250,7 @@ fn load_local_contract_candidate(
         match compiler.compile(&contract_path, false) {
             tolkc::CompilerResult::Success(result) => {
                 if let Some(cache) = file_cache.as_mut() {
-                    let _ = cache.put(&contract.src, &result, false, false, 2, "1.3");
+                    let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.3");
                 }
                 (result.code_boc64, result.abi.map(Arc::new))
             }
@@ -270,20 +270,11 @@ fn load_local_contract_candidate(
 
     Ok(LocalContractCandidate {
         contract_id: contract_id.to_owned(),
-        contract_name: contract.display_name_owned(contract_id),
+        contract_name: contract.display_name(contract_id).to_owned(),
         code_hash: *code.repr_hash(),
         abi: Some(abi),
         compiler_abi,
     })
-}
-
-fn resolve_project_path(path: &str) -> PathBuf {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        configured_project_root().join(path)
-    }
 }
 
 fn decode_storage_json(

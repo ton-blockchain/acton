@@ -14,12 +14,80 @@ pub mod error_fmt {
 
     #[must_use]
     pub fn contract_not_found(config: &ActonConfig, name: &str) -> String {
+        let display_name_matches = contract_ids_by_display_name(config, name);
+        if !display_name_matches.is_empty() {
+            return contract_not_found_for_display_name(config, name, &display_name_matches);
+        }
+
         let available = available_contracts(config);
         format!(
             "Contract {} not found in Acton.toml\nAvailable contracts:\n{}",
             name.yellow(),
             available
         )
+    }
+
+    fn contract_not_found_for_display_name(
+        config: &ActonConfig,
+        provided_name: &str,
+        matches: &[(String, String)],
+    ) -> String {
+        let available = available_contracts(config);
+        let examples = matches
+            .iter()
+            .map(|(contract_id, display_name)| {
+                let header = format!("[contracts.{contract_id}]");
+                let id_marker = format!(
+                    "{}{} contract ID to pass to Acton",
+                    " ".repeat("[contracts.".len()),
+                    "^".repeat(contract_id.len()),
+                );
+                let display_line = format!("display-name = \"{display_name}\"");
+                let display_marker = format!(
+                    "{}{} display-name shown in logs/UI",
+                    " ".repeat("display-name = \"".len()),
+                    "^".repeat(display_name.len()),
+                );
+                format!("{header}\n{id_marker}\n{display_line}\n{display_marker}")
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        if matches.len() == 1 {
+            let contract_id = matches[0].0.as_str();
+            return format!(
+                "Contract {} not found in Acton.toml\n\nIt looks like you passed the contract display-name instead of the contract ID.\n\nIn Acton.toml this contract is configured as:\n{}\n\nPass {} instead of {}.\n\nAvailable contract IDs:\n{}",
+                provided_name.yellow(),
+                examples,
+                contract_id.green().bold(),
+                provided_name.yellow(),
+                available
+            );
+        }
+
+        format!(
+            "Contract {} not found in Acton.toml\n\nIt looks like you passed a contract display-name instead of a contract ID.\nThis display-name matches multiple contracts.\n\nIn Acton.toml use one of these contract IDs:\n{}\n\nPass one of the IDs above instead of {}.\n\nAvailable contract IDs:\n{}",
+            provided_name.yellow(),
+            examples,
+            provided_name.yellow(),
+            available
+        )
+    }
+
+    fn contract_ids_by_display_name(
+        config: &ActonConfig,
+        display_name: &str,
+    ) -> Vec<(String, String)> {
+        config
+            .contracts()
+            .into_iter()
+            .flat_map(|contracts| contracts.iter())
+            .filter_map(|(contract_id, contract)| {
+                let configured_display_name = contract.display_name(contract_id);
+                (configured_display_name == display_name)
+                    .then(|| (contract_id.clone(), configured_display_name.to_owned()))
+            })
+            .collect()
     }
 
     #[must_use]

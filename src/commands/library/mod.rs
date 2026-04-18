@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use tasm::printer::FormatOptions;
 use tempfile::TempDir;
@@ -58,8 +58,7 @@ pub fn publish_cmd(
         let contract = config
             .get_contract(&contract_key)
             .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
-        let contract_path = dunce::canonicalize(contract.src.clone())
-            .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
+        let contract_path = contract.absolute_source_path(project_root());
 
         if contract_path.extension() != Some("tolk".as_ref()) {
             anyhow::bail!("Contract source must be a {} file", ".tolk".yellow());

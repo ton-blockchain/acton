@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling absolute_normalized_target
+    Finished in [TIME]
+    Finished in [TIME]

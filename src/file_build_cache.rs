@@ -406,7 +406,12 @@ impl FileBuildCache {
                         .get(dep_name)
                         .ok_or_else(|| anyhow!("Contract '{dep_name}' not found in Acton.toml"))?;
 
-                    dep_sources.push(contract_config.src.clone());
+                    dep_sources.push(
+                        contract_config
+                            .absolute_source_path(&self.project_root)
+                            .to_string_lossy()
+                            .to_string(),
+                    );
                 }
             }
             dep_sources
@@ -497,9 +502,8 @@ impl FileBuildCache {
         };
 
         for (name, contract) in contracts {
-            let abs_path = Path::new(&contract.src)
-                .absolutize_from(project_root)
-                .unwrap_or_else(|_| Path::new(&contract.src).into())
+            let abs_path = contract
+                .absolute_source_path(project_root)
                 .to_string_lossy()
                 .to_string();
             index.insert(abs_path, name.clone());

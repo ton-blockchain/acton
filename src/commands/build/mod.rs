@@ -139,7 +139,9 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
         let Some(contract_config) = contracts.get(&parent_contract) else {
             continue;
         };
-        let contract_path = resolve_project_config_path(project_root, &contract_config.src);
+        let contract_path = contract_config.absolute_source_path(project_root);
+        let contract_source_key = contract_path.to_string_lossy().to_string();
+        let contract_source_display = contract_config.src.as_str();
 
         generate_dependency_files(
             &parent_contract,
@@ -155,7 +157,8 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
             &mut file_cache,
             &parent_contract,
             contract_config,
-            &contract_config.src,
+            contract_source_display,
+            &contract_source_key,
             &contract_path,
             &config,
             output_fift_dir.is_some(),
@@ -172,7 +175,7 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
 
         if show_info {
             build_info.push((
-                contract_config.display_name_owned(&parent_contract),
+                contract_config.display_name(&parent_contract).to_owned(),
                 code_boc64.clone(),
                 code_hash.clone(),
             ));
@@ -266,16 +269,18 @@ fn record_contract_error(
         .push(error.to_string());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_contract(
     file_cache: &mut FileBuildCache,
     contract_id: &str,
     contract_config: &ContractConfig,
-    contract_src: &str,
+    contract_src_display: &str,
+    contract_cache_key: &str,
     contract_path: &Path,
     acton_config: &ActonConfig,
     with_fift: bool,
 ) -> anyhow::Result<(String, String, Option<String>)> {
-    let (code_boc64, code_hash, fift_code) = if contract_src.ends_with(".boc") {
+    let (code_boc64, code_hash, fift_code) = if contract_src_display.ends_with(".boc") {
         debug!("Loading BoC file: {}", contract_path.display());
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
@@ -284,18 +289,18 @@ fn process_contract(
                     (code_boc64, boc.repr_hash().to_string(), None)
                 }
                 Err(e) => {
-                    anyhow::bail!("Failed to decode BoC file {contract_src}: {e}");
+                    anyhow::bail!("Failed to decode BoC file {contract_src_display}: {e}");
                 }
             },
             Err(e) => {
-                anyhow::bail!("Failed to read BoC file {contract_src}: {e}");
+                anyhow::bail!("Failed to read BoC file {contract_src_display}: {e}");
             }
         }
     } else {
-        let cached_result = file_cache.get(contract_src, false, with_fift, 2, "1.3");
+        let cached_result = file_cache.get(contract_cache_key, false, with_fift, 2, "1.3");
 
         if let Some(cached_result) = cached_result {
-            debug!("Cache hit, use cached result for '{contract_src}'");
+            debug!("Cache hit, use cached result for '{contract_cache_key}'");
             (
                 cached_result.code_boc64,
                 cached_result.code_hash_hex,
@@ -315,7 +320,7 @@ fn process_contract(
             match compilation_result {
                 tolkc::CompilerResult::Success(result) => {
                     if let Err(e) =
-                        file_cache.put(contract_src, &result, false, with_fift, 2, "1.3")
+                        file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.3")
                     {
                         eprintln!(
                             "Warning: Failed to cache compilation result for {}: {}",
@@ -334,7 +339,7 @@ fn process_contract(
                 tolkc::CompilerResult::Error(error) => {
                     let message = rewrite_compiler_error_paths_for_display(
                         &error.message,
-                        contract_src,
+                        contract_src_display,
                         contract_path,
                     );
                     anyhow::bail!(message);

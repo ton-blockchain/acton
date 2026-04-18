@@ -1,7 +1,7 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -42,8 +42,7 @@ pub fn verify_cmd(
     let contract = config
         .get_contract(&contract_key)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
-    let contract_path = dunce::canonicalize(contract.src.clone())
-        .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
+    let contract_path = contract.absolute_source_path(configured_project_root());
 
     let network = Network::from_str(&network)?;
     if !matches!(network, Network::Mainnet | Network::Testnet) {

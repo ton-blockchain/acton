@@ -16,10 +16,11 @@ use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
+use path_absolutize::Absolutize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
@@ -99,99 +100,104 @@ fn run_nested_executor_until_finished(
 
     Ok(())
 }
-extension!(build in (Context) with (path: String, name: String) using build_impl);
-fn build_impl(
-    ctx: &mut Context,
-    stk: &mut Tuple,
-    path: String,
-    name: String,
-) -> anyhow::Result<()> {
-    debug!("Building {name}");
-    let id = name.clone();
+
+extension!(build in (Context) with (path: String, id: String) using build_impl);
+fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> anyhow::Result<()> {
+    debug!("Building {id}");
     let start_time = Instant::now();
 
-    let mut path = path;
-    let mut name = name;
+    let name_only = path.is_empty();
+    let mut path = PathBuf::from(&path);
+    let mut display_name = id.clone(); // by default display name equal to ID
 
-    if path.is_empty() {
+    if name_only {
+        // > build("JettonMinter")
         debug!("No path provided, search in contracts");
-        let found_contract = ctx.env.find_contract(name.as_str());
+        let found_contract = ctx.env.find_contract(&id);
 
-        if let Some(found_contract) = found_contract {
-            debug!("Found contract with info: {found_contract:?}");
-            name = found_contract.display_name_owned(&id);
-            path = found_contract.src;
-            path = dunce::canonicalize(&path)
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or(path);
-        } else {
-            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &name));
-        }
+        let Some(found_contract) = found_contract else {
+            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &id));
+        };
+
+        debug!("Found contract with info: {found_contract:?}");
+
+        display_name = found_contract.display_name(&display_name).to_owned();
+        path = found_contract.absolute_source_path(&ctx.env.project_root);
+    } else if !path.is_absolute() {
+        // > build("JettonMinter", "relative/to/root/path/to/contract")
+        path = path
+            .absolutize_from(ctx.env.project_root.clone())
+            .unwrap_or_else(|_| path.clone().into())
+            .to_path_buf();
     }
 
-    if !path.starts_with('@') && !Path::new(&path).is_absolute() {
-        path = ctx
-            .env
-            .project_root
-            .join(Path::new(&path))
-            .to_string_lossy()
-            .to_string();
-    }
-
-    if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
-        debug!("Overriding code for {name}");
+    // Build overrides used for mutation testing to change actual code of contract
+    // with "mutated" one. This way we actually don't need to recompile each test
+    // thus greatly increase performance of mutation testing
+    if let Some(override_code) = ctx.env.build_override.get(&id) {
+        debug!("Overriding code for {id}");
         stk.push(TupleItem::Cell(override_code.clone()));
         return Ok(());
     }
 
-    // TODO: add test for this case
-    if path.ends_with(".boc") {
+    let path_display = path.display().to_string();
+
+    if path_display.ends_with(".boc") {
         // For BoC source we just return it as a Cell
         let binary_data =
-            fs::read(&path).with_context(|| format!("Cannot read BoC file {path}"))?;
+            fs::read(&path).with_context(|| format!("Cannot read BoC file {path_display}"))?;
         let cell = Boc::decode(binary_data.as_slice())
-            .map_err(|e| anyhow::anyhow!("Failed to decode code BoC for {path}: {e}"))?;
+            .with_context(|| anyhow::anyhow!("Failed to decode code BoC for {path_display}"))?;
         stk.push(TupleItem::Cell(cell));
         return Ok(());
     }
 
-    if let Some(cached) = ctx.build.build_cache.built.get(Path::new(&path)) {
+    // Build cache is runtime only cache, if this contract was already built we just
+    // return cached cell for the contract.
+    if let Some(cached) = ctx.build.build_cache.built.get(&path) {
         let elapsed = start_time.elapsed();
-        info!("Build {path} from memory cache in {elapsed:?}");
+        info!("Build {path_display} from memory cache in {elapsed:?}");
 
-        let code_cell = Boc::decode_base64(&cached.code_boc64)
-            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
+        let code_cell = Boc::decode_base64(&cached.code_boc64).with_context(|| {
+            anyhow::anyhow!("Failed to decode cached code BoC for {path_display}")
+        })?;
         stk.push(TupleItem::Cell(code_cell));
         return Ok(());
     }
 
+    // File build cache is persistent cache that outlives reruns. If this contract was already
+    // built we return cached cell for the contract. Since lookup in this cache is quite expensive
+    // we also add cache entry to runtime build cache.
     if let Some(cached_entry) =
         ctx.build
             .file_build_cache
-            .get(&path, ctx.build.need_debug_info, false, 2, "1.3")
+            .get(&path_display, ctx.build.need_debug_info, false, 2, "1.3")
     {
-        let mappings = ctx.env.config.mappings();
         let elapsed = start_time.elapsed();
         info!(
-            "Build {path} from file cache ({}) in {elapsed:?}",
+            "Build {path_display} from file cache ({}) in {elapsed:?}",
             paths::DEFAULT_BUILD_CACHE_DIR
         );
 
-        let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
-            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
+        let code_cell = Boc::decode_base64(&cached_entry.code_boc64).map_err(|e| {
+            anyhow::anyhow!("Failed to decode cached code BoC for {path_display}: {e}")
+        })?;
         let source_map = Arc::new(TolkSourceMap::from_code_cell(
             cached_entry.new_source_map.clone().unwrap_or_default(),
             &code_cell,
             cached_entry.debug_mark_base64.as_deref(),
         )?);
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
+        let mappings = ctx.env.config.mappings();
+        let contract_abi = contract_abi(content, &path_display, &mappings);
+
         ctx.build.build_cache.memoize(
-            &name,
-            Path::new(&path),
+            &display_name,
+            &path,
             &cached_entry.code_boc64,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             source_map,
-            Some(contract_abi(content, &path, &mappings).into()),
+            Some(contract_abi.into()),
             cached_entry.abi.clone().map(Into::into),
         );
 
@@ -199,55 +205,57 @@ fn build_impl(
         return Ok(());
     }
 
+    // If there is no cache data, rebuild contract from sources.
     let compile_start = Instant::now();
+
     let mappings = ctx.env.config.mappings();
     let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
-    let result = compiler.compile(Path::new(&path), ctx.build.need_debug_info);
+    let result = compiler.compile(&path, ctx.build.need_debug_info);
+
     let compile_time = compile_start.elapsed();
 
     match result {
         tolkc::CompilerResult::Success(success) => {
-            let total_elapsed = start_time.elapsed();
-            info!(
-                "Build {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
-            );
+            info!("Build {path_display} from source (compilation: {compile_time:?}");
 
             if let Err(err) = ctx.build.file_build_cache.put(
-                &path,
+                &path_display,
                 &success,
                 ctx.build.need_debug_info,
                 false,
                 2,
                 "1.3",
             ) {
-                warn!("Failed to build cached code BoC for {path}: {err}");
+                warn!("Failed to build cached code BoC for {path_display}: {err}");
             }
 
             let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
-                anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
+                anyhow::anyhow!("Failed to decode compiled code BoC for {path_display}: {e}")
             })?;
             let source_map = Arc::new(TolkSourceMap::from_code_cell(
                 success.new_source_map.unwrap_or_default(),
                 &code_cell,
                 success.debug_mark_base64.as_deref(),
             )?);
+            let contract_abi = contract_abi(content, &path_display, &mappings);
+
             ctx.build.build_cache.memoize(
-                &name,
-                Path::new(&path),
+                &display_name,
+                &path,
                 &success.code_boc64,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 source_map,
-                Some(contract_abi(content, &path, &mappings).into()),
+                Some(contract_abi.into()),
                 success.abi.clone().map(Into::into),
             );
+
             stk.push(TupleItem::Cell(code_cell));
         }
         tolkc::CompilerResult::Error(error) => {
-            let total_elapsed = start_time.elapsed();
             info!(
-                "Build {} failed after {:?}: {}",
-                path, total_elapsed, error.message
+                "Build {path_display} failed after {compile_time:?}: {}",
+                error.message
             );
 
             anyhow::bail!("Compilation failed: {}", error.message);

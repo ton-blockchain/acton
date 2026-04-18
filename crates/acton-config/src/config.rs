@@ -673,11 +673,6 @@ impl ContractConfig {
     }
 
     #[must_use]
-    pub fn display_name_owned(&self, contract_id: &str) -> String {
-        self.display_name(contract_id).to_owned()
-    }
-
-    #[must_use]
     pub fn dependency_names(&self) -> Vec<&str> {
         self.depends
             .as_ref()
@@ -688,6 +683,16 @@ impl ContractConfig {
     #[must_use]
     pub fn get_dependency(&self, name: &str) -> Option<&ContractDependency> {
         self.depends.as_ref()?.iter().find(|dep| dep.name() == name)
+    }
+
+    /// Returns the contract source path resolved relative to the project root.
+    /// If `src` is already absolute, it is returned as-is.
+    #[must_use]
+    pub fn absolute_source_path(&self, project_root: &Path) -> PathBuf {
+        match Path::new(&self.src).absolutize_from(project_root) {
+            Ok(path) => path.into_owned(),
+            Err(_) => Path::new(self.src.as_str()).to_path_buf(),
+        }
     }
 }
 
