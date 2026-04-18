@@ -1,22 +1,22 @@
-name: Release Docs
+name: Deploy Docs
 
 on:
   pull_request:
     branches:
       - master
     paths:
-      - ".github/workflows/release-docs.yml"
+      - ".github/workflows/deploy-docs.yml"
       - "docs/**"
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/release-docs.yml"
+      - ".github/workflows/deploy-docs.yml"
       - "docs/**"
   workflow_dispatch:
 
 concurrency:
-  group: release-docs
+  group: deploy-docs
   cancel-in-progress: true
 
 permissions: { }
