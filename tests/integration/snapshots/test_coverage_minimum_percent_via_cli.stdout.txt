@@ -22,4 +22,4 @@
 
 Text coverage file saved in threshold.txt
 
-Error: total line coverage 66.67% is below the required minimum of 100.00%.
+Error: coverage score 60.00% is below the required minimum of 65.00%.

@@ -4,7 +4,7 @@ use crate::commands::common::{
 };
 use crate::commands::test::coverage::{
     collect_coverage, generate_lcov_file, generate_lcov_report, generate_text_file,
-    print_coverage_summary, total_line_coverage_percentage,
+    print_coverage_summary, total_coverage_score_percentage,
 };
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
@@ -730,11 +730,11 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     "coverage minimum percent must be between 0 and 100, got {minimum_percent}"
                 );
             }
-            let actual_percent = total_line_coverage_percentage(&coverage);
+            let actual_percent = total_coverage_score_percentage(&coverage);
             if actual_percent < minimum_percent {
                 coverage_threshold_failed = true;
                 println!(
-                    "\n{}: total line coverage {:.2}% is below the required minimum of {:.2}%.",
+                    "\n{}: coverage score {:.2}% is below the required minimum of {:.2}%.",
                     "Error".red(),
                     actual_percent,
                     minimum_percent

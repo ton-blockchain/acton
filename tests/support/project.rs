@@ -1507,7 +1507,7 @@ impl ActonCommand {
         self
     }
 
-    /// Require a minimum total line coverage percentage.
+    /// Require a minimum final coverage score percentage.
     pub(crate) fn with_coverage_minimum_percent(mut self, percent: f64) -> Self {
         self.cmd = self
             .cmd

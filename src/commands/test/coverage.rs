@@ -643,6 +643,10 @@ pub(super) fn total_line_coverage_percentage(coverage: &Coverage) -> f64 {
     total_coverage_stats(coverage).line_percentage()
 }
 
+pub(super) fn total_coverage_score_percentage(coverage: &Coverage) -> f64 {
+    total_coverage_stats(coverage).combined_score()
+}
+
 pub(super) fn print_coverage_summary(coverage: &Coverage) {
     if coverage.files.is_empty() {
         // Empty coverage info, likely compilation error

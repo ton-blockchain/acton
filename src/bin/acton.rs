@@ -251,7 +251,7 @@ enum Commands {
             long,
             value_name = "PERCENT",
             value_parser = parse_coverage_percent,
-            help = "Fail if total line coverage is below this percentage",
+            help = "Fail if the final coverage score is below this percentage",
             help_heading = "Coverage"
         )]
         coverage_minimum_percent: Option<f64>,

@@ -1236,7 +1236,7 @@ fn test_coverage_text_output_write_error_is_non_zero() {
 }
 
 #[test]
-fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() {
+fn test_coverage_minimum_percent_via_cli_fails_when_score_is_below_threshold() {
     let project = build_partial_coverage_project("coverage-min-percent-cli").build();
 
     project
@@ -1245,7 +1245,7 @@ fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() 
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("threshold.txt")
-        .with_coverage_minimum_percent(100.0)
+        .with_coverage_minimum_percent(65.0)
         .run()
         .failure()
         .assert_passed(1)
@@ -1259,13 +1259,13 @@ fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() 
 }
 
 #[test]
-fn test_coverage_minimum_percent_via_config_fails_when_total_coverage_is_too_low() {
+fn test_coverage_minimum_percent_via_config_fails_when_score_is_below_threshold() {
     let project = build_partial_coverage_project("coverage-min-percent-config")
         .with_test_config(TestConfig {
             coverage: Some(true),
             coverage_format: Some("text".to_owned()),
             coverage_file: Some("threshold.txt".to_owned()),
-            coverage_minimum_percent: Some(100.0),
+            coverage_minimum_percent: Some(65.0),
             ..Default::default()
         })
         .build();
