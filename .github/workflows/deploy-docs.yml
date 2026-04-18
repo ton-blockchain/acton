@@ -16,8 +16,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-docs
-  cancel-in-progress: true
+  group: deploy-docs-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions: { }
 
