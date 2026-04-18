@@ -98,10 +98,15 @@ jobs:
     uses: ./.github/workflows/verify-version.yml
     secrets: inherit
 
+  custom-check-release-security:
+    uses: ./.github/workflows/check-release-security.yml
+    secrets: inherit
+
   custom-build-release-binaries:
     needs:
       - plan
       - custom-verify-version
+      - custom-check-release-security
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' }}
     uses: ./.github/workflows/build-release-binaries.yml
     with:
@@ -112,6 +117,7 @@ jobs:
     needs:
       - plan
       - custom-verify-version
+      - custom-check-release-security
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' }}
     uses: ./.github/workflows/attach-objs-to-releases.yml
     with:
