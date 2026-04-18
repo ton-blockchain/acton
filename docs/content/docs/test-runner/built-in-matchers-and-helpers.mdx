@@ -1,0 +1,120 @@
+---
+title: "Built-in Matchers and Helpers"
+description: "Reference map for transaction predicates, map expectations, and out-action helpers in Acton tests"
+---
+
+Before writing custom matchers, check the built-in ones first. Acton already ships a useful set of helpers for transaction search, map assertions, and out-action inspection.
+
+## Transaction Search Matchers
+
+Use these when you want to find or assert on transactions produced by `net.send(...)`:
+
+- `findTransaction()`
+- `toHaveSuccessfulDeploy()`
+- `toHaveSuccessfulTx()`
+- `toHaveTx()`
+- `toNotHaveTx()`
+- `toHaveBouncedTx()`
+- `toHaveFailedTx()`
+
+You can mix exact scalar matches and predicate functions inside `SearchParams`:
+
+```tolk
+expect(res).toHaveTx({
+    from: fun(addr: address): bool {
+        return addr == sender.address;
+    },
+    to: harness.address,
+    value: ton("0.5"),
+    opcode: Ping.__getDeclaredPackPrefix(),
+});
+```
+
+Important matcher semantics:
+
+- `SearchParams` fields accept either exact values or predicate functions.
+- `toHaveSuccessfulTx()` forces `success = true` and defaults `exitCode = 0` unless you override it explicitly.
+- `toHaveFailedTx()` requires a non-zero `exitCode`.
+- Bounced-message opcode matching should be done with `toHaveBouncedTx()` or an explicit `bounced: true` filter.
+- Predicate functions can be useful for custom diagnostics, but runtime errors inside those predicates surface back to the test output.
+
+Go deeper in:
+
+- [SearchParams](/docs/standard_library/emulation/network/#searchparams)
+- [Transaction matchers](/docs/standard_library/emulation/network/#expectationsendresultlisttohavesuccessfultx)
+- [Reading Transaction Chains](/docs/test-runner/reading-transaction-chains)
+
+## Map Expectations
+
+Map helpers are useful for get-method results and in-memory fixtures:
+
+```tolk
+val balances: map<int32, int32> = net.runGetMethod(ledger.address, "balances");
+
+expect(balances).toContainKey(1);
+expect(balances).toContainValue(20);
+expect(balances).toNotContainKey(99);
+expect(balances).toNotContainValue(777);
+expect(balances).toBeNonEmpty();
+expect(balances).toHaveLength(2);
+```
+
+Available helpers:
+
+- `toContainKey()`
+- `toNotContainKey()`
+- `toContainValue()`
+- `toNotContainValue()`
+- `toBeEmpty()`
+- `toBeNonEmpty()`
+- `toHaveLength()`
+
+Practical note:
+
+- `toHaveLength()` counts the current number of keys after overwrites, not the number of `set()` calls used to build the map.
+
+Go deeper in:
+
+- [Map expectations](/docs/standard_library/testing/expect/#expectationmapk-vtocontainkey)
+
+## Out-action Helpers
+
+Use out-action helpers when you need to inspect C5 output, planned sends, or action kinds:
+
+```tolk
+val outActions = testing.outActions();
+
+expect(outActions).toBeSendMessageAt<IncreaseCounter>(2);
+
+val action = outActions.getSendMessageAt(2);
+val body = outActions.getSendMessageBodyAt<IncreaseCounter>(2);
+```
+
+The most useful entry points are:
+
+- `testing.outActions()` for the current VM out list
+- `SendResult.allOutActions()` for one executed transaction result
+- `OutMessage.outActions(mode)` for a message before it is sent
+- `OutActionList.at()`
+- `OutActionList.getSendMessageAt()`
+- `OutActionList.getSendMessageBodyAt()`
+- `Expectation<OutActionList>.toBeSendMessageAt()`
+
+Important out-action semantics:
+
+- Out-action indexing is reversed: index `0` is the last produced action.
+- `kind()` returns stable string tags such as `"send-message"` and `"reserve-currency"`.
+- `getSendMessageAt()` and `getSendMessageBodyAt()` return `null` when the selected action is not a send-message action.
+- `toBeSendMessageAt<Msg>()` verifies that the action is a send-message action and that typed message loading succeeds. For body-field assertions, load the message or body separately.
+
+Go deeper in:
+
+- [testing.outActions()](/docs/standard_library/emulation/testing/#testingoutactions)
+- [SendResult.allOutActions()](/docs/standard_library/emulation/network/#sendresultalloutactions)
+- [out_actions helpers](/docs/standard_library/types/out_actions)
+
+## When To Write Custom Matchers
+
+If the built-in helpers still do not match your domain language, extend `Expectation<T>` with a custom matcher.
+
+See [Custom Matchers](/docs/test-runner/writing-your-own-matchers).

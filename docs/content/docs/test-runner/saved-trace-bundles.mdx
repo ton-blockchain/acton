@@ -1,0 +1,115 @@
+---
+title: "Saved Trace Bundles"
+description: "Reference for the files produced by `acton test --save-test-trace` and reused by the Test UI"
+---
+
+`acton test --save-test-trace` writes reusable JSON artifacts for offline inspection.
+The browser Test UI reads the same trace and contract files.
+
+## When bundles are written
+
+- `acton test --save-test-trace` without a value writes to `build/traces`.
+- `acton test --save-test-trace custom-traces` writes to the explicit directory instead.
+- Relative trace paths are resolved from the project root, not from the current working directory.
+- Regular test runs do not create trace artifacts unless trace export is enabled.
+- `acton test --ui` also enables the default trace bundle directory when `--save-test-trace` is not passed explicitly.
+
+## Directory layout
+
+```text
+build/traces/
+  test-default-trace_trace.json
+  test-custom-trace-names_trace.json
+  contracts/
+    simple.json
+    forwarder.json
+    receiver.json
+```
+
+- Each executed test writes one `<test-name>_trace.json` file.
+- Contract metadata is stored once per output directory under `contracts/<contract-name>.json`, even when multiple tests reuse the same contract.
+
+## Root Trace File
+
+Each `<test-name>_trace.json` file has this top-level structure:
+
+```json
+{
+  "name": "test-custom-trace-names",
+  "pos": { "uri": "...", "row": 1, "column": 1 },
+  "contracts": ["simple"],
+  "wallets": { "<addr>": "deployer" },
+  "traces": [
+    {
+      "name": "deploy-counter",
+      "transactions": [
+        {
+          "lt": "123",
+          "raw_transaction": "...",
+          "parent_transaction": null,
+          "child_transactions": ["124"],
+          "vm_log_diff": "...",
+          "executor_logs": "...",
+          "executor_actions": [],
+          "dest_contract_info": "simple"
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `name`: the owning test name.
+- `pos`: source location of the test in the `.test.tolk` file.
+- `contracts`: contract names that can be resolved in the sibling `contracts/` directory.
+- `wallets`: known-address map used to preserve local wallet names such as `deployer` or `sender`.
+- `traces`: logical transaction chains captured during the test.
+
+## Trace Chains
+
+Each item in `traces` represents one logical message chain:
+
+- `name`: a custom chain name from `txs.giveName(...)`, or a fallback such as `Trace 1`.
+- `transactions`: ordered transactions in that chain.
+- `failed_messages`: optional failed message attempts attached to the same logical chain.
+
+To keep exported traces readable, name them explicitly:
+
+```tolk
+val txs = net.send(deployer.address, deployMsg);
+txs.giveName("deploy-counter");
+```
+
+That custom name appears in `traces[].name` and in the Test UI.
+
+## Transactions
+
+Each transaction entry carries both raw and decoded debugging context:
+
+- `lt`: logical time of the transaction.
+- `raw_transaction`: original transaction BOC as base64.
+- `parent_transaction` and `child_transactions`: links that preserve chain structure.
+- `shard_account_before` and `shard_account`: serialized account state before and after execution.
+- `vm_log_diff`: VM log diff generated for that transaction.
+- `executor_logs`: raw executor log output.
+- `executor_actions`: parsed executor actions such as send attempts and reserve operations, including failure details when available.
+- `actions`: optional decoded action dump.
+- `dest_contract_info`: contract name hint for lookup in `contracts/<name>.json`.
+
+## Contract Files
+
+Each `contracts/<contract-name>.json` file stores the metadata needed to decode and inspect transactions:
+
+- `name`
+- `code_boc64`
+- `source_map`
+- `abi`
+- `compiler_abi`
+
+This lets offline tooling and the Test UI map traces back to source locations and known message layouts.
+
+## Step-by-step Execution
+
+Trace export keeps logical chains intact even when execution is split into batches with [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor).
+
+If you run part of a chain with `executeN()` and then continue with `executeAllRemaining()`, Acton merges those batches back into one exported trace when they belong to the same root transaction. Naming any batch with `giveName(...)` keeps that logical trace readable in the final JSON.
