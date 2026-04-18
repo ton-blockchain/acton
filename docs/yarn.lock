@@ -1001,13 +1001,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@orama/orama@npm:^3.1.16":
-  version: 3.1.16
-  resolution: "@orama/orama@npm:3.1.16"
-  checksum: 10c0/3e1a5e8960959925c5fa34c5363abcc4e6f37b570fd9ab40c8bd0aed32abd36ce4bd91e63443cddd0e1697db977c49d82975bdde7a2a4562151f4a5d8b694706
-  languageName: node
-  linkType: hard
-
 "@orama/orama@npm:^3.1.18":
   version: 3.1.18
   resolution: "@orama/orama@npm:3.1.18"
@@ -2983,7 +2976,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "docs@workspace:."
   dependencies:
-    "@orama/orama": "npm:^3.1.16"
+    "@orama/orama": "npm:^3.1.18"
     "@tailwindcss/postcss": "npm:^4.1.17"
     "@types/mdx": "npm:^2.0.13"
     "@types/node": "npm:^20"

@@ -3,7 +3,9 @@ import { createMDX } from "fumadocs-mdx/next";
 
 const withMDX = createMDX();
 
-const isProd = process.env.NODE_ENV === "production";
+const isProd =   process.env.NODE_ENV === "production" ||
+  process.env.GITHUB_ACTIONS === "true" ||
+  process.env.GITHUB_PAGES === "true";
 const repoName = "acton";
 const docsRoot = fileURLToPath(new URL(".", import.meta.url));
 
