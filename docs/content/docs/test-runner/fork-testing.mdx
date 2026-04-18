@@ -62,6 +62,39 @@ This hybrid approach gives you real data with local execution speed.
 The first access to each unique account will make a network request, which adds latency. Subsequent accesses use the cache. Consider this when writing tests that access many different accounts.
 </Callout>
 
+## Cache Scope and Refresh Behavior
+
+Forked account snapshots are cached only in memory for the current `acton test`
+invocation.
+
+- The cache key is the tuple of fork network, optional pinned block number, and
+  account address.
+- The cache is shared across tests in the same run, so the second test that
+  touches the same account does not re-fetch it.
+- The cache is not persisted to disk. A fresh `acton test --fork-net ...` run
+  starts with an empty remote snapshot cache.
+- Failed lookups are not cached. If a request errors, the next access can try
+  the network again.
+
+If you need to refetch network state, rerun the test command. Mutations made by
+the local emulator do not invalidate and re-download the remote snapshot.
+
 <Callout type="info" title="Local State Priority">
 Accounts that were deployed or modified within your test will **not** be overwritten by network state. Fork testing only loads accounts that don't exist in the local test environment.
 </Callout>
+
+That precedence also applies after an account is fetched once. Once the account
+exists in the emulated world state, later reads and message execution use the
+local copy from that world state rather than querying the network again.
+
+## Library Lookup Precedence
+
+Library lookup follows the same "local first" rule.
+
+When code asks to resolve a library hash, Acton first checks libraries already
+registered in the current emulated world state, for example via
+`testing.registerLibrary(...)`. Only if the library is still missing does it
+fall back to the configured fork network.
+
+This matters when you intentionally override a real network library during a
+forked test: the locally registered library wins for the rest of that run.

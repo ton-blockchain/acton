@@ -14,8 +14,9 @@ CLI.
 
 <Callout>
     New to Acton? Start with [Installation](/docs/installation), then follow
-    the [Quickstart](/docs/quickstart). If you already have a project, use the
-    sections below to jump straight to the part of the workflow you need.
+    the [Quickstart](/docs/quickstart). If you already have a repository, start
+    with `acton init` and the [Project initialization](/docs/project-init)
+    guide instead of creating a new scaffold.
 </Callout>
 
 ## What you can do with Acton
@@ -36,8 +37,8 @@ CLI.
         Build, test, deploy, and verify your first Tolk smart contract.
     </Card>
     <Card href="/docs/project-init" title="Project initialization">
-        Learn how `acton new` structures a project and which templates are
-        available.
+        Choose between `acton new` for fresh scaffolds and `acton init` for
+        existing repositories.
     </Card>
 </Cards>
 
@@ -95,9 +96,9 @@ CLI.
         `acton --version` works in a fresh shell.
     </Step>
     <Step title="Create or open a project">
-        Use [Project initialization](/docs/project-init) if you are starting
-        from scratch, or move into an existing project with an `Acton.toml`
-        file.
+        Use [Project initialization](/docs/project-init) to decide whether you
+        should run `acton new` or `acton init`. Existing repositories do not
+        need to be recreated from a template.
     </Step>
     <Step title="Build and test locally">
         Follow the [Quickstart](/docs/quickstart) and the
@@ -119,6 +120,10 @@ CLI.
 - Want the shortest path to a running project? Go to
   [Quickstart](/docs/quickstart).
 - Looking for command syntax? Open [Commands](/docs/commands).
+- Need help reading CLI help? Use `acton --help` for the overview,
+  `acton help <command>` for the long manual, and `<nested> --help` for exact
+  nested subcommand help such as `acton wallet list --help`.
 - Working on tests? Start with [Test Runner](/docs/test-runner).
 - Need environment and dependency details? Read
   [Acton.toml](/docs/acton-toml) and [Build system](/docs/build-system).
+- If setup or path resolution looks wrong, run `acton doctor`.

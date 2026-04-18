@@ -3,6 +3,17 @@
 /// This module enables interactive scripts by providing functions to query information from the user via the command line.
 /// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 ///
+/// Deterministic fallback matrix:
+/// - `prompt(...)`: returns `""` when no interactive stdin is available or the
+///   host prompt fails
+/// - `select(...)`: returns `""` in non-interactive mode or on prompt failure
+/// - `confirm(...)`: returns `false` in non-interactive mode or on prompt
+///   failure, even if `default` is `true`
+/// - `promptWallet(...)`: returns `"emulated-wallet"` in emulate mode; in
+///   broadcast mode it auto-selects the only configured wallet, but otherwise
+///   fails when no wallet is available or wallet choice cannot be collected
+///   interactively
+///
 /// Examples:
 /// ```tolk
 /// // Simple text input
@@ -29,7 +40,10 @@ import "ffi"
 ///   anything. It is displayed next to the question (e.g. `(John)`).
 ///
 /// Non-interactive fallback:
-/// - Returns `""` when user input cannot be collected (for example, non-interactive runner).
+/// - Returns `""` when user input cannot be collected (for example,
+///   non-interactive runner).
+/// - In that fallback path, `default` is **not** substituted automatically;
+///   the result is still `""`.
 ///
 /// Example:
 /// ```tolk
@@ -85,6 +99,8 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 /// - If only one wallet is configured, returns its name automatically.
 /// - If multiple wallets are configured, shows an interactive selection.
 /// - In non-interactive mode (e.g. CI), fails with an error asking to specify the wallet explicitly.
+/// - If the interactive wallet picker is opened but cancelled or otherwise fails,
+///   `promptWallet()` throws.
 ///
 /// In emulate mode (no `--net`), returns the stable placeholder `"emulated-wallet"`:
 /// `scripts.wallet(name)` accepts any name in emulate mode, so there is nothing real to pick.

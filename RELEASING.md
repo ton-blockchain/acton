@@ -11,6 +11,22 @@ For everyday contributor setup, builds, tests, and docs workflows, see
 - `trunk` and `release-objs` releases are maintained by GitHub Actions and are
   not part of the manual release flow below.
 
+## `xtask` surface at a glance
+
+The full maintainer `xtask` surface currently includes:
+
+- `release`
+- `retag`
+- `dist`
+- `schema`
+- `sync-artifacts`
+- `github-cleanup`
+- `ubicloud-cleanup`
+
+This document focuses on numbered release flows (`release` / `retag`).
+Contributor-facing setup tasks such as `schema` and `sync-artifacts` are
+documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Release command
 
 Use the release `xtask` instead of manual version bump, commit, tag, or push
@@ -77,3 +93,13 @@ existing tag in `origin`, recreates the tag on that retry commit, and pushes
 both `master` and the tag, so it requires explicit confirmation and only runs
 when the tag already exists in `origin` and local `master` exactly matches
 `origin/master`.
+
+## Other maintainer tasks
+
+- `cargo xtask dist archive` packages release archives and `.sha256` files used
+  by CI and release automation
+- other `dist` subcommands currently exist but are still placeholders/TODO
+- `cargo xtask schema` regenerates `acton.schema.json`
+- `cargo xtask sync-artifacts` refreshes native TON artifacts and bundled stdlib assets
+- `cargo xtask github-cleanup` and `cargo xtask ubicloud-cleanup` prune caches;
+  outside CI they default to dry-run safety mode

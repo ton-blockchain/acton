@@ -212,6 +212,8 @@ output-fift = "build/fift"
 ```
 
 CLI flags override config values for the current invocation.
+For dependency helpers, a per-dependency `depends[].path` still overrides the
+resolved `gen-dir` for that helper file.
 
 ## OUTPUTS
 
@@ -219,12 +221,32 @@ Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
 - the configured contract `output` `.boc` file
-- `<gen-dir>/<dependency>.code.tolk` helper files for dependencies
+- `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
+  (or a dependency-specific custom path when `depends[].path` is configured)
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
 Existing output files at those paths are replaced with freshly generated
 artifacts.
+
+## BEST-EFFORT BEHAVIOR
+
+Dependency-graph failures such as missing contracts or circular dependencies
+stop the command before the main compile loop starts, so those failures do not
+produce partial build outputs.
+
+After dependency resolution succeeds, `acton build` becomes best-effort:
+
+- compile failures for one contract are recorded while other eligible contracts
+  continue building
+- artifact-writing failures are also collected instead of aborting immediately
+- artifacts that were written successfully before a later failure remain on disk
+
+If an earlier dependency failed, its generated helper file is not produced. A
+later parent contract may then fail because its generated import is missing.
+
+When you build a specific `_contract-name_`, Acton limits the build set to that
+contract and its transitive dependencies.
 
 ## SIDE EFFECTS
 

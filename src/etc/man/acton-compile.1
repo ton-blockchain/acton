@@ -14,6 +14,19 @@ resulting code information or write artifacts to files.
 This command is useful for inspecting compiler output, producing standalone BoC
 files, generating source maps for debugging, and exporting ABI or Fift output
 without running the full project build pipeline.
+.sp
+Unlike \fBacton build\fR, this command works on one explicit source file. It does
+not traverse the \fB[contracts]\fR graph, does not generate dependency helper
+files, and does not write project build JSON artifacts.
+.sp
+\fBActon.toml\fR is optional here. If it loads successfully, Acton uses it for
+project context such as import mappings and cache location. If it is missing or
+invalid, Acton warns and continues compiling the file without those project
+settings.
+.sp
+\fB\-\-manifest\-path\fR and \fB\-\-project\-root\fR choose which project context to use, but
+they do not rebase unrelated CLI paths. The input file and output paths stay
+relative to the current working directory unless you pass absolute paths.
 .SH "OPTIONS"
 .SS "Compile Options"
 .sp
@@ -90,7 +103,8 @@ still enabled. File\-output flags such as \fB\-\-fift\fR, \fB\-\-source\-map\fR,
 can be combined with either stdout mode.
 .sp
 \fB\-\-boc\fR is special: Acton writes the binary BoC file and returns successfully
-without printing the usual stdout payload.
+without printing the usual stdout payload. If \fB\-\-boc\fR is combined with other
+file\-output flags, those other files may still be written first.
 .sp
 Depending on the selected options, Acton can also write:
 .sp
@@ -110,11 +124,26 @@ Depending on the selected options, Acton can also write:
 \h'-04'\(bu\h'+03'an ABI file via \fB\-\-abi\fR
 .RE
 .sp
+\fBacton compile\fR does \fBnot\fR write:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBbuild/<contract>.json\fR project build artifacts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBgen/*.code.tolk\fR dependency helper files
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'outputs derived from \fB[build]\fR defaults in \fBActon.toml\fR
+.RE
+.sp
 \fB\-\-source\-map\fR enables debug\-oriented compilation output. If the compiler does
 not emit a contract ABI for the input file, \fB\-\-abi\fR does not create an ABI
 artifact.
 .SH "CACHE"
-Acton uses a compilation cache to speed up repeated runs.
+Acton uses the same compilation cache as \fBacton build\fR and \fBacton test\fR to
+speed up repeated runs.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'Use \fB\-\-clear\-cache\fR to force recompilation.
@@ -122,6 +151,16 @@ Acton uses a compilation cache to speed up repeated runs.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'Cache entries are invalidated automatically when source inputs change.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Cache entries are mode\-specific: \fB\-\-source\-map\fR and \fB\-\-fift\fR may require a
+different cache entry than a plain compile of the same file.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Standalone files that are not registered as project contracts still benefit
+from file\-import\-aware cache invalidation.
 .RE
 .SH "EXIT STATUS"
 .sp

@@ -66,6 +66,9 @@ debug output, use \fB\-\-backtrace full\fR or \fB\-\-debug\fR\&.
 \fB\-\-debug\fR
 .RS 4
 Enable debug mode.
+.sp
+This also raises executor verbosity to collect full source locations and stack
+context for live stepping.
 .RE
 .sp
 \fB\-\-debug\-port\fR \fIport\fR
@@ -78,12 +81,18 @@ Debug server port.
 Enable execution backtraces.
 .sp
 Currently supported value: \fBfull\fR\&.
+Full backtraces also raise executor verbosity to collect source locations and
+call stacks without opening the debugger.
 .RE
 .SS "Coverage Options"
 .sp
 \fB\-\-coverage\fR
 .RS 4
 Generate a coverage profile.
+.sp
+Coverage also raises internal executor verbosity enough to map executed
+locations back to source files and lines, but it does not enable stepping or
+print backtraces by itself.
 .RE
 .sp
 \fB\-\-coverage\-format\fR \fIformat\fR
@@ -100,7 +109,7 @@ Output file for the coverage report.
 .sp
 \fB\-\-coverage\-minimum\-percent\fR \fIpercent\fR
 .RS 4
-Fail when total line coverage is below this percentage.
+Fail when the final coverage score is below this percentage.
 .sp
 Valid range: \fB0\fR to \fB100\fR\&.
 .sp
@@ -196,6 +205,9 @@ TonCenter API key for blockchain queries.
 Save transaction traces to a directory.
 .sp
 If passed without a value, Acton uses \fBbuild/traces\fR\&.
+Acton writes one \fB<test\-name>_trace.json\fR file per executed test and stores
+shared contract metadata under \fBcontracts/<contract\-name>.json\fR\&.
+Relative paths are resolved from the project root.
 .RE
 .SS "Mutation Testing Options"
 .sp
@@ -362,8 +374,28 @@ level\-1 executor output such as \fBdebug.dumpStack()\fR
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-v\fR is only low\-level executor logging; \fB\-\-coverage\fR also collects
+source\-location data, while \fB\-\-backtrace full\fR and \fB\-\-debug\fR collect richer
+location and stack data
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-coverage\-file\fR matters only with \fB\-\-coverage\fR; without an explicit path,
 Acton writes \fBlcov.info\fR for \fBlcov\fR and \fBcoverage.txt\fR for \fBtext\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'coverage summaries show line and branch columns plus a blended \fBScore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'LCOV export includes \fBBRDA\fR, \fBBRF\fR, and \fBBRH\fR records when branch sites were
+observed for a file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-coverage\-minimum\-percent\fR checks the final blended \fBScore\fR shown in the
+summary, not just \fB% Lines\fR
 .RE
 .sp
 .RS 4
@@ -373,6 +405,31 @@ use \fB\-\-coverage\-include\-tests\fR or \fB\-\-coverage\-include\-wrappers\fR 
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-save\-test\-trace\fR without a value writes traces to \fBbuild/traces\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'each executed test produces its own \fB<test\-name>_trace.json\fR artifact
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'exported bundles also include \fBcontracts/<contract\-name>.json\fR files with
+code, source maps, and ABI metadata reused across tests in the same bundle
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'trace chains default to names like \fBTrace 1\fR; use \fBtxs.giveName("...")\fR when
+you want stable human\-readable names in exported artifacts and the Test UI
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when you split execution with \fBtesting.createTraceIterationCursor()\fR,
+exported traces still merge batches that belong to the same logical root
+transaction chain
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-ui\fR also enables the default trace bundle directory when
+\fB\-\-save\-test\-trace\fR is otherwise absent
 .RE
 .sp
 .RS 4

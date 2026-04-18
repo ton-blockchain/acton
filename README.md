@@ -92,10 +92,29 @@ acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
 acton script scripts/deploy.tolk --net testnet
+# equivalent scaffold shortcut:
+acton run deploy-testnet
 ```
 
 For a step-by-step walkthrough, see the
 [quickstart guide](https://ton-blockchain.github.io/acton/docs/quickstart).
+
+Already have a repository instead of starting from a template? The existing
+project path is:
+
+```bash
+cd your-repo
+acton init
+acton build
+acton test
+```
+
+`acton init` adds or patches `Acton.toml`, refreshes `.acton/tolk-stdlib`,
+patches `.gitignore`, discovers likely contract roots, and retries local
+wallet/library overlay symlinks without replacing your existing project files.
+
+If path resolution, stdlib health, wallets, or native artifacts look wrong,
+run `acton doctor` before filing an issue.
 
 ## Building from source
 
@@ -105,7 +124,9 @@ Source builds are intended for contributors and local development. See
 ## Contributing
 
 Contributor setup, test workflows, UI build steps, and docs workflows are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md), including a workspace architecture map,
+native artifact/bootstrap rules, docgen/schema workflows, and tree-sitter
+regeneration guidance.
 
 ## License
 

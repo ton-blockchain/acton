@@ -63,7 +63,13 @@ Print an explanation for a lint rule.
 
 ## BEHAVIOR
 
+- `--list-lint-rules` is a hidden machine-readable helper that prints JSON
+  entries with rule `name` and markdown `description`
+- for a human-readable catalog with rule codes, lifecycle status, and quick-fix
+  availability, use the web rules index
 - `--fix` applies edits only in `plain` output mode
+- `--fix` rewrites files only for fixes marked as automatically applicable
+- when a diagnostic offers multiple fixes, `--fix` applies only the first one
 - non-plain output formats report diagnostics without rewriting source files
 - `github` emits GitHub Actions workflow annotations
 - output format resolution is: CLI flag, then `[lint].output-format`, then
@@ -71,14 +77,33 @@ Print an explanation for a lint rule.
 - `--output-file` is not valid with `plain` format
 - project-wide mode includes workspace `*.test.tolk` files and standalone
   script roots that define `main()`
+- project-wide discovery skips built-in directories such as `.git`, `.github`,
+  `.idea`, `.acton`, `node_modules`, `target`, `tolk-stdlib`, `.codex`, and
+  `.claude`
+- contracts with non-`.tolk` sources such as precompiled `.boc` entries are not
+  lint roots
 - single-file mode relaxes `E014 (acton-import-in-contract)`
 - targets ending with `.tolk` are treated as file paths; other targets are
   resolved as contract names from `Acton.toml`
 - use an explicit `.tolk` path such as `./contracts/Counter.tolk` when a name
   could be mistaken for a contract name
-- inline suppressions use `// check-disable-next-line E001,S001`
+- inline suppressions use rule names, for example
+  `// check-disable-next-line unused-variable, write-only-variable`
+- suppressions apply only to the immediately following line and do not affect
+  compiler/parser diagnostics
 - `--fix` applies only linter-provided fixes; diagnostics without a safe fix
   remain in the report
+- `--enable-only` is applied after config is loaded: selected rules keep their
+  configured severity, selected rules that were `allow` are re-enabled at the
+  default severity, and every unselected rule is forced to `allow`
+- `--enable-only` selectors must resolve to exactly one rule; in practice, use
+  full rule codes such as `E003` for stability
+- excluded files still participate in import/type resolution, but lint
+  diagnostics for excluded non-root files are filtered out
+- explicit targets still run even if they match `[lint].exclude`
+- compiler errors are never hidden by excludes
+- `--fix` can still exit with status `1` when unfixed diagnostics or warning
+  threshold violations remain after rewriting
 
 ## EXIT STATUS
 
@@ -119,13 +144,19 @@ Print an explanation for a lint rule.
    acton check --enable-only E001,S001
    ```
 
-6. Emit GitHub Actions annotations in CI:
+6. List rule metadata as JSON:
+
+   ```bash
+   acton check --list-lint-rules
+   ```
+
+7. Emit GitHub Actions annotations in CI:
 
    ```bash
    acton check --output-format github
    ```
 
-7. Apply local autofixes where available:
+8. Apply local autofixes where available:
 
    ```bash
    acton check --fix

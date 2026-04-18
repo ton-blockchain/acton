@@ -112,6 +112,41 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 .sp
 If \fBincomingMessages\fR is missing, message\-sending helpers are not generated. If
 \fBstorage\fR is missing, storage helpers fall back to an untyped initializer.
+.SH "COMMON GENERATED HELPER SHAPES"
+Generated Tolk wrappers usually expose the same family of helpers:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBfromStorage(...)\fR to construct a wrapper together with \fBStateInit\fR and the
+computed deployment address
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'sometimes \fBfromAddress(...)\fR when the template or generator needs a handle to
+an already deployed contract without local init data
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBdeploy(...)\fR to send the deploy message using the wrapper\[cq]s stored
+\fBStateInit\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBsend{Name}(...)\fR helpers for each incoming message declared in the ABI
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBsendAny(...)\fR for a raw custom body cell when you need to bypass typed
+message helpers
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'typed get\-method helpers emitted from declared getter methods
+.RE
+.sp
+The exact method set depends on the ABI. Template wrappers copied by
+\fBacton new\fR are starter files checked into the scaffold and may lag behind or
+slightly differ from the latest generator output, but they follow the same
+general helper patterns.
 .SH "TYPESCRIPT GENERATION"
 \fBacton wrapper \-\-ts\fR shells out to \fBnpx gen\-typescript\-from\-tolk\-dev\fR\&.
 .sp

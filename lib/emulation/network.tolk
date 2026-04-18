@@ -511,7 +511,13 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
 /// }
 /// ```
 ///
-/// Returns a list of send results representing all transactions produced by this send call.
+/// Returns a list of send results representing the full recursively processed
+/// transaction chain produced by this send call.
+///
+/// Unlike [testing.processSingleTraceStep], this helper keeps draining out
+/// messages until the whole trace queue is exhausted. Use it for normal
+/// end-to-end emulation where children, grandchildren, and other follow-up
+/// transactions should all be executed.
 ///
 /// See [testing.processSingleTraceStep] if you need to send a single message without out message processing.
 fun net.send(from: address, message: OutMessage): SendResultList {
@@ -575,7 +581,13 @@ fun net.createExternalMessage<TBody>(
 
 /// Sends an external-in message to the specified destination address.
 /// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
-/// Returns `null` if external message was not accepted or destination account does not exist.
+///
+/// This helper recursively processes the resulting trace just like [net.send],
+/// but it starts from an already composed external-in message instead of an
+/// internal message sent from a wallet-like address.
+///
+/// Returns `null` if the external message was not accepted or the destination
+/// account does not exist.
 fun net.sendExternal(msg: ExternalInMessage): SendResultList? {
     // from and mode fields do not affect anything in case of an ExtIn message
     return ffi.sendMessageFrom(
@@ -817,6 +829,9 @@ fun net.registerCodeCell(code: cell, name: string): void {
 }
 
 /// Load library by hash, first from the current emulated blockchain and then from the configured network.
+///
+/// In forked tests this means locally registered libraries win over the remote
+/// fork network for the same hash.
 ///
 /// Returns null if library is not found.
 fun net.loadLibrary(hash: string): cell? {

@@ -8,6 +8,9 @@ The local node supports two state workflows:
 - Persistent SQLite database (`--db-path`)
 - Portable JSON snapshots (`--load-state`, `--dump-state`)
 
+JSON snapshots are versioned exports of local node state. The current on-disk
+format is snapshot version `1`.
+
 ## Persistent SQLite State
 
 Use a database file when you want state continuity across runs:
@@ -43,6 +46,33 @@ acton litenode start \
 <Callout>
 `--load-state` and `--db-path` cannot be used together in one run for now.
 </Callout>
+
+## What a JSON Snapshot Contains
+
+A JSON snapshot stores enough local node state to resume the same local chain
+view later. Version `1` includes:
+
+- global chain state such as head seqno, logical time, queue policy, and config hash
+- latest account state cache
+- block history and account deltas by seqno
+- transaction and message history indexes
+- address aliases from `/admin/address-name`
+- cached token and NFT metadata
+- registered compiler ABIs from `/admin/compiler-abis`
+- CAS entries for serialized cells and message/code payloads
+- pending internal/external message pools
+
+This is broader than just account balances or contract storage. A restored
+snapshot can also bring back explorer-oriented metadata and local admin state.
+
+## Compatibility Notes
+
+- snapshots are currently written as versioned JSON files; the current format is `version = 1`
+- loading a snapshot with an unsupported version fails immediately
+- snapshots may stop being compatible if the snapshot schema changes in a future release
+- JSON snapshots and SQLite persistence are separate workflows; `--db-path` and `--load-state`
+  cannot be combined in one run
+- when you use `--dump-state`, the snapshot is written on graceful shutdown
 
 ## Choosing a Strategy
 

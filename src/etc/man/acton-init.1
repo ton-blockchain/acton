@@ -140,9 +140,23 @@ and \fB\&.acton\fR
 .RS 4
 \h'-04'\(bu\h'+03'treats files with an \fBonInternalMessage\fR function as contract entry files
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'derives the contract key from the file stem with \fB\-\fR normalized to \fB_\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'derives the default display name from the file stem by splitting on \fB_\fR and
+\fB\-\fR, then capitalizing each word
+.RE
 .SH "STANDARD LIBRARY"
 \fBacton init\fR ensures that the bundled Tolk standard library is installed into
 \fB\&.acton/tolk\-stdlib\fR\&.
+.sp
+If global wallet or library overlay files already exist, \fBacton init\fR also
+tries to create local symlinks for them. Existing local files or symlinks are
+left in place; Acton only creates the link when the local path does not already
+exist.
 .sp
 If symlinks for global wallets or libraries cannot be created, Acton prints a
 warning and still completes initialization. This is relevant on systems where

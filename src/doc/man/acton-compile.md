@@ -17,6 +17,19 @@ This command is useful for inspecting compiler output, producing standalone BoC
 files, generating source maps for debugging, and exporting ABI or Fift output
 without running the full project build pipeline.
 
+Unlike `acton build`, this command works on one explicit source file. It does
+not traverse the `[contracts]` graph, does not generate dependency helper
+files, and does not write project build JSON artifacts.
+
+`Acton.toml` is optional here. If it loads successfully, Acton uses it for
+project context such as import mappings and cache location. If it is missing or
+invalid, Acton warns and continues compiling the file without those project
+settings.
+
+`--manifest-path` and `--project-root` choose which project context to use, but
+they do not rebase unrelated CLI paths. The input file and output paths stay
+relative to the current working directory unless you pass absolute paths.
+
 ## OPTIONS
 
 ### Compile Options
@@ -75,7 +88,8 @@ still enabled. File-output flags such as `--fift`, `--source-map`, and `--abi`
 can be combined with either stdout mode.
 
 `--boc` is special: Acton writes the binary BoC file and returns successfully
-without printing the usual stdout payload.
+without printing the usual stdout payload. If `--boc` is combined with other
+file-output flags, those other files may still be written first.
 
 Depending on the selected options, Acton can also write:
 
@@ -84,16 +98,27 @@ Depending on the selected options, Acton can also write:
 - a source map via `--source-map`
 - an ABI file via `--abi`
 
+`acton compile` does **not** write:
+
+- `build/<contract>.json` project build artifacts
+- `gen/*.code.tolk` dependency helper files
+- outputs derived from `[build]` defaults in `Acton.toml`
+
 `--source-map` enables debug-oriented compilation output. If the compiler does
 not emit a contract ABI for the input file, `--abi` does not create an ABI
 artifact.
 
 ## CACHE
 
-Acton uses a compilation cache to speed up repeated runs.
+Acton uses the same compilation cache as `acton build` and `acton test` to
+speed up repeated runs.
 
 - Use `--clear-cache` to force recompilation.
 - Cache entries are invalidated automatically when source inputs change.
+- Cache entries are mode-specific: `--source-map` and `--fift` may require a
+  different cache entry than a plain compile of the same file.
+- Standalone files that are not registered as project contracts still benefit
+  from file-import-aware cache invalidation.
 
 ## EXIT STATUS
 

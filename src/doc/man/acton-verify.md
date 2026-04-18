@@ -45,7 +45,7 @@ multiple wallets are available.
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
-Currently defaults to `1.1.0`.
+Currently defaults to `1.2.0`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
@@ -90,6 +90,11 @@ Verification usually consists of:
 4. collecting the required signatures
 5. optionally sending the final verification transaction
 
+Acton prepares the local compilation artifacts and uploads them to the
+verification service. The final deployed-code match is established by the
+verifier flow itself; `acton verify` does not first perform a separate local
+on-chain code-hash comparison against the target address before upload.
+
 ## PREREQUISITES
 
 - a `.tolk` contract source in the current project
@@ -124,11 +129,57 @@ Verification usually consists of:
   exits successfully without sending another transaction
 - on successful verification, Acton prints a verifier link for the contract
 
+## ENVIRONMENT OVERRIDES
+
+The verification flow also supports backend/debug environment overrides:
+
+- `ACTON_VERIFY_BACKEND` overrides only the initial `/source` backend used for
+  source upload
+- `ACTON_VERIFY_BACKENDS` replaces the later signer `/sign` backend list
+- `ACTON_VERIFY_DEBUG` enables verbose verification diagnostics by presence
+  alone
+
+Backend override values are trimmed and normalized, including removal of a
+trailing `/`.
+
+With `ACTON_VERIFY_DEBUG`, Acton prints:
+
+- compiler version
+- collected source files
+- active source-backend override
+- active signer-backend override list
+
+Example: debug source upload against a custom backend:
+
+```bash
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
+ACTON_VERIFY_DEBUG=1 \
+acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+```
+
+Example: separate source upload from signer backends:
+
+```bash
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
+ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
+acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+```
+
 ## DRY RUN
 
 `--dry-run` still compiles the contract, uploads sources to the verifier
 backend, and collects the required signatures. It skips only the final
 blockchain transaction.
+
+## RETRIES AND FAILURE HINTS
+
+- source upload retries up to 8 times for transient transport failures and
+  backend 5xx responses
+- retry backoff grows from 1 second to 8 seconds
+- backend error responses are printed with the response body when available
+- 5xx failures suggest retrying later and using `ACTON_VERIFY_DEBUG=1`
+- backend problems can also be narrowed down by pointing
+  `ACTON_VERIFY_BACKEND` at a specific endpoint
 
 ## EXIT STATUS
 
@@ -167,7 +218,7 @@ blockchain transaction.
 5. Verify with an explicit compiler version:
 
    ```bash
-   acton verify Counter --address EQDt7LL... --compiler-version 1.1.0
+   acton verify Counter --address EQDt7LL... --compiler-version 1.2.0
    ```
 
 ## SEE ALSO

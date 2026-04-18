@@ -76,7 +76,9 @@ Acton prints when the server is listening. Then attach from your editor.
 ### Connecting from an editor
 
 Acton works best with the official TON IDE integrations documented in
-[IDE support](/docs/miscellaneous/ide-support/), but any DAP client can attach.
+[IDE support](/docs/miscellaneous/ide-support/). Other DAP clients can attach
+too, but they should expect only the subset of requests and scopes that Acton
+implements today.
 
 Minimal VS Code-style setup:
 
@@ -206,6 +208,13 @@ as `T` without leftover bits or refs.
 - `acton retrace --debug` is stricter than live debugging: it requires
   `--contract`, a local `.tolk` contract, compiler-produced source maps and
   debug marks, and matching local/on-chain code hash.
+- replay debug sessions are single-threaded and do not expose the live
+  `Registers` scope that local sessions can show
+- Acton currently supports source breakpoints, stepping, stacks, variables,
+  exception info, and evaluate, but not step-back, data breakpoints, function
+  breakpoints, or restart-style flows
+- breakpoint locations can slide to the next stoppable line while still being
+  reported as verified
 
 ## 2. Backtraces Without the Debugger
 
@@ -233,6 +242,10 @@ that led into the failing execution.
 
 Acton automatically prepares the required debug metadata when you use
 `--backtrace full`.
+
+This is stronger than `-v`: full backtraces require location and stack data,
+not just low-level executor logs. Coverage also raises internal verbosity for
+source mapping, but it does not print a backtrace unless you ask for one.
 
 <Callout type="warn">
 For test suites, do not treat `--backtrace full` as the default way to run
@@ -264,6 +277,13 @@ Executor debug logs are hidden by default. Re-run with `acton test -v` or
 `acton script <path> -v` when you need level-1 executor output such as
 `debug.dumpStack()`. For richer debug output, use `--backtrace full` or
 `--debug`.
+
+These flags also change how much execution metadata Acton collects:
+
+- `-v` enables only level-1 executor logs.
+- `--coverage` raises internal verbosity to source-location mode so coverage can map VM execution back to files and lines, but it does not print backtraces or enable stepping by itself.
+- `--backtrace full` raises verbosity further to collect full source locations and call stacks for failures.
+- `--debug` uses the same rich location and stack data, then opens the live debug adapter on top.
 
 Strengths:
 
@@ -320,9 +340,17 @@ This is the richest offline inspection path. Use it when:
 
 - you want deterministic artifacts for later review
 - you want to share a failure with teammates
+- you want to inspect the same trace bundle shape that Test UI reads
 
 If you produce multiple traces in one test, name them with
 `txs.giveName(...)` so exported artifacts stay readable.
+
+Saved trace bundles use one `<test-name>_trace.json` file per executed test and
+a sibling `contracts/` directory with shared contract metadata. Relative paths
+are resolved from the project root.
+
+See [Saved Trace Bundles](/docs/test-runner/saved-trace-bundles) for the file
+layout and JSON schema overview.
 
 ## 4. Step-by-step Transaction Control with `TxCursor`
 

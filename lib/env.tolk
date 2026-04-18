@@ -7,8 +7,17 @@
 /// `env<T>` supports only these types. For unsupported generic `T`, execution fails
 /// via [Assert.fail].
 ///
-/// Note for `bool`: when a variable is present, only `"true"` and `"1"` (case-insensitive) map
-/// to `true`; any other present value maps to `false`.
+/// Important null/present-value semantics:
+/// - Missing variable: returns `null` for every supported type.
+/// - `string` and `slice`: return the raw value unchanged, so empty strings and
+///   surrounding whitespace are preserved.
+/// - `??` falls back only when `env<T>` returned `null`. Present values like
+///   `""` or `false` do not trigger the fallback branch.
+/// - `int`, `coins`, `address`, and `cell`: invalid present values return
+///   `null`, so `??` can fall back.
+/// - `bool`: when a variable is present, only `"true"` and `"1"`
+///   (case-insensitive) map to `true`; any other present value maps to
+///   `false`, not `null`.
 ///
 /// Examples:
 /// ```tolk
@@ -42,18 +51,25 @@ import "testing/assert"
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
 /// - `coins`: parsed the same way as `int` and returned as TON amount in nanotons.
 /// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
-/// - `string`: returns the raw string value.
-/// - `slice`: returns the raw string value as a slice.
-/// - `address`: parsed as a TON address (raw or user-friendly).
-/// - `cell`: parsed from base64 or hex encoded BoC.
+/// - `string`: returns the raw string value, including empty and whitespace-only values.
+/// - `slice`: returns the raw string value as a slice, including empty and whitespace-only values.
+/// - `address`: parsed as a TON address (raw or user-friendly); invalid present values return `null`.
+/// - `cell`: parsed from base64 or hex encoded BoC; invalid present values return `null`.
 ///
 /// Unsupported generic types do not return `null` and instead fail via [Assert.fail].
+///
+/// Fallback behavior with `??`:
+/// - `env<string>("NAME") ?? "default"` uses `"default"` only when `NAME` is missing.
+///   If `NAME` is present but empty, the result is still `""`.
+/// - `env<bool>("FLAG") ?? true` uses `true` only when `FLAG` is missing.
+///   A present but malformed value resolves to `false`.
 ///
 /// Example:
 /// ```tolk
 /// val foo = env<int>("FOO") ?? 42;
 /// val amount = env<coins>("TRANSFER_VALUE") ?? ton("0.05");
 /// val bar = env<string>("BAR") ?? "default";
+/// val maybeDisabled = env<bool>("FEATURE_FLAG") ?? true;
 /// ```
 fun env<T>(name: string): T? {
     return T.__env(name);

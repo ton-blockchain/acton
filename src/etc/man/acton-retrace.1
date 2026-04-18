@@ -122,8 +122,23 @@ When \fB\-\-contract\fR is set:
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'Acton refreshes the bundled stdlib under \fB\&.acton/\fR before preparing the
+source\-level retrace
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'Acton recompiles the contract for the current invocation with debug info and
 source maps
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'no prior \fBacton build \-\-debug\fR step is required, but the current local
+sources and import mappings must compile cleanly
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the recompilation must return both source maps and debug marks; missing either
+is a hard error
 .RE
 .sp
 .RS 4
@@ -153,6 +168,28 @@ Protocol.
 .sp
 \fB\-\-debug\-port\fR follows the same convention as other Acton debug commands:
 without \fB\-\-debug\fR it does not start a debug server.
+.sp
+Current replay\-debug limits:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the retrace adapter exposes one DAP thread only
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'replay sessions do not expose the live \fBRegisters\fR scope available in local
+debug sessions
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the supported request set is intentionally narrow: source breakpoints,
+continue/step, stack/scopes/variables, exception info, evaluate, and
+disconnect
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'unsupported client\-specific extension requests are ignored rather than
+emulated
+.RE
 .SH "VS CODE SETUP"
 Typical setup:
 .sp

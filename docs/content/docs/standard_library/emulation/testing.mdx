@@ -142,8 +142,10 @@ fun testing.processSingleTraceStep(from: address, message: OutMessage): SendResu
 
 Send a single message from a specified address.
 
-In contrast to [net.send](../network/#netsend), this method doesn't process out messages, but returns
-a single send result with this out messages.
+In contrast to [net.send](../network/#netsend), this method executes exactly one transaction and
+does not recursively process that transaction's out messages. The returned
+[SendResult](../network/#sendresult) still contains those out messages for inspection, but they are
+left undelivered.
 
 This method is useful to simulate a bounced message.
 
@@ -159,9 +161,9 @@ val bouncedMsg = createMessage({
 testing.processSingleTraceStep(notDeployer.address, bouncedMsg);
 ```
 
-See [net.send](../network/#netsend) if you need to send a message and process out messages.
+See [net.send](../network/#netsend) or [net.sendExternal](../network/#netsendexternal) if you need full recursive trace processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L122" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L124" />
 
 ## `testing.runTickTock`
 
@@ -180,7 +182,7 @@ val results = testing.runTickTock(electorAddress, false); // run tick
 val results = testing.runTickTock(electorAddress, true);  // run tock
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L137" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L139" />
 
 ## `Treasury`
 
@@ -194,7 +196,7 @@ Treasury is a special contract that is used to deploy other contracts.
 
 To create a treasury, use the [testing.treasury](#testingtreasury) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L144" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L146" />
 
 ## `testing.treasury`
 
@@ -216,7 +218,7 @@ get fun `test mint`() {
 
 Note: in scripts always use [scripts.wallet](../scripts/#scriptswallet) instead.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L161" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L163" />
 
 ## `testing.getAccountState`
 
@@ -240,7 +242,7 @@ if (state != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L204" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L206" />
 
 ## `testing.getAccountStorageFee`
 
@@ -260,7 +262,7 @@ if (storageFee != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L219" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L221" />
 
 ## `testing.setNow`
 
@@ -272,13 +274,21 @@ Set the current Unix timestamp for time forwarding emulation.
 
 This is useful for testing time-dependent contracts.
 
+`testing.setNow()` synchronizes time in two places:
+- the emulated world state used for future transactions and snapshots
+- the current VM context's C7 unixtime slot, so `blockchain.now()` in the
+  current test/get-method context immediately sees the same mocked value
+
+This is why `testing.setNow()` affects both future emulated execution and
+time-dependent helpers that read the current VM context right away.
+
 Example:
 ```tolk
 val futureTime = testing.getNow() + 1000; // 1000 seconds from now
 testing.setNow(futureTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L232" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L242" />
 
 ## `testing.getNow`
 
@@ -290,13 +300,17 @@ Get the current Unix timestamp used in emulation.
 
 Returns the current time in the emulated blockchain.
 
+Get-method execution prefers this mocked time once you have called
+[testing.setNow](#testingsetnow). If the emulated time is still `0` (the default before any
+override), Acton falls back to the real wall clock for get-method runs.
+
 Example:
 ```tolk
 val currentTime = testing.getNow();
 println("Current emulation time: {}", currentTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L248" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L262" />
 
 ## `testing.topUp`
 
@@ -314,7 +328,7 @@ testing.topUp(address, ton("10"));
 Note: This function for tests only!
 For testnet TON airdrop onto your wallet, use `acton wallet airdrop` command.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L261" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L275" />
 
 ## `testing.getAccountBalance`
 
@@ -332,7 +346,7 @@ val balance = testing.getAccountBalance(address);
 println("{:ton}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L280" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L294" />
 
 ## `testing.getShardAccount`
 
@@ -352,7 +366,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L295" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L309" />
 
 ## `testing.setShardAccount`
 
@@ -372,7 +386,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L310" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L324" />
 
 ## `testing.loadAndRegisterLibrary`
 
@@ -385,7 +399,7 @@ in the current emulated blockchain.
 
 Returns false if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L322" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L336" />
 
 ## `testing.registerLibrary`
 
@@ -395,7 +409,7 @@ fun testing.registerLibrary(libCell: cell): void
 
 Register a library in the emulated blockchain.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L332" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L346" />
 
 ## `testing.saveSnapshot`
 
@@ -414,7 +428,7 @@ val saved = testing.saveSnapshot("world-state.json");
 expect(saved).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L346" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L360" />
 
 ## `testing.loadSnapshot`
 
@@ -433,7 +447,7 @@ val loaded = testing.loadSnapshot("world-state.json");
 expect(loaded).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L360" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L374" />
 
 ## `testing.setConfig`
 
@@ -447,13 +461,28 @@ This function updates the entire blockchain configuration with a new configurati
 The configuration is validated before being applied. If validation fails, the function
 returns false and the configuration is not updated.
 
+`BlockchainConfigMap.set*` methods only mutate the local map value returned
+by [testing.getConfig](#testinggetconfig). `testing.setConfig()` is the commit point that
+pushes those changes into the emulator.
+
+On success, Acton synchronizes the configuration in two places:
+- the emulator's world-state config used by future transactions and queries
+- the current VM context's C7 config mirrors (both packed root config and
+  the unpacked hot fields used by TVM helpers)
+
+That extra C7 synchronization keeps the current test context, follow-up
+config getters, and emulated execution paths aligned on the same config data
+without requiring a fresh VM bootstrap.
+
 For detailed information about blockchain configuration parameters, see the
 [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 
 Parameters:
 - `config`: The new [BlockchainConfigMap](../config/#blockchainconfigmap) map containing configuration parameters (indices 0-90)
 
-Returns: `true` if the configuration was successfully updated, `false` if validation failed.
+Returns: `true` if the configuration was successfully updated, `false` if
+validation failed. On failure, neither the emulator world state nor the C7
+mirrors are updated.
 
 Example:
 ```tolk
@@ -474,7 +503,7 @@ if (success) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L396" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L425" />
 
 ## `testing.getConfig`
 
@@ -507,7 +536,7 @@ val globalVersion = config.getGlobalVersion();
 println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L455" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L484" />
 
 ## `testing.isDeployed`
 
@@ -532,7 +561,7 @@ fun JettonWallet.getJettonBalance(self): coins {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L475" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L504" />
 
 ## `testing.outActions`
 
@@ -548,5 +577,5 @@ val outActions = testing.outActions();
 println(outActions.size());
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L486" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L515" />
 

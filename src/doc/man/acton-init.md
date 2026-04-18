@@ -76,11 +76,19 @@ When generating a new `Acton.toml`, contract discovery:
   and `.acton`
 - considers `.tolk` files only
 - treats files with an `onInternalMessage` function as contract entry files
+- derives the contract key from the file stem with `-` normalized to `_`
+- derives the default display name from the file stem by splitting on `_` and
+  `-`, then capitalizing each word
 
 ## STANDARD LIBRARY
 
 `acton init` ensures that the bundled Tolk standard library is installed into
 `.acton/tolk-stdlib`.
+
+If global wallet or library overlay files already exist, `acton init` also
+tries to create local symlinks for them. Existing local files or symlinks are
+left in place; Acton only creates the link when the local path does not already
+exist.
 
 If symlinks for global wallets or libraries cannot be created, Acton prints a
 warning and still completes initialization. This is relevant on systems where

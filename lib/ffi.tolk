@@ -1,9 +1,38 @@
 /// Namespace for host-provided functions implemented via `EXTCALL`.
 ///
+/// `ffi` is the low-level boundary between Tolk stdlib code and the Acton host
+/// runtime. Most user code should import higher-level modules instead of
+/// calling `ffi.*` directly.
+///
 /// Each declaration like `fun ffi.foo(...): ... asm "<id> EXTCALL"` is a contract between
 /// stdlib code and the host runtime: opcode id and argument count must match the registered
 /// runtime handler.
 ///
 /// FFI handlers are injected by Acton host executors (for example script/test/emulation runs).
 /// Without host registration for a given opcode, that `EXTCALL` is unavailable at runtime.
+///
+/// This surface is meant for host-driven execution contexts such as `acton test`,
+/// `acton script`, and local emulation helpers. It is not part of deployed
+/// on-chain contract execution on the real network.
+///
+/// High-level modules built on top of `ffi` include:
+/// - [io](./io) for formatted terminal output
+/// - [fs](./fs) for filesystem access
+/// - [env](./env) for typed environment variable access
+/// - [prompts](./prompts) for interactive input helpers
+/// - [build](./build) for runtime contract compilation and BoC loading
+/// - [crypto](./crypto) for randomness, mnemonic, and signing helpers
+/// - [testing/assert](./testing/assert) for assertion failures and diagnostics
+/// - [emulation/network](./emulation/network), [emulation/testing](./emulation/testing),
+///   [emulation/scripts](./emulation/scripts), and [emulation/config](./emulation/config)
+///   for local blockchain state, network access, wallets, and config mutation
+///
+/// On the host side, these handlers are registered from Rust modules under
+/// `src/ffi/`. If you add or change a direct `ffi.*` declaration, its opcode id,
+/// argument count, and value encoding must stay in sync with the corresponding
+/// host implementation.
+///
+/// In practice, direct `ffi.*` declarations are mostly for Acton internals and
+/// host-extension work. For ordinary tests and scripts, prefer the stable
+/// wrappers exposed by the higher-level stdlib modules above.
 struct ffi

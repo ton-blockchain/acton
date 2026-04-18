@@ -122,6 +122,8 @@ output\-fift = "build/fift"
 .RE
 .sp
 CLI flags override config values for the current invocation.
+For dependency helpers, a per\-dependency \fBdepends[].path\fR still overrides the
+resolved \fBgen\-dir\fR for that helper file.
 .SH "OUTPUTS"
 Depending on command flags and project configuration, \fBacton build\fR may write:
 .sp
@@ -134,7 +136,8 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB<gen\-dir>/<dependency>.code.tolk\fR helper files for dependencies
+\h'-04'\(bu\h'+03'\fB<gen\-dir>/<dependency>.code.tolk\fR helper files for dependencies by default
+(or a dependency\-specific custom path when \fBdepends[].path\fR is configured)
 .RE
 .sp
 .RS 4
@@ -147,6 +150,31 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .sp
 Existing output files at those paths are replaced with freshly generated
 artifacts.
+.SH "BEST-EFFORT BEHAVIOR"
+Dependency\-graph failures such as missing contracts or circular dependencies
+stop the command before the main compile loop starts, so those failures do not
+produce partial build outputs.
+.sp
+After dependency resolution succeeds, \fBacton build\fR becomes best\-effort:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compile failures for one contract are recorded while other eligible contracts
+continue building
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'artifact\-writing failures are also collected instead of aborting immediately
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'artifacts that were written successfully before a later failure remain on disk
+.RE
+.sp
+If an earlier dependency failed, its generated helper file is not produced. A
+later parent contract may then fail because its generated import is missing.
+.sp
+When you build a specific \fB_contract\-name_\fR, Acton limits the build set to that
+contract and its transitive dependencies.
 .SH "SIDE EFFECTS"
 \fBacton build\fR writes artifacts, cache entries, and optional graph output under
 the resolved project root. If one contract fails after earlier contracts were

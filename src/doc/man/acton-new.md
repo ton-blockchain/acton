@@ -78,6 +78,16 @@ Jetton minter and wallet template with:
 - CI workflow
 - optional `AGENTS.md`
 
+### nft
+
+NFT collection and item template with:
+
+- collection and item contracts
+- wrappers and tests
+- deployment scripts
+- CI workflow
+- optional `AGENTS.md`
+
 ## INTERACTIVE MODE
 
 When enough information is missing and standard input/output are connected to a
@@ -118,10 +128,33 @@ Depending on the selected template and options, Acton may also generate:
 - contract sources
 - tests
 - wrappers
+- wrappers that usually include helper shapes such as `fromStorage(...)`,
+  `deploy(...)`, `send{Name}(...)`, `sendAny(...)`, and typed get-method calls
 - deployment scripts
+- `[scripts]` aliases such as `deploy-emulation` and `deploy-testnet` in `Acton.toml`
 - frontend files for `--app`
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
+
+Every scaffold also writes `Acton.toml` script aliases for the template's main
+deploy script:
+
+- `deploy-emulation` runs the generated deploy script locally via `acton script`
+- `deploy-testnet` runs the same deploy script with `--net testnet`
+
+That gives new projects an immediate `acton run ...` entrypoint without having
+to hand-author a `[scripts]` section first.
+
+Wrapper files copied during scaffolding are template-owned starter files. They
+are not regenerated during `acton new`, so the exact helper surface can differ
+slightly from what the current `acton wrapper` generator would emit for the
+same contract today.
+
+Each built-in template also ships its own optional `AGENTS.md` guidance. When
+you pass `--agents`, Acton copies the selected template's version into the
+project root. This is a one-time scaffolded file, not a live link back to the
+template, so later template updates do not automatically rewrite your local
+`AGENTS.md`.
 
 ## COUNTER APP LAYOUT
 
@@ -139,6 +172,18 @@ Before running frontend commands, install the app dependencies:
 ```bash
 npm ci
 ```
+
+The generated app scaffold is a real frontend workspace, not just static demo
+files. After `npm ci`, use the usual frontend lifecycle commands from the
+generated `package.json` alongside normal Acton contract commands.
+
+Typical commands in that generated app workspace:
+
+- `npm run dev` to start the Vite development server
+- `npm run build` to build both contracts and the frontend bundle
+- `npm run preview` to preview the production bundle locally
+- `npm run typecheck` for TypeScript checking
+- `npm test` to run the bundled `acton test` command
 
 ## SIDE EFFECTS
 

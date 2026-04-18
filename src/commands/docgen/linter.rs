@@ -107,6 +107,12 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
         "Use `acton check --explain <CODE>` to read a detailed explanation for any specific rule right in the terminal.\n\n",
     );
     mdx_content.push_str(
+        "`acton check --list-lint-rules` also exists as a hidden machine-readable helper, but it only prints rule names and markdown descriptions. This index is the human-readable catalog with rule codes, lifecycle status, and quick-fix availability.\n\n",
+    );
+    mdx_content.push_str(
+        "Lifecycle states currently used in the catalog are mainly `Stable` and `Preview`. The generator also supports future `Deprecated` and `Removed` statuses when rules eventually transition.\n\n",
+    );
+    mdx_content.push_str(
         "For setup, configuration, and CI usage, start with [Linting](/docs/linting).\n\n",
     );
 

@@ -98,8 +98,14 @@ When `--contract` is set:
 
 - the contract must exist in the resolved `Acton.toml`
 - the selected source must be a `.tolk` contract
+- Acton refreshes the bundled stdlib under `.acton/` before preparing the
+  source-level retrace
 - Acton recompiles the contract for the current invocation with debug info and
   source maps
+- no prior `acton build --debug` step is required, but the current local
+  sources and import mappings must compile cleanly
+- the recompilation must return both source maps and debug marks; missing either
+  is a hard error
 - the compiled local code hash must match the code hash used by the retraced
   transaction
 
@@ -119,6 +125,17 @@ Protocol.
 
 `--debug-port` follows the same convention as other Acton debug commands:
 without `--debug` it does not start a debug server.
+
+Current replay-debug limits:
+
+- the retrace adapter exposes one DAP thread only
+- replay sessions do not expose the live `Registers` scope available in local
+  debug sessions
+- the supported request set is intentionally narrow: source breakpoints,
+  continue/step, stack/scopes/variables, exception info, evaluate, and
+  disconnect
+- unsupported client-specific extension requests are ignored rather than
+  emulated
 
 ## VS CODE SETUP
 

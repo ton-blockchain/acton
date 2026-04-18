@@ -20,6 +20,24 @@ bodies, request faucet funds, and remove stored wallet entries.
 Wallets created by this workflow are intended for development and testing. The
 default network context is testnet.
 
+## COMMON LIFECYCLE
+
+The wallet workflow is not limited to `wallet new`.
+
+Typical follow-up commands are:
+
+- `acton wallet import` to reuse an existing mnemonic
+- `acton wallet list --balance` to inspect configured wallets and balances
+- `acton wallet airdrop --net localnet` to fund a wallet from a local LiteNode
+  faucet
+- `acton wallet sign` to sign an external message body without writing a whole
+  script
+- `acton wallet export-mnemonic` for interactive export
+- `acton wallet remove -y` to remove a wallet non-interactively
+
+For remote balance lookups and testnet backends, commands that accept
+`--api-key` also support `TONCENTER_API_KEY`.
+
 ## SUBCOMMANDS
 
 ### acton wallet new

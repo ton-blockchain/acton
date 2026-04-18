@@ -19,7 +19,7 @@ after opting into advanced options.
 {{#option "`--template` _template_" }}
 Project template to use.
 
-Possible values: `empty`, `counter`, `jetton`
+Possible values: `empty`, `counter`, `jetton`, `nft`
 
 If not provided, interactive mode prompts for the template.
 {{/option}}

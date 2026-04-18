@@ -153,6 +153,26 @@ get fun `test transfer flow`() {
 
 Without custom names, traces are shown as `Trace 1`, `Trace 2`, and so on.
 
+## How snapshot matching works
+
+Baseline comparison is key-based rather than fuzzy.
+
+- Opcode rows are keyed by the resolved opcode label.
+- If ABI metadata resolves the opcode, the key is the message name such as
+  `IncreaseCounter`.
+- Otherwise the key falls back to the raw hex opcode such as `0x00000999`.
+
+Trace-chain rows are keyed by a stable internal snapshot key:
+
+```text
+<test-name>::trace#<1-based trace index>
+```
+
+That key comes from the test name plus the 1-based position of the trace in
+that test's execution order. `trace_name` is stored only for display. Renaming a
+trace with `giveName(...)` makes reports easier to read, but it does not change
+how baseline matching works.
+
 ## Reading comparison output
 
 In baseline comparison mode:
@@ -226,3 +246,20 @@ Snapshot is written only when:
 ### Trace names changed but diff mapping is still stable
 
 Trace comparison is matched by stable snapshot key (`<test-name>::trace#<index>`), while `trace_name` is used for display.
+
+### `--fail-on-diff` is stricter than the tables
+
+The comparison tables mainly show aggregated numbers such as averages and fee
+totals. Strict drift detection compares the full snapshot content except for the
+top-level `timestamp`.
+
+That means `--fail-on-diff` treats these as real drift:
+
+- opcode sample-count changes
+- `min_gas` / `max_gas` / `avg_gas` changes
+- differences in per-opcode `all_values`
+- per-trace `tx_count` or fee changes
+- changed `trace_name` for the same snapshot key
+
+For stable CI baselines, keep both the execution order and the profiled test
+data deterministic.

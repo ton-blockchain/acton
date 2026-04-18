@@ -52,17 +52,26 @@ OPTIONS
        --debug
            Enable debug mode.
 
+           This also raises executor verbosity to collect full source locations
+           and stack context for live stepping.
+
        --debug-port port
            Debug server port.
 
        --backtrace level
            Enable execution backtraces.
 
-           Currently supported value: full.
+           Currently supported value: full. Full backtraces also raise executor
+           verbosity to collect source locations and call stacks without
+           opening the debugger.
 
    Coverage Options
        --coverage
            Generate a coverage profile.
+
+           Coverage also raises internal executor verbosity enough to map
+           executed locations back to source files and lines, but it does not
+           enable stepping or print backtraces by itself.
 
        --coverage-format format
            Coverage output format.
@@ -73,7 +82,7 @@ OPTIONS
            Output file for the coverage report.
 
        --coverage-minimum-percent percent
-           Fail when total line coverage is below this percentage.
+           Fail when the final coverage score is below this percentage.
 
            Valid range: 0 to 100.
 
@@ -138,7 +147,10 @@ OPTIONS
        --save-test-trace [dir]
            Save transaction traces to a directory.
 
-           If passed without a value, Acton uses build/traces.
+           If passed without a value, Acton uses build/traces. Acton writes one
+           <test-name>_trace.json file per executed test and stores shared
+           contract metadata under contracts/<contract-name>.json. Relative
+           paths are resolved from the project root.
 
    Mutation Testing Options
        --mutate
@@ -258,13 +270,42 @@ REPORTING AND ARTIFACTS
        o  executor debug logs are hidden by default; re-run with -v when you
           need level-1 executor output such as debug.dumpStack()
 
+       o  -v is only low-level executor logging; --coverage also collects
+          source-location data, while --backtrace full and --debug collect
+          richer location and stack data
+
        o  --coverage-file matters only with --coverage; without an explicit
           path, Acton writes lcov.info for lcov and coverage.txt for text
+
+       o  coverage summaries show line and branch columns plus a blended Score
+
+       o  LCOV export includes BRDA, BRF, and BRH records when branch sites
+          were observed for a file
+
+       o  --coverage-minimum-percent checks the final blended Score shown in
+          the summary, not just % Lines
 
        o  coverage excludes .test.tolk files and @wrappers sources by default;
           use --coverage-include-tests or --coverage-include-wrappers to opt in
 
        o  --save-test-trace without a value writes traces to build/traces
+
+       o  each executed test produces its own <test-name>_trace.json artifact
+
+       o  exported bundles also include contracts/<contract-name>.json files
+          with code, source maps, and ABI metadata reused across tests in the
+          same bundle
+
+       o  trace chains default to names like Trace 1; use txs.giveName("...")
+          when you want stable human-readable names in exported artifacts and
+          the Test UI
+
+       o  when you split execution with testing.createTraceIterationCursor(),
+          exported traces still merge batches that belong to the same logical
+          root transaction chain
+
+       o  --ui also enables the default trace bundle directory when
+          --save-test-trace is otherwise absent
 
        o  gas snapshot files are written only to the explicit paths passed to
           --snapshot or --baseline-snapshot

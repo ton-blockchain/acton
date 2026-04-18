@@ -118,6 +118,11 @@ CLI flags override config values for the current invocation.
   `Ctrl+C`
 - the LiteNode UI is available on the root path, for example
   `http://localhost:<port>/`
+- the bundled UI is a single-page explorer app, so routes like `/explorer`,
+  `/tokens`, `/nfts`, and per-address or per-transaction pages are served from
+  the same frontend shell
+- the UI reads chain data from `/api/v2` and `/api/v3`, and uses `/admin`
+  lookups for local address aliases and registered compiler ABIs
 - when `--port` and `[litenode].port` are both absent, the current runtime
   fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints

@@ -22,6 +22,13 @@ With a command name, Acton first tries to render a generated command manual
 from the bundled `txt` and `man` artifacts. If no generated manual exists,
 Acton falls back to clap long help for that subcommand.
 
+As a practical rule:
+
+- use `acton --help` for the root overview
+- use `acton help <command>` for the long top-level manual
+- use nested clap help such as `acton wallet list --help` when you need the
+  exact nested subcommand usage
+
 Nested command paths such as `wallet list` are not currently accepted by
 `acton help`. In practice, top-level manuals such as `acton help wallet` and
 `acton help library` already include the nested subcommands under that command.

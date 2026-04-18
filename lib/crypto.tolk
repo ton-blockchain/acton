@@ -116,14 +116,30 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
 
 /// Generates fast (non-cryptographic) deterministic random bytes using a seed.
 ///
-/// If `seed` is not provided, the current blockchain time is used.
+/// If `seed` is not provided, the current `blockchain.now()` value is used at
+/// the moment of the call.
 /// The maximum `bytesNum` is 127; values >= 128 will throw an error
 ///
-/// Same seed always produces the same output, which is useful for reproducible tests.
+/// Same seed always produces the same output, which is useful for reproducible
+/// tests.
+///
+/// Practical determinism note:
+/// - Passing an explicit `seed` gives fully time-independent reproducibility.
+/// - Omitting `seed` makes the result deterministic only for a fixed blockchain
+///   time. In tests, `testing.setNow(...)` can be used to freeze that time.
+/// - If the blockchain time changes between calls, the output changes too.
 ///
 /// Example:
 /// ```tolk
 /// val bytes = crypto.getFastRandomBytes(16, 42);
+/// ```
+///
+/// Example with fixed emulation time:
+/// ```tolk
+/// testing.setNow(1700004321);
+/// val a = crypto.getFastRandomBytes(16);
+/// val b = crypto.getFastRandomBytes(16);
+/// // `a == b` because both calls used the same `blockchain.now()`
 /// ```
 fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
     if (seed == null) {

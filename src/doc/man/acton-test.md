@@ -74,6 +74,9 @@ debug output, use `--backtrace full` or `--debug`.
 
 {{#option "`--debug`" }}
 Enable debug mode.
+
+This also raises executor verbosity to collect full source locations and stack
+context for live stepping.
 {{/option}}
 
 {{#option "`--debug-port` _port_" }}
@@ -84,6 +87,8 @@ Debug server port.
 Enable execution backtraces.
 
 Currently supported value: `full`.
+Full backtraces also raise executor verbosity to collect source locations and
+call stacks without opening the debugger.
 {{/option}}
 
 {{/options}}
@@ -94,6 +99,10 @@ Currently supported value: `full`.
 
 {{#option "`--coverage`" }}
 Generate a coverage profile.
+
+Coverage also raises internal executor verbosity enough to map executed
+locations back to source files and lines, but it does not enable stepping or
+print backtraces by itself.
 {{/option}}
 
 {{#option "`--coverage-format` _format_" }}
@@ -107,7 +116,7 @@ Output file for the coverage report.
 {{/option}}
 
 {{#option "`--coverage-minimum-percent` _percent_" }}
-Fail when total line coverage is below this percentage.
+Fail when the final coverage score is below this percentage.
 
 Valid range: `0` to `100`.
 
@@ -212,6 +221,9 @@ TonCenter API key for blockchain queries.
 Save transaction traces to a directory.
 
 If passed without a value, Acton uses `build/traces`.
+Acton writes one `<test-name>_trace.json` file per executed test and stores
+shared contract metadata under `contracts/<contract-name>.json`.
+Relative paths are resolved from the project root.
 {{/option}}
 
 {{/options}}
@@ -328,11 +340,29 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   directory is `test-results`
 - executor debug logs are hidden by default; re-run with `-v` when you need
   level-1 executor output such as `debug.dumpStack()`
+- `-v` is only low-level executor logging; `--coverage` also collects
+  source-location data, while `--backtrace full` and `--debug` collect richer
+  location and stack data
 - `--coverage-file` matters only with `--coverage`; without an explicit path,
   Acton writes `lcov.info` for `lcov` and `coverage.txt` for `text`
+- coverage summaries show line and branch columns plus a blended `Score`
+- LCOV export includes `BRDA`, `BRF`, and `BRH` records when branch sites were
+  observed for a file
+- `--coverage-minimum-percent` checks the final blended `Score` shown in the
+  summary, not just `% Lines`
 - coverage excludes `.test.tolk` files and `@wrappers` sources by default;
   use `--coverage-include-tests` or `--coverage-include-wrappers` to opt in
 - `--save-test-trace` without a value writes traces to `build/traces`
+- each executed test produces its own `<test-name>_trace.json` artifact
+- exported bundles also include `contracts/<contract-name>.json` files with
+  code, source maps, and ABI metadata reused across tests in the same bundle
+- trace chains default to names like `Trace 1`; use `txs.giveName("...")` when
+  you want stable human-readable names in exported artifacts and the Test UI
+- when you split execution with `testing.createTraceIterationCursor()`,
+  exported traces still merge batches that belong to the same logical root
+  transaction chain
+- `--ui` also enables the default trace bundle directory when
+  `--save-test-trace` is otherwise absent
 - gas snapshot files are written only to the explicit paths passed to
   `--snapshot` or `--baseline-snapshot`
 - `[test.fuzz]` applies only to parameterized tests that explicitly opt in with

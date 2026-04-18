@@ -7,16 +7,27 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 
 Module for building contract code cells.
 
-This module provides the capability to compile Tolk contracts dynamically during the execution of tests or scripts.
-It interfaces with the Tolk compiler to generate the code cell for a given contract.
+`build()` is a host-assisted helper for tests, scripts, and emulation
+scenarios. It returns a code cell; it does not deploy the contract by
+itself.
 
 Build a contract with a specified name and optional path.
 
 `name` is the contract name in `Acton.toml` (the key in `[contracts.<name>]`), not
 the display name stored in `[contracts.<name>].display-name`.
 
+`build()` has three practical resolution modes:
+- `build("JettonWallet")`: resolve the contract by name from `Acton.toml`
+- `build("JettonWallet", "contracts/non-standard-filename.tolk")`: skip
+  manifest lookup and compile the explicit `.tolk` file
+- `build("JettonWallet", "build/JettonWallet.boc")`: skip compilation and
+  decode the explicit `.boc` file directly
+
 If `path` is omitted (empty string), Acton looks up the contract name in
 `Acton.toml`. If no contract with that name is found, execution fails.
+If the resolved manifest source already points to a `.boc` file, the name
+lookup still succeeds, but the code is loaded directly from that BoC instead
+of being compiled from Tolk source.
 
 Example:
 
@@ -26,8 +37,8 @@ val cell = build("JettonWallet");
 
 If `path` is non-empty, `Acton.toml` lookup is skipped and that path is used directly.
 The path can point to:
-- a `.tolk` file (compiled, with in-memory and `.acton/cache` caching),
-- a `.boc` file (loaded directly as code cell, without compilation).
+- a `.tolk` file
+- a `.boc` file
 
 Example:
 ```tolk
@@ -39,7 +50,18 @@ Example with prebuilt code:
 val cell = build("JettonWallet", "build/JettonWallet.boc");
 ```
 
-The path should be absolute or relative to the project root (the directory with `Acton.toml`).
+Path rules and cache behavior:
+- Relative paths are resolved from the project root (the directory with
+  `Acton.toml`).
+- `.tolk` paths go through the runtime build pipeline: Acton can reuse an
+  in-memory cache for the current run and the shared file cache under
+  `build/cache` across runs.
+- `.boc` paths bypass compilation entirely. Acton just reads the file,
+  decodes the code cell, and returns it.
+- Because `.boc` mode does not compile anything, it does not populate or
+  consult the compilation cache.
+- Missing or invalid `.boc` files fail at runtime with file-read or BoC
+  decode errors.
 
 ## Definitions
 
@@ -49,5 +71,5 @@ The path should be absolute or relative to the project root (the directory with 
 fun build(name: string, path: string = ""): cell
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/build.tolk#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/build.tolk#L58" />
 

@@ -44,3 +44,17 @@ Most docs changes happen under `content/docs/`. When you add or move pages,
 update the nearby `meta.json` so navigation stays correct. For richer content,
 reuse the shared MDX components and docs UI instead of embedding one-off markup
 directly into pages.
+
+Some docs trees are generated and should not be edited by hand. Their
+source-of-truth inputs live outside `docs/`:
+
+- `src/doc/man/*.md` -> command docs, terminal help text, and manpages
+- `lib/` -> `content/docs/standard_library`
+- `crates/tolkc/assets/tolk-stdlib/` -> `content/docs/tolk_standard_library`
+- linter rule metadata -> `content/docs/linting/rules`
+
+After changing those inputs, rerun:
+
+```bash
+cargo run --bin acton -- docgen
+```

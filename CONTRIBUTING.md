@@ -14,6 +14,27 @@ this repository.
 - Security reporting policy: [SECURITY.md](SECURITY.md)
 - Maintainer release process: [RELEASING.md](RELEASING.md)
 
+## Workspace map
+
+This repository is a Cargo workspace for the CLI and Rust libraries, plus a few
+non-Cargo surfaces such as docs and UI packages.
+
+- Root `acton` crate (`src/`, root `Cargo.toml`): the CLI entrypoint and most
+  end-user commands.
+- Tolk language/compiler stack: `tolkc`, `tolk-*`, `tree-sitter-*`, and the
+  matching `*-syntax` crates.
+- Native/runtime bridge: `ton-objs`, `ton-executor`, `ton-emulator`, and
+  `tvmffi`.
+- Services and tooling: `ton-api`, `ton-litenode`, `ton-indexer`, `retrace`,
+  `ton-ls`, and `acton-debug`.
+- Repo tooling: `xtask` for release/schema/artifact maintenance workflows.
+- Non-Cargo surfaces: `docs/` (Next.js + Fumadocs), the Bun-built UI crates,
+  and template/package-manager assets under `src/commands/new/templates/`.
+
+The `tree-sitter-*` crates own grammar source of truth. The matching
+`*-syntax` crates are typed AST/parser wrappers around those grammars rather
+than independent grammar implementations.
+
 ## Command conventions
 
 - Unless stated otherwise, run commands from the repository root.
@@ -116,6 +137,24 @@ What this does:
 Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
 `i582/ton` fork branch `pmakhnev/acton`.
 
+### Artifact ownership and verification
+
+For normal contributor setup, treat the published `release-objs` assets as the
+source of truth.
+
+- `just sync-artifacts` / `cargo xtask sync-artifacts` owns
+  `crates/ton-objs/artifacts_manifest.toml`, `objs/`, and the bundled stdlib
+  assets under `crates/tolkc/assets/`.
+- `crates/ton-objs/build.rs` verifies `libemulator.a` and `libtolk.a` against
+  the SHA-256 values recorded in that manifest.
+- Only use the manual rebuild path when you are intentionally updating the
+  native artifact set itself; otherwise prefer re-syncing from `release-objs`.
+
+The verification bypass `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY` exists as an
+escape hatch, but it should stay unset for normal contributor builds. When set
+to anything other than `0` / `false`, build-time archive verification is
+disabled.
+
 ### Option 1: sync prebuilt `objs` with xtask
 
 Use the built-in sync task instead of downloading release assets manually:
@@ -138,6 +177,13 @@ This command:
   `tolk-stdlib/` directory and `fift-stdlib/Asm.fif` plus
   `fift-stdlib/Fift.fif`, then removes
   the temporary archive.
+
+After syncing, validate with:
+
+```bash
+just build-dev
+./target/debug/acton doctor
+```
 
 ### Option 2: build TON artifacts manually
 
@@ -171,7 +217,7 @@ Then copy the generated archives into Acton and build the project:
 mkdir -p objs
 cp ton-repo/artifacts/libemulator.a objs/
 cp ton-repo/artifacts/libtolk.a objs/
-# edit crates/ton-objs/artifacts_manifest.toml:
+# only when intentionally updating the native artifact set, edit crates/ton-objs/artifacts_manifest.toml:
 # - increment `artifact_set_revision`
 # - update `sha256.libemulator` / `sha256.libtolk`
 
@@ -236,6 +282,43 @@ Notes:
   ```bash
   CI=1 just test
   ```
+
+## Test layout and conventions
+
+`just test` is broader than just Rust unit tests. It runs:
+
+- workspace Rust tests via `cargo nextest`
+- workspace doctests via `cargo test --workspace --doc`
+- repo-native self-host `.test.tolk` suites via `cargo run -- test`
+
+Useful layout landmarks:
+
+- `tests/integration_test.rs`: the main Rust integration-test binary.
+- `tests/debug_test.rs`: debugger-focused tests that must run sequentially.
+- `tests/integration/`: most feature suites, including the large
+  `test_runner/` subtree.
+- `tests/support/`: helpers such as `ProjectBuilder`, fixture/project copying,
+  snapshot normalization, and command wrappers.
+- `tests/projects/`: committed fixture projects used by Rust harnesses.
+- `tests/scenarios/*.yaml`: scenario sources.
+- `tests/integration/scenarios/*.rs`: generated Rust from those scenario YAML
+  files.
+
+Not every `.test.tolk` file is a top-level self-host suite. Some are copied
+into temp projects and exercised indirectly by Rust harnesses. Use:
+
+- `ProjectBuilder` when you need an ad-hoc project assembled inside a test
+- committed fixture projects under `tests/projects/` when the scenario should be
+  shared across many tests
+- committed root `.test.tolk` suites when the repository itself should be able
+  to run them through `cargo run -- test`
+
+Snapshot and generation conventions:
+
+- Rust snapshot outputs live under `tests/**/snapshots`
+- scenario YAML is source; generated Rust should be regenerated, not hand-edited
+- debugger tests are serialized explicitly
+- retrace tests are also serialized because they hit rate-limited remote APIs
 
 ## Formatting and Linting
 
@@ -333,11 +416,30 @@ cargo run --bin acton -- docgen
 cargo run --bin acton -- docgen --check
 ```
 
-This updates generated docs under:
+Do not hand-edit generated outputs. Edit the source-of-truth inputs instead,
+then rerun `acton docgen`.
 
+Source-of-truth map:
+
+- `src/doc/man/*.md` -> command reference docs under `docs/content/docs/commands`,
+  terminal help text under `src/doc/man/generated_txt`, and installed manpages
+  under `src/etc/man`
+- `lib/` -> `docs/content/docs/standard_library`
+- `crates/tolkc/assets/tolk-stdlib/` -> `docs/content/docs/tolk_standard_library`
+- linter rule metadata in `crates/tolk-linter/` and related macros ->
+  `docs/content/docs/linting/rules`
+
+This updates generated trees under:
+
+- `docs/content/docs/commands`
 - `docs/content/docs/standard_library`
 - `docs/content/docs/tolk_standard_library`
 - `docs/content/docs/linting/rules`
+- `src/etc/man`
+- `src/doc/man/generated_txt`
+
+`acton docgen --check` renders into a temporary output tree and fails if any
+tracked generated file is stale.
 
 If your PR changes any docgen inputs, running `acton docgen` and committing
 generated documentation changes is required. This includes:
@@ -346,6 +448,9 @@ generated documentation changes is required. This includes:
 - `crates/tolkc/assets/tolk-stdlib/`
 - linter rule metadata and mappings (for example `crates/tolk-linter/`,
   `crates/tolk-macros/`)
+
+For docs-site-only pages under `docs/content/docs/` that are not generated,
+edit them directly and keep nearby `meta.json` in sync.
 
 After doc updates (manual or generated), validate docs build:
 
@@ -356,7 +461,36 @@ yarn install --immutable --check-cache --check-resolutions
 yarn build
 ```
 
+## Schema workflow
+
+`acton.schema.json` is generated, not hand-maintained.
+
+Useful commands:
+
+```bash
+cargo xtask schema
+cargo xtask schema --check
+just check-schema
+```
+
+When to rerun schema generation:
+
+- any change to `ActonConfig` or related config structs
+- schema-shaping serde/schemars changes
+- docs or editor work that depends on new config fields
+
+Current consumers include:
+
+- repo editor settings such as `.vscode/settings.json`
+- `ton-ls`, which embeds the schema for TOML hover/completion help
+
+A stale schema usually shows up as `just check-schema` failure, missing hover
+docs, or editor completion that does not know about new config fields.
+
 ## Tree-sitter workflows
+
+Grammar source of truth lives in `crates/tree-sitter-*`. The matching
+`crates/*-syntax` crates wrap those grammars with typed AST helpers.
 
 If your PR changes any `crates/tree-sitter-*` grammar/parser artifacts:
 
@@ -367,14 +501,55 @@ just test-tree-sitter-all
 For quick Tolk-only iteration:
 
 ```bash
-just test-tree-sitter
+just test-tree-sitter-tolk
 ```
 
 When grammar snapshots need refresh:
 
 ```bash
-just update-test-tree-sitter
+just update-test-tree-sitter-tolk
 ```
+
+The canonical local flow for one grammar is:
+
+```bash
+cd crates/tree-sitter-tolk
+yarn install --immutable
+yarn tree-sitter generate
+yarn tree-sitter test
+```
+
+Commit the grammar source plus the generated parser artifacts that changed
+together. In practice that often includes:
+
+- `grammar.js`
+- generated `src/` / bindings output
+- `queries/*`
+- `test/corpus/*`
+
+CI validates grammars by running the same generate + test sequence from
+`.github/workflows/build-grammars.yml`.
+
+## `xtask` map
+
+`cargo xtask` contains both contributor-facing and maintainer-only workflows.
+
+Common contributor-facing tasks:
+
+- `cargo xtask sync-artifacts`
+- `cargo xtask schema`
+- `cargo xtask schema --check`
+
+Mostly maintainer-facing tasks:
+
+- `cargo xtask release`
+- `cargo xtask retag`
+- `cargo xtask dist ...`
+- `cargo xtask github-cleanup`
+- `cargo xtask ubicloud-cleanup`
+
+`RELEASING.md` documents numbered release flows in detail. The cleanup tasks are
+cache-pruning helpers and should not be used casually.
 
 ## Change-based checklist
 

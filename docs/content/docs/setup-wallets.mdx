@@ -6,6 +6,30 @@ icon: "Wallet"
 
 Wallets are essential for interacting with the real blockchain in Acton. They enable you to deploy contracts, send transactions, and verify smart contract source code.
 
+## Wallet lifecycle at a glance
+
+The most common workflow is:
+
+1. create or import a wallet
+2. fund it with testnet or localnet funds
+3. inspect balances and expected addresses
+4. use it from scripts or verification flows
+5. optionally export, sign with, or remove it later
+
+Useful commands to keep in mind:
+
+```bash
+acton wallet import --name deployer --local "word1 ..."
+acton wallet list --balance
+acton wallet airdrop deployer --net localnet
+acton wallet sign deployer --body <hex-or-base64-boc>
+acton wallet export-mnemonic deployer
+acton wallet remove deployer -y
+```
+
+For commands that query remote balances or testnet backends, you can also set
+`TONCENTER_API_KEY` in the environment instead of repeating `--api-key`.
+
 ## Creating and Managing Wallets
 
 ### Creating a New Wallet
@@ -60,6 +84,8 @@ acton wallet new --name deployer --local --airdrop
 ```
 
 Acton creates the wallet and then immediately requests testnet TON from faucet.
+If you only want the request and do not want to wait for balance confirmation,
+add `--no-wait-airdrop`.
 
 ### Option 2: Request Airdrop for Existing Wallet
 

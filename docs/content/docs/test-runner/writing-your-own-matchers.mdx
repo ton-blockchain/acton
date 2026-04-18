@@ -5,6 +5,13 @@ description: "Learn how to add custom matchers for expect() calls"
 
 This guide will walk you through creating your own custom matchers for `expect()` assertions. Custom matchers allow you to extend the standard set of assertions with your own domain-specific logic, making your tests more readable and expressive.
 
+<Callout type="info">
+Before writing a custom matcher, check
+[Built-in Matchers and Helpers](/docs/test-runner/built-in-matchers-and-helpers).
+Acton already provides built-in transaction matchers, map expectations, and
+out-action helpers that often cover the common cases.
+</Callout>
+
 ## The Problem with Standalone Check Functions
 
 Imagine you have some validation logic that you want to extract into a function. By extracting it into a function, you'll get code like this:

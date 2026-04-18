@@ -43,7 +43,7 @@ multiple wallets are available.
 .RS 4
 Tolk compiler version to request on the verifier side.
 .sp
-Currently defaults to \fB1.1.0\fR\&.
+Currently defaults to \fB1.2.0\fR\&.
 .RE
 .sp
 \fB\-\-dry\-run\fR
@@ -112,6 +112,11 @@ Verification usually consists of:
 .RS 4
 \h'-04' 5.\h'+01'optionally sending the final verification transaction
 .RE
+.sp
+Acton prepares the local compilation artifacts and uploads them to the
+verification service. The final deployed\-code match is established by the
+verifier flow itself; \fBacton verify\fR does not first perform a separate local
+on\-chain code\-hash comparison against the target address before upload.
 .SH "PREREQUISITES"
 .sp
 .RS 4
@@ -189,10 +194,90 @@ exits successfully without sending another transaction
 .RS 4
 \h'-04'\(bu\h'+03'on successful verification, Acton prints a verifier link for the contract
 .RE
+.SH "ENVIRONMENT OVERRIDES"
+The verification flow also supports backend/debug environment overrides:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_VERIFY_BACKEND\fR overrides only the initial \fB/source\fR backend used for
+source upload
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_VERIFY_BACKENDS\fR replaces the later signer \fB/sign\fR backend list
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_VERIFY_DEBUG\fR enables verbose verification diagnostics by presence
+alone
+.RE
+.sp
+Backend override values are trimmed and normalized, including removal of a
+trailing \fB/\fR\&.
+.sp
+With \fBACTON_VERIFY_DEBUG\fR, Acton prints:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compiler version
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'collected source files
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'active source\-backend override
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'active signer\-backend override list
+.RE
+.sp
+Example: debug source upload against a custom backend:
+.sp
+.RS 4
+.nf
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \(rs
+ACTON_VERIFY_DEBUG=1 \(rs
+acton verify Counter \-\-address EQDt7LL... \-\-net mainnet \-\-dry\-run
+.fi
+.RE
+.sp
+Example: separate source upload from signer backends:
+.sp
+.RS 4
+.nf
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \(rs
+ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \(rs
+acton verify Counter \-\-address EQDt7LL... \-\-net mainnet \-\-dry\-run
+.fi
+.RE
 .SH "DRY RUN"
 \fB\-\-dry\-run\fR still compiles the contract, uploads sources to the verifier
 backend, and collects the required signatures. It skips only the final
 blockchain transaction.
+.SH "RETRIES AND FAILURE HINTS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'source upload retries up to 8 times for transient transport failures and
+backend 5xx responses
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'retry backoff grows from 1 second to 8 seconds
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'backend error responses are printed with the response body when available
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'5xx failures suggest retrying later and using \fBACTON_VERIFY_DEBUG=1\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'backend problems can also be narrowed down by pointing
+\fBACTON_VERIFY_BACKEND\fR at a specific endpoint
+.RE
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -252,7 +337,7 @@ acton verify Counter \-\-address EQDt7LL... \-\-dry\-run
 .sp
 .RS 4
 .nf
-acton verify Counter \-\-address EQDt7LL... \-\-compiler\-version 1.1.0
+acton verify Counter \-\-address EQDt7LL... \-\-compiler\-version 1.2.0
 .fi
 .RE
 .RE

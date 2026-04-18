@@ -23,6 +23,18 @@ This matters for all relative paths from config sections (for example
 `[contracts].src`, `[build]`, `[test]`, and `[import-mappings]`), because they are
 resolved relative to project root for the current invocation.
 
+Relative CLI path flags are a separate rule:
+
+- Relative paths written inside `Acton.toml` are resolved from project root.
+- Relative CLI path flags stay relative to the current working directory unless they are absolute.
+- `--manifest-path` chooses which manifest to load, but it does not rebase unrelated CLI path flags to the manifest directory.
+
+Examples:
+
+- `[build].out-dir = "artifacts"` writes under `<project-root>/artifacts`.
+- `acton build --out-dir artifacts` writes under `<cwd>/artifacts`.
+- `[wrappers.tolk].output-dir = "wrappers"` resolves from project root, but `acton wrapper Counter --output-dir wrappers` resolves from the current working directory.
+
 ## Root Section
 
 The top-level of `Acton.toml` contains the following sections:
@@ -30,6 +42,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[package]` — Project metadata.
 - `[contracts]` — Definition of smart contracts in the project.
 - `[build]` — Build command output settings.
+- `[wrappers]` — Default output settings for `acton wrapper`.
 - `[fmt]` — Tolk formatter settings for `acton fmt`.
 - `[litenode]` — Default settings for `acton litenode` commands.
 - `[test]` — Configuration for the test runner.
@@ -90,6 +103,10 @@ depends = ["AnotherContract"]
 - `function`: Custom name for the generated code function.
 - `path`: Custom output path for the generated code file.
 
+Dependency helper naming uses the contract key from `[contracts.<name>]`, not
+`display-name`. Relative dependency `path` values are resolved from the project
+root.
+
 Example:
 ```toml
 [contracts.MainContract]
@@ -122,7 +139,51 @@ output-fift = "build/fift"
 ```
 
 `acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
+Config values here are project-root-relative. The CLI flags stay cwd-relative unless you pass absolute paths.
 Precompiled `.boc` contracts are skipped for Fift output.
+
+---
+
+## `[wrappers]` Section
+
+Configures default output locations for `acton wrapper`.
+
+### `[wrappers.tolk]`
+
+| Field             | Type      | Default | Description                                                           |
+|:------------------|:----------|:--------|:----------------------------------------------------------------------|
+| `output-dir`      | `string`  | -       | Default directory for generated Tolk wrappers.                        |
+| `generate-test`   | `boolean` | `false` | Generate a Tolk test stub by default for non-TypeScript wrapper runs. |
+| `test-output-dir` | `string`  | -       | Default directory for generated Tolk test stubs.                      |
+
+### `[wrappers.typescript]`
+
+| Field        | Type     | Default | Description                                          |
+|:-------------|:---------|:--------|:-----------------------------------------------------|
+| `output-dir` | `string` | -       | Default directory for generated TypeScript wrappers. |
+
+Example:
+
+```toml
+[wrappers.tolk]
+output-dir = "wrappers"
+generate-test = true
+test-output-dir = "tests"
+
+[wrappers.typescript]
+output-dir = "app/src/wrappers"
+```
+
+Override rules:
+
+- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.tolk].output-dir`, then the wrapper command's built-in default location.
+- For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
+- For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
+- `[wrappers.tolk].generate-test` affects only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
+
+Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
+
+For full CLI behavior, see [acton wrapper](/docs/commands/wrapper).
 
 ---
 
@@ -322,6 +383,10 @@ output-format = "sarif"
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
 When you pass an explicit target to `acton check` (contract name or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
+Project-wide discovery still skips built-in directories such as `.git`,
+`.github`, `.idea`, `.acton`, `node_modules`, `target`, `tolk-stdlib`,
+`.codex`, and `.claude`, and non-`.tolk` contract entries such as `.boc`
+artifacts are never lint roots.
 CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
 Use `acton check --output-file <PATH>` to write non-plain output into a file.
 For one-off line-level suppressions in source code, use `// check-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
@@ -429,6 +494,32 @@ With the above configuration, you can use these mappings in your Tolk source fil
 import "@core/math"  // Resolves to ./libs/core/math.tolk
 import "@utils/logic" // Resolves to ./libs/utils/logic.tolk
 ```
+
+### Built-in Project Mappings
+
+Projects created with `acton new` or updated with `acton init` usually contain
+these default mappings:
+
+| Mapping      | Default path | Common use                                      |
+|:-------------|:-------------|:------------------------------------------------|
+| `@acton`     | `.acton`     | Standard library imports such as `@acton/testing/expect` |
+| `@contracts` | `contracts`  | Local contract-side modules such as `@contracts/types`   |
+| `@tests`     | `tests`      | Shared test helpers and fixtures                         |
+| `@wrappers`  | `wrappers`   | Generated wrappers such as `@wrappers/Counter`          |
+| `@gen`       | `gen`        | Generated dependency helper files                        |
+
+Example:
+
+```tolk
+import "@acton/testing/expect"
+import "@contracts/types"
+import "@wrappers/Counter"
+```
+
+These defaults are written into `Acton.toml` by project scaffolding commands
+such as `acton new` and `acton init`. If you remove them manually, Acton does
+not silently recreate them during normal compilation; add them back explicitly
+or rerun `acton init`.
 
 ### Prefix Resolution Rules
 

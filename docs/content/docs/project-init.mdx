@@ -6,11 +6,27 @@ icon: SquareTerminal
 
 import { File, Folder, Files } from 'fumadocs-ui/components/files';
 
-The `acton new` command is the starting point for any new Tolk project. It sets up the project structure, standard library, and configuration, and allows you to start from a pre-built template.
+Acton supports two first-class ways to start working in a directory:
 
-This page focuses on the guided setup flow and the generated project layouts.
+- `acton new` creates a brand new scaffold from a built-in template.
+- `acton init` adds Acton support to an existing repository or ad-hoc folder.
+
+This page covers both entrypoints so you can pick the right starting path
+before diving into the detailed command references.
+
 For the complete flag-by-flag reference, see
-[`acton new`](/docs/commands/new).
+[`acton new`](/docs/commands/new) and [`acton init`](/docs/commands/init).
+
+## Choose a starting path
+
+Use `acton new` when you want Acton to generate the project structure for you.
+That path is best for new contracts, template exploration, and starter projects
+that should include ready-to-run wrappers, tests, scripts, and optional app
+scaffolding from day one.
+
+Use `acton init` when the repository already exists and you want Acton to
+discover contracts, create or patch `Acton.toml`, install the bundled stdlib,
+and add the usual ignore/config glue without replacing your existing files.
 
 ## Usage
 
@@ -26,27 +42,72 @@ Where `<PATH>` is the directory where you want to create the project. If you wan
 acton new .
 ```
 
+To add Acton support to an existing directory instead, run:
+
+```bash
+acton init
+```
+
+`acton init` works in place. It does not create a new folder and it does not
+replace an existing `Acton.toml`. Instead it backfills default import mappings
+when they are missing, patches `.gitignore`, refreshes `.acton/tolk-stdlib`,
+and attempts to create local symlinks to global wallet/library overlays when
+those global files already exist.
+
+## Existing-project initialization with `acton init`
+
+When `Acton.toml` does not exist yet, `acton init` scans the current directory
+tree and auto-registers likely contract roots.
+
+Discovery rules:
+
+- it walks the current directory recursively
+- it skips hidden entries plus `node_modules`, `target`, `.git`, and `.acton`
+- it considers `.tolk` files only
+- it treats files that define `onInternalMessage` as contract entry files
+- it derives the contract key from the file stem, replacing `-` with `_`
+- it derives the default display name by splitting the file stem on `_` and
+  `-` and capitalizing the words
+
+Example:
+
+- `contracts/my-counter.tolk` becomes contract key `my_counter`
+- the generated display name becomes `My Counter`
+
+`acton init` is idempotent. Re-running it is safe and mainly refreshes stdlib,
+retries overlay symlinks, and appends only missing ignore entries.
+
+Overlay symlink behavior is intentionally conservative:
+
+- if a local `global.wallets.toml` or `global.libraries.toml` already exists,
+  Acton leaves it alone
+- if the matching global file does not exist, no local symlink is created
+- if symlink creation is not allowed on the current system, Acton prints a
+  warning and continues
+
 ## Interactive Setup
 
 If you don't provide additional flags, Acton will guide you through an interactive setup process to configure your project:
 
 1.  **Project Name**: The name of your project (default: directory name).
-2.  **Description**: A short description of your project.
-3.  **Template**: Choose a starting template (see [Templates](#templates) below).
-4.  **License**: Select an open-source license (MIT, Apache-2.0, etc.).
-5.  **TypeScript app scaffold**: For supported templates, choose whether to include the app.
-6.  **Git hooks**: If `git` is available, choose whether to install the default project-local hooks.
-7.  **`AGENTS.md` guidance**: Choose whether to include the template's coding-agent guidance file.
+2.  **Template**: Choose a starting template (see [Templates](#templates) below).
+3.  **TypeScript app scaffold**: For supported templates, choose whether to include the app.
+4.  **Advanced options**: Decide whether you want to customize description, license, hooks, and `AGENTS.md`.
+5.  **Description**: A short description of your project.
+6.  **License**: Select an open-source license (MIT, Apache-2.0, etc.).
+7.  **Git hooks**: If `git` is available, choose whether to install the default project-local hooks.
+8.  **`AGENTS.md` guidance**: Choose whether to include the template's coding-agent guidance file.
 
 Example interaction:
 
 ```acton-cli
 $ acton new my-project
 ? Project name: my-project
-? Description: A TON blockchain project
 ? Template: counter
 ? License: MIT
 ? Include the TypeScript dApp? No
+? Configure advanced options? Yes
+? Description: A TON blockchain project
 ? Set up Git hooks to run checks before each commit? No
 ? Include AGENTS.md guidance? Yes
 ```
@@ -65,6 +126,10 @@ copies the selected template's `AGENTS.md` into the generated project root. In
 non-interactive mode, both hooks and `AGENTS.md` stay disabled unless their
 flags are passed explicitly.
 
+Each built-in scaffold can ship a different `AGENTS.md`. `counter --app
+--agents`, for example, copies the frontend-aware guidance from the
+`counter-app` scaffold rather than the contract-only `counter` one.
+
 ## Templates
 
 Acton comes with several built-in templates to help you get started quickly:
@@ -75,7 +140,7 @@ A minimal project structure with a single empty contract. Best for starting from
 ### `counter`
 A simple example demonstrating state management in Tolk. It includes:
 - A basic counter contract.
-- A wrapper class for testing.
+- Starter wrappers for testing and scripting.
 - Unit tests.
 - A deployment script.
 
@@ -88,6 +153,34 @@ A comprehensive example of a [Jetton](https://docs.ton.org/develop/dapps/asset-p
 - **Minter Contract**: Manages the total supply and minting of tokens.
 - **Wallet Contract**: Manages individual user balances.
 - **Tests**: Full suite of tests covering minting, transferring, and burning.
+
+### `nft`
+An NFT collection + item scaffold with collection, item, wrappers, tests, and
+ready-made deployment scripts. Use it when you want a multi-contract example
+centered on NFT minting and collection management rather than fungible tokens.
+
+## Starter wrappers vs generated wrappers
+
+The wrappers copied by `acton new` are starter files shipped with the selected
+template. They are not regenerated during scaffolding.
+
+That means two things:
+
+- different templates can expose slightly different helper shapes
+- the current `acton wrapper` generator may emit additional helpers compared to
+  the wrapper file bundled with an older scaffold
+
+Across templates, you will usually see the same core patterns:
+
+- `fromStorage(...)` to build `StateInit` and deployment address from typed storage
+- sometimes `fromAddress(...)` for already deployed contracts
+- `deploy(...)`
+- one `send{Name}(...)` helper per incoming message
+- `sendAny(...)` for raw custom-body messages
+- typed get-method helpers
+
+If you need the latest ABI-driven wrapper shape, regenerate it explicitly with
+[`acton wrapper`](/docs/commands/wrapper).
 
 ## Project Structure
 

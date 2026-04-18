@@ -124,6 +124,17 @@ endpoints, and the bundled LiteNode UI
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'the bundled UI is a single\-page explorer app, so routes like \fB/explorer\fR,
+\fB/tokens\fR, \fB/nfts\fR, and per\-address or per\-transaction pages are served from
+the same frontend shell
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the UI reads chain data from \fB/api/v2\fR and \fB/api/v3\fR, and uses \fB/admin\fR
+lookups for local address aliases and registered compiler ABIs
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'when \fB\-\-port\fR and \fB[litenode].port\fR are both absent, the current runtime
 fallback is \fB5411\fR
 .RE

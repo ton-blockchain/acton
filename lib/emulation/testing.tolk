@@ -1,13 +1,13 @@
 /// Module for public API to be used in tests (which do NOT interact with real blockchain).
-/// 
+///
 /// You cover contracts with tests to simulate their behavior in a real blockchain.
 /// Use methods `testing.xxx` in combination with `net.xxx` in `some-file.test.tolk`.
-/// 
+///
 /// Writing tests differs from writing scripts that operate testnet/mainnet.
 /// In tests, you don't connect your wallet, you use `testing.treasury` (unlimited source of money).
 /// In tests, you may set blockchain config, set any account at any address, etc.
 /// In tests, you don't wait for network responses: all transactions are emulated.
-/// 
+///
 
 import "_impl_emul"
 import "../ffi"
@@ -39,7 +39,7 @@ fun __acton_impl_setConfigParam<T>(value: T, index: int): void {
 
 /// Opaque cursor for step-by-step transaction execution.
 ///
-/// Use [testing.createTraceIterationCursor] to create it, 
+/// Use [testing.createTraceIterationCursor] to create it,
 /// then drain it in parts with [TxCursor.executeN], [TxCursor.executeTill], or [TxCursor.executeAllRemaining].
 struct TxCursor {
     id: int
@@ -101,8 +101,10 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 
 /// Send a single message from a specified address.
 ///
-/// In contrast to [net.send], this method doesn't process out messages, but returns
-/// a single send result with this out messages.
+/// In contrast to [net.send], this method executes exactly one transaction and
+/// does not recursively process that transaction's out messages. The returned
+/// [SendResult] still contains those out messages for inspection, but they are
+/// left undelivered.
 ///
 /// This method is useful to simulate a bounced message.
 ///
@@ -118,7 +120,7 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 /// testing.processSingleTraceStep(notDeployer.address, bouncedMsg);
 /// ```
 ///
-/// See [net.send] if you need to send a message and process out messages.
+/// See [net.send] or [net.sendExternal] if you need full recursive trace processing.
 fun testing.processSingleTraceStep(from: address, message: OutMessage): SendResult {
     val res = ffi.sendSingleMessage(message.messageCell, from.toCell())!;
     return SendResult.fromTuple(res);
@@ -224,6 +226,14 @@ fun testing.getAccountStorageFee(addr: address, seconds: int): coins? {
 ///
 /// This is useful for testing time-dependent contracts.
 ///
+/// `testing.setNow()` synchronizes time in two places:
+/// - the emulated world state used for future transactions and snapshots
+/// - the current VM context's C7 unixtime slot, so `blockchain.now()` in the
+///   current test/get-method context immediately sees the same mocked value
+///
+/// This is why `testing.setNow()` affects both future emulated execution and
+/// time-dependent helpers that read the current VM context right away.
+///
 /// Example:
 /// ```tolk
 /// val futureTime = testing.getNow() + 1000; // 1000 seconds from now
@@ -239,6 +249,10 @@ fun testing.setNow(now: uint32): void {
 /// Get the current Unix timestamp used in emulation.
 ///
 /// Returns the current time in the emulated blockchain.
+///
+/// Get-method execution prefers this mocked time once you have called
+/// [testing.setNow]. If the emulated time is still `0` (the default before any
+/// override), Acton falls back to the real wall clock for get-method runs.
 ///
 /// Example:
 /// ```tolk
@@ -367,13 +381,28 @@ fun testing.loadSnapshot(pathToJsonFile: string): bool {
 /// The configuration is validated before being applied. If validation fails, the function
 /// returns false and the configuration is not updated.
 ///
+/// `BlockchainConfigMap.set*` methods only mutate the local map value returned
+/// by [testing.getConfig]. `testing.setConfig()` is the commit point that
+/// pushes those changes into the emulator.
+///
+/// On success, Acton synchronizes the configuration in two places:
+/// - the emulator's world-state config used by future transactions and queries
+/// - the current VM context's C7 config mirrors (both packed root config and
+///   the unpacked hot fields used by TVM helpers)
+///
+/// That extra C7 synchronization keeps the current test context, follow-up
+/// config getters, and emulated execution paths aligned on the same config data
+/// without requiring a fresh VM bootstrap.
+///
 /// For detailed information about blockchain configuration parameters, see the
 /// [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 ///
 /// Parameters:
 /// - `config`: The new [BlockchainConfigMap] map containing configuration parameters (indices 0-90)
 ///
-/// Returns: `true` if the configuration was successfully updated, `false` if validation failed.
+/// Returns: `true` if the configuration was successfully updated, `false` if
+/// validation failed. On failure, neither the emulator world state nor the C7
+/// mirrors are updated.
 ///
 /// Example:
 /// ```tolk
@@ -433,7 +462,7 @@ fun testing.setConfig(config: BlockchainConfigMap): bool {
 /// Returns a map of all blockchain configuration parameters indexed from 0-90.
 /// The configuration includes gas prices, storage costs, validator settings, and other
 /// network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices],
-/// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion] 
+/// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion]
 /// to access specific parameters.
 ///
 /// For detailed information about blockchain configuration parameters, see the

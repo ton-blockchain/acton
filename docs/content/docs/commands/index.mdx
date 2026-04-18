@@ -29,6 +29,19 @@ acton --project-root ../my-project test
 acton --manifest-path ../my-project/Acton.toml wallet new --local
 ```
 
+## Help And Manuals
+
+Use the CLI help surfaces intentionally:
+
+- `acton --help` shows the root overview and top-level command list
+- `acton help <command>` opens the long manual for a top-level command
+- nested subcommands still use direct clap help such as
+  `acton wallet list --help`
+
+When something about the local environment looks wrong, `acton doctor` is the
+best troubleshooting entry point before you start digging into individual
+command manuals.
+
 <Cards>
     <Card href="/docs/commands/init" title="Initialize Current Directory">
         Add an Acton scaffold to an existing directory without creating a new

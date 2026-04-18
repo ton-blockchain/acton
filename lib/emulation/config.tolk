@@ -39,7 +39,10 @@ import "../testing/assert"
 /// TL-B schema.
 ///
 /// `BlockchainConfigMap.set*` methods mutate only this in-memory map.
-/// To apply updates to the emulator globally, call [testing.setConfig] with the mutated config.
+/// To apply updates to the emulator globally, call [testing.setConfig] with the
+/// mutated config. That apply step updates both the emulator world state and
+/// the current VM context's C7-visible config mirrors, so follow-up reads in
+/// the same test run see the committed values.
 type BlockchainConfigMap = map<uint32, cell>
 
 /// Sets a raw configuration parameter at the given index.
