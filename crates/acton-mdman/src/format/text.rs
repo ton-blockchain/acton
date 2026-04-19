@@ -631,3 +631,21 @@ fn fill_cell(text: &str, width: usize, alignment: Alignment) -> Vec<String> {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::TextFormatter;
+    use crate::format::Formatter;
+
+    #[test]
+    fn uppercases_headings_in_text_output() {
+        let formatter = TextFormatter::new(None);
+        let rendered = formatter
+            .render("# acton-run(1)\n\n## Exit Status\n\nBody.\n")
+            .expect("text output should render");
+
+        assert!(rendered.contains("ACTON-RUN(1)"));
+        assert!(rendered.contains("EXIT STATUS"));
+        assert!(!rendered.contains("Exit Status"));
+    }
+}

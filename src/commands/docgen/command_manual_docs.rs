@@ -61,10 +61,15 @@ fn strip_leading_h1(body: &str) -> &str {
 }
 
 fn strip_leading_section<'a>(body: &'a str, title: &str) -> &'a str {
-    let heading = format!("## {title}\n");
-    let Some(rest) = body.strip_prefix(&heading) else {
+    let Some(rest) = body.strip_prefix("## ") else {
         return body;
     };
+    let Some((heading_title, rest)) = rest.split_once('\n') else {
+        return body;
+    };
+    if !heading_title.eq_ignore_ascii_case(title) {
+        return body;
+    }
 
     match rest.find("\n## ") {
         Some(next_section_idx) => rest[next_section_idx + 1..].trim_start_matches('\n'),
@@ -103,6 +108,13 @@ mod tests {
             strip_leading_section(body, "NAME"),
             "## DESCRIPTION\n\nBody.\n\n## SEE ALSO\n\nMore.\n"
         );
+    }
+
+    #[test]
+    fn strip_leading_section_matches_case_insensitively() {
+        let body = "## Name\n\nIntro.\n\n## Description\n\nBody.\n";
+
+        assert_eq!(strip_leading_section(body, "NAME"), "## Description\n\nBody.\n");
     }
 
     #[test]

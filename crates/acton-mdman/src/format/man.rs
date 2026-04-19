@@ -130,7 +130,7 @@ impl<'e> ManRenderer<'e> {
                                 // Section header
                                 let text = header_text(&mut self.parser)?;
                                 self.flush();
-                                write!(self.output, ".SH \"{}\"\n", text)?;
+                                write!(self.output, ".SH \"{}\"\n", text.to_uppercase())?;
                                 suppress_paragraph = true;
                             } else {
                                 // Subsection header
@@ -462,4 +462,21 @@ fn escape(s: &str) -> Result<String, Error> {
         );
     }
     Ok(replaced)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ManFormatter;
+    use crate::format::Formatter;
+
+    #[test]
+    fn uppercases_section_headings_in_man_output() {
+        let formatter = ManFormatter::new(None);
+        let rendered = formatter
+            .render("# acton-run(1)\n\n## Exit Status\n\nBody.\n")
+            .expect("man output should render");
+
+        assert!(rendered.contains(".SH \"EXIT STATUS\""));
+        assert!(!rendered.contains(".SH \"Exit Status\""));
+    }
 }
