@@ -306,21 +306,20 @@ just build-ui
 
 ## Documentation workflows
 
-Documentation site (Next.js in `docs/`, package manager: Yarn via Corepack):
+Documentation site (Next.js in `docs/`, package manager: Bun):
 
 ```bash
-corepack enable
 cd docs
-yarn install --immutable --check-cache --check-resolutions
-yarn dev
+bun install
+bun run dev
 ```
 
 Build docs:
 
 ```bash
-corepack enable
 cd docs
-yarn build
+bun ci
+bun run build
 ```
 
 Regenerate auto-generated MDX documentation from Acton sources:
@@ -350,10 +349,9 @@ generated documentation changes is required. This includes:
 After doc updates (manual or generated), validate docs build:
 
 ```bash
-corepack enable
 cd docs
-yarn install --immutable --check-cache --check-resolutions
-yarn build
+bun ci
+bun run build
 ```
 
 ## Tree-sitter workflows
@@ -386,7 +384,7 @@ Use this as a quick local matrix before pushing:
 | UI code (`crates/acton-*-ui`, root `package.json`)                                                                        | `just check` + `just build-ui` + `just check-ui`                                                          |
 | Dependency or lockfile changes (`Cargo.lock`, `bun.lock`, `docs/`, tree-sitter/code extension/template package manifests) | `just check-security`                                                                                     |
 | Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata)                        | `just check` + `acton docgen` and  commit generated docs                                                  |
-| Docs site content/config (`docs/`)                                                                                        | `corepack enable && cd docs && yarn install --immutable --check-cache --check-resolutions && yarn build`  |
+| Docs site content/config (`docs/`)                                                                                        | `cd docs && bun ci && bun run build`                                                                       |
 | Tree-sitter grammar (`crates/tree-sitter-*`)                                                                              | `just check` +`just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
 | Release preparation (maintainers)                                                                                         | Follow [RELEASING.md](RELEASING.md)                                                                       |
 

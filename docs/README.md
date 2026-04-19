@@ -19,12 +19,11 @@ highlighting for Acton and TON-related languages.
 
 ## Local development
 
-This workspace is configured for Yarn 4.
+This workspace uses Bun.
 
 ```bash
-corepack enable
-yarn install
-yarn dev
+bun install
+bun run dev
 ```
 
 Open `http://localhost:3000` for the landing page and
@@ -32,11 +31,11 @@ Open `http://localhost:3000` for the landing page and
 
 ## Available scripts
 
-- `yarn dev`: start the local development server.
-- `yarn build`: produce the static production build.
-- `yarn start`: serve the production build locally.
-- `yarn lint`: run ESLint for the docs app.
-- `yarn deploy`: build the static export and publish `out/` to GitHub Pages.
+- `bun run dev`: start the local development server.
+- `bun run build`: produce the static production build.
+- `bun run start`: serve the production build locally.
+- `bun run lint`: run ESLint for the docs app.
+- `bun run deploy`: build the static export and publish `out/` to GitHub Pages.
 
 ## Editing content
 
