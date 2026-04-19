@@ -15,12 +15,16 @@ use tree_sitter::Node;
 ///
 /// ### Example
 /// ```tolk
-/// fun main(data: dict) {}
+/// struct State {
+///     data: dict
+/// }
 /// ```
 ///
 /// Use instead:
 /// ```tolk
-/// fun main(data: map<uint32, cell>) {}
+/// struct State {
+///     data: map<uint32, cell>
+/// }
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]

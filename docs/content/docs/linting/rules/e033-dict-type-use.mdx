@@ -21,12 +21,16 @@ In most cases, `map<K, V>` communicates intent better and gives stronger type ch
 
 ### Example
 ```tolk
-fun main(data: dict) {}
+struct State {
+    data: dict
+}
 ```
 
 Use instead:
 ```tolk
-fun main(data: map<uint32, cell>) {}
+struct State {
+    data: map<uint32, cell>
+}
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dict_type_use.rs#L25" />
