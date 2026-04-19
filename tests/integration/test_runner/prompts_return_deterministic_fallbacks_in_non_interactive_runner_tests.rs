@@ -12,6 +12,7 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
 
             get fun `test prompt select confirm fallbacks`() {
                 expect(prompt("Enter your name:", "Guest")).toEqual("");
+                expect(prompt("Enter your name:", "type your name", "John")).toEqual("John");
                 expect(select("Choose network:", ["Mainnet", "Testnet", "Local"])).toEqual("");
                 expect(confirm("Proceed with deployment?", false, "Safe default should be false.")).toEqual(false);
             }
