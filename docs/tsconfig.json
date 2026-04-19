@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@/public/*": ["./public/*"],
       "fumadocs-mdx:collections/*": ["./.source/*"]
     }
   },

@@ -1,18 +1,8 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import Image from 'next/image';
+import { ThemeLogo } from '@/components/ThemeLogo';
 
 export const logo = (
-    <>
-        <Image
-            alt="Acton"
-            src="/logo.png"
-            width={100}
-            height={100}
-            sizes="100px"
-            className="hidden w-22 in-[.uwu]:block"
-            aria-label="Acton"
-        />
-    </>
+    <ThemeLogo />
 );
 
 export function baseOptions(): BaseLayoutProps {
@@ -21,7 +11,7 @@ export function baseOptions(): BaseLayoutProps {
       title: (
           <>
             {logo}
-            <span className="font-medium in-[.uwu]:hidden">Acton</span>
+            <span className="text-lg font-medium leading-none in-[.uwu]:hidden">Acton</span>
           </>
       ),
     },
