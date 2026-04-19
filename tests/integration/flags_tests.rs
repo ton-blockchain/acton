@@ -1372,6 +1372,8 @@ fn test_up_rejects_conflicting_flag_combinations() {
         (&["--trunk", "--check"], &["--trunk", "--check"]),
         (&["--stable", "--list"], &["--stable", "--list"]),
         (&["--stable", "--check"], &["--stable", "--check"]),
+        (&["--force", "--list"], &["--force", "--list"]),
+        (&["--force", "--check"], &["--force", "--check"]),
         (&["--list", "--check"], &["--list", "--check"]),
     ];
 

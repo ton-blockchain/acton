@@ -28,6 +28,9 @@ OPTIONS
        --stable
            Install the latest stable release.
 
+       --force
+           Install the selected release even if Acton is already up to date.
+
        -y, --yes
            Skip confirmation prompts.
 
@@ -88,6 +91,9 @@ HOMEBREW INSTALLATIONS
        Without --yes, Acton asks whether to continue with the built-in updater.
 
 INTERACTIVITY
+       o  --force bypasses the usual up-to-date short-circuit for the selected
+          release
+
        o  --yes suppresses confirmation prompts for non-interactive use
 
        o  Homebrew-style installs prompt before replacement unless --yes is
@@ -132,7 +138,11 @@ EXAMPLES
 
               acton up --list
 
-       5. Update non-interactively in CI or bootstrap scripts:
+       5. Reinstall the currently selected channel version:
+
+              acton up --force
+
+       6. Update non-interactively in CI or bootstrap scripts:
 
               acton up --stable -y
 

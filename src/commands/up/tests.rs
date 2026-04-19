@@ -25,6 +25,7 @@ fn test_update_stable_to_stable_upgrade() -> Result<()> {
         false,
         true,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -49,6 +50,7 @@ fn test_update_stable_already_latest() -> Result<()> {
         None,
         false,
         true,
+        false,
         false,
     )?;
 
@@ -75,6 +77,7 @@ fn test_update_stable_from_trunk() -> Result<()> {
         false,
         true,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -100,6 +103,7 @@ fn test_update_trunk_to_trunk() -> Result<()> {
         true,
         None,
         true,
+        false,
         false,
         false,
     )?;
@@ -133,6 +137,7 @@ fn test_update_current_trunk_without_flags_keeps_trunk_channel() -> Result<()> {
         false,
         false,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -157,6 +162,7 @@ fn test_downgrade() -> Result<()> {
         current_version,
         false,
         Some("0.2.0".to_owned()),
+        false,
         false,
         false,
         false,
@@ -187,6 +193,7 @@ fn test_network_error() -> Result<()> {
         false,
         true,
         false,
+        false,
     );
 
     assert!(result.is_err());
@@ -211,6 +218,7 @@ fn test_custom_version() -> Result<()> {
         current_version,
         false,
         Some("0.0.5".to_string()),
+        false,
         false,
         false,
         false,
@@ -244,6 +252,19 @@ fn test_validate_version_argument_allows_regular_version() -> Result<()> {
 }
 
 #[test]
+fn test_validate_version_argument_rejects_unicode_dash_force_flag_typo() {
+    let err = super::validate_version_argument(Some("\u{2014}force"))
+        .expect_err("unicode dash force flag typo should be rejected");
+    let err_text = String::from_utf8(strip_ansi_escapes::strip(err.to_string().as_bytes()))
+        .expect("error text should stay utf-8");
+
+    assert_eq!(
+        err_text,
+        "—force looks like an option typed with a Unicode dash. Use --force instead."
+    );
+}
+
+#[test]
 fn test_install_trunk_version_and_then_stable() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
     let current_version = "0.1.0";
@@ -262,6 +283,7 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
         true,
         false,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -278,6 +300,7 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
         None,
         false,
         true,
+        false,
         false,
     )?;
 
@@ -306,6 +329,7 @@ fn test_install_versions() -> Result<()> {
         false,
         false,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -323,6 +347,7 @@ fn test_install_versions() -> Result<()> {
         current_version,
         false,
         None,
+        false,
         false,
         false,
         false,
@@ -355,6 +380,7 @@ fn test_install_trunk_versions() -> Result<()> {
         true,
         false,
         false,
+        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -373,6 +399,7 @@ fn test_install_trunk_versions() -> Result<()> {
         true,
         None,
         true,
+        false,
         false,
         false,
     )?;
@@ -402,7 +429,63 @@ fn test_backup_is_created_correctly() -> Result<()> {
         false,
         true,
         false,
+        false,
     )?;
+    assert_backup_created(&bin_path, current_version, "old_binary")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_force_reinstalls_latest_release_when_already_up_to_date() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.2.0";
+
+    let mut client = MockReleaseClient::new();
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
+
+    workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        false,
+        false,
+        true,
+    )?;
+
+    let content = fs::read_to_string(&bin_path)?;
+    assert_eq!(content, "binary-data-0.2.0");
+
+    assert_backup_created(&bin_path, current_version, "old_binary")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_force_reinstalls_stable_release_when_explicit_stable_matches_current() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.2.0";
+
+    let mut client = MockReleaseClient::new();
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
+
+    workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+        true,
+    )?;
+
+    let content = fs::read_to_string(&bin_path)?;
+    assert_eq!(content, "binary-data-0.2.0");
 
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
@@ -454,6 +537,7 @@ fn test_update_fails_without_checksum_asset() -> Result<()> {
         false,
         true,
         false,
+        false,
     )
     .expect_err("missing checksum asset must fail");
 
@@ -480,6 +564,7 @@ fn test_update_fails_on_checksum_mismatch() -> Result<()> {
         None,
         false,
         true,
+        false,
         false,
     )
     .expect_err("checksum mismatch must fail");

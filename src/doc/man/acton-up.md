@@ -37,6 +37,10 @@ Install the most recent trunk release.
 Install the latest stable release.
 {{/option}}
 
+{{#option "`--force`" }}
+Install the selected release even if Acton is already up to date.
+{{/option}}
+
 {{#option "`-y`, `--yes`" }}
 Skip confirmation prompts.
 {{/option}}
@@ -89,6 +93,7 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
 
 ## Interactivity
 
+- `--force` bypasses the usual up-to-date short-circuit for the selected release
 - `--yes` suppresses confirmation prompts for non-interactive use
 - Homebrew-style installs prompt before replacement unless `--yes` is passed
 - up-to-date checks and `--list` can succeed without making local changes
@@ -135,7 +140,13 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
    acton up --list
    ```
 
-5. Update non-interactively in CI or bootstrap scripts:
+5. Reinstall the currently selected channel version:
+
+   ```bash
+   acton up --force
+   ```
+
+6. Update non-interactively in CI or bootstrap scripts:
 
    ```bash
    acton up --stable -y

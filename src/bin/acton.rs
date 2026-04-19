@@ -884,6 +884,12 @@ enum Commands {
             conflicts_with_all = ["list", "check"]
         )]
         stable: bool,
+        #[arg(
+            long,
+            help = "Install the selected release even if Acton is already up to date",
+            conflicts_with_all = ["list", "check"]
+        )]
+        force: bool,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
         #[arg(long, help = "List available versions", conflicts_with = "check")]
@@ -2028,11 +2034,12 @@ fn main() {
             version,
             trunk,
             stable,
+            force,
             yes,
             list,
             check,
         } => {
-            let result = up_cmd(version, trunk, stable, yes, list, check);
+            let result = up_cmd(version, trunk, stable, force, yes, list, check);
             if check {
                 report_error_as_json(result);
                 return;

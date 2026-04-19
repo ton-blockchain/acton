@@ -16,6 +16,7 @@ pub fn up_cmd(
     version: Option<String>,
     trunk: bool,
     stable: bool,
+    force: bool,
     yes: bool,
     list: bool,
     check: bool,
@@ -52,6 +53,7 @@ pub fn up_cmd(
         trunk,
         stable,
         yes,
+        force,
     );
 
     if let Err(e) = result {
@@ -98,6 +100,7 @@ fn unicode_dash_flag_suggestion(arg: &str) -> Option<&'static str> {
     match stripped.trim_start_matches('-') {
         "trunk" => Some("--trunk"),
         "stable" => Some("--stable"),
+        "force" => Some("--force"),
         "list" => Some("--list"),
         "check" => Some("--check"),
         "yes" => Some("--yes"),

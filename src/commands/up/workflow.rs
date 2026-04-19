@@ -58,6 +58,7 @@ pub(super) fn run_update<C: ReleaseClient>(
     trunk: bool,
     stable: bool,
     yes: bool,
+    force: bool,
 ) -> Result<()> {
     check_homebrew(current_exe, yes)?;
 
@@ -83,6 +84,14 @@ pub(super) fn run_update<C: ReleaseClient>(
                     "  {} stable version {} (current: trunk)",
                     "Installing".green().bold(),
                     target_version
+                );
+                true
+            } else if force {
+                print_forced_install_release(
+                    &target_version,
+                    current_version.as_ref().ok(),
+                    current_version_str,
+                    true,
                 );
                 true
             } else if let Ok(current_version) = &current_version
@@ -113,32 +122,42 @@ pub(super) fn run_update<C: ReleaseClient>(
             return Ok(());
         }
     } else {
-        let current_version = current_version.context("Cannot parse current version")?;
         let clean_tag = release.tag_name.trim_start_matches('v');
         if let Ok(target_version) = Version::parse(clean_tag) {
-            if target_version > current_version {
-                println!(
-                    "    {} version {} (current: {})",
-                    "Updating".green().bold(),
-                    target_version,
-                    current_version
+            if force {
+                print_forced_install_release(
+                    &target_version,
+                    current_version.as_ref().ok(),
+                    current_version_str,
+                    false,
                 );
                 true
-            } else if target_version == current_version {
-                // If versions match, we're up to date
-                println!(
-                    "  {} Acton is up to date (version {})",
-                    "Up to date".green().bold(),
-                    current_version
-                );
-                return Ok(());
             } else {
-                println!(
-                    "  {} Acton is up to date (version {})",
-                    "Up to date".green().bold(),
-                    current_version
-                );
-                return Ok(());
+                let current_version = current_version.context("Cannot parse current version")?;
+                if target_version > current_version {
+                    println!(
+                        "    {} version {} (current: {})",
+                        "Updating".green().bold(),
+                        target_version,
+                        current_version
+                    );
+                    true
+                } else if target_version == current_version {
+                    // If versions match, we're up to date
+                    println!(
+                        "  {} Acton is up to date (version {})",
+                        "Up to date".green().bold(),
+                        current_version
+                    );
+                    return Ok(());
+                } else {
+                    println!(
+                        "  {} Acton is up to date (version {})",
+                        "Up to date".green().bold(),
+                        current_version
+                    );
+                    return Ok(());
+                }
             }
         } else {
             println!(
@@ -168,6 +187,28 @@ pub(super) fn run_update<C: ReleaseClient>(
     println!("     {} to {}", "Updated".green().bold(), release.tag_name);
 
     Ok(())
+}
+
+fn print_forced_install_release(
+    target_version: &Version,
+    current_version: Option<&Version>,
+    current_version_str: &str,
+    stable: bool,
+) {
+    let action = if current_version.is_some_and(|current| current == target_version) {
+        "Reinstalling".green().bold()
+    } else {
+        "Installing".green().bold()
+    };
+    let current_display = current_version
+        .map(ToString::to_string)
+        .unwrap_or_else(|| current_version_str.to_owned());
+    let subject = if stable { "stable version" } else { "version" };
+
+    println!(
+        "  {} {subject} {} (current: {})",
+        action, target_version, current_display
+    );
 }
 
 fn check_homebrew(exe: &Path, yes: bool) -> Result<()> {
