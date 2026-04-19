@@ -24,8 +24,6 @@
 "throw" @keyword
 "redef" @keyword
 "while" @keyword
-"break" @keyword
-"continue" @keyword
 "catch" @keyword
 "match" @keyword
 "return" @keyword
