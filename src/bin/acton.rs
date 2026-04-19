@@ -667,6 +667,11 @@ enum Commands {
         source_map: Option<String>,
         #[arg(long, help = "Output ABI to file")]
         abi: Option<String>,
+        #[arg(
+            long,
+            help = "Allow compiling files without `main()` or `onInternalMessage()` entrypoints"
+        )]
+        allow_no_entrypoint: bool,
         #[arg(long, help = "Clear compilation cache before running")]
         clear_cache: bool,
     },
@@ -1862,6 +1867,7 @@ fn main() {
             fift,
             source_map,
             abi,
+            allow_no_entrypoint,
             clear_cache,
         } => {
             let result = compile_cmd(
@@ -1872,6 +1878,7 @@ fn main() {
                 fift,
                 source_map,
                 abi,
+                allow_no_entrypoint,
                 clear_cache,
             );
             if json {

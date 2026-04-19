@@ -1105,6 +1105,7 @@ impl Project {
             compile_boc: None,
             compile_fift: None,
             compile_source_map: None,
+            compile_allow_no_entrypoint: false,
             test_reporters: Vec::new(),
             junit_merge: false,
             test_exclude_patterns: Vec::new(),
@@ -1155,6 +1156,7 @@ pub(crate) struct ActonCommand {
     pub(crate) compile_boc: Option<String>,
     pub(crate) compile_fift: Option<String>,
     pub(crate) compile_source_map: Option<String>,
+    pub(crate) compile_allow_no_entrypoint: bool,
     pub(crate) test_reporters: Vec<String>,
     pub(crate) junit_merge: bool,
     pub(crate) test_exclude_patterns: Vec<String>,
@@ -1435,6 +1437,11 @@ impl ActonCommand {
 
     pub(crate) fn with_source_map(mut self, source_map_path: &str) -> Self {
         self.compile_source_map = Some(source_map_path.to_string());
+        self
+    }
+
+    pub(crate) fn allow_no_entrypoint(mut self) -> Self {
+        self.compile_allow_no_entrypoint = true;
         self
     }
 
@@ -1888,6 +1895,10 @@ impl ActonCommand {
 
         if let Some(source_map_path) = self.compile_source_map {
             self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
+        }
+
+        if self.compile_allow_no_entrypoint {
+            self.cmd = self.cmd.arg("--allow-no-entrypoint");
         }
 
         if let Some(mode) = self.color_mode {

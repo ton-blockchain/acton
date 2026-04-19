@@ -22,6 +22,7 @@ pub fn compile_cmd(
     fift: Option<String>,
     source_map: Option<String>,
     abi: Option<String>,
+    allow_no_entrypoint: bool,
     clear_cache: bool,
 ) -> anyhow::Result<()> {
     if clear_cache {
@@ -55,7 +56,12 @@ pub fn compile_cmd(
 
     let need_debug_info = source_map.is_some();
     let need_fift = fift.is_some();
-    if let Some(cached_entry) = file_cache.get(path, need_debug_info, need_fift, 2, "1.3") {
+    let cache_profile = if allow_no_entrypoint {
+        "1.3+allow-no-entrypoint"
+    } else {
+        "1.3"
+    };
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, need_fift, 2, cache_profile) {
         let elapsed = start_time.elapsed();
         info!(
             "Compile {path} from file cache ({}) in {elapsed:?}",
@@ -89,6 +95,7 @@ pub fn compile_cmd(
         let mappings = acton_config.mappings();
         compiler = compiler.with_mappings(&mappings);
     }
+    compiler = compiler.with_allow_no_entrypoint(allow_no_entrypoint);
 
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
     let compile_time = compile_start.elapsed();
@@ -100,7 +107,8 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, need_fift, 2, "1.3")
+            if let Err(e) =
+                file_cache.put(path, &result, with_debug_info, need_fift, 2, cache_profile)
                 && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");

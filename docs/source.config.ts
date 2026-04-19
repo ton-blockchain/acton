@@ -1,4 +1,4 @@
-import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
+import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 import type { RehypeCodeOptions } from 'fumadocs-core/mdx-plugins';
 import type { LanguageRegistration } from 'shiki';
 import tolkGrammarRaw from './grammars/grammar-tolk.json';
@@ -7,6 +7,7 @@ import tasmGrammarRaw from './grammars/grammar-tasm.json';
 import tlbGrammarRaw from './grammars/grammar-tlb.json';
 import actonCliGrammarRaw from './grammars/grammar-acton-cli.json';
 import actonTraceGrammarRaw from './grammars/grammar-acton-trace.json';
+import lastModified from 'fumadocs-mdx/plugins/last-modified';
 
 export const docs = defineDocs({
     dir: 'content/docs',
@@ -50,6 +51,9 @@ const tlbGrammar: LanguageRegistration = {
 };
 
 export default defineConfig({
+    plugins: [
+      lastModified(),
+    ],
     mdxOptions: {
         rehypeCodeOptions: {
             themes: {

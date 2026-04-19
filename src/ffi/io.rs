@@ -295,9 +295,9 @@ fn prompt_impl(
         if !default.is_empty() {
             text = text.with_default(&default);
         }
-        text.prompt().unwrap_or_default()
+        text.prompt().unwrap_or_else(|_| default.clone())
     } else {
-        String::new()
+        default
     };
 
     stack.push_string(&text);

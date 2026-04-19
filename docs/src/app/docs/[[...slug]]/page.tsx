@@ -3,6 +3,7 @@ import {
   DocsBody,
   DocsDescription,
   DocsPage,
+  PageLastUpdate,
   DocsTitle,
 } from 'fumadocs-ui/layouts/docs/page';
 import {notFound} from 'next/navigation';
@@ -21,7 +22,7 @@ export default async function Page(props: PageProps) {
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
-  const MDX = page.data.body;
+  const { body: MDX, lastModified } = page.data;
 
   const llmText = getLLMText(page);
 
@@ -44,6 +45,11 @@ export default async function Page(props: PageProps) {
           })}
         />
       </DocsBody>
+      {lastModified && (
+        <div className="mt-4 border-t pt-4">
+          <PageLastUpdate date={lastModified} />
+        </div>
+      )}
     </DocsPage>
   );
 }

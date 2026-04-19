@@ -8,6 +8,12 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const LIBRARY_FILE: &str = r"
+fun helper(value: int): int {
+    return value + 1;
+}
+";
+
 #[test]
 fn test_compile_simple_contract() {
     let project = ProjectBuilder::new("compile-simple")
@@ -23,6 +29,69 @@ fn test_compile_simple_contract() {
         .assert_contains("Code in base64")
         .assert_contains("Code in hex")
         .assert_contains("Code hash hex");
+}
+
+#[test]
+fn test_compile_file_without_entrypoint_requires_flag() {
+    let project = ProjectBuilder::new("compile-no-entrypoint")
+        .file("lib/helper", LIBRARY_FILE)
+        .build();
+
+    project
+        .acton()
+        .compile("lib/helper.tolk")
+        .run()
+        .failure()
+        .assert_stderr_contains("has no entrypoint");
+}
+
+#[test]
+fn test_compile_file_without_entrypoint_with_allow_no_entrypoint_flag() {
+    let project = ProjectBuilder::new("compile-no-entrypoint-allowed")
+        .file("lib/helper", LIBRARY_FILE)
+        .build();
+
+    project
+        .acton()
+        .compile("lib/helper.tolk")
+        .allow_no_entrypoint()
+        .run()
+        .success()
+        .assert_contains("Compilation successful")
+        .assert_contains("Code in base64")
+        .assert_contains("Code in hex")
+        .assert_contains("Code hash hex");
+}
+
+#[test]
+fn test_compile_allow_no_entrypoint_uses_separate_cache_namespace() {
+    let project = ProjectBuilder::new("compile-no-entrypoint-cache")
+        .file("lib/helper", LIBRARY_FILE)
+        .build();
+
+    project
+        .acton()
+        .compile("lib/helper.tolk")
+        .allow_no_entrypoint()
+        .run()
+        .success()
+        .assert_contains("Compilation successful")
+        .assert_not_contains("from cache");
+
+    project
+        .acton()
+        .compile("lib/helper.tolk")
+        .allow_no_entrypoint()
+        .run()
+        .success()
+        .assert_contains("Compilation successful (from cache)");
+
+    project
+        .acton()
+        .compile("lib/helper.tolk")
+        .run()
+        .failure()
+        .assert_stderr_contains("has no entrypoint");
 }
 
 #[test]
