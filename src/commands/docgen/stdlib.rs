@@ -101,6 +101,12 @@ fn collect_docs(
 
         let content = fs::read_to_string(path)?;
         let relative_path = path.strip_prefix(source_dir)?;
+        if relative_path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with('_'))
+        {
+            continue;
+        }
         let file_stem = relative_path
             .file_stem()
             .unwrap_or_default()
