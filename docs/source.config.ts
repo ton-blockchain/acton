@@ -1,5 +1,4 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
-import type { RehypeCodeOptions } from 'fumadocs-core/mdx-plugins';
 import type { LanguageRegistration } from 'shiki';
 import tolkGrammarRaw from './grammars/grammar-tolk.json';
 import funcGrammarRaw from './grammars/grammar-func.json';
@@ -50,17 +49,28 @@ const tlbGrammar: LanguageRegistration = {
     name: 'tlb',
 };
 
+const builtinLangs = [
+  'bash',
+  'fish',
+  'json',
+  'powershell',
+  'toml',
+  'yaml',
+] as const;
+
 export default defineConfig({
     plugins: [
       lastModified(),
     ],
     mdxOptions: {
         rehypeCodeOptions: {
+            lazy: false,
             themes: {
                 light: 'one-light',
                 dark: 'one-dark-pro',
             },
             langs: [
+              ...builtinLangs,
                 tolkGrammar,
                 funcGrammar,
                 tasmGrammar,
@@ -68,6 +78,6 @@ export default defineConfig({
                 actonTraceGrammar,
                 tlbGrammar,
             ],
-        } as RehypeCodeOptions,
+        },
     },
 });
