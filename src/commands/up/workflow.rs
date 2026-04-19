@@ -374,17 +374,25 @@ fn compute_sha256(path: &Path) -> Result<String> {
 }
 
 fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str) -> Result<()> {
-    let tar_gz = File::open(tarball_path)?;
+    let tar_gz = File::open(tarball_path).with_context(|| {
+        format!(
+            "Failed to open the downloaded release archive {}",
+            tarball_path.display()
+        )
+    })?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
 
     let mut temp_bin_path = None;
 
-    let temp_dir = tempfile::tempdir()?;
-    archive.unpack(&temp_dir)?;
+    let temp_dir = tempfile::tempdir()
+        .context("Failed to prepare a temporary directory for extracting the new Acton binary")?;
+    archive.unpack(&temp_dir).context(
+        "Failed to extract the downloaded release archive. The archive may be corrupted.",
+    )?;
 
     for entry in walkdir::WalkDir::new(&temp_dir) {
-        let entry = entry?;
+        let entry = entry.context("Failed while scanning the extracted release archive")?;
         if entry.file_type().is_file() && entry.file_name() == "acton" {
             temp_bin_path = Some(entry.path().to_owned());
             break;

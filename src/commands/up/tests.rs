@@ -4,6 +4,7 @@ use anyhow::{Result, bail};
 use flate2::{Compression, GzBuilder};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -196,11 +197,8 @@ fn test_network_error() -> Result<()> {
         false,
     );
 
-    assert!(result.is_err());
-    assert_eq!(
-        result.expect_err("checked").to_string(),
-        "Mock network failure"
-    );
+    let err = result.expect_err("network error must fail");
+    assert_error_snapshot("test_network_error", err.to_string());
     Ok(())
 }
 
@@ -236,12 +234,10 @@ fn test_custom_version() -> Result<()> {
 fn test_validate_version_argument_rejects_unicode_dash_flag_typo() {
     let err = super::validate_version_argument(Some("\u{2014}trunk"))
         .expect_err("unicode dash flag typo should be rejected");
-    let err_text = String::from_utf8(strip_ansi_escapes::strip(err.to_string().as_bytes()))
-        .expect("error text should stay utf-8");
 
-    assert_eq!(
-        err_text,
-        "—trunk looks like an option typed with a Unicode dash. Use --trunk instead."
+    assert_error_snapshot(
+        "test_validate_version_argument_rejects_unicode_dash_flag_typo",
+        err.to_string(),
     );
 }
 
@@ -255,12 +251,10 @@ fn test_validate_version_argument_allows_regular_version() -> Result<()> {
 fn test_validate_version_argument_rejects_unicode_dash_force_flag_typo() {
     let err = super::validate_version_argument(Some("\u{2014}force"))
         .expect_err("unicode dash force flag typo should be rejected");
-    let err_text = String::from_utf8(strip_ansi_escapes::strip(err.to_string().as_bytes()))
-        .expect("error text should stay utf-8");
 
-    assert_eq!(
-        err_text,
-        "—force looks like an option typed with a Unicode dash. Use --force instead."
+    assert_error_snapshot(
+        "test_validate_version_argument_rejects_unicode_dash_force_flag_typo",
+        err.to_string(),
     );
 }
 
@@ -541,7 +535,7 @@ fn test_update_fails_without_checksum_asset() -> Result<()> {
     )
     .expect_err("missing checksum asset must fail");
 
-    assert!(err.to_string().contains("No matching checksum asset found"));
+    assert_error_snapshot("test_update_fails_without_checksum_asset", err.to_string());
 
     Ok(())
 }
@@ -569,10 +563,246 @@ fn test_update_fails_on_checksum_mismatch() -> Result<()> {
     )
     .expect_err("checksum mismatch must fail");
 
-    assert!(err.to_string().contains("SHA256 mismatch"));
+    assert_error_snapshot("test_update_fails_on_checksum_mismatch", err.to_string());
     assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
 
     Ok(())
+}
+
+#[test]
+fn test_update_fails_when_checksum_file_is_empty() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    let archive_name = MockReleaseClient::current_archive_name()?;
+    client.set_latest(
+        "0.2.0",
+        vec![
+            MockReleaseClient::create_named_asset("0.2.0", &archive_name),
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &format!("{archive_name}.sha256"),
+                Vec::new(),
+            ),
+        ],
+    );
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+        false,
+    )
+    .expect_err("empty checksum file must fail");
+
+    assert_error_snapshot(
+        "test_update_fails_when_checksum_file_is_empty",
+        err.to_string(),
+    );
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+
+    Ok(())
+}
+
+#[test]
+fn test_update_fails_when_checksum_file_has_invalid_digest() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    let archive_name = MockReleaseClient::current_archive_name()?;
+    client.set_latest(
+        "0.2.0",
+        vec![
+            MockReleaseClient::create_named_asset("0.2.0", &archive_name),
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &format!("{archive_name}.sha256"),
+                b"not-a-sha256-digest  acton.tar.gz\n".to_vec(),
+            ),
+        ],
+    );
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+        false,
+    )
+    .expect_err("invalid checksum digest must fail");
+
+    assert_error_snapshot(
+        "test_update_fails_when_checksum_file_has_invalid_digest",
+        err.to_string(),
+    );
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+
+    Ok(())
+}
+
+#[test]
+fn test_update_fails_when_release_archive_is_invalid() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    let archive_name = MockReleaseClient::current_archive_name()?;
+    let archive_bytes = b"not-a-tar-gz".to_vec();
+    let checksum = format!("{:x}", Sha256::digest(&archive_bytes));
+    client.set_latest(
+        "0.2.0",
+        vec![
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &archive_name,
+                archive_bytes,
+            ),
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &format!("{archive_name}.sha256"),
+                format!("{checksum}  {archive_name}\n").into_bytes(),
+            ),
+        ],
+    );
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+        false,
+    )
+    .expect_err("invalid release archive must fail");
+
+    assert_error_snapshot(
+        "test_update_fails_when_release_archive_is_invalid",
+        err.to_string(),
+    );
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+
+    Ok(())
+}
+
+#[test]
+fn test_update_fails_when_archive_has_no_acton_binary() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let current_version = "0.1.0";
+
+    let mut client = MockReleaseClient::new();
+    let archive_name = MockReleaseClient::current_archive_name()?;
+    let archive_bytes = MockReleaseClient::build_archive_with_single_file("README.txt", "hello")?;
+    let checksum = format!("{:x}", Sha256::digest(&archive_bytes));
+    client.set_latest(
+        "0.2.0",
+        vec![
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &archive_name,
+                archive_bytes,
+            ),
+            MockReleaseClient::create_named_asset_with_raw_bytes(
+                "0.2.0",
+                &format!("{archive_name}.sha256"),
+                format!("{checksum}  {archive_name}\n").into_bytes(),
+            ),
+        ],
+    );
+
+    let err = workflow::run_update(
+        &client,
+        &bin_path,
+        current_version,
+        false,
+        None,
+        false,
+        true,
+        false,
+        false,
+    )
+    .expect_err("archive without acton binary must fail");
+
+    assert_error_snapshot(
+        "test_update_fails_when_archive_has_no_acton_binary",
+        err.to_string(),
+    );
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+
+    Ok(())
+}
+
+#[test]
+fn test_homebrew_update_without_yes_fails_non_interactively() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let cellar_dir = dir.path().join("Cellar").join("acton").join("bin");
+    fs::create_dir_all(&cellar_dir)?;
+    let bin_path = cellar_dir.join("acton");
+    fs::write(&bin_path, "old_binary")?;
+
+    let mut client = MockReleaseClient::new();
+    client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
+
+    let err = workflow::run_update(
+        &client, &bin_path, "0.1.0", false, None, false, false, false, false,
+    )
+    .expect_err("homebrew update without --yes must fail in non-interactive tests");
+
+    assert_error_snapshot(
+        "test_homebrew_update_without_yes_fails_non_interactively",
+        err.to_string(),
+    );
+
+    Ok(())
+}
+
+fn assert_error_snapshot(snapshot_name: &str, actual: impl AsRef<str>) {
+    let snapshot_path = unit_snapshot_path(snapshot_name);
+    let normalized = normalize_error_text(actual.as_ref());
+
+    if env::var("SNAPSHOTS").ok().as_deref() == Some("overwrite") {
+        fs::create_dir_all(
+            snapshot_path
+                .parent()
+                .expect("unit snapshot must have a parent directory"),
+        )
+        .expect("failed to create unit snapshot directory");
+        fs::write(&snapshot_path, format!("{normalized}\n"))
+            .expect("failed to write unit snapshot");
+        return;
+    }
+
+    let expected = fs::read_to_string(&snapshot_path)
+        .unwrap_or_else(|err| panic!("failed to read snapshot {}: {err}", snapshot_path.display()));
+    assert_eq!(expected, format!("{normalized}\n"));
+}
+
+fn normalize_error_text(text: &str) -> String {
+    let stripped = strip_ansi_escapes::strip(text.as_bytes());
+    String::from_utf8(stripped)
+        .expect("error text should stay utf-8")
+        .replace("\r\n", "\n")
+}
+
+fn unit_snapshot_path(snapshot_name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("snapshots")
+        .join("up_unit")
+        .join(format!("{snapshot_name}.txt"))
 }
 
 fn assert_backup_created(bin_path: &Path, version: &str, expected_content: &str) -> Result<()> {
@@ -648,6 +878,7 @@ impl MockReleaseClient {
             url: format!("http://api.mock.url/v{version}/{name}"),
             version: version.to_owned(),
             content: None,
+            raw_bytes: None,
             browser_download_url: format!("http://mock.url/v{version}/{name}"),
             size: 1024,
         }
@@ -659,6 +890,19 @@ impl MockReleaseClient {
             url: format!("http://api.mock.url/v{version}/{name}"),
             version: version.to_owned(),
             content: Some(content.to_owned()),
+            raw_bytes: None,
+            browser_download_url: format!("http://mock.url/v{version}/{name}"),
+            size: 1024,
+        }
+    }
+
+    fn create_named_asset_with_raw_bytes(version: &str, name: &str, raw_bytes: Vec<u8>) -> Asset {
+        Asset {
+            name: name.to_owned(),
+            url: format!("http://api.mock.url/v{version}/{name}"),
+            version: version.to_owned(),
+            content: None,
+            raw_bytes: Some(raw_bytes),
             browser_download_url: format!("http://mock.url/v{version}/{name}"),
             size: 1024,
         }
@@ -687,6 +931,10 @@ impl MockReleaseClient {
     }
 
     fn build_archive_bytes(asset: &Asset) -> Result<Vec<u8>> {
+        if let Some(raw_bytes) = &asset.raw_bytes {
+            return Ok(raw_bytes.clone());
+        }
+
         let encoder = GzBuilder::new()
             .mtime(0)
             .write(Vec::new(), Compression::default());
@@ -710,6 +958,24 @@ impl MockReleaseClient {
         header.set_cksum();
 
         tar.append(&header, data.as_bytes())?;
+
+        let encoder = tar.into_inner()?;
+        Ok(encoder.finish()?)
+    }
+
+    fn build_archive_with_single_file(path: &str, contents: &str) -> Result<Vec<u8>> {
+        let encoder = GzBuilder::new()
+            .mtime(0)
+            .write(Vec::new(), Compression::default());
+        let mut tar = tar::Builder::new(encoder);
+
+        let mut header = tar::Header::new_gnu();
+        header.set_path(path)?;
+        header.set_size(contents.len() as u64);
+        header.set_mode(0o644);
+        header.set_mtime(0);
+        header.set_cksum();
+        tar.append(&header, contents.as_bytes())?;
 
         let encoder = tar.into_inner()?;
         Ok(encoder.finish()?)
@@ -777,6 +1043,11 @@ impl ReleaseClient for MockReleaseClient {
 
         if asset.name.ends_with(".sha256") {
             let archive_name = asset.name.trim_end_matches(".sha256");
+            if let Some(raw_bytes) = &asset.raw_bytes {
+                fs::write(&path, raw_bytes)?;
+                return Ok(path);
+            }
+
             let archive_asset = Asset {
                 name: archive_name.to_owned(),
                 url: asset.url.clone(),
@@ -784,6 +1055,7 @@ impl ReleaseClient for MockReleaseClient {
                 size: asset.size,
                 version: asset.version.clone(),
                 content: asset.content.clone(),
+                raw_bytes: None,
             };
             let archive_bytes = Self::build_archive_bytes(&archive_asset)?;
             let checksum = format!("{:x}", Sha256::digest(&archive_bytes));

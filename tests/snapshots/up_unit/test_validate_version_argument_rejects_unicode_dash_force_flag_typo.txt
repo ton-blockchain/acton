@@ -1,0 +1,1 @@
+—force looks like an option typed with a Unicode dash. Use --force instead.

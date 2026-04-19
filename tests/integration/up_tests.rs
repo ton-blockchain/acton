@@ -570,6 +570,34 @@ fn test_up_list_fails_when_offline() {
 }
 
 #[test]
+// Verifies that `--list` surfaces GitHub API server errors when both repositories return HTTP 500.
+fn test_up_list_fails_when_github_returns_server_errors() {
+    let project = ProjectBuilder::new("up-list-server-errors").build();
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+            ),
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/i582/acton-public/releases?per_page=100&page=1",
+            ),
+        ]
+    });
+
+    let output = up_command(&project)
+        .arg("--list")
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/up/test_up_list_fails_when_github_returns_server_errors.stderr.txt",
+    );
+}
+
+#[test]
 // Verifies that a normal update surfaces a connectivity error instead of pretending the release is missing.
 fn test_up_update_fails_when_offline() {
     let project = ProjectBuilder::new("up-update-offline").build();
@@ -583,6 +611,110 @@ fn test_up_update_fails_when_offline() {
     output.assert_stderr_snapshot_matches(
         "integration/snapshots/up/test_up_update_fails_when_offline.stderr.txt",
     );
+}
+
+#[test]
+// Verifies that a normal update surfaces GitHub API server errors when both repositories return HTTP 500.
+fn test_up_update_fails_when_github_returns_server_errors() {
+    let project = ProjectBuilder::new("up-update-server-errors").build();
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::empty(500, "/repos/ton-blockchain/acton/releases/latest"),
+            ExpectedHttpRequest::empty(500, "/repos/i582/acton-public/releases/latest"),
+        ]
+    });
+
+    let output = up_command(&project)
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/up/test_up_update_fails_when_github_returns_server_errors.stderr.txt",
+    );
+}
+
+#[test]
+// Verifies that an unknown version still fails clearly when fetching the fallback versions list also fails.
+fn test_up_unknown_version_when_available_versions_list_fails() {
+    let project = ProjectBuilder::new("up-unknown-version-list-failure").build();
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::empty(404, "/repos/ton-blockchain/acton/releases/tags/v0.0.1"),
+            ExpectedHttpRequest::empty(404, "/repos/i582/acton-public/releases/tags/v0.0.1"),
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+            ),
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/i582/acton-public/releases?per_page=100&page=1",
+            ),
+        ]
+    });
+
+    let output = up_command(&project)
+        .arg("0.0.1")
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/up/test_up_unknown_version_when_available_versions_list_fails.stderr.txt",
+    );
+}
+
+#[test]
+// Verifies that update reports a download connectivity error after release lookup succeeds but the asset host is offline.
+fn test_up_fails_when_asset_download_is_offline() -> Result<()> {
+    let (project, fake_binary) = setup_up_project("up-download-offline")?;
+    let archive_name = supported_archive_name();
+    let offline_url = unused_local_url();
+    let mock = GitHubMockServer::spawn_with(|base_url| {
+        let release = json!({
+            "tag_name": "v9.9.9",
+            "assets": [
+                {
+                    "name": archive_name,
+                    "url": format!("{base_url}/download-api/9.9.9/{archive_name}"),
+                    "browser_download_url": format!("{offline_url}/download/9.9.9/{archive_name}"),
+                    "size": 42
+                },
+                {
+                    "name": format!("{archive_name}.sha256"),
+                    "url": format!("{base_url}/download-api/9.9.9/{archive_name}.sha256"),
+                    "browser_download_url": format!("{base_url}/download/9.9.9/{archive_name}.sha256"),
+                    "size": 42
+                }
+            ]
+        })
+        .to_string();
+
+        vec![expected_json_response(
+            "/repos/ton-blockchain/acton/releases/latest",
+            release,
+        )]
+    });
+
+    let output = up_command(&project)
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .env(TEST_CURRENT_EXE_ENV, &fake_binary.to_string_lossy())
+        .run()
+        .failure();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/up/test_up_fails_when_asset_download_is_offline.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/up/test_up_fails_when_asset_download_is_offline.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".fake-bin/acton",
+            "integration/snapshots/up/test_up_fails_when_asset_download_is_offline.binary.txt",
+        );
+
+    Ok(())
 }
 
 #[test]

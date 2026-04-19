@@ -4,12 +4,14 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
+#[cfg(debug_assertions)]
 use std::env;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
 const GITHUB_RELEASE_REPOSITORIES: [&str; 2] = ["ton-blockchain/acton", "i582/acton-public"];
-const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE"; // integration tests only
+#[cfg(debug_assertions)]
+const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE"; // non-release test hook only
 
 #[derive(Deserialize, Debug, Clone)]
 pub(super) struct Release {
@@ -28,6 +30,8 @@ pub(super) struct Asset {
     pub version: String,
     #[cfg(test)]
     pub content: Option<String>,
+    #[cfg(test)]
+    pub raw_bytes: Option<Vec<u8>>,
 }
 
 pub(super) trait ReleaseClient {
@@ -77,7 +81,7 @@ impl GitHubClient {
     }
 
     fn api_base_for_repo(repo: &str) -> String {
-        if let Ok(base) = env::var(TEST_GITHUB_API_BASE_ENV) {
+        if let Some(base) = test_github_api_base_override() {
             let base = base.trim().trim_end_matches('/');
             if !base.is_empty() {
                 return format!("{base}/repos/{repo}");
@@ -187,6 +191,16 @@ impl GitHubClient {
     }
 }
 
+#[cfg(debug_assertions)]
+fn test_github_api_base_override() -> Option<String> {
+    env::var(TEST_GITHUB_API_BASE_ENV).ok()
+}
+
+#[cfg(not(debug_assertions))]
+fn test_github_api_base_override() -> Option<String> {
+    None
+}
+
 impl ReleaseClient for GitHubClient {
     fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         let path = Self::release_request_path(version, trunk);
@@ -281,10 +295,19 @@ impl ReleaseClient for GitHubClient {
                 .header("Authorization", format!("token {token}"));
         }
 
-        let mut resp = req
-            .header(USER_AGENT, "acton-cli")
-            .send()
-            .with_context(|| format!("Failed to download {} from GitHub", asset.name))?;
+        let mut resp = match req.header(USER_AGENT, "acton-cli").send() {
+            Ok(resp) => resp,
+            Err(err) if err.is_connect() || err.is_timeout() => {
+                bail!(
+                    "Failed to download {} from GitHub. Check your network connection and try again.",
+                    asset.name
+                );
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Failed to download {} from GitHub", asset.name));
+            }
+        };
 
         if !resp.status().is_success() {
             bail!(
@@ -294,23 +317,31 @@ impl ReleaseClient for GitHubClient {
             );
         }
 
-        let mut file = tempfile::NamedTempFile::new()?;
+        let mut file = tempfile::NamedTempFile::new()
+            .with_context(|| format!("Failed to create a temporary file for {}", asset.name))?;
         let mut buf = [0; 8192];
         let mut downloaded = 0;
 
         loop {
-            let n = resp.read(&mut buf)?;
+            let n = resp.read(&mut buf).with_context(|| {
+                format!(
+                    "Failed while downloading {} from GitHub. Check your network connection and try again.",
+                    asset.name
+                )
+            })?;
             if n == 0 {
                 break;
             }
-            file.write_all(&buf[..n])?;
+            file.write_all(&buf[..n])
+                .with_context(|| format!("Failed to write {} to a temporary file", asset.name))?;
             downloaded += n as u64;
             pb.set_position(downloaded);
         }
         pb.finish_and_clear();
 
         let path = file.path().to_owned();
-        file.keep()?;
+        file.keep()
+            .with_context(|| format!("Failed to persist the downloaded file for {}", asset.name))?;
 
         Ok(path)
     }
