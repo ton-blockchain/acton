@@ -38,7 +38,10 @@ post-announce-jobs = ["./publish-docker-image", "./publish-mirror"]
 # Host jobs to run in CI
 host-jobs = ["./check-release-binary", "./check-installer-file"]
 # Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "publish-docker-image" = { packages = "write" } }
+github-custom-job-permissions = {
+  "publish-docker-image" = { packages = "write" },
+  "check-release-security" = { contents = "read" },
+}
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Whether to install an updater program

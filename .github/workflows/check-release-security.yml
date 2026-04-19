@@ -14,11 +14,17 @@ jobs:
   rust-deps:
     uses: ./.github/workflows/check-rust-deps.yml
     secrets: inherit
+    permissions:
+      contents: read
 
   ui-deps:
     uses: ./.github/workflows/check-ui-deps.yml
     secrets: inherit
+    permissions:
+      contents: read
 
   grammar-deps:
     uses: ./.github/workflows/check-grammar-deps.yml
     secrets: inherit
+    permissions:
+      contents: read

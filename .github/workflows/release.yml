@@ -101,6 +101,8 @@ jobs:
   custom-check-release-security:
     uses: ./.github/workflows/check-release-security.yml
     secrets: inherit
+    permissions:
+      "contents": "read"
 
   custom-build-release-binaries:
     needs:
