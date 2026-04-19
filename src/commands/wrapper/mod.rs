@@ -14,6 +14,8 @@ use tolkc::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
 use ton_abi::ContractAbi as LegacyContractAbi;
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
+const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
+const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrapper-ts";
 
 struct WrapperModel {
     project_root: PathBuf,
@@ -310,7 +312,9 @@ fn resolve_wrapper_path(
                 .join(&file_name);
         }
 
-        return project_root.join("wrappers").join(&file_name);
+        return project_root
+            .join(DEFAULT_TYPESCRIPT_WRAPPER_DIR)
+            .join(&file_name);
     }
 
     if let Some(configured_tolk_output_dir) = non_empty_path(configured_tolk_output_dir) {
@@ -323,7 +327,7 @@ fn resolve_wrapper_path(
             .join(&file_name);
     }
 
-    project_root.join("wrappers").join(&file_name)
+    project_root.join(DEFAULT_TOLK_WRAPPER_DIR).join(&file_name)
 }
 
 fn resolve_test_path(

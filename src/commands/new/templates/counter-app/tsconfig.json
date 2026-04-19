@@ -17,5 +17,5 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["app/src", "wrappers", "vite.config.ts"]
+  "include": ["app/src", "wrapper-ts", "vite.config.ts"]
 }

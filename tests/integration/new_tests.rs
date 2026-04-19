@@ -496,7 +496,7 @@ fn test_new_counter_project_with_app_flag() {
 
     let project_dir = project.path().join("foobar");
     assert!(project_dir.join("app/src/App.tsx").exists());
-    assert!(project_dir.join("wrappers/Counter.ts").exists());
+    assert!(project_dir.join("wrapper-ts/Counter.ts").exists());
     assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir

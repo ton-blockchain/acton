@@ -241,7 +241,7 @@ COUNTER APP LAYOUT
 
        o  contracts/scripts for deployment and utility scripts
 
-       o  wrappers/ for the generated TypeScript wrapper used by the app
+       o  wrapper-ts/ for the generated TypeScript wrapper used by the app
 
        o  app/ for the React + Vite frontend
 
