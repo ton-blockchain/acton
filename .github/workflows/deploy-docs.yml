@@ -35,25 +35,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup Node.js 22.x
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: 22.x
-          cache-dependency-path: docs/yarn.lock
-          package-manager-cache: ${{ github.ref == 'refs/heads/master' }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install docs dependencies
         working-directory: docs
-        run: yarn install --immutable --check-cache --check-resolutions
+        run: bun ci
 
       - name: Build docs
         working-directory: docs
         env:
           NEXT_TELEMETRY_DISABLED: '1'
-        run: yarn run build
+        run: bun run build
 
       - name: Upload GitHub Pages artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
