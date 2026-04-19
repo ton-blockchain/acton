@@ -107,12 +107,7 @@ acton build
 acton test
 ```
 
-`acton init` adds or patches `Acton.toml`, refreshes `.acton/tolk-stdlib`,
-patches `.gitignore`, discovers likely contract roots, and retries local
-wallet/library overlay symlinks without replacing your existing project files.
-
-If path resolution, stdlib health, wallets, or native artifacts look wrong,
-run `acton doctor` before filing an issue.
+For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/project-init/) article.
 
 ## Building from source
 

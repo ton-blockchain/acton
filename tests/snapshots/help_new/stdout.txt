@@ -45,7 +45,7 @@ OPTIONS
        --template template
            Project template to use.
 
-           Possible values: empty, counter, jetton
+           Possible values: empty, counter, jetton, nft
 
            If not provided, interactive mode prompts for the template.
 
@@ -151,6 +151,19 @@ TEMPLATES
 
        o  optional AGENTS.md
 
+   nft
+       NFT collection and item template with:
+
+       o  collection and item contracts
+
+       o  wrappers and tests
+
+       o  deployment scripts
+
+       o  CI workflow
+
+       o  optional AGENTS.md
+
 INTERACTIVE MODE
        When enough information is missing and standard input/output are
        connected to a terminal, acton new uses a short default flow:
@@ -204,7 +217,14 @@ FILES
 
        o  wrappers
 
+       o  wrappers that usually include helper shapes such as fromStorage(...),
+          deploy(...), send{Name}(...), sendAny(...), and typed get-method
+          calls
+
        o  deployment scripts
+
+       o  [scripts] aliases such as deploy-emulation and deploy-testnet in
+          Acton.toml
 
        o  frontend files for --app
 
@@ -231,6 +251,22 @@ COUNTER APP LAYOUT
        Before running frontend commands, install the app dependencies:
 
            npm ci
+
+       The generated app scaffold is a real frontend workspace, not just static
+       demo files. After npm ci, use the usual frontend lifecycle commands from
+       the generated package.json alongside normal Acton contract commands.
+
+       Typical commands in that generated app workspace:
+
+       o  npm run dev to start the Vite development server
+
+       o  npm run build to build both contracts and the frontend bundle
+
+       o  npm run preview to preview the production bundle locally
+
+       o  npm run typecheck for TypeScript checking
+
+       o  npm test to run the bundled acton test command
 
 SIDE EFFECTS
        acton new writes only inside the chosen target directory. When _path_ is
