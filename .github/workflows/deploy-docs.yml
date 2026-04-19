@@ -43,13 +43,19 @@ jobs:
         uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-docs-${{ hashFiles('docs/bun.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-docs-${{ hashFiles('docs/bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-docs-
+            ${{ runner.os }}-${{ runner.arch }}-bun-docs-
 
       - name: Install docs dependencies
         working-directory: docs
         run: bun ci
+
+      - name: Build docs
+        working-directory: docs
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: bun run build
 
       - name: Save Bun cache
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
@@ -57,12 +63,6 @@ jobs:
         with:
           path: ~/.bun/install/cache
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
-
-      - name: Build docs
-        working-directory: docs
-        env:
-          NEXT_TELEMETRY_DISABLED: '1'
-        run: bun run build
 
       - name: Upload GitHub Pages artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
