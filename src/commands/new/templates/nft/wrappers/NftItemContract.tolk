@@ -43,6 +43,7 @@ fun NftItemContract.sendAskToChangeOwnership(
     queryId: uint64,
     newOwnerAddress: address,
     sendExcessesTo: address?,
+    // check-disable-next-line dict-type-use
     customPayload: dict,
     forwardTonAmount: coins,
     forwardPayload: slice,

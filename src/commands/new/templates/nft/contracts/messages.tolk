@@ -79,6 +79,7 @@ struct (0x5fcc3d14) AskToChangeOwnership {
     queryId: uint64
     newOwnerAddress: address
     sendExcessesTo: address?
+    // check-disable-next-line dict-type-use
     customPayload: dict
     forwardTonAmount: coins
     forwardPayload: Payload
