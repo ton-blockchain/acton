@@ -6,7 +6,7 @@
 use crate::file_db::FileDb;
 use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -165,15 +165,20 @@ impl ProjectIndex {
         let mut queue = VecDeque::new();
         queue.push_back(file_id);
 
+        let mut visited = FxHashSet::default();
+        visited.insert(file_id);
         let mut result = vec![file_id];
         while let Some(file_id) = queue.pop_front() {
             let Some(imports) = self.imports.get(&file_id) else {
                 continue;
             };
 
-            let imported_files = imports.iter().filter_map(|import| import.target);
-            result.extend(imported_files.clone());
-            queue.extend(imported_files);
+            for imported_file in imports.iter().filter_map(|import| import.target) {
+                if visited.insert(imported_file) {
+                    result.push(imported_file);
+                    queue.push_back(imported_file);
+                }
+            }
         }
 
         result
@@ -305,6 +310,53 @@ impl ProjectIndex {
         let mut abs_path = abs_path;
         abs_path.as_mut_os_string().push(".tolk");
         abs_path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProjectIndex;
+    use crate::file_db::FileDb;
+
+    #[test]
+    fn reachable_files_stops_on_cyclic_imports() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_root = temp_dir.path();
+
+        let a_path = project_root.join("a.tolk");
+        let b_path = project_root.join("b.tolk");
+
+        std::fs::write(
+            &a_path,
+            r#"
+            import "b.tolk"
+
+            fun a() {}
+            "#,
+        )
+        .unwrap();
+        std::fs::write(
+            &b_path,
+            r#"
+            import "a.tolk"
+
+            fun b() {}
+            "#,
+        )
+        .unwrap();
+
+        let file_db = FileDb::new(project_root.join("__stdlib__"), None);
+        let a_path = file_db.canonicalize(&a_path).unwrap();
+        let b_path = file_db.canonicalize(&b_path).unwrap();
+
+        let index = ProjectIndex::builder(&file_db, a_path.clone())
+            .build()
+            .unwrap();
+
+        let a_id = index.get_file_by_path(&a_path).unwrap();
+        let b_id = index.get_file_by_path(&b_path).unwrap();
+
+        assert_eq!(index.reachable_files(a_id), vec![a_id, b_id]);
     }
 }
 
