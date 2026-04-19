@@ -4,10 +4,12 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
+use std::env;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
 const GITHUB_RELEASE_REPOSITORIES: [&str; 2] = ["ton-blockchain/acton", "i582/acton-public"];
+const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE"; // integration tests only
 
 #[derive(Deserialize, Debug, Clone)]
 pub(super) struct Release {
@@ -41,7 +43,8 @@ pub(super) struct GitHubClient {
 
 enum RepoFetchResult<T> {
     Found(T),
-    NotFound,
+    Missing,
+    Failed(String),
 }
 
 impl GitHubClient {
@@ -74,6 +77,13 @@ impl GitHubClient {
     }
 
     fn api_base_for_repo(repo: &str) -> String {
+        if let Ok(base) = env::var(TEST_GITHUB_API_BASE_ENV) {
+            let base = base.trim().trim_end_matches('/');
+            if !base.is_empty() {
+                return format!("{base}/repos/{repo}");
+            }
+        }
+
         format!("https://api.github.com/repos/{repo}")
     }
 
@@ -89,20 +99,29 @@ impl GitHubClient {
         let url = format!("{}/{path}", Self::api_base_for_repo(repo));
         let resp = match self.request(&url).send() {
             Ok(resp) => resp,
-            Err(_) => return RepoFetchResult::NotFound,
+            Err(err) => {
+                return RepoFetchResult::Failed(format!(
+                    "could not reach GitHub release API for {repo}: {err}"
+                ));
+            }
         };
 
-        if resp.status().as_u16() != 200 {
-            return RepoFetchResult::NotFound;
+        if resp.status().as_u16() == 404 {
+            return RepoFetchResult::Missing;
         }
 
         if !resp.status().is_success() {
-            return RepoFetchResult::NotFound;
+            return RepoFetchResult::Failed(format!(
+                "GitHub release API returned {} for {repo}",
+                resp.status()
+            ));
         }
 
         match resp.json() {
             Ok(release) => RepoFetchResult::Found(release),
-            Err(_) => RepoFetchResult::NotFound,
+            Err(err) => RepoFetchResult::Failed(format!(
+                "GitHub release API returned invalid JSON for {repo}: {err}"
+            )),
         }
     }
 
@@ -119,21 +138,30 @@ impl GitHubClient {
 
             let resp = match self.request(&url).send() {
                 Ok(resp) => resp,
-                Err(_) => return RepoFetchResult::NotFound,
+                Err(err) => {
+                    return RepoFetchResult::Failed(format!(
+                        "could not reach GitHub release API for {repo}: {err}"
+                    ));
+                }
             };
 
             if resp.status().as_u16() == 404 {
-                return RepoFetchResult::NotFound;
+                return RepoFetchResult::Missing;
             }
 
             if !resp.status().is_success() {
-                return RepoFetchResult::NotFound;
+                return RepoFetchResult::Failed(format!(
+                    "GitHub release API returned {} while listing releases for {repo}",
+                    resp.status()
+                ));
             }
 
             let releases: Vec<Release> = match resp.json() {
                 Ok(releases) => releases,
                 Err(_) => {
-                    return RepoFetchResult::NotFound;
+                    return RepoFetchResult::Failed(format!(
+                        "GitHub release API returned invalid JSON while listing releases for {repo}"
+                    ));
                 }
             };
             let page_len = releases.len();
@@ -162,20 +190,38 @@ impl GitHubClient {
 impl ReleaseClient for GitHubClient {
     fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         let path = Self::release_request_path(version, trunk);
+        let mut errors = Vec::new();
 
         for repo in GITHUB_RELEASE_REPOSITORIES {
             match self.fetch_release_from_repo(repo, &path) {
                 RepoFetchResult::Found(release) => return Ok(release),
-                RepoFetchResult::NotFound => continue,
+                RepoFetchResult::Missing => continue,
+                RepoFetchResult::Failed(err) => errors.push(err),
             }
         }
 
-        bail!("Release not found");
+        if errors.is_empty() {
+            let requested = requested_release_label(version, trunk);
+            bail!("Release not found: {requested}");
+        }
+
+        let requested = requested_release_label(version, trunk);
+        if all_release_errors_are_network_related(&errors) {
+            bail!(
+                "Failed to look up {} on GitHub. Check your network connection and try again.",
+                requested
+            );
+        }
+        bail!(
+            "Failed to look up {requested} on GitHub. {}",
+            errors.join("; ")
+        );
     }
 
     fn list_releases(&self) -> Result<Vec<String>> {
         let mut tags = Vec::new();
         let mut success = false;
+        let mut errors = Vec::new();
 
         for repo in GITHUB_RELEASE_REPOSITORIES {
             match self.fetch_release_tags_from_repo(repo) {
@@ -187,7 +233,8 @@ impl ReleaseClient for GitHubClient {
                         }
                     }
                 }
-                RepoFetchResult::NotFound => {}
+                RepoFetchResult::Missing => {}
+                RepoFetchResult::Failed(err) => errors.push(err),
             }
         }
 
@@ -195,7 +242,20 @@ impl ReleaseClient for GitHubClient {
             return Ok(tags);
         }
 
-        bail!("Failed to fetch releases from GitHub")
+        if errors.is_empty() {
+            bail!("No GitHub release metadata was found in the configured repositories");
+        }
+
+        if all_release_errors_are_network_related(&errors) {
+            bail!(
+                "Failed to fetch the release list from GitHub. Check your network connection and try again."
+            );
+        }
+
+        bail!(
+            "Failed to fetch the release list from GitHub. {}",
+            errors.join("; ")
+        )
     }
 
     fn download_asset(&self, asset: &Asset) -> Result<PathBuf> {
@@ -224,10 +284,14 @@ impl ReleaseClient for GitHubClient {
         let mut resp = req
             .header(USER_AGENT, "acton-cli")
             .send()
-            .context("Failed to download asset")?;
+            .with_context(|| format!("Failed to download {} from GitHub", asset.name))?;
 
         if !resp.status().is_success() {
-            bail!("Failed to download asset: {}", resp.status());
+            bail!(
+                "GitHub returned {} while downloading {}",
+                resp.status(),
+                asset.name
+            );
         }
 
         let mut file = tempfile::NamedTempFile::new()?;
@@ -250,4 +314,23 @@ impl ReleaseClient for GitHubClient {
 
         Ok(path)
     }
+}
+
+fn requested_release_label(version: Option<&str>, trunk: bool) -> String {
+    if let Some(version) = version {
+        return format!("release `{}`", version.trim());
+    }
+
+    if trunk {
+        return "the `trunk` release".to_owned();
+    }
+
+    "the latest release".to_owned()
+}
+
+fn all_release_errors_are_network_related(errors: &[String]) -> bool {
+    !errors.is_empty()
+        && errors
+            .iter()
+            .all(|error| error.starts_with("could not reach GitHub release API"))
 }

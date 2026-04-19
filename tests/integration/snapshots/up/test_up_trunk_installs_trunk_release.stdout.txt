@@ -1,0 +1,5 @@
+  Installing trunk release
+       Found acton-aarch64-apple-darwin.tar.gz
+       Found acton-aarch64-apple-darwin.tar.gz.sha256
+    Verified acton-aarch64-apple-darwin.tar.gz.sha256
+     Updated to trunk

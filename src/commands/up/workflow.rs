@@ -30,8 +30,9 @@ pub(super) fn check_update<C: ReleaseClient>(
         // don't report anything for trunk release user
         false
     } else {
-        let current_v =
-            Version::parse(current_version_str).context("Cannot parse current version")?;
+        let current_v = Version::parse(current_version_str).with_context(|| {
+            format!("Current Acton version '{current_version_str}' is not valid semver")
+        })?;
         let latest_v_str = latest_version.trim_start_matches('v');
         if let Ok(latest_v) = Version::parse(latest_v_str) {
             latest_v > current_v
@@ -133,7 +134,9 @@ pub(super) fn run_update<C: ReleaseClient>(
                 );
                 true
             } else {
-                let current_version = current_version.context("Cannot parse current version")?;
+                let current_version = current_version.with_context(|| {
+                    format!("Current Acton version '{current_version_str}' is not valid semver")
+                })?;
                 if target_version > current_version {
                     println!(
                         "    {} version {} (current: {})",
@@ -230,8 +233,12 @@ fn check_homebrew(exe: &Path, yes: bool) -> Result<()> {
 
         match ans {
             Ok(true) => Ok(()),
-            Ok(false) => bail!("Update cancelled."),
-            Err(_) => bail!("Failed to read input."),
+            Ok(false) => bail!(
+                "Built-in update cancelled. Use `brew upgrade acton` to update a Homebrew installation."
+            ),
+            Err(_) => bail!(
+                "Could not read the confirmation prompt. Re-run with `--yes` or use `brew upgrade acton`."
+            ),
         }
     } else {
         Ok(())
@@ -252,7 +259,14 @@ pub(super) fn find_asset_for_target_triple<'a>(
         .assets
         .iter()
         .find(|asset| asset.name.eq_ignore_ascii_case(&expected_name))
-        .ok_or_else(|| anyhow::anyhow!("No matching asset found: expected {expected_name}"))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Release {} does not include an archive for target {}. Expected asset: {}",
+                release.tag_name,
+                target_triple,
+                expected_name
+            )
+        })
 }
 
 pub(super) fn release_asset_name_for_target_triple(target_triple: &str) -> Result<String> {
@@ -271,7 +285,11 @@ fn find_checksum_asset<'a>(release: &'a Release, archive_name: &str) -> Result<&
         .iter()
         .find(|asset| asset.name.eq_ignore_ascii_case(&checksum_name))
         .ok_or_else(|| {
-            anyhow::anyhow!("No matching checksum asset found: expected {checksum_name}")
+            anyhow::anyhow!(
+                "Release {} is missing the checksum file {}. The release may be incomplete.",
+                release.tag_name,
+                checksum_name
+            )
         })
 }
 
@@ -280,7 +298,12 @@ fn verify_sha256(tarball_path: &Path, checksum_path: &Path, archive_name: &str) 
     let actual = compute_sha256(tarball_path)?;
 
     if actual != expected {
-        bail!("SHA256 mismatch for {archive_name}: expected {expected}, got {actual}");
+        bail!(
+            "Downloaded archive {} failed SHA256 verification. Expected {}, got {}.",
+            archive_name,
+            expected,
+            actual
+        );
     }
 
     println!("    {} {archive_name}.sha256", "Verified".green().bold());
@@ -289,24 +312,33 @@ fn verify_sha256(tarball_path: &Path, checksum_path: &Path, archive_name: &str) 
 }
 
 fn read_expected_sha256(checksum_path: &Path, archive_name: &str) -> Result<String> {
-    let contents = fs::read_to_string(checksum_path)
-        .with_context(|| format!("Failed to read checksum file {}", checksum_path.display()))?;
+    let contents = fs::read_to_string(checksum_path).with_context(|| {
+        format!(
+            "Failed to read the downloaded checksum file for {}",
+            archive_name
+        )
+    })?;
 
     let line = contents
         .lines()
         .map(str::trim)
         .find(|line| !line.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("Checksum file is empty: {}", checksum_path.display()))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("The downloaded checksum file for {} is empty", archive_name)
+        })?;
 
     let mut parts = line.split_whitespace();
-    let checksum = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("Checksum file is invalid: {}", checksum_path.display()))?;
+    let checksum = parts.next().ok_or_else(|| {
+        anyhow::anyhow!(
+            "The downloaded checksum file for {} has an invalid format",
+            archive_name
+        )
+    })?;
 
     if checksum.len() != 64 || !checksum.chars().all(|ch| ch.is_ascii_hexdigit()) {
         bail!(
-            "Checksum file has invalid SHA256 digest: {}",
-            checksum_path.display()
+            "The downloaded checksum file for {} contains an invalid SHA256 digest",
+            archive_name
         );
     }
 
@@ -314,7 +346,9 @@ fn read_expected_sha256(checksum_path: &Path, archive_name: &str) -> Result<Stri
         let reported_name = reported_name.trim_start_matches('*');
         if reported_name != archive_name {
             bail!(
-                "Checksum file references unexpected asset '{reported_name}' (expected '{archive_name}')"
+                "The downloaded checksum file references '{}', but the archive is '{}'",
+                reported_name,
+                archive_name
             );
         }
     }
@@ -357,26 +391,31 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
         }
     }
 
-    let new_bin_path = temp_bin_path
-        .ok_or_else(|| anyhow::anyhow!("Could not find 'acton' binary in the archive"))?;
+    let new_bin_path = temp_bin_path.ok_or_else(|| {
+        anyhow::anyhow!("The downloaded release archive does not contain an `acton` binary")
+    })?;
 
-    let bin_dir = current_exe
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine binary directory"))?;
+    let bin_dir = current_exe.parent().ok_or_else(|| {
+        anyhow::anyhow!("Could not determine the directory of the current Acton binary")
+    })?;
 
     let backup_name = format!("acton-{current_version}");
     let backup_path = bin_dir.join(&backup_name);
 
     // 1. Create backup by copying current binary
-    fs::copy(current_exe, &backup_path)
-        .with_context(|| format!("Failed to create backup at {}", backup_path.display()))?;
+    fs::copy(current_exe, &backup_path).with_context(|| {
+        format!(
+            "Failed to create a backup of the current Acton binary at {}",
+            backup_path.display()
+        )
+    })?;
 
     // 2. Prepare new binary in a temporary file in the same directory to ensure atomic rename
     let temp_file = tempfile::NamedTempFile::new_in(bin_dir)
-        .context("Failed to create temporary file for new binary")?;
+        .context("Failed to create a temporary file for the new Acton binary")?;
 
     fs::copy(&new_bin_path, temp_file.path())
-        .context("Failed to copy new binary to temporary file")?;
+        .context("Failed to copy the new Acton binary into the temporary file")?;
 
     // 3. Set permissions on the temporary file
     #[cfg(unix)]
@@ -388,9 +427,9 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
     }
 
     // 4. Atomically replace the current binary
-    temp_file
-        .persist(current_exe)
-        .context("Failed to atomically replace current binary")?;
+    temp_file.persist(current_exe).context(
+        "Failed to replace the current Acton binary. Try re-running with sufficient permissions.",
+    )?;
 
     let _ = fs::remove_file(tarball_path);
 
