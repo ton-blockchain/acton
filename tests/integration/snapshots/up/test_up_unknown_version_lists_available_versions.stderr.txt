@@ -1,0 +1,5 @@
+Available versions:
+  v0.4.0
+  trunk
+
+Error: Requested release `0.0.1` was not found in GitHub releases. Run `acton up --list` to inspect available versions.

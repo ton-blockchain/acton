@@ -36,6 +36,7 @@ mod script_tests;
 mod stdlib_tests;
 mod test_runner;
 mod test_tests;
+mod up_tests;
 mod verify_tests;
 mod wallet_airdrop_tests;
 mod wallet_tests;

@@ -1,5 +1,6 @@
 use crate::common::{assert_ui, strip_ansi};
 use crate::regex;
+use acton::build_info;
 use snapbox::IntoData;
 use snapbox::filter::Filter;
 use std::mem;
@@ -24,9 +25,11 @@ pub(crate) fn normalize_output_preserve_escapes(stdout: &str, project_path: &Pat
     let redactions = build_redactions(project_path);
     redact_json_value(&mut value, &redactions);
 
-    serde_json::to_string_pretty(&value)
-        .expect("failed to serialize normalized JSON snapshot")
-        .replace("\r\n", "\n")
+    normalize_up_snapshot_text(
+        serde_json::to_string_pretty(&value)
+            .expect("failed to serialize normalized JSON snapshot")
+            .replace("\r\n", "\n"),
+    )
 }
 
 fn normalize_output_internal(
@@ -51,13 +54,28 @@ fn normalize_output_internal(
 
     let redactions = build_redactions(project_path);
 
-    normalize_dynamic_mutation_output(redactions.redact(&content))
+    normalize_dynamic_output(redactions.redact(&content))
+}
+
+fn normalize_dynamic_output(content: String) -> String {
+    normalize_dynamic_mutation_output(normalize_up_snapshot_text(content))
 }
 
 fn normalize_dynamic_mutation_output(content: String) -> String {
     regex!(r"(?m)^Session:\s+[0-9a-f]{16}$")
         .replace_all(&content, "Session:  [MUTATION_SESSION_ID]")
         .into_owned()
+}
+
+fn normalize_up_snapshot_text(content: String) -> String {
+    let target_triple = build_info::TARGET_TRIPLE;
+    let archive_name = format!("acton-{target_triple}.tar.gz");
+    let checksum_name = format!("{archive_name}.sha256");
+
+    content
+        .replace(&checksum_name, "[ACTON_ARCHIVE_SHA256]")
+        .replace(&archive_name, "[ACTON_ARCHIVE]")
+        .replace(target_triple, "[TARGET_TRIPLE]")
 }
 
 fn build_redactions(project_path: &Path) -> snapbox::Redactions {

@@ -1,0 +1,1 @@
+Error: Failed to fetch the release list from GitHub. Check your network connection and try again.

@@ -1,0 +1,3 @@
+/repos/ton-blockchain/acton/releases/latest
+/download-api/9.9.9/[ACTON_ARCHIVE]
+/download-api/9.9.9/[ACTON_ARCHIVE_SHA256]

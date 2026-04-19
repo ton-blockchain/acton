@@ -8,9 +8,13 @@ use crate::build_info;
 use acton_config::color::OwoColorize;
 use anyhow::Result;
 use std::env;
+use std::path::PathBuf;
 
 use client::{GitHubClient, ReleaseClient};
 use workflow::{check_update, run_update};
+
+#[cfg(debug_assertions)]
+const TEST_CURRENT_EXE_ENV: &str = "ACTON_TEST_UP_CURRENT_EXE"; // non-release test hook only
 
 pub fn up_cmd(
     version: Option<String>,
@@ -23,9 +27,10 @@ pub fn up_cmd(
 ) -> Result<()> {
     let token = env::var("GITHUB_TOKEN").ok();
     let client = GitHubClient::new(token);
-    let current_exe = env::current_exe()?;
     let current_version_str = build_info::PACKAGE_VERSION;
     let current_is_trunk = build_info::is_trunk_build();
+    let requested_release =
+        requested_release_label(version.as_deref(), trunk, stable, current_is_trunk);
 
     if check {
         let info = check_update(&client, current_version_str, current_is_trunk)?;
@@ -43,6 +48,7 @@ pub fn up_cmd(
     }
 
     validate_version_argument(version.as_deref())?;
+    let current_exe = current_executable_path()?;
 
     let result = run_update(
         &client,
@@ -58,21 +64,54 @@ pub fn up_cmd(
 
     if let Err(e) = result {
         if e.to_string().contains("Release not found") {
-            let releases = client.list_releases()?;
-            eprintln!("{}: {}", "Error".red(), e);
-            eprintln!("\nAvailable versions:");
-            for release in releases {
-                eprintln!("  {}", release.yellow());
+            match client.list_releases() {
+                Ok(releases) => {
+                    eprintln!("Available versions:");
+                    for release in releases {
+                        eprintln!("  {}", release.yellow());
+                    }
+                    eprintln!();
+                }
+                Err(list_err) => {
+                    eprintln!("Could not fetch the available versions list: {list_err}");
+                    eprintln!();
+                }
             }
-            eprintln!();
-            eprintln!("Check the available versions above");
-            eprintln!();
-            return Err(anyhow::anyhow!("Update failed due to unknown version"));
+
+            return Err(anyhow::anyhow!(
+                "Requested {} was not found in GitHub releases. Run `acton up --list` to inspect available versions.",
+                requested_release
+            ));
         }
         return Err(e);
     }
 
     Ok(())
+}
+
+fn current_executable_path() -> Result<PathBuf> {
+    if let Some(path) = test_current_executable_override()? {
+        return Ok(path);
+    }
+
+    Ok(env::current_exe()?)
+}
+
+fn requested_release_label(
+    version: Option<&str>,
+    trunk: bool,
+    stable: bool,
+    current_is_trunk: bool,
+) -> String {
+    if let Some(version) = version {
+        return format!("release `{}`", version.trim());
+    }
+
+    if trunk || (current_is_trunk && !stable) {
+        return "the `trunk` release".to_owned();
+    }
+
+    "the latest stable release".to_owned()
 }
 
 fn validate_version_argument(version: Option<&str>) -> Result<()> {
@@ -116,4 +155,30 @@ const fn is_unicode_dash(ch: char) -> bool {
         ch,
         '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2015}' | '\u{2212}'
     )
+}
+
+#[cfg(debug_assertions)]
+fn test_current_executable_override() -> Result<Option<PathBuf>> {
+    match env::var(TEST_CURRENT_EXE_ENV) {
+        Ok(path) => {
+            let trimmed = path.trim();
+            if trimmed.is_empty() {
+                anyhow::bail!(
+                    "Invalid value for {}: path must not be empty",
+                    TEST_CURRENT_EXE_ENV.yellow()
+                );
+            }
+            Ok(Some(PathBuf::from(trimmed)))
+        }
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(err) => Err(anyhow::anyhow!(
+            "Failed to read {}: {err}",
+            TEST_CURRENT_EXE_ENV.yellow()
+        )),
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn test_current_executable_override() -> Result<Option<PathBuf>> {
+    Ok(None)
 }

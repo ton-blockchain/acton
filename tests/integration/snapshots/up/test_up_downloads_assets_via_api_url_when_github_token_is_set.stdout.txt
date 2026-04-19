@@ -1,0 +1,5 @@
+    Updating version 9.9.9 (current: 0.2.0)
+       Found [ACTON_ARCHIVE]
+       Found [ACTON_ARCHIVE_SHA256]
+    Verified [ACTON_ARCHIVE_SHA256]
+     Updated to v9.9.9

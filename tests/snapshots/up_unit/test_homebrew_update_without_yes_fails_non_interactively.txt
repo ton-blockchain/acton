@@ -1,0 +1,1 @@
+Could not read the confirmation prompt. Re-run with `--yes` or use `brew upgrade acton`.
