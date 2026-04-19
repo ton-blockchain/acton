@@ -79,7 +79,7 @@ INSTALLATION FLOW
 
        acton up --list is read-only and skips download or replacement.
 
-HOME BREW INSTALLATIONS
+HOMEBREW INSTALLATIONS
        If the current binary path looks like a Homebrew installation, Acton
        warns and recommends using:
 
