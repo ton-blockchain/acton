@@ -114,7 +114,10 @@ mod tests {
     fn strip_leading_section_matches_case_insensitively() {
         let body = "## Name\n\nIntro.\n\n## Description\n\nBody.\n";
 
-        assert_eq!(strip_leading_section(body, "NAME"), "## Description\n\nBody.\n");
+        assert_eq!(
+            strip_leading_section(body, "NAME"),
+            "## Description\n\nBody.\n"
+        );
     }
 
     #[test]
