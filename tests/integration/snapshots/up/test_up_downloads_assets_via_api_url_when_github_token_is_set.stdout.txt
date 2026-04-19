@@ -1,5 +1,5 @@
     Updating version 9.9.9 (current: 0.2.0)
-       Found acton-aarch64-apple-darwin.tar.gz
-       Found acton-aarch64-apple-darwin.tar.gz.sha256
-    Verified acton-aarch64-apple-darwin.tar.gz.sha256
+       Found [ACTON_ARCHIVE]
+       Found [ACTON_ARCHIVE_SHA256]
+    Verified [ACTON_ARCHIVE_SHA256]
      Updated to v9.9.9

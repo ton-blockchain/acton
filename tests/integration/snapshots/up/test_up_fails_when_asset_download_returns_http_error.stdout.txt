@@ -1,2 +1,2 @@
     Updating version 9.9.9 (current: 0.2.0)
-       Found acton-aarch64-apple-darwin.tar.gz
+       Found [ACTON_ARCHIVE]

@@ -55,7 +55,7 @@ pub fn up_cmd(
         &current_exe,
         current_version_str,
         current_is_trunk,
-        version.clone(),
+        version,
         trunk,
         stable,
         yes,

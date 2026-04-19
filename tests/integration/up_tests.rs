@@ -1042,7 +1042,7 @@ impl GitHubMockServer {
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .expect("failed to set GitHub mock read timeout");
 
-                let request = read_http_request(&mut stream);
+                let request = read_http_request(&stream);
                 assert_eq!(
                     request.method, expected.method,
                     "unexpected HTTP method for {}",
@@ -1118,7 +1118,7 @@ struct ParsedHttpRequest {
     headers: Vec<(String, String)>,
 }
 
-fn read_http_request(stream: &mut std::net::TcpStream) -> ParsedHttpRequest {
+fn read_http_request(stream: &std::net::TcpStream) -> ParsedHttpRequest {
     let mut reader = BufReader::new(
         stream
             .try_clone()

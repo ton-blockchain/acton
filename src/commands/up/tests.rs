@@ -792,9 +792,21 @@ fn assert_error_snapshot(snapshot_name: &str, actual: impl AsRef<str>) {
 
 fn normalize_error_text(text: &str) -> String {
     let stripped = strip_ansi_escapes::strip(text.as_bytes());
-    String::from_utf8(stripped)
-        .expect("error text should stay utf-8")
-        .replace("\r\n", "\n")
+    normalize_up_snapshot_text(
+        String::from_utf8(stripped)
+            .expect("error text should stay utf-8")
+            .replace("\r\n", "\n"),
+    )
+}
+
+fn normalize_up_snapshot_text(text: String) -> String {
+    let target_triple = env!("TARGET_TRIPLE");
+    let archive_name = format!("acton-{target_triple}.tar.gz");
+    let checksum_name = format!("{archive_name}.sha256");
+
+    text.replace(&checksum_name, "[ACTON_ARCHIVE_SHA256]")
+        .replace(&archive_name, "[ACTON_ARCHIVE]")
+        .replace(target_triple, "[TARGET_TRIPLE]")
 }
 
 fn unit_snapshot_path(snapshot_name: &str) -> PathBuf {

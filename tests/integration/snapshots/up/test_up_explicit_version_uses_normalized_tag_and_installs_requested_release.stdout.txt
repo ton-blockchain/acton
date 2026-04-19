@@ -1,5 +1,5 @@
   Installing v0.1.5
-       Found acton-aarch64-apple-darwin.tar.gz
-       Found acton-aarch64-apple-darwin.tar.gz.sha256
-    Verified acton-aarch64-apple-darwin.tar.gz.sha256
+       Found [ACTON_ARCHIVE]
+       Found [ACTON_ARCHIVE_SHA256]
+    Verified [ACTON_ARCHIVE_SHA256]
      Updated to v0.1.5

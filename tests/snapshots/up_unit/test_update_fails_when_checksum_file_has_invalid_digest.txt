@@ -1,1 +1,1 @@
-The downloaded checksum file for acton-aarch64-apple-darwin.tar.gz contains an invalid SHA256 digest
+The downloaded checksum file for [ACTON_ARCHIVE] contains an invalid SHA256 digest

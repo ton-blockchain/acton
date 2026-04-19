@@ -1,1 +1,1 @@
-Downloaded archive acton-aarch64-apple-darwin.tar.gz failed SHA256 verification. Expected 005a91c4fb1877364a936a4fdf356b660c5d41f4e111be5ece6d4353d1e69469, got abd876aa19efb22487f8c41128abf8f5057322c30d1dccb738ae24a9f74589f6.
+Downloaded archive [ACTON_ARCHIVE] failed SHA256 verification. Expected 005a91c4fb1877364a936a4fdf356b660c5d41f4e111be5ece6d4353d1e69469, got abd876aa19efb22487f8c41128abf8f5057322c30d1dccb738ae24a9f74589f6.

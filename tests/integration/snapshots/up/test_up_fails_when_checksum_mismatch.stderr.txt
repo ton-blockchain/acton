@@ -1,1 +1,1 @@
-Error: The downloaded checksum file references 'broken.tar.gz', but the archive is 'acton-aarch64-apple-darwin.tar.gz'
+Error: The downloaded checksum file references 'broken.tar.gz', but the archive is '[ACTON_ARCHIVE]'
