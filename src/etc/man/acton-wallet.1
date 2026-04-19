@@ -47,8 +47,10 @@ script
 \h'-04'\(bu\h'+03'\fBacton wallet remove \-y\fR to remove a wallet non\-interactively
 .RE
 .sp
-For remote balance lookups and testnet backends, commands that accept
-\fB\-\-api\-key\fR also support \fBTONCENTER_API_KEY\fR\&.
+Acton\[cq]s testnet TonCenter client reads \fBTONCENTER_API_KEY\fR for balance\-backed
+flows such as \fBwallet list \-\-balance\fR and the interactive post\-airdrop balance
+confirmation after \fBwallet new\fR\&. \fBwallet list \-\-balance\fR also accepts
+\fB\-\-api\-key\fR\&.
 .SH "SUBCOMMANDS"
 .SS "acton wallet new"
 Generate a new wallet.
@@ -326,7 +328,9 @@ to appear on testnet and lets you skip that wait by pressing \fBEnter\fR, unless
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBwallet list \-\-balance\fR resolves balances through TonCenter and also respects
-the \fBTONCENTER_API_KEY\fR environment variable
+the \fBTONCENTER_API_KEY\fR environment variable; the same environment fallback
+is used when \fBwallet new\fR waits for testnet funds after an interactive
+auto\-airdrop
 .RE
 .sp
 .RS 4

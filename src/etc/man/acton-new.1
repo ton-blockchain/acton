@@ -317,31 +317,6 @@ Depending on the selected template and options, Acton may also generate:
 .RS 4
 \h'-04'\(bu\h'+03'\fBAGENTS.md\fR for \fB\-\-agents\fR
 .RE
-.sp
-Every scaffold also writes \fBActon.toml\fR script aliases for the template\[cq]s main
-deploy script:
-.sp
-.RS 4
-\h'-04'\(bu\h'+03'\fBdeploy\-emulation\fR runs the generated deploy script locally via \fBacton script\fR
-.RE
-.sp
-.RS 4
-\h'-04'\(bu\h'+03'\fBdeploy\-testnet\fR runs the same deploy script with \fB\-\-net testnet\fR
-.RE
-.sp
-That gives new projects an immediate \fBacton run ...\fR entrypoint without having
-to hand\-author a \fB[scripts]\fR section first.
-.sp
-Wrapper files copied during scaffolding are template\-owned starter files. They
-are not regenerated during \fBacton new\fR, so the exact helper surface can differ
-slightly from what the current \fBacton wrapper\fR generator would emit for the
-same contract today.
-.sp
-Each built\-in template also ships its own optional \fBAGENTS.md\fR guidance. When
-you pass \fB\-\-agents\fR, Acton copies the selected template\[cq]s version into the
-project root. This is a one\-time scaffolded file, not a live link back to the
-template, so later template updates do not automatically rewrite your local
-\fBAGENTS.md\fR\&.
 .SH "COUNTER APP LAYOUT"
 When \fBacton new \-\-template counter \-\-app\fR is used, the project includes:
 .sp

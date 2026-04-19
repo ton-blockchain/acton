@@ -38,15 +38,6 @@ This page tracks TonCenter v2 and v3 API coverage in Acton local development nod
 | `GET`  | `/api/v2/getConfigAll`                  | ✅                       | Get All Config                   |
 | `GET`  | `/api/v2/getLibraries`                  | ✅                       | Get Libraries                    |
 
-## Legacy v2 Compatibility Aliases
-
-Acton keeps a few TonCenter-style compatibility aliases for older clients:
-
-- `POST /api/v2` is the primary JSON-RPC entrypoint.
-- `POST /api/v2/jsonRPC` is accepted as a legacy JSON-RPC alias.
-- `POST /api/v2/v2/jsonRPC` is also accepted for clients that accidentally double-prefix the `v2` segment.
-- `GET /api/v2/getShards` and `GET /api/v2/shards` resolve to the same shard-list handler.
-
 ## TonCenter v3 Coverage Matrix
 
 Acton local development node currently supports 11 TonCenter v3 endpoints:

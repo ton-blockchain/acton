@@ -37,8 +37,10 @@ COMMON LIFECYCLE
 
        o  acton wallet remove -y to remove a wallet non-interactively
 
-       For remote balance lookups and testnet backends, commands that accept
-       --api-key also support TONCENTER_API_KEY.
+       Acton’s testnet TonCenter client reads TONCENTER_API_KEY for
+       balance-backed flows such as wallet list --balance and the interactive
+       post-airdrop balance confirmation after wallet new. wallet list
+       --balance also accepts --api-key.
 
 SUBCOMMANDS
    acton wallet new
@@ -250,7 +252,9 @@ NEW AND IMPORT WORKFLOW
 
 LISTING, SIGNING, AND EXPORT
        o  wallet list --balance resolves balances through TonCenter and also
-          respects the TONCENTER_API_KEY environment variable
+          respects the TONCENTER_API_KEY environment variable; the same
+          environment fallback is used when wallet new waits for testnet funds
+          after an interactive auto-airdrop
 
        o  wallet sign auto-detects hex and base64 input, preferring hex when a
           payload could be interpreted as both

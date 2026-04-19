@@ -15,18 +15,6 @@
 /// `acton script`, and local emulation helpers. It is not part of deployed
 /// on-chain contract execution on the real network.
 ///
-/// High-level modules built on top of `ffi` include:
-/// - [io](./io) for formatted terminal output
-/// - [fs](./fs) for filesystem access
-/// - [env](./env) for typed environment variable access
-/// - [prompts](./prompts) for interactive input helpers
-/// - [build](./build) for runtime contract compilation and BoC loading
-/// - [crypto](./crypto) for randomness, mnemonic, and signing helpers
-/// - [testing/assert](./testing/assert) for assertion failures and diagnostics
-/// - [emulation/network](./emulation/network), [emulation/testing](./emulation/testing),
-///   [emulation/scripts](./emulation/scripts), and [emulation/config](./emulation/config)
-///   for local blockchain state, network access, wallets, and config mutation
-///
 /// On the host side, these handlers are registered from Rust modules under
 /// `src/ffi/`. If you add or change a direct `ffi.*` declaration, its opcode id,
 /// argument count, and value encoding must stay in sync with the corresponding

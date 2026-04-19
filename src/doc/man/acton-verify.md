@@ -173,9 +173,9 @@ blockchain transaction.
 
 ## RETRIES AND FAILURE HINTS
 
-- source upload retries up to 8 times for transient transport failures and
-  backend 5xx responses
-- retry backoff grows from 1 second to 8 seconds
+- source upload is attempted up to 8 times total (initial try plus up to
+  7 retries) for transient transport failures and backend 5xx responses
+- retry backoff grows from 1 second to 7 seconds between attempts
 - backend error responses are printed with the response body when available
 - 5xx failures suggest retrying later and using `ACTON_VERIFY_DEBUG=1`
 - backend problems can also be narrowed down by pointing

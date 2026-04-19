@@ -511,13 +511,18 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
 /// }
 /// ```
 ///
-/// Returns a list of send results representing the full recursively processed
-/// transaction chain produced by this send call.
+/// In local emulation mode, returns a list of send results representing the
+/// full recursively processed transaction chain produced by this send call.
 ///
-/// Unlike [testing.processSingleTraceStep], this helper keeps draining out
-/// messages until the whole trace queue is exhausted. Use it for normal
+/// Unlike [testing.processSingleTraceStep], the emulation path keeps draining
+/// out messages until the whole trace queue is exhausted. Use it for normal
 /// end-to-end emulation where children, grandchildren, and other follow-up
 /// transactions should all be executed.
+///
+/// When `from` resolves to a real opened wallet and the call is routed to a
+/// broadcast network instead of the local emulator, Acton sends the message to
+/// that network and returns a single pseudo transaction placeholder rather than
+/// recursively executing descendants locally.
 ///
 /// See [testing.processSingleTraceStep] if you need to send a single message without out message processing.
 fun net.send(from: address, message: OutMessage): SendResultList {
@@ -582,9 +587,9 @@ fun net.createExternalMessage<TBody>(
 /// Sends an external-in message to the specified destination address.
 /// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 ///
-/// This helper recursively processes the resulting trace just like [net.send],
-/// but it starts from an already composed external-in message instead of an
-/// internal message sent from a wallet-like address.
+/// This helper recursively processes the resulting trace in local emulation
+/// just like [net.send], but it starts from an already composed external-in
+/// message instead of an internal message sent from a wallet-like address.
 ///
 /// Returns `null` if the external message was not accepted or the destination
 /// account does not exist.

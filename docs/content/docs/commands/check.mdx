@@ -189,8 +189,9 @@ This conflicts with `--manifest-path`.
   could be mistaken for a contract name
 - inline suppressions use rule names, for example
   `// check-disable-next-line unused-variable, write-only-variable`
-- suppressions apply only to the immediately following line and do not affect
-  compiler/parser diagnostics
+- suppressions apply only to the immediately following line and match
+  diagnostic names, including `compiler-error` and `parse-error`; diagnostic
+  codes such as `C001` are not matched
 - `--fix` applies only linter-provided fixes; diagnostics without a safe fix
   remain in the report
 - `--enable-only` is applied after config is loaded: selected rules keep their
@@ -201,7 +202,10 @@ This conflicts with `--manifest-path`.
 - excluded files still participate in import/type resolution, but lint
   diagnostics for excluded non-root files are filtered out
 - explicit targets still run even if they match `[lint].exclude`
-- compiler errors are never hidden by excludes
+- in project-wide runs, excluded contract roots are skipped entirely, so their
+  compiler errors and lint diagnostics are not reported
+- compiler errors are still shown for roots that are actually checked,
+  including explicit targets
 - `--fix` can still exit with status `1` when unfixed diagnostics or warning
   threshold violations remain after rewriting
 

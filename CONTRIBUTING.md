@@ -274,51 +274,15 @@ Notes:
 
 - `just test` uses `cargo nextest run` for Rust test targets and
   `cargo test --workspace --doc` for doctests.
-- `retrace` tests stay inside the shared workspace run, but are serialized via
-  a nextest test group because they hit rate-limited remote APIs.
+- `retrace` tests stay inside the shared workspace run, but the repo's nextest
+  config assigns `package(retrace)` to the `retrace-serial` group, so those
+  tests still run one at a time.
 - CI test behavior is slightly different: the `ci` nextest profile and
   `only_ci` feature are enabled in CI.
   For parity, run:
   ```bash
   CI=1 just test
   ```
-
-## Test layout and conventions
-
-`just test` is broader than just Rust unit tests. It runs:
-
-- workspace Rust tests via `cargo nextest`
-- workspace doctests via `cargo test --workspace --doc`
-- repo-native self-host `.test.tolk` suites via `cargo run -- test`
-
-Useful layout landmarks:
-
-- `tests/integration_test.rs`: the main Rust integration-test binary.
-- `tests/debug_test.rs`: debugger-focused tests that must run sequentially.
-- `tests/integration/`: most feature suites, including the large
-  `test_runner/` subtree.
-- `tests/support/`: helpers such as `ProjectBuilder`, fixture/project copying,
-  snapshot normalization, and command wrappers.
-- `tests/projects/`: committed fixture projects used by Rust harnesses.
-- `tests/scenarios/*.yaml`: scenario sources.
-- `tests/integration/scenarios/*.rs`: generated Rust from those scenario YAML
-  files.
-
-Not every `.test.tolk` file is a top-level self-host suite. Some are copied
-into temp projects and exercised indirectly by Rust harnesses. Use:
-
-- `ProjectBuilder` when you need an ad-hoc project assembled inside a test
-- committed fixture projects under `tests/projects/` when the scenario should be
-  shared across many tests
-- committed root `.test.tolk` suites when the repository itself should be able
-  to run them through `cargo run -- test`
-
-Snapshot and generation conventions:
-
-- Rust snapshot outputs live under `tests/**/snapshots`
-- scenario YAML is source; generated Rust should be regenerated, not hand-edited
-- debugger tests are serialized explicitly
-- retrace tests are also serialized because they hit rate-limited remote APIs
 
 ## Formatting and Linting
 
@@ -509,26 +473,6 @@ When grammar snapshots need refresh:
 ```bash
 just update-test-tree-sitter-tolk
 ```
-
-The canonical local flow for one grammar is:
-
-```bash
-cd crates/tree-sitter-tolk
-yarn install --immutable
-yarn tree-sitter generate
-yarn tree-sitter test
-```
-
-Commit the grammar source plus the generated parser artifacts that changed
-together. In practice that often includes:
-
-- `grammar.js`
-- generated `src/` / bindings output
-- `queries/*`
-- `test/corpus/*`
-
-CI validates grammars by running the same generate + test sequence from
-`.github/workflows/build-grammars.yml`.
 
 ## `xtask` map
 

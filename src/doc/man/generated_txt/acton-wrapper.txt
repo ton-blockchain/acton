@@ -90,30 +90,6 @@ ABI REQUIREMENTS
        generated. If storage is missing, storage helpers fall back to an
        untyped initializer.
 
-COMMON GENERATED HELPER SHAPES
-       Generated Tolk wrappers usually expose the same family of helpers:
-
-       o  fromStorage(...) to construct a wrapper together with StateInit and
-          the computed deployment address
-
-       o  sometimes fromAddress(...) when the template or generator needs a
-          handle to an already deployed contract without local init data
-
-       o  deploy(...) to send the deploy message using the wrapper’s stored
-          StateInit
-
-       o  send{Name}(...) helpers for each incoming message declared in the ABI
-
-       o  sendAny(...) for a raw custom body cell when you need to bypass typed
-          message helpers
-
-       o  typed get-method helpers emitted from declared getter methods
-
-       The exact method set depends on the ABI. Template wrappers copied by
-       acton new are starter files checked into the scaffold and may lag behind
-       or slightly differ from the latest generator output, but they follow the
-       same general helper patterns.
-
 TYPESCRIPT GENERATION
        acton wrapper --ts shells out to npx gen-typescript-from-tolk-dev.
 

@@ -144,7 +144,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
             If secure storage is unavailable, or if you disable it with `--secure false`, your mnemonic will be written to `wallets.toml`. **Never commit it to git.** Acton adds it to `.gitignore` automatically.
         </Callout>
 
-        After creating a wallet, the `--airdrop` flag automatically requests 2 TON on the testnet.
+        After creating a wallet, the `--airdrop` flag automatically requests testnet funds from the configured faucet.
         <Callout type="warn">
             If you don't use `--airdrop`, or if the faucet request fails, you can still fund the wallet through the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending it your wallet address.
         </Callout>
@@ -197,20 +197,6 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
         ```bash
         acton script scripts/deploy.tolk --net testnet
-        ```
-
-        The generated scaffold also exposes the same deploy script through
-        `acton run` aliases, so the equivalent shortcut is:
-
-        ```bash
-        acton run deploy-testnet
-        ```
-
-        If you want to exercise the same script against the local emulator
-        first, use:
-
-        ```bash
-        acton run deploy-emulation
         ```
 
         If successful, you'll see the deployment transaction hash, the contract

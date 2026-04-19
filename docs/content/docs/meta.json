@@ -25,7 +25,6 @@
     "miscellaneous/ide-support",
     "standard_library",
     "tolk_standard_library",
-    "miscellaneous/support-policy",
-    "miscellaneous/security"
+    "miscellaneous/support-policy"
   ]
 }

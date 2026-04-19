@@ -92,8 +92,6 @@ acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
 acton script scripts/deploy.tolk --net testnet
-# equivalent scaffold shortcut:
-acton run deploy-testnet
 ```
 
 For a step-by-step walkthrough, see the
@@ -124,9 +122,7 @@ Source builds are intended for contributors and local development. See
 ## Contributing
 
 Contributor setup, test workflows, UI build steps, and docs workflows are in
-[CONTRIBUTING.md](CONTRIBUTING.md), including a workspace architecture map,
-native artifact/bootstrap rules, docgen/schema workflows, and tree-sitter
-regeneration guidance.
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

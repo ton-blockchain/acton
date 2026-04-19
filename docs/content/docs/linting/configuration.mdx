@@ -29,7 +29,8 @@ Behavior notes:
 - Non-`.tolk` contract entries such as precompiled `.boc` contracts are never lint roots.
 - If you pass an explicit target (`acton check <contract-name>` or `acton check <file.tolk>`), that root target is still analyzed.
 - Excluded dependency files can still be parsed/resolved, but their lint diagnostics are filtered out.
-- Compiler errors are never filtered by `exclude`.
+- In project-wide runs, excluded contract roots are skipped entirely, so their compiler errors and lint diagnostics are not reported.
+- Compiler errors are still shown for roots that are actually checked, including explicit targets.
 - Exclude matching is checked against both project-root-relative and absolute paths.
 
 ## `[lint.rules]` Global Rule Levels
@@ -94,11 +95,11 @@ Notes:
 
 - Suppression applies only to the immediately following line.
 - The suppression comment must use `//` and be placed directly above the target line.
-- Use lint rule names (for example `unused-variable`), not diagnostic codes (for example `E002`).
+- Use lint rule names (for example `unused-variable`) or diagnostic names such as `compiler-error` / `parse-error`, not diagnostic codes (for example `E002` or `C001`).
 - Matching is keyed from the diagnostic's primary location, so the suppression must sit directly above the line that receives the primary annotation.
 - Unknown rule names in the suppression list are ignored.
-- `all` suppresses all lints for the next line.
-- Suppressions apply to linter diagnostics only. Compiler/parser diagnostics (`C001`) are not suppressed.
+- `all` suppresses all diagnostics for the next line.
+- Suppressions also apply to compiler/parser diagnostics when the diagnostic name matches (`compiler-error`, `parse-error`).
 
 ## Temporary rule narrowing with `--enable-only`
 

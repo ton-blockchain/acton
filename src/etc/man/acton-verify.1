@@ -258,12 +258,12 @@ blockchain transaction.
 .SH "RETRIES AND FAILURE HINTS"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'source upload retries up to 8 times for transient transport failures and
-backend 5xx responses
+\h'-04'\(bu\h'+03'source upload is attempted up to 8 times total (initial try plus up to
+7 retries) for transient transport failures and backend 5xx responses
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'retry backoff grows from 1 second to 8 seconds
+\h'-04'\(bu\h'+03'retry backoff grows from 1 second to 7 seconds between attempts
 .RE
 .sp
 .RS 4

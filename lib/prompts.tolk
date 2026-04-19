@@ -4,8 +4,8 @@
 /// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 ///
 /// Deterministic fallback matrix:
-/// - `prompt(...)`: returns `""` when no interactive stdin is available or the
-///   host prompt fails
+/// - `prompt(...)`: returns `default` when no interactive stdin is available
+///   or the host prompt fails; when `default` is omitted, that still means `""`
 /// - `select(...)`: returns `""` in non-interactive mode or on prompt failure
 /// - `confirm(...)`: returns `false` in non-interactive mode or on prompt
 ///   failure, even if `default` is `true`
@@ -40,10 +40,9 @@ import "ffi"
 ///   anything. It is displayed next to the question (e.g. `(John)`).
 ///
 /// Non-interactive fallback:
-/// - Returns `""` when user input cannot be collected (for example,
-///   non-interactive runner).
-/// - In that fallback path, `default` is **not** substituted automatically;
-///   the result is still `""`.
+/// - Returns `default` when user input cannot be collected (for example,
+///   non-interactive runner) or the host prompt fails.
+/// - If `default` is omitted, the fallback result is still `""`.
 ///
 /// Example:
 /// ```tolk

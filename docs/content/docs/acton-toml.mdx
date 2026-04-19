@@ -176,7 +176,7 @@ output-dir = "app/src/wrappers"
 
 Override rules:
 
-- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.tolk].output-dir`, then the wrapper command's built-in default location.
+- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
 - For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
 - For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
 - `[wrappers.tolk].generate-test` affects only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
@@ -500,13 +500,13 @@ import "@utils/logic" // Resolves to ./libs/utils/logic.tolk
 Projects created with `acton new` or updated with `acton init` usually contain
 these default mappings:
 
-| Mapping      | Default path | Common use                                      |
-|:-------------|:-------------|:------------------------------------------------|
-| `@acton`     | `.acton`     | Standard library imports such as `@acton/testing/expect` |
-| `@contracts` | `contracts`  | Local contract-side modules such as `@contracts/types`   |
-| `@tests`     | `tests`      | Shared test helpers and fixtures                         |
-| `@wrappers`  | `wrappers`   | Generated wrappers such as `@wrappers/Counter`          |
-| `@gen`       | `gen`        | Generated dependency helper files                        |
+| Mapping      | Default path                       | Common use                                               |
+|:-------------|:-----------------------------------|:---------------------------------------------------------|
+| `@acton`     | `.acton`                           | Standard library imports such as `@acton/testing/expect` |
+| `@contracts` | `contracts` or `contracts/src`     | Local contract-side modules such as `@contracts/types`   |
+| `@tests`     | `tests` or `contracts/tests`       | Shared test helpers and fixtures                         |
+| `@wrappers`  | `wrappers` or `contracts/wrappers` | Generated wrappers such as `@wrappers/Counter`           |
+| `@gen`       | `gen`                              | Generated dependency helper files                        |
 
 Example:
 
@@ -517,9 +517,12 @@ import "@wrappers/Counter"
 ```
 
 These defaults are written into `Acton.toml` by project scaffolding commands
-such as `acton new` and `acton init`. If you remove them manually, Acton does
-not silently recreate them during normal compilation; add them back explicitly
-or rerun `acton init`.
+such as `acton new` and `acton init`. The exact path depends on the scaffold
+layout: standard templates use `contracts` / `tests` / `wrappers`, while
+`--app` scaffolds use `contracts/src` / `contracts/tests` /
+`contracts/wrappers`. If you remove them manually, Acton does not silently
+recreate them during normal compilation; add them back explicitly or rerun
+`acton init`.
 
 ### Prefix Resolution Rules
 

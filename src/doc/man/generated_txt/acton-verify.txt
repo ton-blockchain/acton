@@ -178,10 +178,11 @@ DRY RUN
        blockchain transaction.
 
 RETRIES AND FAILURE HINTS
-       o  source upload retries up to 8 times for transient transport failures
-          and backend 5xx responses
+       o  source upload is attempted up to 8 times total (initial try plus up
+          to 7 retries) for transient transport failures and backend 5xx
+          responses
 
-       o  retry backoff grows from 1 second to 8 seconds
+       o  retry backoff grows from 1 second to 7 seconds between attempts
 
        o  backend error responses are printed with the response body when
           available

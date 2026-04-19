@@ -19,10 +19,15 @@ Unlike \fBacton build\fR, this command works on one explicit source file. It doe
 not traverse the \fB[contracts]\fR graph, does not generate dependency helper
 files, and does not write project build JSON artifacts.
 .sp
+By default the compiler still expects a contract or script entrypoint. Use
+\fB\-\-allow\-no\-entrypoint\fR when compiling library or helper files that
+intentionally define neither \fBmain()\fR nor \fBonInternalMessage()\fR\&.
+.sp
 \fBActon.toml\fR is optional here. If it loads successfully, Acton uses it for
-project context such as import mappings and cache location. If it is missing or
-invalid, Acton warns and continues compiling the file without those project
-settings.
+project context such as import mappings. Cache placement still follows the
+resolved project root and the usual \fBbuild/cache\fR layout. If the manifest is
+missing or invalid, Acton warns and continues compiling the file without those
+manifest\-derived project settings.
 .sp
 \fB\-\-manifest\-path\fR and \fB\-\-project\-root\fR choose which project context to use, but
 they do not rebase unrelated CLI paths. The input file and output paths stay
@@ -63,6 +68,11 @@ Write a source map file and enable debug\-oriented compilation output.
 \fB\-\-abi\fR \fIpath\fR
 .RS 4
 Write the emitted contract ABI to a file.
+.RE
+.sp
+\fB\-\-allow\-no\-entrypoint\fR
+.RS 4
+Allow compiling files that do not define \fBmain()\fR or \fBonInternalMessage()\fR\&.
 .RE
 .sp
 \fB\-\-clear\-cache\fR

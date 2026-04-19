@@ -21,10 +21,15 @@ Unlike `acton build`, this command works on one explicit source file. It does
 not traverse the `[contracts]` graph, does not generate dependency helper
 files, and does not write project build JSON artifacts.
 
+By default the compiler still expects a contract or script entrypoint. Use
+`--allow-no-entrypoint` when compiling library or helper files that
+intentionally define neither `main()` nor `onInternalMessage()`.
+
 `Acton.toml` is optional here. If it loads successfully, Acton uses it for
-project context such as import mappings and cache location. If it is missing or
-invalid, Acton warns and continues compiling the file without those project
-settings.
+project context such as import mappings. Cache placement still follows the
+resolved project root and the usual `build/cache` layout. If the manifest is
+missing or invalid, Acton warns and continues compiling the file without those
+manifest-derived project settings.
 
 `--manifest-path` and `--project-root` choose which project context to use, but
 they do not rebase unrelated CLI paths. The input file and output paths stay
@@ -62,6 +67,10 @@ Write a source map file and enable debug-oriented compilation output.
 
 {{#option "`--abi` _path_" }}
 Write the emitted contract ABI to a file.
+{{/option}}
+
+{{#option "`--allow-no-entrypoint`" }}
+Allow compiling files that do not define `main()` or `onInternalMessage()`.
 {{/option}}
 
 {{#option "`--clear-cache`" }}

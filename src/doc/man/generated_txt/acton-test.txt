@@ -149,8 +149,10 @@ OPTIONS
 
            If passed without a value, Acton uses build/traces. Acton writes one
            <test-name>_trace.json file per executed test and stores shared
-           contract metadata under contracts/<contract-name>.json. Relative
-           paths are resolved from the project root.
+           contract metadata under contracts/<contract-name>.json. These
+           filenames are derived only from the test name and contract name, so
+           duplicate names overwrite earlier artifacts in the same output
+           directory. Relative paths are resolved from the project root.
 
    Mutation Testing Options
        --mutate

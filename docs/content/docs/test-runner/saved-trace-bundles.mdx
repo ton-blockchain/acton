@@ -26,8 +26,9 @@ build/traces/
     receiver.json
 ```
 
-- Each executed test writes one `<test-name>_trace.json` file.
+- Each executed test normally writes one `<test-name>_trace.json` file.
 - Contract metadata is stored once per output directory under `contracts/<contract-name>.json`, even when multiple tests reuse the same contract.
+- Filenames are derived only from the test name and contract name. If those names collide across files, later exports overwrite earlier artifacts in the same output directory.
 
 ## Root Trace File
 
@@ -93,7 +94,7 @@ Each transaction entry carries both raw and decoded debugging context:
 - `vm_log_diff`: VM log diff generated for that transaction.
 - `executor_logs`: raw executor log output.
 - `executor_actions`: parsed executor actions such as send attempts and reserve operations, including failure details when available.
-- `actions`: optional decoded action dump.
+- `actions`: optional base64-encoded actions cell copied from the trace export. Runtime helpers may decode it later when needed.
 - `dest_contract_info`: contract name hint for lookup in `contracts/<name>.json`.
 
 ## Contract Files

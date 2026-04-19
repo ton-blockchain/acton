@@ -207,6 +207,8 @@ Save transaction traces to a directory.
 If passed without a value, Acton uses \fBbuild/traces\fR\&.
 Acton writes one \fB<test\-name>_trace.json\fR file per executed test and stores
 shared contract metadata under \fBcontracts/<contract\-name>.json\fR\&.
+These filenames are derived only from the test name and contract name, so
+duplicate names overwrite earlier artifacts in the same output directory.
 Relative paths are resolved from the project root.
 .RE
 .SS "Mutation Testing Options"

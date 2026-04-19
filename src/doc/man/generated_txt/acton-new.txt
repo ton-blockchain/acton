@@ -232,28 +232,6 @@ FILES
 
        o  AGENTS.md for --agents
 
-       Every scaffold also writes Acton.toml script aliases for the
-       template’s main deploy script:
-
-       o  deploy-emulation runs the generated deploy script locally via acton
-          script
-
-       o  deploy-testnet runs the same deploy script with --net testnet
-
-       That gives new projects an immediate acton run ... entrypoint without
-       having to hand-author a [scripts] section first.
-
-       Wrapper files copied during scaffolding are template-owned starter
-       files. They are not regenerated during acton new, so the exact helper
-       surface can differ slightly from what the current acton wrapper
-       generator would emit for the same contract today.
-
-       Each built-in template also ships its own optional AGENTS.md guidance.
-       When you pass --agents, Acton copies the selected template’s version
-       into the project root. This is a one-time scaffolded file, not a live
-       link back to the template, so later template updates do not
-       automatically rewrite your local AGENTS.md.
-
 COUNTER APP LAYOUT
        When acton new --template counter --app is used, the project includes:
 

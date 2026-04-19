@@ -123,7 +123,7 @@ Available fields:
 
 Override rules:
 
-- Tolk wrapper path: `--output` -> `--output-dir` -> `[wrappers.tolk].output-dir` -> wrapper command built-in default.
+- Tolk wrapper path: `--output` -> `--output-dir` -> `[wrappers.tolk].output-dir` -> `@wrappers` mapping -> wrapper command built-in default.
 - TypeScript wrapper path: `--output` -> `--output-dir` -> `[wrappers.typescript].output-dir` -> wrapper command built-in default.
 - Test stub path: `--test-output` -> `--test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
 - `[wrappers.tolk].generate-test` only affects non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
@@ -304,17 +304,19 @@ import "@core/math.tolk"
 
 Built-in project mappings commonly used in Acton projects:
 
-| Mapping      | Default path | Common use                                               |
-|--------------|--------------|----------------------------------------------------------|
-| `@acton`     | `.acton`     | Standard library imports such as `@acton/testing/expect` |
-| `@contracts` | `contracts`  | Local contract-side modules such as `@contracts/types`   |
-| `@tests`     | `tests`      | Shared test helpers and fixtures                         |
-| `@wrappers`  | `wrappers`   | Generated wrappers such as `@wrappers/Counter`           |
-| `@gen`       | `gen`        | Generated dependency helper files                        |
+| Mapping      | Default path                       | Common use                                               |
+|--------------|------------------------------------|----------------------------------------------------------|
+| `@acton`     | `.acton`                           | Standard library imports such as `@acton/testing/expect` |
+| `@contracts` | `contracts` or `contracts/src`     | Local contract-side modules such as `@contracts/types`   |
+| `@tests`     | `tests` or `contracts/tests`       | Shared test helpers and fixtures                         |
+| `@wrappers`  | `wrappers` or `contracts/wrappers` | Generated wrappers such as `@wrappers/Counter`           |
+| `@gen`       | `gen`                              | Generated dependency helper files                        |
 
 These defaults are usually written into `Acton.toml` by `acton new` and
-`acton init`. If you remove them manually, Acton does not recreate them during
-normal compilation.
+`acton init`. Standard scaffolds use `contracts` / `tests` / `wrappers`, while
+`--app` scaffolds use `contracts/src` / `contracts/tests` /
+`contracts/wrappers`. If you remove them manually, Acton does not recreate them
+during normal compilation.
 
 Mappings follow these rules:
 1. **Normalization**: Any mapping key missing the `@` prefix will have it added automatically.

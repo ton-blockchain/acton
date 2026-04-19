@@ -152,8 +152,9 @@ could be mistaken for a contract name
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'suppressions apply only to the immediately following line and do not affect
-compiler/parser diagnostics
+\h'-04'\(bu\h'+03'suppressions apply only to the immediately following line and match
+diagnostic names, including \fBcompiler\-error\fR and \fBparse\-error\fR; diagnostic
+codes such as \fBC001\fR are not matched
 .RE
 .sp
 .RS 4
@@ -182,7 +183,13 @@ diagnostics for excluded non\-root files are filtered out
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'compiler errors are never hidden by excludes
+\h'-04'\(bu\h'+03'in project\-wide runs, excluded contract roots are skipped entirely, so their
+compiler errors and lint diagnostics are not reported
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compiler errors are still shown for roots that are actually checked,
+including explicit targets
 .RE
 .sp
 .RS 4

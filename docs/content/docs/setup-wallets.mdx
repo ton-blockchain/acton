@@ -27,8 +27,10 @@ acton wallet export-mnemonic deployer
 acton wallet remove deployer -y
 ```
 
-For commands that query remote balances or testnet backends, you can also set
-`TONCENTER_API_KEY` in the environment instead of repeating `--api-key`.
+For TonCenter-backed balance lookups, including
+`acton wallet list --balance` and the interactive post-airdrop wait after
+`acton wallet new`, you can set `TONCENTER_API_KEY` in the environment.
+`acton wallet list --balance` also accepts `--api-key`.
 
 ## Creating and Managing Wallets
 

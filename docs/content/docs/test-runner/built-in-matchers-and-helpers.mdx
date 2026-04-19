@@ -21,12 +21,12 @@ You can mix exact scalar matches and predicate functions inside `SearchParams`:
 
 ```tolk
 expect(res).toHaveTx({
-    from: fun(addr: address): bool {
-        return addr == sender.address;
+    from: fun (addr: address): bool {
+        return addr == deployer.address;
     },
     to: harness.address,
     value: ton("0.5"),
-    opcode: Ping.__getDeclaredPackPrefix(),
+    opcode: 0x0000_0001,
 });
 ```
 
