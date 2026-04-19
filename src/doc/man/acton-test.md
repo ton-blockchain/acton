@@ -1,14 +1,14 @@
 # acton-test(1)
 
-## NAME
+## Name
 
 acton-test --- Discover and run Tolk smart contract tests
 
-## SYNOPSIS
+## Synopsis
 
 `acton test` [_options_] [_path_]
 
-## DESCRIPTION
+## Description
 
 Discover and execute tests from `.test.tolk` files.
 
@@ -16,7 +16,7 @@ The test runner supports filtering, multiple reporters, coverage collection,
 gas snapshots, mutation testing, trace export, remote-state fork mode, and a
 browser UI for exploring results.
 
-## OPTIONS
+## Options
 
 ### Discovery Options
 
@@ -324,7 +324,7 @@ May be passed multiple times.
 
 {{> options-project-resolved }}
 
-## DISCOVERY
+## Discovery
 
 Acton discovers tests by finding files that end with `.test.tolk`.
 
@@ -332,7 +332,7 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - If `_path_` is a directory, search is recursive
 - Relative `_path_` values are resolved from the current working directory
 
-## REPORTING AND ARTIFACTS
+## Reporting And Artifacts
 
 - `--reporter` on the CLI overrides `[test].reporter` for the current run
 - `--ui` adds the browser UI in addition to text reporters
@@ -373,7 +373,7 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - fuzz tests show the seed in console output; if `[test.fuzz].seed` is omitted,
   Acton picks a new seed for each `acton test` run
 
-## CONFIGURATION
+## Configuration
 
 Defaults can be configured in `Acton.toml`:
 
@@ -406,7 +406,7 @@ disable-rules = ["flip_plus"]
 
 CLI flags override config values for the current invocation.
 
-## NOTES
+## Notes
 
 - If both `--snapshot` and `--baseline-snapshot` are provided, Acton runs in
   comparison mode and does not overwrite the snapshot file
@@ -435,7 +435,7 @@ CLI flags override config values for the current invocation.
 - `--mutation-minimum-percent` and `[test.mutation].minimum-percent` apply to
   that filtered mutation score after compile errors are excluded
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: All selected tests passed, or a non-mutating reporting mode completed
   successfully.
@@ -445,7 +445,7 @@ CLI flags override config values for the current invocation.
   mode, no tests matched after filtering, or infrastructure such as
   compilation, trace export, UI startup, or remote-state resolution failed.
 
-## EXAMPLES
+## Examples
 
 1. Run all tests:
 
@@ -537,7 +537,7 @@ CLI flags override config values for the current invocation.
    acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff --reporter console,junit
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help wrapper`
 - [Test runner guide](https://ton-blockchain.github.io/acton/docs/test-runner)

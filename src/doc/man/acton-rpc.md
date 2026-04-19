@@ -1,14 +1,14 @@
 # acton-rpc(1)
 
-## NAME
+## Name
 
 acton-rpc --- Inspect remote account state and decode contract storage
 
-## SYNOPSIS
+## Synopsis
 
 `acton rpc` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Query blockchain account state through a configured network endpoint.
 
@@ -25,7 +25,7 @@ When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton rpc info
 
@@ -72,15 +72,15 @@ TonCenter API key for blockchain queries.
 If no local ABI match is found, Acton still prints the raw remote account
 information and reports that decoded storage is unavailable.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-pass-through }}
 
-## NETWORK RESOLUTION
+## Network Resolution
 
 - `mainnet` and `testnet` use the built-in TonCenter endpoints
 - `localnet` uses the configured local LiteNode or its default URL
@@ -89,7 +89,7 @@ information and reports that decoded storage is unavailable.
 For `custom:<name>`, Acton needs access to the selected project or manifest so
 it can read the custom network configuration.
 
-## ABI MATCHING
+## ABI Matching
 
 Storage decoding is best-effort and depends on local project context.
 
@@ -103,13 +103,13 @@ Acton attempts to:
 This means decoding is robust for contracts you control in the current Acton
 project, but not guaranteed for arbitrary third-party deployments.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected RPC query completed successfully.
 - `1`: The address was invalid, the network could not be resolved, the remote
   request failed, or local ABI decoding encountered an unrecoverable error.
 
-## EXAMPLES
+## Examples
 
 1. Inspect a testnet account quickly:
 
@@ -135,7 +135,7 @@ project, but not guaranteed for arbitrary third-party deployments.
    acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help disasm`
 - `acton help retrace`

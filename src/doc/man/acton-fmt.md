@@ -1,14 +1,14 @@
 # acton-fmt(1)
 
-## NAME
+## Name
 
 acton-fmt --- Format Tolk source files
 
-## SYNOPSIS
+## Synopsis
 
 `acton fmt` [_options_] [_paths_...]
 
-## DESCRIPTION
+## Description
 
 Format `.tolk` files using the built-in Tolk formatter.
 
@@ -16,7 +16,7 @@ The command can rewrite files in place or run in `--check` mode for CI and
 pre-commit validation. If no `_paths_` are provided, Acton scans the resolved
 project root recursively.
 
-## OPTIONS
+## Options
 
 ### Format Options
 
@@ -44,7 +44,7 @@ In this mode Acton prints diffs for mismatches and exits non-zero.
 
 {{> options-project-resolved }}
 
-## BEHAVIOR
+## Behavior
 
 - Only `.tolk` files are formatted
 - Directory traversal is recursive
@@ -57,7 +57,7 @@ In this mode Acton prints diffs for mismatches and exits non-zero.
 - `--check` prints a unified diff with three lines of context for each changed
   file
 
-## CONFIGURATION
+## Configuration
 
 `acton fmt` reads defaults from `[fmt]` in `Acton.toml`:
 
@@ -74,7 +74,7 @@ Useful fields include:
 - `ignore` for additional exclude globs
 - `separate-import-groups` for blank lines between import groups
 
-## IMPORT SORTING
+## Import Sorting
 
 Imports are sorted by group in this order:
 
@@ -87,14 +87,14 @@ Imports are sorted by group in this order:
 
 Within each group, imports are sorted lexicographically.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: All requested files were formatted successfully, or `--check` found no
   formatting differences.
 - `1`: Files needed formatting in `--check` mode, syntax errors prevented
   formatting, or path resolution failed.
 
-## EXAMPLES
+## Examples
 
 1. Format all Tolk files in the project:
 
@@ -126,7 +126,7 @@ Within each group, imports are sorted lexicographically.
    acton fmt contracts/main.tolk --check
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help check`
 - [Formatting guide](https://ton-blockchain.github.io/acton/docs/commands/fmt)

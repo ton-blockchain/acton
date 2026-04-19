@@ -1,14 +1,14 @@
 # acton-retrace(1)
 
-## NAME
+## Name
 
 acton-retrace --- Replay an on-chain transaction locally for inspection
 
-## SYNOPSIS
+## Synopsis
 
 `acton retrace` [_options_] _hash_
 
-## DESCRIPTION
+## Description
 
 Download a transaction by hash and replay it locally in the TON sandbox.
 
@@ -21,7 +21,7 @@ the named project contract by recompiling it with debug info and source maps.
 When `--debug` is added, the prepared replay is exposed as a local Debug
 Adapter Protocol (DAP) server for editor integration.
 
-## OPTIONS
+## Options
 
 ### Retrace Options
 
@@ -82,7 +82,7 @@ When omitted, Acton uses `12345`.
 
 {{> options-project-resolved }}
 
-## NETWORK AND API BEHAVIOR
+## Network And API Behavior
 
 - Without `--net`, Acton tries mainnet and then testnet
 - `localnet` and `custom:<name>` are not supported by the retrace backend
@@ -92,7 +92,7 @@ When omitted, Acton uses `12345`.
 For library fallback lookups, retrace also supports `DTON_API_KEY` from the
 environment.
 
-## SOURCE-LEVEL RETRACE
+## Source-Level Retrace
 
 When `--contract` is set:
 
@@ -112,7 +112,7 @@ When `--contract` is set:
 If you run the command outside the project directory, use `--manifest-path` or
 `--project-root` so Acton can resolve the contract configuration and import mappings.
 
-## DEBUG MODE
+## Debug Mode
 
 When `--debug` is used together with `--contract`:
 
@@ -137,7 +137,7 @@ Current replay-debug limits:
 - unsupported client-specific extension requests are ignored rather than
   emulated
 
-## VS CODE SETUP
+## VS Code Setup
 
 Typical setup:
 
@@ -179,7 +179,7 @@ After the DAP server is listening, launch the matching VS Code debug
 configuration. Breakpoints should be set in the same `.tolk` sources that
 belong to the selected contract from `Acton.toml`.
 
-## OUTPUT
+## Output
 
 The command prints:
 
@@ -194,7 +194,7 @@ The command prints:
 When `--logs-dir` is set, Acton creates the target directory and writes
 `vm.log` plus `executor.log` there.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The transaction was fetched and replayed successfully.
 - `1`: The transaction could not be found, network lookup failed, replay data
@@ -202,7 +202,7 @@ When `--logs-dir` is set, Acton creates the target directory and writes
   code hash did not match the retraced account code, the DAP server could not
   start, or local log files could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Retrace with automatic network fallback:
 
@@ -234,7 +234,7 @@ When `--logs-dir` is set, Acton creates the target directory and writes
    acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter --debug --debug-port 4711
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help disasm`
 - [Retrace command guide](https://ton-blockchain.github.io/acton/docs/commands/retrace)

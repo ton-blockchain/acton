@@ -1,14 +1,14 @@
 # acton-init(1)
 
-## NAME
+## Name
 
 acton-init --- Initialize Acton support in the current directory
 
-## SYNOPSIS
+## Synopsis
 
 `acton init` [_options_]
 
-## DESCRIPTION
+## Description
 
 Initialize Acton support in the current working directory.
 
@@ -24,7 +24,7 @@ If `Acton.toml` does not exist, the command scans `.tolk` files in the current
 directory tree and auto-registers files that define `onInternalMessage` as
 contract entry files.
 
-## IDEMPOTENCY
+## Idempotency
 
 `acton init` is safe to run repeatedly.
 
@@ -35,15 +35,15 @@ contract entry files.
 - it refreshes `.acton/tolk-stdlib`
 - it re-attempts global wallet and library symlinks on each run
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-pass-through }}
 
-## GENERATED AND PATCHED FILES
+## Generated And Patched Files
 
 `acton init` can create or update:
 
@@ -70,7 +70,7 @@ When patching `.gitignore`, Acton adds groups for:
 - local and global wallet/library overlay files
 - `.env` and mnemonic files
 
-## CONTRACT DISCOVERY
+## Contract Discovery
 
 When generating a new `Acton.toml`, contract discovery:
 
@@ -83,7 +83,7 @@ When generating a new `Acton.toml`, contract discovery:
 - derives the default display name from the file stem by splitting on `_` and
   `-`, then capitalizing each word
 
-## STANDARD LIBRARY
+## Standard Library
 
 `acton init` ensures that the bundled Tolk standard library is installed into
 `.acton/tolk-stdlib`.
@@ -99,21 +99,21 @@ If symlinks for global wallets or libraries cannot be created, Acton prints a
 warning and still completes initialization. This is relevant on systems where
 symlink creation is restricted.
 
-## SIDE EFFECTS
+## Side Effects
 
 `acton init` writes or patches local project files and may create local
 symlinks to global overlay files. It does not modify Git config. When it
 patches an existing `Acton.toml`, it rewrites the parsed manifest and may drop
 TOML comments or unknown keys; `.gitignore` patching remains append-only.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Initialization completed successfully, including no-op repeat runs.
 - `1`: Manifest parsing, stdlib installation, writing or patching project
   files, or another hard filesystem operation failed. Contract discovery skips
   unreadable/unparseable `.tolk` files, and overlay symlink failures only warn.
 
-## EXAMPLES
+## Examples
 
 1. Initialize Acton support in an existing repository:
 
@@ -133,7 +133,7 @@ TOML comments or unknown keys; `.gitignore` patching remains append-only.
    acton init
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help new`
 - `acton help doctor`

@@ -1,14 +1,14 @@
 # acton-new(1)
 
-## NAME
+## Name
 
 acton-new --- Create a new Acton project
 
-## SYNOPSIS
+## Synopsis
 
 `acton new` [_options_] _path_
 
-## DESCRIPTION
+## Description
 
 Create a new Acton project in the given directory.
 
@@ -28,7 +28,7 @@ changes, not only files created by the scaffold.
 
 The command does not create an initial commit.
 
-## OPTIONS
+## Options
 
 ### New Options
 
@@ -42,7 +42,7 @@ The command does not create an initial commit.
 
 {{> options-project }}
 
-## TEMPLATES
+## Templates
 
 ### empty
 
@@ -88,7 +88,7 @@ NFT collection and item template with:
 - CI workflow
 - optional `AGENTS.md`
 
-## INTERACTIVE MODE
+## Interactive Mode
 
 When enough information is missing and standard input/output are connected to a
 terminal, `acton new` uses a short default flow:
@@ -113,7 +113,7 @@ In non-interactive mode, optional features stay disabled unless their flags are
 passed explicitly. For CI or scripts, pass `--name`, `--description`,
 `--template`, and `--license` if you want to avoid prompts entirely.
 
-## FILES
+## Files
 
 The generated project always includes:
 
@@ -136,7 +136,7 @@ Depending on the selected template and options, Acton may also generate:
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
 
-## COUNTER APP LAYOUT
+## Counter App Layout
 
 When `acton new --template counter --app` is used, the project includes:
 
@@ -165,7 +165,7 @@ Typical commands in that generated app workspace:
 - `npm run typecheck` for TypeScript checking
 - `npm test` to run the bundled `acton test` command
 
-## SIDE EFFECTS
+## Side Effects
 
 `acton new` writes only inside the chosen target directory. When `_path_` is
 `.`, that means the current directory itself, and existing files with the same
@@ -178,13 +178,13 @@ contents.
 
 The command does not create a commit and does not modify parent directories.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The project scaffold was created successfully.
 - `1`: Project creation failed because the target path already existed, a
   prompt could not be completed, or a filesystem/setup step failed.
 
-## EXAMPLES
+## Examples
 
 1. Create a new project in `my-project`:
 
@@ -216,7 +216,7 @@ The command does not create a commit and does not modify parent directories.
    acton new . --template empty --name "My Project" --description "A TON blockchain project" --license MIT
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help init`
 - [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)

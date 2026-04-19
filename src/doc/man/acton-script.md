@@ -1,14 +1,14 @@
 # acton-script(1)
 
-## NAME
+## Name
 
 acton-script --- Execute a standalone Tolk script file
 
-## SYNOPSIS
+## Synopsis
 
 `acton script` [_options_] _path_ [_args_...]
 
-## DESCRIPTION
+## Description
 
 Execute a standalone Tolk script.
 
@@ -16,7 +16,7 @@ Scripts are useful for experimentation, deployment flows, blockchain queries,
 and one-off operational tasks. Unlike tests, scripts use a `main()` entry point
 and can send real transactions when `--net` is provided.
 
-## OPTIONS
+## Options
 
 ### Script Options
 
@@ -125,7 +125,7 @@ Show decoded message bodies in printed transaction trees when ABI is known.
 
 {{> options-project-resolved }}
 
-## SCRIPT MODEL
+## Script Model
 
 A Tolk script defines a `main()` function and runs as an isolated execution.
 
@@ -138,7 +138,7 @@ Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
 `global.wallets.toml` on name conflicts.
 
-## ARGUMENT FORWARDING
+## Argument Forwarding
 
 Arguments after `_path_` are passed through to the script runtime.
 
@@ -149,7 +149,7 @@ the script arguments:
 acton script scripts/query.tolk -- --net-like-value
 ```
 
-## SIDE EFFECTS
+## Side Effects
 
 `acton script` always compiles and executes the selected script. With
 `--net`, it can send real blockchain transactions; without `--net`, execution
@@ -158,13 +158,13 @@ stays local even when `--fork-net` is used.
 Executor debug logs are hidden by default. Re-run with `-v` when you need
 level-1 executor output such as `debug.dumpStack()`.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The script completed successfully, including successful broadcast flows.
 - `1`: Script execution failed, broadcast submission failed, or remote network
   access such as fork-state resolution failed.
 
-## SAFE EXECUTION ORDER
+## Safe Execution Order
 
 When a script can affect on-chain state, the usual safe sequence is:
 
@@ -173,7 +173,7 @@ When a script can affect on-chain state, the usual safe sequence is:
 3. `acton script <path>` without `--net`
 4. only then `acton script <path> --net testnet`
 
-## EXAMPLES
+## Examples
 
 1. Execute locally in the emulator:
 
@@ -205,7 +205,7 @@ When a script can affect on-chain state, the usual safe sequence is:
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help run`
 - [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting)

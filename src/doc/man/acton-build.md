@@ -1,14 +1,14 @@
 # acton-build(1)
 
-## NAME
+## Name
 
 acton-build --- Build all configured contracts or a selected contract
 
-## SYNOPSIS
+## Synopsis
 
 `acton build` [_options_] [_contract-name_]
 
-## DESCRIPTION
+## Description
 
 Compile contracts declared in `Acton.toml`, resolve their dependencies, and
 write build artifacts for the requested build set.
@@ -28,7 +28,7 @@ their code, includes them in dependency resolution, and skips recompilation.
 If the project has no `[contracts]` section or the section is empty, the
 command prints guidance and exits without compiling anything.
 
-## OPTIONS
+## Options
 
 ### Build Options
 
@@ -42,7 +42,7 @@ command prints guidance and exits without compiling anything.
 
 {{> options-project-build }}
 
-## CONFIGURATION
+## Configuration
 
 `acton build` reads contracts from `Acton.toml`:
 
@@ -67,7 +67,7 @@ CLI flags override config values for the current invocation.
 For dependency helpers, a per-dependency `depends[].path` still overrides the
 resolved `gen-dir` for that helper file.
 
-## OUTPUTS
+## Outputs
 
 Depending on command flags and project configuration, `acton build` may write:
 
@@ -81,7 +81,7 @@ Depending on command flags and project configuration, `acton build` may write:
 Existing output files at those paths are replaced with freshly generated
 artifacts.
 
-## BEST-EFFORT BEHAVIOR
+## Best-Effort Behavior
 
 Dependency-graph failures such as missing contracts or circular dependencies
 stop the command before the main compile loop starts, so those failures do not
@@ -100,19 +100,19 @@ later parent contract may then fail because its generated import is missing.
 When you build a specific `_contract-name_`, Acton limits the build set to that
 contract and its transitive dependencies.
 
-## SIDE EFFECTS
+## Side Effects
 
 `acton build` writes artifacts, cache entries, and optional graph output under
 the resolved project root. If one contract fails after earlier contracts were
 built successfully, the successful artifacts remain on disk.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The command completed without compilation failures.
 - `1`: The command failed because compilation, artifact writing, or dependency
   resolution failed for at least one requested contract.
 
-## EXAMPLES
+## Examples
 
 1. Build every configured contract:
 
@@ -150,7 +150,7 @@ built successfully, the successful artifacts remain on disk.
    acton build --info
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help wrapper`
 - [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)

@@ -1,14 +1,14 @@
 # acton-compile(1)
 
-## NAME
+## Name
 
 acton-compile --- Compile a Tolk file into TVM code and related artifacts
 
-## SYNOPSIS
+## Synopsis
 
 `acton compile` [_options_] _path_
 
-## DESCRIPTION
+## Description
 
 Compile a single `.tolk` source file with the Tolk compiler and print the
 resulting code information or write artifacts to files.
@@ -35,7 +35,7 @@ manifest-derived project settings.
 they do not rebase unrelated CLI paths. The input file and output paths stay
 relative to the current working directory unless you pass absolute paths.
 
-## OPTIONS
+## Options
 
 ### Compile Options
 
@@ -87,7 +87,7 @@ Clear the compilation cache before compiling.
 
 {{> options-project-resolved }}
 
-## OUTPUT
+## Output
 
 Without file-output flags, `acton compile` prints compilation information to
 standard output.
@@ -117,7 +117,7 @@ Depending on the selected options, Acton can also write:
 not emit a contract ABI for the input file, `--abi` does not create an ABI
 artifact.
 
-## CACHE
+## Cache
 
 Acton uses the same compilation cache as `acton build` and `acton test` to
 speed up repeated runs.
@@ -129,13 +129,13 @@ speed up repeated runs.
 - Standalone files that are not registered as project contracts still benefit
   from file-import-aware cache invalidation.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Compilation completed successfully, including runs that emitted warnings.
 - `1`: Compilation failed, cache setup failed, input validation failed, or an
   output artifact could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Compile a Tolk file and print the result:
 
@@ -167,7 +167,7 @@ speed up repeated runs.
    acton compile contracts/main.tolk --boc build/main.boc --source-map build/main.map.json
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help build`
 - `acton help disasm`

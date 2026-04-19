@@ -1,21 +1,21 @@
 # acton-library(1)
 
-## NAME
+## Name
 
 acton-library --- Manage on-chain TON libraries
 
-## SYNOPSIS
+## Synopsis
 
 `acton library` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Publish, fetch, inspect, and top up on-chain TON libraries.
 
 Library metadata can also be stored locally in `libraries.toml` or globally in
 `global.libraries.toml` for later inspection and maintenance.
 
-## LIFECYCLE
+## Lifecycle
 
 A typical library workflow is:
 
@@ -25,7 +25,7 @@ A typical library workflow is:
 4. `fetch` the code again for inspection or backup
 5. `topup` the library account when more storage time is needed
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton library publish
 
@@ -202,15 +202,15 @@ Skip confirmation prompts.
 After a successful top-up, Acton updates `last_topup_timestamp` in the stored
 library metadata.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-resolved }}
 
-## RESOLUTION RULES
+## Resolution Rules
 
 - library metadata is merged from `global.libraries.toml` first and then local
   `libraries.toml`
@@ -220,14 +220,14 @@ library metadata.
 - if neither `--local` nor `--global` is passed to `publish`, Acton prompts for
   the destination file
 
-## AMOUNT ESTIMATION
+## Amount Estimation
 
 For `publish` and `topup`, `--duration` is used to estimate the required TON
 amount from the library size and storage duration.
 
 If `--amount` is passed, it overrides that estimate completely.
 
-## METADATA FILES
+## Metadata Files
 
 Saved library metadata typically includes:
 
@@ -241,7 +241,7 @@ Saved library metadata typically includes:
 - last top-up timestamp
 - code size in bits and cells
 
-## FETCH OUTPUT
+## Fetch Output
 
 - without `--output`, fetched code is printed to stdout
 - with `--output path.boc`, Acton writes binary BoC
@@ -251,14 +251,14 @@ Saved library metadata typically includes:
 - if both `--json` and `--disasm` are passed, disassembly text takes
   precedence over JSON on successful runs
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected library subcommand completed successfully.
 - `1`: Contract or wallet resolution failed, chain access failed, metadata
   could not be written, or publish/top-up transaction preparation or submission
   failed.
 
-## EXAMPLES
+## Examples
 
 1. Publish a contract as a library:
 
@@ -290,6 +290,6 @@ Saved library metadata typically includes:
    acton library fetch <HASH> --output build/math-lib.boc
    ```
 
-## SEE ALSO
+## See Also
 
 - [Libraries guide](https://ton-blockchain.github.io/acton/docs/advanced/libraries)

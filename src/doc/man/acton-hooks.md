@@ -1,14 +1,14 @@
 # acton-hooks(1)
 
-## NAME
+## Name
 
 acton-hooks --- Scaffold and manage project-local Git hooks
 
-## SYNOPSIS
+## Synopsis
 
 `acton hooks` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Manage project-local Git hooks through Git's `core.hooksPath` mechanism.
 
@@ -16,7 +16,7 @@ Acton expects hooks to live in `.githooks/` inside the resolved project root.
 The `hooks` command can create the scaffold, install the Git config override,
 check whether it is active, and remove it again.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton hooks new
 
@@ -113,22 +113,22 @@ are not installed.
 
 On success, Acton reports that Git hooks were uninstalled.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected hooks subcommand completed successfully, including no-op
   uninstall when no local override is present.
 - `1`: The project was not a local Git repository, hooks were already
   configured in an incompatible way, or Git config or filesystem updates failed.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-resolved }}
 
-## RECOMMENDED WORKFLOW
+## Recommended Workflow
 
 ```bash
 acton hooks new --template default
@@ -143,7 +143,7 @@ acton hooks uninstall
 acton hooks install
 ```
 
-## SEE ALSO
+## See Also
 
 - `acton help new`
 - [Hooks command guide](https://ton-blockchain.github.io/acton/docs/commands/hooks)

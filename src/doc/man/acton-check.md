@@ -1,14 +1,14 @@
 # acton-check(1)
 
-## NAME
+## Name
 
 acton-check --- Lint Tolk contracts and files
 
-## SYNOPSIS
+## Synopsis
 
 `acton check` [_options_] [_target_]
 
-## DESCRIPTION
+## Description
 
 Run the Tolk linter on the whole project, a specific contract name from
 `Acton.toml`, or a single `.tolk` file.
@@ -17,7 +17,7 @@ By default, Acton checks contracts from `Acton.toml` together with workspace
 test files and standalone script roots that define `main()`. The command also
 supports machine-readable output formats and rule explanations.
 
-## OPTIONS
+## Options
 
 ### Check Options
 
@@ -61,7 +61,7 @@ Print an explanation for a lint rule.
 
 {{> options-project-resolved }}
 
-## BEHAVIOR
+## Behavior
 
 - `--list-lint-rules` is a hidden machine-readable helper that prints JSON
   entries with rule `name` and markdown `description`
@@ -109,14 +109,14 @@ Print an explanation for a lint rule.
 - `--fix` can still exit with status `1` when unfixed diagnostics or warning
   threshold violations remain after rewriting
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: No lint errors were reported, warning thresholds were respected, and any
   requested autofixes completed successfully.
 - `1`: Lint errors were found, warning limits were exceeded, autofix failed, or
   configuration/target resolution failed.
 
-## EXAMPLES
+## Examples
 
 1. Check the whole project:
 
@@ -166,7 +166,7 @@ Print an explanation for a lint rule.
    acton check --fix
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help fmt`
 - [Linting guide](https://ton-blockchain.github.io/acton/docs/linting)

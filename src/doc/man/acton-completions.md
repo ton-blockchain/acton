@@ -1,14 +1,14 @@
 # acton-completions(1)
 
-## NAME
+## Name
 
 acton-completions --- Generate static shell completion scripts
 
-## SYNOPSIS
+## Synopsis
 
 `acton completions` [_options_] _shell_
 
-## DESCRIPTION
+## Description
 
 Generate a static completion script for the selected shell.
 
@@ -16,14 +16,14 @@ Acton also supports dynamic completions through the `COMPLETE=<shell> acton`
 mechanism. Dynamic completions are usually more powerful because they can use
 project context such as contract and script names.
 
-## QUICK START
+## Quick Start
 
 - for dynamic completions, prefer `COMPLETE=<shell> acton`
 - for a static script without editing shell startup files yet, run
   `acton completions <shell>` and inspect the output first
 - regenerate static completion files after upgrading Acton
 
-## OPTIONS
+## Options
 
 ### Completion Options
 
@@ -45,7 +45,7 @@ Possible values: `bash`, `elvish`, `fish`, `powershell`, `zsh`
 
 {{> options-project-pass-through }}
 
-## DYNAMIC COMPLETIONS
+## Dynamic Completions
 
 Dynamic completions are recommended when your shell supports them.
 
@@ -73,7 +73,7 @@ Add this to `~/.config/fish/config.fish`:
 COMPLETE=fish acton | source
 ```
 
-## STATIC INSTALLATION
+## Static Installation
 
 `acton completions` writes the completion script to standard output. Typical
 installation patterns include:
@@ -143,7 +143,7 @@ Then load it from `~/.elvish/rc.elv`:
 use completions/acton
 ```
 
-## VERIFYING INSTALLATION
+## Verifying Installation
 
 After installation, try:
 
@@ -154,7 +154,7 @@ acton test --<TAB>
 
 You should see command names and flag suggestions from the selected shell.
 
-## TROUBLESHOOTING
+## Troubleshooting
 
 - if static completions show old commands, regenerate them after updating Acton
 - Zsh usually needs `compinit` after changing completion locations
@@ -163,12 +163,12 @@ You should see command names and flag suggestions from the selected shell.
 - if PowerShell completions do not persist, verify that the generated script is
   loaded from `$PROFILE`
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The completion script was generated successfully.
 - `1`: The shell value was unsupported or output could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Generate a static Zsh script:
 
@@ -188,6 +188,6 @@ You should see command names and flag suggestions from the selected shell.
    acton completions zsh | head
    ```
 
-## SEE ALSO
+## See Also
 
 - [Shell completions guide](https://ton-blockchain.github.io/acton/docs/commands/shell-completions)

@@ -1,14 +1,14 @@
 # acton-disasm(1)
 
-## NAME
+## Name
 
 acton-disasm --- Disassemble TVM bytecode into human-readable TASM
 
-## SYNOPSIS
+## Synopsis
 
 `acton disasm` [_options_] [_boc-file_]
 
-## DESCRIPTION
+## Description
 
 Disassemble compiled TVM bytecode from a file, a literal BoC string, or a live
 contract address.
@@ -17,7 +17,7 @@ This command is useful for debugging compiler output, inspecting deployed code,
 following library references, and correlating bytecode with Tolk source via
 source maps.
 
-## OPTIONS
+## Options
 
 ### Disassembly Options
 
@@ -90,7 +90,7 @@ This is not a general recursive library-follow mode.
 
 {{> options-project-resolved }}
 
-## BLOCKCHAIN LOOKUPS
+## Blockchain Lookups
 
 When `--address` is used, Acton fetches code from the selected network.
 
@@ -105,7 +105,7 @@ When `--follow-libraries` is used with a local file or `--string`, Acton uses
 the explicit `--net` if provided; otherwise library fetches default to
 testnet.
 
-## INPUT PRECEDENCE
+## Input Precedence
 
 - `BOC_FILE` and `--string` are mutually exclusive
 - `--address` is used only when neither a file nor `--string` is provided
@@ -116,7 +116,7 @@ testnet.
 - if library lookup fails, Acton warns and disassembles the original code
   instead; this still exits successfully
 
-## SOURCE MAPS
+## Source Maps
 
 If you compiled a contract with `acton compile --source-map`, you can pass that
 source map JSON here to annotate the disassembly with original Tolk locations.
@@ -124,14 +124,14 @@ source map JSON here to annotate the disassembly with original Tolk locations.
 `--source-map` only affects annotations in the output. It does not change which
 BoC is disassembled.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Disassembly completed successfully, including runs with unresolved
   library references that were left as warnings.
 - `1`: BoC input was invalid, a blockchain fetch failed, source-map loading
   failed, or the output file could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Disassemble a local BoC file:
 
@@ -175,7 +175,7 @@ BoC is disassembled.
    acton disasm library-ref.boc --follow-libraries --net custom:staging
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help compile`
 - [Disassembly command guide](https://ton-blockchain.github.io/acton/docs/commands/disasm)

@@ -1,14 +1,14 @@
 # acton-help(1)
 
-## NAME
+## Name
 
 acton-help --- Show root help or detailed help for a specific top-level command
 
-## SYNOPSIS
+## Synopsis
 
 `acton help` [_options_] [_command_]
 
-## DESCRIPTION
+## Description
 
 Show help for the Acton CLI.
 
@@ -38,7 +38,7 @@ example `acton wallet list --help`.
 If the command name is unknown, Acton reports an error and may suggest a
 similar command name.
 
-## OPTIONS
+## Options
 
 ### Help Options
 
@@ -62,7 +62,7 @@ Nested command paths are not currently supported.
 
 {{> options-project-pass-through }}
 
-## PAGER AND FALLBACK
+## Pager And Fallback
 
 - when output is a terminal, `acton help <command>` prefers rendering through
   `man`, then `less`, then `more`
@@ -73,12 +73,12 @@ Nested command paths are not currently supported.
   clap long help, which is typically shorter and flag-focused
 - `acton help` itself does not require a project to exist
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Help was printed successfully.
 - `1`: The requested command was unknown or help rendering failed.
 
-## EXAMPLES
+## Examples
 
 1. Show the root command overview:
 
@@ -116,7 +116,7 @@ Nested command paths are not currently supported.
    acton help build | rg "EXIT STATUS|EXAMPLES"
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton --help`
 - `acton help new`

@@ -1,14 +1,14 @@
 # acton-verify(1)
 
-## NAME
+## Name
 
 acton-verify --- Verify contract source code on the TON verifier service
 
-## SYNOPSIS
+## Synopsis
 
 `acton verify` [_options_] [_contract-name_]
 
-## DESCRIPTION
+## Description
 
 Verify that a deployed contract address matches the local source code for a
 contract from your project.
@@ -17,7 +17,7 @@ The verification flow compiles local sources, prepares data for the verifier
 backend, collects the required signatures, and optionally submits the final
 verification transaction to the blockchain.
 
-## OPTIONS
+## Options
 
 ### Verify Options
 
@@ -80,7 +80,7 @@ Defaults to `testnet`.
 
 {{> options-project-resolved }}
 
-## PROCESS
+## Process
 
 Verification usually consists of:
 
@@ -95,7 +95,7 @@ verification service. The final deployed-code match is established by the
 verifier flow itself; `acton verify` does not first perform a separate local
 on-chain code-hash comparison against the target address before upload.
 
-## PREREQUISITES
+## Prerequisites
 
 - a `.tolk` contract source in the current project
 - a supported verifier network: `testnet` or `mainnet`
@@ -103,7 +103,7 @@ on-chain code-hash comparison against the target address before upload.
 - a configured wallet, funded when not using `--dry-run`
 - reproducible compiler settings that match the deployed contract
 
-## CONTRACT AND WALLET SELECTION
+## Contract And Wallet Selection
 
 - if `_contract-name_` is omitted and exactly one contract is configured, Acton
   selects it automatically
@@ -112,7 +112,7 @@ on-chain code-hash comparison against the target address before upload.
   it automatically
 - if multiple wallets are configured, Acton prompts for the wallet
 
-## REQUIREMENTS AND LIMITATIONS
+## Requirements And Limitations
 
 - only `.tolk` sources can be verified
 - precompiled `.boc` contracts cannot be verified
@@ -121,7 +121,7 @@ on-chain code-hash comparison against the target address before upload.
 - if a contract with the same code hash is already verified, the backend may
   skip the final transaction
 
-## COST AND BACKEND NOTES
+## Cost And Backend Notes
 
 - when `--dry-run` is not used, the final verification transaction sends
   `0.1 TON`
@@ -129,7 +129,7 @@ on-chain code-hash comparison against the target address before upload.
   exits successfully without sending another transaction
 - on successful verification, Acton prints a verifier link for the contract
 
-## ENVIRONMENT OVERRIDES
+## Environment Overrides
 
 The verification flow also supports backend/debug environment overrides:
 
@@ -165,13 +165,13 @@ ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
 ```
 
-## DRY RUN
+## Dry Run
 
 `--dry-run` still compiles the contract, uploads sources to the verifier
 backend, and collects the required signatures. It skips only the final
 blockchain transaction.
 
-## RETRIES AND FAILURE HINTS
+## Retries And Failure Hints
 
 - source upload is attempted up to 8 times total (initial try plus up to
   7 retries) for transient transport failures and backend 5xx responses
@@ -181,7 +181,7 @@ blockchain transaction.
 - backend problems can also be narrowed down by pointing
   `ACTON_VERIFY_BACKEND` at a specific endpoint
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Verification completed successfully, including successful dry runs and
   flows where the backend decides that no final transaction is needed.
@@ -189,7 +189,7 @@ blockchain transaction.
   enough signatures could be collected, wallet resolution failed, or the final
   blockchain transaction could not be sent.
 
-## EXAMPLES
+## Examples
 
 1. Verify on testnet:
 
@@ -221,7 +221,7 @@ blockchain transaction.
    acton verify Counter --address EQDt7LL... --compiler-version 1.2.0
    ```
 
-## SEE ALSO
+## See Also
 
 - [Contract verification guide](https://ton-blockchain.github.io/acton/docs/contract-verification)
 - [Wallet setup guide](https://ton-blockchain.github.io/acton/docs/setup-wallets)

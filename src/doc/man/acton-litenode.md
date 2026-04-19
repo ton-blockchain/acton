@@ -1,19 +1,19 @@
 # acton-litenode(1)
 
-## NAME
+## Name
 
 acton-litenode --- Manage Acton's lightweight local TON node
 
-## SYNOPSIS
+## Synopsis
 
 `acton litenode` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Manage the local development node used for TON-compatible local execution,
 forked-state development, and faucet-based local funding.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton litenode start
 
@@ -93,7 +93,7 @@ LiteNode server port.
 
 {{/options}}
 
-## CONFIGURATION
+## Configuration
 
 You can store defaults in `Acton.toml`:
 
@@ -108,7 +108,7 @@ rate-limit = 1
 
 CLI flags override config values for the current invocation.
 
-## RUNTIME MODEL
+## Runtime Model
 
 - fork mode allows local development against remote chain state
 - `acton litenode start` runs in the foreground until the process is stopped
@@ -128,7 +128,7 @@ CLI flags override config values for the current invocation.
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
 - `--dump-state` writes a snapshot during graceful shutdown
 
-## PERSISTENCE
+## Persistence
 
 - `--db-path` enables persistent SQLite-backed node state across runs
 - `--load-state` initializes state from a JSON snapshot and cannot be combined
@@ -136,21 +136,21 @@ CLI flags override config values for the current invocation.
 - `--dump-state` exports a JSON snapshot on shutdown
 - when `--db-path` is not used, node state is ephemeral unless loaded or dumped
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected LiteNode subcommand completed successfully.
 - `1`: Startup failed because port binding, state loading, remote fork
   initialization, or faucet handling failed.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-resolved }}
 
-## EXAMPLES
+## Examples
 
 1. Start with defaults:
 
@@ -182,7 +182,7 @@ CLI flags override config values for the current invocation.
    acton litenode start --accounts deployer,user --db-path build/localnet.db
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help wallet`
 - [Local development node guide](https://ton-blockchain.github.io/acton/docs/local-development-node)

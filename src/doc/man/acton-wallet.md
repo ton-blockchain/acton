@@ -1,14 +1,14 @@
 # acton-wallet(1)
 
-## NAME
+## Name
 
 acton-wallet --- Create, import, inspect, and use development wallets
 
-## SYNOPSIS
+## Synopsis
 
 `acton wallet` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Manage wallets used for Acton development workflows.
 
@@ -19,7 +19,7 @@ bodies, request faucet funds, and remove stored wallet entries.
 Wallets created by this workflow are intended for development and testing. The
 default network context is testnet.
 
-## COMMON LIFECYCLE
+## Common Lifecycle
 
 The wallet workflow is not limited to `wallet new`.
 
@@ -39,7 +39,7 @@ flows such as `wallet list --balance` and the interactive post-airdrop balance
 confirmation after `wallet new`. `wallet list --balance` also accepts
 `--api-key`.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton wallet new
 
@@ -277,7 +277,7 @@ Emit JSON output.
 If the wallet uses keyring storage, Acton also removes the mnemonic from the
 secure store.
 
-## RESOLUTION RULES
+## Resolution Rules
 
 - wallet definitions are merged from `global.wallets.toml` first and then
   local `wallets.toml`
@@ -287,7 +287,7 @@ secure store.
 - otherwise Acton prompts on a TTY; in non-interactive contexts, provide the
   wallet name explicitly
 
-## NEW AND IMPORT WORKFLOW
+## New And Import Workflow
 
 `wallet new` and `wallet import` share the same storage choices and most of the
 same prompts.
@@ -312,7 +312,7 @@ After an interactive auto-airdrop succeeds, Acton briefly waits for the balance
 to appear on testnet and lets you skip that wait by pressing `Enter`, unless
 `--no-wait-airdrop` is passed.
 
-## LISTING, SIGNING, AND EXPORT
+## Listing, Signing, And Export
 
 - `wallet list --balance` resolves balances through TonCenter and also respects
   the `TONCENTER_API_KEY` environment variable; the same environment fallback
@@ -324,7 +324,7 @@ to appear on testnet and lets you skip that wait by pressing `Enter`, unless
 - `wallet export-mnemonic` is interactive-only and asks for confirmation before
   showing the mnemonic
 
-## AIRDROP DETAILS
+## Airdrop Details
 
 For `wallet airdrop`, the selected backend depends on `--net`.
 
@@ -343,7 +343,7 @@ When `--json` is used, successful responses include the wallet address and may
 also include PoW metadata such as difficulty, nonce, and solve time for the
 testnet flow.
 
-## REMOVAL NOTES
+## Removal Notes
 
 - if both local and global wallets share the same name, local config takes
   precedence when removing
@@ -351,7 +351,7 @@ testnet flow.
 - removing a wallet from config does not delete external files or environment
   variables referenced through other mnemonic sources
 
-## STORAGE
+## Storage
 
 Wallets can be stored:
 
@@ -364,28 +364,28 @@ Wallets can be stored:
 For local wallets, keyring IDs usually include a project prefix. For global
 wallets, the keyring ID usually matches the wallet name.
 
-## SECURITY
+## Security
 
 - secure keyring storage is recommended when available
 - plain-text mnemonic storage is for development only
 - do not commit wallet files with real secrets to version control
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected wallet subcommand completed successfully.
 - `1`: Input validation failed, a required wallet could not be resolved, a
   prompt could not run non-interactively, secure storage failed, or a network
   call such as balance lookup or faucet funding failed.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-resolved }}
 
-## EXAMPLES
+## Examples
 
 1. Create a local deployer wallet:
 
@@ -418,7 +418,7 @@ wallets, the keyring ID usually matches the wallet name.
    cat body.boc.base64 | acton wallet sign deployer
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help litenode`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
