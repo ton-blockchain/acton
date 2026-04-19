@@ -1787,7 +1787,7 @@ fn run_get_method_impl(
     let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&Some(code))
+        .result_for_code(&Some(code.clone()))
         .map(|(_, result)| result);
     // Remote/forked contracts may have no local debug info. We still run the live
     // executor, but the child replayer will then fall back to a synthetic source map.
@@ -1909,6 +1909,7 @@ fn run_get_method_impl(
 
                 let location =
                     retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc);
+                let build = ctx.build.build_cache.result_for_code(&Some(code));
 
                 *ctx.asserts.assert_failure =
                     Some(AssertFailure::GetMethod(GetMethodAssertFailure {
@@ -1917,6 +1918,10 @@ fn run_get_method_impl(
                         suggested_name,
                         vm_log: result.vm_log,
                         source_map,
+                        abi: build.as_ref().and_then(|(_, result)| result.abi.clone()),
+                        compiler_abi: build
+                            .as_ref()
+                            .and_then(|(_, result)| result.compiler_abi.clone()),
                         caller_trace: None,
                         location,
                     }));
@@ -2442,15 +2447,15 @@ fn register_localnet_compiler_abis(
 
     anyhow::ensure!(
         status.is_success(),
-        "LiteNode compiler ABI registration failed with status {status}: {body}"
+        "Localnet compiler ABI registration failed with status {status}: {body}"
     );
 
     let response_json: serde_json::Value = serde_json::from_str(&body).with_context(|| {
-        format!("LiteNode compiler ABI registration returned invalid JSON: {body}")
+        format!("Localnet compiler ABI registration returned invalid JSON: {body}")
     })?;
     anyhow::ensure!(
         response_json.get("ok").and_then(serde_json::Value::as_bool) == Some(true),
-        "LiteNode compiler ABI registration failed: {}",
+        "Localnet compiler ABI registration failed: {}",
         response_json
             .get("error")
             .and_then(serde_json::Value::as_str)

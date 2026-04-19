@@ -60,6 +60,8 @@ pub struct GetMethodAssertFailure {
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
     pub source_map: Arc<TolkSourceMap>,
+    pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }

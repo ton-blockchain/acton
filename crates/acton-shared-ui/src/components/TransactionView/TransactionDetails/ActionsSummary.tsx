@@ -178,7 +178,9 @@ const renderActionDetails = (
   onContractClick?: (address: string) => void,
 ): React.JSX.Element | undefined => {
   const execution = getActionExecutionMeta(executorAction)
-  const contractAbi = contracts.get(contractAddress)?.abi
+  const contract = contracts.get(contractAddress)
+  const contractAbi = contract?.abi
+  const contractCompilerAbi = contract?.compilerAbi
 
   switch (action.type) {
     case "sendMsg": {
@@ -281,7 +283,12 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    compilerAbi={contractCompilerAbi}
+                    phase="action"
+                  />
                 </span>
               </div>
             )}
@@ -337,7 +344,12 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    compilerAbi={contractCompilerAbi}
+                    phase="action"
+                  />
                 </span>
               </div>
             )}

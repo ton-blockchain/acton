@@ -1086,7 +1086,6 @@ fn run_file_tests(
     let mut skipped = 0;
     let mut todo = 0;
     let mappings = runner.acton_config.mappings();
-
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
         let mut test_report = TestReport {

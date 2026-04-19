@@ -5,7 +5,11 @@ import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import type {BackendContractInfo} from "@/types"
 import type {ContractData, ParsedValue, TransactionInfo} from "@/types/transaction"
 import {fmt} from "@/index"
-import {computeSendMode, getTransactionOpcode, resolveTransactionOpcodeName} from "@/utils/transaction"
+import {
+  computeSendMode,
+  getTransactionOpcode,
+  resolveTransactionOpcodeName,
+} from "@/utils/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
@@ -385,7 +389,11 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
+                  <ExitCodeChip
+                    exitCode={computePhase.exitCode}
+                    abi={targetContract?.abi}
+                    compilerAbi={targetContract?.compilerAbi}
+                  />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -428,6 +436,7 @@ export function TransactionDetails({
                   <ExitCodeChip
                     exitCode={actionPhase.resultCode}
                     abi={targetContract?.abi}
+                    compilerAbi={targetContract?.compilerAbi}
                     phase="action"
                   />
                 </div>

@@ -982,6 +982,37 @@ fn test_script_custom_exit_code() {
 }
 
 #[test]
+fn test_script_custom_exit_code_from_abi_shows_single_name() {
+    let project = ProjectBuilder::new("script-exit-abi")
+        .script_file(
+            "exit_abi",
+            r#"
+            import "../../lib/io"
+
+            enum Errors {
+                AbiFailure = 709
+            }
+
+            fun main() {
+                println("Exiting with code 709");
+                throw Errors.AbiFailure
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_abi.tolk")
+        .run()
+        .code(1)
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_success_exit_code() {
     let project = ProjectBuilder::new("script-success")
         .script_file(
@@ -1061,6 +1092,45 @@ fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
         .code(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name() {
+    let project = ProjectBuilder::new("script-exit-abi-backtrace")
+        .script_file(
+            "exit_abi_backtrace",
+            r#"
+            import "../../lib/io"
+
+            enum Errors {
+                AbiFailure = 709
+            }
+
+            fun explode() {
+                throw Errors.AbiFailure
+            }
+
+            fun nested() {
+                explode();
+            }
+
+            fun main() {
+                nested();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_abi_backtrace.tolk")
+        .with_backtrace("full")
+        .run()
+        .code(1)
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
         );
 }
 

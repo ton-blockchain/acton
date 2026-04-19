@@ -219,6 +219,7 @@ fn run_script_file(
 struct ScriptResult {
     result: GetMethodResult,
     source_map: Arc<TolkSourceMap>,
+    compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -346,14 +347,21 @@ fn execute_script(
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
         let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-        replayer.set_compiler_abi(compiler_abi);
+        replayer.set_compiler_abi(compiler_abi.clone());
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);
         ctx.debug.process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
-        print_script_result(&ctx, ScriptResult { result, source_map });
+        print_script_result(
+            &ctx,
+            ScriptResult {
+                result,
+                source_map,
+                compiler_abi,
+            },
+        );
         return Ok(());
     }
 
@@ -361,7 +369,14 @@ fn execute_script(
     ffi::register(&mut executor, &mut ctx);
     let result = executor.run_get_method(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
 
-    print_script_result(&ctx, ScriptResult { result, source_map });
+    print_script_result(
+        &ctx,
+        ScriptResult {
+            result,
+            source_map,
+            compiler_abi,
+        },
+    );
     Ok(())
 }
 
@@ -442,6 +457,19 @@ fn format_nonzero_script_exit_code_details<'a>(
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
     let exit_code_info = retrace::find_exception_info(&result.vm_log, &script_result.source_map);
+    let custom_exit_code_info = if matches!(
+        exit_code,
+        CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT
+            | CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE
+    ) {
+        None
+    } else {
+        FormatterContext::find_custom_exit_code_info(
+            exit_code,
+            Some(ctx.env.abi.as_ref()),
+            script_result.compiler_abi.as_deref(),
+        )
+    };
 
     if let Some(info) = &exit_code_info {
         writeln!(
@@ -459,7 +487,7 @@ fn format_nonzero_script_exit_code_details<'a>(
             }
         }
 
-        if !info.description.is_empty() {
+        if !info.description.is_empty() && custom_exit_code_info.is_none() {
             writeln!(details, "Description: {}", info.description.dimmed()).ok();
         }
     }
@@ -472,6 +500,12 @@ fn format_nonzero_script_exit_code_details<'a>(
             writeln!(details, "Description: {}", info.description.dimmed()).ok();
         }
         writeln!(details, "Phase: {}", info.phase.dimmed()).ok();
+    } else if let Some(info) = custom_exit_code_info {
+        writeln!(details, "Description: {}", info.description.dimmed()).ok();
+        if info.symbolic_name != info.description {
+            writeln!(details, "Error: {}", info.symbolic_name.dimmed()).ok();
+        }
+        writeln!(details, "Phase: {}", "Compute phase".dimmed()).ok();
     }
 
     if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {

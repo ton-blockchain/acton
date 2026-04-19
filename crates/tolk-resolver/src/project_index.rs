@@ -6,7 +6,7 @@
 use crate::file_db::FileDb;
 use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -165,15 +165,20 @@ impl ProjectIndex {
         let mut queue = VecDeque::new();
         queue.push_back(file_id);
 
+        let mut visited = FxHashSet::default();
+        visited.insert(file_id);
         let mut result = vec![file_id];
         while let Some(file_id) = queue.pop_front() {
             let Some(imports) = self.imports.get(&file_id) else {
                 continue;
             };
 
-            let imported_files = imports.iter().filter_map(|import| import.target);
-            result.extend(imported_files.clone());
-            queue.extend(imported_files);
+            for imported_file in imports.iter().filter_map(|import| import.target) {
+                if visited.insert(imported_file) {
+                    result.push(imported_file);
+                    queue.push_back(imported_file);
+                }
+            }
         }
 
         result

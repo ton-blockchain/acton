@@ -104,9 +104,47 @@ export interface AbiMessage {
   readonly opcode: number | undefined
 }
 
+export interface AbiExitCode {
+  readonly constantName: string
+  readonly value: number
+}
+
 export interface Abi {
   readonly messages: AbiMessage[]
-  readonly exitCodes?: Record<number, string>
+  readonly exitCodes?: readonly AbiExitCode[]
+}
+
+export interface CompilerAbiThrownError {
+  readonly name: string
+  readonly err_code: number
+}
+
+export interface CompilerAbiConstant {
+  readonly name: string
+  readonly description?: string
+}
+
+export interface CompilerAbiEnumMember {
+  readonly name: string
+  readonly description?: string
+}
+
+export type CompilerAbiDeclaration =
+  | {
+      readonly kind: "enum"
+      readonly name: string
+      readonly members: readonly CompilerAbiEnumMember[]
+    }
+  | {
+      readonly kind: string
+      readonly name?: string
+      readonly members?: readonly CompilerAbiEnumMember[]
+    }
+
+export interface CompilerAbi {
+  readonly thrown_errors?: readonly CompilerAbiThrownError[]
+  readonly constants?: readonly CompilerAbiConstant[]
+  readonly declarations?: readonly CompilerAbiDeclaration[]
 }
 
 export interface BackendContractInfo {
@@ -114,7 +152,7 @@ export interface BackendContractInfo {
   readonly code_boc64: string
   readonly source_map: unknown
   readonly abi?: Abi
-  readonly compiler_abi?: unknown
+  readonly compiler_abi?: CompilerAbi
 }
 
 export * from "./transaction"

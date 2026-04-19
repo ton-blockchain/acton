@@ -432,6 +432,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
         address: address,
         letter: String.fromCodePoint(65 + (map.size % 26)),
         abi: backendContract?.abi,
+        compilerAbi: backendContract?.compiler_abi,
       } as ContractData)
     }
 

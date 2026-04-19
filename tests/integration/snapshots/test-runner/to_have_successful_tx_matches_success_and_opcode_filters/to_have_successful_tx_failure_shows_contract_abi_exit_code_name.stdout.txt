@@ -1,0 +1,26 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/tx_expect.test.tolk (1 test)
+  ✗ ae successful tx failure shows abi [EXIT_STATUS] [TIME]
+    └─ Error: expect(actual).toHaveSuccessfulTx(expected)
+        N/A -> sender A
+        └── Ping 0.5 TON -> harness B                                                   gas=583 exit_code=701 aborted
+            └── Compute phase failed: ERR_FAIL
+        
+        Cannot find transaction from sender A EQAXTu..1D6wLK to harness B EQAaaK..1fnTtj
+        with:
+          opcode=0xae110001 Ping
+          success=true
+          exit_code=0
+      └─ at tests/tx_expect.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

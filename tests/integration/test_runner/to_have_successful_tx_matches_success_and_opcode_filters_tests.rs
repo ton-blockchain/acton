@@ -323,6 +323,25 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
 }
 
 #[test]
+fn to_have_successful_tx_failure_shows_contract_abi_exit_code_name() {
+    run_failure_case(
+        "ae-stdlib-successful-tx-failure-shows-abi-exit-code",
+        r"
+get fun `test ae successful tx failure shows abi exit code`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 10);
+
+    expect(res).toHaveSuccessfulTx<Ping>({
+        from: sender.address,
+        to: harness.address,
+    });
+}
+",
+        "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_successful_tx_failure_shows_contract_abi_exit_code_name.stdout.txt",
+    );
+}
+
+#[test]
 fn deploy_filter_distinguishes_deploy_and_non_deploy_transactions() {
     run_success_case(
         "ae-stdlib-deploy-filter",

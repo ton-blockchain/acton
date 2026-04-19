@@ -64,6 +64,12 @@ enum FormattedExtraInfo {
     Annotation(String),
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct AbiExitCodeInfo {
+    pub symbolic_name: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum MapScalarType {
     Int { bits: u16, signed: bool },
@@ -143,6 +149,96 @@ impl<'a> FormatterContext<'a> {
             network: ctx.network.clone(),
             api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
+    }
+
+    fn compiler_abi_symbol_description(
+        compiler_abi: &CompilerContractABI,
+        symbol: &str,
+    ) -> Option<String> {
+        if let Some((enum_name, member_name)) = symbol.rsplit_once('.')
+            && let Some(description) = compiler_abi
+                .declarations
+                .iter()
+                .find_map(|declaration| match declaration {
+                    tolkc::abi::ABIDeclaration::Enum { name, members, .. } if name == enum_name => {
+                        members
+                            .iter()
+                            .find(|member| member.name == member_name)
+                            .map(|member| member.description.as_str())
+                    }
+                    _ => None,
+                })
+                .filter(|description| !description.is_empty())
+        {
+            return Some(description.to_owned());
+        }
+
+        compiler_abi
+            .constants
+            .iter()
+            .find(|constant| constant.name == symbol && !constant.description.is_empty())
+            .map(|constant| constant.description.clone())
+    }
+
+    fn compiler_abi_symbol_name(compiler_abi: &CompilerContractABI, code: i32) -> Option<String> {
+        compiler_abi
+            .thrown_errors
+            .iter()
+            .find(|error| error.err_code == code && !error.name.is_empty())
+            .map(|thrown| thrown.name.clone())
+    }
+
+    #[must_use]
+    pub(crate) fn find_custom_exit_code_info(
+        code: i32,
+        abi: Option<&ContractAbi>,
+        compiler_abi: Option<&CompilerContractABI>,
+    ) -> Option<AbiExitCodeInfo> {
+        if let Some(compiler_abi) = compiler_abi
+            && let Some(symbolic_name) = Self::compiler_abi_symbol_name(compiler_abi, code)
+        {
+            let description = Self::compiler_abi_symbol_description(compiler_abi, &symbolic_name)
+                .unwrap_or_else(|| symbolic_name.clone());
+            return Some(AbiExitCodeInfo {
+                symbolic_name,
+                description,
+            });
+        }
+
+        let exit_code = abi?.exit_codes.iter().find(|item| item.value == code)?;
+        let symbolic_name = exit_code.constant_name.clone();
+        let description = compiler_abi
+            .and_then(|abi| Self::compiler_abi_symbol_description(abi, &symbolic_name))
+            .unwrap_or_else(|| symbolic_name.clone());
+
+        Some(AbiExitCodeInfo {
+            symbolic_name,
+            description,
+        })
+    }
+
+    fn find_tx_custom_exit_code_info(
+        &self,
+        tx: &Transaction,
+        code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        let code_cell = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
+        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
+        Self::find_custom_exit_code_info(code, build.abi.as_deref(), build.compiler_abi.as_deref())
+    }
+
+    fn find_code_custom_exit_code_info(
+        &self,
+        code_boc64: &str,
+        exit_code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        let code_cell = Boc::decode_base64(code_boc64).ok();
+        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
+        Self::find_custom_exit_code_info(
+            exit_code,
+            build.abi.as_deref(),
+            build.compiler_abi.as_deref(),
+        )
     }
 
     #[must_use]
@@ -1406,6 +1502,11 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "Compute phase failed: {}",
                 info.description.to_string().yellow()
+            )));
+        } else if let Some(info) = self.find_tx_custom_exit_code_info(tx, compute.exit_code) {
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
+                "Compute phase failed: {}",
+                info.description.yellow()
             )));
         }
 
@@ -2952,6 +3053,19 @@ impl FormatterContext<'_> {
         if let Some(info) = exit_codes::find(failure.vm_exit_code) {
             writeln!(details, "Description: {}", info.description).ok();
             writeln!(details, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = Self::find_custom_exit_code_info(
+            failure.vm_exit_code,
+            failure
+                .abi
+                .as_deref()
+                .or_else(|| Some(self.contract_abi.as_ref())),
+            failure.compiler_abi.as_deref(),
+        ) {
+            writeln!(details, "Description: {}", info.description).ok();
+            if info.symbolic_name != info.description {
+                writeln!(details, "Error: {}", info.symbolic_name).ok();
+            }
+            writeln!(details, "Phase: Compute phase").ok();
         } else if let Some(info) = &replayed_exception {
             let description = if info.description.is_empty() {
                 format!("uncaught exception {}", info.errno)
@@ -3269,6 +3383,21 @@ impl FormatterContext<'_> {
         if let Some(info) = exit_codes::find(exit_code) {
             writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = self
+            .find_code_custom_exit_code_info(result.code.as_ref(), exit_code)
+            .or_else(|| {
+                Self::find_custom_exit_code_info(
+                    exit_code,
+                    Some(test.abi.as_ref()),
+                    test.compiler_abi.as_deref(),
+                )
+            })
+        {
+            writeln!(output, "Description: {}", info.description).ok();
+            if info.symbolic_name != info.description {
+                writeln!(output, "Error: {}", info.symbolic_name).ok();
+            }
+            writeln!(output, "Phase: Compute phase").ok();
         } else if let Some(info) = &exit_code_info {
             let description = if info.description.is_empty() {
                 format!("uncaught exception {}", info.errno)

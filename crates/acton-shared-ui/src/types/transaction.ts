@@ -1,6 +1,6 @@
 import type {Address, Cell, OutAction, Transaction} from "@ton/core"
 
-import type {Abi, BackendExecutorAction} from "./index"
+import type {Abi, BackendExecutorAction, CompilerAbi} from "./index"
 
 export interface ParsedTransactionBody {
   readonly name: string
@@ -77,6 +77,7 @@ export interface ContractData {
   readonly address: Address
   readonly letter: string
   readonly abi?: Abi
+  readonly compilerAbi?: CompilerAbi
   readonly incomingMessageNamesByOpcode?: ReadonlyMap<number, string>
   readonly outgoingMessageNamesByOpcode?: ReadonlyMap<number, string>
 }

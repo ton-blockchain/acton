@@ -16,6 +16,18 @@ get fun currentCounterFail(): int { throw 10 }
 get fun getCell(): cell { return beginCell().storeInt(32, 32).endCell() }
 ";
 
+const CUSTOM_GET_EXIT_CONTRACT: &str = r"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+enum Errors {
+    AbiFailure = 709
+}
+
+get fun currentCounter(): int { return 0 }
+get fun currentCounterCustomFail(): int { throw Errors.AbiFailure }
+";
+
 const TEST_PREPARE: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build"
@@ -245,6 +257,65 @@ fn test_get_method_call_shows_exit_code_variant() {
         .failure()
         .assert_snapshot_matches(
             "integration/snapshots/test_get_method_call_shows_exit_code_variant.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_uses_contract_abi_for_custom_exit_code() {
+    ProjectBuilder::new("simple-custom-exit")
+        .contract("simple", CUSTOM_GET_EXIT_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounterCustomFail");
+                println("Counter: {}", counterRes);
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_uses_contract_abi_for_custom_exit_code.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_uses_contract_abi_for_custom_exit_code_with_backtrace_full() {
+    ProjectBuilder::new("simple-custom-exit-backtrace")
+        .contract("simple", CUSTOM_GET_EXIT_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int>(counter.address, "currentCounterCustomFail");
+                println("Counter: {}", counterRes);
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_uses_contract_abi_for_custom_exit_code_with_backtrace_full.stdout.txt",
         );
 }
 
