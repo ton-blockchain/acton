@@ -197,7 +197,7 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
 }
 
 fn wait_until_address_state_active(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     address: &str,
     timeout: Duration,
 ) {
@@ -1922,7 +1922,7 @@ fun main() {
 
     write_localnet_wallet_config(&project, "deployer");
 
-    let node = project.litenode().args(["--accounts", "deployer"]).start();
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
     append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
 
     let deploy_output = project

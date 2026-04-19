@@ -88,7 +88,7 @@ PROJECT OPTIONS
 NETWORK RESOLUTION
        o  mainnet and testnet use the built-in TonCenter endpoints
 
-       o  localnet uses the configured local LiteNode or its default URL
+       o  localnet uses the configured localnet or its default URL
 
        o  custom:<name> resolves through [networks.<name>] in Acton.toml
 

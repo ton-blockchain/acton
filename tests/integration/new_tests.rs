@@ -288,7 +288,7 @@ fn assert_new_project_localnet_deploy_snapshot(
     write_localnet_wallet_config(&project_dir, wallet_name);
 
     let node = project
-        .litenode()
+        .localnet()
         .current_dir(&project_dir)
         .args(["--accounts", wallet_name])
         .start();

@@ -142,11 +142,11 @@ pub(super) const COMMAND_MANUALS: &[CommandManualSpec] = &[
         docs_description: "Reference manual for the acton rpc command",
     },
     CommandManualSpec {
-        command: "litenode",
-        source_name: "acton-litenode.md",
-        docs_slug: "litenode",
-        docs_title: "acton litenode",
-        docs_description: "Reference manual for the acton litenode command",
+        command: "localnet",
+        source_name: "acton-localnet.md",
+        docs_slug: "localnet",
+        docs_title: "acton localnet",
+        docs_description: "Reference manual for the acton localnet command",
     },
     CommandManualSpec {
         command: "doc",

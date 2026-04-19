@@ -16,7 +16,7 @@ Commands:
   rpc              <COMMAND>           Inspect remote account and contract state
   verify           [CONTRACT_NAME]     Verify contract source code on verifier.ton.org
   library          <COMMAND>           Manage TON libraries
-  litenode         <COMMAND>           Manage lightweight TON node
+  localnet         <COMMAND>           Manage local TON network
   retrace          <TX_HASH>           Retrace a transaction by its hash
 
   run              <SCRIPT> [ARGS...]  Run a script defined in Acton.toml

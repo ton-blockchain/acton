@@ -27,7 +27,7 @@ const MANUAL_COMMANDS: &[&str] = &[
     "library",
     "wallet",
     "rpc",
-    "litenode",
+    "localnet",
     "doc",
     "ls",
     "up",

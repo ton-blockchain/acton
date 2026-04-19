@@ -19,7 +19,7 @@ members = ["crates/*", "xtask"]
 exclude = [
   "crates/acton-test-ui",
   "crates/acton-shared-ui",
-  "crates/acton-litenode-ui",
+  "crates/acton-localnet-ui",
 ]
 
 [workspace.package]
@@ -64,7 +64,7 @@ retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
 ton-networks = { path = "crates/ton-networks" }
-ton-litenode = { path = "crates/ton-litenode" }
+ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
 ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
@@ -214,7 +214,7 @@ ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolkfmt = { workspace = true }
-ton-litenode = { workspace = true }
+ton-localnet = { workspace = true }
 
 # remote crates
 # base TON libraries

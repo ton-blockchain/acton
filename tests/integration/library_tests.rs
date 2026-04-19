@@ -16,12 +16,12 @@ use std::{fs, thread};
 use toml::Value as TomlValue;
 
 const LIB_HASH: &str = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27";
-const LITENODE_LIBRARY_CONTRACT: &str = r"
+const LOCALNET_LIBRARY_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
-const LITENODE_DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
+const LOCALNET_DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
 kind = "v4r2"
 workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
@@ -847,12 +847,12 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
 }
 
 #[test]
-fn test_library_publish_happy_path_litenode_saves_local_metadata() {
-    let project = ProjectBuilder::new("library-publish-litenode-local")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_publish_happy_path_localnet_saves_local_metadata() {
+    let project = ProjectBuilder::new("library-publish-localnet-local")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     let output = project
         .acton()
@@ -898,13 +898,13 @@ fn test_library_publish_happy_path_litenode_saves_local_metadata() {
 }
 
 #[test]
-fn test_library_publish_happy_path_litenode_saves_global_metadata_with_flag() {
-    let project = ProjectBuilder::new("library-publish-litenode-global")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_publish_happy_path_localnet_saves_global_metadata_with_flag() {
+    let project = ProjectBuilder::new("library-publish-localnet-global")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
     let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -957,15 +957,15 @@ fn test_library_publish_happy_path_litenode_saves_global_metadata_with_flag() {
 
 #[cfg(unix)]
 #[test]
-fn test_library_publish_interactive_save_location_defaults_to_local_litenode() {
+fn test_library_publish_interactive_save_location_defaults_to_local_localnet() {
     use expectrl::Eof;
 
-    let project = ProjectBuilder::new("library-publish-litenode-interactive-save")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+    let project = ProjectBuilder::new("library-publish-localnet-interactive-save")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
     let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     let mut session = project
         .acton()
@@ -1014,12 +1014,12 @@ fn test_library_publish_interactive_save_location_defaults_to_local_litenode() {
 }
 
 #[test]
-fn test_library_topup_happy_path_litenode_updates_last_topup_timestamp() {
-    let project = ProjectBuilder::new("library-topup-litenode-happy-path")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_topup_happy_path_localnet_updates_last_topup_timestamp() {
+    let project = ProjectBuilder::new("library-topup-localnet-happy-path")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1074,12 +1074,12 @@ fn test_library_topup_happy_path_litenode_updates_last_topup_timestamp() {
 }
 
 #[test]
-fn test_library_info_shows_balance_and_runway_on_litenode() {
-    let project = ProjectBuilder::new("library-info-litenode-balance-runway")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_info_shows_balance_and_runway_on_localnet() {
+    let project = ProjectBuilder::new("library-info-localnet-balance-runway")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1123,12 +1123,12 @@ fn test_library_info_shows_balance_and_runway_on_litenode() {
 }
 
 #[test]
-fn test_library_info_shows_runway_warning_when_exhausted_on_litenode() {
-    let project = ProjectBuilder::new("library-info-litenode-runway-warning")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_info_shows_runway_warning_when_exhausted_on_localnet() {
+    let project = ProjectBuilder::new("library-info-localnet-runway-warning")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1171,12 +1171,12 @@ fn test_library_info_shows_runway_warning_when_exhausted_on_litenode() {
 }
 
 #[test]
-fn test_library_fetch_json_with_output_behavior_is_stable_on_litenode() {
-    let project = ProjectBuilder::new("library-fetch-json-output-litenode")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_fetch_json_with_output_behavior_is_stable_on_localnet() {
+    let project = ProjectBuilder::new("library-fetch-json-output-localnet")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1235,12 +1235,12 @@ fn test_library_fetch_json_with_output_behavior_is_stable_on_litenode() {
 }
 
 #[test]
-fn test_library_fetch_json_with_disasm_behavior_is_stable_on_litenode() {
-    let project = ProjectBuilder::new("library-fetch-json-disasm-litenode")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+fn test_library_fetch_json_with_disasm_behavior_is_stable_on_localnet() {
+    let project = ProjectBuilder::new("library-fetch-json-disasm-localnet")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1356,12 +1356,12 @@ api = { v3 = "http://127.0.0.1:1/api/v3" }
 fn test_library_publish_interactive_selects_global_storage() {
     use expectrl::Eof;
 
-    let project = ProjectBuilder::new("library-publish-litenode-interactive-global")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+    let project = ProjectBuilder::new("library-publish-localnet-interactive-global")
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
     let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     let mut session = project
         .acton()
@@ -1417,10 +1417,10 @@ fn test_library_topup_reports_metadata_update_failure_after_successful_send() {
     use std::os::unix::fs::PermissionsExt;
 
     let project = ProjectBuilder::new("library-topup-metadata-update-failure")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     project
         .acton()
@@ -1489,10 +1489,10 @@ fn test_library_info_interactive_library_select() {
     use expectrl::Eof;
 
     let project = ProjectBuilder::new("library-info-interactive-select")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_deployer_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     for _ in 0..2 {
         project
@@ -1540,10 +1540,10 @@ fn test_library_topup_interactive_library_and_wallet_select() {
     use expectrl::Eof;
 
     let project = ProjectBuilder::new("library-topup-interactive-library-wallet-select")
-        .contract("library_contract", LITENODE_LIBRARY_CONTRACT)
+        .contract("library_contract", LOCALNET_LIBRARY_CONTRACT)
         .build();
     write_two_wallets(project.path());
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
 
     for _ in 0..2 {
         project
@@ -2732,7 +2732,7 @@ struct StoredLibraryEntry {
 fn write_deployer_wallets(project_path: &Path) {
     fs::write(
         project_path.join("wallets.toml"),
-        LITENODE_DEPLOYER_WALLET_CONFIG,
+        LOCALNET_DEPLOYER_WALLET_CONFIG,
     )
     .expect("failed to write wallets.toml");
 }
@@ -3029,9 +3029,9 @@ api = {{ v2 = "{v2_url}" }}
         .expect("failed to write Acton.toml with custom network");
 }
 
-fn start_litenode_with_localnet(project: &Project) -> crate::support::litenode::LiteNodeHandle {
+fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::LocalnetHandle {
     let node = project
-        .litenode()
+        .localnet()
         .before_start(super::super::support::project::ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
@@ -3121,7 +3121,7 @@ fn mark_library_runway_exhausted(path: &Path, library_id: &str) {
 }
 
 fn wait_for_library_in_api(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     hash: &str,
     timeout: Duration,
 ) {
@@ -3187,7 +3187,7 @@ fn normalize_hash_to_bytes(hash: &str) -> Option<[u8; 32]> {
 }
 
 fn wait_until_address_state_active(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     address: &str,
     timeout: Duration,
 ) {

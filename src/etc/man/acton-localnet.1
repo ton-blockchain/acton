@@ -1,0 +1,261 @@
+'\" t
+.TH "ACTON\-LOCALNET" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-localnet \[em] Manage Acton\[cq]s lightweight local TON node
+.SH "SYNOPSIS"
+\fBacton localnet\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Manage the local development node used for TON\-compatible local execution,
+forked\-state development, and faucet\-based local funding.
+.SH "SUBCOMMANDS"
+.SS "acton localnet start"
+Start the local TON network.
+.SS "Synopsis"
+\fBacton localnet start\fR [\fIoptions\fR]
+.SS "Options"
+.sp
+\fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-fork\-net\fR \fInetwork\fR
+.RS 4
+Remote network to use for forked account resolution.
+.RE
+.sp
+\fB\-\-fork\-block\-number\fR \fIseqno\fR
+.RS 4
+Historical block sequence number to fork from.
+.RE
+.sp
+\fB\-\-accounts\fR \fIname\fR[,\fIname\fR\[u2026]]_
+.RS 4
+Wallet names to auto\-fund and deploy on startup.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for remote blockchain queries.
+.RE
+.sp
+\fB\-\-db\-path\fR \fIpath\fR
+.RS 4
+Path to a SQLite database for persistent node state.
+.RE
+.sp
+\fB\-\-rate\-limit\fR \fIrps\fR
+.RS 4
+Maximum \fB/api\fR requests per second to simulate provider rate limits.
+.RE
+.sp
+\fB\-\-load\-state\fR \fIpath\fR
+.RS 4
+Load Localnet state from a JSON snapshot before startup.
+.RE
+.sp
+\fB\-\-dump\-state\fR \fIpath\fR
+.RS 4
+Dump Localnet state to a JSON snapshot on shutdown.
+.RE
+.sp
+\fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
+.SS "acton localnet airdrop"
+Send TON from the local faucet to an address.
+.SS "Synopsis"
+\fBacton localnet airdrop\fR [\fIoptions\fR] \fIaddress\fR
+.SS "Options"
+.sp
+\fIaddress\fR
+.RS 4
+Recipient address.
+.RE
+.sp
+\fB\-a\fR, \fB\-\-amount\fR \fIton\fR
+.RS 4
+Amount of TON to request.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.SH "CONFIGURATION"
+You can store defaults in \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+[localnet]
+port = 5411
+fork\-net = "testnet"
+fork\-block\-number = 55000000
+accounts = ["deployer", "user"]
+rate\-limit = 1
+.fi
+.RE
+.sp
+CLI flags override config values for the current invocation.
+.SH "RUNTIME MODEL"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'fork mode allows local development against remote chain state
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton localnet start\fR runs in the foreground until the process is stopped
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Acton starts an HTTP server on \fBlocalhost:<port>\fR for localnet API, admin
+endpoints, and the bundled localnet UI
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the server keeps running until the process is stopped, for example with
+\fBCtrl+C\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the Localnet UI is available on the root path, for example
+\fBhttp://localhost:<port>/\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the bundled UI is a single\-page explorer app, so routes like \fB/explorer\fR,
+\fB/tokens\fR, \fB/nfts\fR, and per\-address or per\-transaction pages are served from
+the same frontend shell
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the UI reads chain data from \fB/api/v2\fR and \fB/api/v3\fR, and uses \fB/admin\fR
+lookups for local address aliases and registered compiler ABIs
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when \fB\-\-port\fR and \fB[localnet].port\fR are both absent, the current runtime
+fallback is \fB5411\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-rate\-limit\fR applies to \fB/api/*\fR endpoints, not admin endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR writes a snapshot during graceful shutdown
+.RE
+.SH "PERSISTENCE"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR enables persistent SQLite\-backed node state across runs
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-load\-state\fR initializes state from a JSON snapshot and cannot be combined
+with \fB\-\-db\-path\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR exports a JSON snapshot on shutdown
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when \fB\-\-db\-path\fR is not used, node state is ephemeral unless loaded or dumped
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected localnet subcommand completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Startup failed because port binding, state loading, remote fork
+initialization, or faucet handling failed.
+.RE
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Start with defaults:
+.sp
+.RS 4
+.nf
+acton localnet start
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Fork from testnet at a historical block:
+.sp
+.RS 4
+.nf
+acton localnet start \-\-fork\-net testnet \-\-fork\-block\-number 55000000
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Load and dump JSON state snapshots:
+.sp
+.RS 4
+.nf
+acton localnet start \-\-load\-state snapshots/localnet.json \-\-dump\-state snapshots/localnet.json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Airdrop local funds:
+.sp
+.RS 4
+.nf
+acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-amount 25
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Start a local integration node with pre\-funded accounts:
+.sp
+.RS 4
+.nf
+acton localnet start \-\-accounts deployer,user \-\-db\-path build/localnet.db
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help wallet\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fILocal development node guide\fR <https://ton\-blockchain.github.io/acton/docs/local\-development\-node>
+.RE

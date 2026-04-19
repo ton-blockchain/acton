@@ -28,7 +28,7 @@ use acton::paths;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
-    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
+    ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
     WalletsFile, global_wallets_path, init_manifest_path_with_source,
     init_project_root_with_source, project_root as configured_project_root,
 };
@@ -823,12 +823,12 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
-        about = "Manage lightweight TON node",
-        after_help = detailed_help_pointer("litenode")
+        about = "Manage local TON network",
+        after_help = detailed_help_pointer("localnet")
     )]
-    Litenode {
+    Localnet {
         #[command(subcommand)]
-        command: LitenodeCommand,
+        command: LocalnetCommand,
     },
     #[command(
         about = "Format Tolk source files",
@@ -951,26 +951,26 @@ enum Commands {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LitenodeCommand {
-    #[command(about = "Start the lightweight TON node")]
+pub enum LocalnetCommand {
+    #[command(about = "Start the local TON network")]
     Start {
-        #[arg(long, help = "LiteNode server port (default: [litenode].port or 5411)")]
+        #[arg(long, help = "Localnet server port (default: [localnet].port or 5411)")]
         port: Option<u16>,
         #[arg(
             long,
-            help = "Fork from network for remote account resolution (default: [litenode].fork-net)"
+            help = "Fork from network for remote account resolution (default: [localnet].fork-net)"
         )]
         fork_net: Option<String>,
         #[arg(
             long,
-            help = "Block sequence number to fork from (default: [litenode].fork-block-number)",
+            help = "Block sequence number to fork from (default: [localnet].fork-block-number)",
             value_name = "SEQNO"
         )]
         fork_block_number: Option<u64>,
         #[arg(
             long,
             value_delimiter = ',',
-            help = "Wallet names to auto-fund and deploy on startup (default: [litenode].accounts)",
+            help = "Wallet names to auto-fund and deploy on startup (default: [localnet].accounts)",
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
@@ -982,19 +982,19 @@ pub enum LitenodeCommand {
             long,
             value_name = "RPS",
             value_parser = clap::value_parser!(u32).range(1..),
-            help = "Maximum API requests per second to simulate provider rate limits (default: [litenode].rate-limit)"
+            help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
         #[arg(
             long,
-            help = "Load LiteNode state from JSON snapshot before startup",
+            help = "Load Localnet state from JSON snapshot before startup",
             conflicts_with = "db_path", // for now
             value_name = "PATH"
         )]
         load_state: Option<String>,
         #[arg(
             long,
-            help = "Dump LiteNode state to JSON snapshot on shutdown",
+            help = "Dump Localnet state to JSON snapshot on shutdown",
             value_name = "PATH"
         )]
         dump_state: Option<String>,
@@ -1008,7 +1008,7 @@ pub enum LitenodeCommand {
         #[arg(
             long,
             short,
-            help = "LiteNode server port (default: [litenode].port or 5411)"
+            help = "Localnet server port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
     },
@@ -1261,7 +1261,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("litenode", "<COMMAND>"),
+        ("localnet", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -2075,8 +2075,8 @@ fn main() {
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
-        Commands::Litenode { command } => match command {
-            LitenodeCommand::Start {
+        Commands::Localnet { command } => match command {
+            LocalnetCommand::Start {
                 port,
                 fork_net,
                 fork_block_number,
@@ -2087,7 +2087,7 @@ fn main() {
                 load_state,
                 dump_state,
             } => {
-                let resolved_litenode = resolve_litenode_settings(
+                let resolved_localnet = resolve_localnet_settings(
                     port,
                     fork_net,
                     fork_block_number,
@@ -2099,13 +2099,13 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::litenode::litenode_start_cmd(
-                        resolved_litenode.port,
+                    commands::localnet::localnet_start_cmd(
+                        resolved_localnet.port,
                         db_path,
-                        resolved_litenode.fork_net,
-                        resolved_litenode.fork_block_number,
-                        resolved_litenode.accounts,
-                        resolved_litenode.rate_limit,
+                        resolved_localnet.fork_net,
+                        resolved_localnet.fork_block_number,
+                        resolved_localnet.accounts,
+                        resolved_localnet.rate_limit,
                         load_state,
                         dump_state,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
@@ -2113,18 +2113,18 @@ fn main() {
                     .await
                 })
             }
-            LitenodeCommand::Airdrop {
+            LocalnetCommand::Airdrop {
                 address,
                 amount,
                 port,
             } => {
-                let port = resolve_litenode_port(port);
+                let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::litenode::litenode_airdrop_cmd(&address, amount, port).await
+                    commands::localnet::localnet_airdrop_cmd(&address, amount, port).await
                 })
             }
         },
@@ -2157,7 +2157,7 @@ fn lint_command_error(args: &[String]) -> anyhow::Error {
     anyhow::anyhow!("`acton lint` is not supported. Use `acton check{suffix}` instead.")
 }
 
-struct ResolvedLitenodeSettings {
+struct ResolvedLocalnetSettings {
     port: u16,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
@@ -2165,19 +2165,19 @@ struct ResolvedLitenodeSettings {
     rate_limit: Option<u32>,
 }
 
-fn resolve_litenode_port(cli_port: Option<u16>) -> u16 {
-    resolve_litenode_settings(cli_port, None, None, None, None).port
+fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
+    resolve_localnet_settings(cli_port, None, None, None, None).port
 }
 
-fn resolve_litenode_settings(
+fn resolve_localnet_settings(
     cli_port: Option<u16>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
-) -> ResolvedLitenodeSettings {
-    let config = load_litenode_settings_from_config();
-    ResolvedLitenodeSettings {
+) -> ResolvedLocalnetSettings {
+    let config = load_localnet_settings_from_config();
+    ResolvedLocalnetSettings {
         port: cli_port.or(config.port).unwrap_or(5411),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
@@ -2186,10 +2186,10 @@ fn resolve_litenode_settings(
     }
 }
 
-fn load_litenode_settings_from_config() -> LitenodeSettings {
+fn load_localnet_settings_from_config() -> LocalnetSettings {
     ActonConfig::load()
         .ok()
-        .and_then(|config| config.litenode)
+        .and_then(|config| config.localnet)
         .unwrap_or_default()
 }
 

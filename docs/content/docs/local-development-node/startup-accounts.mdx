@@ -18,14 +18,14 @@ This removes the manual "airdrop + first deploy transaction" bootstrap step from
 ## Configure in `Acton.toml`
 
 ```toml title="Acton.toml"
-[litenode]
+[localnet]
 accounts = ["deployer", "user"]
 ```
 
 ## Configure via CLI
 
 ```bash
-acton litenode start --accounts deployer,user
+acton localnet start --accounts deployer,user
 ```
 
 CLI values override `Acton.toml` for the current run.

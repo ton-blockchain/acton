@@ -1,0 +1,170 @@
+ACTON-LOCALNET(1)
+
+NAME
+       acton-localnet — Manage Acton’s local TON network
+
+SYNOPSIS
+       acton localnet [options] command
+
+DESCRIPTION
+       Manage the local development node used for TON-compatible local
+       execution, forked-state development, and faucet-based local funding.
+
+SUBCOMMANDS
+   acton localnet start
+       Start the local TON network.
+
+      Synopsis
+          acton localnet start [options]
+
+      Options
+          --port port
+              Localnet server port.
+
+          --fork-net network
+              Remote network to use for forked account resolution.
+
+          --fork-block-number seqno
+              Historical block sequence number to fork from.
+
+          --accounts name[,name…]_
+              Wallet names to auto-fund and deploy on startup.
+
+          --api-key key
+              TonCenter API key for remote blockchain queries.
+
+          --db-path path
+              Path to a SQLite database for persistent node state.
+
+          --rate-limit rps
+              Maximum /api requests per second to simulate provider rate
+              limits.
+
+          --load-state path
+              Load Localnet state from a JSON snapshot before startup.
+
+          --dump-state path
+              Dump Localnet state to a JSON snapshot on shutdown.
+
+          --load-state and --db-path cannot be used together in the same run.
+
+   acton localnet airdrop
+       Send TON from the local faucet to an address.
+
+      Synopsis
+          acton localnet airdrop [options] address
+
+      Options
+          address
+              Recipient address.
+
+          -a, --amount ton
+              Amount of TON to request.
+
+          -p, --port port
+              Localnet server port.
+
+CONFIGURATION
+       You can store defaults in Acton.toml:
+
+           [localnet]
+           port = 5411
+           fork-net = "testnet"
+           fork-block-number = 55000000
+           accounts = ["deployer", "user"]
+           rate-limit = 1
+
+       CLI flags override config values for the current invocation.
+
+RUNTIME MODEL
+       o  fork mode allows local development against remote chain state
+
+       o  acton localnet start runs in the foreground until the process is
+          stopped
+
+       o  Acton starts an HTTP server on localhost:<port> for localnet API,
+          admin endpoints, and the bundled localnet UI
+
+       o  the server keeps running until the process is stopped, for example
+          with Ctrl+C
+
+       o  the Localnet UI is available on the root path, for example
+          http://localhost:<port>/
+
+       o  the bundled UI is a single-page explorer app, so routes like
+          /explorer, /tokens, /nfts, and per-address or per-transaction pages
+          are served from the same frontend shell
+
+       o  the UI reads chain data from /api/v2 and /api/v3, and uses /admin
+          lookups for local address aliases and registered compiler ABIs
+
+       o  when --port and [localnet].port are both absent, the current runtime
+          fallback is 5411
+
+       o  --rate-limit applies to /api/* endpoints, not admin endpoints
+
+       o  --dump-state writes a snapshot during graceful shutdown
+
+PERSISTENCE
+       o  --db-path enables persistent SQLite-backed node state across runs
+
+       o  --load-state initializes state from a JSON snapshot and cannot be
+          combined with --db-path
+
+       o  --dump-state exports a JSON snapshot on shutdown
+
+       o  when --db-path is not used, node state is ephemeral unless loaded or
+          dumped
+
+EXIT STATUS
+       o  0: The selected localnet subcommand completed successfully.
+
+       o  1: Startup failed because port binding, state loading, remote fork
+          initialization, or faucet handling failed.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+EXAMPLES
+       1. Start with defaults:
+
+              acton localnet start
+
+       2. Fork from testnet at a historical block:
+
+              acton localnet start --fork-net testnet --fork-block-number 55000000
+
+       3. Load and dump JSON state snapshots:
+
+              acton localnet start --load-state snapshots/localnet.json --dump-state snapshots/localnet.json
+
+       4. Airdrop local funds:
+
+              acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
+
+       5. Start a local integration node with pre-funded accounts:
+
+              acton localnet start --accounts deployer,user --db-path build/localnet.db
+
+SEE ALSO
+       o  acton help wallet
+
+       o  Local development node guide
+          <https://ton-blockchain.github.io/acton/docs/local-development-node>
+

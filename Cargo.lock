@@ -92,7 +92,7 @@ dependencies = [
  "ton-api",
  "ton-emulator",
  "ton-executor",
- "ton-litenode",
+ "ton-localnet",
  "ton-ls",
  "ton-source-map",
  "tower-http",
@@ -5198,7 +5198,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-litenode"
+name = "ton-localnet"
 version = "0.2.0"
 dependencies = [
  "acton-config",

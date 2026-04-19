@@ -287,13 +287,13 @@ fn test_rpc_info_rejects_invalid_address() {
 }
 
 #[test]
-fn test_rpc_info_reads_wallet_account_from_litenode() {
-    let project = ProjectBuilder::new("rpc-info-litenode-wallet")
+fn test_rpc_info_reads_wallet_account_from_localnet() {
+    let project = ProjectBuilder::new("rpc-info-localnet-wallet")
         .script_file("print_deployer_address", PRINT_DEPLOYER_ADDRESS_SCRIPT)
         .build();
     write_deployer_wallets(project.path());
 
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
     let log_dir = prepare_log_dir(project.path());
 
     let script_output = project
@@ -322,17 +322,17 @@ fn test_rpc_info_reads_wallet_account_from_litenode() {
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success();
-    assert_litenode_rpc_snapshot(
+    assert_localnet_rpc_snapshot(
         &output,
-        "integration/snapshots/rpc/test_rpc_info_litenode_wallet.stdout.txt",
+        "integration/snapshots/rpc/test_rpc_info_localnet_wallet.stdout.txt",
     );
 
     node.stop();
 }
 
 #[test]
-fn test_rpc_info_decodes_storage_from_litenode() {
-    let project = ProjectBuilder::new("rpc-info-litenode-storage")
+fn test_rpc_info_decodes_storage_from_localnet() {
+    let project = ProjectBuilder::new("rpc-info-localnet-storage")
         .file_from_path(
             "contracts/types",
             "src/commands/new/templates/counter/contracts/types.tolk",
@@ -346,7 +346,7 @@ fn test_rpc_info_decodes_storage_from_litenode() {
     write_deployer_wallets(project.path());
 
     let node = project
-        .litenode()
+        .localnet()
         .before_start(ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
@@ -380,9 +380,9 @@ fn test_rpc_info_decodes_storage_from_litenode() {
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success();
-    assert_litenode_rpc_snapshot(
+    assert_localnet_rpc_snapshot(
         &output,
-        "integration/snapshots/rpc/test_rpc_info_litenode_storage.stdout.txt",
+        "integration/snapshots/rpc/test_rpc_info_localnet_storage.stdout.txt",
     );
 
     node.stop();
@@ -596,8 +596,8 @@ fn write_deployer_wallets(project_root: &Path) {
         .expect("failed to write wallets.toml");
 }
 
-fn start_litenode_with_localnet(project: &Project) -> crate::support::litenode::LiteNodeHandle {
-    let node = project.litenode().args(["--accounts", "deployer"]).start();
+fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::LocalnetHandle {
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
     append_localnet_network(project.path(), &node.base_url());
     node
 }
@@ -631,7 +631,7 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
 }
 
 fn wait_until_address_state_active(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     address: &str,
     timeout: Duration,
 ) {
@@ -657,18 +657,18 @@ fn prepare_log_dir(project_root: &Path) -> String {
     log_dir.to_string_lossy().into_owned()
 }
 
-fn assert_litenode_rpc_snapshot(
+fn assert_localnet_rpc_snapshot(
     output: &crate::support::assertions::TestSuccess,
     snapshot_path: &str,
 ) {
-    let normalized = normalize_litenode_rpc_stdout(&output.get_normalized_stdout());
+    let normalized = normalize_localnet_rpc_stdout(&output.get_normalized_stdout());
     let expected_path = Path::new("tests").join(snapshot_path);
     let expected =
-        fs::read_to_string(&expected_path).expect("lite-node rpc snapshot file must exist");
+        fs::read_to_string(&expected_path).expect("localnet rpc snapshot file must exist");
     assertion().eq(normalized, expected);
 }
 
-fn normalize_litenode_rpc_stdout(stdout: &str) -> String {
+fn normalize_localnet_rpc_stdout(stdout: &str) -> String {
     let mut normalized_lines = Vec::new();
     for line in stdout.lines() {
         if let Some((prefix, _)) = line.split_once("Last Tx Hash:") {

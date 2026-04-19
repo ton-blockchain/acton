@@ -9,16 +9,16 @@ Fork mode lets the local node resolve account state from a remote network while 
 
 ```bash
 # Fork from testnet
-acton litenode start --fork-net testnet
+acton localnet start --fork-net testnet
 
 # Fork from mainnet
-acton litenode start --fork-net mainnet
+acton localnet start --fork-net mainnet
 ```
 
 ## Historical Fork at a Specific Block
 
 ```bash
-acton litenode start --fork-net testnet --fork-block-number 55000000
+acton localnet start --fork-net testnet --fork-block-number 55000000
 ```
 
 This is useful for deterministic debugging of historical behavior.
@@ -28,7 +28,7 @@ This is useful for deterministic debugging of historical behavior.
 Use `--api-key` for TonCenter access:
 
 ```bash
-acton litenode start --fork-net mainnet --api-key YOUR_API_KEY
+acton localnet start --fork-net mainnet --api-key YOUR_API_KEY
 ```
 
 You can also set `TONCENTER_API_KEY` and omit `--api-key`.
@@ -36,9 +36,9 @@ You can also set `TONCENTER_API_KEY` and omit `--api-key`.
 ## Configure Defaults in `Acton.toml`
 
 ```toml title="Acton.toml"
-[litenode]
+[localnet]
 fork-net = "testnet"
 fork-block-number = 55000000
 ```
 
-Now `acton litenode start` automatically uses these defaults.
+Now `acton localnet start` automatically uses these defaults.

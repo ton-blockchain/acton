@@ -108,7 +108,7 @@ coverage-clean:
 build-ui:
     bun ci
     cd crates/acton-test-ui && bun ci && bun run build
-    cd crates/acton-litenode-ui && bun ci && bun run build
+    cd crates/acton-localnet-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint

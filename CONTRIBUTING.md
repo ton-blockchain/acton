@@ -25,7 +25,7 @@ non-Cargo surfaces such as docs and UI packages.
   matching `*-syntax` crates.
 - Native/runtime bridge: `ton-objs`, `ton-executor`, `ton-emulator`, and
   `tvmffi`.
-- Services and tooling: `ton-api`, `ton-litenode`, `ton-indexer`, `retrace`,
+- Services and tooling: `ton-api`, `ton-localnet`, `ton-indexer`, `retrace`,
   `ton-ls`, and `acton-debug`.
 - Repo tooling: `xtask` for release/schema/artifact maintenance workflows.
 - Non-Cargo surfaces: `docs/` (Next.js + Fumadocs), the Bun-built UI crates,
@@ -519,7 +519,7 @@ This command runs Rust formatting, docgen, dependency, dependency-policy, lint, 
 Install `cargo-shear`, `cargo-deny`, and `typos-cli` if you want to run it locally.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
-If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-litenode-ui`,
+If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-localnet-ui`,
 `crates/acton-shared-ui`, or root UI config in `package.json`), you must also
 run:
 
@@ -556,7 +556,7 @@ Rules:
 
 - Use one of: `feat`, `fix`, `chore`, `refactor` (and `docs`/`test`/`ci` when
   appropriate).
-- Keep scope specific (`check`, `litenode`, `stdlib`, `wallet`, `test-runner`,
+- Keep scope specific (`check`, `localnet`, `stdlib`, `wallet`, `test-runner`,
   `docs`, etc.).
 - Use present tense in the subject (for example: `add`, `fix`, `update`, not
   `added`, `fixed`, `updated`).

@@ -252,7 +252,7 @@ It makes the CLI easy to install from official artifacts while keeping the proje
 
 ### Fixed
 
-- Fixed numerous issues across CI, release automation, tests, documentation, wrappers, wallets, localnet and litenode integration, formatter output, and diagnostics.
+- Fixed numerous issues across CI, release automation, tests, documentation, wrappers, wallets, localnet and localnet integration, formatter output, and diagnostics.
 - Fixed multiple flaky tests and platform-specific issues, especially around macOS and release workflows.
 - Fixed many smaller bugs and polish issues accumulated over the last few months across the CLI, compiler-facing tooling, and project templates.
 

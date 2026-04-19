@@ -27,7 +27,7 @@ Typical follow-up commands are:
 
 - `acton wallet import` to reuse an existing mnemonic
 - `acton wallet list --balance` to inspect configured wallets and balances
-- `acton wallet airdrop --net localnet` to fund a wallet from a local LiteNode
+- `acton wallet airdrop --net localnet` to fund a wallet from a localnet
   faucet
 - `acton wallet sign` to sign an external message body without writing a whole
   script
@@ -245,7 +245,7 @@ Emit JSON output.
 
 {{/options}}
 
-With `--net localnet`, Acton uses the local LiteNode faucet instead of the
+With `--net localnet`, Acton uses the localnet faucet instead of the
 testnet PoW flow.
 
 ### acton wallet remove
@@ -330,7 +330,7 @@ For `wallet airdrop`, the selected backend depends on `--net`.
 
 - `testnet` requests a PoW challenge from the faucet, solves it locally, and
   submits a claim
-- `localnet` sends a fixed faucet transfer through LiteNode
+- `localnet` sends a fixed faucet transfer through Localnet
 
 After a successful interactive testnet `wallet airdrop`, Acton briefly waits
 for the balance to appear and lets you skip that wait by pressing `Enter`,
@@ -420,6 +420,6 @@ wallets, the keyring ID usually matches the wallet name.
 
 ## See Also
 
-- `acton help litenode`
+- `acton help localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
 - [Wallet setup guide](https://ton-blockchain.github.io/acton/docs/setup-wallets)

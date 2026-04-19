@@ -83,7 +83,7 @@ information and reports that decoded storage is unavailable.
 ## Network Resolution
 
 - `mainnet` and `testnet` use the built-in TonCenter endpoints
-- `localnet` uses the configured local LiteNode or its default URL
+- `localnet` uses the configured localnet or its default URL
 - `custom:<name>` resolves through `[networks.<name>]` in `Acton.toml`
 
 For `custom:<name>`, Acton needs access to the selected project or manifest so

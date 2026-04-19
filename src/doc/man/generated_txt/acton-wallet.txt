@@ -28,7 +28,7 @@ COMMON LIFECYCLE
           balances
 
        o  acton wallet airdrop --net localnet to fund a wallet from a local
-          LiteNode faucet
+          localnet faucet
 
        o  acton wallet sign to sign an external message body without writing a
           whole script
@@ -186,7 +186,7 @@ SUBCOMMANDS
           --json
               Emit JSON output.
 
-          With --net localnet, Acton uses the local LiteNode faucet instead of
+          With --net localnet, Acton uses the localnet faucet instead of
           the testnet PoW flow.
 
    acton wallet remove
@@ -271,7 +271,7 @@ AIRDROP DETAILS
        o  testnet requests a PoW challenge from the faucet, solves it locally,
           and submits a claim
 
-       o  localnet sends a fixed faucet transfer through LiteNode
+       o  localnet sends a fixed faucet transfer through Localnet
 
        After a successful interactive testnet wallet airdrop, Acton briefly
        waits for the balance to appear and lets you skip that wait by pressing
@@ -363,7 +363,7 @@ EXAMPLES
               cat body.boc.base64 | acton wallet sign deployer
 
 SEE ALSO
-       o  acton help litenode
+       o  acton help localnet
 
        o  Wallet command guide
           <https://ton-blockchain.github.io/acton/docs/commands/wallet>

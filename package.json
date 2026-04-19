@@ -6,13 +6,13 @@
   "author": "TON Core",
   "type": "module",
   "workspaces": [
-    "crates/acton-litenode-ui",
+    "crates/acton-localnet-ui",
     "crates/acton-shared-ui",
     "crates/acton-test-ui"
   ],
   "scripts": {
     "build": "bun --filter '*' build",
-    "dev:litenode": "bun --filter acton-litenode-ui dev",
+    "dev:localnet": "bun --filter acton-localnet-ui dev",
     "dev:test": "bun --filter acton-test-ui dev",
     "fmt": "bun --filter '*' fmt",
     "fmt:check": "bun --filter '*' fmt:check",

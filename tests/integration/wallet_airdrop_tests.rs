@@ -326,18 +326,18 @@ fn status_text(status: u16) -> &'static str {
     }
 }
 
-fn append_litenode_port(project_path: &Path, port: u16) {
+fn append_localnet_port(project_path: &Path, port: u16) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
     acton_toml.push_str(&format!(
         r"
 
-[litenode]
+[localnet]
 port = {port}
 "
     ));
-    fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with litenode port");
+    fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet port");
 }
 
 fn find_unused_port() -> u16 {
@@ -680,8 +680,8 @@ fn test_wallet_airdrop_localnet_success_uses_configured_port_and_fixed_amount() 
         .run()
         .success();
 
-    let node = project.litenode().start();
-    append_litenode_port(project.path(), node.port());
+    let node = project.localnet().start();
+    append_localnet_port(project.path(), node.port());
 
     let output = project
         .acton()
@@ -720,7 +720,7 @@ fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
         .run()
         .success();
 
-    append_litenode_port(project.path(), find_unused_port());
+    append_localnet_port(project.path(), find_unused_port());
 
     let output = project
         .acton()
@@ -732,7 +732,7 @@ fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
         .failure();
 
     output.assert_stderr_contains(
-        "Failed to send request to localnet faucet. Make sure `acton litenode start` is running",
+        "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
     );
 }
 
@@ -758,7 +758,7 @@ fn test_wallet_airdrop_localnet_http_error_preserves_response_body() {
         status: 500,
         body: r#"{"error":"backend unavailable"}"#,
     }]);
-    append_litenode_port(project.path(), port);
+    append_localnet_port(project.path(), port);
 
     let output = project
         .acton()
@@ -800,7 +800,7 @@ fn test_wallet_airdrop_localnet_invalid_json_response_reports_parse_error() {
         status: 200,
         body: "not json",
     }]);
-    append_litenode_port(project.path(), port);
+    append_localnet_port(project.path(), port);
 
     let output = project
         .acton()
@@ -836,8 +836,8 @@ fn test_wallet_airdrop_localnet_json_success_omits_pow_fields() {
         .run()
         .success();
 
-    let node = project.litenode().start();
-    append_litenode_port(project.path(), node.port());
+    let node = project.localnet().start();
+    append_localnet_port(project.path(), node.port());
 
     let output = project
         .acton()

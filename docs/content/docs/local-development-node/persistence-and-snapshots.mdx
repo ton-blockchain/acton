@@ -16,7 +16,7 @@ format is snapshot version `1`.
 Use a database file when you want state continuity across runs:
 
 ```bash
-acton litenode start --db-path .acton/litenode.db
+acton localnet start --db-path .acton/localnet.db
 ```
 
 This is useful for long-running local environments.
@@ -26,19 +26,19 @@ This is useful for long-running local environments.
 Load state before startup:
 
 ```bash
-acton litenode start --load-state snapshots/localnet.json
+acton localnet start --load-state snapshots/localnet.json
 ```
 
 Dump state on graceful shutdown:
 
 ```bash
-acton litenode start --dump-state snapshots/localnet.json
+acton localnet start --dump-state snapshots/localnet.json
 ```
 
 You can combine both to evolve a portable local chain state file between sessions:
 
 ```bash
-acton litenode start \
+acton localnet start \
   --load-state snapshots/localnet.json \
   --dump-state snapshots/localnet.json
 ```

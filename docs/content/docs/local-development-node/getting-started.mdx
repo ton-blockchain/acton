@@ -3,15 +3,15 @@ title: "Getting Started"
 description: "Start Acton local development node, use faucet, and run a minimal local workflow"
 ---
 
-The local development node is available through the `acton litenode` command group.
+The local development node is available through the `acton localnet` command group.
 
 ## Start the Node
 
 ```bash
-acton litenode start
+acton localnet start
 ```
 
-By default, the node listens on port `5411` (or `[litenode].port` from `Acton.toml`).
+By default, the node listens on port `5411` (or `[localnet].port` from `Acton.toml`).
 
 You can verify that the server is running:
 
@@ -24,25 +24,25 @@ curl -s "http://localhost:5411/api/v2/getMasterchainInfo"
 Use the built-in faucet command:
 
 ```bash
-acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM
+acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM
 ```
 
 Set a custom amount:
 
 ```bash
-acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50
+acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50
 ```
 
 ## Use a Custom Port
 
 ```bash
-acton litenode start --port 3010
+acton localnet start --port 3010
 ```
 
 Then target the same port for CLI helpers:
 
 ```bash
-acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
+acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
 ## Stop the Node

@@ -98,7 +98,7 @@ const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
 const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
 const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const DEFAULT_FAUCET_URL: &str = "https://acton.monster/faucet/";
-const DEFAULT_LITENODE_PORT: u16 = 5411;
+const DEFAULT_LOCALNET_PORT: u16 = 5411;
 const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
@@ -403,9 +403,9 @@ fn resolve_airdrop_target(
             }
             let port = ActonConfig::load()
                 .ok()
-                .and_then(|config| config.litenode)
-                .and_then(|litenode| litenode.port)
-                .unwrap_or(DEFAULT_LITENODE_PORT);
+                .and_then(|config| config.localnet)
+                .and_then(|localnet| localnet.port)
+                .unwrap_or(DEFAULT_LOCALNET_PORT);
 
             Ok(AirdropTarget::Localnet {
                 port,
@@ -543,7 +543,7 @@ fn perform_localnet_airdrop(
         }))
         .send()
         .context(
-            "Failed to send request to localnet faucet. Make sure `acton litenode start` is running",
+            "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
         )?;
 
     if response.status().is_success() {

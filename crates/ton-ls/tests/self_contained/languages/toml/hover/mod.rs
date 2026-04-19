@@ -92,7 +92,7 @@ fn test_hover_networks_dynamic_tables() {
             networks.mainnet.api.v2
             ```
 
-            The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port
+            The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<localnet.port>/api/v2` with `5411` as the fallback port
 
             - Type: `string`
 
@@ -102,7 +102,7 @@ fn test_hover_networks_dynamic_tables() {
             networks.mainnet.api.v3
             ```
 
-            The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port
+            The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<localnet.port>/api/v3` with `5411` as the fallback port
 
             - Type: `string`"#]],
     );

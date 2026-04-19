@@ -25,7 +25,7 @@ fail-on-diff = false
 
 [test.mutation]
 
-[litenode]
+[localnet]
 port = 3010
 accounts = ["local-wallet"]
 

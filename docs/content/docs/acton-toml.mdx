@@ -44,7 +44,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[build]` — Build command output settings.
 - `[wrappers]` — Default output settings for `acton wrapper`.
 - `[fmt]` — Tolk formatter settings for `acton fmt`.
-- `[litenode]` — Default settings for `acton litenode` commands.
+- `[localnet]` — Default settings for `acton localnet` commands.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — General linter configuration.
 - `[networks]` — Custom network definitions.
@@ -211,21 +211,21 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 ---
 
-## `[litenode]` Section
+## `[localnet]` Section
 
-Configures defaults for `acton litenode`.
+Configures defaults for `acton localnet`.
 
 | Field               | Type       | Default | Description                                                                         |
 |:--------------------|:-----------|:--------|:------------------------------------------------------------------------------------|
-| `port`              | `integer`  | `3000`  | Port used by `acton litenode` commands when `--port` is omitted.                    |
-| `fork-net`          | `string`   | -       | Network used by `acton litenode start` when `--fork-net` is omitted.                |
-| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton litenode start` for historical state fork.     |
-| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `litenode start`.     |
+| `port`              | `integer`  | `3000`  | Port used by `acton localnet` commands when `--port` is omitted.                    |
+| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                |
+| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.     |
+| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.     |
 | `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow). |
 
 Example:
 ```toml
-[litenode]
+[localnet]
 port = 3010
 fork-net = "testnet"
 fork-block-number = 55000000
@@ -233,7 +233,7 @@ accounts = ["deployer", "user"]
 rate-limit = 1
 ```
 
-`acton litenode start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, and `--rate-limit <RPS>` override these values for a single run.
+`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, and `--rate-limit <RPS>` override these values for a single run.
 
 ---
 
@@ -438,8 +438,8 @@ Defines network settings used by `--net`/`--fork-net`.
 
 | Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TonCenter API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<litenode.port>/api/v2`; if `[litenode].port` is not set, it falls back to port `5411`.                                                                                                                          |
-| `api.v3`   | `string` | No                                      | TonCenter API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<litenode.port>/api/v3`; if `[litenode].port` is not set, it falls back to port `5411`.                                                                                                                          |
+| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TonCenter API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                          |
+| `api.v3`   | `string` | No                                      | TonCenter API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                          |
 | `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://localhost:<port>/explorer/tx/<hash>`. |
 
 Example:
