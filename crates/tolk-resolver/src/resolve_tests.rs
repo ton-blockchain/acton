@@ -1734,7 +1734,7 @@ mod tests {
             fun a() {}
             "#,
         )
-            .unwrap();
+        .unwrap();
         std::fs::write(
             &b_path,
             r#"
@@ -1743,7 +1743,7 @@ mod tests {
             fun b() {}
             "#,
         )
-            .unwrap();
+        .unwrap();
 
         let file_db = FileDb::new(project_root.join("__stdlib__"), None);
         let a_path = file_db.canonicalize(&a_path).unwrap();
