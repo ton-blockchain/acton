@@ -32,7 +32,7 @@ github-attestations = false
 # Which actions to run on pull requests
 pr-run-mode = "skip"
 # Plan jobs to run in CI
-plan-jobs = ["./verify-version"]
+plan-jobs = ["./verify-version", "./check-release-security"]
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./publish-docker-image", "./publish-mirror"]
 # Host jobs to run in CI
