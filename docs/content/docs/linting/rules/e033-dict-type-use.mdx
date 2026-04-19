@@ -1,0 +1,32 @@
+---
+title: "E033: dict-type-use"
+description: "Warns when code uses the low-level `dict` type."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E033`
+- `Rule`: `dict-type-use`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Warns when code uses the low-level `dict` type.
+
+### Why is this bad?
+`dict` erases key and value types, which makes code less type-safe and harder to understand.
+In most cases, `map<K, V>` communicates intent better and gives stronger type checking.
+
+### Example
+```tolk
+fun main(data: dict) {}
+```
+
+Use instead:
+```tolk
+fun main(data: map<uint32, cell>) {}
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dict_type_use.rs#L23" />

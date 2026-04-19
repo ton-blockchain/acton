@@ -4,6 +4,7 @@ pub mod bless_call_missing_safety_comment;
 pub mod compiler_error;
 pub mod dangerous_send_mode_missing_safety_comment;
 pub mod deprecated_symbol_use;
+pub mod dict_type_use;
 pub mod duplicated_condition;
 pub mod enum_cast_missing_safety_comment;
 pub mod explicit_return_type;

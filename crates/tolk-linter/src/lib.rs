@@ -3,10 +3,11 @@ extern crate core;
 use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
     acton_import_in_contract, bless_call_missing_safety_comment,
-    dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, duplicated_condition,
-    enum_cast_missing_safety_comment, explicit_return_type, identical_conditional_branches,
-    incoming_messages_duplicate_opcode, missing_contract_header, negated_is_type_can_use_not_is,
-    no_bounce_handler, no_global_variables, several_not_null_assertions,
+    dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, dict_type_use,
+    duplicated_condition, enum_cast_missing_safety_comment, explicit_return_type,
+    identical_conditional_branches, incoming_messages_duplicate_opcode, missing_contract_header,
+    negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
+    several_not_null_assertions,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -856,6 +857,11 @@ impl CheckerWalker<'_, '_> {
         if let Resolved::Global(resolved) = usage.resolved
             && let Some(symbol) = self.checker.type_db.project_index.resolve_symbol(resolved)
         {
+            run_rule!(
+                self.checker,
+                Rule::DictTypeUse,
+                dict_type_use::check_resolved_reference(self.checker, self.file_id, node, symbol)
+            );
             run_rule!(
                 self.checker,
                 Rule::DeprecatedSymbolUse,

@@ -6,6 +6,7 @@ mod asm_safety_comment_tests;
 mod bless_safety_comment_tests;
 mod dangerous_send_mode_safety_comment_tests;
 mod deprecated_tests;
+mod dict_type_use_tests;
 mod divide_before_multiply_tests;
 mod duplicated_condition_tests;
 mod enable_only_tests;

@@ -33,6 +33,7 @@
     "e030-enum-cast-missing-safety-comment",
     "e031-missing-contract-header",
     "e032-unused-expression",
+    "e033-dict-type-use",
     "s001-name-case-checker",
     "s002-explicit-return-type"
   ]
