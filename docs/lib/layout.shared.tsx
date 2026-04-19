@@ -11,7 +11,7 @@ export function baseOptions(): BaseLayoutProps {
       title: (
           <>
             {logo}
-            <span className="text-lg font-medium leading-none in-[.uwu]:hidden">Acton</span>
+            <span className="text-lg font-bold leading-none in-[.uwu]:hidden">Acton</span>
           </>
       ),
     },
