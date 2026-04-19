@@ -80,6 +80,15 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-build-ui-
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
@@ -99,6 +108,13 @@ jobs:
       - name: Run tests
         run: |
           just test
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -193,12 +209,28 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-lint-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-lint-ui-
+
       - name: Install UI dependencies
         run: bun ci
 
       - name: Run UI checks
         run: |
           just check-ui-ci
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
   build-macos:
     name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
@@ -252,6 +284,15 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-build-ui-
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
@@ -269,6 +310,13 @@ jobs:
       - name: Run tests
         run: |
           just test
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
