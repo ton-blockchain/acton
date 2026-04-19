@@ -337,7 +337,7 @@ fn localnet_serves_embedded_ui_and_spa_routes() {
             "GET {url} failed with status {status}: {body}"
         );
         assert!(
-            body.contains("<title>TON Lite Node UI</title>"),
+            body.contains("<title>TON Localnet UI</title>"),
             "Expected Localnet UI HTML from {url}, got:\n{body}"
         );
         assert!(

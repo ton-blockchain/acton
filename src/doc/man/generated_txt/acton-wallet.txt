@@ -27,8 +27,8 @@ COMMON LIFECYCLE
        o  acton wallet list --balance to inspect configured wallets and
           balances
 
-       o  acton wallet airdrop --net localnet to fund a wallet from a local
-          localnet faucet
+       o  acton wallet airdrop --net localnet to fund a wallet from a localnet
+          faucet
 
        o  acton wallet sign to sign an external message body without writing a
           whole script
@@ -186,8 +186,8 @@ SUBCOMMANDS
           --json
               Emit JSON output.
 
-          With --net localnet, Acton uses the localnet faucet instead of
-          the testnet PoW flow.
+          With --net localnet, Acton uses the localnet faucet instead of the
+          testnet PoW flow.
 
    acton wallet remove
        Remove a wallet from configuration.
