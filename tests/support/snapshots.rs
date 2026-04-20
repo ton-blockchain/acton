@@ -71,11 +71,28 @@ fn normalize_up_snapshot_text(content: String) -> String {
     let target_triple = build_info::TARGET_TRIPLE;
     let archive_name = format!("acton-{target_triple}.tar.gz");
     let checksum_name = format!("{archive_name}.sha256");
+    let current_version = build_info::PACKAGE_VERSION;
 
     content
         .replace(&checksum_name, "[ACTON_ARCHIVE_SHA256]")
         .replace(&archive_name, "[ACTON_ARCHIVE]")
         .replace(target_triple, "[TARGET_TRIPLE]")
+        .replace(
+            &format!(r#""current_version": "{current_version}""#),
+            r#""current_version": "[ACTON_VERSION]""#,
+        )
+        .replace(
+            &format!("Reinstalling version {current_version}"),
+            "Reinstalling version [ACTON_VERSION]",
+        )
+        .replace(
+            &format!("current: {current_version}"),
+            "current: [ACTON_VERSION]",
+        )
+        .replace(
+            &format!("binary-data-{current_version}"),
+            "binary-data-[ACTON_VERSION]",
+        )
 }
 
 fn build_redactions(project_path: &Path) -> snapbox::Redactions {

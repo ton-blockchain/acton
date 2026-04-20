@@ -1,4 +1,4 @@
-  Reinstalling version 0.2.0 (current: 0.2.0)
+  Reinstalling version [ACTON_VERSION] (current: [ACTON_VERSION])
        Found [ACTON_ARCHIVE]
        Found [ACTON_ARCHIVE_SHA256]
     Verified [ACTON_ARCHIVE_SHA256]
