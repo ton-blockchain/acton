@@ -709,10 +709,6 @@
       "description": "Default settings for the test runner",
       "type": "object",
       "properties": {
-        "api-key": {
-          "description": "API key for the network provider when forking",
-          "type": "string"
-        },
         "backtrace": {
           "description": "Enable stack traces for failed tests",
           "allOf": [

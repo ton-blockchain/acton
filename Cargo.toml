@@ -216,7 +216,6 @@ retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolkfmt = { workspace = true }
 ton-localnet = { workspace = true }
-toncenter-keys = { workspace = true }
 
 # remote crates
 # base TON libraries
@@ -309,6 +308,7 @@ dap-client = { workspace = true }
 function_name = { workspace = true }
 owo-colors = { workspace = true } # overall coloring
 dap = { workspace = true }
+toncenter-keys = { workspace = true }
 
 [build-dependencies]
 chrono = { workspace = true }

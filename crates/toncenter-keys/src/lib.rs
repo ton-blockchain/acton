@@ -21,14 +21,14 @@ pub const fn env_var_name(network: &Network) -> Option<&'static str> {
 /// Resolves the TonCenter API key for the selected network from the process environment.
 #[must_use]
 pub fn api_key(network: &Network) -> Option<String> {
-    let env_name = env_var_name(network)?;
-    lookup_api_key(env_name, |name| std::env::var(name).ok())
+    api_key_with(network, |name| std::env::var(name).ok())
 }
 
-fn lookup_api_key<F>(env_name: &str, lookup: F) -> Option<String>
+fn api_key_with<F>(network: &Network, lookup: F) -> Option<String>
 where
     F: FnOnce(&str) -> Option<String>,
 {
+    let env_name = env_var_name(network)?;
     lookup(env_name)
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -42,36 +42,28 @@ mod tests {
     fn resolves_mainnet_key_from_mainnet_env() {
         let lookup = |name: &str| match name {
             TONCENTER_MAINNET_API_KEY_ENV => Some(" mainnet-key ".to_string()),
-            TONCENTER_TESTNET_API_KEY_ENV => None,
             _ => None,
         };
 
         assert_eq!(
-            lookup_api_key(TONCENTER_MAINNET_API_KEY_ENV, lookup),
+            api_key_with(&Network::Mainnet, lookup),
             Some("mainnet-key".to_string())
         );
-        assert_eq!(
-            env_var_name(&Network::Testnet),
-            Some(TONCENTER_TESTNET_API_KEY_ENV)
-        );
+        assert_eq!(api_key_with(&Network::Testnet, |_| None), None);
     }
 
     #[test]
     fn resolves_testnet_key_from_testnet_env() {
         let lookup = |name: &str| match name {
             TONCENTER_TESTNET_API_KEY_ENV => Some("testnet-key".to_string()),
-            TONCENTER_MAINNET_API_KEY_ENV => None,
             _ => None,
         };
 
         assert_eq!(
-            lookup_api_key(TONCENTER_TESTNET_API_KEY_ENV, lookup),
+            api_key_with(&Network::Testnet, lookup),
             Some("testnet-key".to_string())
         );
-        assert_eq!(
-            env_var_name(&Network::Mainnet),
-            Some(TONCENTER_MAINNET_API_KEY_ENV)
-        );
+        assert_eq!(api_key_with(&Network::Mainnet, |_| None), None);
     }
 
     #[test]
@@ -83,7 +75,7 @@ mod tests {
     #[test]
     fn ignores_empty_values_after_trimming() {
         assert_eq!(
-            lookup_api_key(TONCENTER_MAINNET_API_KEY_ENV, |_| Some("   ".into())),
+            api_key_with(&Network::Mainnet, |_| Some("   ".into())),
             None
         );
     }

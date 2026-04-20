@@ -97,7 +97,7 @@ impl TonApiClient {
     }
 
     #[must_use]
-    pub fn has_api_key(&self) -> bool {
+    pub const fn has_api_key(&self) -> bool {
         self.api_key.is_some()
     }
 
