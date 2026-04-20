@@ -31,15 +31,9 @@ concurrency:
 permissions: { }
 
 jobs:
-  check-dependencies:
-    name: Check Dependencies
-    strategy:
-      matrix:
-        include:
-          - runner: ubicloud-standard-2-ubuntu-2204
-            os: linux
-            arch: x86_64
-    runs-on: ${{ matrix.runner }}
+  rust-audit:
+    name: Rust audit
+    runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read
@@ -50,19 +44,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          key: ${{ runner.os }}-${{ runner.arch }}
-          save-if: ${{ github.ref == 'refs/heads/master' }}
-
-      - name: Install Rust
-        run: rustup toolchain install
-
       - name: Install cargo-deny
         uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
         with:
-          tool: cargo-deny@0.19.0
+          tool: cargo-deny@0.19.4
 
       - name: Run cargo-deny
         run: cargo deny check
