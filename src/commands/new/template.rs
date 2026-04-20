@@ -21,6 +21,7 @@ static NFT_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft");
 
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
+const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ProjectLayout {
@@ -347,8 +348,9 @@ pub(super) fn create_project_from_scaffold(
     scaffold: ProjectScaffold,
     target_dir: &Path,
     include_agents: bool,
+    npm_package_name: Option<&str>,
 ) -> anyhow::Result<()> {
-    extract_template_dir(scaffold.dir, target_dir, include_agents)?;
+    extract_template_dir(scaffold.dir, target_dir, include_agents, npm_package_name)?;
     Ok(())
 }
 
@@ -356,6 +358,7 @@ fn extract_template_dir(
     dir: &Dir<'static>,
     base_path: &Path,
     include_agents: bool,
+    npm_package_name: Option<&str>,
 ) -> std::io::Result<()> {
     for entry in dir.entries() {
         if !include_agents && should_skip_entry(entry.path()) {
@@ -366,7 +369,7 @@ fn extract_template_dir(
 
         if let Some(subdir) = entry.as_dir() {
             fs::create_dir_all(&path)?;
-            extract_template_dir(subdir, base_path, include_agents)?;
+            extract_template_dir(subdir, base_path, include_agents, npm_package_name)?;
             continue;
         }
 
@@ -375,7 +378,18 @@ fn extract_template_dir(
                 fs::create_dir_all(parent)?;
             }
 
-            fs::write(path, file.contents())?;
+            if let Some(package_name) = npm_package_name
+                && matches!(
+                    entry.path().to_str(),
+                    Some("package.json" | "package-lock.json")
+                )
+            {
+                let content = String::from_utf8_lossy(file.contents())
+                    .replace(NPM_PACKAGE_NAME_PLACEHOLDER, package_name);
+                fs::write(path, content)?;
+            } else {
+                fs::write(path, file.contents())?;
+            }
         }
     }
 
