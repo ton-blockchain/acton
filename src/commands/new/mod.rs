@@ -5,9 +5,8 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
 };
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
-use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{IsTerminal, Write, stdin, stdout};
@@ -200,7 +199,16 @@ pub fn new_cmd(
     std::env::set_current_dir(&project_path)?;
 
     // use `.` since we explicitly change current dir to project dir
-    template::create_project_from_scaffold(scaffold, Path::new("."), include_agents)?;
+    let normalized_npm_package_name = scaffold
+        .layout()
+        .includes_typescript_app()
+        .then(|| normalize_npm_package_name(&project_name));
+    template::create_project_from_scaffold(
+        scaffold,
+        Path::new("."),
+        include_agents,
+        normalized_npm_package_name.as_deref(),
+    )?;
 
     let mut contracts = BTreeMap::new();
     for contract in scaffold.contracts() {
@@ -237,10 +245,6 @@ pub fn new_cmd(
     let mut acton_toml = toml::to_string_pretty(&config)?;
     acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
     fs::write("Acton.toml", acton_toml)?;
-
-    if scaffold.layout().includes_typescript_app() {
-        update_npm_package_metadata(&project_name)?;
-    }
 
     stdlib::ensure_latest(Path::new("."))?;
 
@@ -490,193 +494,6 @@ fn project_mappings(layout: ProjectLayout) -> BTreeMap<String, String> {
     mappings.insert("tests".to_owned(), layout.tests_mapping().to_owned());
     mappings.insert("wrappers".to_owned(), layout.wrappers_mapping().to_owned());
     mappings
-}
-
-fn update_npm_package_metadata(project_name: &str) -> anyhow::Result<()> {
-    let normalized_name = normalize_npm_package_name(project_name);
-    let has_workspaces = update_package_json_name(&normalized_name)?;
-    update_package_lock_name(&normalized_name, has_workspaces)?;
-    Ok(())
-}
-
-fn update_package_json_name(normalized_name: &str) -> anyhow::Result<bool> {
-    let package_json_path = Path::new("package.json");
-
-    if !package_json_path.exists() {
-        return Ok(false);
-    }
-
-    let content = fs::read_to_string(package_json_path)
-        .with_context(|| format!("Failed to read {}", package_json_path.display()))?;
-    let mut package_json: JsonValue = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
-    let has_workspaces = matches!(
-        &package_json,
-        JsonValue::Object(object) if object.contains_key("workspaces")
-    );
-
-    if matches!(package_json, JsonValue::Object(_))
-        && let Some(updated_content) =
-            replace_top_level_json_string_field(&content, "name", normalized_name)
-    {
-        fs::write(package_json_path, updated_content)
-            .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
-        return Ok(has_workspaces);
-    }
-
-    if let JsonValue::Object(object) = &mut package_json {
-        object.insert(
-            "name".to_owned(),
-            JsonValue::String(normalized_name.to_owned()),
-        );
-    } else {
-        let mut object = JsonMap::new();
-        object.insert(
-            "name".to_owned(),
-            JsonValue::String(normalized_name.to_owned()),
-        );
-        package_json = JsonValue::Object(object);
-    }
-
-    let formatted =
-        serde_json::to_string_pretty(&package_json).context("Failed to serialize package.json")?;
-    fs::write(package_json_path, format!("{formatted}\n"))
-        .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
-    Ok(has_workspaces)
-}
-
-fn replace_top_level_json_string_field(content: &str, field: &str, value: &str) -> Option<String> {
-    let bytes = content.as_bytes();
-    let field_literal = serde_json::to_string(field).ok()?;
-    let replacement_literal = serde_json::to_string(value).ok()?;
-    let mut index = 0;
-    let mut depth = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-
-    while index < bytes.len() {
-        let byte = bytes[index];
-
-        if in_string {
-            if escaped {
-                escaped = false;
-            } else if byte == b'\\' {
-                escaped = true;
-            } else if byte == b'"' {
-                in_string = false;
-            }
-            index += 1;
-            continue;
-        }
-
-        match byte {
-            b'"' => {
-                if depth == 1 && bytes[index..].starts_with(field_literal.as_bytes()) {
-                    let key_end = index + field_literal.len();
-                    let mut value_start = key_end;
-
-                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
-                        value_start += 1;
-                    }
-
-                    if bytes.get(value_start) != Some(&b':') {
-                        in_string = true;
-                        index += 1;
-                        continue;
-                    }
-
-                    value_start += 1;
-                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
-                        value_start += 1;
-                    }
-
-                    if bytes.get(value_start) != Some(&b'"') {
-                        return None;
-                    }
-
-                    let value_end = find_json_string_end(bytes, value_start)?;
-                    let mut updated = String::with_capacity(
-                        content.len() + replacement_literal.len() - (value_end - value_start),
-                    );
-                    updated.push_str(&content[..value_start]);
-                    updated.push_str(&replacement_literal);
-                    updated.push_str(&content[value_end..]);
-                    return Some(updated);
-                }
-
-                in_string = true;
-            }
-            b'{' | b'[' => depth += 1,
-            b'}' | b']' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-
-        index += 1;
-    }
-
-    None
-}
-
-fn find_json_string_end(bytes: &[u8], start_quote: usize) -> Option<usize> {
-    let mut index = start_quote + 1;
-    let mut escaped = false;
-
-    while index < bytes.len() {
-        let byte = bytes[index];
-
-        if escaped {
-            escaped = false;
-        } else if byte == b'\\' {
-            escaped = true;
-        } else if byte == b'"' {
-            return Some(index + 1);
-        }
-
-        index += 1;
-    }
-
-    None
-}
-
-fn update_package_lock_name(normalized_name: &str, has_workspaces: bool) -> anyhow::Result<()> {
-    let package_lock_path = Path::new("package-lock.json");
-
-    if !package_lock_path.exists() {
-        return Ok(());
-    }
-
-    let content = fs::read_to_string(package_lock_path)
-        .with_context(|| format!("Failed to read {}", package_lock_path.display()))?;
-    let mut package_lock: JsonValue = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", package_lock_path.display()))?;
-
-    let JsonValue::Object(root) = &mut package_lock else {
-        anyhow::bail!("{} must contain a JSON object", package_lock_path.display());
-    };
-
-    root.insert(
-        "name".to_owned(),
-        JsonValue::String(normalized_name.to_owned()),
-    );
-
-    if let Some(packages) = root.get_mut("packages").and_then(JsonValue::as_object_mut) {
-        if let Some(root_package) = packages.get_mut("").and_then(JsonValue::as_object_mut) {
-            root_package.insert(
-                "name".to_owned(),
-                JsonValue::String(normalized_name.to_owned()),
-            );
-        }
-
-        if !has_workspaces {
-            packages.retain(|path, _| path.is_empty() || path.starts_with("node_modules"));
-        }
-    }
-
-    let formatted =
-        serde_json::to_string_pretty(&package_lock).context("Failed to serialize package-lock")?;
-    fs::write(package_lock_path, format!("{formatted}\n"))
-        .with_context(|| format!("Failed to write {}", package_lock_path.display()))?;
-    Ok(())
 }
 
 fn normalize_npm_package_name(project_name: &str) -> String {
