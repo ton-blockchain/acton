@@ -16,7 +16,6 @@ use std::fs;
 use std::io::{IsTerminal, Read, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 use toml_edit::{DocumentMut, Item, Table, value};
@@ -24,7 +23,7 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
-use ton_api::{CustomNetworkUrls, Network, TonApiClient};
+use ton_api::{Network, TonApiClient};
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
 #[clap(rename_all = "lowercase")]
@@ -103,7 +102,6 @@ const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
-const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL"; // integration tests only
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -628,25 +626,7 @@ where
 
 fn create_testnet_ton_api_client() -> anyhow::Result<TonApiClient> {
     let config = ActonConfig::load().unwrap_or_default();
-    let mut custom_networks = config.custom_networks();
-    let toncenter_v3_override = env::var(TEST_TONCENTER_V3_URL_ENV).ok();
-
-    if let Some(url) = toncenter_v3_override {
-        // test only code
-        let network_name = "__wallet_list_testnet_override".to_string();
-        let normalized = Arc::<str>::from(url.trim_end_matches('/').to_owned());
-        custom_networks.insert(
-            network_name.clone(),
-            CustomNetworkUrls {
-                v2_url: Arc::clone(&normalized),
-                v3_url: Some(normalized),
-                explorer_url: None,
-            },
-        );
-        TonApiClient::new(Network::Custom(Arc::from(network_name)), custom_networks)
-    } else {
-        TonApiClient::new(Network::Testnet, custom_networks)
-    }
+    TonApiClient::new(Network::Testnet, config.custom_networks())
 }
 
 fn http_retry_backoff(attempt: usize) -> Duration {

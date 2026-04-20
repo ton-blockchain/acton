@@ -62,6 +62,7 @@ impl Network {
 
     fn testnet_toncenter_v3_url() -> String {
         env_value("ACTON_TEST_TONCENTER_TESTNET_V3_URL")
+            .or_else(|| env_value("ACTON_TEST_TONCENTER_V3_URL"))
             .unwrap_or_else(|| "https://testnet.toncenter.com/api/v3".to_owned())
     }
 

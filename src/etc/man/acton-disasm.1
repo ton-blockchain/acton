@@ -130,6 +130,10 @@ testnet.
 Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
 .sp
+For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
+names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so
+\fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
 Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.

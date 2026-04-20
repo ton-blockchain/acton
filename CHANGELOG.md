@@ -50,7 +50,9 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```
 
   Built-in `mainnet`/`testnet` commands now pick the matching env var
-  automatically. The old shared `TONCENTER_API_KEY` fallback is gone.
+  automatically. For `custom:<name>`, Acton reads
+  `<NORMALIZED_NAME>_API_KEY` instead, for example `custom:foo-bar` ->
+  `FOO_BAR_API_KEY`. The old shared `TONCENTER_API_KEY` fallback is gone.
 
 - `acton litenode` was renamed to `acton localnet`, and the manifest section
   `[litenode]` was renamed to `[localnet]`. The network name stays `localnet`,

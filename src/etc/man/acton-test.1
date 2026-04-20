@@ -210,6 +210,10 @@ Relative paths are resolved from the project root.
 When tests fork from the built\-in \fBmainnet\fR/\fBtestnet\fR backends, authenticated
 requests read \fBTONCENTER_MAINNET_API_KEY\fR or \fBTONCENTER_TESTNET_API_KEY\fR\&.
 .sp
+When tests fork from \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&.
+Custom network names are uppercased and non\-alphanumeric characters are
+replaced with \fB_\fR, so \fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
 Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.

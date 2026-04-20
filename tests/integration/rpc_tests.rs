@@ -89,6 +89,7 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
         .arg(RAW_INFO_ADDRESS)
         .arg("--net")
         .arg("custom:mock")
+        .env("MOCK_API_KEY", "custom-mock-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run();
 
@@ -112,8 +113,8 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
     );
     assert_eq!(
         header_value(&captured[0].headers, "X-API-Key"),
-        None,
-        "rpc info should not send TonCenter API keys for custom networks",
+        Some("custom-mock-api-key"),
+        "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
     );
 }
 
