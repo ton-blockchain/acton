@@ -2,7 +2,7 @@
 
 This project was generated from Acton's `counter` template with
 TypeScript app scaffold enabled. It includes a counter contract, Tolk tests and
-wrappers under `contracts/`, a generated TypeScript wrapper in `wrapper-ts/`, and
+wrappers under `contracts/`, a generated TypeScript wrapper in `wrappers-ts/`, and
 a Vite-based React app in `app/`.
 
 ## Layout
@@ -11,7 +11,7 @@ a Vite-based React app in `app/`.
 - `contracts/tests` contains integration tests.
 - `contracts/wrappers` contains Tolk wrappers used by tests and scripts.
 - `contracts/scripts` contains deployment scripts.
-- `wrapper-ts/Counter.ts` is the generated TypeScript wrapper consumed by the app.
+- `wrappers-ts/Counter.ts` is the generated TypeScript wrapper consumed by the app.
 - `app/` contains the React + Vite frontend.
 - `package.json`, `tsconfig.json`, and `vite.config.ts` configure the app
   toolchain.

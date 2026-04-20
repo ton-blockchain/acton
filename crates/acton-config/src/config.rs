@@ -2006,7 +2006,7 @@ generate-test = true
 test-output-dir = "tests/generated-tests"
 
 [wrappers.typescript]
-output-dir = "./wrapper-ts"
+output-dir = "./wrappers-ts"
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -2019,7 +2019,10 @@ output-dir = "./wrapper-ts"
             config.tolk_wrapper_test_output_dir(),
             Some("tests/generated-tests")
         );
-        assert_eq!(config.typescript_wrapper_output_dir(), Some("./wrapper-ts"));
+        assert_eq!(
+            config.typescript_wrapper_output_dir(),
+            Some("./wrappers-ts")
+        );
     }
 
     #[test]

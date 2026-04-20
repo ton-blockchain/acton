@@ -128,7 +128,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```
 
 - Default generated TypeScript wrapper output moved from `wrappers/` to
-  `wrapper-ts/`.
+  `wrappers-ts/`.
 
   If your frontend imports from the old directory, either update the import
   path or pin the old output directory:

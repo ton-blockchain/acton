@@ -247,7 +247,7 @@ generate-test = true
 test-output-dir = "tests"
 
 [wrappers.typescript]
-output-dir = "wrapper-ts"
+output-dir = "wrappers-ts"
 ```
 
 CLI flags override config values for the current invocation.
@@ -283,13 +283,13 @@ CLI flags override config values for the current invocation.
    ```bash
    acton wrapper Counter --output-dir tests/generated
    acton wrapper Counter --test --test-output-dir tests/generated
-   acton wrapper Counter --ts --output-dir wrapper-ts
+   acton wrapper Counter --ts --output-dir wrappers-ts
    ```
 
 5. Generate a frontend-oriented TypeScript wrapper layout:
 
    ```bash
-   acton wrapper Counter --ts --output-dir app/src/wrapper-ts
+   acton wrapper Counter --ts --output-dir app/src/wrappers-ts
    ```
 
 ## See Also

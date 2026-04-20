@@ -21,7 +21,7 @@ Commands:
 
   run              <SCRIPT> [ARGS...]  Run a script defined in Acton.toml
   compile          <PATH>              Compile a Tolk file
-  wrapper          <CONTRACT_NAME>     Generate wrapper and optionally stub test file for a contract
+  wrapper          <CONTRACT_NAME>     Generate wrappers and optionally a stub test file for a contract
   disasm           [BOC_FILE]          Disassemble TVM bitcode to human-readable TASM
   doc              tvm <QUERY...>      Lookup reference documentation
 
