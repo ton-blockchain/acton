@@ -567,9 +567,13 @@ Rules:
 
 ## Useful environment variables
 
-- `TONCENTER_API_KEY`: API key used by commands that query blockchain data.
+- `TONCENTER_MAINNET_API_KEY`: API key for TonCenter mainnet requests.
+- `TONCENTER_TESTNET_API_KEY`: API key for TonCenter testnet requests.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
+
+In generated projects, `.env` is usually the simplest place to set the
+TonCenter keys because Acton loads that file automatically.
 
 ## AI Policy
 

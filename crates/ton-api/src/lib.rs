@@ -7,6 +7,7 @@ use std::fmt;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 pub use ton_networks::{CustomNetworkUrls, Network};
+use toncenter_keys::api_key as toncenter_api_key;
 use tvmffi::json_stack::{json_to_legacy_stack, json_to_stack};
 use tvmffi::stack::TupleItem;
 use tycho_types::boc::Boc;
@@ -71,7 +72,6 @@ impl TonApiClient {
     pub fn new(
         network: Network,
         custom_networks: HashMap<String, CustomNetworkUrls>,
-        api_key: Option<String>,
     ) -> anyhow::Result<TonApiClient> {
         let mut client_builder = reqwest::blocking::ClientBuilder::new()
             .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
@@ -84,8 +84,8 @@ impl TonApiClient {
             client: client_builder
                 .build()
                 .context("Cannot create HTTP client, please check if network is available")?,
+            api_key: toncenter_api_key(&network),
             network,
-            api_key,
             custom_networks,
         })
     }
@@ -97,9 +97,8 @@ impl TonApiClient {
     }
 
     #[must_use]
-    pub fn with_api_key(mut self, api_key: String) -> Self {
-        self.api_key = Some(api_key);
-        self
+    pub fn has_api_key(&self) -> bool {
+        self.api_key.is_some()
     }
 
     fn build_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {

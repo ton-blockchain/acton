@@ -110,24 +110,6 @@ Run verification without submitting the final blockchain transaction.
 </CommandOption>
 
 
-<CommandOption>
-<CommandOptionTitle>
-
-`--api-key` _key_
-
-</CommandOptionTitle>
-
-TonCenter API key for blockchain queries.
-
-<CommandOptionMeta label="Environment">
-
-`TONCENTER_API_KEY`.
-
-</CommandOptionMeta>
-
-</CommandOption>
-
-
 </CommandOptions>
 
 ### Network Options
@@ -154,6 +136,15 @@ Network to verify against.
 
 
 </CommandOptions>
+
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on `--net`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ### Display Options
 

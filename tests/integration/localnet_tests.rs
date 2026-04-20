@@ -682,8 +682,6 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -833,8 +831,6 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         .fetch(&library_hash)
         .arg("--net")
         .arg("localnet")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .arg("--output")
         .arg("fetched_library.boc")
         .run()
@@ -894,8 +890,6 @@ fn localnet_supports_library_ref_contract_deploy_and_destroy_flow() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 

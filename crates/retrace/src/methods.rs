@@ -34,8 +34,7 @@ use tycho_types::prelude::{Cell, HashBytes};
 /// println!("Found tx with lt: {}", info.lt);
 /// ```
 pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<BaseTxInfo> {
-    let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let client = TonCenterClient::new(net.clone(), api_key)?;
+    let client = TonCenterClient::new(net.clone())?;
 
     let resp = client.get_transactions(hash, 1).await?;
 
@@ -121,8 +120,7 @@ pub(crate) async fn find_shard_block_for_tx(
     let shard_uint = shard_int as u64;
     let shard_hex = format!("0x{shard_uint:x}");
 
-    let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let client = TonCenterClient::new(net, api_key)?;
+    let client = TonCenterClient::new(net)?;
 
     let res = client
         .get_blocks(shard.workchain, &shard_hex, shard.seqno)
@@ -191,8 +189,7 @@ pub(crate) async fn find_all_transactions_between(
     base_tx: &BaseTxInfo,
     min_lt: u64,
 ) -> anyhow::Result<Vec<tycho_types::models::Transaction>> {
-    let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let client = TonCenterClient::new(net, api_key)?;
+    let client = TonCenterClient::new(net)?;
 
     let address = base_tx.address.display_base64_url(false).to_string();
     let hash_base64 = general_purpose::STANDARD.encode(base_tx.hash);
@@ -505,8 +502,7 @@ pub(crate) fn compute_final_data(
 ///
 /// Attempts to fetch from `TonCenter` first, falling back to dton.io if needed.
 pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
-    let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let toncenter = TonCenterClient::new(net.clone(), api_key)?;
+    let toncenter = TonCenterClient::new(net.clone())?;
 
     Ok(if let Ok(data) = toncenter.get_libraries(hash).await {
         Boc::decode_base64(data)?

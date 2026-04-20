@@ -19,7 +19,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 const COUNTER_CONTRACT: &str = include_str!("../acton-stdlib/contracts/counter.tolk");
 const COUNTER_TYPES: &str = include_str!("../acton-stdlib/contracts/types.tolk");
-const TEST_TONCENTER_API_KEY: &str = "test-toncenter-api-key";
+const TEST_API_KEY: &str = "test-toncenter-api-key";
 const TEST_TONCENTER_MAINNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V3_URL";
 const TEST_TONCENTER_TESTNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V3_URL";
 
@@ -79,7 +79,7 @@ fn header_value<'a>(request: &'a CapturedToncenterRequest, name: &str) -> Option
 fn assert_api_key_header(request: &CapturedToncenterRequest) {
     assert_eq!(
         header_value(request, "X-API-Key"),
-        Some(TEST_TONCENTER_API_KEY),
+        Some(TEST_API_KEY),
         "expected TonCenter request to carry X-API-Key header"
     );
 }
@@ -578,7 +578,7 @@ fn test_disasm_from_blockchain_custom_network_address_with_mock_toncenter() {
         .disasm()
         .with_address(address)
         .with_net("custom:mock-remote")
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .run()
         .success();
 
@@ -619,7 +619,7 @@ fn test_disasm_from_blockchain_custom_network_fetch_failure_with_mock_toncenter(
         .disasm()
         .with_address(address)
         .with_net("custom:mock-remote")
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .run()
         .failure();
 
@@ -658,7 +658,7 @@ fn test_disasm_from_blockchain_mainnet_address_with_mock_autodetect() {
         .acton()
         .disasm()
         .with_address(address)
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &mainnet_url)
         .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, "http://127.0.0.1:1")
         .run()
@@ -699,7 +699,7 @@ fn test_disasm_from_blockchain_testnet_address_with_mock_autodetect() {
         .acton()
         .disasm()
         .with_address(address)
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &mainnet_url)
         .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, &testnet_url)
         .run()
@@ -744,7 +744,7 @@ fn test_disasm_from_blockchain_address_not_found_on_both_networks_with_mock_auto
         .acton()
         .disasm()
         .with_address(address)
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &mainnet_url)
         .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, &testnet_url)
         .run()
@@ -794,7 +794,7 @@ fn test_disasm_follow_libraries_with_mock_toncenter() {
         .disasm()
         .with_address(address)
         .with_net("custom:mock-remote")
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .follow_libraries()
         .run()
         .success();
@@ -840,7 +840,7 @@ fn test_disasm_follow_libraries_warns_and_keeps_original_code_with_mock_toncente
         .disasm()
         .with_address(address)
         .with_net("custom:mock-remote")
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .follow_libraries()
         .run()
         .success();
@@ -884,7 +884,7 @@ fn test_disasm_follow_libraries_skips_lookup_for_non_library_code_with_mock_tonc
         .disasm()
         .with_address(address)
         .with_net("custom:mock-remote")
-        .with_api_key(TEST_TONCENTER_API_KEY)
+        .with_api_key(TEST_API_KEY)
         .follow_libraries()
         .run()
         .success();
@@ -908,7 +908,8 @@ fn test_disasm_follow_libraries_skips_lookup_for_non_library_code_with_mock_tonc
 // We don't usually want to store keys this way, but without keys it's almost
 // impossible to use API calls :(
 fn toncenter_api_key() -> &'static str {
-    option_env!("TONCENTER_API_KEY")
+    option_env!("TONCENTER_TESTNET_API_KEY")
+        .or(option_env!("TONCENTER_MAINNET_API_KEY"))
         .unwrap_or("49efa980ccdcd018fd09d387e63537afd9db4dbb8509d69e7bc2303ca2b2c860")
 }
 

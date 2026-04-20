@@ -285,7 +285,6 @@ fn execute_script<'a>(
             build_override: BTreeMap::new(),
             explorer: None,
             fork_net: None,
-            api_key: None,
             running_id: "script".into(),
             test_code: Some(test_code_cell),
         },
@@ -351,7 +350,6 @@ fn execute_script<'a>(
         backtrace: None,
         fork_net: None,
         network: None,
-        api_key: None,
     };
 
     Ok((result, io, formatter))

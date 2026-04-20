@@ -30,22 +30,16 @@ pub enum RpcCommand {
             help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
         )]
         net: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
     },
 }
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
-        RpcCommand::Info {
-            address,
-            net,
-            api_key,
-        } => rpc_info_cmd(&address, net, api_key),
+        RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
     }
 }
 
-fn rpc_info_cmd(address: &str, net: Option<String>, api_key: Option<String>) -> anyhow::Result<()> {
+fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
     let (address, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
         .map_err(|_| anyhow!("Invalid address"))
         .with_context(|| error_fmt::invalid_address(address))?;
@@ -57,7 +51,7 @@ fn rpc_info_cmd(address: &str, net: Option<String>, api_key: Option<String>) -> 
         .unwrap_or(Network::Testnet);
 
     let config = load_rpc_config()?;
-    let client = TonApiClient::new(network.clone(), config.custom_networks(), api_key)?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
     let remote = client
         .get_account_info(None, &address.to_string())

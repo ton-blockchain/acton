@@ -150,7 +150,6 @@ pub struct TestConfig {
     pub baseline_snapshot: Option<String>,
     pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,
     pub save_test_trace: Option<String>,
     pub mutate: bool,

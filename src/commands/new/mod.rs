@@ -61,11 +61,15 @@ gen/
 ";
 
 const BASE_DOT_ENV: &str = "
+# Acton loads this .env file automatically.
+# This is usually the easiest place to keep project-local Toncenter API keys.
 # Acton uses Toncenter to access blockchain data and send messages.
 # Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
 # exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
 # You can obtain a key in the bot at https://t.me/toncenter.
-# TONCENTER_API_KEY=\"your-key-here\"
+# Uncomment the network keys you need:
+# TONCENTER_MAINNET_API_KEY=\"your-mainnet-key-here\"
+# TONCENTER_TESTNET_API_KEY=\"your-testnet-key-here\"
 ";
 
 const BASE_EDITORCONFIG: &str = "

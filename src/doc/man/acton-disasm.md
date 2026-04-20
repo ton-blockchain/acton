@@ -57,10 +57,6 @@ disassembly output.
 Fetch contract code from the blockchain by address and disassemble it.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{#option "`--net` _network_" }}
 Network to use for `--address` and library lookups.
 
@@ -97,13 +93,21 @@ When `--address` is used, Acton fetches code from the selected network.
 - `--net` accepts `mainnet`, `testnet`, `localnet`, and `custom:<name>`
 - `localnet` and `custom:<name>` use URLs from `Acton.toml`
 - Without `--net`, Acton tries mainnet first and then testnet
-- `--api-key` helps avoid TonCenter rate limits
 - with `--address`, `--follow-libraries` reuses the network that returned the
   contract code
 
 When `--follow-libraries` is used with a local file or `--string`, Acton uses
 the explicit `--net` if provided; otherwise library fetches default to
 testnet.
+
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ## Input Precedence
 

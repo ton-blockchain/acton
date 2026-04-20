@@ -52,12 +52,6 @@ Currently defaults to `1.2.0`.
 Run verification without submitting the final blockchain transaction.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-
-Also read from `TONCENTER_API_KEY`.
-{{/option}}
-
 {{/options}}
 
 ### Network Options
@@ -71,6 +65,15 @@ Defaults to `testnet`.
 {{/option}}
 
 {{/options}}
+
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on `--net`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ### Display Options
 

@@ -207,10 +207,6 @@ Fork remote blockchain state for account resolution.
 Historical block sequence number to fork from.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{/options}}
 
 ### Tracing Options
@@ -229,6 +225,15 @@ Relative paths are resolved from the project root.
 {{/option}}
 
 {{/options}}
+
+## TonCenter API Keys
+
+When tests fork from the built-in `mainnet`/`testnet` backends, authenticated
+requests read `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ### Mutation Testing Options
 

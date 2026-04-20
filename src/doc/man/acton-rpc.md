@@ -52,10 +52,6 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 `custom:<name>`.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{/options}}
 
 #### Output
@@ -89,6 +85,15 @@ information and reports that decoded storage is unavailable.
 For `custom:<name>`, Acton needs access to the selected project or manifest so
 it can read the custom network configuration.
 
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
+
 ## ABI Matching
 
 Storage decoding is best-effort and depends on local project context.
@@ -117,10 +122,10 @@ project, but not guaranteed for arbitrary third-party deployments.
    acton rpc info EQC...
    ```
 
-2. Inspect a mainnet account with an API key:
+2. Inspect a mainnet account with an API key from the environment:
 
    ```bash
-   acton rpc info EQC... --net mainnet --api-key $TONCENTER_API_KEY
+   TONCENTER_MAINNET_API_KEY=your-key acton rpc info EQC... --net mainnet
    ```
 
 3. Inspect a localnet deployment and decode storage with the current project:

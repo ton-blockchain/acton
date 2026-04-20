@@ -25,13 +25,15 @@ This is useful for deterministic debugging of historical behavior.
 
 ## API Key
 
-Use `--api-key` for TonCenter access:
+Use the TonCenter env var that matches the forked network:
 
 ```bash
-acton localnet start --fork-net mainnet --api-key YOUR_API_KEY
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton localnet start --fork-net testnet
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton localnet start --fork-net mainnet
 ```
 
-You can also set `TONCENTER_API_KEY` and omit `--api-key`.
+Acton reads these env vars automatically for the built-in `testnet` and
+`mainnet` fork backends.
 
 ## Configure Defaults in `Acton.toml`
 

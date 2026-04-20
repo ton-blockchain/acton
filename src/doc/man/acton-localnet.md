@@ -43,10 +43,6 @@ Historical block sequence number to fork from.
 Wallet names to auto-fund and deploy on startup.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for remote blockchain queries.
-{{/option}}
-
 {{#option "`--db-path` _path_" }}
 Path to a SQLite database for persistent node state.
 {{/option}}
@@ -107,6 +103,16 @@ rate-limit = 1
 ```
 
 CLI flags override config values for the current invocation.
+
+## TonCenter API Keys
+
+When localnet forks from the built-in `mainnet`/`testnet` backends,
+authenticated requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ## Runtime Model
 

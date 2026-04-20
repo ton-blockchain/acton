@@ -294,8 +294,6 @@ pub struct TestSettings {
     /// Network to fork for testing
     #[schemars(with = "Option<Network>")]
     pub fork_net: Option<String>,
-    /// API key for the network provider when forking
-    pub api_key: Option<String>,
     /// Specific block number to fork from
     pub fork_block_number: Option<u64>,
     /// Configuration for mutation testing
@@ -1217,7 +1215,6 @@ impl TestSettings {
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
         fork_net_override: Option<Network>,
-        api_key_override: Option<String>,
         fork_block_number_override: Option<u64>,
         save_test_trace_override: Option<String>,
         mutate_override: bool,
@@ -1311,7 +1308,6 @@ impl TestSettings {
                         _ => None,
                     })
             }),
-            api_key: api_key_override.or_else(|| self.api_key.clone()),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
             save_test_trace: save_test_trace_override,
             mutate: mutate_override,

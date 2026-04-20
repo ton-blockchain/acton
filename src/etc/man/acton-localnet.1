@@ -37,11 +37,6 @@ Historical block sequence number to fork from.
 Wallet names to auto\-fund and deploy on startup.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for remote blockchain queries.
-.RE
-.sp
 \fB\-\-db\-path\fR \fIpath\fR
 .RS 4
 Path to a SQLite database for persistent node state.
@@ -98,6 +93,14 @@ rate\-limit = 1
 .RE
 .sp
 CLI flags override config values for the current invocation.
+.SH "TONCENTER API KEYS"
+When localnet forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
+authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "RUNTIME MODEL"
 .sp
 .RS 4

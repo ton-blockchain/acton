@@ -18,7 +18,6 @@ use tycho_types::prelude::HashBytes;
 pub struct RemoteProvider {
     pub network: Network,
     pub fork_block_number: Option<u64>,
-    pub api_key: Option<String>,
 }
 
 pub fn fetch_remote_shard_account(
@@ -30,11 +29,7 @@ pub fn fetch_remote_shard_account(
 
     let config = config::ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(
-        provider.network.clone(),
-        custom_networks,
-        provider.api_key.as_deref().map(ToString::to_string),
-    )?;
+    let api_client = TonApiClient::new(provider.network.clone(), custom_networks)?;
 
     let info = api_client.get_account_info(provider.fork_block_number, &addr.to_string())?;
 

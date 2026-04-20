@@ -34,7 +34,6 @@ pub fn publish_cmd(
     code_arg: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
-    api_key: Option<String>,
     net: String,
     amount_arg: Option<String>,
     yes: bool,
@@ -189,7 +188,7 @@ pub fn publish_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
@@ -282,7 +281,6 @@ fn calculate_cell_size(cell: &dyn CellImpl, seen: &mut HashSet<HashBytes>) -> (u
 pub fn fetch_cmd(
     hash: String,
     disasm: bool,
-    api_key: Option<String>,
     output: Option<String>,
     net: String,
     json: bool,
@@ -290,7 +288,7 @@ pub fn fetch_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let network = Network::from_str(&net)?;
-    let client = TonApiClient::new(network, custom_networks, api_key)?;
+    let client = TonApiClient::new(network, custom_networks)?;
 
     if !json {
         println!("  {} Fetching library: 0x{hash}", "→".blue().bold());
@@ -311,7 +309,6 @@ pub fn fetch_cmd(
             Some(boc_hex),
             output.clone(), // If output provided, disasm writes to it
             FormatOptions::default(),
-            None,
             None,
             Some(net),
             false,
@@ -346,7 +343,7 @@ pub fn fetch_cmd(
     Ok(())
 }
 
-pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result<()> {
+pub fn info_cmd(name: Option<String>) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
     let libraries = config
         .libraries()
@@ -369,7 +366,7 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
 
     let custom_networks = config.custom_networks();
     let network = Network::from_str(&lib.network.to_string())?;
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks)?;
 
     let last_topup_timestamp = &lib.last_topup_timestamp;
     let mut balance_u128: Option<u128> = None;
@@ -468,7 +465,6 @@ pub fn topup_cmd(
     name: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
-    api_key: Option<String>,
     amount_arg: Option<String>,
     yes: bool,
 ) -> anyhow::Result<()> {
@@ -555,7 +551,7 @@ pub fn topup_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let network_name = network.to_string();
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);

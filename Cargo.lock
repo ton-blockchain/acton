@@ -95,6 +95,7 @@ dependencies = [
  "ton-localnet",
  "ton-ls",
  "ton-source-map",
+ "toncenter-keys",
  "tower-http",
  "tower-lsp",
  "tree-sitter",
@@ -3758,6 +3759,7 @@ dependencies = [
  "tokio",
  "ton-executor",
  "ton-networks",
+ "toncenter-keys",
  "tycho-types",
  "vmlogs",
 ]
@@ -5132,6 +5134,7 @@ dependencies = [
  "serde",
  "serde_json",
  "ton-networks",
+ "toncenter-keys",
  "tvmffi",
  "tycho-types",
  "urlencoding",
@@ -5346,6 +5349,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
+]
+
+[[package]]
+name = "toncenter-keys"
+version = "0.2.0"
+dependencies = [
+ "ton-networks",
 ]
 
 [[package]]

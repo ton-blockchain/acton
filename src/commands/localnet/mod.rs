@@ -34,7 +34,6 @@ pub async fn localnet_start_cmd(
     rate_limit: Option<u32>,
     load_state: Option<String>,
     dump_state: Option<String>,
-    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     if load_state.is_some() && db_path.is_some() {
         anyhow::bail!("--load-state cannot be used together with --db-path for now");
@@ -47,7 +46,6 @@ pub async fn localnet_start_cmd(
             StateSource::Remote(RemoteProvider {
                 network,
                 fork_block_number,
-                api_key,
             }),
             Some(fork_network),
         )

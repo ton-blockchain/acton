@@ -318,7 +318,6 @@ impl<'a> TestRunner<'a> {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
                 net.clone(),
                 self.config.fork_block_number,
-                self.config.api_key.clone(),
                 self.remote_cache.clone(),
             )),
             None => AccountsState::Local(LocalAccountsState::new()),
@@ -344,7 +343,6 @@ impl<'a> TestRunner<'a> {
                 open_wallets: Default::default(), // in tests, we never use real wallets
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
-                api_key: self.config.api_key.clone(),
                 fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
                 test_code: Some(code_cell.clone()),
@@ -1249,7 +1247,6 @@ fn run_file_tests(
                 backtrace: runner.config.backtrace,
                 fork_net: None,
                 network: None,
-                api_key: None,
             };
 
             if let Some(failure) = &assert_failure {

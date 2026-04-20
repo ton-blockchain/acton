@@ -297,7 +297,7 @@ fn send_message_impl(
             warn!("Failed to register compiler ABI in localnet: {err:#}");
         }
 
-        send_wallet_message(&msg, wallet, &network, &ctx.env.api_key, custom_networks)
+        send_wallet_message(&msg, wallet, &network, custom_networks)
             .context("Failed to send message to real network")?;
 
         // Add pseudo transaction to the result list to wait on it
@@ -725,13 +725,12 @@ fn send_wallet_message(
     message: &Cell,
     wallet: Wallet,
     network: &Network,
-    api_key: &Option<String>,
     custom_networks: HashMap<String, acton_config::config::CustomNetworkUrls>,
 ) -> anyhow::Result<()> {
     let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
     let expire_at = expired_at_time.duration_since(UNIX_EPOCH)?.as_secs() as u32;
 
-    let client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let client = TonApiClient::new(network.clone(), custom_networks)?;
 
     let (seqno, need_state_init) = wallet.seqno(&client)?;
     let message_ton = TonCell::from_boc(Boc::encode(message))?;
@@ -2137,8 +2136,7 @@ fn load_library_by_hash_impl(
         return Ok(());
     }
 
-    let api_key = ctx.env.api_key.clone();
-    let Ok(api_client) = TonApiClient::new(network, custom_networks, api_key) else {
+    let Ok(api_client) = TonApiClient::new(network, custom_networks) else {
         stack.push(TupleItem::Null);
         return Ok(());
     };
@@ -2266,8 +2264,7 @@ fn wait_for_transaction_impl(
     let network = ctx.network();
 
     let custom_networks = ctx.env.config.custom_networks();
-    let api_key = ctx.env.api_key.clone();
-    let Ok(api_client) = TonApiClient::new(network, custom_networks, api_key) else {
+    let Ok(api_client) = TonApiClient::new(network, custom_networks) else {
         stack.push_bool(false);
         return Ok(());
     };
@@ -2518,8 +2515,7 @@ fn get_config_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     if ctx.is_broadcasting {
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
-        let api_key = ctx.env.api_key.clone();
-        let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+        let api_client = TonApiClient::new(network, custom_networks)?;
         let config = api_client.get_config_all()?;
         stack.push(TupleItem::Cell(config));
         return Ok(());

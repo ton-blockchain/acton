@@ -55,9 +55,6 @@ OPTIONS
        --fork-block-number seqno
            Historical block sequence number to fork from.
 
-       --api-key key
-           TonCenter API key for blockchain queries.
-
    Broadcasting Options
        --net network
            Broadcast to the selected network. If omitted, the script runs in
@@ -158,11 +155,19 @@ EXAMPLES
 
        4. Query mainnet state without broadcasting:
 
-              acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+              TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
 
        5. Broadcast a deploy flow and print explorer links:
 
               acton script scripts/deploy.tolk --net testnet --explorer tonscan
+
+TONCENTER API KEYS
+       Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY, depending on the selected network.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 SEE ALSO
        o  acton help run

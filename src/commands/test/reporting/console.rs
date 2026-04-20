@@ -268,7 +268,6 @@ impl TestReporter for ConsoleReporter {
                 backtrace: test.backtrace,
                 fork_net: None,
                 network: None,
-                api_key: None,
             };
 
             match &failure_context.get_result {

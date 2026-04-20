@@ -687,7 +687,6 @@ pub struct Env<'a> {
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
     pub running_id: Arc<str>,
     /// The compiled code of the currently running test contract (for c3 in `run_continuation`).
     pub test_code: Option<Cell>,

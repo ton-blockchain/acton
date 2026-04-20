@@ -20,7 +20,6 @@ pub fn disasm_cmd(
     output_file: Option<String>,
     opts: FormatOptions,
     address: Option<String>,
-    api_key: Option<String>,
     net: Option<String>,
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
@@ -61,7 +60,7 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
-        let fetched = remote::fetch_contract_boc(network, &addr, api_key.as_deref())?;
+        let fetched = remote::fetch_contract_boc(network, &addr)?;
         resolved_network = Some(fetched.network);
         fetched.boc
     } else {
@@ -103,7 +102,6 @@ pub fn disasm_cmd(
             let client = TonApiClient::new(
                 resolved_network.unwrap_or(Network::Testnet),
                 custom_networks,
-                api_key,
             )?;
             match client.get_library_by_hash(&lib_hash) {
                 Ok(lib_cell) => {

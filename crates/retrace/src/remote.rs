@@ -9,6 +9,7 @@ use serde::Deserialize;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+use toncenter_keys::api_key as toncenter_api_key;
 
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
@@ -25,7 +26,7 @@ pub(crate) struct TonCenterClient {
 
 impl TonCenterClient {
     /// Creates a new `TonCenter` client for the specified network.
-    pub(crate) fn new(network: Network, api_key: Option<String>) -> anyhow::Result<Self> {
+    pub(crate) fn new(network: Network) -> anyhow::Result<Self> {
         let base_url = match network {
             Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
             Network::Testnet => "https://testnet.toncenter.com/api/v3".to_string(),
@@ -35,7 +36,7 @@ impl TonCenterClient {
         };
         Ok(Self {
             client: Client::new(),
-            api_key,
+            api_key: toncenter_api_key(&network),
             base_url,
         })
     }

@@ -282,8 +282,8 @@ acton script query.tolk --fork-net testnet
 # Query a contract on mainnet
 acton script query.tolk --fork-net mainnet
 
-# With API key to avoid rate limiting
-acton script query.tolk --fork-net testnet --api-key YOUR_API_KEY
+# With a TonCenter API key to avoid rate limiting
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
 When `--fork-net` is enabled, Acton automatically fetches account state from

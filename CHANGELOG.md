@@ -34,6 +34,24 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   jobs, or shell aliases, remove it everywhere. If you still want local
   execution against remote state, keep using `--fork-net` without `--net`.
 
+- TonCenter authentication is now environment-only and split by network.
+  User-facing `--api-key` flags and the `[test].api-key` config field were
+  removed. Use `TONCENTER_TESTNET_API_KEY` for testnet flows and
+  `TONCENTER_MAINNET_API_KEY` for mainnet flows.
+
+  ```bash
+  # before
+  acton test --fork-net testnet --api-key YOUR_API_KEY
+  acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
+
+  # after
+  TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
+  TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
+  ```
+
+  Built-in `mainnet`/`testnet` commands now pick the matching env var
+  automatically. The old shared `TONCENTER_API_KEY` fallback is gone.
+
 - `acton litenode` was renamed to `acton localnet`, and the manifest section
   `[litenode]` was renamed to `[localnet]`. The network name stays `localnet`,
   so `--net localnet` and `[networks.localnet]` do not change.

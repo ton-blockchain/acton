@@ -30,9 +30,6 @@ SUBCOMMANDS
           --accounts name[,name…]_
               Wallet names to auto-fund and deploy on startup.
 
-          --api-key key
-              TonCenter API key for remote blockchain queries.
-
           --db-path path
               Path to a SQLite database for persistent node state.
 
@@ -75,6 +72,15 @@ CONFIGURATION
            rate-limit = 1
 
        CLI flags override config values for the current invocation.
+
+TONCENTER API KEYS
+       When localnet forks from the built-in mainnet/testnet backends,
+       authenticated requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 RUNTIME MODEL
        o  fork mode allows local development against remote chain state

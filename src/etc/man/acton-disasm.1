@@ -58,11 +58,6 @@ disassembly output.
 Fetch contract code from the blockchain by address and disassemble it.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.RE
-.sp
 \fB\-\-net\fR \fInetwork\fR
 .RS 4
 Network to use for \fB\-\-address\fR and library lookups.
@@ -124,10 +119,6 @@ When \fB\-\-address\fR is used, Acton fetches code from the selected network.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-api\-key\fR helps avoid TonCenter rate limits
-.RE
-.sp
-.RS 4
 \h'-04'\(bu\h'+03'with \fB\-\-address\fR, \fB\-\-follow\-libraries\fR reuses the network that returned the
 contract code
 .RE
@@ -135,6 +126,13 @@ contract code
 When \fB\-\-follow\-libraries\fR is used with a local file or \fB\-\-string\fR, Acton uses
 the explicit \fB\-\-net\fR if provided; otherwise library fetches default to
 testnet.
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "INPUT PRECEDENCE"
 .sp
 .RS 4

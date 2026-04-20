@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
-use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -188,8 +187,6 @@ pub struct RemoteAccountState {
     pub fork_net: Network,
     /// Optional block number to pin the state to.
     pub fork_block_number: Option<u64>,
-    /// Optional API key for `TonCenter`.
-    pub api_key: Option<String>,
 
     /// Shared API client for network fetches.
     api_client: OnceCell<TonApiClient>,
@@ -203,16 +200,12 @@ impl RemoteAccountState {
     pub fn new(
         fork_net: Network,
         fork_block_number: Option<u64>,
-        api_key: Option<String>,
         cache: RemoteSnapshotCache,
     ) -> Self {
-        let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-
         Self {
             accounts: FxHashMap::default(),
             fork_net,
             fork_block_number,
-            api_key,
             api_client: OnceCell::new(),
             cache,
         }
@@ -305,8 +298,7 @@ impl RemoteAccountState {
                 .ok()
                 .map(|config| config.custom_networks())
                 .unwrap_or_default();
-            let client =
-                TonApiClient::new(self.fork_net.clone(), custom_networks, self.api_key.clone())?;
+            let client = TonApiClient::new(self.fork_net.clone(), custom_networks)?;
             let _ = self.api_client.set(client);
         }
 

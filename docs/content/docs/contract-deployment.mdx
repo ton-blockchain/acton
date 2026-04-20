@@ -148,10 +148,12 @@ acton script scripts/deploy.tolk --net localnet
 For faster and more reliable interactions, especially on mainnet, it is recommended to use an API key from [TonCenter](https://toncenter.com/).
 
 ```bash
-acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
 ```
 
-You can also set the `TONCENTER_API_KEY` environment variable to avoid passing it every time.
+Set `TONCENTER_MAINNET_API_KEY` for mainnet flows and
+`TONCENTER_TESTNET_API_KEY` for testnet flows. Acton reads the matching env
+variable automatically for the built-in TonCenter-backed networks.
 
 ## Local Testing
 

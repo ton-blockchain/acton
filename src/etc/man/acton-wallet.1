@@ -46,11 +46,14 @@ script
 .RS 4
 \h'-04'\(bu\h'+03'\fBacton wallet remove \-y\fR to remove a wallet non\-interactively
 .RE
+.SH "TONCENTER API KEYS"
+Testnet balance\-backed wallet flows read \fBTONCENTER_TESTNET_API_KEY\fR,
+including \fBwallet list \-\-balance\fR and the interactive post\-airdrop balance
+confirmation after \fBwallet new\fR\&.
 .sp
-Acton\[cq]s testnet TonCenter client reads \fBTONCENTER_API_KEY\fR for balance\-backed
-flows such as \fBwallet list \-\-balance\fR and the interactive post\-airdrop balance
-confirmation after \fBwallet new\fR\&. \fBwallet list \-\-balance\fR also accepts
-\fB\-\-api\-key\fR\&.
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep this key there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "SUBCOMMANDS"
 .SS "acton wallet new"
 Generate a new wallet.
@@ -158,11 +161,6 @@ List configured wallets.
 \fB\-b\fR, \fB\-\-balance\fR
 .RS 4
 Fetch and print wallet balances.
-.RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for balance lookups.
 .RE
 .sp
 \fB\-\-json\fR
@@ -328,9 +326,8 @@ to appear on testnet and lets you skip that wait by pressing \fBEnter\fR, unless
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBwallet list \-\-balance\fR resolves balances through TonCenter and also respects
-the \fBTONCENTER_API_KEY\fR environment variable; the same environment fallback
-is used when \fBwallet new\fR waits for testnet funds after an interactive
-auto\-airdrop
+\fBTONCENTER_TESTNET_API_KEY\fR; the same environment variable is used when
+\fBwallet new\fR waits for testnet funds after an interactive auto\-airdrop
 .RE
 .sp
 .RS 4

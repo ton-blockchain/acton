@@ -34,7 +34,6 @@ pub fn verify_cmd(
     wallet_name: Option<String>,
     compiler_version: Option<String>,
     dry_run: bool,
-    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
@@ -396,12 +395,12 @@ pub fn verify_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let is_testnet = network == Network::Testnet;
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
     let quorum = usize::from(get_verifier_quorum(
         &api_client,
         &registry_address,
@@ -492,11 +491,11 @@ pub fn verify_cmd(
     let cell_data = &msg_cell.data;
     let body_cell = Boc::decode(cell_data)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
 
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -849,8 +848,8 @@ fn truncate_for_display(text: &str, max_chars: usize) -> String {
     out
 }
 
-fn wait_for_rate_limit(api_key: &Option<String>) {
-    if api_key.is_none() {
+fn wait_for_rate_limit(has_api_key: bool) {
+    if !has_api_key {
         // rate limit
         println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
         std::thread::sleep(std::time::Duration::from_secs(1));

@@ -44,9 +44,6 @@ OPTIONS
            Fetch contract code from the blockchain by address and disassemble
            it.
 
-       --api-key key
-           TonCenter API key for blockchain queries.
-
        --net network
            Network to use for --address and library lookups.
 
@@ -93,14 +90,20 @@ BLOCKCHAIN LOOKUPS
 
        o  Without --net, Acton tries mainnet first and then testnet
 
-       o  --api-key helps avoid TonCenter rate limits
-
        o  with --address, --follow-libraries reuses the network that returned
           the contract code
 
        When --follow-libraries is used with a local file or --string, Acton
        uses the explicit --net if provided; otherwise library fetches default
        to testnet.
+
+TONCENTER API KEYS
+       Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY, depending on the selected network.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 INPUT PRECEDENCE
        o  BOC_FILE and --string are mutually exclusive

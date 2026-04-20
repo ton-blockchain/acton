@@ -98,7 +98,7 @@ fn rejects_non_numeric_fork_block_number() {
 }
 
 #[test]
-fn accepts_api_key_and_fork_block_without_remote_access() {
+fn accepts_fork_block_without_remote_access() {
     let project = ProjectBuilder::new("i-api-key-no-fork")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -116,8 +116,6 @@ fn accepts_api_key_and_fork_block_without_remote_access() {
     project
         .acton()
         .test()
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .arg("--fork-block-number")
         .arg("42")
         .run()

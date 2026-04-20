@@ -10,6 +10,7 @@ use crate::support::verifier::{VerifierMockResponse, spawn_verifier_mock};
 use expectrl::Eof;
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
@@ -836,8 +837,7 @@ fn test_verify_dry_run_collects_signature_from_override_backend() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .arg("--dry-run")
         .run()
         .success();
@@ -931,8 +931,7 @@ fn test_verify_fails_when_signer_backends_do_not_reach_quorum() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .arg("--dry-run")
         .run()
         .failure();
@@ -1010,8 +1009,7 @@ fn test_verify_send_transaction_successfully_after_mocked_prepare_flow() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .success();
 
@@ -1094,8 +1092,7 @@ fn test_verify_send_transaction_successfully_on_testnet() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("testnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .success();
 
@@ -1163,8 +1160,7 @@ fn test_verify_reports_send_boc_failure() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .failure();
 

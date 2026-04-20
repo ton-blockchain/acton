@@ -14,6 +14,7 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fs, thread};
 use toml::Value as TomlValue;
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 const LIB_HASH: &str = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27";
 const LOCALNET_LIBRARY_CONTRACT: &str = r"
@@ -27,11 +28,14 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 const TEST_LIBRARY_ACCOUNT: &str = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT";
+const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";
+const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
 
 // We don't usually want to store keys this way, but without keys it's almost
 // impossible to use API calls :(
 fn toncenter_api_key() -> &'static str {
-    option_env!("TONCENTER_API_KEY")
+    option_env!("TONCENTER_TESTNET_API_KEY")
+        .or(option_env!("TONCENTER_MAINNET_API_KEY"))
         .unwrap_or("49efa980ccdcd018fd09d387e63537afd9db4dbb8509d69e7bc2303ca2b2c860")
 }
 
@@ -869,8 +873,6 @@ fn test_library_publish_happy_path_localnet_saves_local_metadata() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -925,8 +927,6 @@ fn test_library_publish_happy_path_localnet_saves_global_metadata_with_flag() {
         .arg("5")
         .arg("--yes")
         .arg("--global")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success()
         .assert_contains("Library info saved");
@@ -985,8 +985,6 @@ fn test_library_publish_interactive_save_location_defaults_to_local_localnet() {
         .arg("--amount")
         .arg("5")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
@@ -1036,8 +1034,6 @@ fn test_library_topup_happy_path_localnet_updates_last_topup_timestamp() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1058,8 +1054,6 @@ fn test_library_topup_happy_path_localnet_updates_last_topup_timestamp() {
         .arg("--amount")
         .arg("1")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success()
         .assert_contains("Top-up transaction sent successfully");
@@ -1096,8 +1090,6 @@ fn test_library_info_shows_balance_and_runway_on_localnet() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1111,8 +1103,6 @@ fn test_library_info_shows_balance_and_runway_on_localnet() {
         .library()
         .arg("info")
         .arg(&library_id)
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success()
         .assert_contains("Library:")
@@ -1145,8 +1135,6 @@ fn test_library_info_shows_runway_warning_when_exhausted_on_localnet() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1161,8 +1149,6 @@ fn test_library_info_shows_runway_warning_when_exhausted_on_localnet() {
         .library()
         .arg("info")
         .arg(&library_id)
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success()
         .assert_contains("Storage runway is exhausted");
@@ -1193,8 +1179,6 @@ fn test_library_fetch_json_with_output_behavior_is_stable_on_localnet() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1212,8 +1196,6 @@ fn test_library_fetch_json_with_output_behavior_is_stable_on_localnet() {
         .arg("--json")
         .arg("--output")
         .arg(output_file)
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1257,8 +1239,6 @@ fn test_library_fetch_json_with_disasm_behavior_is_stable_on_localnet() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1274,8 +1254,6 @@ fn test_library_fetch_json_with_disasm_behavior_is_stable_on_localnet() {
         .arg("localnet")
         .arg("--json")
         .arg("--disasm")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1381,8 +1359,6 @@ fn test_library_publish_interactive_selects_global_storage() {
         .arg("--amount")
         .arg("5")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
@@ -1437,8 +1413,6 @@ fn test_library_topup_reports_metadata_update_failure_after_successful_send() {
         .arg("5")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .success();
 
@@ -1464,8 +1438,6 @@ fn test_library_topup_reports_metadata_update_failure_after_successful_send() {
         .arg("--amount")
         .arg("1")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .run()
         .failure();
 
@@ -1510,8 +1482,6 @@ fn test_library_info_interactive_library_select() {
             .arg("5")
             .arg("--yes")
             .arg("--local")
-            .arg("--api-key")
-            .arg("local-test-api-key")
             .run()
             .success();
     }
@@ -1520,8 +1490,6 @@ fn test_library_info_interactive_library_select() {
         .acton()
         .library()
         .arg("info")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
@@ -1561,8 +1529,6 @@ fn test_library_topup_interactive_library_and_wallet_select() {
             .arg("5")
             .arg("--yes")
             .arg("--local")
-            .arg("--api-key")
-            .arg("local-test-api-key")
             .run()
             .success();
     }
@@ -1574,8 +1540,6 @@ fn test_library_topup_interactive_library_and_wallet_select() {
         .arg("--amount")
         .arg("1")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
@@ -1591,7 +1555,7 @@ fn test_library_topup_interactive_library_and_wallet_select() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_fetch_uses_env_api_key_when_flag_missing() {
+fn test_library_fetch_uses_testnet_env_api_key() {
     let mock_response_body = serde_json::json!({
         "ok": true,
         "result": {
@@ -1610,16 +1574,16 @@ fn test_library_fetch_uses_env_api_key_when_flag_missing() {
         }]);
 
     let project = ProjectBuilder::new("library-fetch-env-api-key").build();
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
         .library()
         .fetch(LIB_HASH)
         .arg("--net")
-        .arg("custom:mock-v2")
+        .arg("testnet")
         .arg("--json")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "env-api-key")
         .run()
         .success()
         .assert_contains("\"success\":true");
@@ -1645,7 +1609,7 @@ fn test_library_fetch_uses_env_api_key_when_flag_missing() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_fetch_flag_api_key_overrides_env() {
+fn test_library_fetch_uses_mainnet_env_api_key_for_mainnet() {
     let mock_response_body = serde_json::json!({
         "ok": true,
         "result": {
@@ -1663,19 +1627,18 @@ fn test_library_fetch_flag_api_key_overrides_env() {
             body: mock_response_body,
         }]);
 
-    let project = ProjectBuilder::new("library-fetch-flag-api-key").build();
-    append_custom_network(project.path(), "mock-v2", &mock_url);
+    let project = ProjectBuilder::new("library-fetch-mainnet-env-api-key").build();
 
     project
         .acton()
         .library()
         .fetch(LIB_HASH)
         .arg("--net")
-        .arg("custom:mock-v2")
+        .arg("mainnet")
         .arg("--json")
-        .arg("--api-key")
-        .arg("flag-api-key")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_MAINNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, "mainnet-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "testnet-api-key")
         .run()
         .success()
         .assert_contains("\"success\":true");
@@ -1690,7 +1653,7 @@ fn test_library_fetch_flag_api_key_overrides_env() {
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
         .map(|(_, value)| value.as_str());
-    assert_eq!(header, Some("flag-api-key"));
+    assert_eq!(header, Some("mainnet-api-key"));
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1866,7 +1829,7 @@ fn test_library_fetch_invalid_network_json_reports_error_object() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_publish_uses_env_api_key_when_flag_missing() {
+fn test_library_publish_uses_testnet_env_api_key() {
     let project = ProjectBuilder::new("library-publish-env-api-key").build();
     write_deployer_wallets(project.path());
 
@@ -1874,7 +1837,6 @@ fn test_library_publish_uses_env_api_key_when_flag_missing() {
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
@@ -1884,12 +1846,13 @@ fn test_library_publish_uses_env_api_key_when_flag_missing() {
         .with_duration("1d")
         .wallet("deployer")
         .arg("--net")
-        .arg("custom:mock-v2")
+        .arg("testnet")
         .arg("--amount")
         .arg("1")
         .arg("--yes")
         .arg("--local")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "env-api-key")
         .run()
         .success();
 
@@ -1913,15 +1876,14 @@ fn test_library_publish_uses_env_api_key_when_flag_missing() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_publish_flag_api_key_overrides_env() {
-    let project = ProjectBuilder::new("library-publish-flag-api-key").build();
+fn test_library_publish_uses_mainnet_env_api_key_for_mainnet() {
+    let project = ProjectBuilder::new("library-publish-mainnet-env-api-key").build();
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
@@ -1931,14 +1893,14 @@ fn test_library_publish_flag_api_key_overrides_env() {
         .with_duration("1d")
         .wallet("deployer")
         .arg("--net")
-        .arg("custom:mock-v2")
+        .arg("mainnet")
         .arg("--amount")
         .arg("1")
         .arg("--yes")
         .arg("--local")
-        .arg("--api-key")
-        .arg("flag-api-key")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_MAINNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, "mainnet-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "testnet-api-key")
         .run()
         .success();
 
@@ -1956,32 +1918,27 @@ fn test_library_publish_flag_api_key_overrides_env() {
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
             .map(|(_, value)| value.as_str());
-        assert_eq!(header, Some("flag-api-key"));
+        assert_eq!(header, Some("mainnet-api-key"));
     }
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_info_uses_env_api_key_when_flag_missing() {
+fn test_library_info_uses_testnet_env_api_key() {
     let project = ProjectBuilder::new("library-info-env-api-key").build();
     let libraries_path = project.path().join("libraries.toml");
-    write_library_metadata_file(
-        &libraries_path,
-        "my-lib",
-        "custom:mock-v2",
-        "2026-01-05T12:00:00Z",
-    );
+    write_library_metadata_file(&libraries_path, "my-lib", "testnet", "2026-01-05T12:00:00Z");
 
     let (mock_url, mock_handle, captured) =
         spawn_toncenter_v2_mock(vec![toncenter_v2_balance_ok_response("1000000000")]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
         .library()
         .arg("info")
         .arg("my-lib")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "env-api-key")
         .run()
         .success();
 
@@ -2000,28 +1957,22 @@ fn test_library_info_uses_env_api_key_when_flag_missing() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_info_flag_api_key_overrides_env() {
-    let project = ProjectBuilder::new("library-info-flag-api-key").build();
+fn test_library_info_uses_mainnet_env_api_key_for_mainnet() {
+    let project = ProjectBuilder::new("library-info-mainnet-env-api-key").build();
     let libraries_path = project.path().join("libraries.toml");
-    write_library_metadata_file(
-        &libraries_path,
-        "my-lib",
-        "custom:mock-v2",
-        "2026-01-05T12:00:00Z",
-    );
+    write_library_metadata_file(&libraries_path, "my-lib", "mainnet", "2026-01-05T12:00:00Z");
 
     let (mock_url, mock_handle, captured) =
         spawn_toncenter_v2_mock(vec![toncenter_v2_balance_ok_response("1000000000")]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
         .library()
         .arg("info")
         .arg("my-lib")
-        .arg("--api-key")
-        .arg("flag-api-key")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_MAINNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, "mainnet-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "testnet-api-key")
         .run()
         .success();
 
@@ -2035,27 +1986,21 @@ fn test_library_info_flag_api_key_overrides_env() {
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
         .map(|(_, value)| value.as_str());
-    assert_eq!(header, Some("flag-api-key"));
+    assert_eq!(header, Some("mainnet-api-key"));
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_topup_uses_env_api_key_when_flag_missing() {
+fn test_library_topup_uses_testnet_env_api_key() {
     let project = ProjectBuilder::new("library-topup-env-api-key").build();
     write_deployer_wallets(project.path());
     let libraries_path = project.path().join("libraries.toml");
-    write_library_metadata_file(
-        &libraries_path,
-        "my-lib",
-        "custom:mock-v2",
-        "2026-01-05T12:00:00Z",
-    );
+    write_library_metadata_file(&libraries_path, "my-lib", "testnet", "2026-01-05T12:00:00Z");
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
@@ -2067,7 +2012,8 @@ fn test_library_topup_uses_env_api_key_when_flag_missing() {
         .arg("--amount")
         .arg("1")
         .arg("--yes")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "env-api-key")
         .run()
         .success();
 
@@ -2091,22 +2037,16 @@ fn test_library_topup_uses_env_api_key_when_flag_missing() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_library_topup_flag_api_key_overrides_env() {
-    let project = ProjectBuilder::new("library-topup-flag-api-key").build();
+fn test_library_topup_uses_mainnet_env_api_key_for_mainnet() {
+    let project = ProjectBuilder::new("library-topup-mainnet-env-api-key").build();
     write_deployer_wallets(project.path());
     let libraries_path = project.path().join("libraries.toml");
-    write_library_metadata_file(
-        &libraries_path,
-        "my-lib",
-        "custom:mock-v2",
-        "2026-01-05T12:00:00Z",
-    );
+    write_library_metadata_file(&libraries_path, "my-lib", "mainnet", "2026-01-05T12:00:00Z");
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
@@ -2118,9 +2058,9 @@ fn test_library_topup_flag_api_key_overrides_env() {
         .arg("--amount")
         .arg("1")
         .arg("--yes")
-        .arg("--api-key")
-        .arg("flag-api-key")
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TEST_TONCENTER_MAINNET_V2_URL_ENV, &mock_url)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, "mainnet-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "testnet-api-key")
         .run()
         .success();
 
@@ -2138,7 +2078,7 @@ fn test_library_topup_flag_api_key_overrides_env() {
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
             .map(|(_, value)| value.as_str());
-        assert_eq!(header, Some("flag-api-key"));
+        assert_eq!(header, Some("mainnet-api-key"));
     }
 }
 

@@ -24,20 +24,12 @@ struct ContractTraceArtifacts {
 pub fn retrace_cmd(
     hash: String,
     net: Option<String>,
-    api_key: Option<String>,
     verbose: bool,
     logs_dir: Option<String>,
     contract: Option<String>,
     debug: bool,
     debug_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    if let Some(key) = api_key {
-        // SAFETY: this is a single thread program
-        unsafe {
-            std::env::set_var("TONCENTER_API_KEY", key);
-        }
-    }
-
     let debug_port = if debug {
         Some(debug_port.unwrap_or(12345))
     } else {

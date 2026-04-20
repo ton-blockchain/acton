@@ -8,7 +8,6 @@ Arguments:
 Options:
       --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
       --net <NET>             Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
-      --api-key <API_KEY>     TonCenter API key for blockchain queries
       --manifest-path <PATH>  Path to Acton.toml
       --project-root <PATH>   Path to project root
   -h, --help                  Print help

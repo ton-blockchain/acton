@@ -41,7 +41,6 @@ impl TeamCityReporter {
             backtrace: test.backtrace,
             fork_net: None,
             network: None,
-            api_key: None,
         })
     }
 

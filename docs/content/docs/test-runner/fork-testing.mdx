@@ -35,11 +35,12 @@ acton test --fork-net mainnet
 
 ### Configuring API Access
 
-Access to TonCenter API requires an API key to avoid rate limiting. You can provide it with the `--api-key` flag:
+Access to TonCenter API requires an API key to avoid rate limiting. Set the env
+var that matches the forked network:
 
 ```bash
-acton test --fork-net testnet --api-key YOUR_API_KEY
-acton test --fork-net mainnet --api-key YOUR_API_KEY
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton test --fork-net mainnet
 ```
 
 <Callout type="info" title="Getting an API Key">

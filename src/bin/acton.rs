@@ -339,12 +339,6 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
-        #[arg(
-            long,
-            help = "TonCenter API key for blockchain queries",
-            help_heading = "Remote"
-        )]
-        api_key: Option<String>,
 
         // Tracing
         #[arg(
@@ -572,12 +566,6 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
-        #[arg(
-            long,
-            help = "TonCenter API key for blockchain queries",
-            help_heading = "Remote"
-        )]
-        api_key: Option<String>,
 
         // Broadcasting
         #[arg(
@@ -703,8 +691,6 @@ enum Commands {
             help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
         )]
         address: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Network for `--address` and library lookups")]
         net: Option<String>,
         #[arg(
@@ -734,8 +720,6 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
     },
     #[command(
         about = "Check Tolk files in the project for errors",
@@ -789,8 +773,6 @@ enum Commands {
         hash: String,
         #[arg(long, help = "Network to use")]
         net: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(
             short,
             long,
@@ -980,8 +962,6 @@ pub enum LocalnetCommand {
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Path to SQLite database for persistent storage")]
         db_path: Option<String>,
         #[arg(
@@ -1035,8 +1015,6 @@ pub enum LibraryCommand {
         duration: Option<String>,
         #[arg(long, help = "Wallet to use for publishing (prompts if not provided)", add = ArgValueCompleter::new(complete_wallets))]
         wallet: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
         net: String,
         #[arg(long, help = "Amount of TON to send for publication")]
@@ -1054,8 +1032,6 @@ pub enum LibraryCommand {
         hash: String,
         #[arg(long, help = "Disassemble fetched library code")]
         disasm: bool,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(
             long,
             short,
@@ -1071,8 +1047,6 @@ pub enum LibraryCommand {
     Info {
         #[arg(help = "Library name to show info for")]
         name: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
     },
     #[command(about = "Top up a library's account for storage")]
     Topup {
@@ -1085,8 +1059,6 @@ pub enum LibraryCommand {
         duration: Option<String>,
         #[arg(long, help = "Wallet to use for topping up (prompts if not provided)")]
         wallet: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(
             long,
             help = "Amount of TON to send (overrides duration-based calculation)"
@@ -1705,7 +1677,6 @@ fn main() {
             baseline_snapshot,
             fail_on_diff,
             fork_net,
-            api_key,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -1752,7 +1723,6 @@ fn main() {
                     baseline_snapshot,
                     fail_on_diff,
                     fork_net,
-                    api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     fork_block_number,
                     save_test_trace.or_else(|| {
                         if ui {
@@ -1791,15 +1761,12 @@ fn main() {
         Commands::Retrace {
             hash,
             net,
-            api_key,
             verbose,
             logs_dir,
             contract,
             debug,
             debug_port,
-        } => retrace_cmd(
-            hash, net, api_key, verbose, logs_dir, contract, debug, debug_port,
-        ),
+        } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -1826,7 +1793,6 @@ fn main() {
             debug_port,
             clear_cache,
             fork_net,
-            api_key,
             fork_block_number,
             net,
             explorer,
@@ -1841,7 +1807,6 @@ fn main() {
                 debug_port,
                 clear_cache,
                 fork_net,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 fork_block_number,
                 net,
                 explorer,
@@ -1911,7 +1876,6 @@ fn main() {
             show_offsets,
             source_map,
             address,
-            api_key,
             net,
             follow_libraries,
         } => match read_source_map(source_map) {
@@ -1925,7 +1889,6 @@ fn main() {
                     source_map,
                 },
                 address,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 net,
                 follow_libraries,
             ),
@@ -1938,23 +1901,13 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
-            api_key,
-        } => verify_cmd(
-            contract_id,
-            address,
-            net,
-            wallet,
-            compiler_version,
-            dry_run,
-            api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-        ),
+        } => verify_cmd(contract_id, address, net, wallet, compiler_version, dry_run),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
                 contract_id,
                 code,
                 duration,
                 wallet,
-                api_key,
                 net,
                 amount,
                 yes,
@@ -1965,7 +1918,6 @@ fn main() {
                 code,
                 duration,
                 wallet,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 net,
                 amount,
                 yes,
@@ -1975,43 +1927,25 @@ fn main() {
             LibraryCommand::Fetch {
                 hash,
                 disasm,
-                api_key,
                 output,
                 net,
                 json,
             } => {
-                let result = fetch_cmd(
-                    hash,
-                    disasm,
-                    api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                    output,
-                    net,
-                    json,
-                );
+                let result = fetch_cmd(hash, disasm, output, net, json);
                 if json {
                     report_error_as_json(result);
                     return;
                 }
                 result
             }
-            LibraryCommand::Info { name, api_key } => {
-                info_cmd(name, api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()))
-            }
+            LibraryCommand::Info { name } => info_cmd(name),
             LibraryCommand::Topup {
                 name,
                 duration,
                 wallet,
-                api_key,
                 amount,
                 yes,
-            } => commands::library::topup_cmd(
-                name,
-                duration,
-                wallet,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                amount,
-                yes,
-            ),
+            } => commands::library::topup_cmd(name, duration, wallet, amount, yes),
         },
         Commands::Check {
             fix,
@@ -2089,7 +2023,6 @@ fn main() {
                 fork_net,
                 fork_block_number,
                 accounts,
-                api_key,
                 db_path,
                 rate_limit,
                 load_state,
@@ -2116,7 +2049,6 @@ fn main() {
                         resolved_localnet.rate_limit,
                         load_state,
                         dump_state,
-                        api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     )
                     .await
                 })
@@ -2329,7 +2261,6 @@ fn create_test_config(
     baseline_snapshot: Option<String>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
-    api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,
     mutate: bool,
@@ -2391,7 +2322,6 @@ fn create_test_config(
             snapshot,
             baseline_snapshot,
             fork_net,
-            api_key,
             fork_block_number,
             save_test_trace,
             mutate,
@@ -2440,7 +2370,6 @@ fn create_test_config(
         snapshot,
         baseline_snapshot,
         fail_on_diff,
-        api_key,
         fork_block_number,
         save_test_trace,
         mutate,

@@ -1,5 +1,5 @@
 [package]
-name = "ton-api"
+name = "toncenter-keys"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -11,20 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-urlencoding = { workspace = true }
-num-bigint = { workspace = true }
-tycho-types = { workspace = true }
 ton-networks = { workspace = true }
-toncenter-keys = { workspace = true }
-log = { workspace = true }
-tvmffi = { workspace = true }
 
 [lints]
 workspace = true
-
-[lib]
-doctest = false

@@ -255,11 +255,15 @@ Configures the behavior of `acton test`.
 | `junit-path`                | `string`   | -             | Directory for JUnit XML reports.                                       |
 | `junit-merge`               | `boolean`  | `false`       | Merge all test results into a single JUnit file.                       |
 | `fork-net`                  | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).                |
-| `api-key`                   | `string`   | -             | API key for the network provider when forking.                         |
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+TonCenter API keys are configured through the process environment, not
+`Acton.toml`: use `TONCENTER_TESTNET_API_KEY` or
+`TONCENTER_MAINNET_API_KEY` when the built-in fork target needs
+authentication.
 
 ### `[test.coverage]` Section
 

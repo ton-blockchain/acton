@@ -34,10 +34,15 @@ Typical follow-up commands are:
 - `acton wallet export-mnemonic` for interactive export
 - `acton wallet remove -y` to remove a wallet non-interactively
 
-Acton's testnet TonCenter client reads `TONCENTER_API_KEY` for balance-backed
-flows such as `wallet list --balance` and the interactive post-airdrop balance
-confirmation after `wallet new`. `wallet list --balance` also accepts
-`--api-key`.
+## TonCenter API Keys
+
+Testnet balance-backed wallet flows read `TONCENTER_TESTNET_API_KEY`,
+including `wallet list --balance` and the interactive post-airdrop balance
+confirmation after `wallet new`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep this key there and use shell environment variables only for
+one-off overrides or CI.
 
 ## Subcommands
 
@@ -152,10 +157,6 @@ List configured wallets.
 
 {{#option "`-b`, `--balance`" }}
 Fetch and print wallet balances.
-{{/option}}
-
-{{#option "`--api-key` _key_" }}
-TonCenter API key for balance lookups.
 {{/option}}
 
 {{#option "`--json`" }}
@@ -315,9 +316,8 @@ to appear on testnet and lets you skip that wait by pressing `Enter`, unless
 ## Listing, Signing, And Export
 
 - `wallet list --balance` resolves balances through TonCenter and also respects
-  the `TONCENTER_API_KEY` environment variable; the same environment fallback
-  is used when `wallet new` waits for testnet funds after an interactive
-  auto-airdrop
+  `TONCENTER_TESTNET_API_KEY`; the same environment variable is used when
+  `wallet new` waits for testnet funds after an interactive auto-airdrop
 - `wallet sign` auto-detects hex and base64 input, preferring hex when a payload
   could be interpreted as both
 - surrounding stdin whitespace is trimmed before decoding the message body

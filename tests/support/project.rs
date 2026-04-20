@@ -8,6 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 pub(crate) struct ProjectBuilder {
     name: String,
@@ -1363,7 +1364,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify API key for `TonCenter` requests
+    /// Specify TonCenter API key env value for test requests
     ///
     /// # Examples
     /// ```
@@ -1858,7 +1859,10 @@ impl ActonCommand {
         }
 
         if let Some(api_key) = self.disasm_api_key {
-            self.cmd = self.cmd.arg("--api-key").arg(api_key);
+            self.cmd = self
+                .cmd
+                .env(TONCENTER_MAINNET_API_KEY_ENV, &api_key)
+                .env(TONCENTER_TESTNET_API_KEY_ENV, &api_key);
         }
 
         if let Some(net) = self.disasm_net {

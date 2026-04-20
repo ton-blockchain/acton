@@ -63,10 +63,6 @@ Network to use.
 Defaults to `testnet`.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
-{{/option}}
-
 {{#option "`--amount` _ton_" }}
 Explicit TON amount to send.
 
@@ -120,10 +116,6 @@ Network to use.
 Defaults to `testnet`.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
-{{/option}}
-
 {{#option "`--json`" }}
 Emit JSON output for raw library fetches.
 
@@ -148,10 +140,6 @@ Show information about a deployed library.
 Library name to inspect.
 
 If omitted, Acton can prompt from the available library metadata.
-{{/option}}
-
-{{#option "`--api-key` _key_" }}
-TonCenter API key for balance checks.
 {{/option}}
 
 {{/options}}
@@ -189,10 +177,6 @@ Overrides duration-based estimation.
 Wallet to use for the top-up transaction.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
-{{/option}}
-
 {{#option "`-y`, `--yes`" }}
 Skip confirmation prompts.
 {{/option}}
@@ -201,6 +185,15 @@ Skip confirmation prompts.
 
 After a successful top-up, Acton updates `last_topup_timestamp` in the stored
 library metadata.
+
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ## Display Options
 

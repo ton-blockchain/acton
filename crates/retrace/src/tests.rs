@@ -1,6 +1,7 @@
 use crate::types::ComputeInfo;
 use crate::{Network, retrace};
 use std::collections::HashMap;
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 #[tokio::test]
 async fn test_retrace_709() {
@@ -134,7 +135,11 @@ async fn assert_retrace(
     // SAFETY: well...
     unsafe {
         std::env::set_var(
-            "TONCENTER_API_KEY",
+            match net {
+                Network::Mainnet => TONCENTER_MAINNET_API_KEY_ENV,
+                Network::Testnet => TONCENTER_TESTNET_API_KEY_ENV,
+                Network::Localnet | Network::Custom(_) => return,
+            },
             "49efa980ccdcd018fd09d387e63537afd9db4dbb8509d69e7bc2303ca2b2c860",
         );
     }

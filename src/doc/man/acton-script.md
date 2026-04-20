@@ -84,10 +84,6 @@ network.
 Historical block sequence number to fork from.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{/options}}
 
 ### Broadcasting Options
@@ -196,7 +192,7 @@ When a script can affect on-chain state, the usual safe sequence is:
 4. Query mainnet state without broadcasting:
 
    ```bash
-   acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+   TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
    ```
 
 5. Broadcast a deploy flow and print explorer links:
@@ -204,6 +200,15 @@ When a script can affect on-chain state, the usual safe sequence is:
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
+
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ## See Also
 

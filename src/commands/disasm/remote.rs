@@ -12,7 +12,6 @@ pub(super) struct FetchedContractBoc {
 pub(super) fn fetch_contract_boc(
     network: Option<Network>,
     address: &str,
-    api_key: Option<&str>,
 ) -> anyhow::Result<FetchedContractBoc> {
     StdAddr::from_str_ext(address, StdAddrFormat::any())
         .map_err(|_| anyhow::anyhow!("Invalid address"))
@@ -21,11 +20,7 @@ pub(super) fn fetch_contract_boc(
     if let Some(network) = network {
         let config = acton_config::config::ActonConfig::load().unwrap_or_default();
         let custom_networks = config.custom_networks();
-        let client = TonApiClient::new(
-            network.clone(),
-            custom_networks,
-            api_key.map(ToString::to_string),
-        )?;
+        let client = TonApiClient::new(network.clone(), custom_networks)?;
         let boc = client
             .get_contract_boc(address)
             .with_context(|| format!("Failed to fetch contract boc from {network}"));
@@ -35,22 +30,14 @@ pub(super) fn fetch_contract_boc(
     // No explicit network given, trying both
     let config = acton_config::config::ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let mainnet_client = TonApiClient::new(
-        Network::Mainnet,
-        custom_networks.clone(),
-        api_key.map(ToString::to_string),
-    )?;
+    let mainnet_client = TonApiClient::new(Network::Mainnet, custom_networks.clone())?;
     if let Ok(boc) = mainnet_client.get_contract_boc(address) {
         Ok(FetchedContractBoc {
             boc,
             network: Network::Mainnet,
         })
     } else {
-        let testnet_client = TonApiClient::new(
-            Network::Testnet,
-            custom_networks,
-            api_key.map(ToString::to_string),
-        )?;
+        let testnet_client = TonApiClient::new(Network::Testnet, custom_networks)?;
         testnet_client
             .get_contract_boc(address)
             .map(|boc| FetchedContractBoc {

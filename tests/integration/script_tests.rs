@@ -1811,8 +1811,6 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1842,8 +1840,6 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1873,8 +1869,6 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("localnet")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -2081,8 +2075,6 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account-with-init")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -2116,8 +2108,6 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-wallet-rejection-with-init")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 

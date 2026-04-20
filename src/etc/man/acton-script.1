@@ -71,11 +71,6 @@ network.
 .RS 4
 Historical block sequence number to fork from.
 .RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.RE
 .SS "Broadcasting Options"
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -226,7 +221,7 @@ acton script scripts/deploy.tolk \-\-net testnet
 .sp
 .RS 4
 .nf
-acton script query.tolk \-\-fork\-net mainnet \-\-api\-key YOUR_API_KEY
+TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainnet
 .fi
 .RE
 .RE
@@ -240,6 +235,13 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
 .fi
 .RE
 .RE
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "SEE ALSO"
 .sp
 .RS 4

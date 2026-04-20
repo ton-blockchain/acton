@@ -23,7 +23,8 @@
 //! recommended for higher limits and faster execution.
 //! You can also provide a Dton API key for alternative library resolution.
 //!
-//! *   `TONCENTER_API_KEY`: Your `TonCenter` V3 API key (recommended).
+//! *   `TONCENTER_MAINNET_API_KEY`: Your `TonCenter` mainnet V3 API key.
+//! *   `TONCENTER_TESTNET_API_KEY`: Your `TonCenter` testnet V3 API key.
 //! *   `DTON_API_KEY`: (Optional) Your dton.io API key for fallback library lookups.
 //!
 //! # Main Entry Points

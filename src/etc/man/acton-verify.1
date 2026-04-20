@@ -50,13 +50,6 @@ Currently defaults to \fB1.2.0\fR\&.
 .RS 4
 Run verification without submitting the final blockchain transaction.
 .RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.sp
-Also read from \fBTONCENTER_API_KEY\fR\&.
-.RE
 .SS "Network Options"
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -65,6 +58,13 @@ Network to verify against.
 .sp
 Defaults to \fBtestnet\fR\&.
 .RE
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on \fB\-\-net\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SS "Display Options"
 .sp
 \fB\-\-color\fR \fIwhen\fR

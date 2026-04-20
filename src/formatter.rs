@@ -107,7 +107,6 @@ pub struct FormatterContext<'a> {
     pub available_wallets: Vec<String>,
     pub backtrace: Option<BacktraceMode>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<Cow<'a, str>>,
     pub network: Option<Network>,
 }
 
@@ -127,7 +126,6 @@ impl<'a> FormatterContext<'a> {
             backtrace: None,
             fork_net: None,
             network: None,
-            api_key: None,
         }
     }
 
@@ -147,7 +145,6 @@ impl<'a> FormatterContext<'a> {
             backtrace: ctx.build.backtrace,
             fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
-            api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
     }
 
