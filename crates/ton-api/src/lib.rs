@@ -553,7 +553,6 @@ impl TonApiClient {
         limit: Option<u32>,
         lt: Option<String>,
         hash: Option<String>,
-        archival: bool,
     ) -> anyhow::Result<Vec<TonCenterTransaction>> {
         let url = format!(
             "{}/getTransactions",
@@ -569,9 +568,6 @@ impl TonApiClient {
         }
         if let Some(hash) = hash {
             params.push(("hash", hash));
-        }
-        if archival {
-            params.push(("archival", "true".to_string()));
         }
 
         let response = self.send_with_retry(

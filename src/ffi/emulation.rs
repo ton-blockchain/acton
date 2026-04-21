@@ -2470,10 +2470,7 @@ fn poll_send_result_v2(
     dest_address: &str,
     target_hash: &HashBytes,
 ) -> anyhow::Result<Option<PolledSendResult>> {
-    // Reference impl in the TON docs uses `limit: 10, archival: true` — enough for a
-    // freshly-sent tx on any real account, and `archival: true` guarantees the query
-    // hits a node with full history.
-    let txs = client.get_transactions(dest_address, Some(10), None, None, true)?;
+    let txs = client.get_transactions(dest_address, Some(100), None, None)?;
     for tx in txs {
         let tx_cell = Boc::decode_base64(&tx.data)
             .context("Failed to decode transaction BoC from toncenter")?;
