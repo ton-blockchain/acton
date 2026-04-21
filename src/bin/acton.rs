@@ -1167,7 +1167,7 @@ fn complete_wallets(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
 
 fn complete_commands(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
     let current = current.to_string_lossy();
-    Cli::command()
+    base_cli_command()
         .get_subcommands()
         .filter(|cmd| !cmd.is_hide_set())
         .map(|cmd| cmd.get_name().to_string())
@@ -1266,7 +1266,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         (&cyan, tooling_commands),
         (&white, support_commands),
     ];
-    let mut command_metadata = Cli::command();
+    let mut command_metadata = base_cli_command();
     command_metadata.build();
 
     let command_descriptions = command_metadata
@@ -1303,11 +1303,15 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .filter(|arg| !arg.is_positional())
         .filter(|arg| arg.is_global_set() || matches!(arg.get_long(), Some("help" | "version")))
         .filter_map(|arg| {
-            let name = match (arg.get_short(), arg.get_long()) {
-                (Some(short), Some(long)) => format!("-{short}, --{long}"),
-                (Some(short), None) => format!("-{short}"),
-                (None, Some(long)) => format!("--{long}"),
-                (None, None) => return None,
+            let name = if matches!(arg.get_long(), Some("version")) {
+                "-v, --version".to_owned()
+            } else {
+                match (arg.get_short(), arg.get_long()) {
+                    (Some(short), Some(long)) => format!("-{short}, --{long}"),
+                    (Some(short), None) => format!("-{short}"),
+                    (None, Some(long)) => format!("--{long}"),
+                    (None, None) => return None,
+                }
             };
 
             let hint = arg
@@ -1395,8 +1399,21 @@ fn root_help(show_global_options: bool) -> StyledStr {
     writer
 }
 
+fn base_cli_command() -> clap::Command {
+    Cli::command()
+        .disable_version_flag(true)
+        .arg(
+            clap::Arg::new("version")
+                .short('v')
+                .short_alias('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help("Print version"),
+        )
+}
+
 fn cli_command(show_global_options: bool) -> clap::Command {
-    Cli::command().override_help(root_help(show_global_options))
+    base_cli_command().override_help(root_help(show_global_options))
 }
 
 fn completion_command() -> clap::Command {
@@ -1421,7 +1438,7 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
                 return Ok(());
             }
 
-            let mut cli = Cli::command();
+            let mut cli = base_cli_command();
             cli.build();
             if let Some(subcommand) = cli.find_subcommand_mut(command) {
                 subcommand.print_long_help()?;
@@ -1444,7 +1461,7 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
             }
             message.push_str("\n\nhelp: view all commands with `acton --help`");
 
-            Cli::command()
+            base_cli_command()
                 .error(clap::error::ErrorKind::InvalidSubcommand, message)
                 .exit();
         }
@@ -2000,7 +2017,12 @@ fn main() {
         Commands::Hooks { command } => hooks_cmd(command),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
+            clap_complete::generate(
+                shell,
+                &mut base_cli_command(),
+                "acton",
+                &mut std::io::stdout(),
+            );
             Ok(())
         }
         Commands::Docgen { output, check } => docgen_cmd(output, check),

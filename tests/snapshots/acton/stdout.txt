@@ -37,8 +37,8 @@ Global options:
   --color          <WHEN>              Control when to use colored output
   --manifest-path  <PATH>              Path to Acton.toml
   --project-root   <PATH>              Path to project root
+  -v, --version                        Print version
   -h, --help                           Print help
-  -V, --version                        Print version
 
 Use acton help <command> for detailed manuals with behavior, config, and examples.
 
