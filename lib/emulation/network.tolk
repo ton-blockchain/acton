@@ -203,61 +203,77 @@ fun SendResultList.giveName(self, nameForUI: string): void {
     ffi.saveTraceName(self, nameForUI);
 }
 
-/// Wait for the transaction to be applied on the blockchain.
+/// Wait for the first (root) message of the send result to be applied on the blockchain.
 ///
 /// This method is useful when broadcasting transactions to the real network.
 /// It polls the network until the transaction is applied or the maximum number of attempts is reached.
 ///
-/// Returns `true` if transaction is found and `false` otherwise.
-/// 
-/// In emulation mode (without `--net`), this method returns immediately with `true`.
+/// The lookup follows the TON docs message-lookup reference
+/// (https://docs.ton.org/ecosystem/ton-connect/message-lookup): the external-in message
+/// actually delivered to the network is identified by its TEP-467 normalized hash
+/// (returned by `sendBocReturnHash` at send time), and the destination account's recent
+/// transactions are scanned until one with a matching `inMessage` shows up.
+///
+/// Returns the matched [SendResult] rebuilt from the on-chain transaction if found, or `null`
+/// otherwise. Fields that cannot be reconstructed from a single on-chain transaction
+/// (`childTxs`, `parentLt`, `outActions`) are left empty/null; `outMessages`, `externals`,
+/// and `gasUsed` are derived from the transaction itself.
+///
+/// In emulation mode (without `--net`), this method returns the first [SendResult] immediately
+/// (or `null` if the list is empty), because the trace is already fully processed locally.
 ///
 /// Example:
 /// ```tolk
 /// val result = net.send(wallet.address, message);
-/// val success = result.wait();
-/// if (success) {
-///     println("Transaction applied successfully");
+/// val applied = result.waitForFirstTransaction();
+/// if (applied != null) {
+///     println("Transaction applied successfully at lt {}", applied.lt);
 /// }
 /// ```
 ///
 /// Example with custom parameters:
 /// ```tolk
 /// val result = net.send(wallet.address, message);
-/// val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
+/// result.waitForFirstTransaction(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 /// ```
-fun SendResultList.wait(
+fun SendResultList.waitForFirstTransaction(
     self,
     quiet: bool = false,
     attempts: int = 20,
     sleepDuration: int = 1000,
-): bool {
-    if (!ffi.isBroadcasting()) {
-        // in emulation mode we don't need to wait for anything
-        return true;
-    }
-
+): SendResult? {
     if (self.size() == 0) {
-        // unexpected
-        return false;
+        return null;
     }
 
     val res = self.at(0);
-    val tx = res.tx.load();
-    val inMsgCell = tx.messages.load().inMsg.unwrap();
-    val inMsg = inMsgCell.load();
-    var body = inMsg.body;
-    body.skipBits(1); // skip Either bit
-    val bodyHash = body.hash();
-    val bodyHashSlice = beginCell().storeUint(bodyHash, 256).toSlice();
+    if (!ffi.isBroadcasting()) {
+        // in emulation mode the trace is already applied locally
+        return res;
+    }
 
-    return ffi.waitForTransaction(
-        inMsg.info.dest.toCell(),
-        bodyHashSlice.toCell(),
+    // FFI returns a single-element list (or null) — we unwrap to a nullable SendResult here
+    // because Tolk packs a struct across multiple stack slots when returned directly from
+    // an asm function, whereas BigArray items are kept on a single slot.
+    val list = ffi.waitForTransaction(
+        __acton_impl_pseudoTxCell(res),
         quiet,
         attempts,
         sleepDuration,
     );
+    if (list == null || list.size() == 0) {
+        return null;
+    }
+    return list.at(0);
+}
+
+/// Return the raw pseudo-transaction cell carried by a broadcast [SendResult].
+///
+/// Rust parses this cell to recover both the external-in delivered to the network
+/// (from `in_msg`) and the TEP-467 normalized hash returned by `sendBocReturnHash`
+/// at send time (stashed in `prev_trans_hash`).
+fun __acton_impl_pseudoTxCell(res: SendResult): cell {
+    return res.tx as cell;
 }
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
@@ -1153,7 +1169,7 @@ fun ffi.failToFindTransactionByParams(location: string, message: string, txs: Se
 fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "104 EXTCALL"
 fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
-fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
+fun ffi.waitForTransaction(pseudoTxCell: cell, quiet: bool, attempts: int, sleepDuration: int): SendResultList? asm "25 EXTCALL"
 fun ffi.enableBroadcast(): void asm "26 EXTCALL"
 fun ffi.disableBroadcast(): void asm "27 EXTCALL"
 fun ffi.getConfig(): dict asm "31 EXTCALL"

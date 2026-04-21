@@ -56,7 +56,7 @@ fun main() {
 
     println("Deploying Jetton contract...");
     val deployRes = minter.sendDeploy(deployer.address, { value: ton("0.03") });
-    if (!deployRes.wait()) {
+    if (deployRes.waitForFirstTransaction() == null) {
         return;
     }
 
@@ -70,7 +70,7 @@ fun main() {
         ton("0.01"),
         ton("0.02"),
     );
-    if (!mintRes.wait()) {
+    if (mintRes.waitForFirstTransaction() == null) {
         return;
     }
 

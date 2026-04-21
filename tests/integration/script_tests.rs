@@ -1974,7 +1974,7 @@ fun main() {
         value: ton("0.05"),
         dest: { stateInit: init },
     }));
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 

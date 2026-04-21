@@ -22,7 +22,7 @@ fun main() {
         createEmptySlice(),
         { value: ton("0.05"), bounce: true },
     );
-    res.wait();
+    res.waitForFirstTransaction();
 
     printNftItemInfo(item, "NFT");
 }

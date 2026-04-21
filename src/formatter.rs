@@ -417,7 +417,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         if message.is_empty() {
             lines.push(format!(
                 "└── submitted to network; call {} to confirm inclusion",
-                "res.wait()".yellow()
+                "res.waitForFirstTransaction()".yellow()
             ));
             return lines.join("\n");
         }
@@ -425,7 +425,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         lines.push(format!("└── {message}"));
         lines.push(format!(
             "    └── submitted to network; call {} to confirm inclusion",
-            "res.wait()".yellow()
+            "res.waitForFirstTransaction()".yellow()
         ));
         lines.join("\n")
     }

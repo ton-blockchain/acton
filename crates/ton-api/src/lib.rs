@@ -370,6 +370,57 @@ impl TonApiClient {
         Ok(())
     }
 
+    /// Send BOC to network via `sendBocReturnHash`, returning the TEP-467 normalized hash
+    /// that toncenter computed for the external-in message.
+    ///
+    /// Preferable to [`Self::send_boc`] when the caller needs to poll for the resulting
+    /// transaction (`waitForTransaction` / `waitForTrace`) — the returned hash is exactly
+    /// what toncenter indexes against, so no local TEP-467 normalization is needed on the
+    /// send side.
+    pub fn send_boc_return_hash(&self, boc: &str) -> Result<HashBytes, SendBocError> {
+        let base_url = self
+            .network
+            .toncenter_v2_url(&self.custom_networks)
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+        let url = format!("{base_url}/sendBocReturnHash");
+
+        let json = serde_json::json!({ "boc": boc });
+
+        let response = self
+            .send_with_retry(
+                || self.build_post_request(&url).json(&json),
+                "Failed to send BOC",
+            )
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_send_boc_fail(response));
+        }
+
+        #[derive(Deserialize)]
+        struct Resp {
+            result: Inner,
+        }
+        #[derive(Deserialize)]
+        struct Inner {
+            hash: String,
+        }
+
+        let data: Resp = response.json().map_err(|err| {
+            SendBocError::new(
+                SendBocErrorKind::Other,
+                format!("Failed to parse sendBocReturnHash response: {err}"),
+            )
+        })?;
+
+        decode_toncenter_hash(&data.result.hash).map_err(|err| {
+            SendBocError::new(
+                SendBocErrorKind::Other,
+                format!("Failed to decode sendBocReturnHash hash: {err}"),
+            )
+        })
+    }
+
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
         let url = format!(
             "{}/getMasterchainInfo",
@@ -553,6 +604,7 @@ impl TonApiClient {
         limit: Option<u32>,
         lt: Option<String>,
         hash: Option<String>,
+        archival: bool,
     ) -> anyhow::Result<Vec<TonCenterTransaction>> {
         let url = format!(
             "{}/getTransactions",
@@ -568,6 +620,9 @@ impl TonApiClient {
         }
         if let Some(hash) = hash {
             params.push(("hash", hash));
+        }
+        if archival {
+            params.push(("archival", "true".to_string()));
         }
 
         let response = self.send_with_retry(
@@ -794,6 +849,7 @@ pub struct TonCenterMessage {
     pub fwd_fee: Option<String>,
     pub ihr_fee: Option<String>,
     pub created_lt: Option<String>,
+    pub hash: Option<String>,
     pub body_hash: Option<String>,
     pub message: Option<String>,
 }
@@ -803,6 +859,28 @@ struct TonCenterErrorResponse {
     #[allow(dead_code)]
     ok: bool,
     error: String,
+}
+
+/// Decode a toncenter-returned 32-byte hash. Toncenter commonly returns base64 (standard
+/// or url-safe) but may also return hex — all three are accepted here.
+fn decode_toncenter_hash(raw: &str) -> anyhow::Result<HashBytes> {
+    use base64::Engine as _;
+    use base64::engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD};
+
+    let bytes = STANDARD
+        .decode(raw)
+        .or_else(|_| URL_SAFE.decode(raw))
+        .or_else(|_| URL_SAFE_NO_PAD.decode(raw))
+        .or_else(|_| hex::decode(raw))
+        .with_context(|| format!("Unrecognized hash encoding: {raw}"))?;
+
+    if bytes.len() != 32 {
+        anyhow::bail!("Expected 32-byte hash, got {} bytes", bytes.len());
+    }
+
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&bytes);
+    Ok(HashBytes(out))
 }
 
 fn should_disable_system_proxy() -> bool {

@@ -10,7 +10,7 @@ fun main() {
 
     val contract = Empty.fromStorage(Storage { owner: deployer.address });
     val res = contract.deploy(deployer.address, { value: ton("0.05") });
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 
