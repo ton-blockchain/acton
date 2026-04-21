@@ -5200,7 +5200,6 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "base64",
- "hex",
  "log",
  "num-bigint",
  "reqwest",

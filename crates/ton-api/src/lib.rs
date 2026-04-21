@@ -848,8 +848,8 @@ struct TonCenterErrorResponse {
     error: String,
 }
 
-/// Decode a toncenter-returned 32-byte hash. Toncenter commonly returns base64 (standard
-/// or url-safe) but may also return hex — all three are accepted here.
+/// Decode a toncenter-returned 32-byte hash. Toncenter returns standard base64;
+/// url-safe variants are accepted defensively for custom gateways.
 fn decode_toncenter_hash(raw: &str) -> anyhow::Result<HashBytes> {
     use base64::Engine as _;
     use base64::engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD};
@@ -858,7 +858,6 @@ fn decode_toncenter_hash(raw: &str) -> anyhow::Result<HashBytes> {
         .decode(raw)
         .or_else(|_| URL_SAFE.decode(raw))
         .or_else(|_| URL_SAFE_NO_PAD.decode(raw))
-        .or_else(|_| hex::decode(raw))
         .with_context(|| format!("Unrecognized hash encoding: {raw}"))?;
 
     if bytes.len() != 32 {

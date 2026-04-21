@@ -23,7 +23,6 @@ toncenter-keys = { workspace = true }
 log = { workspace = true }
 tvmffi = { workspace = true }
 base64 = { workspace = true }
-hex = { workspace = true }
 
 [lints]
 workspace = true
