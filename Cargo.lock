@@ -5314,6 +5314,7 @@ dependencies = [
 name = "ton-ls"
 version = "0.3.1"
 dependencies = [
+ "acton-config",
  "anyhow",
  "dashmap 7.0.0-rc2",
  "expect-test",

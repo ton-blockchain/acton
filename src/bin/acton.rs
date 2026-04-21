@@ -14,6 +14,7 @@ use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
+use acton::commands::meta::print_schema_cmd;
 use acton::commands::new::{ProjectTemplate, new_cmd};
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::rpc::{RpcCommand, rpc_cmd};
@@ -914,6 +915,11 @@ enum Commands {
         #[arg(value_parser = ["bash", "elvish", "fish", "powershell", "zsh", "nushell"])]
         shell: String,
     },
+    #[command(hide = true)]
+    Meta {
+        #[command(subcommand)]
+        command: MetaCommand,
+    },
     #[command(
         about = "Internal command to generate MDX documentation from standard library",
         hide = true
@@ -1088,6 +1094,12 @@ pub enum DocCommand {
         #[arg(long, help = "Output instruction entry as JSON")]
         json: bool,
     },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum MetaCommand {
+    #[command(about = "Print the built-in Acton.toml JSON schema")]
+    GetSchema,
 }
 
 #[inline]
@@ -1598,6 +1610,7 @@ fn main() {
             | Commands::New { .. }
             | Commands::Help { .. }
             | Commands::Rpc { .. }
+            | Commands::Meta { .. }
             | Commands::Lint { .. }
     ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
@@ -1607,7 +1620,7 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Ls { .. } | Commands::Help { .. } | Commands::Lint { .. }
+        Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
     ) && let Err(err) = setup_logging()
     {
         eprintln!(
@@ -2016,6 +2029,9 @@ fn main() {
             }
             Ok(())
         }
+        Commands::Meta { command } => match command {
+            MetaCommand::GetSchema => print_schema_cmd(),
+        },
         Commands::Docgen { output, check } => docgen_cmd(output, check),
         Commands::Ls {
             port,

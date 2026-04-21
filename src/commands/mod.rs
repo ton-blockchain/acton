@@ -15,6 +15,7 @@ pub mod internal;
 pub mod library;
 pub mod localnet;
 pub mod ls;
+pub mod meta;
 pub mod new;
 pub mod retrace;
 pub mod rpc;
