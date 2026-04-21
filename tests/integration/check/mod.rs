@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 mod acton_import_tests;
 mod asm_safety_comment_tests;
 mod bless_safety_comment_tests;
+mod create_message_body_to_cell_tests;
 mod dangerous_send_mode_safety_comment_tests;
 mod deprecated_tests;
 mod dict_type_use_tests;

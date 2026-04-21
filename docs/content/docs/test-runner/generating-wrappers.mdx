@@ -226,11 +226,11 @@ generate-test = true
 test-output-dir = "tests/generated-tests"
 
 [wrappers.typescript]
-output-dir = "./wrapper-ts"
+output-dir = "./wrappers-ts"
 ```
 
 Then:
 - `acton wrapper Counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/Counter.test.tolk`
-- `acton wrapper Counter --ts` writes `wrapper-ts/Counter.ts` by default
+- `acton wrapper Counter --ts` writes `wrappers-ts/Counter.ts` by default
 
 See the [wrapper command reference](/docs/commands/wrapper) for more details about CLI options.

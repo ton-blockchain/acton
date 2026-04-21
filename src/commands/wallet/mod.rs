@@ -423,6 +423,7 @@ fn perform_testnet_airdrop(
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))
+        .user_agent(crate::build_info::user_agent())
         .build()
         .context("Failed to build HTTP client")?;
 
@@ -523,6 +524,7 @@ fn perform_localnet_airdrop(
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
+        .user_agent(crate::build_info::user_agent())
         .build()
         .context("Failed to build HTTP client")?;
     let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;
@@ -2145,6 +2147,7 @@ mod wallet_name_tests {
             .no_proxy()
             .connect_timeout(Duration::from_millis(50))
             .timeout(Duration::from_millis(100))
+            .user_agent(crate::build_info::user_agent())
             .build()
             .expect("failed to create reqwest client");
 

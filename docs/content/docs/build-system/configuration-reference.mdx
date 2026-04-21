@@ -109,7 +109,7 @@ generate-test = true
 test-output-dir = "tests"
 
 [wrappers.typescript]
-output-dir = "app/src/wrapper-ts"
+output-dir = "app/src/wrappers-ts"
 ```
 
 Available fields:
@@ -155,7 +155,7 @@ depends = []
 
 The contract name (`[contracts.NAME]` in `Acton.toml`, e.g., `Counter`) is used:
 - As a contract entrypoint `contracts/Counter.tolk` (with `onInternalMessage`, get methods, etc.)
-- As a filename for generated wrappers (e.g., `wrappers/Counter.tolk`, `wrapper-ts/Counter.ts`)
+- As a filename for generated wrappers (e.g., `wrappers/Counter.tolk`, `wrappers-ts/Counter.ts`)
 - As the dependency name when referencing this contract
 - To generate the output file name in the dependency output directory (default: `gen/`, e.g., `Counter` → `gen/Counter.code.tolk`)
 - To generate the function name (e.g., `Counter` → `counterCompiledCode()`)

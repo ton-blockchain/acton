@@ -47,7 +47,8 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
 
     let mut parts_docs = vec![];
     for part in parts {
-        parts_docs.push(print_type(ctx, &part)?);
+        let part_doc = print_type(ctx, &part)?;
+        parts_docs.push(part_doc);
     }
 
     let (first, rest) = parts_docs.split_first()?;
@@ -56,6 +57,12 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
         let kind = p.kind();
         kind == "type_alias_declaration"
     });
+    // we want to preserve user's newlines
+    let source_has_newline = union
+        .0
+        .utf8_text(ctx.code.as_ref().as_ref())
+        .ok()
+        .is_some_and(|text| text.contains('\n'));
 
     // we add `|` only for
     // ```
@@ -73,21 +80,38 @@ pub fn print_union_type<'a>(ctx: &Context<'_>, union: &UnionType) -> Option<RcDo
     // ```
     let multiline_prefix = if in_type_alias { "    | " } else { "" };
 
+    let force_alias_breaks = |doc: RcDoc<'a>| {
+        if in_type_alias {
+            doc.append(RcDoc::break_parent().flat_alt(RcDoc::nil()))
+        } else {
+            doc
+        }
+    };
+
     let first_doc = RcDoc::concat([
         RcDoc::flat_alt(RcDoc::text(multiline_prefix), RcDoc::nil()),
-        first.clone(),
+        force_alias_breaks(first.clone()),
     ]);
 
     let mut tail_docs = vec![];
     for doc in rest {
         tail_docs.push(RcDoc::line());
         tail_docs.push(RcDoc::text("| "));
-        tail_docs.push(doc.clone());
+        tail_docs.push(force_alias_breaks(doc.clone()));
     }
 
-    Some(RcDoc::group(
-        RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]).nest(4),
-    ))
+    let union_doc =
+        RcDoc::concat([RcDoc::softline_(), first_doc, RcDoc::concat(tail_docs)]).nest(4);
+
+    if in_type_alias {
+        return Some(if source_has_newline {
+            RcDoc::break_parent().append(union_doc)
+        } else {
+            union_doc
+        });
+    }
+
+    Some(RcDoc::group(union_doc))
 }
 
 fn collect_union_parts<'tree>(union: &UnionType<'tree>, parts: &mut Vec<Type<'tree>>) {

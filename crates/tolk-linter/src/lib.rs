@@ -2,7 +2,7 @@ extern crate core;
 
 use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
-    acton_import_in_contract, bless_call_missing_safety_comment,
+    acton_import_in_contract, bless_call_missing_safety_comment, create_message_body_to_cell,
     dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, dict_type_use,
     duplicated_condition, enum_cast_missing_safety_comment, explicit_return_type,
     identical_conditional_branches, incoming_messages_duplicate_opcode, missing_contract_header,
@@ -577,6 +577,11 @@ impl<'file> Walker<'file> for CheckerWalker<'_, '_> {
             self.checker,
             Rule::NoBounceHandler,
             no_bounce_handler::check_call_expr(self.checker, self.file_id, node, self.current_decl)
+        );
+        run_rule!(
+            self.checker,
+            Rule::CreateMessageBodyToCell,
+            create_message_body_to_cell::check_call_expr(self.checker, self.file_id, node)
         );
 
         if let Some(inference) = self.current_inference {

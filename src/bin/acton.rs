@@ -458,11 +458,11 @@ enum Commands {
         ui_port: u16,
     },
     #[command(
-        about = "Generate wrapper and optionally stub test file for a contract",
+        about = "Generate wrappers and optionally a stub test file for a contract",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrapper", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(
             long,

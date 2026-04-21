@@ -5,6 +5,8 @@ import {TonClient} from "../api/client"
 
 import styles from "./Tokens.module.css"
 
+const TOKEN_PLACEHOLDER_IMAGE = "/token-placeholder.svg"
+
 interface TokensProps {
   readonly wallets: JettonWallet[]
   readonly client: TonClient
@@ -83,15 +85,13 @@ export const Tokens: React.FC<TokensProps> = ({wallets, client, onAddressClick})
               tabIndex={0}
             >
               <img
-                src={
-                  w.master?.jetton_content?.image ||
-                  "https://wallet.ton.org/assets/img/token-placeholder.svg"
-                }
+                src={w.master?.jetton_content?.image || TOKEN_PLACEHOLDER_IMAGE}
                 alt={symbol}
                 className={styles.jettonImage}
                 onError={e => {
-                  ;(e.target as HTMLImageElement).src =
-                    "https://wallet.ton.org/assets/img/token-placeholder.svg"
+                  const img = e.currentTarget
+                  if (img.getAttribute("src") === TOKEN_PLACEHOLDER_IMAGE) return
+                  img.src = TOKEN_PLACEHOLDER_IMAGE
                 }}
               />
               <div className={styles.jettonInfoMain}>

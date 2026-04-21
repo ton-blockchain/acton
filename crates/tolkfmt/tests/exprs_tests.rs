@@ -898,6 +898,82 @@ fn test_function_call_with_literals() {
 }
 
 #[test]
+fn test_function_call_with_newline_after_open_paren_stays_multiline() {
+    check(
+        "fun test() { foo(\n            a, b); }",
+        expect![[r"
+                fun test() {
+                    foo(
+                        a,
+                        b,
+                    );
+                }"]],
+    );
+}
+
+#[test]
+fn test_function_call_with_single_internal_newline_stays_multiline() {
+    check(
+        "fun test() { foo(a,\n            b); }",
+        expect![[r"
+                fun test() {
+                    foo(
+                        a,
+                        b,
+                    );
+                }"]],
+    );
+}
+
+#[test]
+fn test_function_call_with_newline_before_close_paren_stays_multiline() {
+    check(
+        "fun test() { foo(a, b\n        ); }",
+        expect![[r"
+                fun test() {
+                    foo(
+                        a,
+                        b,
+                    );
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_object_call_argument_with_top_level_newline_stays_multiline() {
+    check(
+        r"
+            fun test() {
+                val counter = Counter.fromStorage(
+                    { id: 0, counter: 0 });
+            }",
+        expect![[r"
+                fun test() {
+                    val counter = Counter.fromStorage(
+                        { id: 0, counter: 0 },
+                    );
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_string_call_argument_with_top_level_newline_stays_multiline() {
+    check(
+        r#"
+            fun test() {
+                log(
+                    "hello");
+            }"#,
+        expect![[r#"
+                fun test() {
+                    log(
+                        "hello",
+                    );
+                }"#]],
+    );
+}
+
+#[test]
 fn test_function_call_breaking_long() {
     check_with_width(
         "fun test() { very_long_function_name(argument_one, argument_two, argument_three, argument_four, argument_five); }",
@@ -930,6 +1006,26 @@ fn test_single_lambda_call_argument_stays_after_open_paren() {
 }
 
 #[test]
+fn test_single_lambda_call_argument_with_top_level_newline_stays_multiline() {
+    check_with_width(
+        r"
+            fun test() {
+                nums.map<int>(
+                    fun(x: int): int { return x * x; });
+            }",
+        expect![[r"
+                fun test() {
+                    nums.map<int>(
+                        fun(x: int): int {
+                            return x * x;
+                        },
+                    );
+                }"]],
+        100,
+    );
+}
+
+#[test]
 fn test_lambda_call_argument_forces_multiline_argument_list() {
     check_with_width(
         "fun test() { foo(a, fun(x: int): bool { return x > 0; }); }",
@@ -943,6 +1039,24 @@ fn test_lambda_call_argument_forces_multiline_argument_list() {
                     );
                 }"]],
         100,
+    );
+}
+
+#[test]
+fn test_method_call_with_top_level_newline_stays_multiline() {
+    check(
+        r"
+            fun test() {
+                x.foo(
+                    a, b);
+            }",
+        expect![[r"
+                fun test() {
+                    x.foo(
+                        a,
+                        b,
+                    );
+                }"]],
     );
 }
 
@@ -2119,7 +2233,9 @@ fn test_complex_expression_combination_with_breaking() {
             fun main() {
                 val bouncedBody = beginCell()
                     .storeUint(0xffffffff, 32)
-                    .storeSlice(outBody.toCell().beginParse())
+                    .storeSlice(
+                        outBody.toCell().beginParse(),
+                    )
                     .endCell();
             }"]],
         100,

@@ -2,6 +2,7 @@ pub mod acton_import_in_contract;
 pub mod asm_function_missing_safety_comment;
 pub mod bless_call_missing_safety_comment;
 pub mod compiler_error;
+pub mod create_message_body_to_cell;
 pub mod dangerous_send_mode_missing_safety_comment;
 pub mod deprecated_symbol_use;
 pub mod dict_type_use;

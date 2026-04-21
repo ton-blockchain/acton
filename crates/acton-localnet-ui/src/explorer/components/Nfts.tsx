@@ -10,7 +10,7 @@ interface NftsProps {
   readonly onAddressClick?: (addr: string) => void
 }
 
-const NFT_PLACEHOLDER_IMAGE = "https://wallet.ton.org/assets/img/token-placeholder.svg"
+const NFT_PLACEHOLDER_IMAGE = "/token-placeholder.svg"
 
 const getContentString = (content: Record<string, unknown>, key: string): string | undefined => {
   const value = content[key]
@@ -54,7 +54,9 @@ export const Nfts: React.FC<NftsProps> = ({items, onAddressClick}) => {
                     alt={name}
                     className={styles.nftImage}
                     onError={event => {
-                      ;(event.target as HTMLImageElement).src = NFT_PLACEHOLDER_IMAGE
+                      const img = event.currentTarget
+                      if (img.getAttribute("src") === NFT_PLACEHOLDER_IMAGE) return
+                      img.src = NFT_PLACEHOLDER_IMAGE
                     }}
                   />
                 </div>

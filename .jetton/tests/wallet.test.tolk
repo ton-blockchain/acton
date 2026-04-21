@@ -386,7 +386,7 @@ get fun `test malformed forward payload`() {
             customPayload: null,
             forwardTonAmount: forwardAmount,
             forwardPayload: createEmptySlice(),
-        }.toCell(),
+        },
     });
 
     val res = net.send(deployer.address, transferMsg);
@@ -885,7 +885,7 @@ get fun `test wallet should restore balance on internal transfer bounce`() {
             customPayload: null,
             forwardTonAmount: 0,
             forwardPayload: beginCell().storeMaybeRef(null).endCell().beginParse(),
-        }.toCell(),
+        },
     });
 
     val transferResult = testing.processSingleTraceStep(deployer.address, transferMsg);
@@ -942,7 +942,7 @@ get fun `test wallet should restore balance on burn notification bounce`() {
             jettonAmount: burnAmount,
             sendExcessesTo: deployer.address,
             customPayload: null,
-        }.toCell(),
+        },
     });
 
     val burnResult = testing.processSingleTraceStep(deployer.address, burnMsg);
@@ -1074,7 +1074,7 @@ get fun `test transfer to masterchain`() {
             customPayload: null,
             forwardTonAmount: 0,
             forwardPayload: beginCell().storeUint(0, 1).endCell().beginParse(),
-        }.toCell(),
+        },
     });
 
     val res = net.send(deployer.address, transferMsg);

@@ -8,6 +8,11 @@ pub const SHORT_VERSION: &str = env!("ACTON_SHORT_VERSION");
 pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
 
 #[must_use]
+pub const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
+#[must_use]
 pub fn is_trunk_build() -> bool {
     env!("ACTON_IS_TRUNK_BUILD") == "1"
 }

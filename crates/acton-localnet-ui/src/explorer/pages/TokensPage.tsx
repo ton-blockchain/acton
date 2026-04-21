@@ -7,6 +7,8 @@ import type {JettonMaster} from "../api/types"
 
 import styles from "./TokensPage.module.css"
 
+const TOKEN_PLACEHOLDER_IMAGE = "/token-placeholder.svg"
+
 interface TokensPageProps {
   readonly client: TonClient
 }
@@ -56,9 +58,7 @@ export const TokensPage: React.FC<TokensPageProps> = ({client}) => {
           {tokens.map(token => {
             const symbol = token.jetton_content.symbol || "???"
             const name = token.jetton_content.name || "Unknown Jetton"
-            const image =
-              token.jetton_content.image ||
-              "https://wallet.ton.org/assets/img/token-placeholder.svg"
+            const image = token.jetton_content.image || TOKEN_PLACEHOLDER_IMAGE
             const decimals = Number(token.jetton_content.decimals || 9)
             const totalSupply = (Number(token.total_supply) / 10 ** decimals).toLocaleString()
 
@@ -81,8 +81,9 @@ export const TokensPage: React.FC<TokensPageProps> = ({client}) => {
                     alt={symbol}
                     className={styles.tokenImage}
                     onError={e => {
-                      ;(e.target as HTMLImageElement).src =
-                        "https://wallet.ton.org/assets/img/token-placeholder.svg"
+                      const img = e.currentTarget
+                      if (img.getAttribute("src") === TOKEN_PLACEHOLDER_IMAGE) return
+                      img.src = TOKEN_PLACEHOLDER_IMAGE
                     }}
                   />
                   <div className={styles.tokenInfo}>

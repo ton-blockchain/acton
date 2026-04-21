@@ -35,6 +35,7 @@
     "e032-unused-expression",
     "e033-dict-type-use",
     "e034-throw-requires-errors-enum",
+    "e035-create-message-body-to-cell",
     "s001-name-case-checker",
     "s002-explicit-return-type"
   ]

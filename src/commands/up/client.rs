@@ -92,7 +92,10 @@ impl GitHubClient {
     }
 
     fn request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut req = self.client.get(url).header(USER_AGENT, "acton-cli");
+        let mut req = self
+            .client
+            .get(url)
+            .header(USER_AGENT, crate::build_info::user_agent());
         if let Some(token) = &self.token {
             req = req.header("Authorization", format!("token {token}"));
         }
@@ -294,7 +297,10 @@ impl ReleaseClient for GitHubClient {
                 .header("Authorization", format!("token {token}"));
         }
 
-        let mut resp = match req.header(USER_AGENT, "acton-cli").send() {
+        let mut resp = match req
+            .header(USER_AGENT, crate::build_info::user_agent())
+            .send()
+        {
             Ok(resp) => resp,
             Err(err) if err.is_connect() || err.is_timeout() => {
                 bail!(
