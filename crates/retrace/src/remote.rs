@@ -5,6 +5,7 @@ use crate::types::{
     AccountFromAPI, BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse,
 };
 use reqwest::Client;
+use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -14,6 +15,10 @@ use toncenter_keys::api_key as toncenter_api_key;
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
+
+const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
 
 /// Client for `TonCenter` V2/V3 API.
 ///
@@ -71,6 +76,7 @@ impl TonCenterClient {
         let mut request = self
             .client
             .get(format!("{}/transactions", self.base_url))
+            .header(USER_AGENT, user_agent())
             .query(&[("hash", hash), ("limit", &limit.to_string())]);
 
         if let Some(key) = &self.api_key {
@@ -104,6 +110,7 @@ impl TonCenterClient {
         let mut request = self
             .client
             .get(format!("{}/blocks", self.base_url))
+            .header(USER_AGENT, user_agent())
             .query(&[
                 ("workchain", workchain.to_string()),
                 ("shard", shard.to_string()),
@@ -158,7 +165,11 @@ impl TonCenterClient {
             }
         });
 
-        let mut request = self.client.post(url).json(&body);
+        let mut request = self
+            .client
+            .post(url)
+            .header(USER_AGENT, user_agent())
+            .json(&body);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -187,7 +198,11 @@ impl TonCenterClient {
             self.base_url.replace("/api/v3", "/api/v2")
         );
 
-        let mut request = self.client.get(url).query(&[("libraries", hash)]);
+        let mut request = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .query(&[("libraries", hash)]);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -251,7 +266,12 @@ impl TonHubClient {
         hash: &str,
     ) -> anyhow::Result<TransactionTransactionsResponse> {
         let url = format!("{}/account/{}/tx/{}/{}", self.base_url, address, lt, hash);
-        let response = self.client.get(url).send().await?;
+        let response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .send()
+            .await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
@@ -272,7 +292,12 @@ impl TonHubClient {
             block: Option<BlockInfo>,
         }
 
-        let response = self.client.get(url).send().await?;
+        let response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .send()
+            .await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
@@ -302,7 +327,12 @@ impl TonHubClient {
             account: AccountFromAPI,
         }
 
-        let response = self.client.get(url).send().await?;
+        let response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .send()
+            .await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
@@ -327,7 +357,12 @@ impl TonHubClient {
             cell: String,
         }
 
-        let response = self.client.get(url).send().await?;
+        let response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .send()
+            .await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
@@ -374,6 +409,7 @@ impl DtonClient {
         let response: serde_json::Value = self
             .client
             .post(endpoint)
+            .header(USER_AGENT, user_agent())
             .json(&query)
             .send()
             .await?

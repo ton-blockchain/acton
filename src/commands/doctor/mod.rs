@@ -7,6 +7,7 @@ use acton_config::config::{
     resolved_paths_diagnostics,
 };
 use anyhow::Result;
+use reqwest::header::USER_AGENT;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -871,7 +872,7 @@ fn send_doctor_api_request(
         (DoctorApiMethod::PostJson, Some(body)) => client.post(&target.url).json(body),
         (DoctorApiMethod::PostJson, None) => client.post(&target.url),
     }
-    .header("User-Agent", "acton-doctor")
+    .header(USER_AGENT, build_info::user_agent())
     .send()
 }
 
