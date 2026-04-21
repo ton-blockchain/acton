@@ -2776,6 +2776,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         46 => get_wallet_id : 1,
         47 => parse_int : 1,
         48 => find_transaction_by_predicate_params : 3,
+        49 => wait_for_trace : 4,
         501 => call_tolk_function : 3,
     });
 }
@@ -2995,5 +2996,448 @@ mod tests {
         assert_eq!(pending.parent_lt, Some(200));
         assert_eq!(pending.message, second_child);
         assert!(!message_iters.is_done(cursor_id));
+    }
+}
+
+// =============================================================================
+// waitForTrace implementation.
+//
+// TODO(waitForTrace): this branch is intentionally broken-on-master. It is
+// meant to be rebased on top of the `waitForFirstTransaction` PR (which
+// renames .wait() -> .waitForFirstTransaction(), fixes net.sendExternal, and
+// lands the TEP-467 message-lookup plumbing that this feature depends on).
+//
+// After that PR merges to master, rebase this branch and fold this block into
+// the existing waitForTransaction/message-lookup code path — there is no
+// reason for it to live in a separate bottom-of-file block. In particular:
+//
+//   * `read_broadcast_target`, `tx_cell_to_send_result_tuple`,
+//     `WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS`, and
+//     `WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS` are all introduced by the first
+//     PR — use them from here instead of redeclaring.
+//   * V3 summary types (`V3Trace`, `V3TransactionSummary`, `V3TxDescription`,
+//     ...) live in `crates/ton-api/src/lib.rs` — import them at the top.
+//   * Register opcode `49 => wait_for_trace : 4` in `register_extensions`
+//     (already done in this branch).
+//
+// Until the rebase happens this module references symbols that do not exist
+// yet, so the crate will not build. That is intentional — the goal is to keep
+// the diff reviewable, not to ship this branch standalone.
+// =============================================================================
+
+use ton_api::{V3MessageSummary, V3TransactionSummary, V3TxDescription};
+
+extension!(wait_for_trace in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: bool, tx_cell: Cell) using wait_for_trace_impl);
+fn wait_for_trace_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    sleep_duration: BigInt,
+    attempts: BigInt,
+    quiet: bool,
+    tx_cell: Cell,
+) -> anyhow::Result<()> {
+    if !ctx.is_broadcasting {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
+    let attempts = attempts.to_u32().unwrap_or(20);
+    let sleep_duration_ms = sleep_duration
+        .to_u64()
+        .unwrap_or(WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS);
+
+    if attempts == 0 {
+        anyhow::bail!("Attempt number must be positive");
+    }
+
+    // Use the TEP-467 normalized hash toncenter returned from `sendBocReturnHash` (stashed
+    // in the pseudo tx's `prev_trans_hash`). v3 `/traces` accepts it as `msg_hash` and
+    // matches against the same value stored by its indexer.
+    let (_, target_hash, _) = read_broadcast_target(&tx_cell)?;
+    let msg_hash_hex = hex::encode(target_hash.as_slice());
+
+    let network = ctx.network();
+    let custom_networks = ctx.env.config.custom_networks();
+    let Ok(api_client) = TonApiClient::new(network, custom_networks) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    let mut last_transport_err: Option<anyhow::Error> = None;
+    for attempt in 1..=attempts {
+        if !quiet {
+            println!("Awaiting trace... [Attempt {attempt}/{attempts}]");
+        }
+
+        match poll_send_results_by_trace(&api_client, &msg_hash_hex) {
+            Ok(Some(send_results)) => {
+                // Settle delay so late trace entries (still being indexed) are not missed.
+                std::thread::sleep(Duration::from_millis(WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS));
+                if !quiet {
+                    println!("Trace settled with {} transaction(s)", send_results.len());
+                }
+                stack.push(TupleItem::big_array_from_items(send_results));
+                return Ok(());
+            }
+            Ok(None) => {}
+            Err(err) => {
+                // Don't silently retry past errors — surface them to the user via a warning
+                // on every failing attempt, and hold on to the last one in case all attempts
+                // fail (so we can include it in the final bail message).
+                warn!("waitForTrace poll failed on attempt {attempt}: {err:#}");
+                last_transport_err = Some(err);
+            }
+        }
+
+        if attempt < attempts {
+            std::thread::sleep(Duration::from_millis(sleep_duration_ms));
+        }
+    }
+
+    if let Some(err) = last_transport_err {
+        return Err(err.context(format!(
+            "waitForTrace: toncenter polling failed on every attempt ({attempts} total)"
+        )));
+    }
+
+    stack.push(TupleItem::Null);
+    Ok(())
+}
+
+/// One polling step for a full trace.
+///
+/// Returns `Ok(None)` when the indexer hasn't yet built the trace or referenced txs aren't
+/// resolvable yet. Returns `Err` when the trace exists but we failed to reconstruct a tx
+/// from it — those errors are surfaced, not swallowed, so the caller can stop and report.
+fn poll_send_results_by_trace(
+    client: &TonApiClient,
+    msg_hash_hex: &str,
+) -> anyhow::Result<Option<Vec<TupleItem>>> {
+    let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1)?;
+    let Some(trace) = traces.into_iter().next() else {
+        return Ok(None);
+    };
+    if trace.transactions_order.is_empty() {
+        return Ok(None);
+    }
+
+    let mut results = Vec::with_capacity(trace.transactions_order.len());
+    for tx_hash in &trace.transactions_order {
+        let Some(summary) = trace.transactions.get(tx_hash) else {
+            // Indexer returned an id it cannot resolve — trace is still being assembled.
+            return Ok(None);
+        };
+        let tx_cell = if let Some(raw_boc) = summary.raw_transaction.as_deref() {
+            // Older toncenter deployments inline the BoC — use it directly.
+            Boc::decode_base64(raw_boc).with_context(|| {
+                format!("Failed to decode raw_transaction from /traces for tx {tx_hash}")
+            })?
+        } else {
+            // Current deployments only ship structured summary fields — synthesize a
+            // Transaction cell so Tolk can return a useful SendResult.
+            synthesize_tx_cell_from_v3(summary).with_context(|| {
+                format!("Failed to synthesize Transaction cell for tx {tx_hash}")
+            })?
+        };
+        results.push(tx_cell_to_send_result_tuple(tx_cell)?);
+    }
+
+    Ok(Some(results))
+}
+
+/// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
+///
+/// Current toncenter deployments no longer inline `raw_transaction` in `/traces`. This
+/// function reconstructs a structurally valid `Transaction` from the structured summary
+/// fields so `SendResultList` exposes usable `lt`, `outMessages`, `externals`, and
+/// `gasUsed`. The synthesized cell's `repr_hash` is NOT expected to match the on-chain
+/// hash — cell encoding choices (inline vs ref, state update hashes) are lossy here.
+fn synthesize_tx_cell_from_v3(summary: &V3TransactionSummary) -> anyhow::Result<Cell> {
+    let account = parse_account_hash(&summary.account)
+        .with_context(|| format!("Unsupported account address format: {}", summary.account))?;
+    let lt: u64 = summary
+        .lt
+        .parse()
+        .with_context(|| format!("Invalid lt '{}' in v3 tx summary", summary.lt))?;
+    let prev_trans_lt: u64 = summary
+        .prev_trans_lt
+        .as_deref()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let prev_trans_hash = summary
+        .prev_trans_hash
+        .as_deref()
+        .map(parse_hash_bytes)
+        .transpose()?
+        .unwrap_or_default();
+
+    let in_msg = summary
+        .in_msg
+        .as_ref()
+        .map(build_message_cell_from_v3)
+        .transpose()
+        .context("Failed to reconstruct inbound message cell")?;
+
+    let mut out_msgs = Dict::<Uint15, Cell>::new();
+    for (idx, m) in summary.out_msgs.iter().enumerate() {
+        let key = Uint15::new(idx as u16);
+        let cell = build_message_cell_from_v3(m).with_context(|| {
+            format!(
+                "Failed to reconstruct outbound message {idx} of tx {}",
+                summary.hash
+            )
+        })?;
+        out_msgs.set(key, cell)?;
+    }
+    let out_msg_count = Uint15::new(summary.out_msgs.len() as u16);
+
+    let total_fees = CurrencyCollection {
+        tokens: parse_tokens_opt(summary.total_fees.as_deref()),
+        other: ExtraCurrencyCollection::new(),
+    };
+
+    let tx = Transaction {
+        account,
+        lt,
+        prev_trans_hash,
+        prev_trans_lt,
+        now: summary.now,
+        out_msg_count,
+        orig_status: parse_account_status(summary.orig_status.as_deref()),
+        end_status: parse_account_status(summary.end_status.as_deref()),
+        in_msg,
+        out_msgs,
+        total_fees,
+        state_update: Lazy::new(&HashUpdate {
+            old: HashBytes::ZERO,
+            new: HashBytes::ZERO,
+        })
+        .context("Failed to build synthetic state_update")?,
+        info: Lazy::new(&build_tx_info_from_v3(summary.description.as_ref()))
+            .context("Failed to build synthetic tx info")?,
+    };
+
+    Ok(to_cell(&tx))
+}
+
+/// Build a full `Message` cell from a v3 message summary. For external-in the source is
+/// forced to `addr_none` (matching how toncenter indexes external-ins). Body always goes
+/// into a reference, init (if present) into a reference as well.
+fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
+    let body_cell = match m.message_content.as_ref().and_then(|c| c.body.as_deref()) {
+        Some(b) => Boc::decode_base64(b).context("Failed to decode message body BoC")?,
+        None => CellBuilder::new().build().context("empty body cell")?,
+    };
+    let init_cell = match m.init_state.as_ref().and_then(|i| i.body.as_deref()) {
+        Some(b) => Some(Boc::decode_base64(b).context("Failed to decode message init BoC")?),
+        None => None,
+    };
+
+    let info = infer_msg_info_from_v3(m)?;
+
+    let ctx = Cell::empty_context();
+    let mut b = CellBuilder::new();
+    info.store_into(&mut b, ctx)?;
+    match init_cell {
+        Some(c) => {
+            b.store_bit_one()?; // Maybe.Just
+            b.store_bit_one()?; // Either.Right (ref)
+            b.store_reference(c)?;
+        }
+        None => b.store_bit_zero()?, // Maybe.Nothing
+    }
+    b.store_bit_one()?; // body: Either.Right (ref)
+    b.store_reference(body_cell)?;
+    Ok(b.build()?)
+}
+
+/// Decide which `MsgInfo` variant a v3 message summary represents and pack its fields.
+///
+/// Heuristic: presence of `value` implies internal; otherwise absence of `source` implies
+/// external-in; otherwise external-out. Matches how toncenter populates the summary.
+fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
+    if m.value.is_some() {
+        let src = parse_int_addr(m.source.as_deref())?
+            .context("Internal message summary missing source address")?;
+        let dst = parse_int_addr(m.destination.as_deref())?
+            .context("Internal message summary missing destination address")?;
+        Ok(MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: m.ihr_disabled.unwrap_or(true),
+            bounce: m.bounce.unwrap_or(false),
+            bounced: m.bounced.unwrap_or(false),
+            src,
+            dst,
+            value: CurrencyCollection {
+                tokens: parse_tokens_opt(m.value.as_deref()),
+                other: ExtraCurrencyCollection::new(),
+            },
+            ihr_fee: parse_tokens_opt(m.ihr_fee.as_deref()),
+            fwd_fee: parse_tokens_opt(m.fwd_fee.as_deref()),
+            created_lt: m
+                .created_lt
+                .as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            created_at: m.created_at.unwrap_or(0),
+        }))
+    } else if m.source.is_none() {
+        let dst = parse_int_addr(m.destination.as_deref())?
+            .context("External-in message missing destination address")?;
+        Ok(MsgInfo::ExtIn(ExtInMsgInfo {
+            src: None,
+            dst,
+            import_fee: parse_tokens_opt(m.import_fee.as_deref()),
+        }))
+    } else {
+        let src = parse_int_addr(m.source.as_deref())?
+            .context("External-out message missing source address")?;
+        // External-out destinations are opaque ExtAddr; we leave dst = None.
+        Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
+            src,
+            dst: None,
+            created_lt: m
+                .created_lt
+                .as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            created_at: m.created_at.unwrap_or(0),
+        }))
+    }
+}
+
+/// Translate a v3 transaction description into a minimal `TxInfo::Ordinary`. Fields we
+/// don't have (credit_phase, bounce_phase) are left empty; compute + action phases
+/// preserve their success/gas/exit-code values so user assertions remain meaningful.
+fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
+    let desc = match desc {
+        Some(d) => d,
+        None => {
+            return TxInfo::Ordinary(OrdinaryTxInfo {
+                credit_first: false,
+                storage_phase: None,
+                credit_phase: None,
+                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                    reason: ComputePhaseSkipReason::NoState,
+                }),
+                action_phase: None,
+                aborted: true,
+                bounce_phase: None,
+                destroyed: false,
+            });
+        }
+    };
+
+    let compute_phase = match desc.compute_ph.as_ref() {
+        Some(cp) if cp.skipped == Some(true) => ComputePhase::Skipped(SkippedComputePhase {
+            reason: ComputePhaseSkipReason::NoState,
+        }),
+        Some(cp) => ComputePhase::Executed(tycho_types::models::ExecutedComputePhase {
+            success: cp.success.unwrap_or(false),
+            msg_state_used: cp.msg_state_used.unwrap_or(false),
+            account_activated: cp.account_activated.unwrap_or(false),
+            gas_fees: parse_tokens_opt(cp.gas_fees.as_deref()),
+            gas_used: cp
+                .gas_used
+                .as_deref()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(tycho_types::num::VarUint56::new)
+                .unwrap_or_default(),
+            gas_limit: cp
+                .gas_limit
+                .as_deref()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(tycho_types::num::VarUint56::new)
+                .unwrap_or_default(),
+            gas_credit: cp
+                .gas_credit
+                .as_deref()
+                .and_then(|s| s.parse::<u32>().ok())
+                .map(tycho_types::num::VarUint24::new),
+            mode: cp.mode.unwrap_or(0),
+            exit_code: cp.exit_code.unwrap_or(0),
+            exit_arg: cp.exit_arg,
+            vm_steps: cp.vm_steps.unwrap_or(0),
+            vm_init_state_hash: cp
+                .vm_init_state_hash
+                .as_deref()
+                .map(parse_hash_bytes)
+                .transpose()
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+            vm_final_state_hash: cp
+                .vm_final_state_hash
+                .as_deref()
+                .map(parse_hash_bytes)
+                .transpose()
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+        }),
+        None => ComputePhase::Skipped(SkippedComputePhase {
+            reason: ComputePhaseSkipReason::NoState,
+        }),
+    };
+
+    TxInfo::Ordinary(OrdinaryTxInfo {
+        credit_first: desc.credit_first.unwrap_or(false),
+        storage_phase: None,
+        credit_phase: None,
+        compute_phase,
+        action_phase: None,
+        aborted: desc.aborted.unwrap_or(false),
+        bounce_phase: None,
+        destroyed: desc.destroyed.unwrap_or(false),
+    })
+}
+
+fn parse_account_hash(account: &str) -> anyhow::Result<HashBytes> {
+    // Expect "wc:hex" or "hex"; the `account` field in v3 is `<wc>:<hex>`.
+    let hex_part = account.rsplit(':').next().unwrap_or(account);
+    parse_hash_bytes(hex_part)
+}
+
+fn parse_hash_bytes(h: &str) -> anyhow::Result<HashBytes> {
+    // Accept hex or base64 (std / urlsafe).
+    let bytes = if h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit()) {
+        hex::decode(h).context("hex decode")?
+    } else {
+        base64::engine::general_purpose::STANDARD
+            .decode(h)
+            .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(h))
+            .or_else(|_| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(h))
+            .context("base64 decode")?
+    };
+    if bytes.len() != 32 {
+        anyhow::bail!("expected 32-byte hash, got {}", bytes.len());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&bytes);
+    Ok(HashBytes(out))
+}
+
+fn parse_int_addr(s: Option<&str>) -> anyhow::Result<Option<IntAddr>> {
+    match s {
+        None => Ok(None),
+        Some(a) if a.is_empty() => Ok(None),
+        Some(a) => IntAddr::from_str(a)
+            .map(Some)
+            .map_err(|e| anyhow!("Failed to parse address '{a}': {e:?}")),
+    }
+}
+
+fn parse_tokens_opt(s: Option<&str>) -> Tokens {
+    s.and_then(|v| v.parse::<u128>().ok())
+        .map(Tokens::new)
+        .unwrap_or_default()
+}
+
+fn parse_account_status(s: Option<&str>) -> AccountStatus {
+    match s {
+        Some("uninit") => AccountStatus::Uninit,
+        Some("active") => AccountStatus::Active,
+        Some("frozen") => AccountStatus::Frozen,
+        Some("nonexist") => AccountStatus::NotExists,
+        _ => AccountStatus::Uninit,
     }
 }

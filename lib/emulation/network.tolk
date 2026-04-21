@@ -260,6 +260,42 @@ fun SendResultList.wait(
     );
 }
 
+// TODO(waitForTrace): after the `waitForFirstTransaction` PR lands on master, rebase this
+// branch and rewrite `waitForTrace` on top of the updated infrastructure — it should reuse
+// `__acton_impl_pseudoTxCell` and the `SendResultList?`-returning FFI shape introduced there.
+
+/// Wait for the full message chain originating from the first message to settle on-chain.
+///
+/// Unlike `SendResultList.waitForFirstTransaction`, this method follows all descendant
+/// transactions (children, grandchildren, ...) using toncenter's traces API and returns
+/// them as a fresh [SendResultList].
+///
+/// In emulation mode (without `--net`), the trace is already fully processed locally, so
+/// the method returns `self` as-is (or `null` if the list is empty).
+///
+/// Returns `null` if the chain cannot be fetched within the given attempt budget.
+fun SendResultList.waitForTrace(
+    self,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 1000,
+): SendResultList? {
+    if (self.size() == 0) {
+        return null;
+    }
+    if (!ffi.isBroadcasting()) {
+        return self;
+    }
+
+    val res = self.at(0);
+    return ffi.waitForTrace(
+        __acton_impl_pseudoTxCell(res),
+        quiet,
+        attempts,
+        sleepDuration,
+    );
+}
+
 /// Represents a set of parameters to search for a transaction in the transaction list.
 struct SearchParams {
     /// Destination address of the transaction.
@@ -1154,6 +1190,7 @@ fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs:
 fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
 fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
+fun ffi.waitForTrace(pseudoTxCell: cell, quiet: bool, attempts: int, sleepDuration: int): SendResultList? asm "49 EXTCALL"
 fun ffi.enableBroadcast(): void asm "26 EXTCALL"
 fun ffi.disableBroadcast(): void asm "27 EXTCALL"
 fun ffi.getConfig(): dict asm "31 EXTCALL"
