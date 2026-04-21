@@ -5199,7 +5199,6 @@ name = "ton-api"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "base64",
  "log",
  "num-bigint",
  "reqwest",

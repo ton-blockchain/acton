@@ -1,3 +1,3 @@
 Script finished with [EXIT_STATUS] 100
   Re-run with --backtrace full to get more information
-Failed to send message to real network: Failed to send BOC: error sending request for url ([LOCALHOST_URL]/sendBocReturnHash): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])
+Failed to send message to real network: Failed to send BOC: error sending request for url ([LOCALHOST_URL]/sendBoc): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])

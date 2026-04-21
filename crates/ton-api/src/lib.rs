@@ -348,49 +348,11 @@ impl TonApiClient {
 
     /// Send BOC to network
     pub fn send_boc(&self, boc: &str) -> Result<(), SendBocError> {
-        self.post_send_boc("sendBoc", boc).map(|_| ())
-    }
-
-    /// Send BOC to network via `sendBocReturnHash`, returning the TEP-467 normalized hash
-    /// that toncenter computed for the external-in message.
-    ///
-    /// Preferable to [`Self::send_boc`] when the caller needs to poll for the resulting
-    /// transaction (`waitForTransaction` / `waitForTrace`) — the returned hash is exactly
-    /// what toncenter indexes against, so no local TEP-467 normalization is needed on the
-    /// send side.
-    pub fn send_boc_return_hash(&self, boc: &str) -> Result<HashBytes, SendBocError> {
-        let response = self.post_send_boc("sendBocReturnHash", boc)?;
-
-        #[derive(Deserialize)]
-        struct Resp {
-            result: Inner,
-        }
-        #[derive(Deserialize)]
-        struct Inner {
-            hash: String,
-        }
-
-        let data: Resp = response.json().map_err(|err| {
-            SendBocError::new(
-                SendBocErrorKind::Other,
-                format!("Failed to parse sendBocReturnHash response: {err}"),
-            )
-        })?;
-
-        decode_toncenter_hash(&data.result.hash).map_err(|err| {
-            SendBocError::new(
-                SendBocErrorKind::Other,
-                format!("Failed to decode sendBocReturnHash hash: {err}"),
-            )
-        })
-    }
-
-    fn post_send_boc(&self, endpoint: &str, boc: &str) -> Result<Response, SendBocError> {
         let base_url = self
             .network
             .toncenter_v2_url(&self.custom_networks)
             .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-        let url = format!("{base_url}/{endpoint}");
+        let url = format!("{base_url}/sendBoc");
 
         let json = serde_json::json!({ "boc": boc });
 
@@ -405,7 +367,7 @@ impl TonApiClient {
             return Err(Self::handle_send_boc_fail(response));
         }
 
-        Ok(response)
+        Ok(())
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
@@ -846,27 +808,6 @@ struct TonCenterErrorResponse {
     #[allow(dead_code)]
     ok: bool,
     error: String,
-}
-
-/// Decode a toncenter-returned 32-byte hash. Toncenter returns standard base64;
-/// url-safe variants are accepted defensively for custom gateways.
-fn decode_toncenter_hash(raw: &str) -> anyhow::Result<HashBytes> {
-    use base64::Engine as _;
-    use base64::engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD};
-
-    let bytes = STANDARD
-        .decode(raw)
-        .or_else(|_| URL_SAFE.decode(raw))
-        .or_else(|_| URL_SAFE_NO_PAD.decode(raw))
-        .with_context(|| format!("Unrecognized hash encoding: {raw}"))?;
-
-    if bytes.len() != 32 {
-        anyhow::bail!("Expected 32-byte hash, got {} bytes", bytes.len());
-    }
-
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&bytes);
-    Ok(HashBytes(out))
 }
 
 fn should_disable_system_proxy() -> bool {

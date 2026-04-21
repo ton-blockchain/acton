@@ -292,13 +292,18 @@ fn send_message_impl(
     };
 
     if is_external && ctx.is_broadcasting {
+        let parsed_ext_in = msg
+            .parse::<Message<'_>>()
+            .context("Failed to parse external-in message cell")?;
+        let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
+        drop(parsed_ext_in);
+
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
         let client = TonApiClient::new(network, custom_networks)
             .context("Failed to initialize toncenter client for external-in broadcast")?;
-        let boc = Boc::encode_base64(&msg);
-        let norm_hash = client
-            .send_boc_return_hash(&boc)
+        client
+            .send_boc(&Boc::encode_base64(&msg))
             .map_err(|error| format_send_boc_error(error, SendBocContext::Generic))?;
 
         let pseudo_tx = build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), msg, norm_hash);
@@ -858,12 +863,17 @@ fn send_wallet_message(
     let boc = &external.to_boc_base64()?;
     let network_name = network.to_string();
     let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
-    let norm_hash = client
-        .send_boc_return_hash(boc)
+    client
+        .send_boc(boc)
         .map_err(|error| format_send_boc_error(error, context))?;
 
     let external_in_cell =
-        Boc::decode_base64(boc).context("Failed to re-decode wallet external-in BoC")?;
+        Boc::decode_base64(boc).context("Failed to decode wallet external-in BoC")?;
+    let parsed_ext_in = external_in_cell
+        .parse::<Message<'_>>()
+        .context("Failed to parse wallet external-in message")?;
+    let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
+    drop(parsed_ext_in);
     Ok((external_in_cell, norm_hash))
 }
 
