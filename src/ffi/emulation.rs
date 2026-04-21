@@ -313,10 +313,6 @@ fn send_message_impl(
             warn!("Failed to register compiler ABI in localnet: {err:#}");
         }
 
-        // `send_wallet_message` returns the external-in cell the wallet SDK actually
-        // delivered to the wallet account — that's what the wallet's first on-chain
-        // transaction will carry as its inMessage, so it's what `waitForFirstTransaction`
-        // needs to match (per TON docs message-lookup).
         let (wallet_ext_in, norm_hash) =
             send_wallet_message(&msg, wallet, &network, custom_networks)
                 .context("Failed to send message to real network")?;
@@ -474,30 +470,19 @@ fn build_send_result_tuple(
     ]))
 }
 
-/// Build `SendResult` from a raw transaction cell (e.g. fetched from toncenter).
+/// Build `SendResult` from an already-parsed transaction (e.g. fetched from toncenter).
 ///
 /// Fields that cannot be reconstructed from a single on-chain transaction
 /// (`childTxs`, `parentLt`, `outActions`) are left empty/null. Externals are
 /// derived by filtering the transaction's own outgoing messages.
-fn tx_cell_to_send_result_tuple(tx_cell: Cell) -> anyhow::Result<TupleItem> {
-    let parsed_tx: Transaction = tx_cell
-        .parse::<Transaction>()
-        .context("Failed to parse transaction cell")?;
-
+fn tx_cell_to_send_result_tuple(tx_cell: Cell, parsed_tx: &Transaction) -> TupleItem {
     let externals: Vec<Cell> = parsed_tx
         .iter_out_msgs()
         .filter_map(Result::ok)
         .filter_map(|msg| matches!(msg.info, MsgInfo::ExtOut(_)).then(|| to_cell(&msg)))
         .collect();
 
-    Ok(build_send_result_tuple(
-        tx_cell,
-        &parsed_tx,
-        &[],
-        None,
-        Cell::default(),
-        &externals,
-    ))
+    build_send_result_tuple(tx_cell, parsed_tx, &[], None, Cell::default(), &externals)
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -512,10 +497,7 @@ fn tx_cell_to_send_result_tuple(tx_cell: Cell) -> anyhow::Result<TupleItem> {
 /// The resulting cell's `repr_hash` is returned. This form is stable across cell-layout
 /// re-serializations and is the value both sides of a lookup compute locally — so a client
 /// that polled for it can match a transaction whose `inMessage` toncenter may have rebuilt.
-fn compute_normalized_ext_in_hash(msg_cell: &Cell) -> anyhow::Result<HashBytes> {
-    let msg = msg_cell
-        .parse::<Message<'_>>()
-        .context("Failed to parse external-in message cell")?;
+fn compute_normalized_ext_in_hash(msg: &Message<'_>) -> anyhow::Result<HashBytes> {
     let MsgInfo::ExtIn(info) = &msg.info else {
         anyhow::bail!("TEP-467 normalization only applies to external-in messages");
     };
@@ -560,22 +542,17 @@ fn ext_in_dest_address(msg_cell: &Cell) -> anyhow::Result<String> {
     }
 }
 
-/// Build a placeholder `SendResult` tuple for transactions that were broadcast to a real network.
+/// Build a placeholder `SendResult` tuple for transactions broadcast to a real network.
 ///
-/// The pseudo `tx` carries:
-/// - the external-in message delivered to the network (in `in_msg`) — `waitForFirstTransaction`
-///   reads its `dst` to pick the destination account to poll;
-/// - the TEP-467 normalized hash returned by toncenter's `sendBocReturnHash` (stashed in
-///   `prev_trans_hash`) — used as the lookup key, so we don't re-normalize locally.
-///
-/// The unused `Transaction` slots (`state_update`, `info`, etc.) are filled with minimal
-/// defaults so the tx cell round-trips through TL-B serialization.
+/// The pseudo `tx` carries the external-in message in `in_msg` (for its `dst`) and the
+/// TEP-467 normalized hash in `prev_trans_hash` (used as the lookup key on the wait side
+/// — avoids re-normalizing locally). Other `Transaction` slots are minimal defaults so the
+/// cell round-trips through TL-B serialization.
 fn build_pseudo_broadcast_tx(now: u32, in_msg: Cell, norm_hash: HashBytes) -> TupleItem {
     let tx = Transaction {
         account: Default::default(),
         lt: 0,
-        // Abused slot: carries the TEP-467 normalized hash of `in_msg` for the Rust-side
-        // `waitForFirstTransaction` to look up; pseudo txs have no real previous transaction.
+        // HACK: abused slot — carries the TEP-467 normalized hash for the Rust-side lookup.
         prev_trans_hash: norm_hash,
         prev_trans_lt: 0,
         now,
@@ -858,12 +835,8 @@ fn execute_message_iter_batch(
     )
 }
 
-/// Broadcast an internal message through an opened wallet.
-///
-/// Returns the external-in cell the wallet SDK built (i.e. the message that actually
-/// hits the wallet's account) and its TEP-467 normalized hash, as returned by toncenter's
-/// `sendBocReturnHash`. Callers use these to stash the wallet's first on-chain transaction
-/// into the pseudo `SendResult` so `waitForFirstTransaction` can find it.
+/// Broadcast an internal message through an opened wallet. Returns the external-in cell
+/// the wallet SDK built and its TEP-467 normalized hash returned by `sendBocReturnHash`.
 fn send_wallet_message(
     message: &Cell,
     wallet: Wallet,
@@ -2378,18 +2351,16 @@ fn find_open_wallet_by_address<'a>(ctx: &'a Context, addr: &StdAddr) -> Option<&
 const WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS: u64 = 1000;
 const WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS: u64 = 1000;
 
-/// Extract the lookup target (destination address + TEP-467 normalized hash) from the
-/// pseudo `Transaction` cell stashed by [`build_pseudo_broadcast_tx`].
-fn read_broadcast_target(tx_cell: &Cell) -> anyhow::Result<(String, HashBytes, Cell)> {
+fn read_broadcast_target(tx_cell: &Cell) -> anyhow::Result<(String, HashBytes)> {
     let parsed: Transaction = tx_cell
         .parse::<Transaction>()
         .context("Failed to parse pseudo broadcast tx")?;
     let in_msg = parsed
         .in_msg
-        .clone()
+        .as_ref()
         .context("Pseudo broadcast tx has no in_msg")?;
-    let dest = ext_in_dest_address(&in_msg)?;
-    Ok((dest, parsed.prev_trans_hash, in_msg))
+    let dest = ext_in_dest_address(in_msg)?;
+    Ok((dest, parsed.prev_trans_hash))
 }
 
 extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: bool, tx_cell: Cell) using wait_for_transaction_impl);
@@ -2416,24 +2387,23 @@ fn wait_for_transaction_impl(
         anyhow::bail!("Attempt number must be positive");
     }
 
-    // Lookup target comes straight from the pseudo tx: `prev_trans_hash` carries the
-    // TEP-467 normalized hash that toncenter returned from `sendBocReturnHash`, and
-    // `in_msg` is the external-in actually delivered to the network — its `dst` is the
-    // account whose recent transactions we scan. No local normalization on this side.
-    // If the caller happens to call waitForFirstTransaction on a real emulation-result tx
-    // (e.g. from a non-wallet `net.send` with broadcast toggled on afterwards), the tx
-    // won't be an external-in-shaped pseudo tx — treat that as "nothing to wait for" and
-    // return null rather than bailing.
-    let Ok((dest_address, target_hash, _)) = read_broadcast_target(&tx_cell) else {
+    // Non-pseudo txs (e.g. a real emulation result from `net.send` with broadcast toggled
+    // on afterwards) won't have the external-in-shaped lookup target — treat that as
+    // "nothing to wait for" rather than bailing.
+    let Ok((dest_address, target_hash)) = read_broadcast_target(&tx_cell) else {
         stack.push(TupleItem::Null);
         return Ok(());
     };
 
     let network = ctx.network();
     let custom_networks = ctx.env.config.custom_networks();
-    let Ok(api_client) = TonApiClient::new(network, custom_networks) else {
-        stack.push(TupleItem::Null);
-        return Ok(());
+    let api_client = match TonApiClient::new(network, custom_networks) {
+        Ok(client) => client,
+        Err(err) => {
+            log::warn!("Failed to initialize toncenter client for waitForTransaction: {err:#}");
+            stack.push(TupleItem::Null);
+            return Ok(());
+        }
     };
 
     for attempt in 1..=attempts {
@@ -2442,20 +2412,18 @@ fn wait_for_transaction_impl(
         }
 
         match poll_send_result_v2(&api_client, &dest_address, &target_hash) {
-            Ok(Some((tx_hash_hex, send_result))) => {
+            Ok(Some(polled)) => {
                 // Short settle delay so descendant transactions are more likely to be visible.
                 std::thread::sleep(Duration::from_millis(WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS));
 
                 if !quiet {
                     println!("Transaction successfully applied!");
-                    let link = transaction_link(ctx, &dest_address, &tx_hash_hex);
+                    let link = transaction_link(ctx, &dest_address, &polled);
                     println!("You can view it at {}", link.underline());
                 }
-                // Tolk expects a BigArray (SendResultList) here — see the Tolk unwrap in
-                // `SendResultList.waitForFirstTransaction`. A bare struct tuple would be spread
-                // across multiple stack slots by Tolk's struct calling convention and cause
-                // a stack underflow on return.
-                stack.push(TupleItem::big_array_from_items(vec![send_result]));
+                // Tolk expects a BigArray here (see the Tolk-side unwrap): a bare struct tuple
+                // would be spread across multiple stack slots and cause a stack underflow.
+                stack.push(TupleItem::big_array_from_items(vec![polled.send_result]));
                 return Ok(());
             }
             Ok(None) => {}
@@ -2473,18 +2441,25 @@ fn wait_for_transaction_impl(
     Ok(())
 }
 
+struct PolledSendResult {
+    tx_hash_hex: String,
+    lt: u64,
+    utime: u32,
+    send_result: TupleItem,
+}
+
 /// One polling step using toncenter v2 — a direct translation of the TON docs
 /// `waitForTransaction` reference: fetch the destination account's recent transactions
 /// (`limit: 10, archival: true`), and for each transaction whose `inMessage` is
 /// external-in, locally compute the TEP-467 normalized hash and compare with the target.
 ///
-/// Returns `Ok(Some((tx_hash_hex, send_result_tuple)))` on a hit, or `Ok(None)` when
-/// the indexer hasn't seen the transaction yet. Transport errors propagate as `Err`.
+/// Returns `Ok(Some(...))` on a hit, or `Ok(None)` when the indexer hasn't seen the
+/// transaction yet. Transport errors propagate as `Err`.
 fn poll_send_result_v2(
     client: &TonApiClient,
     dest_address: &str,
     target_hash: &HashBytes,
-) -> anyhow::Result<Option<(String, TupleItem)>> {
+) -> anyhow::Result<Option<PolledSendResult>> {
     // Reference impl in the TON docs uses `limit: 10, archival: true` — enough for a
     // freshly-sent tx on any real account, and `archival: true` guarantees the query
     // hits a node with full history.
@@ -2505,21 +2480,27 @@ fn poll_send_result_v2(
         if !matches!(parsed_in_msg.info, MsgInfo::ExtIn(_)) {
             continue;
         }
-        let actual_hash = compute_normalized_ext_in_hash(in_msg_cell)?;
+        let actual_hash = compute_normalized_ext_in_hash(&parsed_in_msg)?;
         if actual_hash != *target_hash {
             continue;
         }
-        let send_result = tx_cell_to_send_result_tuple(tx_cell)?;
+        let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx);
         let tx_hash_hex = base64::engine::general_purpose::STANDARD
             .decode(&tx.transaction_id.hash)
             .map_or_else(|_| tx.transaction_id.hash.clone(), hex::encode);
-        return Ok(Some((tx_hash_hex, send_result)));
+        return Ok(Some(PolledSendResult {
+            tx_hash_hex,
+            lt: parsed_tx.lt,
+            utime: parsed_tx.now,
+            send_result,
+        }));
     }
     Ok(None)
 }
 
-fn transaction_link(ctx: &mut Context, address_str: &str, tx_hash_hex: &str) -> String {
+fn transaction_link(ctx: &mut Context, address_str: &str, polled: &PolledSendResult) -> String {
     let network = ctx.network();
+    let tx_hash_hex = polled.tx_hash_hex.as_str();
     match &network {
         Network::Localnet => {
             if let Some(url) = localnet_transaction_link(ctx, tx_hash_hex) {
@@ -2544,10 +2525,14 @@ fn transaction_link(ctx: &mut Context, address_str: &str, tx_hash_hex: &str) -> 
     let explorer = ctx.env.explorer.unwrap_or(Explorer::Tonscan);
     match explorer {
         Explorer::Tonscan => format!("https://{network_prefix}tonscan.org/tx/{tx_hash_hex}"),
-        Explorer::Toncx => {
-            format!("https://{network_prefix}ton.cx/tx/{tx_hash_hex}:{address_str}",)
-        }
-        Explorer::Dton => format!("https://{network_prefix}dton.io/tx/{tx_hash_hex}"),
+        Explorer::Toncx => format!(
+            "https://{network_prefix}ton.cx/tx/{}:{tx_hash_hex}:{address_str}",
+            polled.lt
+        ),
+        Explorer::Dton => format!(
+            "https://{network_prefix}dton.io/tx/{tx_hash_hex}?time={}",
+            polled.utime
+        ),
         Explorer::Tonviewer => {
             format!("https://{network_prefix}tonviewer.com/transaction/{tx_hash_hex}")
         }

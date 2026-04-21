@@ -348,26 +348,7 @@ impl TonApiClient {
 
     /// Send BOC to network
     pub fn send_boc(&self, boc: &str) -> Result<(), SendBocError> {
-        let base_url = self
-            .network
-            .toncenter_v2_url(&self.custom_networks)
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-        let url = format!("{base_url}/sendBoc");
-
-        let json = serde_json::json!({ "boc": boc });
-
-        let response = self
-            .send_with_retry(
-                || self.build_post_request(&url).json(&json),
-                "Failed to send BOC",
-            )
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_send_boc_fail(response));
-        }
-
-        Ok(())
+        self.post_send_boc("sendBoc", boc).map(|_| ())
     }
 
     /// Send BOC to network via `sendBocReturnHash`, returning the TEP-467 normalized hash
@@ -378,24 +359,7 @@ impl TonApiClient {
     /// what toncenter indexes against, so no local TEP-467 normalization is needed on the
     /// send side.
     pub fn send_boc_return_hash(&self, boc: &str) -> Result<HashBytes, SendBocError> {
-        let base_url = self
-            .network
-            .toncenter_v2_url(&self.custom_networks)
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-        let url = format!("{base_url}/sendBocReturnHash");
-
-        let json = serde_json::json!({ "boc": boc });
-
-        let response = self
-            .send_with_retry(
-                || self.build_post_request(&url).json(&json),
-                "Failed to send BOC",
-            )
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
-
-        if !response.status().is_success() {
-            return Err(Self::handle_send_boc_fail(response));
-        }
+        let response = self.post_send_boc("sendBocReturnHash", boc)?;
 
         #[derive(Deserialize)]
         struct Resp {
@@ -419,6 +383,29 @@ impl TonApiClient {
                 format!("Failed to decode sendBocReturnHash hash: {err}"),
             )
         })
+    }
+
+    fn post_send_boc(&self, endpoint: &str, boc: &str) -> Result<Response, SendBocError> {
+        let base_url = self
+            .network
+            .toncenter_v2_url(&self.custom_networks)
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+        let url = format!("{base_url}/{endpoint}");
+
+        let json = serde_json::json!({ "boc": boc });
+
+        let response = self
+            .send_with_retry(
+                || self.build_post_request(&url).json(&json),
+                "Failed to send BOC",
+            )
+            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_send_boc_fail(response));
+        }
+
+        Ok(response)
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {

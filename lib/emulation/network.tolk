@@ -252,11 +252,11 @@ fun SendResultList.waitForFirstTransaction(
         return res;
     }
 
-    // FFI returns a single-element list (or null) — we unwrap to a nullable SendResult here
-    // because Tolk packs a struct across multiple stack slots when returned directly from
-    // an asm function, whereas BigArray items are kept on a single slot.
+    // FFI returns a single-element list (or null) rather than `SendResult?` directly
+    // because Tolk packs a struct across multiple stack slots when returned from an asm
+    // function, whereas BigArray items are kept on a single slot.
     val list = ffi.waitForTransaction(
-        __acton_impl_pseudoTxCell(res),
+        res.tx as cell,
         quiet,
         attempts,
         sleepDuration,
@@ -265,15 +265,6 @@ fun SendResultList.waitForFirstTransaction(
         return null;
     }
     return list.at(0);
-}
-
-/// Return the raw pseudo-transaction cell carried by a broadcast [SendResult].
-///
-/// Rust parses this cell to recover both the external-in delivered to the network
-/// (from `in_msg`) and the TEP-467 normalized hash returned by `sendBocReturnHash`
-/// at send time (stashed in `prev_trans_hash`).
-fun __acton_impl_pseudoTxCell(res: SendResult): cell {
-    return res.tx as cell;
 }
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
