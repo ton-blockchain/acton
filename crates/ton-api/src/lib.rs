@@ -1,6 +1,7 @@
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
+use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt;
@@ -20,6 +21,10 @@ const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
+
+const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SendBocErrorKind {
@@ -102,7 +107,7 @@ impl TonApiClient {
     }
 
     fn build_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.get(url).header("User-Agent", "acton-cli");
+        let mut request = self.client.get(url).header(USER_AGENT, user_agent());
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);
@@ -112,7 +117,7 @@ impl TonApiClient {
     }
 
     fn build_post_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.post(url).header("User-Agent", "acton-cli");
+        let mut request = self.client.post(url).header(USER_AGENT, user_agent());
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);

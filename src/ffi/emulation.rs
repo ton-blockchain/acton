@@ -2428,6 +2428,7 @@ fn register_localnet_compiler_abis(
         .no_proxy()
         .connect_timeout(Duration::from_secs(2))
         .timeout(Duration::from_secs(5))
+        .user_agent(crate::build_info::user_agent())
         .build()?;
     let response = client
         .post(&url)
