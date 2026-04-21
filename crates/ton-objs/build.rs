@@ -118,7 +118,7 @@ fn verify_archive_sha(objs_dir: &Path, manifest_path: &Path, lib_name: &str) {
     assert_eq!(
         actual_sha256,
         expected_sha256,
-        "SHA-256 mismatch for {}: expected {}, got {}. Refresh {} if the archive update was intentional.",
+        "SHA-256 mismatch for {}: expected {}, got {}. Try running `just sync-artifacts` if the local artifacts are stale. Refresh {} if the archive update was intentional.",
         archive_path.display(),
         expected_sha256,
         actual_sha256,
