@@ -137,4 +137,4 @@ TOML comments or unknown keys; `.gitignore` patching remains append-only.
 
 - `acton help new`
 - `acton help doctor`
-- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)
+- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/tutorial/project-init)

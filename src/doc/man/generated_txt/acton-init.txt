@@ -161,5 +161,5 @@ SEE ALSO
        o  acton help doctor
 
        o  Project initialization guide
-          <https://ton-blockchain.github.io/acton/docs/project-init>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/project-init>
 
