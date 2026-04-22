@@ -300,6 +300,11 @@
   gap: var(--spacing-xss);
 }
 
+.infoValueGroup {
+  display: flex;
+  flex-direction: column;
+}
+
 .infoLabel {
   font-size: var(--font-size-xss);
   color: var(--text-muted);
@@ -316,6 +321,14 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.statusDescription {
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .traceFeesSection {
