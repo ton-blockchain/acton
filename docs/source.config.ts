@@ -53,6 +53,7 @@ const builtinLangs = [
   'bash',
   'fish',
   'json',
+  'nushell',
   'powershell',
   'toml',
   'yaml',
