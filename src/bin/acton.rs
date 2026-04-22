@@ -913,8 +913,8 @@ enum Commands {
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
-        #[clap(value_enum)]
-        shell: clap_complete::Shell,
+        #[arg(value_parser = ["bash", "elvish", "fish", "powershell", "zsh", "nushell"])]
+        shell: String,
     },
     #[command(
         about = "Internal command to generate MDX documentation from standard library",
@@ -2000,7 +2000,23 @@ fn main() {
         Commands::Hooks { command } => hooks_cmd(command),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
+            if shell == "nushell" {
+                clap_complete::generate(
+                    clap_complete_nushell::Nushell,
+                    &mut Cli::command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            } else {
+                let shell = clap_complete::Shell::from_str(&shell)
+                    .expect("validated completion shell should parse");
+                clap_complete::generate(
+                    shell,
+                    &mut Cli::command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            }
             Ok(())
         }
         Commands::Docgen { output, check } => docgen_cmd(output, check),

@@ -34,7 +34,7 @@ project context such as contract and script names.
 .RS 4
 Shell to generate completions for.
 .sp
-Possible values: \fBbash\fR, \fBelvish\fR, \fBfish\fR, \fBpowershell\fR, \fBzsh\fR
+Possible values: \fBbash\fR, \fBelvish\fR, \fBfish\fR, \fBpowershell\fR, \fBzsh\fR, \fBnushell\fR
 .RE
 .SS "Display Options"
 .sp
@@ -163,6 +163,21 @@ Then load it from \fB~/.elvish/rc.elv\fR:
 .RS 4
 .nf
 use completions/acton
+.fi
+.RE
+.SS "Nushell"
+.sp
+.RS 4
+.nf
+acton completions nushell | save --force ~/.config/nushell/completions/acton.nu
+.fi
+.RE
+.sp
+Then load it from \fBconfig.nu\fR:
+.sp
+.RS 4
+.nf
+source ~/.config/nushell/completions/acton.nu
 .fi
 .RE
 .SH "VERIFYING INSTALLATION"

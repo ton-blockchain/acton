@@ -132,6 +132,7 @@ dotenvy = "0.15.7"
 pathdiff = "0.2.3"
 strsim = "0.11.1"
 clap_complete = { version = "4.6.1", features = ["unstable-dynamic"] }
+clap_complete_nushell = "4.6.0"
 human-panic = "2.0.5" # better panic handling
 crash-handler = "0.7.0" # low-level fatal signal/exception handling
 ctrlc = "3.4.5" # graceful Ctrl+C handling
@@ -266,6 +267,7 @@ dotenvy = { workspace = true }
 pathdiff = { workspace = true }
 strsim = { workspace = true }
 clap_complete = { workspace = true }
+clap_complete_nushell = { workspace = true }
 human-panic = { workspace = true } # better panic handling
 crash-handler = { workspace = true } # low-level fatal signal/exception handling
 ctrlc = { workspace = true } # graceful Ctrl+C handling

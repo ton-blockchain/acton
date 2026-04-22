@@ -32,7 +32,7 @@ project context such as contract and script names.
 {{#option "_shell_" }}
 Shell to generate completions for.
 
-Possible values: `bash`, `elvish`, `fish`, `powershell`, `zsh`
+Possible values: `bash`, `elvish`, `fish`, `powershell`, `zsh`, `nushell`
 {{/option}}
 
 {{/options}}
@@ -141,6 +141,18 @@ Then load it from `~/.elvish/rc.elv`:
 
 ```bash
 use completions/acton
+```
+
+### Nushell
+
+```bash
+acton completions nushell | save --force ~/.config/nushell/completions/acton.nu
+```
+
+Then load it from `config.nu`:
+
+```nu
+source ~/.config/nushell/completions/acton.nu
 ```
 
 ## Verifying Installation
