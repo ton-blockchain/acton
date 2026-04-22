@@ -8,10 +8,10 @@ format in two places:
 
 - after `println(txs)` or `println(result)` in a test
 - inside failure diagnostics from transaction matchers such as
-  [`toHaveTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavetx),
-  [`toHaveSuccessfulTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavesuccessfultx),
+  [`toHaveTx()`](/docs/standard_library/emulation/network#expectationsendresultlisttohavetx),
+  [`toHaveSuccessfulTx()`](/docs/standard_library/emulation/network#expectationsendresultlisttohavesuccessfultx),
   and
-  [`toHaveFailedTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavefailedtx)
+  [`toHaveFailedTx()`](/docs/standard_library/emulation/network#expectationsendresultlisttohavefailedtx)
 
 Use this output when you want a quick terminal-native view of what happened in a
 trace without opening the browser UI.
@@ -164,11 +164,11 @@ Common extra lines:
 
 - Give treasuries explicit names with `testing.treasury("deployer")`.
 - Name arbitrary addresses with
-  [`randomAddress("name")`](/docs/standard_library/emulation/network/#randomaddress)
+  [`randomAddress("name")`](/docs/standard_library/emulation/network#randomaddress)
   or
-  [`net.registerAddress(...)`](/docs/standard_library/emulation/network/#netregisteraddress).
+  [`net.registerAddress(...)`](/docs/standard_library/emulation/network#netregisteraddress).
 - Label undeployed or dynamically-created contracts with
-  [`net.registerCodeCell(...)`](/docs/standard_library/emulation/network/#netregistercodecell).
+  [`net.registerCodeCell(...)`](/docs/standard_library/emulation/network#netregistercodecell).
 - Use matcher failures as a focused debugger: when
   `expect(txs).toHaveSuccessfulTx({...})` fails, Acton prints the same trace tree
   plus the exact search parameters that were not matched.

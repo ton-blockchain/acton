@@ -144,7 +144,7 @@ fun TlbTransaction.getUsedGas(self): int
 
 Returns consumed gas for ordinary transactions with VM compute phase.
 
-Fails with [Assert.fail](../../testing/assert/#assertfail):
+Fails with [Assert.fail](/docs/standard_library/testing/assert#assertfail):
 - if `description` is not [TlbTransOrd](#tlbtransord);
 - if `description.computePh` is [TlbTrComputeSkipped](#tlbtrcomputeskipped).
 

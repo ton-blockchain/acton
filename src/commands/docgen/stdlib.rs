@@ -132,6 +132,7 @@ fn collect_docs(
             docs.push(FileDoc {
                 source_path: path.to_path_buf(),
                 output_stem_path: output_root.join(relative_path.with_extension("")),
+                docs_url: build_docs_url(source_kind.docs_url_root(), relative_path),
                 title: file_stem.clone(),
                 description: format!("{}.tolk {}", file_stem, source_kind.description_suffix()),
                 symbols,
@@ -149,6 +150,7 @@ fn build_symbol_map(docs: &[FileDoc]) -> HashMap<String, Vec<LinkTarget>> {
         for symbol in &doc.symbols {
             let link_target = LinkTarget {
                 path: doc.output_stem_path.clone(),
+                url: doc.docs_url.clone(),
                 anchor: symbol.name.clone(),
             };
             insert_link_target(&mut symbol_map, symbol.name.clone(), link_target.clone());
@@ -220,15 +222,10 @@ fn write_doc_page(
                                     normalize_symbol_link(&link_target.anchor)
                                 )
                             } else {
-                                let relative_link_path =
-                                    pathdiff::diff_paths(target_path, current_file_stem_path)
-                                        .unwrap_or_else(|| target_path.clone());
-
-                                let link = relative_link_path.to_string_lossy().to_string();
                                 format!(
-                                    "[{}]({}/#{})",
+                                    "[{}]({}#{})",
                                     name,
-                                    link,
+                                    link_target.url,
                                     normalize_symbol_link(&link_target.anchor)
                                 )
                             }
@@ -303,6 +300,7 @@ struct SymbolInfo {
 struct FileDoc {
     source_path: PathBuf,
     output_stem_path: PathBuf,
+    docs_url: String,
     title: String,
     description: String,
     symbols: Vec<SymbolInfo>,
@@ -321,12 +319,26 @@ impl SourceKind {
             Self::Tolk => "Tolk standard library file",
         }
     }
+
+    const fn docs_url_root(&self) -> &'static str {
+        match self {
+            Self::Acton => "/docs/standard_library",
+            Self::Tolk => "/docs/tolk_standard_library",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LinkTarget {
     path: PathBuf,
+    url: String,
     anchor: String,
+}
+
+fn build_docs_url(root: &str, relative_path: &Path) -> String {
+    let path = relative_path.with_extension("");
+    let path = path.to_string_lossy().replace('\\', "/");
+    format!("{root}/{path}")
 }
 
 fn extract_symbols(source_file: &SourceFile, source: &str) -> Vec<SymbolInfo> {

@@ -53,8 +53,8 @@ fun ActonWallet.toKeyPair(self): KeyPair
 
 Returns the key pair for a wallet configured in wallets.toml or global.wallets.toml.
 
-The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign](../../crypto/#cryptosign)
-and [crypto.rawSign](../../crypto/#cryptorawsign). This is available only for wallets opened by
+The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign](/docs/standard_library/crypto#cryptosign)
+and [crypto.rawSign](/docs/standard_library/crypto#cryptorawsign). This is available only for wallets opened by
 [scripts.wallet](#scriptswallet) when the script was started with `--net`.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L38" />
@@ -125,7 +125,7 @@ in scripts launched with `--net` to execute transactions on the real blockchain.
 Without `--net`, the wallet refers to an internal wallet, created in the
 same way as in `testing.treasury`.
 
-Note: in tests, use [testing.treasury](../testing/#testingtreasury).
+Note: in tests, use [testing.treasury](/docs/standard_library/emulation/testing#testingtreasury).
 
 Example:
 ```tolk
@@ -156,7 +156,7 @@ Returns current account state for address or null if no information available or
 contract is not deployed.
 
 The account state includes balance, storage information, and other account data.
-See [TlbAccountInfo](../../types/transaction/#tlbaccountinfo) type for more information.
+See [TlbAccountInfo](/docs/standard_library/types/transaction#tlbaccountinfo) type for more information.
 
 Example:
 ```tolk
@@ -238,14 +238,14 @@ Retrieves the current blockchain configuration.
 
 Returns a map of all blockchain configuration parameters indexed from 0-90.
 The configuration includes gas prices, storage costs, validator settings, and other
-network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices](../config/#blockchainconfigmapgetgasprices),
-[BlockchainConfigMap.getStoragePrices](../config/#blockchainconfigmapgetstorageprices), or [BlockchainConfigMap.getGlobalVersion](../config/#blockchainconfigmapgetglobalversion)
+network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices](/docs/standard_library/emulation/config#blockchainconfigmapgetgasprices),
+[BlockchainConfigMap.getStoragePrices](/docs/standard_library/emulation/config#blockchainconfigmapgetstorageprices), or [BlockchainConfigMap.getGlobalVersion](/docs/standard_library/emulation/config#blockchainconfigmapgetglobalversion)
 to access specific parameters.
 
 For detailed information about blockchain configuration parameters, see the
 [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 
-Returns: A [BlockchainConfigMap](../config/#blockchainconfigmap) containing all current blockchain configuration parameters.
+Returns: A [BlockchainConfigMap](/docs/standard_library/emulation/config#blockchainconfigmap) containing all current blockchain configuration parameters.
 
 Example:
 ```tolk

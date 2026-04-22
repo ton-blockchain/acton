@@ -480,7 +480,7 @@ get fun `test send message`() {
 In local emulation mode, returns a list of send results representing the
 full recursively processed transaction chain produced by this send call.
 
-Unlike [testing.processSingleTraceStep](../testing/#testingprocesssingletracestep), the emulation path keeps draining
+Unlike [testing.processSingleTraceStep](/docs/standard_library/emulation/testing#testingprocesssingletracestep), the emulation path keeps draining
 out messages until the whole trace queue is exhausted. Use it for normal
 end-to-end emulation where children, grandchildren, and other follow-up
 transactions should all be executed.
@@ -490,7 +490,7 @@ broadcast network instead of the local emulator, Acton sends the message to
 that network and returns a single pseudo transaction placeholder rather than
 recursively executing descendants locally.
 
-See [testing.processSingleTraceStep](../testing/#testingprocesssingletracestep) if you need to send a single message without out message processing.
+See [testing.processSingleTraceStep](/docs/standard_library/emulation/testing#testingprocesssingletracestep) if you need to send a single message without out message processing.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L535" />
 
@@ -568,7 +568,7 @@ val msg = createMessage({
 val bouncedMsg = msg.bounced();
 ```
 
-This is useful for testing single messages with [testing.processSingleTraceStep](../testing/#testingprocesssingletracestep).
+This is useful for testing single messages with [testing.processSingleTraceStep](/docs/standard_library/emulation/testing#testingprocesssingletracestep).
 
 Example:
 ```tolk
@@ -618,7 +618,7 @@ Useful for testing broadcasting logic in emulation mode.
 It toggles only the runtime broadcast flag.
 
 Wallets are loaded once at startup (when the script is launched with CLI `--net`).
-Calling [net.enableBroadcast](#netenablebroadcast) later does not load wallets, so [scripts.wallet](../scripts/#scriptswallet) can still fail
+Calling [net.enableBroadcast](#netenablebroadcast) later does not load wallets, so [scripts.wallet](/docs/standard_library/emulation/scripts#scriptswallet) can still fail
 and wallet-backed real sends can remain unavailable.
 
 Example:

@@ -128,7 +128,7 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 
 Start step-by-step execution for a message sent from [from](#testingcreatetraceiterationcursor).
 
-In contrast to [net.send](../network/#netsend), this method does not execute the whole transaction chain eagerly.
+In contrast to [net.send](/docs/standard_library/emulation/network#netsend), this method does not execute the whole transaction chain eagerly.
 Instead it returns a cursor that can be advanced in batches.
 
 This API is emulation-only and is intended for programmable partial execution workflows
@@ -144,9 +144,9 @@ fun testing.processSingleTraceStep(from: address, message: OutMessage): SendResu
 
 Send a single message from a specified address.
 
-In contrast to [net.send](../network/#netsend), this method executes exactly one transaction and
+In contrast to [net.send](/docs/standard_library/emulation/network#netsend), this method executes exactly one transaction and
 does not recursively process that transaction's out messages. The returned
-[SendResult](../network/#sendresult) still contains those out messages for inspection, but they are
+[SendResult](/docs/standard_library/emulation/network#sendresult) still contains those out messages for inspection, but they are
 left undelivered.
 
 This method is useful to simulate a bounced message.
@@ -163,7 +163,7 @@ val bouncedMsg = createMessage({
 testing.processSingleTraceStep(notDeployer.address, bouncedMsg);
 ```
 
-See [net.send](../network/#netsend) or [net.sendExternal](../network/#netsendexternal) if you need full recursive trace processing.
+See [net.send](/docs/standard_library/emulation/network#netsend) or [net.sendExternal](/docs/standard_library/emulation/network#netsendexternal) if you need full recursive trace processing.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L124" />
 
@@ -218,7 +218,7 @@ get fun `test mint`() {
 }
 ```
 
-Note: in scripts always use [scripts.wallet](../scripts/#scriptswallet) instead.
+Note: in scripts always use [scripts.wallet](/docs/standard_library/emulation/scripts#scriptswallet) instead.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L163" />
 
@@ -232,7 +232,7 @@ Returns current account state for address or null if no information available or
 contract is not deployed.
 
 The account state includes balance, storage information, and other account data.
-See [TlbAccountInfo](../../types/transaction/#tlbaccountinfo) type for more information.
+See [TlbAccountInfo](/docs/standard_library/types/transaction#tlbaccountinfo) type for more information.
 
 Example:
 ```tolk
@@ -480,7 +480,7 @@ For detailed information about blockchain configuration parameters, see the
 [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 
 Parameters:
-- `config`: The new [BlockchainConfigMap](../config/#blockchainconfigmap) map containing configuration parameters (indices 0-90)
+- `config`: The new [BlockchainConfigMap](/docs/standard_library/emulation/config#blockchainconfigmap) map containing configuration parameters (indices 0-90)
 
 Returns: `true` if the configuration was successfully updated, `false` if
 validation failed. On failure, neither the emulator world state nor the C7
@@ -517,14 +517,14 @@ Retrieves the current blockchain configuration.
 
 Returns a map of all blockchain configuration parameters indexed from 0-90.
 The configuration includes gas prices, storage costs, validator settings, and other
-network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices](../config/#blockchainconfigmapgetgasprices),
-[BlockchainConfigMap.getStoragePrices](../config/#blockchainconfigmapgetstorageprices), or [BlockchainConfigMap.getGlobalVersion](../config/#blockchainconfigmapgetglobalversion)
+network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices](/docs/standard_library/emulation/config#blockchainconfigmapgetgasprices),
+[BlockchainConfigMap.getStoragePrices](/docs/standard_library/emulation/config#blockchainconfigmapgetstorageprices), or [BlockchainConfigMap.getGlobalVersion](/docs/standard_library/emulation/config#blockchainconfigmapgetglobalversion)
 to access specific parameters.
 
 For detailed information about blockchain configuration parameters, see the
 [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
 
-Returns: A [BlockchainConfigMap](../config/#blockchainconfigmap) containing all current blockchain configuration parameters.
+Returns: A [BlockchainConfigMap](/docs/standard_library/emulation/config#blockchainconfigmap) containing all current blockchain configuration parameters.
 
 Example:
 ```tolk

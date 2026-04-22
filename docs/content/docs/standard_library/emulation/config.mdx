@@ -54,7 +54,7 @@ Configuration parameters are defined in the [`block.tlb`](https://github.com/ton
 TL-B schema.
 
 `BlockchainConfigMap.set*` methods mutate only this in-memory map.
-To apply updates to the emulator globally, call [testing.setConfig](../testing/#testingsetconfig) with the
+To apply updates to the emulator globally, call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig) with the
 mutated config. That apply step updates both the emulator world state and
 the current VM context's C7-visible config mirrors, so follow-up reads in
 the same test run see the committed values.
@@ -72,7 +72,7 @@ Sets a raw configuration parameter at the given index.
 This is a low-level function that directly stores a cell at the specified parameter index.
 For type-safe parameter access, prefer using specialized setter functions such as
 [BlockchainConfigMap.setGasPrices](#blockchainconfigmapsetgasprices), [BlockchainConfigMap.setStoragePrices](#blockchainconfigmapsetstorageprices), or [BlockchainConfigMap.setGlobalVersion](#blockchainconfigmapsetglobalversion).
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 Parameters:
 - `index`: The configuration parameter index (typically 0-90)
@@ -151,7 +151,7 @@ Sets the global network version and capabilities (Param 8).
 This function updates the network version and validator capabilities configuration.
 When validators vote to update the network, they update this parameter, allowing
 the TON Blockchain to upgrade without downtime.
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 Parameters:
 - `version`: The new global network version struct containing version and capabilities
@@ -321,7 +321,7 @@ Sets the storage price configuration (Param 18).
 Storage prices are organized as a dictionary mapping timestamps to price structures,
 allowing for price adjustments over time. This function updates the entire storage
 price dictionary.
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 Parameters:
 - `prices`: A dictionary mapping Unix timestamps to [StoragePrices](#storageprices) configurations
@@ -450,7 +450,7 @@ Parameters:
 - `prices`: Gas price configuration struct
 - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
 
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/config.tolk#L332" />
 
@@ -538,7 +538,7 @@ Parameters:
 - `prices`: Message forwarding price configuration
 - `chainType`: If equal to `MASTERCHAIN`, uses Param 24; any other value (including `BASECHAIN`) uses Param 25
 
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 Example:
 ```tolk
@@ -658,7 +658,7 @@ Sets the precompiled contracts configuration (Param 45).
 Updates the list of precompiled smart contracts and their associated gas costs.
 Precompiled contracts are system-provided optimizations for common cryptographic
 and utility operations.
-This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](../testing/#testingsetconfig).
+This mutates only the local [BlockchainConfigMap](#blockchainconfigmap) value until you call [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig).
 
 Parameters:
 - `precompiledConfig`: Configuration containing the dictionary of precompiled contracts
@@ -690,7 +690,7 @@ Returns the configuration of all precompiled contracts available in the network,
 including their fixed gas costs.
 In the default emulator config this dictionary starts with one built-in entry.
 If you explicitly write an empty dictionary via [BlockchainConfigMap.setPrecompiledContractsConfig](#blockchainconfigmapsetprecompiledcontractsconfig)
-and apply it with [testing.setConfig](../testing/#testingsetconfig), subsequent reads return an empty dictionary.
+and apply it with [testing.setConfig](/docs/standard_library/emulation/testing#testingsetconfig), subsequent reads return an empty dictionary.
 
 Returns: [PrecompiledContractsConfig](#precompiledcontractsconfig) containing the precompiled contracts dictionary.
 

@@ -111,6 +111,6 @@ This lets offline tooling and the Test UI map traces back to source locations an
 
 ## Step-by-step Execution
 
-Trace export keeps logical chains intact even when execution is split into batches with [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing/#testingcreatetraceiterationcursor).
+Trace export keeps logical chains intact even when execution is split into batches with [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing#testingcreatetraceiterationcursor).
 
 If you run part of a chain with `executeN()` and then continue with `executeAllRemaining()`, Acton merges those batches back into one exported trace when they belong to the same root transaction. Naming any batch with `giveName(...)` keeps that logical trace readable in the final JSON.

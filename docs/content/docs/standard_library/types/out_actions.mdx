@@ -256,7 +256,7 @@ type OutActionList = array<Cell<TlbOutAction>>
 
 Type alias for the out action list array.
 
-To get the out actions, use [testing.outActions](../../emulation/testing/#testingoutactions) method.
+To get the out actions, use [testing.outActions](/docs/standard_library/emulation/testing#testingoutactions) method.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L180" />
 
@@ -270,7 +270,7 @@ Returns the out action at the given index.
 
 NOTE: this list is reversed, so the last action is at index 0.
 
-Fails with [Assert.fail](../../testing/assert/#assertfail) if the stored tuple element cannot be decoded as [TlbOutAction](#tlboutaction).
+Fails with [Assert.fail](/docs/standard_library/testing/assert#assertfail) if the stored tuple element cannot be decoded as [TlbOutAction](#tlboutaction).
 
 Example:
 ```tolk
