@@ -165,3 +165,4 @@ EXAMPLES
 SEE ALSO
        o  Shell completions guide
           <https://ton-blockchain.github.io/acton/docs/commands/shell-completions>
+
