@@ -811,22 +811,11 @@ struct TonCenterErrorResponse {
     error: String,
 }
 
-// =============================================================================
-// TonCenter v3 types consumed by waitForTrace.
-//
-// TODO(waitForTrace): this block only includes the v3-specific types needed by
-// `synthesize_tx_cell_from_v3` on the acton side. The accompanying
-// `get_traces_by_msg_hash` method lives on `TonApiClient` — when rebasing this
-// branch onto master after the `waitForFirstTransaction` PR lands, move these
-// types up next to the other `TonCenter*` types and fold
-// `get_traces_by_msg_hash` into the `impl TonApiClient` block.
-// =============================================================================
-
 /// TonCenter v3 transaction summary returned by `/api/v3/transactionsByMessage` and
 /// embedded inside `/api/v3/traces` responses.
 ///
-/// Current toncenter deployments no longer inline `raw_transaction` in `/traces` — callers
-/// reconstruct a synthetic `Transaction` cell from the structured fields below instead.
+/// `/traces` does not ship the raw Transaction BoC — callers reconstruct a synthetic
+/// `Transaction` cell from the structured fields below.
 #[derive(Deserialize, Debug, Clone)]
 pub struct V3TransactionSummary {
     pub account: String,
@@ -850,8 +839,6 @@ pub struct V3TransactionSummary {
     pub in_msg: Option<V3MessageSummary>,
     #[serde(default)]
     pub out_msgs: Vec<V3MessageSummary>,
-    #[serde(default)]
-    pub raw_transaction: Option<String>,
 }
 
 /// v3 transaction description. Only the subset of fields consumed during synthesis is

@@ -267,13 +267,9 @@ fun SendResultList.waitForFirstTransaction(
     return list.at(0);
 }
 
-// TODO(waitForTrace): after the `waitForFirstTransaction` PR lands on master, rebase this
-// branch and rewrite `waitForTrace` on top of the updated infrastructure — it should reuse
-// `__acton_impl_pseudoTxCell` and the `SendResultList?`-returning FFI shape introduced there.
-
 /// Wait for the full message chain originating from the first message to settle on-chain.
 ///
-/// Unlike `SendResultList.waitForFirstTransaction`, this method follows all descendant
+/// Unlike [SendResultList.waitForFirstTransaction], this method follows all descendant
 /// transactions (children, grandchildren, ...) using toncenter's traces API and returns
 /// them as a fresh [SendResultList].
 ///
@@ -291,12 +287,13 @@ fun SendResultList.waitForTrace(
         return null;
     }
     if (!ffi.isBroadcasting()) {
+        // in emulation mode the trace is already applied locally
         return self;
     }
 
     val res = self.at(0);
     return ffi.waitForTrace(
-        __acton_impl_pseudoTxCell(res),
+        res.tx as cell,
         quiet,
         attempts,
         sleepDuration,

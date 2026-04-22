@@ -28,7 +28,7 @@ use tolkc::TolkSourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
-use ton_api::{Network, TonApiClient};
+use ton_api::{Network, TonApiClient, V3MessageSummary, V3TransactionSummary, V3TxDescription};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
@@ -43,11 +43,12 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, ExtInMsgInfo, HashUpdate,
-    IntAddr, LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage,
-    RelaxedMsgInfo, ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
+    AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, CurrencyCollection,
+    ExtInMsgInfo, ExtOutMsgInfo, ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo,
+    LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
-use tycho_types::num::Tokens;
+use tycho_types::num::{Tokens, Uint15};
 
 /// Resolve the unix time to use for a get method invocation.
 ///
@@ -3185,34 +3186,6 @@ mod tests {
     }
 }
 
-// =============================================================================
-// waitForTrace implementation.
-//
-// TODO(waitForTrace): this branch is intentionally broken-on-master. It is
-// meant to be rebased on top of the `waitForFirstTransaction` PR (which
-// renames .wait() -> .waitForFirstTransaction(), fixes net.sendExternal, and
-// lands the TEP-467 message-lookup plumbing that this feature depends on).
-//
-// After that PR merges to master, rebase this branch and fold this block into
-// the existing waitForTransaction/message-lookup code path — there is no
-// reason for it to live in a separate bottom-of-file block. In particular:
-//
-//   * `read_broadcast_target`, `tx_cell_to_send_result_tuple`,
-//     `WAIT_FOR_TRANSACTION_DEFAULT_SLEEP_MS`, and
-//     `WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS` are all introduced by the first
-//     PR — use them from here instead of redeclaring.
-//   * V3 summary types (`V3Trace`, `V3TransactionSummary`, `V3TxDescription`,
-//     ...) live in `crates/ton-api/src/lib.rs` — import them at the top.
-//   * Register opcode `49 => wait_for_trace : 4` in `register_extensions`
-//     (already done in this branch).
-//
-// Until the rebase happens this module references symbols that do not exist
-// yet, so the crate will not build. That is intentional — the goal is to keep
-// the diff reviewable, not to ship this branch standalone.
-// =============================================================================
-
-use ton_api::{V3MessageSummary, V3TransactionSummary, V3TxDescription};
-
 extension!(wait_for_trace in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: bool, tx_cell: Cell) using wait_for_trace_impl);
 fn wait_for_trace_impl(
     ctx: &mut Context,
@@ -3239,14 +3212,22 @@ fn wait_for_trace_impl(
     // Use the TEP-467 normalized hash toncenter returned from `sendBocReturnHash` (stashed
     // in the pseudo tx's `prev_trans_hash`). v3 `/traces` accepts it as `msg_hash` and
     // matches against the same value stored by its indexer.
-    let (_, target_hash, _) = read_broadcast_target(&tx_cell)?;
+    let Ok((_, target_hash)) = read_broadcast_target(&tx_cell) else {
+        // Non-pseudo txs don't carry the external-in lookup target — nothing to wait for.
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
     let msg_hash_hex = hex::encode(target_hash.as_slice());
 
     let network = ctx.network();
     let custom_networks = ctx.env.config.custom_networks();
-    let Ok(api_client) = TonApiClient::new(network, custom_networks) else {
-        stack.push(TupleItem::Null);
-        return Ok(());
+    let api_client = match TonApiClient::new(network, custom_networks) {
+        Ok(client) => client,
+        Err(err) => {
+            warn!("Failed to initialize toncenter client for waitForTrace: {err:#}");
+            stack.push(TupleItem::Null);
+            return Ok(());
+        }
     };
 
     let mut last_transport_err: Option<anyhow::Error> = None;
@@ -3257,8 +3238,6 @@ fn wait_for_trace_impl(
 
         match poll_send_results_by_trace(&api_client, &msg_hash_hex) {
             Ok(Some(send_results)) => {
-                // Settle delay so late trace entries (still being indexed) are not missed.
-                std::thread::sleep(Duration::from_millis(WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS));
                 if !quiet {
                     println!("Trace settled with {} transaction(s)", send_results.len());
                 }
@@ -3313,19 +3292,9 @@ fn poll_send_results_by_trace(
             // Indexer returned an id it cannot resolve — trace is still being assembled.
             return Ok(None);
         };
-        let tx_cell = if let Some(raw_boc) = summary.raw_transaction.as_deref() {
-            // Older toncenter deployments inline the BoC — use it directly.
-            Boc::decode_base64(raw_boc).with_context(|| {
-                format!("Failed to decode raw_transaction from /traces for tx {tx_hash}")
-            })?
-        } else {
-            // Current deployments only ship structured summary fields — synthesize a
-            // Transaction cell so Tolk can return a useful SendResult.
-            synthesize_tx_cell_from_v3(summary).with_context(|| {
-                format!("Failed to synthesize Transaction cell for tx {tx_hash}")
-            })?
-        };
-        results.push(tx_cell_to_send_result_tuple(tx_cell)?);
+        let (tx_cell, parsed_tx) = synthesize_tx_cell_from_v3(summary)
+            .with_context(|| format!("Failed to synthesize Transaction cell for tx {tx_hash}"))?;
+        results.push(tx_cell_to_send_result_tuple(tx_cell, &parsed_tx));
     }
 
     Ok(Some(results))
@@ -3333,12 +3302,14 @@ fn poll_send_results_by_trace(
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
 ///
-/// Current toncenter deployments no longer inline `raw_transaction` in `/traces`. This
-/// function reconstructs a structurally valid `Transaction` from the structured summary
-/// fields so `SendResultList` exposes usable `lt`, `outMessages`, `externals`, and
-/// `gasUsed`. The synthesized cell's `repr_hash` is NOT expected to match the on-chain
-/// hash — cell encoding choices (inline vs ref, state update hashes) are lossy here.
-fn synthesize_tx_cell_from_v3(summary: &V3TransactionSummary) -> anyhow::Result<Cell> {
+/// TonCenter `/traces` only ships structured summary fields, not the raw BoC, so we
+/// reconstruct a structurally valid `Transaction` from them — enough for `SendResultList`
+/// to expose usable `lt`, `outMessages`, `externals`, and `gasUsed`. The synthesized
+/// cell's `repr_hash` is NOT expected to match the on-chain hash — cell encoding choices
+/// (inline vs ref, state update hashes) are lossy here.
+fn synthesize_tx_cell_from_v3(
+    summary: &V3TransactionSummary,
+) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)
         .with_context(|| format!("Unsupported account address format: {}", summary.account))?;
     let lt: u64 = summary
@@ -3403,7 +3374,8 @@ fn synthesize_tx_cell_from_v3(summary: &V3TransactionSummary) -> anyhow::Result<
             .context("Failed to build synthetic tx info")?,
     };
 
-    Ok(to_cell(&tx))
+    let cell = to_cell(&tx);
+    Ok((cell, tx))
 }
 
 /// Build a full `Message` cell from a v3 message summary. For external-in the source is
@@ -3495,22 +3467,19 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 /// don't have (credit_phase, bounce_phase) are left empty; compute + action phases
 /// preserve their success/gas/exit-code values so user assertions remain meaningful.
 fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
-    let desc = match desc {
-        Some(d) => d,
-        None => {
-            return TxInfo::Ordinary(OrdinaryTxInfo {
-                credit_first: false,
-                storage_phase: None,
-                credit_phase: None,
-                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
-                    reason: ComputePhaseSkipReason::NoState,
-                }),
-                action_phase: None,
-                aborted: true,
-                bounce_phase: None,
-                destroyed: false,
-            });
-        }
+    let Some(desc) = desc else {
+        return TxInfo::Ordinary(OrdinaryTxInfo {
+            credit_first: false,
+            storage_phase: None,
+            credit_phase: None,
+            compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                reason: ComputePhaseSkipReason::NoState,
+            }),
+            action_phase: None,
+            aborted: true,
+            bounce_phase: None,
+            destroyed: false,
+        });
     };
 
     let compute_phase = match desc.compute_ph.as_ref() {
@@ -3604,8 +3573,7 @@ fn parse_hash_bytes(h: &str) -> anyhow::Result<HashBytes> {
 
 fn parse_int_addr(s: Option<&str>) -> anyhow::Result<Option<IntAddr>> {
     match s {
-        None => Ok(None),
-        Some(a) if a.is_empty() => Ok(None),
+        None | Some("") => Ok(None),
         Some(a) => IntAddr::from_str(a)
             .map(Some)
             .map_err(|e| anyhow!("Failed to parse address '{a}': {e:?}")),
@@ -3620,7 +3588,6 @@ fn parse_tokens_opt(s: Option<&str>) -> Tokens {
 
 fn parse_account_status(s: Option<&str>) -> AccountStatus {
     match s {
-        Some("uninit") => AccountStatus::Uninit,
         Some("active") => AccountStatus::Active,
         Some("frozen") => AccountStatus::Frozen,
         Some("nonexist") => AccountStatus::NotExists,
