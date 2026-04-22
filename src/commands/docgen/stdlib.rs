@@ -57,9 +57,7 @@ fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
     let meta_file = stdlib_out_dir.join("meta.json");
     let _ = fs::write(
         &meta_file,
-        format!(
-            "{{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}}\n"
-        ),
+        "{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
     );
     Ok(())
 }
@@ -78,9 +76,7 @@ fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path) -> Result<()> {
     let meta_file = tolk_stdlib_out_dir.join("meta.json");
     let _ = fs::write(
         &meta_file,
-        format!(
-            "{{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}}\n"
-        ),
+        "{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
     );
     Ok(())
 }
