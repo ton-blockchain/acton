@@ -217,5 +217,5 @@ one-off overrides or CI.
 ## See Also
 
 - `acton help run`
-- [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting)
+- [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting/overview)
 - [Wallet setup](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)

@@ -177,7 +177,7 @@ SEE ALSO
        o  acton help run
 
        o  Scripting guide
-          <https://ton-blockchain.github.io/acton/docs/scripting>
+          <https://ton-blockchain.github.io/acton/docs/scripting/overview>
 
        o  Wallet setup
           <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>

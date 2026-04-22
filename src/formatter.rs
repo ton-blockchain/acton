@@ -1531,7 +1531,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                 "testing.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
             )));
-            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/libraries/".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);

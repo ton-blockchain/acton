@@ -289,4 +289,4 @@ Saved library metadata typically includes:
 
 ## See Also
 
-- [Libraries guide](https://ton-blockchain.github.io/acton/docs/advanced/libraries)
+- [Libraries guide](https://ton-blockchain.github.io/acton/docs/libraries)

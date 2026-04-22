@@ -51,7 +51,7 @@ fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
         render_generated_index_page(
             "Overview",
             "All available functions, structs, constants, and other entities available in Acton standard library",
-            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](../tolk_standard_library/overview).\n",
+            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](/docs/tolk_standard_library/overview).\n",
         ),
     )?;
     let meta_file = stdlib_out_dir.join("meta.json");

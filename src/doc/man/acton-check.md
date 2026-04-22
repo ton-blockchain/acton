@@ -169,5 +169,5 @@ Print an explanation for a lint rule.
 ## See Also
 
 - `acton help fmt`
-- [Linting guide](https://ton-blockchain.github.io/acton/docs/linting)
-- [Linter rules](https://ton-blockchain.github.io/acton/docs/rules)
+- [Linting guide](https://ton-blockchain.github.io/acton/docs/linting/overview)
+- [Linter rules](https://ton-blockchain.github.io/acton/docs/rules/overview)

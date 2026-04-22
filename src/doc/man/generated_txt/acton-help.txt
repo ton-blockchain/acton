@@ -117,5 +117,5 @@ SEE ALSO
        o  acton help new
 
        o  Commands overview
-          <https://ton-blockchain.github.io/acton/docs/commands>
+          <https://ton-blockchain.github.io/acton/docs/commands/overview>
 
