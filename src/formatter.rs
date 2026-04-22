@@ -3201,8 +3201,12 @@ impl FormatterContext<'_> {
             AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
                 let left = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
                 let right = self.format_tuple_value(&bin_failure.right, &bin_failure.right_type, 0);
-                writeln!(result, "Actual:   {left}").ok();
-                writeln!(result, "Expected: {right}").ok();
+                writeln!(result, "        Actual:   {left}").ok();
+                writeln!(result, "        Expected: {right}").ok();
+            }
+            AssertFailure::Decimal(decimal_failure) => {
+                writeln!(result, "        Actual:   {}", decimal_failure.left).ok();
+                writeln!(result, "        Expected: {}", decimal_failure.right).ok();
             }
             AssertFailure::TransactionNotFound(tx_failure) => {
                 let params = self.format_search_transaction_parameters(tx_failure, abi);

@@ -1,6 +1,6 @@
 use crate::context::{
-    AssertBinFailure, AssertFailure, Context, FailAssertFailure, TransactionGenericAssertFailure,
-    TransactionNotFoundParams, WalletNotFoundFailure,
+    AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, FailAssertFailure,
+    TransactionGenericAssertFailure, TransactionNotFoundParams, WalletNotFoundFailure,
 };
 use anyhow::Context as ErrorContext;
 use num_bigint::BigInt;
@@ -153,18 +153,18 @@ fn assert_decimal_impl(
         return Ok(());
     }
 
+    let decimals_u32 = decimals.to_u32().unwrap_or(0);
+    let left_str = format_decimal(&left, decimals_u32);
+    let right_str = format_decimal(&right, decimals_u32);
     let message = if message.is_empty() {
-        let decimals_u32 = decimals.to_u32().unwrap_or(0);
-        let left_str = format_decimal(&left, decimals_u32);
-        let right_str = format_decimal(&right, decimals_u32);
-        format!(
-            "expect(<actual>).toEqualDecimal(<expected>)\n       Actual:   {left_str}\n       Expected: {right_str}"
-        )
+        "expect(<actual>).toEqualDecimal(<expected>)".to_owned()
     } else {
         message
     };
 
-    *ctx.asserts.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
+    *ctx.asserts.assert_failure = Some(AssertFailure::Decimal(AssertDecimalFailure {
+        left: left_str,
+        right: right_str,
         message: Some(message),
         location: SourceLocation::parse(&location)?,
     }));

@@ -16,8 +16,8 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
  > tests/assert_equal_decimal_signed.test.tolk (1 test)
   ✗ eg assert equal decimal negative leading zero [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
-       Actual:   -0.05
-       Expected: -0.06
+        Actual:   -0.05
+        Expected: -0.06
 
  ✗ 1 failed in 1 file
 

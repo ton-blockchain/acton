@@ -16,13 +16,13 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
  > tests/expect_decimal_edges.test.tolk (2 tests)
   ✗ ef decimal failure format zero decimals [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
-       Actual:   123.0
-       Expected: 124.0
+        Actual:   123.0
+        Expected: 124.0
       └─ at tests/expect_decimal_edges.test[LINE]
   ✗ ef decimal failure format high decimals [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
-       Actual:   -0.000000000000000015
-       Expected: -0.000000000000000016
+        Actual:   -0.000000000000000015
+        Expected: -0.000000000000000016
       └─ at tests/expect_decimal_edges.test[LINE]
 
  ✗ 2 failed in 1 file

@@ -100,6 +100,11 @@ impl TeamCityReporter {
                         message = "Assertion failed".to_string();
                     }
                 },
+                AssertFailure::Decimal(failure) => {
+                    message = "Decimal equality failed".to_string();
+                    expected = Some(failure.right.clone());
+                    actual = Some(failure.left.clone());
+                }
                 AssertFailure::Fail(_) => {
                     message = "Test assertion failed".to_string();
                 }

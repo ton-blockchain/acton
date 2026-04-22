@@ -54,6 +54,14 @@ pub struct FailAssertFailure {
 }
 
 #[derive(Debug, Clone)]
+pub struct AssertDecimalFailure {
+    pub left: String,
+    pub right: String,
+    pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+}
+
+#[derive(Debug, Clone)]
 pub struct GetMethodAssertFailure {
     pub get_method_presentation: String,
     pub vm_exit_code: i32,
@@ -136,6 +144,7 @@ pub struct WalletNotFoundFailure {
 #[derive(Debug, Clone)]
 pub enum AssertFailure {
     Bin(AssertBinFailure),
+    Decimal(AssertDecimalFailure),
     Fail(FailAssertFailure),
     Assume(FailAssertFailure),
     GetMethod(GetMethodAssertFailure),
@@ -149,6 +158,7 @@ impl AssertFailure {
     pub fn message(&self) -> Option<String> {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
+            AssertFailure::Decimal(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
             AssertFailure::GetMethod(_) | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
@@ -161,6 +171,7 @@ impl AssertFailure {
     pub fn location(&self) -> Option<SourceLocation> {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
+            AssertFailure::Decimal(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.location.clone(),
             AssertFailure::GetMethod(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {

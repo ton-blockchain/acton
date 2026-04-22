@@ -430,6 +430,11 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         println!("        Expected: {}", right.green());
     }
 
+    if let AssertFailure::Decimal(failure) = &failure {
+        println!("        Actual:   {}", failure.left.red());
+        println!("        Expected: {}", failure.right.green());
+    }
+
     if let AssertFailure::TransactionNotFound(failure) = &failure {
         let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
         let tx_tree = fmt.format(&failure.txs);
