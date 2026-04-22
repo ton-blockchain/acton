@@ -3,6 +3,10 @@ title: "Contract deployment"
 description: "Learn how to deploy smart contracts"
 ---
 
+<Callout>
+  TODO: To be reworked. Some parts will go to deploy.mdx, and this page will become a part of a single cohesive tutorial.
+</Callout>
+
 In Acton, there is no dedicated `acton deploy` command. Instead, it uses [Tolk scripts](/docs/commands/script/) for deployment.
 
 This approach provides maximum flexibility. Real-world contracts often require complex initialization data—such as dictionaries for metadata, encoded cell structures, or specific initial state configurations—which are cumbersome or impossible to pass via command-line arguments. By using scripts, you can utilize the full power of the Tolk language to prepare deployment data, calculate initial state, and manage the deployment flow programmatically.

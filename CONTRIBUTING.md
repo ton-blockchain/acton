@@ -390,14 +390,14 @@ Source-of-truth map:
 - `lib/` -> `docs/content/docs/standard_library`
 - `crates/tolkc/assets/tolk-stdlib/` -> `docs/content/docs/tolk_standard_library`
 - linter rule metadata in `crates/tolk-linter/` and related macros ->
-  `docs/content/docs/linting/rules`
+  `docs/content/docs/rules`
 
 This updates generated trees under:
 
 - `docs/content/docs/commands`
 - `docs/content/docs/standard_library`
 - `docs/content/docs/tolk_standard_library`
-- `docs/content/docs/linting/rules`
+- `docs/content/docs/rules`
 - `src/etc/man`
 - `src/doc/man/generated_txt`
 

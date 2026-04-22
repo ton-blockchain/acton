@@ -51,7 +51,7 @@ source-of-truth inputs live outside `docs/`:
 - `src/doc/man/*.md` -> command docs, terminal help text, and manpages
 - `lib/` -> `content/docs/standard_library`
 - `crates/tolkc/assets/tolk-stdlib/` -> `content/docs/tolk_standard_library`
-- linter rule metadata -> `content/docs/linting/rules`
+- linter rule metadata -> `content/docs/rules`
 
 After changing those inputs, rerun:
 
