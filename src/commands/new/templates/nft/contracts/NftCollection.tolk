@@ -26,7 +26,10 @@ fun deployNftItem(
 }
 
 type AllowedMessageToNftCollection =
-RequestRoyaltyParams | DeployNft | BatchDeployNfts | ChangeCollectionAdmin
+    | RequestRoyaltyParams
+    | DeployNft
+    | BatchDeployNfts
+    | ChangeCollectionAdmin
 
 fun onInternalMessage(in: InMessage) {
     val msg = lazy AllowedMessageToNftCollection.fromSlice(in.body);

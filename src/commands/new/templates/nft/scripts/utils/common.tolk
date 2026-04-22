@@ -102,7 +102,7 @@ fun deployNftCollectionContract(
         makeNftCollectionStorage(deployer.address, info),
     );
     val res = collection.deploy(deployer.address, { value: ton("0.05"), bounce: false });
-    res.wait();
+    res.waitForFirstTransaction();
     return collection;
 }
 
@@ -121,7 +121,7 @@ fun deployNftItemContract(
         { ownerAddress: owner, content: itemContent },
         { value: ton("0.05"), bounce: true },
     );
-    res.wait();
+    res.waitForFirstTransaction();
     return NftItemContract.fromAddress(collection.getNftAddressByIndex(itemIndex));
 }
 

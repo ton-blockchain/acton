@@ -527,7 +527,11 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Func) -> Option<RcDoc<'a>> {
         parts.push(print_type_parameters(ctx, &tp)?);
     }
 
-    parts.push(print_parameter_list(ctx, &parameters)?);
+    parts.push(print_parameter_list_with_options(
+        ctx,
+        &parameters,
+        function_parameter_list_options(ctx, func.0.child_by_field_name("parameters")),
+    )?);
 
     if let Some(ret) = func.return_type() {
         parts.push(RcDoc::text(": "));
@@ -569,7 +573,11 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcD
         parts.push(print_type_parameters(ctx, &tp)?);
     }
 
-    parts.push(print_parameter_list(ctx, &parameters)?);
+    parts.push(print_parameter_list_with_options(
+        ctx,
+        &parameters,
+        function_parameter_list_options(ctx, m.0.child_by_field_name("parameters")),
+    )?);
 
     if let Some(ret) = m.return_type() {
         parts.push(RcDoc::text(": "));
@@ -600,7 +608,11 @@ pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<
     parts.push(RcDoc::text("get fun "));
     parts.push(exprs::print_ident(ctx, &name)?);
 
-    parts.push(print_parameter_list(ctx, &parameters)?);
+    parts.push(print_parameter_list_with_options(
+        ctx,
+        &parameters,
+        function_parameter_list_options(ctx, g.0.child_by_field_name("parameters")),
+    )?);
 
     if let Some(ret) = g.return_type() {
         parts.push(RcDoc::text(": "));
@@ -629,6 +641,24 @@ fn should_print_inline_function_body(ctx: &Context<'_>, body: &FuncBody<'_>) -> 
         FuncBody::Block(_) => true,
         FuncBody::AsmBody(asm) => is_single_triple_quoted_asm_body(ctx, asm),
         _ => false,
+    }
+}
+
+fn function_parameter_list_options<'a>(
+    ctx: &Context<'_>,
+    parameter_list: Option<Node<'_>>,
+) -> common::ListOptions<'a> {
+    common::ListOptions {
+        multiline_threshold: if parameter_list
+            .and_then(|node| node.utf8_text(ctx.code.as_ref().as_ref()).ok())
+            .is_some_and(|text| text.contains('\n'))
+        {
+            // preserve new lines style if any new line in parameters
+            0
+        } else {
+            common::ListOptions::default().multiline_threshold
+        },
+        ..common::ListOptions::default()
     }
 }
 
@@ -758,13 +788,24 @@ pub fn print_parameter_list<'a, 'tree, P>(ctx: &Context<'tree>, params: &[P]) ->
 where
     P: ParameterTrait + 'tree,
 {
+    print_parameter_list_with_options(ctx, params, common::ListOptions::default())
+}
+
+pub fn print_parameter_list_with_options<'a, 'tree, P>(
+    ctx: &Context<'tree>,
+    params: &[P],
+    options: common::ListOptions<'a>,
+) -> Option<RcDoc<'a>>
+where
+    P: ParameterTrait + 'tree,
+{
     common::print_list(
         ctx,
         params,
         print_parameter_declaration,
         P::syntax,
         |_| vec![],
-        common::ListOptions::default(),
+        options,
     )
 }
 

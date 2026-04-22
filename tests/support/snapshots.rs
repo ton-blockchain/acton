@@ -178,6 +178,9 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
         .unwrap();
     redactions
+        .insert("[EXT_IN_OPCODE]", regex!(r"ext-in 0x[0-9a-f]+"))
+        .unwrap();
+    redactions
         .insert(
             "[EXPLORER_TX_URL]",
             regex!(r"http://(?:localhost|127\.0\.0\.1):\d+/explorer/tx/[0-9a-fA-F]+"),

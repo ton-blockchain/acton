@@ -60,7 +60,7 @@ get fun `test bh stdlib wait for transaction positive known body hash`() {{
         success: true,
     }});
 
-    expect(txs.wait(true, 1, 1)).toEqual(true);
+    expect(txs.waitForFirstTransaction(true, 1, 1)).toBeNotNull();
 }}
 "#
     );

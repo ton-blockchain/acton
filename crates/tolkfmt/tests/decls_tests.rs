@@ -258,6 +258,39 @@ fn test_type_alias_union_type() {
                     | address"]],
         20,
     );
+    check_with_width(
+        "type ComplexUnion = int | VeryLongTypeName<FirstType, SecondType, ThirdType> | bool;",
+        expect![[r"
+                type ComplexUnion =
+                    | int
+                    | VeryLongTypeName<
+                        FirstType,
+                        SecondType,
+                        ThirdType,
+                    >
+                    | bool"]],
+        40,
+    );
+    check(
+        "type AllowedMessageToNftCollection = RequestRoyaltyParams | DeployNft | BatchDeployNfts | ChangeCollectionAdmin;",
+        expect![[r"
+                type AllowedMessageToNftCollection =
+                    | RequestRoyaltyParams
+                    | DeployNft
+                    | BatchDeployNfts
+                    | ChangeCollectionAdmin"]],
+    );
+}
+
+#[test]
+fn test_type_alias_union_type_with_existing_newline() {
+    check(
+        "type Foo = int\n| slice;",
+        expect![[r"
+                type Foo =
+                    | int
+                    | slice"]],
+    );
 }
 
 #[test]
@@ -680,6 +713,83 @@ fn test_function_parameters() {
 }
 
 #[test]
+fn test_function_parameters_with_existing_newlines_stay_multiline() {
+    check(
+        "fun add(
+            a: int,
+            b: int
+        ): int { return a + b; }",
+        expect![[r"
+                fun add(
+                    a: int,
+                    b: int,
+                ): int {
+                    return a + b;
+                }"]],
+    );
+}
+
+#[test]
+fn test_function_parameters_with_newline_after_open_paren_stay_multiline() {
+    check(
+        "fun add(
+            a: int, b: int): int { return a + b; }",
+        expect![[r"
+                fun add(
+                    a: int,
+                    b: int,
+                ): int {
+                    return a + b;
+                }"]],
+    );
+}
+
+#[test]
+fn test_function_parameters_with_single_internal_newline_stay_multiline() {
+    check(
+        "fun add(a: int,
+            b: int): int { return a + b; }",
+        expect![[r"
+                fun add(
+                    a: int,
+                    b: int,
+                ): int {
+                    return a + b;
+                }"]],
+    );
+}
+
+#[test]
+fn test_function_parameters_with_newline_before_close_paren_stay_multiline() {
+    check(
+        "fun add(a: int, b: int
+        ): int { return a + b; }",
+        expect![[r"
+                fun add(
+                    a: int,
+                    b: int,
+                ): int {
+                    return a + b;
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_function_parameter_with_existing_newline_stays_multiline() {
+    check(
+        "fun wrap(
+            value: int
+        ): int { return value; }",
+        expect![[r"
+                fun wrap(
+                    value: int,
+                ): int {
+                    return value;
+                }"]],
+    );
+}
+
+#[test]
 fn test_function_parameter_with_default() {
     check(
         "fun add(a: int = 10, b: int = 20 + 10): int { return a + b; }",
@@ -929,6 +1039,23 @@ fn test_method_multiple_parameters() {
 }
 
 #[test]
+fn test_method_parameters_with_existing_newlines_stay_multiline() {
+    check(
+        "fun slice.concat(
+            other: slice,
+            separator: slice
+        ): slice { return self; }",
+        expect![[r"
+                fun slice.concat(
+                    other: slice,
+                    separator: slice,
+                ): slice {
+                    return self;
+                }"]],
+    );
+}
+
+#[test]
 fn test_method_no_parameters() {
     check(
         "fun int.double(): int { return self * 2; }",
@@ -980,6 +1107,23 @@ fn test_get_method_with_parameters() {
         expect![[r"
                 get fun item(index: int): slice? {
                     return null;
+                }"]],
+    );
+}
+
+#[test]
+fn test_get_method_parameters_with_existing_newlines_stay_multiline() {
+    check(
+        "get fun item(
+            index: int,
+            fallback: slice
+        ): slice? { return fallback; }",
+        expect![[r"
+                get fun item(
+                    index: int,
+                    fallback: slice,
+                ): slice? {
+                    return fallback;
                 }"]],
     );
 }

@@ -799,6 +799,7 @@ pub struct TonCenterMessage {
     pub fwd_fee: Option<String>,
     pub ihr_fee: Option<String>,
     pub created_lt: Option<String>,
+    pub hash: Option<String>,
     pub body_hash: Option<String>,
     pub message: Option<String>,
 }

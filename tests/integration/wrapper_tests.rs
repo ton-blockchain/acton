@@ -188,10 +188,10 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrapper-ts/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.ts");
 
     assert_eq!(
-        fs::read_to_string(project.path().join("wrapper-ts/MyContract.ts")).unwrap(),
+        fs::read_to_string(project.path().join("wrappers-ts/MyContract.ts")).unwrap(),
         "// generated ts wrapper\nexport const marker = \"ts\";\n"
     );
 
@@ -211,7 +211,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
 fn test_wrapper_generation_typescript_uses_config_output_dir_relative_to_project_root() {
     let project = ProjectBuilder::new("wrapper_typescript_config_output_dir")
         .contract("my_contract", SIMPLE_CONTRACT)
-        .with_wrappers_typescript_output_dir("./wrapper-ts")
+        .with_wrappers_typescript_output_dir("./wrappers-ts")
         .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
         .build();
     let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
@@ -234,10 +234,10 @@ fn test_wrapper_generation_typescript_uses_config_output_dir_relative_to_project
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrapper-ts/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.ts");
 
     assert_eq!(
-        fs::read_to_string(project.path().join("wrapper-ts/MyContract.ts")).unwrap(),
+        fs::read_to_string(project.path().join("wrappers-ts/MyContract.ts")).unwrap(),
         "// generated ts wrapper\nexport const marker = \"ts\";\n"
     );
 }
@@ -289,7 +289,7 @@ fn test_wrapper_generation_typescript_ignores_tolk_test_defaults() {
         .contract("my_contract", SIMPLE_CONTRACT)
         .with_wrappers_tolk_generate_test(true)
         .with_wrappers_tolk_test_output_dir("tests/generated-tests")
-        .with_wrappers_typescript_output_dir("./wrapper-ts")
+        .with_wrappers_typescript_output_dir("./wrappers-ts")
         .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
         .build();
     let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
@@ -308,9 +308,9 @@ fn test_wrapper_generation_typescript_ignores_tolk_test_defaults() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrapper-ts/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.ts");
 
-    assert!(project.path().join("wrapper-ts/MyContract.ts").exists());
+    assert!(project.path().join("wrappers-ts/MyContract.ts").exists());
     assert!(
         !project
             .path()

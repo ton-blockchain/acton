@@ -12,7 +12,7 @@ fun main() {
         counter: 0,
     });
     val res = counter.deploy(deployer.address, { value: ton("0.005") });
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 

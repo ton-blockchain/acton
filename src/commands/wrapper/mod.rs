@@ -15,7 +15,7 @@ use ton_abi::ContractAbi as LegacyContractAbi;
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
-const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrapper-ts";
+const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
 struct WrapperModel {
     project_root: PathBuf,
