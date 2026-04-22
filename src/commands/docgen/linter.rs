@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 use tolk_linter::{FixAvailability, Linter, RuleGroup};
 
+const RULES_BASE_PATH: &str = "/docs/rules";
+
 #[derive(Debug)]
 struct LinterRuleDoc {
     code: String,
@@ -121,7 +123,7 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
 
     for rule in rules {
         mdx_content.push_str(&format!(
-            "| [{}](./{}) | [`{}`](./{}) | {} | {} | {} |\n",
+            "| [{}]({RULES_BASE_PATH}/{}) | [`{}`]({RULES_BASE_PATH}/{}) | {} | {} | {} |\n",
             rule.code,
             rule.slug,
             rule.rule_name,
