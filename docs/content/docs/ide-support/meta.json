@@ -2,6 +2,7 @@
   "title": "IDE support",
   "icon": "ToolCase",
   "pages": [
+    "overview",
     "jetbrains",
     "vscode"
   ]
