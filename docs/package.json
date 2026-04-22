@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generated-source": "bunx fumadocs-mdx",
+    "lint:links": "bun ./scripts/validate-link.ts"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
@@ -37,6 +39,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
+    "next-validate-link": "^1.6.4",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
   }

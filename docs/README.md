@@ -35,6 +35,7 @@ Open `http://localhost:3000` for the landing page and
 - `bun run build`: produce the static production build.
 - `bun run start`: serve the production build locally.
 - `bun run lint`: run ESLint for the docs app.
+- `bun run lint:links`: validate MDX links with `next-validate-link`.
 
 Production deployment is handled by CI via `.github/workflows/deploy-docs.yml`.
 

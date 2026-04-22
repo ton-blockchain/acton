@@ -42,7 +42,9 @@ jobs:
         id: bun-cache
         uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
-          path: ~/.bun/install/cache
+          path: |
+            ~/.bun/install/cache
+            ${{ github.workspace }}/docs/.next/cache
           key: ${{ runner.os }}-${{ runner.arch }}-bun-docs-${{ hashFiles('docs/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-docs-
@@ -50,6 +52,14 @@ jobs:
       - name: Install docs dependencies
         working-directory: docs
         run: bun ci
+
+      - name: Generated source
+        working-directory: docs
+        run: bun run generated-source
+
+      - name: Lint Check links
+        working-directory: docs
+        run: bun run lint:links
 
       - name: Build docs
         working-directory: docs
