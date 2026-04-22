@@ -54,12 +54,18 @@ Skips the test execution. The test won't run but will be counted in the test sum
 **Syntax:**
 ```tolk
 @test.skip
+@test.skip("Custom description")
 ```
 
-**Example:**
+**Examples:**
 ```tolk
 @test.skip
 get fun `test broken for now`() {
+    expect(1 + 1).toEqual(3); // This won't execute
+}
+
+@test.skip("waiting for parser cleanup")
+get fun `test blocked on parser refactor`() {
     expect(1 + 1).toEqual(3); // This won't execute
 }
 ```
@@ -67,6 +73,7 @@ get fun `test broken for now`() {
 **Output:**
 ```
 ○ test broken for now skipped
+○ test blocked on parser refactor [waiting for parser cleanup]
 ```
 
 ### todo

@@ -9,7 +9,7 @@ pub(super) struct TestAnnotations {
     pub fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
-    pub todo_description: Option<String>,
+    pub status_description: Option<String>,
 }
 
 impl TestAnnotations {
@@ -24,8 +24,8 @@ impl TestAnnotations {
         if other.gas_limit.is_some() {
             self.gas_limit = other.gas_limit;
         }
-        if other.todo_description.is_some() {
-            self.todo_description = other.todo_description;
+        if other.status_description.is_some() {
+            self.status_description = other.status_description;
         }
     }
 }
@@ -66,7 +66,7 @@ fn parse_dotted_test_annotation(
     };
 
     match kind {
-        "skip" => parse_dotted_skip(annotation.args()),
+        "skip" => parse_dotted_skip(content, annotation.args()),
         "todo" => parse_dotted_todo(content, annotation.args()),
         "fail_with" => parse_dotted_fail_with(content, annotation.args()),
         "gas_limit" => parse_dotted_gas_limit(content, annotation.args()),
@@ -79,11 +79,15 @@ fn first_annotation_arg(args: Option<AnnotationArgs<'_>>) -> Option<Expr<'_>> {
     args.and_then(|args| args.args().next())
 }
 
-fn parse_dotted_skip(args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+fn parse_dotted_skip(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
     let mut parsed = TestAnnotations::default();
 
     match first_annotation_arg(args) {
         None => parsed.annotations.push(TestAnnotation::Skip),
+        Some(Expr::StringLit(value)) => {
+            parsed.annotations.push(TestAnnotation::Skip);
+            parsed.status_description = Some(value.content(content).to_string());
+        }
         Some(Expr::BoolLit(value)) if value.value() => {
             parsed.annotations.push(TestAnnotation::Skip);
         }
@@ -100,11 +104,11 @@ fn parse_dotted_todo(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnn
         None => parsed.annotations.push(TestAnnotation::Todo),
         Some(Expr::StringLit(value)) => {
             parsed.annotations.push(TestAnnotation::Todo);
-            parsed.todo_description = Some(value.content(content).to_string());
+            parsed.status_description = Some(value.content(content).to_string());
         }
         Some(Expr::BoolLit(value)) if value.value() => {
             parsed.annotations.push(TestAnnotation::Todo);
-            parsed.todo_description = Some("TODO".to_string());
+            parsed.status_description = Some("TODO".to_string());
         }
         _ => {}
     }

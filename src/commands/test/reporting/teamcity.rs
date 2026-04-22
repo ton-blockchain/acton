@@ -243,9 +243,16 @@ impl TestReporter for TeamCityReporter {
                 }
             }
             TestStatus::Skipped | TestStatus::Todo => {
-                println!(
-                    "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}']"
-                );
+                if let Some(details) = test.details.as_deref() {
+                    println!(
+                        "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' message='{}']",
+                        self.escape_name(details),
+                    );
+                } else {
+                    println!(
+                        "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}']"
+                    );
+                }
             }
             TestStatus::Passed => {}
         }

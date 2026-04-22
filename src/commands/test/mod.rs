@@ -1118,7 +1118,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
-            test_report.details = test.todo_description.clone();
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
@@ -1126,6 +1126,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
@@ -1384,7 +1385,7 @@ pub struct TestDescriptor {
     fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
-    pub todo_description: Option<String>,
+    pub status_description: Option<String>,
     pub declared_parameter_count: usize,
     parameters: Vec<FuzzParameter>,
     pub pos: Pos,
@@ -1417,7 +1418,7 @@ fn find_all_test(
                     fuzz: test_annotations.fuzz,
                     expected_exit_code: test_annotations.expected_exit_code,
                     gas_limit: test_annotations.gas_limit,
-                    todo_description: test_annotations.todo_description,
+                    status_description: test_annotations.status_description,
                     declared_parameter_count,
                     parameters: Vec::new(),
                     pos: Pos {

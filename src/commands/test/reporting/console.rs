@@ -187,12 +187,23 @@ impl TestReporter for ConsoleReporter {
         }
 
         if test.status == TestStatus::Skipped {
-            println!(
-                "  {} {} {}",
-                "○".dimmed(),
-                beautified_name,
-                "skipped".dimmed()
-            );
+            if let Some(description) = test.details.as_deref() {
+                println!(
+                    "  {} {} {}{}{}",
+                    "○".dimmed(),
+                    beautified_name,
+                    "[".dimmed(),
+                    description.dimmed(),
+                    "]".dimmed()
+                );
+            } else {
+                println!(
+                    "  {} {} {}",
+                    "○".dimmed(),
+                    beautified_name,
+                    "skipped".dimmed()
+                );
+            }
         }
 
         if test.status == TestStatus::Todo {
