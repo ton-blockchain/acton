@@ -54,6 +54,11 @@ fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
             "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](../tolk_standard_library/overview).\n",
         ),
     )?;
+    let meta_file = stdlib_out_dir.join("meta.json");
+    let _ = fs::write(
+        &meta_file,
+        format!("{{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}}\n"),
+    );
     Ok(())
 }
 
@@ -68,6 +73,11 @@ fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path) -> Result<()> {
             "This section contains documentation of Tolk standard library.\n",
         ),
     )?;
+    let meta_file = tolk_stdlib_out_dir.join("meta.json");
+    let _ = fs::write(
+        &meta_file,
+        format!("{{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}}\n"),
+    );
     Ok(())
 }
 
