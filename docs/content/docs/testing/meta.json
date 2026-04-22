@@ -2,8 +2,6 @@
   "title": "Testing",
   "icon": "FlaskConical",
   "pages": [
-    "your-first-unit-test-in-tolk",
-    "your-first-integration-test-in-tolk",
     "generating-wrappers",
     "test-attributes",
     "fuzz-testing",
