@@ -9,7 +9,9 @@ import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/u
 import {parseReserveMode} from "@/utils/transaction"
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
+import {ChangeLibraryModeViewer} from "../ChangeLibraryModeViewer/ChangeLibraryModeViewer"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
@@ -335,6 +337,8 @@ const renderActionDetails = (
       )
     }
     case "setCode": {
+      const newCodeBocHex = action.newCode.toBoc().toString("hex")
+
       return (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
@@ -342,11 +346,18 @@ const renderActionDetails = (
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>New Code Hash:</span>
+              <span className={styles.detailLabel}>Code Hash:</span>
               <span className={styles.detailValue}>
-                <DataBlock data={action.newCode.toBoc().toString("hex")} />
+                <DataBlock data={action.newCode.hash().toString("hex")} />
               </span>
             </div>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Code BoC:</span>
+              <span className={styles.detailValue}>
+                <DataBlock data={newCodeBocHex} />
+              </span>
+            </div>
+            <DisasmSection bocHex={newCodeBocHex} />
           </div>
         </div>
       )
@@ -396,6 +407,10 @@ const renderActionDetails = (
       )
     }
     case "changeLibrary": {
+      const isEmbeddedLibrary = action.libRef.type === "ref"
+      const embeddedLibraryBocHex =
+        action.libRef.type === "ref" ? action.libRef.library.toBoc().toString("hex") : undefined
+
       return (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
@@ -404,12 +419,14 @@ const renderActionDetails = (
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Mode:</span>
-              <span className={styles.detailValue}>{action.mode}</span>
+              <div className={`${styles.detailValue} ${styles.modeDetailValue}`}>
+                <ChangeLibraryModeViewer mode={action.mode} />
+              </div>
             </div>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Reference:</span>
               <span className={styles.detailValue}>
-                {action.libRef.type === "hash" ? "Library Hash" : "Library Cell"}
+                {action.libRef.type === "hash" ? "Library Hash" : "Embedded Library"}
               </span>
             </div>
             <div className={styles.detailRow}>
@@ -421,11 +438,14 @@ const renderActionDetails = (
                   data={
                     action.libRef.type === "hash"
                       ? action.libRef.libHash.toString("hex")
-                      : action.libRef.library.toBoc().toString("hex")
+                      : embeddedLibraryBocHex!
                   }
                 />
               </span>
             </div>
+            {isEmbeddedLibrary && embeddedLibraryBocHex && (
+              <DisasmSection bocHex={embeddedLibraryBocHex} title="Library Disassembly" />
+            )}
           </div>
         </div>
       )
