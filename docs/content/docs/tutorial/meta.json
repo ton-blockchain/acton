@@ -1,0 +1,8 @@
+{
+  "pages": [
+    "project-init.mdx",
+    "contract-deployment.mdx",
+    "contract-verification.mdx",
+    "setup-wallets.mdx"
+  ]
+}

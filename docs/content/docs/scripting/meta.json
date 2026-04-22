@@ -1,4 +1,6 @@
 {
+  "title": "Scripting",
+  "icon": "FileCode",
   "pages": [
     "passing-arguments",
     "blockchain-interaction"

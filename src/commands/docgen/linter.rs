@@ -97,8 +97,9 @@ fn clear_generated_linter_rule_pages(out_dir: &Path) -> anyhow::Result<()> {
 fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result<()> {
     let mut mdx_content = String::new();
     mdx_content.push_str("---\n");
-    mdx_content.push_str("title: \"Rules\"\n");
+    mdx_content.push_str("title: \"Linting rules\"\n");
     mdx_content.push_str("description: \"Reference for all Tolk linter checks\"\n");
+    mdx_content.push_str("icon: \"FileCheck\"\n");
     mdx_content.push_str("---\n\n");
     mdx_content.push_str(
         "The `acton check` command validates your Tolk code and reports diagnostics for lint rules.\n\n",

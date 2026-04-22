@@ -1,0 +1,322 @@
+---
+title: "Manage projects"
+description: "How to manage Acton projects"
+icon: FolderTree
+---
+
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+import { Callout } from "fumadocs-ui/components/callout";
+
+<Callout>
+  TODO: currently a copy-paste of the project initialization page from tutorial, but this should become a broader how-to on project management, actual usage of Acton.toml in real projects, etc.
+</Callout>
+
+Acton supports two first-class ways to start working in a directory:
+
+- `acton new` creates a brand new scaffold from a built-in template.
+- `acton init` adds Acton support to an existing repository or ad-hoc folder.
+
+This page covers both entrypoints so you can pick the right starting path
+before diving into the detailed command references.
+
+For the complete flag-by-flag reference, see
+[`acton new`](/docs/commands/new) and [`acton init`](/docs/commands/init).
+
+## Choose a starting path
+
+Use `acton new` when you want Acton to generate the project structure for you.
+That path is best for new contracts, template exploration, and starter projects
+that should include ready-to-run wrappers, tests, scripts, and optional app
+scaffolding from day one.
+
+Use `acton init` when the repository already exists and you want Acton to
+discover contracts, create or patch `Acton.toml`, install the bundled stdlib,
+and add the usual ignore/config glue without replacing your existing files.
+
+## Usage
+
+To create a new project, run:
+
+```bash
+acton new <PATH>
+```
+
+Where `<PATH>` is the directory where you want to create the project. If you want to create the project in the current directory, use `.`:
+
+```bash
+acton new .
+```
+
+To add Acton support to an existing directory instead, run:
+
+```bash
+acton init
+```
+
+`acton init` works in place. It does not create a new folder. When
+`Acton.toml` already exists, Acton backfills missing default import mappings,
+patches `.gitignore`, refreshes `.acton/tolk-stdlib`, and attempts to create
+local symlinks to global wallet/library overlays when those global files
+already exist.
+
+That patch path reloads the manifest into Acton's typed config and writes it
+back out. Existing supported settings are preserved, but TOML comments and
+unknown keys are not.
+
+## Existing-project initialization with `acton init`
+
+When `Acton.toml` does not exist yet, `acton init` scans the current directory
+tree and auto-registers likely contract roots.
+
+Discovery rules:
+
+- it walks the current directory recursively
+- it skips hidden entries plus `node_modules`, `target`, `.git`, and `.acton`
+- it considers `.tolk` files only
+- it treats files that define `onInternalMessage` as contract entry files
+- it derives the contract key from the file stem, replacing `-` with `_`
+- it derives the default display name by splitting the file stem on `_` and
+  `-` and capitalizing the words
+
+Example:
+
+- `contracts/my-counter.tolk` becomes contract key `my_counter`
+- the generated display name becomes `My Counter`
+
+`acton init` is idempotent. Re-running it is safe and mainly refreshes stdlib,
+rechecks overlay symlink setup, and appends only missing ignore entries.
+
+Overlay symlink behavior is intentionally conservative:
+
+- if a local `global.wallets.toml` or `global.libraries.toml` already exists,
+  Acton leaves it alone
+- if a local overlay path is a dangling symlink, Acton attempts to create the
+  symlink again and currently warns instead of repairing the dangling link
+- if the matching global file does not exist, no local symlink is created
+- if symlink creation is not allowed on the current system, Acton prints a
+  warning and continues
+
+## Interactive Setup
+
+If you don't provide additional flags, Acton will guide you through an interactive setup process to configure your project:
+
+1.  **Project Name**: The name of your project (default: directory name).
+2.  **Template**: Choose a starting template (see [Templates](#templates) below).
+3.  **TypeScript app scaffold**: For supported templates, choose whether to include the app.
+4.  **Advanced options**: Decide whether you want to customize description, license, hooks, and `AGENTS.md`.
+5.  **Description**: A short description of your project.
+6.  **License**: Select an open-source license (MIT, Apache-2.0, etc.).
+7.  **Git hooks**: If `git` is available, choose whether to install the default project-local hooks.
+8.  **`AGENTS.md` guidance**: Choose whether to include the template's coding-agent guidance file.
+
+Example interaction:
+
+```acton-cli
+$ acton new my-project
+? Project name: my-project
+? Template: counter
+? Include the TypeScript dApp? No
+? Configure advanced options? Yes
+? Description: A TON blockchain project
+? License: MIT
+? Set up Git hooks to run checks before each commit? No
+? Include AGENTS.md guidance for coding agents? Yes
+```
+
+If a template supports a UI scaffold (TypeScript dApp), you can skip that prompt by passing
+`--app`. In non-interactive mode, Acton keeps the contract-only layout unless
+you pass `--app` explicitly.
+
+If `git` is available, you can skip the hooks prompt with `--hooks`. When
+enabled, Acton creates `.githooks/pre-commit` and configures the repository's
+local `core.hooksPath` to `.githooks`. For ongoing hook management after
+project creation, see [`acton hooks`](/docs/commands/hooks).
+
+You can skip the coding-agent prompt with `--agents`. When enabled, Acton
+copies the selected template's `AGENTS.md` into the generated project root. In
+non-interactive mode, both hooks and `AGENTS.md` stay disabled unless their
+flags are passed explicitly.
+
+## Templates
+
+Acton comes with several built-in templates to help you get started quickly:
+
+### `empty`
+A minimal project structure with a single empty contract. Best for starting from scratch when you know exactly what you want to build.
+
+### `counter`
+A simple example demonstrating state management in Tolk. It includes:
+- A basic counter contract.
+- Starter wrappers for testing and scripting.
+- Unit tests.
+- A deployment script.
+
+The `counter` template also supports `--app`, which adds a React + Vite app,
+top-level `package.json` and `package-lock.json`, and a generated TypeScript
+wrapper in `wrappers-ts/Counter.ts`.
+
+### `jetton`
+A comprehensive example of a [Jetton](https://docs.ton.org/develop/dapps/asset-processing/jettons) (Token) implementation. This is a great reference for building complex multi-contract applications. It includes:
+- **Minter Contract**: Manages the total supply and minting of tokens.
+- **Wallet Contract**: Manages individual user balances.
+- **Tests**: Full suite of tests covering minting, transferring, and burning.
+
+### `nft`
+An NFT collection + item scaffold with collection, item, wrappers, tests, and
+ready-made deployment scripts. Use it when you want a multi-contract example
+centered on NFT minting and collection management rather than fungible tokens.
+
+## Project Structure
+
+### Contract-only layout
+
+A typical contract-only template project starts with the following structure:
+
+<Files>
+  <Folder name=".acton" defaultOpen>
+    <File name="tolk-stdlib/" />
+    <File name="..." />
+  </Folder>
+  <Folder name="contracts" defaultOpen>
+    <File name="Contract.tolk" />
+  </Folder>
+  <Folder name="scripts" defaultOpen>
+    <File name="deploy.tolk" />
+  </Folder>
+  <Folder name="tests" defaultOpen>
+    <File name="contract.test.tolk" />
+  </Folder>
+  <Folder name="wrappers" defaultOpen>
+    <File name="Contract.tolk" />
+  </Folder>
+  <File name="Acton.toml" />
+  <File name=".env" />
+  <File name=".editorconfig" />
+  <File name="README.md" />
+  <File name="LICENSE" />
+  <File name=".gitignore" />
+</Files>
+
+### Directory Overview
+
+- **`.acton/`**: Contains internal files and standard libraries managed by Acton. You generally shouldn't edit files in here manually.
+- **`contracts/`**: This is where your `.tolk` smart contract source files live.
+- **`scripts/`**: Contains auxiliary Tolk scripts for deployment, administration, and interaction with your contracts.
+- **`tests/`**: Contains your unit and integration tests.
+- **`wrappers/`**: Contains contract wrappers that provide an interface for testing and scripting.
+- **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
+- **`.env`**: Local environment variables template (includes commented `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY` hints).
+- **`.editorconfig`**: Shared formatting defaults for the generated project.
+- **`README.md`**: Template-specific onboarding notes and common commands for the generated project.
+
+Acton can add more files after project creation or when you opt in:
+
+- **`build/`**: Generated when you run `acton build`. It contains compiled build artifacts.
+- **`wallets.toml`**: Project-specific wallet configurations, created when you add local wallets.
+- **`global.wallets.toml`**: Optional symbolic link to global wallets, created when a global wallets file exists.
+- **`.githooks/pre-commit`**: Added when you pass `--hooks` or confirm the hooks prompt.
+- **`AGENTS.md`**: Added when you pass `--agents` or confirm the coding-agent prompt.
+- **`.github/workflows/ci.yml`**: Included by the built-in templates for CI checks.
+
+### Counter Template With `--app`
+
+If you initialize the `counter` template with `--app`, the project layout
+changes to keep contracts and frontend separate:
+
+<Files>
+  <Folder name=".acton" defaultOpen>
+    <File name="tolk-stdlib/" />
+    <File name="..." />
+  </Folder>
+  <Folder name="contracts" defaultOpen>
+    <Folder name="src" defaultOpen>
+      <File name="counter.tolk" />
+      <File name="types.tolk" />
+    </Folder>
+    <Folder name="tests" defaultOpen>
+      <File name="counter.test.tolk" />
+    </Folder>
+    <Folder name="wrappers" defaultOpen>
+      <File name="Counter.tolk" />
+    </Folder>
+    <Folder name="scripts" defaultOpen>
+      <File name="deploy.tolk" />
+    </Folder>
+  </Folder>
+  <Folder name="app" defaultOpen>
+    <File name="src/App.tsx" />
+    <File name="..." />
+  </Folder>
+  <Folder name="wrappers" defaultOpen>
+    <File name="Counter.ts" />
+  </Folder>
+  <File name="package.json" />
+  <File name="package-lock.json" />
+  <File name="Acton.toml" />
+  <File name=".env" />
+  <File name=".editorconfig" />
+  <File name="README.md" />
+  <File name="LICENSE" />
+  <File name=".gitignore" />
+</Files>
+
+- **`contracts/src/`**: Tolk contract sources and shared types.
+- **`contracts/tests/`**: Tolk tests.
+- **`contracts/wrappers/`**: Generated Tolk wrappers used by tests and scripts.
+- **`contracts/scripts/`**: Contract deployment and maintenance scripts.
+- **`wrappers/`**: Generated TypeScript wrappers consumed by the frontend.
+- **`app/`**: React + Vite application.
+- **`package.json` / `package-lock.json`**: Frontend scripts and pinned npm dependencies.
+- **`README.md`**: Setup notes for the split contract + app layout.
+
+Install frontend dependencies after project creation with:
+
+```bash
+npm ci
+```
+
+## Configuration
+
+The project configuration is stored in `Acton.toml`. This file defines your package metadata, contracts, and dependencies. Wallet configurations are stored in separate `wallets.toml` files for security and convenience.
+
+Example `Acton.toml`:
+
+```toml
+[package]
+name = "my-project"
+description = "A TON blockchain project"
+license = "MIT"
+
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/Counter.tolk"
+```
+
+For the `counter --app` layout, the contract source moves under `contracts/src`:
+
+```toml
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/src/Counter.tolk"
+```
+
+Learn more about [Acton Manifest](/docs/acton-toml/).
+
+## Next Steps
+
+Once your project is created, navigate into the directory and try running the
+build and tests:
+
+```bash
+cd my-project
+acton build
+acton test
+```
+
+If you created the `counter --app` layout, install frontend dependencies and
+start the app toolchain too:
+
+```bash
+npm ci
+npm run dev
+```

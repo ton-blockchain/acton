@@ -15,7 +15,7 @@ mod stdlib;
 const DEFAULT_COMMAND_DOCS_OUT: &str = "docs/content/docs/commands";
 const DEFAULT_STDLIB_OUT: &str = "docs/content/docs/standard_library";
 const DEFAULT_TOLK_STDLIB_OUT: &str = "docs/content/docs/tolk_standard_library";
-const DEFAULT_LINTER_OUT: &str = "docs/content/docs/linting/rules";
+const DEFAULT_LINTER_OUT: &str = "docs/content/docs/rules";
 const DEFAULT_MAN_OUT: &str = "src/etc/man";
 const DEFAULT_TERMINAL_HELP_OUT: &str = "src/doc/man/generated_txt";
 const TOLK_STDLIB_SRC: &str = "crates/tolkc/assets/tolk-stdlib";

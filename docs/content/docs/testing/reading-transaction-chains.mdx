@@ -1,0 +1,180 @@
+---
+title: "Reading Transaction Chains"
+description: "Understand the text trace format printed for transaction results and matcher failures"
+---
+
+Acton can render a result of `net.send()` as a text tree. You will usually see this
+format in two places:
+
+- after `println(txs)` or `println(result)` in a test
+- inside failure diagnostics from transaction matchers such as
+  [`toHaveTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavetx),
+  [`toHaveSuccessfulTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavesuccessfultx),
+  and
+  [`toHaveFailedTx()`](/docs/standard_library/emulation/network/#expectationsendresultlisttohavefailedtx)
+
+Use this output when you want a quick terminal-native view of what happened in a
+trace without opening the browser UI.
+
+If you are using this trace together with matcher failures, see
+[Built-in Matchers and Helpers](/docs/testing/built-in-matchers-and-helpers)
+for predicate-based transaction search, map helpers, and out-action helpers.
+
+Decoded message bodies are hidden by default. To show parsed fields under
+transactions, run `acton test --show-bodies` or `acton script ... --show-bodies`.
+Acton prints them only when it knows the contract compiler ABI and can decode
+the payload completely.
+
+## Print a Trace
+
+```tolk
+val txs = net.send(deployer.address, msg);
+println(txs);
+```
+
+Example:
+
+```acton-trace
+N/A -> sender A
+└── FmRoute 0.6 TON -> fm_linear_root B                                gas=1782
+    └── FmDelivered 0.1996 TON -> fm_linear_mid C                      gas=435 exit_code=63 aborted
+        └── Compute phase failed: Unable to load data from cell because prefix does not match
+```
+
+## Show Decoded Message Bodies
+
+With `--show-bodies`, Acton adds decoded fields under the transaction line.
+
+Small bodies stay compact:
+
+```acton-trace
+N/A -> sender A
+└── FmKnownAddressBody 0.05 TON -> fm_known_address_sink B               gas=333
+    queryId: 0, newAdminAddress: 0QDx... (not_deployer)
+```
+
+Multi-line bodies use the continuation gutter `│` so they stay visually attached
+to the transaction header even when child transactions follow:
+
+```acton-trace
+N/A -> sender A
+└── FmWrappedKnownAddressBody 0.05 TON -> fm_wrapped_known_address_sink B gas=1572
+    │   internalTransferMsg: {
+    │       queryId: 0
+    │       newAdminAddress: 0QDx... (not_deployer)
+    │       tonAmount: 1000000000
+    │   }
+    └── empty 0.0096 TON -> sender A                                    gas=309
+```
+
+## How to Read the Main Line
+
+- `N/A -> sender A` is the entry into this printed trace. It is not a blockchain
+  transaction by itself. It shows where the root transaction came from inside
+  the current result list.
+- `└──` and `├──` show the parent/child transaction structure. A child line was
+  produced by the parent transaction above it.
+- `FmRoute` and `FmDelivered` are message names resolved from ABI opcodes.
+  `empty` means an empty body. Unknown opcodes are printed as hex, for example
+  `0x1`.
+- `0.6 TON` is the incoming message value for that transaction.
+- `sender`, `fm_linear_root`, and `fm_linear_mid` are display names for
+  participants. When Acton knows a symbolic name, it prints that name.
+  Otherwise it falls back to a shortened address.
+- `A`, `B`, `C` are local aliases for addresses inside the current printed
+  result. They make repeated participants easier to follow.
+- `gas=1782` is compute gas usage for the transaction.
+- `exit_code=63` means compute phase failed with that exit code.
+- `aborted` means the transaction finished in aborted state.
+
+<Callout type="info">
+The `A`, `B`, `C` aliases are local to one printed result. They are a reading
+aid, not stable identifiers across different runs.
+</Callout>
+
+## Special Markers
+
+### Bounced Messages
+
+```acton-trace
+N/A -> sender A
+└── (!) empty 0.2 TON -> fm_bounce_echo B                                       gas=271
+```
+
+- `(!)` marks a bounced internal message.
+- For bounced messages, Acton still tries to resolve the original opcode from
+  the bounced body, so you can often see the original message name instead of a
+  generic bounce wrapper.
+
+### Compute Skipped
+
+```acton-trace
+N/A -> sender A
+└── FmBouncePing 0.2 TON -> EQAAAA..ALrXfh B                          compute phase skipped aborted
+```
+
+- `compute phase skipped` means TVM compute did not run for this transaction.
+- In practice this usually means the message reached an account/state where only
+  envelope-level processing happened, so the next step is to inspect the
+  destination and message kind.
+
+### External Input and Output
+
+```acton-trace
+N/A -> external
+└── ext-in FmExternalTrigger -> fm_external_root A                              gas=2757
+    ├── ext-out FmExternalNoneDest -> none
+    └── ext-out FmExternalAddressDest -> 0xa1b2c3d4 (32 bits)
+```
+
+- `ext-in` is an external inbound message.
+- `ext-out` lines are external messages emitted by the transaction.
+- External destinations are shown either as `none` or as raw external address
+  bytes.
+
+## Extra Diagnostic Lines
+
+Transactions can print extra lines under the main row:
+
+```acton-trace
+N/A -> sender A
+└── empty 0.2 TON -> fm_action_fail B                         gas=2347 aborted action_result_code=37
+    ├── account created
+    ├── Action phase failed
+    ├── Description: Not enough Toncoin
+    ├── Re-run with --backtrace full to get actions location
+    └── Executed actions:
+        ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL                             balance: 0.0990612 TON
+        └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3...                          balance: 0 TON
+```
+
+Common extra lines:
+
+- `account created` and `account destroyed` show storage lifecycle changes
+- `Compute phase failed: ...` explains a non-zero `exit_code`
+- `Action phase failed` and `action_result_code=...` describe action-phase
+  errors
+- decoded body fields may appear before child transactions when `--show-bodies`
+  is enabled and ABI is known
+- `Executed actions:` shows parsed out actions such as `sendMsg` and `reserve`
+- `Re-run with --backtrace full ...` means Acton can show source locations for
+  failed actions or compute errors if you enable full backtraces
+
+## Making Traces More Readable
+
+- Give treasuries explicit names with `testing.treasury("deployer")`.
+- Name arbitrary addresses with
+  [`randomAddress("name")`](/docs/standard_library/emulation/network/#randomaddress)
+  or
+  [`net.registerAddress(...)`](/docs/standard_library/emulation/network/#netregisteraddress).
+- Label undeployed or dynamically-created contracts with
+  [`net.registerCodeCell(...)`](/docs/standard_library/emulation/network/#netregistercodecell).
+- Use matcher failures as a focused debugger: when
+  `expect(txs).toHaveSuccessfulTx({...})` fails, Acton prints the same trace tree
+  plus the exact search parameters that were not matched.
+- Re-run with `acton test --show-bodies` when you want decoded message fields in
+  the terminal tree.
+- Re-run with `acton test --backtrace full` when you need source locations for
+  compute/action failures.
+- Switch to [`acton test --ui`](/docs/testing/test-ui/) when the tree is too
+  large and you need clickable transactions, fee tables, or grouped logs.
