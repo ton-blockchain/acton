@@ -1,5 +1,7 @@
 {
+  "icon": "FileCheck",
   "pages": [
+    "overview",
     "c001-compiler-error",
     "e001-field-init-can-be-folded",
     "e002-unused-variable",
@@ -38,5 +40,6 @@
     "e035-create-message-body-to-cell",
     "s001-name-case-checker",
     "s002-explicit-return-type"
-  ]
+  ],
+  "title": "Linting rules"
 }

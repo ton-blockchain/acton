@@ -241,8 +241,8 @@ fn test_commands_index_links_all_documented_command_pages() {
         .expect("failed to read commands meta.json");
     let meta: CommandsMeta =
         serde_json::from_str(&meta).expect("failed to parse commands meta.json");
-    let index = fs::read_to_string("docs/content/docs/commands/index.mdx")
-        .expect("failed to read commands index.mdx");
+    let index = fs::read_to_string("docs/content/docs/commands/overview.mdx")
+        .expect("failed to read commands overview.mdx");
 
     for page in meta.pages {
         let href = format!("href=\"/docs/commands/{page}\"");

@@ -1,5 +1,7 @@
 {
+  "title": "Mutation testing",
   "pages": [
+    "overview",
     "rules"
   ]
 }

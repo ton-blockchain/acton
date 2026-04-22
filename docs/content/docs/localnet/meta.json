@@ -1,5 +1,8 @@
 {
+  "title": "Localnet",
+  "icon": "Server",
   "pages": [
+    "overview",
     "getting-started",
     "forking-from-network",
     "startup-accounts",

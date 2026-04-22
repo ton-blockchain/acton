@@ -2,8 +2,8 @@
   "pages": [
     "welcome.mdx",
     "installation.mdx",
-    "ide-support",
     "quickstart.mdx",
+    "ide-support",
     "tutorial",
     "--- Guides ---",
     "projects.mdx",

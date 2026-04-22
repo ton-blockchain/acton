@@ -2,6 +2,7 @@
   "title": "Testing",
   "icon": "FlaskConical",
   "pages": [
+    "overview",
     "generating-wrappers",
     "test-attributes",
     "fuzz-testing",

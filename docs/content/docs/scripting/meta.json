@@ -2,6 +2,7 @@
   "title": "Scripting",
   "icon": "FileCode",
   "pages": [
+    "overview",
     "passing-arguments",
     "blockchain-interaction"
   ]

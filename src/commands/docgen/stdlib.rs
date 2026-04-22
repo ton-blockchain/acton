@@ -45,13 +45,13 @@ pub(super) fn generate_stdlib_docs(
 
 fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
     fs::create_dir_all(stdlib_out_dir)?;
-    let index_article = stdlib_out_dir.join("index.mdx");
+    let index_article = stdlib_out_dir.join("overview.mdx");
     fs::write(
         &index_article,
         render_generated_index_page(
-            "Acton standard library",
-            "Learn about available functions/struct/constants available in Acton standard library",
-            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](../tolk_standard_library).\n",
+            "Overview",
+            "All available functions, structs, constants, and other entities available in Acton standard library",
+            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](../tolk_standard_library/overview).\n",
         ),
     )?;
     Ok(())
@@ -59,12 +59,12 @@ fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
 
 fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path) -> Result<()> {
     fs::create_dir_all(tolk_stdlib_out_dir)?;
-    let index_article = tolk_stdlib_out_dir.join("index.mdx");
+    let index_article = tolk_stdlib_out_dir.join("overview.mdx");
     fs::write(
         &index_article,
         render_generated_index_page(
-            "Tolk standard library",
-            "Learn about bundled Tolk stdlib modules used by Acton standard library",
+            "Overview",
+            "Bundled Tolk stdlib modules used by Acton standard library",
             "This section contains documentation of Tolk standard library.\n",
         ),
     )?;
@@ -249,9 +249,7 @@ fn write_doc_page(
 }
 
 fn render_generated_index_page(title: &str, description: &str, body: &str) -> String {
-    format!(
-        "---\ntitle: {title:?}\ndescription: {description:?}\nicon: FileCode\n---\n\n{GENERATED_NOTICE}{body}"
-    )
+    format!("---\ntitle: {title:?}\ndescription: {description:?}\n---\n\n{GENERATED_NOTICE}{body}")
 }
 
 fn normalize_symbol_link(link: &str) -> String {

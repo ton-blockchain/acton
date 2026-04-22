@@ -1,4 +1,6 @@
 {
+  "title": "Command reference",
+  "icon": "Terminal",
   "pages": [
     "new",
     "init",

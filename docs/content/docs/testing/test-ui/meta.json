@@ -1,5 +1,7 @@
 {
+  "title": "Test UI",
   "pages": [
+    "overview",
     "quickstart",
     "reference"
   ]
