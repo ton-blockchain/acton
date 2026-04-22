@@ -1,7 +1,7 @@
 .parsedContainer {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 0.35rem;
   min-width: 0;
 }
 
@@ -28,7 +28,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   min-width: 0;
   padding-left: var(--spacing-mds);
@@ -70,7 +70,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--border-color);

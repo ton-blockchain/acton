@@ -14,9 +14,8 @@ interface DisasmSectionProps {
 
 type DisasmState =
   | {readonly status: "idle"}
-  | {readonly status: "loading"}
-  | {readonly status: "ready"; readonly disasm: string}
-  | {readonly status: "error"; readonly error: string}
+  | {readonly status: "ready"; readonly bocHex: string; readonly disasm: string}
+  | {readonly status: "error"; readonly bocHex: string; readonly error: string}
 
 const EMPTY_DISASM_TEXT = "// Disassembly is empty for this code cell"
 const EMPTY_CELL_DISASM_TEXT = "// Cell is empty"
@@ -31,18 +30,24 @@ export function DisasmSection({
 
   useEffect(() => {
     if (!isExpanded) {
-      setState(currentState => (currentState.status === "idle" ? currentState : {status: "idle"}))
+      return
+    }
+
+    if (
+      (state.status === "ready" || state.status === "error") &&
+      state.bocHex === bocHex
+    ) {
       return
     }
 
     let isCancelled = false
-    setState({status: "loading"})
 
     void disassembleBocHex(bocHex)
       .then(result => {
         if (!isCancelled) {
           setState({
             status: "ready",
+            bocHex,
             disasm:
               result.disasm.trim().length > 0
                 ? result.disasm
@@ -55,14 +60,14 @@ export function DisasmSection({
       .catch(error => {
         if (!isCancelled) {
           const message = error instanceof Error ? error.message : "Failed to disassemble code"
-          setState({status: "error", error: message})
+          setState({status: "error", bocHex, error: message})
         }
       })
 
     return () => {
       isCancelled = true
     }
-  }, [bocHex, isExpanded])
+  }, [bocHex, isExpanded, state])
 
   return (
     <div className={styles.disasmSection}>
@@ -74,27 +79,23 @@ export function DisasmSection({
             setIsExpanded(!isExpanded)
           }}
           className={styles.actionsToggleButton}
-          aria-label={isExpanded ? "Hide disassembled code" : "Open disassembled code"}
+          aria-label={isExpanded ? "Hide disassembled code" : "Show disassembled code"}
         >
           {isExpanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-          <span className={styles.actionsToggleText}>{isExpanded ? "Hide" : "Open"}</span>
+          <span className={styles.actionsToggleText}>{isExpanded ? "Hide" : "Show"}</span>
         </button>
       </div>
 
       {isExpanded &&
-        (state.status === "loading" ? (
-          <div className={styles.disasmLoading}>Loading disassembly...</div>
-        ) : state.status === "error" ? (
+        (state.status === "error" && state.bocHex === bocHex ? (
           <div className={styles.disasmError}>{state.error}</div>
-        ) : state.status === "ready" ? (
+        ) : state.status === "ready" && state.bocHex === bocHex ? (
           <div className={styles.disasmBlock}>
             <pre className={styles.disasmCode}>
               <code>{state.disasm}</code>
             </pre>
           </div>
-        ) : (
-          <div className={styles.disasmLoading}>Preparing disassembly...</div>
-        ))}
+        ) : undefined)}
     </div>
   )
 }

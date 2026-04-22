@@ -16,6 +16,12 @@ interface CustomExitCodeInfo {
   readonly description: string
 }
 
+interface FallbackExitCodeInfo {
+  readonly name: string
+  readonly description: string
+  readonly origin: string
+}
+
 const getCompilerAbiSymbolDescription = (
   compilerAbi: CompilerAbi | undefined,
   symbol: string,
@@ -59,6 +65,15 @@ const getCustomExitCodeInfo = (
   }
 }
 
+const getFallbackExitCodeInfo = (
+  phase: "compute" | "action",
+): FallbackExitCodeInfo => ({
+  name: "Custom Exit Code",
+  description:
+    "Contract returned a user-defined exit code that is not declared in the ABI, so no symbolic description is available for this value.",
+  origin: phase === "action" ? "Action phase" : "Compute phase",
+})
+
 export function ExitCodeChip({exitCode, abi, compilerAbi, phase = "compute"}: ExitCodeViewerProps) {
   if (exitCode === undefined) {
     return <span className={styles.exitCode}>—</span>
@@ -68,11 +83,15 @@ export function ExitCodeChip({exitCode, abi, compilerAbi, phase = "compute"}: Ex
     exitCode
   ]
   const customExitCode = getCustomExitCodeInfo(exitCode, abi, compilerAbi)
-  const displayName = standardDescription?.name ?? customExitCode?.symbolicName ?? ""
-  const description = standardDescription?.description ?? customExitCode?.description
+  const fallbackExitCode =
+    standardDescription || customExitCode ? undefined : getFallbackExitCodeInfo(phase)
+  const displayName =
+    standardDescription?.name ?? customExitCode?.symbolicName ?? fallbackExitCode?.name ?? ""
+  const description =
+    standardDescription?.description ?? customExitCode?.description ?? fallbackExitCode?.description
   const origin =
     standardDescription?.phase ??
-    (customExitCode ? (phase === "action" ? "Action phase" : "Compute phase") : undefined)
+    (customExitCode ? (phase === "action" ? "Action phase" : "Compute phase") : fallbackExitCode?.origin)
   const docsUrl = standardDescription ? getExitCodeDocsUrl(exitCode) : undefined
 
   const tooltipContent = (

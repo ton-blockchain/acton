@@ -167,6 +167,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const abiByCodeHash = new Map<
             string,
             {
+              readonly compilerAbi: ContractData["compilerAbi"]
               readonly incoming: ReadonlyMap<number, string>
               readonly outgoing: ReadonlyMap<number, string>
             }
@@ -183,6 +184,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           )
           for (const [codeHash, compilerAbi] of fetchedAbis) {
             abiByCodeHash.set(codeHash, {
+              compilerAbi: (compilerAbi as ContractData["compilerAbi"] | undefined) ?? undefined,
               incoming: buildMessageNamesByOpcodeNumber(compilerAbi, "incoming_messages"),
               outgoing: buildMessageNamesByOpcodeNumber(compilerAbi, "outgoing_messages"),
             })
@@ -194,13 +196,14 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               const letter = String.fromCodePoint(nextLetterCode++)
               const displayAddr = normalizeAddress(addr)
               const customName = await fetchName(addr)
-              const messageNames = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
+              const contractAbi = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
               contractsMap.set(addr, {
                 displayName: customName || fmt.formatAddress(displayAddr),
                 address: Address.parse(addr),
                 letter,
-                incomingMessageNamesByOpcode: messageNames?.incoming,
-                outgoingMessageNamesByOpcode: messageNames?.outgoing,
+                compilerAbi: contractAbi?.compilerAbi,
+                incomingMessageNamesByOpcode: contractAbi?.incoming,
+                outgoingMessageNamesByOpcode: contractAbi?.outgoing,
               })
             }),
           )

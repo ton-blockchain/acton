@@ -1,7 +1,7 @@
 .parsedBodySection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 0.35rem;
   min-width: 0;
 }
 

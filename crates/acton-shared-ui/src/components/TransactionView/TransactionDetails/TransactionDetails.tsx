@@ -1,10 +1,12 @@
 import * as React from "react"
 import {useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
+import type {Cell} from "@ton/core"
 
 import type {BackendContractInfo} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
-import {fmt} from "@/index"
+import {DataBlock, fmt} from "@/index"
+import {decodeStateInitData} from "@/utils/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -17,8 +19,10 @@ import {
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
+import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 
 import {ActionsSummary} from "./ActionsSummary"
@@ -38,6 +42,7 @@ export function TransactionDetails({
   onContractClick,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
+  const [showStateInit, setShowStateInit] = useState(false)
 
   const description = tx.transaction.description
   if (description.type !== "generic" && description.type !== "tick-tock") {
@@ -88,6 +93,7 @@ export function TransactionDetails({
   }
 
   const inMessage = tx.transaction.inMessage ?? undefined
+  const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
     inMessage != undefined &&
@@ -95,10 +101,18 @@ export function TransactionDetails({
       const body = inMessage.body.asSlice()
       return body.remainingBits > 0 || body.remainingRefs > 0
     })()
+  const stateInitCode = inMessage?.init?.code ?? undefined
+  const stateInitData = inMessage?.init?.data ?? undefined
+  const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const parsedStateInitData = decodeStateInitData(
+    stateInitData,
+    targetContract,
+    tx.contractName,
+    allContracts,
+  )
   const sendMode = computeSendMode(tx)
 
   const opcode = getTransactionOpcode(tx.transaction)
-  const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
   const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
 
   const sentTotal = [...tx.transaction.outMessages.values()].reduce(
@@ -112,7 +126,7 @@ export function TransactionDetails({
     <div className={styles.transactionDetailsContainer}>
       <div className={styles.detailRow}>
         <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message Route"}</div>
-        <div className={styles.detailValue}>
+        <div className={styles.heightDetailValue}>
           {isTickTock ? (
             <span className={styles.triggerRoute}>
               <span className={styles.triggerKind}>{triggerLabel ?? "Tick-Tock"}</span>
@@ -237,6 +251,56 @@ export function TransactionDetails({
                 contracts={contracts}
                 onContractClick={onContractClick}
               />
+            )}
+            {(stateInitCode || stateInitData) && (
+              <div className={styles.parsedBodySection}>
+                <div className={styles.parsedBodyTitle}>
+                  State Init
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStateInit(!showStateInit)
+                    }}
+                    className={styles.actionsToggleButton}
+                    aria-label={showStateInit ? "Hide state init" : "Show state init"}
+                  >
+                    {showStateInit ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                    <span className={styles.actionsToggleText}>
+                      {showStateInit ? "Hide" : "Show"}
+                    </span>
+                  </button>
+                </div>
+                {showStateInit && (
+                  <div className={styles.stateInitSection}>
+                    {stateInitCode && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>Code</div>
+                        <DataBlock data={stateInitCodeBocHex!} />
+                        <DisasmSection bocHex={stateInitCodeBocHex!} title="Code Disassembly" />
+                      </div>
+                    )}
+                    {stateInitData && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>Data</div>
+                        {parsedStateInitData ? (
+                          <div className={styles.parsedBodyTree}>
+                            <div className={styles.parsedBodyContent}>
+                              <ParsedValueView
+                                value={parsedStateInitData.value}
+                                contracts={contracts}
+                                onContractClick={onContractClick}
+                                fallbackTypeName={parsedStateInitData.name}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <DataBlock data={formatCellBocHex(stateInitData)} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -424,6 +488,10 @@ export function TransactionDetails({
       </div>
     </div>
   )
+}
+
+function formatCellBocHex(cell: Cell): string {
+  return cell.toBoc({idx: false, crc32: false}).toString("hex")
 }
 
 function formatDetailedTimestamp(

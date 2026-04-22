@@ -16,7 +16,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   padding-left: var(--spacing-mds);
   border-left: 1px solid var(--border-color);
