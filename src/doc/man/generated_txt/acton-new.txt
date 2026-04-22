@@ -315,5 +315,5 @@ SEE ALSO
           <https://ton-blockchain.github.io/acton/docs/project-init>
 
        o  Build system configuration reference
-          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+          <https://ton-blockchain.github.io/acton/docs/building/reference>
 

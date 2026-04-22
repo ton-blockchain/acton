@@ -171,4 +171,4 @@ speed up repeated runs.
 
 - `acton help build`
 - `acton help disasm`
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

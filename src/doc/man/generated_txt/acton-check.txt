@@ -179,5 +179,5 @@ SEE ALSO
        o  Linting guide <https://ton-blockchain.github.io/acton/docs/linting>
 
        o  Linter rules
-          <https://ton-blockchain.github.io/acton/docs/linting/rules>
+          <https://ton-blockchain.github.io/acton/docs/rules>
 

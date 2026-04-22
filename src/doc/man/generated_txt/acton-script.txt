@@ -180,5 +180,5 @@ SEE ALSO
           <https://ton-blockchain.github.io/acton/docs/scripting>
 
        o  Wallet setup
-          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>
 

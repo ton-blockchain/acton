@@ -170,4 +170,4 @@ Print an explanation for a lint rule.
 
 - `acton help fmt`
 - [Linting guide](https://ton-blockchain.github.io/acton/docs/linting)
-- [Linter rules](https://ton-blockchain.github.io/acton/docs/linting/rules)
+- [Linter rules](https://ton-blockchain.github.io/acton/docs/rules)

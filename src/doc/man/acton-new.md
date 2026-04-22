@@ -220,4 +220,4 @@ The command does not create a commit and does not modify parent directories.
 
 - `acton help init`
 - [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

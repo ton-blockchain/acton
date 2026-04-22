@@ -196,4 +196,4 @@ one-off overrides or CI.
 ## See Also
 
 - `acton help wallet`
-- [Local development node guide](https://ton-blockchain.github.io/acton/docs/local-development-node)
+- [Local development node guide](https://ton-blockchain.github.io/acton/docs/localnet)

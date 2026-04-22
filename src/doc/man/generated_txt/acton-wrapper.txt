@@ -149,5 +149,5 @@ SEE ALSO
        o  acton help test
 
        o  Generating wrappers guide
-          <https://ton-blockchain.github.io/acton/docs/test-runner/generating-wrappers>
+          <https://ton-blockchain.github.io/acton/docs/testing/generating-wrappers>
 

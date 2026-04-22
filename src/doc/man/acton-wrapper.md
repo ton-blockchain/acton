@@ -170,4 +170,4 @@ CLI flags override config values for the current invocation.
 
 - `acton help build`
 - `acton help test`
-- [Generating wrappers guide](https://ton-blockchain.github.io/acton/docs/test-runner/generating-wrappers)
+- [Generating wrappers guide](https://ton-blockchain.github.io/acton/docs/testing/generating-wrappers)

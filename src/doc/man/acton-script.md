@@ -218,4 +218,4 @@ one-off overrides or CI.
 
 - `acton help run`
 - [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting)
-- [Wallet setup](https://ton-blockchain.github.io/acton/docs/setup-wallets)
+- [Wallet setup](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)

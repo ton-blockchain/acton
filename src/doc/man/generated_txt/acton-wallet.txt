@@ -370,5 +370,5 @@ SEE ALSO
           <https://ton-blockchain.github.io/acton/docs/commands/wallet>
 
        o  Wallet setup guide
-          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>
 
