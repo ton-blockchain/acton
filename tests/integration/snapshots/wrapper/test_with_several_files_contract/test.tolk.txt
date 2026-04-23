@@ -4,7 +4,7 @@ import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "../contracts/types"
 import "../contracts/types_other"
-import "../wrappers/MyContract"
+import "../wrappers/MyContract.gen"
 
 /// Example test case demonstrating the basic flow
 get fun `test basic flow`() {

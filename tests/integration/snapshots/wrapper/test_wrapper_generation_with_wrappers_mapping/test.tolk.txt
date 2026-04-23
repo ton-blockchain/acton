@@ -2,7 +2,7 @@ import "@stdlib/gas-payments"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@wrappers/Main"
+import "@wrappers/Main.gen"
 import "../contracts/types"
 
 /// Example test case demonstrating the basic flow

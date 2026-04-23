@@ -356,7 +356,11 @@ fn resolve_test_path(
 }
 
 fn wrapper_file_name(contract_name: &str, generate_typescript: bool) -> String {
-    let extension = if generate_typescript { "ts" } else { "tolk" };
+    let extension = if generate_typescript {
+        "gen.ts"
+    } else {
+        "gen.tolk"
+    };
     format!("{contract_name}.{extension}")
 }
 
