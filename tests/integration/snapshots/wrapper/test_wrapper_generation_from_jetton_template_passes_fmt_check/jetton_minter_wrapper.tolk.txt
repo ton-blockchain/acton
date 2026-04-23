@@ -12,6 +12,7 @@ import "@acton/types/message"
 import "@contracts/messages"
 import "@contracts/storage"
 
+/// Storage `MinterStorage` is defined in `contracts/storage.tolk`
 struct JettonMinter {
     address: address
     stateInit: ContractState? = null

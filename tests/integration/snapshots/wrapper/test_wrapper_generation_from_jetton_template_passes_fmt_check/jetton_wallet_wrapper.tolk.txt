@@ -12,6 +12,7 @@ import "@acton/types/message"
 import "@contracts/messages"
 import "@contracts/storage"
 
+/// Storage `WalletStorage` is defined in `contracts/storage.tolk`
 struct JettonWallet {
     address: address
     stateInit: ContractState? = null

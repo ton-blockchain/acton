@@ -11,6 +11,7 @@ import "@acton/testing/expect"
 import "@acton/types/message"
 import "../contracts/storage"
 
+/// Storage `FirstStorage` is defined in `contracts/storage.tolk`
 struct MyContract {
     address: address
     stateInit: ContractState? = null
