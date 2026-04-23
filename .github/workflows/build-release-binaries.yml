@@ -53,9 +53,10 @@ jobs:
         run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1
+          fallback: none
 
       - name: Install LLVM and Clang (don't cache)
         run: |
@@ -144,9 +145,10 @@ jobs:
         run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1
+          fallback: none
 
       - name: Download TON objects archive
         env:

@@ -54,9 +54,10 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1,nextest@0.9.132
+          fallback: none
 
       - name: Download TON objects archive
         env:
@@ -166,9 +167,10 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1,cargo-shear@1.11.2,typos@1.45.0
+          fallback: none
 
       - name: Download TON objects archive
         env:
@@ -202,9 +204,10 @@ jobs:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1
+          fallback: none
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -265,9 +268,10 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
           tool: just@1.48.1,nextest@0.9.132
+          fallback: none
 
       - name: Download TON objects archive
         env:
