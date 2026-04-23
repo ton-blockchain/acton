@@ -3576,63 +3576,73 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
 
 /// Decide which `MsgInfo` variant a v3 message summary represents and pack its fields.
 ///
-/// Heuristic: presence of `value` implies internal; otherwise absence of `source` implies
-/// external-in; otherwise external-out. Matches how toncenter populates the summary.
+/// Classify by the address pair: `source=None` → external-in, `destination=None` →
+/// external-out, both present → internal.
 fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
-    if m.value.is_some() {
-        let src = parse_int_addr(m.source.as_deref())?
-            .context("Internal message summary missing source address")?;
-        let dst = parse_int_addr(m.destination.as_deref())?
-            .context("Internal message summary missing destination address")?;
-        Ok(MsgInfo::Int(IntMsgInfo {
-            ihr_disabled: m.ihr_disabled.unwrap_or(true),
-            bounce: m.bounce.unwrap_or(false),
-            bounced: m.bounced.unwrap_or(false),
-            src,
-            dst,
-            value: CurrencyCollection {
-                tokens: parse_tokens_opt(m.value.as_deref()),
-                other: ExtraCurrencyCollection::new(),
-            },
-            ihr_fee: parse_tokens_opt(m.ihr_fee.as_deref()),
-            fwd_fee: parse_tokens_opt(m.fwd_fee.as_deref()),
-            created_lt: m
-                .created_lt
-                .as_deref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-            created_at: m
-                .created_at
-                .as_deref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        }))
-    } else if m.source.is_none() {
-        let dst = parse_int_addr(m.destination.as_deref())?
-            .context("External-in message missing destination address")?;
-        Ok(MsgInfo::ExtIn(ExtInMsgInfo {
-            src: None,
-            dst,
-            import_fee: parse_tokens_opt(m.import_fee.as_deref()),
-        }))
-    } else {
-        let src = parse_int_addr(m.source.as_deref())?
-            .context("External-out message missing source address")?;
-        // External-out destinations are opaque ExtAddr; we leave dst = None.
-        Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
-            src,
-            dst: None,
-            created_lt: m
-                .created_lt
-                .as_deref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-            created_at: m
-                .created_at
-                .as_deref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-        }))
+    let src_str = m.source.as_deref().filter(|s| !s.is_empty());
+    let dst_str = m.destination.as_deref().filter(|s| !s.is_empty());
+
+    match (src_str, dst_str) {
+        (None, Some(_)) => {
+            let dst = parse_int_addr(dst_str)?
+                .context("External-in message missing destination address")?;
+            Ok(MsgInfo::ExtIn(ExtInMsgInfo {
+                src: None,
+                dst,
+                import_fee: parse_tokens_opt(m.import_fee.as_deref()),
+            }))
+        }
+        (Some(_), None) => {
+            let src =
+                parse_int_addr(src_str)?.context("External-out message missing source address")?;
+            // External-out destinations are opaque ExtAddr; we leave dst = None.
+            Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
+                src,
+                dst: None,
+                created_lt: m
+                    .created_lt
+                    .as_deref()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+                created_at: m
+                    .created_at
+                    .as_deref()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+            }))
+        }
+        (Some(_), Some(_)) => {
+            let src = parse_int_addr(src_str)?
+                .context("Internal message summary missing source address")?;
+            let dst = parse_int_addr(dst_str)?
+                .context("Internal message summary missing destination address")?;
+            Ok(MsgInfo::Int(IntMsgInfo {
+                ihr_disabled: m.ihr_disabled.unwrap_or(true),
+                bounce: m.bounce.unwrap_or(false),
+                bounced: m.bounced.unwrap_or(false),
+                src,
+                dst,
+                value: CurrencyCollection {
+                    tokens: parse_tokens_opt(m.value.as_deref()),
+                    other: ExtraCurrencyCollection::new(),
+                },
+                ihr_fee: parse_tokens_opt(m.ihr_fee.as_deref()),
+                fwd_fee: parse_tokens_opt(m.fwd_fee.as_deref()),
+                created_lt: m
+                    .created_lt
+                    .as_deref()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+                created_at: m
+                    .created_at
+                    .as_deref()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+            }))
+        }
+        (None, None) => anyhow::bail!(
+            "message summary has neither source nor destination; cannot classify variant"
+        ),
     }
 }
 
