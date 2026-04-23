@@ -11,4 +11,4 @@ kind = "v5r1"
 workchain = 0
 keys = { [MNEMONIC] }
 
-See [ACTON_DOCS_URL]/setup-wallets/ for more information
+See [ACTON_DOCS_URL]/tutorial/setup-wallets for more information

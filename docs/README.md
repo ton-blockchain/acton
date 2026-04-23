@@ -27,7 +27,7 @@ bun run dev
 ```
 
 Open `http://localhost:3000` for the landing page and
-`http://localhost:3000/docs/welcome/` for the documentation entry point.
+`http://localhost:3000/docs/welcome` for the documentation entry point.
 
 ## Available scripts
 

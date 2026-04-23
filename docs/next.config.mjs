@@ -13,7 +13,6 @@ const docsRoot = fileURLToPath(new URL(".", import.meta.url));
 const config = {
   reactStrictMode: true,
   output: "export",
-  trailingSlash: true,
   images: { unoptimized: true },
   turbopack: {
     root: docsRoot,
