@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling noop
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/wait_for_trace_in_emulation.test.tolk (1 test)
+  ✓ bi stdlib wait for trace returns self in emulation [TIME]
+
+ ✓ 1 passed in 1 file

@@ -43,10 +43,11 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, CurrencyCollection,
-    ExtInMsgInfo, ExtOutMsgInfo, ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo,
-    LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
+    AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
+    ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
+    ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
+    OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount,
+    SkippedComputePhase, StdAddr, StdAddrFormat, StorageUsedShort, Transaction, TxInfo,
 };
 use tycho_types::num::{Tokens, Uint15};
 
@@ -3244,11 +3245,14 @@ fn wait_for_trace_impl(
                 stack.push(TupleItem::big_array_from_items(send_results));
                 return Ok(());
             }
-            Ok(None) => {}
+            Ok(None) => {
+                // Successful call, trace just not indexed yet — clear any stashed transport
+                // error so a transient earlier failure doesn't poison the timeout result.
+                last_transport_err = None;
+            }
             Err(err) => {
-                // Don't silently retry past errors — surface them to the user via a warning
-                // on every failing attempt, and hold on to the last one in case all attempts
-                // fail (so we can include it in the final bail message).
+                // Surface the failure on each attempt, and hold on to the last one so we can
+                // include it in the bail message if errors persist through timeout.
                 warn!("waitForTrace poll failed on attempt {attempt}: {err:#}");
                 last_transport_err = Some(err);
             }
@@ -3259,6 +3263,8 @@ fn wait_for_trace_impl(
         }
     }
 
+    // Only bail if we ended the budget on a run of transport errors. If the last poll was a
+    // clean Ok(None), fall through to the documented "null when not fetched in time" path.
     if let Some(err) = last_transport_err {
         return Err(err.context(format!(
             "waitForTrace: toncenter polling failed on every attempt ({attempts} total)"
@@ -3464,8 +3470,10 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 }
 
 /// Translate a v3 transaction description into a minimal `TxInfo::Ordinary`. Fields we
-/// don't have (credit_phase, bounce_phase) are left empty; compute + action phases
-/// preserve their success/gas/exit-code values so user assertions remain meaningful.
+/// don't have (credit_phase, bounce_phase, storage_phase, per-phase cell hashes / message
+/// sizes) are left empty; compute and action phases preserve their success / gas /
+/// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
+/// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
 fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
     let Some(desc) = desc else {
         return TxInfo::Ordinary(OrdinaryTxInfo {
@@ -3534,12 +3542,37 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
         }),
     };
 
+    let action_phase = desc.action.as_ref().map(|ap| ActionPhase {
+        success: ap.success.unwrap_or(false),
+        valid: ap.valid.unwrap_or(false),
+        no_funds: ap.no_funds.unwrap_or(false),
+        status_change: AccountStatusChange::Unchanged,
+        total_fwd_fees: ap
+            .total_fwd_fees
+            .as_deref()
+            .and_then(|s| s.parse::<u128>().ok())
+            .map(Tokens::new),
+        total_action_fees: ap
+            .total_action_fees
+            .as_deref()
+            .and_then(|s| s.parse::<u128>().ok())
+            .map(Tokens::new),
+        result_code: ap.result_code.unwrap_or(0),
+        result_arg: ap.result_arg,
+        total_actions: ap.total_actions.unwrap_or(0),
+        special_actions: ap.spec_actions.unwrap_or(0),
+        skipped_actions: ap.skipped_actions.unwrap_or(0),
+        messages_created: ap.msgs_created.unwrap_or(0),
+        action_list_hash: HashBytes::ZERO,
+        total_message_size: StorageUsedShort::ZERO,
+    });
+
     TxInfo::Ordinary(OrdinaryTxInfo {
         credit_first: desc.credit_first.unwrap_or(false),
         storage_phase: None,
         credit_phase: None,
         compute_phase,
-        action_phase: None,
+        action_phase,
         aborted: desc.aborted.unwrap_or(false),
         bounce_phase: None,
         destroyed: desc.destroyed.unwrap_or(false),
