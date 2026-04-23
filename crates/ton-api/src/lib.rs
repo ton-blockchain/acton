@@ -1028,6 +1028,11 @@ pub struct V3Trace {
     pub trace_id: String,
     pub transactions_order: Vec<String>,
     pub transactions: HashMap<String, V3TransactionSummary>,
+    /// Set by the indexer when the trace exceeds its `MaxTraceTransactions` threshold —
+    /// in that case `transactions`/`transactions_order` are truncated and retries won't
+    /// help, so callers should bail rather than return a partial `SendResultList`.
+    #[serde(default)]
+    pub is_incomplete: bool,
 }
 
 impl TonApiClient {

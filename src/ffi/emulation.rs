@@ -3307,17 +3307,27 @@ fn wait_for_trace_impl(
         }
 
         match poll_send_results_by_trace(&api_client, &msg_hash_hex) {
-            Ok(Some(send_results)) => {
+            Ok(TracePollOutcome::Settled(send_results)) => {
                 if !quiet {
                     println!("Trace settled with {} transaction(s)", send_results.len());
                 }
                 stack.push(TupleItem::big_array_from_items(send_results));
                 return Ok(());
             }
-            Ok(None) => {
+            Ok(TracePollOutcome::NotYet) => {
                 // Successful call, trace just not indexed yet — clear any stashed transport
                 // error so a transient earlier failure doesn't poison the timeout result.
                 last_transport_err = None;
+            }
+            Ok(TracePollOutcome::Incomplete) => {
+                // `is_incomplete=true` means the trace exceeds toncenter's size threshold —
+                // the response is truncated and retries won't help. Bail so callers don't
+                // silently consume a partial `SendResultList`.
+                anyhow::bail!(
+                    "waitForTrace: toncenter returned is_incomplete=true for the trace of \
+                     {msg_hash_hex} — the trace exceeds the indexer's size limit and cannot \
+                     be fetched in full"
+                );
             }
             Err(err) => {
                 // Surface the failure on each attempt, and hold on to the last one so we can
@@ -3344,35 +3354,46 @@ fn wait_for_trace_impl(
     Ok(())
 }
 
+/// Result of one polling step. `Incomplete` is split out from `Err` so the retry loop can
+/// bail instead of treating it as a transient transport failure and burning the budget.
+enum TracePollOutcome {
+    Settled(Vec<TupleItem>),
+    NotYet,
+    Incomplete,
+}
+
 /// One polling step for a full trace.
 ///
-/// Returns `Ok(None)` when the indexer hasn't yet built the trace or referenced txs aren't
-/// resolvable yet. Returns `Err` when the trace exists but we failed to reconstruct a tx
-/// from it — those errors are surfaced, not swallowed, so the caller can stop and report.
+/// Returns `NotYet` when the indexer hasn't yet built the trace or referenced txs aren't
+/// resolvable yet, `Incomplete` when the indexer explicitly flagged the trace as truncated,
+/// and `Err` for transport / parse failures the caller may retry on.
 fn poll_send_results_by_trace(
     client: &TonApiClient,
     msg_hash_hex: &str,
-) -> anyhow::Result<Option<Vec<TupleItem>>> {
+) -> anyhow::Result<TracePollOutcome> {
     let traces = client.get_traces_by_msg_hash(msg_hash_hex, 1)?;
     let Some(trace) = traces.into_iter().next() else {
-        return Ok(None);
+        return Ok(TracePollOutcome::NotYet);
     };
+    if trace.is_incomplete {
+        return Ok(TracePollOutcome::Incomplete);
+    }
     if trace.transactions_order.is_empty() {
-        return Ok(None);
+        return Ok(TracePollOutcome::NotYet);
     }
 
     let mut results = Vec::with_capacity(trace.transactions_order.len());
     for tx_hash in &trace.transactions_order {
         let Some(summary) = trace.transactions.get(tx_hash) else {
             // Indexer returned an id it cannot resolve — trace is still being assembled.
-            return Ok(None);
+            return Ok(TracePollOutcome::NotYet);
         };
         let (tx_cell, parsed_tx) = synthesize_tx_cell_from_v3(summary)
             .with_context(|| format!("Failed to synthesize Transaction cell for tx {tx_hash}"))?;
         results.push(tx_cell_to_send_result_tuple(tx_cell, &parsed_tx));
     }
 
-    Ok(Some(results))
+    Ok(TracePollOutcome::Settled(results))
 }
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
