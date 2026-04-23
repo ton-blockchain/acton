@@ -5,6 +5,7 @@ extend-exclude = [
   "block.tlb",
   "crates/tasm/spec/**",
   "crates/tolkc/assets/**",
+  "src/ffi/testdata/**",
   "tests/**/snapshots/**",
 ]
 

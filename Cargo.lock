@@ -37,6 +37,7 @@ dependencies = [
  "dotenvy",
  "dunce",
  "ed25519-dalek",
+ "expect-test",
  "expectrl",
  "fern",
  "flate2",

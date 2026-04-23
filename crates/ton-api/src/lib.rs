@@ -834,11 +834,26 @@ pub struct V3TransactionSummary {
     #[serde(default)]
     pub total_fees: Option<String>,
     #[serde(default)]
+    pub total_fees_extra_currencies: HashMap<String, String>,
+    #[serde(default)]
     pub description: Option<V3TxDescription>,
     #[serde(default)]
     pub in_msg: Option<V3MessageSummary>,
     #[serde(default)]
     pub out_msgs: Vec<V3MessageSummary>,
+    #[serde(default)]
+    pub account_state_before: Option<V3AccountStateRef>,
+    #[serde(default)]
+    pub account_state_after: Option<V3AccountStateRef>,
+}
+
+/// Opaque pointer to the account state before/after the transaction executed. Only the
+/// `hash` is used today — it feeds `state_update` so synthesized tx cells match their
+/// on-chain `repr_hash`.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3AccountStateRef {
+    #[serde(default)]
+    pub hash: Option<String>,
 }
 
 /// v3 transaction description. Only the subset of fields consumed during synthesis is
@@ -860,6 +875,18 @@ pub struct V3TxDescription {
     pub action: Option<V3ActionPhase>,
     #[serde(default)]
     pub storage_ph: Option<V3StoragePhase>,
+    #[serde(default)]
+    pub credit_ph: Option<V3CreditPhase>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3CreditPhase {
+    #[serde(default)]
+    pub due_fees_collected: Option<String>,
+    #[serde(default)]
+    pub credit: Option<String>,
+    #[serde(default)]
+    pub credit_extra_currencies: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -905,11 +932,15 @@ pub struct V3ActionPhase {
     #[serde(default)]
     pub no_funds: Option<bool>,
     #[serde(default)]
+    pub status_change: Option<String>,
+    #[serde(default)]
     pub result_code: Option<i32>,
     #[serde(default)]
     pub result_arg: Option<i32>,
-    #[serde(default)]
-    pub total_actions: Option<u16>,
+    // `tot_actions` is the on-wire name; `total_actions` is accepted as a fallback so old
+    // fixtures and forks that never shortened the key still deserialize.
+    #[serde(default, alias = "total_actions")]
+    pub tot_actions: Option<u16>,
     #[serde(default)]
     pub spec_actions: Option<u16>,
     #[serde(default)]
@@ -920,6 +951,18 @@ pub struct V3ActionPhase {
     pub total_fwd_fees: Option<String>,
     #[serde(default)]
     pub total_action_fees: Option<String>,
+    #[serde(default)]
+    pub action_list_hash: Option<String>,
+    #[serde(default)]
+    pub tot_msg_size: Option<V3StorageUsedShort>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3StorageUsedShort {
+    #[serde(default)]
+    pub cells: Option<String>,
+    #[serde(default)]
+    pub bits: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -945,13 +988,15 @@ pub struct V3MessageSummary {
     #[serde(default)]
     pub value: Option<String>,
     #[serde(default)]
+    pub value_extra_currencies: Option<HashMap<String, String>>,
+    #[serde(default)]
     pub fwd_fee: Option<String>,
     #[serde(default)]
     pub ihr_fee: Option<String>,
     #[serde(default)]
     pub created_lt: Option<String>,
     #[serde(default)]
-    pub created_at: Option<u32>,
+    pub created_at: Option<String>,
     #[serde(default)]
     pub ihr_disabled: Option<bool>,
     #[serde(default)]

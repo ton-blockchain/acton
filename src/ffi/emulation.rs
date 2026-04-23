@@ -47,7 +47,8 @@ use tycho_types::models::{
     ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
     ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
     OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount,
-    SkippedComputePhase, StdAddr, StdAddrFormat, StorageUsedShort, Transaction, TxInfo,
+    SkippedComputePhase, StdAddr, StdAddrFormat, StoragePhase, StorageUsedShort, Transaction,
+    TxInfo,
 };
 use tycho_types::num::{Tokens, Uint15};
 
@@ -3185,6 +3186,74 @@ mod tests {
         assert_eq!(pending.message, second_child);
         assert!(!message_iters.is_done(cursor_id));
     }
+
+    /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell BoCs
+    /// match a captured snapshot, and whose `repr_hash` equals the on-chain `hash` reported
+    /// by toncenter.
+    ///
+    /// Fixtures are live mainnet traces captured from `/api/v3/traces` into
+    /// `testdata/v3_trace_fixture*.json`; the expected synthesized-BoC output is recorded
+    /// alongside each response in `testdata/v3_trace_fixture*.synthesized.txt` as one
+    /// `<tx_hash_b64> <boc_b64>` line per transaction. Regenerate with `UPDATE_EXPECT=1`
+    /// after a deliberate synthesis change — a silent drift here would break the on-chain
+    /// `res.tx.hash()` contract that `waitForTrace` users rely on.
+    #[test]
+    fn synthesize_tx_cell_from_v3_reproduces_on_chain_hash() {
+        use expect_test::expect_file;
+        use ton_api::V3Trace;
+
+        #[derive(serde::Deserialize)]
+        struct TraceEnvelope {
+            traces: Vec<V3Trace>,
+        }
+
+        let fixtures = [
+            (
+                include_str!("testdata/v3_trace_fixture.json"),
+                expect_file!["testdata/v3_trace_fixture.synthesized.txt"],
+            ),
+            (
+                include_str!("testdata/v3_trace_fixture_multi.json"),
+                expect_file!["testdata/v3_trace_fixture_multi.synthesized.txt"],
+            ),
+        ];
+
+        for (idx, (fixture, expected)) in fixtures.into_iter().enumerate() {
+            let envelope: TraceEnvelope = serde_json::from_str(fixture)
+                .unwrap_or_else(|e| panic!("fixture {idx} must deserialize: {e:#}"));
+            let trace = envelope
+                .traces
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| panic!("fixture {idx} has no traces"));
+
+            // Iterate in indexer-reported order so the snapshot is stable —
+            // `V3Trace.transactions` is a HashMap and has no natural ordering.
+            let mut actual = String::new();
+            for tx_hash_b64 in &trace.transactions_order {
+                let summary = trace
+                    .transactions
+                    .get(tx_hash_b64)
+                    .unwrap_or_else(|| panic!("trace references unknown tx {tx_hash_b64}"));
+                let on_chain = parse_hash_bytes(tx_hash_b64).unwrap_or_else(|e| {
+                    panic!("bad on-chain hash in fixture {idx} {tx_hash_b64}: {e:#}")
+                });
+                let (cell, _parsed) = synthesize_tx_cell_from_v3(summary)
+                    .unwrap_or_else(|e| panic!("synthesize failed for {tx_hash_b64}: {e:#}"));
+                assert_eq!(
+                    cell.repr_hash(),
+                    &on_chain,
+                    "synthesized repr_hash must match on-chain hash for {tx_hash_b64} \
+                     (fixture {idx})",
+                );
+                actual.push_str(tx_hash_b64);
+                actual.push(' ');
+                actual.push_str(&Boc::encode_base64(cell));
+                actual.push('\n');
+            }
+            expected.assert_eq(&actual);
+        }
+    }
 }
 
 extension!(wait_for_trace in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: bool, tx_cell: Cell) using wait_for_trace_impl);
@@ -3309,10 +3378,11 @@ fn poll_send_results_by_trace(
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
 ///
 /// TonCenter `/traces` only ships structured summary fields, not the raw BoC, so we
-/// reconstruct a structurally valid `Transaction` from them — enough for `SendResultList`
-/// to expose usable `lt`, `outMessages`, `externals`, and `gasUsed`. The synthesized
-/// cell's `repr_hash` is NOT expected to match the on-chain hash — cell encoding choices
-/// (inline vs ref, state update hashes) are lossy here.
+/// reconstruct a structurally valid `Transaction` from them. The synthesized cell's
+/// `repr_hash` matches the on-chain hash for traces whose external-in messages carry no
+/// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original
+/// cell had a non-addr_none src, a non-zero import_fee, or an init), the original
+/// external-in data is lost and the reconstructed tx hash won't match.
 fn synthesize_tx_cell_from_v3(
     summary: &V3TransactionSummary,
 ) -> anyhow::Result<(Cell, Transaction)> {
@@ -3359,6 +3429,21 @@ fn synthesize_tx_cell_from_v3(
         other: ExtraCurrencyCollection::new(),
     };
 
+    let state_update_old = summary
+        .account_state_before
+        .as_ref()
+        .and_then(|s| s.hash.as_deref())
+        .map(parse_hash_bytes)
+        .transpose()?
+        .unwrap_or_default();
+    let state_update_new = summary
+        .account_state_after
+        .as_ref()
+        .and_then(|s| s.hash.as_deref())
+        .map(parse_hash_bytes)
+        .transpose()?
+        .unwrap_or_default();
+
     let tx = Transaction {
         account,
         lt,
@@ -3372,8 +3457,8 @@ fn synthesize_tx_cell_from_v3(
         out_msgs,
         total_fees,
         state_update: Lazy::new(&HashUpdate {
-            old: HashBytes::ZERO,
-            new: HashBytes::ZERO,
+            old: state_update_old,
+            new: state_update_new,
         })
         .context("Failed to build synthetic state_update")?,
         info: Lazy::new(&build_tx_info_from_v3(summary.description.as_ref()))
@@ -3384,9 +3469,13 @@ fn synthesize_tx_cell_from_v3(
     Ok((cell, tx))
 }
 
-/// Build a full `Message` cell from a v3 message summary. For external-in the source is
-/// forced to `addr_none` (matching how toncenter indexes external-ins). Body always goes
-/// into a reference, init (if present) into a reference as well.
+/// Build a full `Message` cell from a v3 message summary.
+///
+/// TL-B leaves two Either choices — init (inline vs ref) and body (inline vs ref) — unset
+/// by the summary. Toncenter doesn't report which branch the on-chain cell used, so we try
+/// every combination and pick the one whose `repr_hash` matches the summary's `hash`.
+/// Without this the synthesized tx's `repr_hash` can disagree with the on-chain hash on any
+/// transaction whose messages happened to be laid out differently than our fixed guess.
 fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
     let body_cell = match m.message_content.as_ref().and_then(|c| c.body.as_deref()) {
         Some(b) => Boc::decode_base64(b).context("Failed to decode message body BoC")?,
@@ -3398,21 +3487,70 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
     };
 
     let info = infer_msg_info_from_v3(m)?;
+    let expected_hash = m.hash.as_deref().and_then(|h| parse_hash_bytes(h).ok());
 
-    let ctx = Cell::empty_context();
-    let mut b = CellBuilder::new();
-    info.store_into(&mut b, ctx)?;
-    match init_cell {
-        Some(c) => {
-            b.store_bit_one()?; // Maybe.Just
-            b.store_bit_one()?; // Either.Right (ref)
-            b.store_reference(c)?;
+    let try_layout = |init_as_ref: bool, body_as_ref: bool| -> anyhow::Result<Cell> {
+        let ctx = Cell::empty_context();
+        let mut b = CellBuilder::new();
+        info.store_into(&mut b, ctx)?;
+        match &init_cell {
+            Some(c) => {
+                b.store_bit_one()?; // Maybe.Just
+                if init_as_ref {
+                    b.store_bit_one()?; // Either.Right (^StateInit)
+                    b.store_reference(c.clone())?;
+                } else {
+                    b.store_bit_zero()?; // Either.Left (inline StateInit)
+                    b.store_slice(c.as_slice_allow_exotic())?;
+                    for r in 0..c.reference_count() {
+                        b.store_reference(c.reference_cloned(r).expect("ref exists"))?;
+                    }
+                }
+            }
+            None => b.store_bit_zero()?, // Maybe.Nothing
         }
-        None => b.store_bit_zero()?, // Maybe.Nothing
+        if body_as_ref {
+            b.store_bit_one()?; // Either.Right (ref)
+            b.store_reference(body_cell.clone())?;
+        } else {
+            b.store_bit_zero()?; // Either.Left (inline)
+            b.store_slice(body_cell.as_slice_allow_exotic())?;
+            for r in 0..body_cell.reference_count() {
+                b.store_reference(body_cell.reference_cloned(r).expect("ref exists"))?;
+            }
+        }
+        Ok(b.build()?)
+    };
+
+    // Try (init_ref, body_ref) combinations. Prefer ref-form first since that's what
+    // toncenter emits when indexing messages, and it matches the majority of on-chain layouts.
+    let layouts: &[(bool, bool)] = match (init_cell.is_some(), expected_hash.is_some()) {
+        (true, true) => &[(true, true), (true, false), (false, true), (false, false)],
+        (false, true) => &[(true, true), (false, false), (true, false), (false, true)],
+        _ => &[(true, true)],
+    };
+
+    let mut last = None;
+    for &(init_as_ref, body_as_ref) in layouts {
+        match try_layout(init_as_ref, body_as_ref) {
+            Ok(cell) => {
+                if let Some(expected) = &expected_hash
+                    && cell.repr_hash() == expected
+                {
+                    return Ok(cell);
+                }
+                last = Some(cell);
+            }
+            Err(e) => {
+                // Inline-storage can fail if the inlined cell's bits/refs don't fit alongside
+                // the existing info prefix — fall through to the next layout rather than
+                // bailing the whole synthesis.
+                log::debug!("Message layout build failed ({init_as_ref},{body_as_ref}): {e:#}");
+            }
+        }
     }
-    b.store_bit_one()?; // body: Either.Right (ref)
-    b.store_reference(body_cell)?;
-    Ok(b.build()?)
+
+    last.ok_or_else(|| anyhow!("no buildable message layout for summary hash {:?}", m.hash))
 }
 
 /// Decide which `MsgInfo` variant a v3 message summary represents and pack its fields.
@@ -3442,7 +3580,11 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
                 .as_deref()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(0),
-            created_at: m.created_at.unwrap_or(0),
+            created_at: m
+                .created_at
+                .as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
         }))
     } else if m.source.is_none() {
         let dst = parse_int_addr(m.destination.as_deref())?
@@ -3464,14 +3606,18 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
                 .as_deref()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(0),
-            created_at: m.created_at.unwrap_or(0),
+            created_at: m
+                .created_at
+                .as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
         }))
     }
 }
 
 /// Translate a v3 transaction description into a minimal `TxInfo::Ordinary`. Fields we
-/// don't have (credit_phase, bounce_phase, storage_phase, per-phase cell hashes / message
-/// sizes) are left empty; compute and action phases preserve their success / gas /
+/// don't have (credit_phase, bounce_phase, per-phase cell hashes / message sizes) are left
+/// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
 fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
@@ -3492,7 +3638,7 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
 
     let compute_phase = match desc.compute_ph.as_ref() {
         Some(cp) if cp.skipped == Some(true) => ComputePhase::Skipped(SkippedComputePhase {
-            reason: ComputePhaseSkipReason::NoState,
+            reason: parse_compute_phase_skip_reason(cp.reason.as_deref()),
         }),
         Some(cp) => ComputePhase::Executed(tycho_types::models::ExecutedComputePhase {
             success: cp.success.unwrap_or(false),
@@ -3542,11 +3688,21 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
         }),
     };
 
+    let storage_phase = desc.storage_ph.as_ref().map(|sp| StoragePhase {
+        storage_fees_collected: parse_tokens_opt(sp.storage_fees_collected.as_deref()),
+        storage_fees_due: sp
+            .storage_fees_due
+            .as_deref()
+            .and_then(|s| s.parse::<u128>().ok())
+            .map(Tokens::new),
+        status_change: parse_account_status_change(sp.status_change.as_deref()),
+    });
+
     let action_phase = desc.action.as_ref().map(|ap| ActionPhase {
         success: ap.success.unwrap_or(false),
         valid: ap.valid.unwrap_or(false),
         no_funds: ap.no_funds.unwrap_or(false),
-        status_change: AccountStatusChange::Unchanged,
+        status_change: parse_account_status_change(ap.status_change.as_deref()),
         total_fwd_fees: ap
             .total_fwd_fees
             .as_deref()
@@ -3559,24 +3715,80 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
             .map(Tokens::new),
         result_code: ap.result_code.unwrap_or(0),
         result_arg: ap.result_arg,
-        total_actions: ap.total_actions.unwrap_or(0),
+        total_actions: ap.tot_actions.unwrap_or(0),
         special_actions: ap.spec_actions.unwrap_or(0),
         skipped_actions: ap.skipped_actions.unwrap_or(0),
         messages_created: ap.msgs_created.unwrap_or(0),
-        action_list_hash: HashBytes::ZERO,
-        total_message_size: StorageUsedShort::ZERO,
+        action_list_hash: ap
+            .action_list_hash
+            .as_deref()
+            .map(parse_hash_bytes)
+            .transpose()
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        total_message_size: ap
+            .tot_msg_size
+            .as_ref()
+            .map(|s| StorageUsedShort {
+                cells: s
+                    .cells
+                    .as_deref()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .map(tycho_types::num::VarUint56::new)
+                    .unwrap_or_default(),
+                bits: s
+                    .bits
+                    .as_deref()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .map(tycho_types::num::VarUint56::new)
+                    .unwrap_or_default(),
+            })
+            .unwrap_or_default(),
     });
+
+    let credit_phase = desc
+        .credit_ph
+        .as_ref()
+        .map(|cp| tycho_types::models::CreditPhase {
+            due_fees_collected: cp
+                .due_fees_collected
+                .as_deref()
+                .and_then(|s| s.parse::<u128>().ok())
+                .map(Tokens::new),
+            credit: CurrencyCollection {
+                tokens: parse_tokens_opt(cp.credit.as_deref()),
+                other: ExtraCurrencyCollection::new(),
+            },
+        });
 
     TxInfo::Ordinary(OrdinaryTxInfo {
         credit_first: desc.credit_first.unwrap_or(false),
-        storage_phase: None,
-        credit_phase: None,
+        storage_phase,
+        credit_phase,
         compute_phase,
         action_phase,
         aborted: desc.aborted.unwrap_or(false),
         bounce_phase: None,
         destroyed: desc.destroyed.unwrap_or(false),
     })
+}
+
+fn parse_compute_phase_skip_reason(s: Option<&str>) -> ComputePhaseSkipReason {
+    match s {
+        Some("bad_state") => ComputePhaseSkipReason::BadState,
+        Some("no_gas") => ComputePhaseSkipReason::NoGas,
+        Some("suspended") => ComputePhaseSkipReason::Suspended,
+        _ => ComputePhaseSkipReason::NoState,
+    }
+}
+
+fn parse_account_status_change(s: Option<&str>) -> AccountStatusChange {
+    match s {
+        Some("frozen") => AccountStatusChange::Frozen,
+        Some("deleted") => AccountStatusChange::Deleted,
+        _ => AccountStatusChange::Unchanged,
+    }
 }
 
 fn parse_account_hash(account: &str) -> anyhow::Result<HashBytes> {
