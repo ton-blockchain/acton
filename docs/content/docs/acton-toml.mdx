@@ -40,6 +40,7 @@ Examples:
 The top-level of `Acton.toml` contains the following sections:
 
 - `[package]` — Project metadata.
+- `[toolchain]` — Optional project Acton/Tolk version pins.
 - `[contracts]` — Definition of smart contracts in the project.
 - `[build]` — Build command output settings.
 - `[wrappers]` — Default output settings for `acton wrapper`.
@@ -74,6 +75,53 @@ version = "0.1.0"
 repository = "https://github.com/user/my-awesome-contract"
 license = "MIT"
 ```
+
+---
+
+## `[toolchain]` Section
+
+Pins the Acton toolchain used by project-aware commands such as `build`,
+`test`, `check`, `fmt`, `script`, `run`, `verify`, and `wrapper`.
+
+```toml
+[toolchain]
+acton = "0.3.0"
+tolk = "1.3.0"
+```
+
+| Field   | Type     | Required | Description |
+|:--------|:---------|:---------|:------------|
+| `acton` | `string` | No       | Exact Acton release to run. A leading `v` is accepted, but exact `X.Y.Z` versions are recommended. |
+| `tolk`  | `string` | No       | Exact bundled Tolk version required by the project. Partial versions such as `1.3` are rejected. |
+
+At least one field must be present when `[toolchain]` exists.
+
+Resolution rules:
+
+- `acton = "0.3.0"` selects that exact Acton release.
+- `tolk = "1.3.0"` uses the current Acton binary when it already ships exactly
+  Tolk `1.3.0`; otherwise it selects the newest stable non-yanked Acton release
+  that ships exactly Tolk `1.3.0`.
+- If both fields are set, the selected Acton release must ship that exact Tolk
+  version.
+- Project toolchains do not support `acton = "trunk"`.
+
+When the selected Acton release is installed under `~/.acton/toolchains/`,
+Acton re-executes it automatically. In an interactive terminal, Acton asks
+before installing a missing project toolchain. In CI, install explicitly:
+
+```bash
+acton toolchain install
+acton test
+```
+
+For one command, you can override the project pin with Cargo-style syntax:
+
+```bash
+acton +0.3.0 test
+```
+
+`+0.3.0` means an Acton toolchain version, not a Tolk version.
 
 ---
 

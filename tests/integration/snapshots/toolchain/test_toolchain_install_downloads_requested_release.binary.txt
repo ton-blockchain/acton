@@ -1,1 +1,6 @@
-toolchain-acton-0.4.0
+#!/bin/sh
+if [ "$1" = "-V" ] || [ "$1" = "--version" ]; then
+  echo 'acton 0.4.0 with Tolk 1.4.0'
+  exit 0
+fi
+echo 'toolchain-acton-0.4.0'

@@ -127,6 +127,9 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         )
         .unwrap();
     redactions
+        .insert("[DATE]", regex!(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"))
+        .unwrap();
+    redactions
         .insert("[DURATION]", regex!(r"duration='\d+'"))
         .unwrap();
     redactions
@@ -203,6 +206,12 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .unwrap();
     redactions
         .insert("[ACTON_VERSION]", format!("v{current_version}"))
+        .unwrap();
+    redactions
+        .insert(
+            "[TOOLCHAIN_TMP]",
+            regex!(r"\.[0-9]+\.[0-9]+\.[0-9]+\.[A-Za-z0-9]+"),
+        )
         .unwrap();
     redactions
         .insert(

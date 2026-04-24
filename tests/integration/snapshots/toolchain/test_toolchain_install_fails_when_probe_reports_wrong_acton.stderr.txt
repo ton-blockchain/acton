@@ -1,0 +1,2 @@
+Error: Installed toolchain at [ROOT]/.home/.acton/toolchains/[TOOLCHAIN_TMP]/acton reports Acton 0.4.1.
+Run `acton toolchain remove 0.4.0` and then `acton toolchain install 0.4.0`.

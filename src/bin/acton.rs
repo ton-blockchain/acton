@@ -1607,6 +1607,10 @@ fn apply_project_toolchain(
     }
 
     let config = load_project_toolchain_config()?;
+    if selector.is_none() && config.is_none() {
+        return Ok(());
+    }
+
     let environment = ToolchainEnvironment::runtime()?;
     let mut report = resolve_toolchain(config.as_ref(), selector, &environment)?;
 

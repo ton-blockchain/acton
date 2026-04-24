@@ -156,6 +156,13 @@ pub(super) const COMMAND_MANUALS: &[CommandManualSpec] = &[
         docs_description: "Reference manual for the acton up command",
     },
     CommandManualSpec {
+        command: "toolchain",
+        source_name: "acton-toolchain.md",
+        docs_slug: "toolchain",
+        docs_title: "acton toolchain",
+        docs_description: "Reference manual for the acton toolchain command",
+    },
+    CommandManualSpec {
         command: "help",
         source_name: "acton-help.md",
         docs_slug: "help",

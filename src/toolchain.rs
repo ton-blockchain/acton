@@ -1,13 +1,25 @@
 use acton_config::config::{ActonConfig, ToolchainConfig, manifest_path};
 use anyhow::{Context, Result, bail};
+use base64::Engine;
+use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
+use reqwest::blocking::Client;
+use reqwest::header::{
+    AUTHORIZATION, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED, USER_AGENT,
+};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const BUNDLED_TOOLCHAIN_INDEX_JSON: &str = include_str!("../toolchain-index.json");
+const TOOLCHAIN_INDEX_REPOSITORIES: [&str; 2] = ["i582/acton-public", "ton-blockchain/acton"];
+const TOOLCHAIN_INDEX_FILE: &str = "toolchain-index.json";
+const TOOLCHAIN_INDEX_CACHE_TTL_HOURS: i64 = 24;
+#[cfg(debug_assertions)]
+const TEST_TOOLCHAIN_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_TOOLCHAIN_GITHUB_API_BASE";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CliToolchainSelector {
@@ -40,28 +52,90 @@ pub struct ToolchainEnvironment {
     pub current_tolk: String,
     pub current_exe: PathBuf,
     pub index: Option<ToolchainIndex>,
-    pub installed: BTreeMap<String, PathBuf>,
+    pub index_warning: Option<String>,
+    pub installed: BTreeMap<String, InstalledToolchain>,
 }
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct InstalledToolchain {
+    pub binary_path: PathBuf,
+    pub release: Option<ToolchainReleaseMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+pub struct ToolchainReleaseMetadata {
+    pub schema: u32,
+    pub acton: String,
+    pub tolk: String,
+    pub target_triple: String,
+    #[serde(default)]
+    pub yanked: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yank_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 pub struct ToolchainIndex {
     schema: u32,
-    #[allow(dead_code)]
     generated_at: String,
     releases: Vec<ToolchainIndexRelease>,
 }
 
-#[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 pub struct ToolchainIndexRelease {
     pub acton: String,
     pub tolk: String,
-    #[allow(dead_code)]
     pub tag: String,
     #[serde(default)]
     pub stable: bool,
     #[serde(default)]
     pub yanked: bool,
     pub yank_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+pub struct ToolchainIndexCacheMeta {
+    pub schema: u32,
+    pub fetched_at: String,
+    pub source_repo: String,
+    pub source_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_modified: Option<String>,
+}
+
+struct ToolchainIndexLoad {
+    index: ToolchainIndex,
+    warning: Option<String>,
+}
+
+struct CachedToolchainIndex {
+    index: ToolchainIndex,
+    meta: Option<ToolchainIndexCacheMeta>,
+}
+
+enum RemoteToolchainIndex {
+    Fresh {
+        index: ToolchainIndex,
+        meta: ToolchainIndexCacheMeta,
+    },
+    NotModified {
+        meta: ToolchainIndexCacheMeta,
+    },
+}
+
+enum RepoFetchResult<T> {
+    Found(T),
+    NotModified,
+    Missing,
+    Failed(String),
+}
+
+#[derive(Deserialize)]
+struct GitHubContentResponse {
+    content: String,
+    encoding: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -171,39 +245,80 @@ pub fn load_project_toolchain_config() -> Result<Option<ToolchainConfig>> {
 
 impl ToolchainEnvironment {
     pub fn runtime() -> Result<Self> {
+        let index = ToolchainIndex::load_best_effort()?;
         Ok(Self {
             current_acton: crate::build_info::PACKAGE_VERSION.to_owned(),
             current_tolk: crate::build_info::TOLK_VERSION.to_owned(),
-            current_exe: std::env::current_exe().context("failed to resolve current executable")?,
-            index: Some(ToolchainIndex::load_best_effort()?),
+            current_exe: env::current_exe().context("failed to resolve current executable")?,
+            index: Some(index.index),
+            index_warning: index.warning,
             installed: scan_installed_toolchains(),
         })
     }
 }
 
 impl ToolchainIndex {
-    pub fn load_best_effort() -> Result<Self> {
-        if let Some(cache_path) = toolchain_index_cache_path()
-            && cache_path.exists()
-        {
-            match Self::read_from_path(&cache_path) {
-                Ok(index) => return Ok(index),
-                Err(err) => {
-                    eprintln!(
-                        "Warning: failed to read cached toolchain index at {}: {err}",
-                        cache_path.display()
-                    );
-                }
+    fn load_best_effort() -> Result<ToolchainIndexLoad> {
+        let cached = match read_cached_toolchain_index() {
+            Ok(cached) => cached,
+            Err(err) => {
+                eprintln!("Warning: failed to read cached toolchain index: {err}");
+                None
             }
+        };
+
+        if let Some(cached) = cached.as_ref()
+            && cached
+                .meta
+                .as_ref()
+                .is_some_and(toolchain_index_cache_is_fresh)
+        {
+            return Ok(ToolchainIndexLoad {
+                index: cached.index.clone(),
+                warning: None,
+            });
         }
 
-        Self::from_json(BUNDLED_TOOLCHAIN_INDEX_JSON)
-    }
+        match fetch_remote_toolchain_index(cached.as_ref().and_then(|cached| cached.meta.as_ref()))
+        {
+            Ok(RemoteToolchainIndex::Fresh { index, meta }) => {
+                let warning = write_toolchain_index_cache(&index, &meta).err().map(|err| {
+                    format!("fetched toolchain index but failed to update cache: {err}")
+                });
+                Ok(ToolchainIndexLoad { index, warning })
+            }
+            Ok(RemoteToolchainIndex::NotModified { meta }) => {
+                if let Some(cached) = cached {
+                    let warning = write_toolchain_index_cache(&cached.index, &meta)
+                        .err()
+                        .map(|err| {
+                            format!("refreshed toolchain index metadata but failed to update cache: {err}")
+                        });
+                    Ok(ToolchainIndexLoad {
+                        index: cached.index,
+                        warning,
+                    })
+                } else {
+                    bundled_toolchain_index_load(Some(
+                        "remote toolchain index returned 304 but no local cache exists".to_owned(),
+                    ))
+                }
+            }
+            Err(err) => {
+                if let Some(cached) = cached {
+                    return Ok(ToolchainIndexLoad {
+                        index: cached.index,
+                        warning: Some(format!(
+                            "failed to refresh toolchain index, using cached index: {err}"
+                        )),
+                    });
+                }
 
-    fn read_from_path(path: &Path) -> Result<Self> {
-        let json = fs::read_to_string(path)
-            .with_context(|| format!("failed to read toolchain index {}", path.display()))?;
-        Self::from_json(&json)
+                bundled_toolchain_index_load(Some(format!(
+                    "failed to fetch toolchain index, using bundled index: {err}"
+                )))
+            }
+        }
     }
 
     fn from_json(json: &str) -> Result<Self> {
@@ -213,17 +328,42 @@ impl ToolchainIndex {
         Ok(index)
     }
 
+    pub fn from_json_for_tests(json: &str) -> Result<Self> {
+        Self::from_json(json)
+    }
+
+    fn to_pretty_json(&self) -> Result<String> {
+        let mut json = serde_json::to_string_pretty(self)?;
+        json.push('\n');
+        Ok(json)
+    }
+
     fn validate(&self) -> Result<()> {
         if self.schema != 1 {
             bail!("unsupported toolchain index schema {}", self.schema);
         }
 
+        parse_toolchain_index_generated_at(&self.generated_at)?;
+
         for release in &self.releases {
             parse_exact_semver("toolchain index acton version", &release.acton)?;
             parse_exact_semver("toolchain index tolk version", &release.tolk)?;
+            if release.tag != format!("v{}", release.acton) {
+                bail!(
+                    "toolchain index tag for Acton {} must be v{}",
+                    release.acton,
+                    release.acton
+                );
+            }
         }
 
         Ok(())
+    }
+
+    fn read_from_path(path: &Path) -> Result<Self> {
+        let json = fs::read_to_string(path)
+            .with_context(|| format!("failed to read toolchain index {}", path.display()))?;
+        Self::from_json(&json)
     }
 
     fn release_for_acton(&self, acton: &str) -> Option<&ToolchainIndexRelease> {
@@ -266,6 +406,270 @@ impl ToolchainIndex {
         versions.dedup();
         versions
     }
+
+    fn supported_acton_versions_for_tolk(&self, tolk: &str) -> Vec<&str> {
+        let mut releases = self
+            .releases
+            .iter()
+            .filter(|release| release.tolk == tolk && release.stable && !release.yanked)
+            .filter_map(|release| {
+                parse_exact_semver("toolchain index acton version", &release.acton)
+                    .ok()
+                    .map(|version| (version, release.acton.as_str()))
+            })
+            .collect::<Vec<_>>();
+        releases.sort_by(|(left, _), (right, _)| left.cmp(right));
+        releases.into_iter().map(|(_, acton)| acton).collect()
+    }
+}
+
+fn bundled_toolchain_index_load(warning: Option<String>) -> Result<ToolchainIndexLoad> {
+    Ok(ToolchainIndexLoad {
+        index: ToolchainIndex::from_json(BUNDLED_TOOLCHAIN_INDEX_JSON)?,
+        warning,
+    })
+}
+
+fn read_cached_toolchain_index() -> Result<Option<CachedToolchainIndex>> {
+    let Some(index_path) = toolchain_index_cache_path() else {
+        return Ok(None);
+    };
+    if !index_path.exists() {
+        return Ok(None);
+    }
+
+    let index = ToolchainIndex::read_from_path(&index_path)?;
+    let meta = toolchain_index_meta_cache_path()
+        .filter(|path| path.exists())
+        .and_then(|path| match read_toolchain_index_cache_meta(&path) {
+            Ok(meta) => Some(meta),
+            Err(err) => {
+                eprintln!("Warning: failed to read cached toolchain index metadata: {err}");
+                None
+            }
+        });
+
+    Ok(Some(CachedToolchainIndex { index, meta }))
+}
+
+fn read_toolchain_index_cache_meta(path: &Path) -> Result<ToolchainIndexCacheMeta> {
+    let json = fs::read_to_string(path)
+        .with_context(|| format!("failed to read toolchain index metadata {}", path.display()))?;
+    let meta: ToolchainIndexCacheMeta =
+        serde_json::from_str(&json).context("failed to parse toolchain index metadata JSON")?;
+    if meta.schema != 1 {
+        bail!(
+            "unsupported toolchain index metadata schema {}",
+            meta.schema
+        );
+    }
+    Ok(meta)
+}
+
+fn write_toolchain_index_cache(
+    index: &ToolchainIndex,
+    meta: &ToolchainIndexCacheMeta,
+) -> Result<()> {
+    let store_dir = toolchain_store_dir()?;
+    fs::create_dir_all(&store_dir)?;
+
+    let index_path = store_dir.join("index.json");
+    let meta_path = store_dir.join("index-meta.json");
+
+    fs::write(&index_path, index.to_pretty_json()?)
+        .with_context(|| format!("failed to write {}", index_path.display()))?;
+
+    let mut meta_json = serde_json::to_string_pretty(meta)?;
+    meta_json.push('\n');
+    fs::write(&meta_path, meta_json)
+        .with_context(|| format!("failed to write {}", meta_path.display()))?;
+
+    Ok(())
+}
+
+fn toolchain_index_cache_is_fresh(meta: &ToolchainIndexCacheMeta) -> bool {
+    parse_toolchain_index_generated_at(&meta.fetched_at)
+        .map(|fetched_at| Utc::now().signed_duration_since(fetched_at))
+        .is_ok_and(|age| age <= ChronoDuration::hours(TOOLCHAIN_INDEX_CACHE_TTL_HOURS))
+}
+
+fn parse_toolchain_index_generated_at(value: &str) -> Result<DateTime<Utc>> {
+    Ok(DateTime::parse_from_rfc3339(value)
+        .with_context(|| format!("invalid RFC3339 timestamp `{value}`"))?
+        .with_timezone(&Utc))
+}
+
+fn fetch_remote_toolchain_index(
+    cached_meta: Option<&ToolchainIndexCacheMeta>,
+) -> Result<RemoteToolchainIndex> {
+    let client = Client::new();
+    let token = env::var("GITHUB_TOKEN").ok();
+    let mut errors = Vec::new();
+
+    for repo in TOOLCHAIN_INDEX_REPOSITORIES {
+        match fetch_remote_toolchain_index_from_repo(&client, &token, repo, cached_meta) {
+            RepoFetchResult::Found(index) => return Ok(index),
+            RepoFetchResult::NotModified => {
+                let mut meta = cached_meta.cloned().context(
+                    "remote toolchain index was not modified but no cache metadata exists",
+                )?;
+                meta.fetched_at = current_timestamp();
+                return Ok(RemoteToolchainIndex::NotModified { meta });
+            }
+            RepoFetchResult::Missing => {}
+            RepoFetchResult::Failed(err) => errors.push(err),
+        }
+    }
+
+    if errors.is_empty() {
+        bail!(
+            "{} was not found in {}",
+            TOOLCHAIN_INDEX_FILE,
+            TOOLCHAIN_INDEX_REPOSITORIES.join(", ")
+        );
+    }
+
+    bail!("{}", errors.join("; "))
+}
+
+fn fetch_remote_toolchain_index_from_repo(
+    client: &Client,
+    token: &Option<String>,
+    repo: &str,
+    cached_meta: Option<&ToolchainIndexCacheMeta>,
+) -> RepoFetchResult<RemoteToolchainIndex> {
+    let url = format!(
+        "{}/contents/{}",
+        github_api_base_for_repo(repo),
+        TOOLCHAIN_INDEX_FILE
+    );
+    let mut request = client
+        .get(&url)
+        .header(USER_AGENT, crate::build_info::user_agent());
+
+    if let Some(token) = token {
+        request = request.header(AUTHORIZATION, format!("token {token}"));
+    }
+
+    if let Some(meta) = cached_meta
+        && meta.source_repo == repo
+    {
+        if let Some(etag) = meta.etag.as_deref() {
+            request = request.header(IF_NONE_MATCH, etag);
+        }
+        if let Some(last_modified) = meta.last_modified.as_deref() {
+            request = request.header(IF_MODIFIED_SINCE, last_modified);
+        }
+    }
+
+    let response = match request.send() {
+        Ok(response) => response,
+        Err(err) => {
+            return RepoFetchResult::Failed(format!(
+                "could not reach GitHub contents API for {repo}: {err}"
+            ));
+        }
+    };
+
+    if response.status().as_u16() == 304 {
+        return RepoFetchResult::NotModified;
+    }
+    if response.status().as_u16() == 404 {
+        return RepoFetchResult::Missing;
+    }
+    if !response.status().is_success() {
+        return RepoFetchResult::Failed(format!(
+            "GitHub contents API returned {} for {repo}",
+            response.status()
+        ));
+    }
+
+    let etag = response
+        .headers()
+        .get(ETAG)
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    let last_modified = response
+        .headers()
+        .get(LAST_MODIFIED)
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+
+    let body: GitHubContentResponse = match response.json() {
+        Ok(body) => body,
+        Err(err) => {
+            return RepoFetchResult::Failed(format!(
+                "GitHub contents API returned invalid JSON for {repo}: {err}"
+            ));
+        }
+    };
+
+    let json = match decode_github_content(&body) {
+        Ok(json) => json,
+        Err(err) => {
+            return RepoFetchResult::Failed(format!(
+                "GitHub contents API returned invalid {TOOLCHAIN_INDEX_FILE} for {repo}: {err}"
+            ));
+        }
+    };
+
+    let index = match ToolchainIndex::from_json(&json) {
+        Ok(index) => index,
+        Err(err) => {
+            return RepoFetchResult::Failed(format!(
+                "GitHub contents API returned invalid toolchain index for {repo}: {err}"
+            ));
+        }
+    };
+
+    let meta = ToolchainIndexCacheMeta {
+        schema: 1,
+        fetched_at: current_timestamp(),
+        source_repo: repo.to_owned(),
+        source_ref: "default".to_owned(),
+        etag,
+        last_modified,
+    };
+
+    RepoFetchResult::Found(RemoteToolchainIndex::Fresh { index, meta })
+}
+
+fn decode_github_content(body: &GitHubContentResponse) -> Result<String> {
+    if body.encoding != "base64" {
+        bail!("unsupported content encoding `{}`", body.encoding);
+    }
+
+    let encoded = body.content.lines().collect::<String>();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .context("failed to decode base64 content")?;
+
+    String::from_utf8(bytes).context("toolchain index content is not UTF-8")
+}
+
+fn github_api_base_for_repo(repo: &str) -> String {
+    if let Some(base) = test_toolchain_github_api_base_override() {
+        let base = base.trim().trim_end_matches('/');
+        if !base.is_empty() {
+            return format!("{base}/repos/{repo}");
+        }
+    }
+
+    format!("https://api.github.com/repos/{repo}")
+}
+
+#[cfg(debug_assertions)]
+fn test_toolchain_github_api_base_override() -> Option<String> {
+    env::var(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV).ok()
+}
+
+#[cfg(not(debug_assertions))]
+fn test_toolchain_github_api_base_override() -> Option<String> {
+    None
+}
+
+fn current_timestamp() -> String {
+    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 fn project_request(config: Option<&ToolchainConfig>) -> Result<ToolchainRequest> {
@@ -305,15 +709,23 @@ fn resolve_acton_request(
         .index
         .as_ref()
         .and_then(|index| index.release_for_acton(acton));
+    let installed = environment.installed.get(acton);
+    let installed_metadata = installed.and_then(|installed| installed.release.as_ref());
 
     if let Some(release) = release
         && release.yanked
     {
         bail_yanked_release(release)?;
     }
+    if let Some(metadata) = installed_metadata
+        && metadata.yanked
+    {
+        bail_yanked_metadata(acton, metadata.yank_reason.as_deref())?;
+    }
 
     let bundled_tolk = release
         .map(|release| release.tolk.as_str())
+        .or_else(|| installed_metadata.map(|metadata| metadata.tolk.as_str()))
         .or_else(|| {
             (acton == environment.current_acton).then_some(environment.current_tolk.as_str())
         })
@@ -323,7 +735,13 @@ fn resolve_acton_request(
         && bundled_tolk != requested_tolk
     {
         bail!(
-            "Acton.toml requests acton {acton} and tolk {requested_tolk}, but acton {acton} ships tolk {bundled_tolk}.\n\nSet `tolk = \"{bundled_tolk}\"`, or remove the `acton` pin so Acton can choose a compatible release."
+            "{}",
+            conflicting_project_pins_message(
+                acton,
+                requested_tolk,
+                bundled_tolk,
+                environment.index.as_ref()
+            )
         );
     }
 
@@ -332,6 +750,7 @@ fn resolve_acton_request(
         acton,
         bundled_tolk,
         release,
+        installed,
         environment,
     ))
 }
@@ -361,6 +780,7 @@ fn resolve_tolk_request(
         &release.acton,
         &release.tolk,
         Some(release),
+        environment.installed.get(&release.acton),
         environment,
     ))
 }
@@ -389,24 +809,28 @@ fn report_for_acton(
     acton: &str,
     tolk: &str,
     release: Option<&ToolchainIndexRelease>,
+    installed: Option<&InstalledToolchain>,
     environment: &ToolchainEnvironment,
 ) -> ToolchainResolveReport {
-    let yanked = release.is_some_and(|release| release.yanked);
-    let yank_reason = release.and_then(|release| release.yank_reason.clone());
+    let local_metadata = installed.and_then(|installed| installed.release.as_ref());
+    let yanked = release.is_some_and(|release| release.yanked)
+        || local_metadata.is_some_and(|metadata| metadata.yanked);
+    let yank_reason = release
+        .and_then(|release| release.yank_reason.clone())
+        .or_else(|| local_metadata.and_then(|metadata| metadata.yank_reason.clone()));
 
     if acton == environment.current_acton {
         return report_for_current(source, environment, yanked, yank_reason);
     }
 
-    let path = environment.installed.get(acton).cloned();
     ToolchainResolveReport {
         source,
         acton: acton.to_owned(),
         tolk: tolk.to_owned(),
         current: false,
-        installed: path.is_some(),
-        install_required: path.is_none(),
-        path: path.map(|path| path.display().to_string()),
+        installed: installed.is_some(),
+        install_required: installed.is_none(),
+        path: installed.map(|installed| installed.binary_path.display().to_string()),
         yanked,
         yank_reason,
     }
@@ -428,6 +852,42 @@ fn bail_yanked_release(release: &ToolchainIndexRelease) -> Result<()> {
         }
         _ => bail!("Acton {} is yanked", release.acton),
     }
+}
+
+fn bail_yanked_metadata(acton: &str, reason: Option<&str>) -> Result<()> {
+    match reason {
+        Some(reason) if !reason.trim().is_empty() => {
+            bail!("Acton {acton} is yanked: {reason}")
+        }
+        _ => bail!("Acton {acton} is yanked"),
+    }
+}
+
+fn conflicting_project_pins_message(
+    acton: &str,
+    requested_tolk: &str,
+    bundled_tolk: &str,
+    index: Option<&ToolchainIndex>,
+) -> String {
+    let mut message = format!(
+        "Acton.toml requests acton {acton} and tolk {requested_tolk}, but acton {acton} ships tolk {bundled_tolk}."
+    );
+
+    if let Some(index) = index {
+        let known = index.supported_acton_versions_for_tolk(requested_tolk);
+        if let Some(recommended) = known.last() {
+            message.push_str(&format!(
+                "\nKnown Acton releases for Tolk {requested_tolk}: {}.\nRecommended fix:\n  [toolchain]\n  acton = \"{recommended}\"\n  tolk = \"{requested_tolk}\"\n\nOr remove the `acton` pin and keep `tolk = \"{requested_tolk}\"` so Acton can choose the newest supported release.\nThen run `acton toolchain install`.",
+                known.join(", ")
+            ));
+            return message;
+        }
+    }
+
+    message.push_str(&format!(
+        "\nChoose one fix:\n  1. Change `[toolchain].acton` to an Acton release that ships Tolk {requested_tolk}.\n  2. Remove `[toolchain].acton` and keep `tolk = \"{requested_tolk}\"` so Acton can choose the newest supported release.\nThen run `acton toolchain install`."
+    ));
+    message
 }
 
 fn unknown_acton_message(acton: &str, index: Option<&ToolchainIndex>) -> String {
@@ -537,11 +997,15 @@ fn help_or_version_command_name(arg: &OsStr) -> &'static str {
     }
 }
 
-fn toolchain_index_cache_path() -> Option<PathBuf> {
+pub fn toolchain_index_cache_path() -> Option<PathBuf> {
     Some(optional_toolchain_store_dir()?.join("index.json"))
 }
 
-fn scan_installed_toolchains() -> BTreeMap<String, PathBuf> {
+pub fn toolchain_index_meta_cache_path() -> Option<PathBuf> {
+    Some(optional_toolchain_store_dir()?.join("index-meta.json"))
+}
+
+fn scan_installed_toolchains() -> BTreeMap<String, InstalledToolchain> {
     let Some(store_dir) = optional_toolchain_store_dir() else {
         return BTreeMap::new();
     };
@@ -559,9 +1023,38 @@ fn scan_installed_toolchains() -> BTreeMap<String, PathBuf> {
             }
 
             let binary_path = entry.path().join(acton_binary_name());
-            binary_path.is_file().then_some((version, binary_path))
+            binary_path.is_file().then(|| {
+                let release = read_installed_toolchain_metadata(&entry.path())
+                    .ok()
+                    .flatten();
+                (
+                    version,
+                    InstalledToolchain {
+                        binary_path,
+                        release,
+                    },
+                )
+            })
         })
         .collect()
+}
+
+fn read_installed_toolchain_metadata(dir: &Path) -> Result<Option<ToolchainReleaseMetadata>> {
+    let path = dir.join("release.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let json = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read toolchain metadata {}", path.display()))?;
+    let metadata: ToolchainReleaseMetadata =
+        serde_json::from_str(&json).context("failed to parse toolchain metadata JSON")?;
+    if metadata.schema != 1 {
+        bail!("unsupported toolchain metadata schema {}", metadata.schema);
+    }
+    parse_exact_semver("toolchain metadata acton version", &metadata.acton)?;
+    parse_exact_semver("toolchain metadata tolk version", &metadata.tolk)?;
+    Ok(Some(metadata))
 }
 
 pub fn toolchain_store_dir() -> Result<PathBuf> {
@@ -583,9 +1076,9 @@ fn optional_toolchain_store_dir() -> Option<PathBuf> {
 
 fn home_dir() -> Option<PathBuf> {
     #[cfg(windows)]
-    let home = std::env::var_os("USERPROFILE");
+    let home = env::var_os("USERPROFILE");
     #[cfg(not(windows))]
-    let home = std::env::var_os("HOME");
+    let home = env::var_os("HOME");
 
     home.map(PathBuf::from)
 }
@@ -619,6 +1112,7 @@ mod tests {
             current_tolk: "1.3.0".to_owned(),
             current_exe: PathBuf::from("/bin/acton"),
             index: Some(index),
+            index_warning: None,
             installed: BTreeMap::new(),
         }
     }

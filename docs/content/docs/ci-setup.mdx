@@ -45,6 +45,9 @@ jobs:
       - name: Verify version
         run: acton --version
 
+      - name: Install project toolchain
+        run: acton toolchain install
+
       - name: Build
         run: acton build
 
@@ -57,6 +60,12 @@ jobs:
       - name: Format check
         run: acton fmt --check
 ```
+
+`acton toolchain install` is a no-op when the current Acton binary already
+satisfies the project `[toolchain]` pin. When the project requires a different
+Acton release, it installs that side-by-side under `~/.acton/toolchains/` before
+the non-interactive CI commands run. CI jobs should use this explicit preinstall
+step instead of relying on interactive auto-install prompts.
 
 ## Wallets and Secrets in CI
 
@@ -106,6 +115,9 @@ jobs:
 
       - name: Verify version
         run: acton --version
+
+      - name: Install project toolchain
+        run: acton toolchain install
 
       - name: Build
         run: acton build

@@ -2,18 +2,24 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use fs2::FileExt;
 use inquire::Confirm;
-use serde::Serialize;
 use std::fs::{self, OpenOptions};
 use std::io::{IsTerminal, stdin, stdout};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::commands::up::client::{GitHubClient, ReleaseClient};
 use crate::commands::up::workflow::{download_verified_release_archive, extract_acton_binary};
 use crate::toolchain::{
-    CliToolchainSelector, ToolchainEnvironment, ToolchainResolveReport,
+    CliToolchainSelector, ToolchainEnvironment, ToolchainReleaseMetadata, ToolchainResolveReport,
     installed_toolchain_binary_path, installed_toolchain_dir, load_project_toolchain_config,
     normalize_explicit_acton_version, resolve_toolchain, toolchain_store_dir,
 };
+
+const DEFAULT_TOOLCHAIN_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(debug_assertions)]
+const TEST_TOOLCHAIN_LOCK_TIMEOUT_MS_ENV: &str = "ACTON_TEST_TOOLCHAIN_LOCK_TIMEOUT_MS";
 
 #[derive(Subcommand, Clone)]
 pub enum ToolchainCommand {
@@ -46,24 +52,25 @@ pub fn toolchain_cmd(command: ToolchainCommand) -> Result<()> {
 }
 
 fn install_cmd(version: Option<String>) -> Result<()> {
-    let environment = ToolchainEnvironment::runtime()?;
-    let report = match version {
-        Some(version) => {
-            let selector = CliToolchainSelector {
-                acton: normalize_explicit_acton_version(&version)?,
-            };
-            resolve_toolchain(None, Some(&selector), &environment)?
-        }
-        None => {
-            let config = load_project_toolchain_config()?;
-            let Some(config) = config else {
-                anyhow::bail!(
-                    "`acton toolchain install` requires a project [toolchain] section or an explicit Acton version.\nRun `acton toolchain install 0.3.0` or add [toolchain] to Acton.toml."
-                );
-            };
-            resolve_toolchain(Some(&config), None, &environment)?
-        }
+    let selector = version
+        .as_deref()
+        .map(normalize_explicit_acton_version)
+        .transpose()?
+        .map(|acton| CliToolchainSelector { acton });
+    let config = if selector.is_none() {
+        let config = load_project_toolchain_config()?;
+        let Some(config) = config else {
+            anyhow::bail!(
+                "`acton toolchain install` requires a project [toolchain] section or an explicit Acton version.\nRun `acton toolchain install 0.3.0` or add [toolchain] to Acton.toml."
+            );
+        };
+        Some(config)
+    } else {
+        None
     };
+    let environment = ToolchainEnvironment::runtime()?;
+    print_index_warning(&environment);
+    let report = resolve_toolchain(config.as_ref(), selector.as_ref(), &environment)?;
 
     if report.current {
         println!(
@@ -119,7 +126,7 @@ fn remove_cmd(version: String) -> Result<()> {
         .create(true)
         .truncate(false)
         .open(&lock_path)?;
-    lock.lock_exclusive()?;
+    lock_toolchain_version(&lock, &version)?;
 
     let result = remove_toolchain_locked(&version, &target_dir);
     let _ = lock.unlock();
@@ -128,13 +135,14 @@ fn remove_cmd(version: String) -> Result<()> {
 
 fn list_cmd() -> Result<()> {
     let environment = ToolchainEnvironment::runtime()?;
+    print_index_warning(&environment);
 
     if environment.installed.is_empty() {
         println!("Installed toolchains: none");
     } else {
         println!("Installed toolchains:");
-        for (version, path) in &environment.installed {
-            println!("  {version}  {}", path.display());
+        for (version, installed) in &environment.installed {
+            println!("  {version}  {}", installed.binary_path.display());
         }
     }
 
@@ -184,6 +192,7 @@ fn which_cmd() -> Result<()> {
 fn resolve_cmd() -> Result<()> {
     let config = load_project_toolchain_config()?;
     let environment = ToolchainEnvironment::runtime()?;
+    print_index_warning(&environment);
     let report = resolve_toolchain(config.as_ref(), None, &environment)?;
 
     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -204,7 +213,7 @@ pub fn install_toolchain(report: &ToolchainResolveReport) -> Result<PathBuf> {
         .create(true)
         .truncate(false)
         .open(&lock_path)?;
-    lock.lock_exclusive()?;
+    lock_toolchain_version(&lock, &report.acton)?;
 
     let result = install_toolchain_locked(report, &target_dir, &target_binary, &store_dir);
     let _ = lock.unlock();
@@ -243,6 +252,7 @@ fn install_toolchain_locked(
         let temp_binary = temp_dir.path().join(acton_binary_name());
         fs::copy(&extracted.path, &temp_binary)?;
         set_executable_permissions(&temp_binary)?;
+        probe_installed_toolchain(&temp_binary, report)?;
         write_release_metadata(temp_dir.path(), report)?;
 
         let temp_path = temp_dir.keep();
@@ -289,6 +299,106 @@ fn confirm_toolchain_removal(version: &str, target_dir: &Path) -> Result<bool> {
     .context("Failed to read toolchain removal confirmation")
 }
 
+fn print_index_warning(environment: &ToolchainEnvironment) {
+    if let Some(warning) = environment.index_warning.as_deref() {
+        eprintln!("Warning: {warning}");
+    }
+}
+
+fn lock_toolchain_version(lock: &fs::File, version: &str) -> Result<()> {
+    let timeout = toolchain_lock_timeout();
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        match lock.try_lock_exclusive() {
+            Ok(()) => return Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                if Instant::now() >= deadline {
+                    anyhow::bail!(
+                        "Another Acton process is installing {version} and the install lock timed out.\nTry again after the other process exits."
+                    );
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Failed to lock toolchain install for {version}"));
+            }
+        }
+    }
+}
+
+fn toolchain_lock_timeout() -> Duration {
+    #[cfg(debug_assertions)]
+    if let Ok(value) = std::env::var(TEST_TOOLCHAIN_LOCK_TIMEOUT_MS_ENV)
+        && let Ok(millis) = value.parse::<u64>()
+    {
+        return Duration::from_millis(millis);
+    }
+
+    DEFAULT_TOOLCHAIN_LOCK_TIMEOUT
+}
+
+fn probe_installed_toolchain(binary: &Path, report: &ToolchainResolveReport) -> Result<()> {
+    let output = Command::new(binary).arg("-V").output().with_context(|| {
+        format!(
+            "Failed to execute installed toolchain at {}",
+            binary.display()
+        )
+    })?;
+
+    if !output.status.success() {
+        anyhow::bail!(
+            "Installed toolchain at {} failed version probe with status {}.\nRun `acton toolchain remove {}` and then `acton toolchain install {}`.",
+            binary.display(),
+            output.status,
+            report.acton,
+            report.acton
+        );
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let (acton, tolk) = parse_version_probe_output(&stdout).with_context(|| {
+        format!(
+            "Installed toolchain at {} did not report Acton and Tolk versions",
+            binary.display()
+        )
+    })?;
+
+    if acton != report.acton {
+        anyhow::bail!(
+            "Installed toolchain at {} reports Acton {}.\nRun `acton toolchain remove {}` and then `acton toolchain install {}`.",
+            binary.display(),
+            acton,
+            report.acton,
+            report.acton
+        );
+    }
+
+    if tolk != report.tolk {
+        anyhow::bail!(
+            "Acton {} was selected for Tolk {}, but {} reports Tolk {}.\nUpdate the toolchain index or reinstall the toolchain.",
+            report.acton,
+            report.tolk,
+            binary.display(),
+            tolk
+        );
+    }
+
+    Ok(())
+}
+
+fn parse_version_probe_output(stdout: &str) -> Result<(String, String)> {
+    let text = stdout.trim();
+    let Some(rest) = text.strip_prefix("acton ") else {
+        anyhow::bail!("missing `acton` prefix");
+    };
+    let Some((acton, tolk)) = rest.split_once(" with Tolk ") else {
+        anyhow::bail!("missing bundled Tolk version");
+    };
+    Ok((acton.trim().to_owned(), tolk.trim().to_owned()))
+}
+
 fn current_exe_is(path: &Path) -> Result<bool> {
     let current_exe = std::env::current_exe().context("failed to resolve current executable")?;
     if current_exe == path {
@@ -307,27 +417,16 @@ fn current_exe_is(path: &Path) -> Result<bool> {
 fn write_release_metadata(path: &Path, report: &ToolchainResolveReport) -> Result<()> {
     let metadata = ToolchainReleaseMetadata {
         schema: 1,
-        acton: &report.acton,
-        tolk: &report.tolk,
-        target_triple: env!("TARGET_TRIPLE"),
+        acton: report.acton.clone(),
+        tolk: report.tolk.clone(),
+        target_triple: env!("TARGET_TRIPLE").to_owned(),
         yanked: report.yanked,
-        yank_reason: report.yank_reason.as_deref(),
+        yank_reason: report.yank_reason.clone(),
     };
     let mut json = serde_json::to_string_pretty(&metadata)?;
     json.push('\n');
     fs::write(path.join("release.json"), json)?;
     Ok(())
-}
-
-#[derive(Serialize)]
-struct ToolchainReleaseMetadata<'a> {
-    schema: u32,
-    acton: &'a str,
-    tolk: &'a str,
-    target_triple: &'static str,
-    yanked: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    yank_reason: Option<&'a str>,
 }
 
 fn set_executable_permissions(path: &Path) -> Result<()> {
@@ -365,11 +464,11 @@ mod tests {
         };
         let metadata = ToolchainReleaseMetadata {
             schema: 1,
-            acton: &report.acton,
-            tolk: &report.tolk,
-            target_triple: "test-target",
+            acton: report.acton.clone(),
+            tolk: report.tolk.clone(),
+            target_triple: "test-target".to_owned(),
             yanked: report.yanked,
-            yank_reason: report.yank_reason.as_deref(),
+            yank_reason: report.yank_reason,
         };
 
         let json = serde_json::to_string(&metadata).expect("metadata must serialize");
@@ -377,5 +476,13 @@ mod tests {
         assert!(json.contains("\"acton\":\"0.3.0\""));
         assert!(json.contains("\"tolk\":\"1.3.0\""));
         assert!(json.contains("\"target_triple\":\"test-target\""));
+    }
+
+    #[test]
+    fn parses_version_probe_output() {
+        let (acton, tolk) = parse_version_probe_output("acton 0.3.0 with Tolk 1.3.0\n").unwrap();
+
+        assert_eq!(acton, "0.3.0");
+        assert_eq!(tolk, "1.3.0");
     }
 }
