@@ -1,4 +1,5 @@
 import "@stdlib/reflection"
+import "@local-acton/types/array"
 import "@local-acton/io"
 import "@local-acton/build"
 import "@local-acton/fmt"
@@ -208,29 +209,6 @@ get fun `test predicate mixed`() {
     });
 }
 
-fun array<T>.map<U>(self, f: (T -> U)): array<U> {
-    var res: array<U> = [];
-    var i = 0;
-    repeat (self.size()) {
-        res.push(f(self.get(i)));
-        i += 1;
-    }
-    return res;
-}
-
-fun array<T>.filter(self, f: (T -> bool)): array<T> {
-    var res: array<T> = [];
-    var i = 0;
-    repeat (self.size()) {
-        val item = self.get(i);
-        if (f(item)) {
-            res.push(item);
-        }
-        i += 1;
-    }
-    return res;
-}
-
 get fun `test map and filter`() {
     val nums: array<int> = [
         1,
@@ -288,6 +266,30 @@ get fun `test map and filter`() {
     expect(scaled.size()).toEqual(5);
     expect(scaled.get(0)).toEqual(42);
     expect(scaled.get(4)).toEqual(70);
+}
+
+get fun `test each`() {
+    // each on empty array never calls the callback
+    val empty: array<int> = [];
+    empty.each(fun(_x: int) {
+        Assert.fail("each should not call callback on empty array");
+    });
+
+    // each passes correct values
+    val nums: array<int> = [2, 4, 6];
+    nums.each(fun(x: int) {
+        if (x <= 0 || x > 6) {
+            Assert.fail("each passed unexpected value");
+        }
+    });
+
+    // each with closure capturing outer state
+    val threshold = 3;
+    nums.each(fun(x: int) {
+        if (x <= threshold && x != 2) {
+            Assert.fail("each closure did not capture outer state correctly");
+        }
+    });
 }
 
 /// Test negative: inline lambda that never matches
