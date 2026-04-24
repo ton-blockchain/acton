@@ -1,0 +1,54 @@
+# NFT App Template
+
+Original FunC: [ton-blockchain/nft-contract](https://github.com/ton-blockchain/nft-contract).
+
+This project was generated from Acton's `nft` template with
+TypeScript app scaffold enabled. It includes NFT collection and item contracts,
+Tolk tests and wrappers under `contracts/`, generated TypeScript wrappers in
+`wrappers-ts/`, and a Vite-based React app in `app/`.
+
+## Layout
+
+- `contracts/src` contains the NFT collection and item contracts with shared types, messages, and errors.
+- `contracts/tests` contains integration tests for collection and item behavior.
+- `contracts/wrappers` contains Tolk wrappers used by tests and scripts.
+- `contracts/scripts` contains deployment and management scripts.
+- `wrappers-ts/` contains generated TypeScript wrappers consumed by the app.
+- `app/` contains the React + Vite frontend with TON Connect wallet integration.
+- `package.json`, `tsconfig.json`, and `vite.config.ts` configure the app toolchain.
+- `package-lock.json` pins the npm dependency tree for reproducible installs.
+
+## Install
+
+```bash
+npm ci
+```
+
+## Commands
+
+```bash
+acton build
+acton test
+npm run build
+npm run typecheck
+npm run fmt:check
+npm run dev
+```
+
+## Scripts
+
+- `acton script contracts/scripts/deployCollection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
+- `acton script contracts/scripts/deployItem.tolk` — mints a single NFT item into an existing collection.
+- `acton script contracts/scripts/deployBatch.tolk` — batch-mints multiple items in a single transaction.
+- `acton script contracts/scripts/transferItem.tolk` — transfers an NFT item to a new owner.
+- `acton script contracts/scripts/changeAdmin.tolk` — changes the admin address of an existing collection.
+
+## Notes
+
+- `acton build` compiles the contracts using `contracts/src/NftCollection.tolk` and `contracts/src/NftItem.tolk`.
+- `npm run build` runs the contract build and the frontend build.
+- `npm run test` delegates to `acton test`.
+- The app reads blockchain data through Toncenter. Set
+  `VITE_TONCENTER_API_KEY` in `.env` if you need higher rate limits. For Acton
+  CLI flows against testnet/mainnet, the generated `.env` is also the easiest
+  place to keep `TONCENTER_TESTNET_API_KEY` and `TONCENTER_MAINNET_API_KEY`.
