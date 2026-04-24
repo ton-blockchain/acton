@@ -20,7 +20,7 @@ Using `Errors.SomeName` keeps custom exit codes consistent across contracts, tes
 Bare constants such as `ERR_NOT_OWNER` are harder to discover and produce inconsistent symbolic names.
 
 ### Example
-```tolk
+```tolk twoslash
 struct Storage {
     ownerAddress: address
 }
@@ -29,7 +29,9 @@ const ERR_NOT_OWNER = 401
 
 fun onInternalMessage(in: InMessage) {
     val storage = lazy Storage.load();
-    assert (in.senderAddress == storage.ownerAddress) throw ERR_NOT_OWNER;
+    val isOwner = in.senderAddress == storage.ownerAddress;
+    assert (isOwner) throw ERR_NOT_OWNER;
+    //                     ^^^^^^^^^^^^^ E034: throw code should use `Errors.<Name>`
 }
 ```
 
@@ -45,8 +47,9 @@ struct Storage {
 
 fun onInternalMessage(in: InMessage) {
     val storage = lazy Storage.load();
-    assert (in.senderAddress == storage.ownerAddress) throw Errors.NotOwner;
+    val isOwner = in.senderAddress == storage.ownerAddress;
+    assert (isOwner) throw Errors.NotOwner;
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/throw_requires_errors_enum.rs#L48" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/throw_requires_errors_enum.rs#L51" />

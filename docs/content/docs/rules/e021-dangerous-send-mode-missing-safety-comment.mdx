@@ -20,8 +20,9 @@ Flags like `SEND_MODE_CARRY_ALL_BALANCE` or `SEND_MODE_DESTROY` can drain balanc
 or destroy the contract. These calls should always document their assumptions.
 
 ### Example
-```tolk
+```tolk twoslash
 outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E021: send with dangerous mode requires safety comment
 ```
 
 Use instead:
@@ -30,4 +31,4 @@ Use instead:
 outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dangerous_send_mode_missing_safety_comment.rs#L29" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dangerous_send_mode_missing_safety_comment.rs#L30" />

@@ -20,9 +20,10 @@ Such expressions usually have no effect and often indicate a typo, such as using
 instead of `=` or `+=`.
 
 ### Example
-```tolk
+```tolk twoslash
 fun main(a: int, b: int) {
     a != b;
+//  ^^^^^^^ E032: unused expression has no effect
 }
 ```
 
@@ -33,4 +34,4 @@ fun main(mutate a: int, b: int) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_expression.rs#L28" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_expression.rs#L29" />

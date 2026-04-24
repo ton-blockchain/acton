@@ -22,7 +22,7 @@ unnecessary and can be worse for performance because it forces an extra cell cre
 when the compiler could inline a small body directly.
 
 ### Example
-```tolk
+```tolk twoslash
 struct Transfer {
     amount: int32
 }
@@ -33,6 +33,7 @@ fun send(dest: address) {
         value: ton("0.1"),
         dest,
         body: Transfer { amount: 1 }.toCell(),
+        //                          ^^^^^^^^^ E035: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
     });
 }
 ```
@@ -53,4 +54,4 @@ fun send(dest: address) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/create_message_body_to_cell.rs#L50" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/create_message_body_to_cell.rs#L51" />

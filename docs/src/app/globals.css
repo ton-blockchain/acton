@@ -1,5 +1,16 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/style.css';
+@import 'fumadocs-twoslash/twoslash.css';
+
+.twoslash .twoslash-error.twoslash-error-level-warning {
+  text-decoration: wavy underline var(--color-twoslash-tag-warn-foreground);
+}
+
+.twoslash .twoslash-error-line.twoslash-error-level-warning {
+  background-color: var(--color-twoslash-tag-warn);
+  border-left-color: var(--color-twoslash-tag-warn-foreground);
+  color: var(--color-twoslash-tag-warn-foreground);
+}
 
 :root {
   --headless-color: #4b2ce8;
@@ -43,7 +54,7 @@ code, pre {
   backdrop-filter: blur(50px) saturate(200%);
   -webkit-backdrop-filter: blur(50px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 
+  box-shadow:
     0 20px 40px -12px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     inset 0 0 30px rgba(255, 255, 255, 0.03);
@@ -54,8 +65,8 @@ code, pre {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06),
     inset 0 0 20px rgba(255, 255, 255, 0.02);
 }
@@ -72,7 +83,7 @@ code, pre {
 .glass-feature-card:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 
+  box-shadow:
     0 12px 24px 0 rgba(0, 0, 0, 0.2),
     inset 0 0 15px rgba(255, 255, 255, 0.03);
 }

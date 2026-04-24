@@ -20,8 +20,9 @@ Requires documenting safety requirements for every declaration with an `asm` bod
 it is hard to review assumptions and soundness constraints.
 
 ### Example
-```tolk
+```tolk twoslash
 fun lowLevelLoad(x: slice): int asm "32 LDI";
+//                              ^^^ E015: asm function requires safety comment
 ```
 
 Use instead:
@@ -30,4 +31,4 @@ Use instead:
 fun lowLevelLoad(x: slice): int asm "32 LDI";
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/asm_function_missing_safety_comment.rs#L27" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/asm_function_missing_safety_comment.rs#L28" />

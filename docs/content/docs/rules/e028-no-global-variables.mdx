@@ -21,8 +21,9 @@ Keeping state in explicit storage structures and passing values through function
 clearer and less error-prone.
 
 ### Example
-```tolk
+```tolk twoslash
 global counter: int
+//     ^^^^^^^ E028: global variable declarations are not allowed
 ```
 
 Use instead:
@@ -32,4 +33,4 @@ struct State {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/no_global_variables.rs#L26" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/no_global_variables.rs#L27" />

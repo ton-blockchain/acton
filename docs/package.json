@@ -15,6 +15,7 @@
     "class-variance-authority": "^0.7.1",
     "fumadocs-core": "^16.7.14",
     "fumadocs-mdx": "^14.2.13",
+    "fumadocs-twoslash": "^3.2.0",
     "fumadocs-ui": "^16.7.14",
     "geist": "^1.5.1",
     "gsap": "^3.13.0",
@@ -27,6 +28,7 @@
     "remark-directive": "^4.0.0",
     "remark-directive-rehype": "^0.4.2",
     "tailwind-merge": "^3.4.0",
+    "twoslash": "^0.3.8",
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {

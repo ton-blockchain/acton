@@ -19,12 +19,13 @@ Checks for struct initialization where the field name and the variable used to i
 It's redundant and can be simplified using the shorthand syntax.
 
 ### Example
-```tolk
+```tolk twoslash
 struct Foo { bar: int }
 
 fun main() {
     val bar = 1;
     val foo = Foo { bar: bar };
+    //              ^^^^^^^^ E001: field initialization can be folded
 }
 ```
 
@@ -38,4 +39,4 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/field_init_can_be_folded.rs#L35" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/field_init_can_be_folded.rs#L36" />

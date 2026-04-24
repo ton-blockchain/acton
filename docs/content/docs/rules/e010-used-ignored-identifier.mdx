@@ -20,10 +20,11 @@ Prefixing with `_` means the identifier is intentionally unused.
 Using it later is misleading and makes code harder to read.
 
 ### Example
-```tolk
+```tolk twoslash
 fun main() {
     val _value = 10;
     _value;
+//  ^^^^^^ E010: identifier marked as unused is used
 }
 ```
 
@@ -35,4 +36,4 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/used_ignored_identifier.rs#L29" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/used_ignored_identifier.rs#L30" />

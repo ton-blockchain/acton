@@ -21,15 +21,16 @@ unexpected behavior, or reliance on outdated APIs. Such symbols
 may be removed in future versions.
 
 ### Example
-```tolk
+```tolk twoslash
 @deprecated
 fun oldFunction() {
     // some deprecated logic
 }
 
 fun main() {
-    oldFunction(); // <- error: usage of deprecated symbol
+    oldFunction();
+//  ^^^^^^^^^^^ E004: usage of deprecated symbol
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/deprecated_symbol_use.rs#L29" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/deprecated_symbol_use.rs#L30" />

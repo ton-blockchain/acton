@@ -19,9 +19,10 @@ Checks for variables that are written to but never read.
 A variable that is only written to but never read is likely a bug or redundant code.
 
 ### Example
-```tolk
+```tolk twoslash
 fun main() {
     var x = 1;
+    //  ^ E005: variable is only written to but never read
     x = 2;
     println("hello");
 }
@@ -41,4 +42,4 @@ fun main() {
 - This rule only reports variables with writes and no reads.
   Operations that imply reads (for example `+=`) do not match this rule.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/write_only_variable.rs#L37" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/write_only_variable.rs#L38" />

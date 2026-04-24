@@ -19,9 +19,10 @@ Checks `contract` header field `incomingMessages` for duplicate message opcodes.
 If two incoming message variants share the same opcode, message decoding is ambiguous.
 
 ### Example
-```tolk
+```tolk twoslash
 struct (0x1000) MsgA {}
 struct (0x1000) MsgB {}
+//      ^^^^^^ E029: incomingMessages contains message variants with duplicate opcode
 
 contract Wallet {
     incomingMessages: MsgA | MsgB,
@@ -34,4 +35,4 @@ struct (0x1000) MsgA {}
 struct (0x1001) MsgB {}
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/incoming_messages_duplicate_opcode.rs#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/incoming_messages_duplicate_opcode.rs#L37" />

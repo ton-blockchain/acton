@@ -20,8 +20,9 @@ Messages are first-class entities in Tolk and should have meaningful names.
 Generic names like `msg` make code harder to read and reason about.
 
 ### Example
-```tolk
+```tolk twoslash
 val msg = createMessage({ ... });
+//  ^^^ E011: message should be properly named
 msg.send(SEND_MODE_REGULAR);
 ```
 
@@ -31,4 +32,4 @@ val deployMessage = createMessage({ ... });
 deployMessage.send(SEND_MODE_REGULAR);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/message_entity_naming.rs#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/message_entity_naming.rs#L31" />

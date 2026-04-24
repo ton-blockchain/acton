@@ -19,8 +19,9 @@ Requires explicit return types for function declarations.
 Omitting return types makes APIs less clear and can hide accidental signature changes.
 
 ### Example
-```tolk
+```tolk twoslash
 fun buildSlice() {
+//  ^^^^^^^^^^ S002: function return type should be explicit
     return beginCell().toSlice();
 }
 ```
@@ -36,4 +37,4 @@ fun buildSlice(): slice {
 - Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.
 - Functions whose inferred return type is `void` are ignored by this rule.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/explicit_return_type.rs#L33" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/explicit_return_type.rs#L34" />

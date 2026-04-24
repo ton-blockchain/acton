@@ -17,7 +17,7 @@ use tree_sitter::Node;
 /// Bare constants such as `ERR_NOT_OWNER` are harder to discover and produce inconsistent symbolic names.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct Storage {
 ///     ownerAddress: address
 /// }
@@ -26,7 +26,9 @@ use tree_sitter::Node;
 ///
 /// fun onInternalMessage(in: InMessage) {
 ///     val storage = lazy Storage.load();
-///     assert (in.senderAddress == storage.ownerAddress) throw ERR_NOT_OWNER;
+///     val isOwner = in.senderAddress == storage.ownerAddress;
+///     assert (isOwner) throw ERR_NOT_OWNER;
+///     //                     ^^^^^^^^^^^^^ E034: throw code should use `Errors.<Name>`
 /// }
 /// ```
 ///
@@ -42,7 +44,8 @@ use tree_sitter::Node;
 ///
 /// fun onInternalMessage(in: InMessage) {
 ///     val storage = lazy Storage.load();
-///     assert (in.senderAddress == storage.ownerAddress) throw Errors.NotOwner;
+///     val isOwner = in.senderAddress == storage.ownerAddress;
+///     assert (isOwner) throw Errors.NotOwner;
 /// }
 /// ```
 #[derive(ViolationMetadata)]

@@ -19,9 +19,10 @@ use tolk_syntax::{
 /// If two incoming message variants share the same opcode, message decoding is ambiguous.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct (0x1000) MsgA {}
 /// struct (0x1000) MsgB {}
+/// //      ^^^^^^ E029: incomingMessages contains message variants with duplicate opcode
 ///
 /// contract Wallet {
 ///     incomingMessages: MsgA | MsgB,

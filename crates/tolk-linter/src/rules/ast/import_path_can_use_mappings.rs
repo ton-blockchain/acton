@@ -13,8 +13,9 @@ use tolk_resolver::file_index::{FileId, Span};
 /// Relative imports are harder to maintain in larger projects and become fragile when files move.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// import "../libs/math.tolk";
+/// //      ^^^^^^^^^^^^^^^^^ E018: import path can use mappings
 /// ```
 ///
 /// Use instead:

@@ -19,8 +19,9 @@ Detects repeated not-null assertions like `foo!!`.
 Repeating `!` is redundant: after the first not-null assertion the value is already non-null.
 
 ### Example
-```tolk
+```tolk twoslash
 val x = foo!!;
+//         ^^ E019: several not-null assertions in a row
 ```
 
 Use instead:
@@ -28,4 +29,4 @@ Use instead:
 val x = foo!;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/several_not_null_assertions.rs#L25" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/several_not_null_assertions.rs#L26" />

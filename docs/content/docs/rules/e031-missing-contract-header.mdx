@@ -20,8 +20,9 @@ The contract header is the ABI source of truth for metadata like `storage` and `
 Without it, wrapper generation and other tooling cannot recover the contract shape reliably.
 
 ### Example
-```tolk
+```tolk twoslash
 fun onInternalMessage(in: InMessage) {
+//  ^^^^^^^^^^^^^^^^^ E031: contract defines entrypoints but is missing a `contract` header
     // ...
 }
 ```
@@ -38,4 +39,4 @@ fun onInternalMessage(in: InMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/missing_contract_header.rs#L34" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/missing_contract_header.rs#L35" />

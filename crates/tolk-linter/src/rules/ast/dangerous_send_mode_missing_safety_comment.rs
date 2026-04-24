@@ -17,8 +17,9 @@ use tolk_ty::InferenceResult;
 /// or destroy the contract. These calls should always document their assumptions.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
+/// //          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E021: send with dangerous mode requires safety comment
 /// ```
 ///
 /// Use instead:

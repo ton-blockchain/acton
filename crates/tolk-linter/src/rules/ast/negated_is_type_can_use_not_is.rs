@@ -14,8 +14,9 @@ use tolk_syntax::ast::expressions::{Expr, IsType, Unary};
 /// Tolk has a dedicated `!is` operator, which is clearer than negating `is`.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// if (!(value is int)) {
+/// //  ^^^^^^^^^^^^^^^ E022: negated `is` type check can use `!is`
 ///     return;
 /// }
 /// ```

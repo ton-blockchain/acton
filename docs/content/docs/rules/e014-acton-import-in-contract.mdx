@@ -20,8 +20,9 @@ Contract sources should not depend on Acton internals from `.acton`.
 Such imports are environment-dependent and make contracts less portable.
 
 ### Example
-```tolk
+```tolk twoslash
 import "@acton/tlb/maybe";
+//      ^^^^^^^^^^^^^^^^ E014: contracts cannot import files from Acton standard library
 ```
 
 Use instead:
@@ -29,4 +30,4 @@ Use instead:
 import "@stdlib/gas-payments";
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/acton_import_in_contract.rs#L23" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/acton_import_in_contract.rs#L24" />

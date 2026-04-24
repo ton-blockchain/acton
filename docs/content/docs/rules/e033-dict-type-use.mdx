@@ -20,9 +20,10 @@ Warns when code uses the low-level `dict` type.
 In most cases, `map<K, V>` communicates intent better and gives stronger type checking.
 
 ### Example
-```tolk
+```tolk twoslash
 struct State {
     data: dict
+    //    ^^^^ E033: low-level `dict` type should be replaced with typed `map<K, V>`
 }
 ```
 
@@ -33,4 +34,4 @@ struct State {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dict_type_use.rs#L29" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/dict_type_use.rs#L30" />

@@ -12,6 +12,7 @@ const docsRoot = fileURLToPath(new URL(".", import.meta.url));
 const config = {
   reactStrictMode: true,
   output: "export",
+  serverExternalPackages: ["typescript", "twoslash"],
   images: { unoptimized: true },
   turbopack: {
     root: docsRoot,

@@ -22,9 +22,10 @@ high-level control-flow assumptions. Call sites should document
 why inputs are trusted and which invariants are required.
 
 ### Example
-```tolk
+```tolk twoslash
 fun convert(code: slice): continuation {
     return transformSliceToContinuation(code);
+    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E023: converting slice to continuation requires safety comment
 }
 ```
 
@@ -36,4 +37,4 @@ fun convert(code: slice): continuation {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/bless_call_missing_safety_comment.rs#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/bless_call_missing_safety_comment.rs#L37" />

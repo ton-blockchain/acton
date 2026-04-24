@@ -20,14 +20,16 @@ Such condition has no effect on behavior and usually indicates a bug or a
 copy-paste mistake.
 
 ### Example
-```tolk
+```tolk twoslash
 if (flag) {
     checkAccess();
 } else {
     checkAccess();
+//  ^^^^^^^^^^^^^ E027: conditional branches are identical
 }
 
 val result = flag ? value + 1 : value + 1;
+//                              ^^^^^^^^^ E027: conditional branches are identical
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/identical_conditional_branches.rs#L26" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/identical_conditional_branches.rs#L28" />

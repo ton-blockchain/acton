@@ -19,9 +19,10 @@ Checks for variables that are declared as mutable (`var`) but are never mutated.
 Using `val` instead of `var` makes the code clearer by signaling that the variable's value will not change.
 
 ### Example
-```tolk
+```tolk twoslash
 fun main() {
     var x = 1;
+//  ^^^ E003: variable can be immutable
     println(x);
 }
 ```
@@ -41,4 +42,4 @@ fun main() {
 - Autofix is available for simple `var x = ...` declarations.
   Destructuring declarations still warn but may not have a fix.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_variable_can_be_immutable.rs#L40" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_variable_can_be_immutable.rs#L41" />

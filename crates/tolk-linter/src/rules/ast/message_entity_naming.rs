@@ -17,8 +17,9 @@ use tolk_ty::InferenceResult;
 /// Generic names like `msg` make code harder to read and reason about.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// val msg = createMessage({ ... });
+/// //  ^^^ E011: message should be properly named
 /// msg.send(SEND_MODE_REGULAR);
 /// ```
 ///
@@ -47,8 +48,9 @@ impl Violation for MessageShouldBeNamed {
 /// Prefer giving message a name before sending.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// createMessage({ ... }).send(SEND_MODE_REGULAR);
+/// //                    ^^^^^ E012: create named message before send
 /// ```
 ///
 /// Use instead:

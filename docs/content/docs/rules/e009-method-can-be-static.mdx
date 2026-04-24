@@ -19,10 +19,11 @@ Checks for instance methods where `self` is unnecessary.
 If `self` is never used, the method can be static which makes the API clearer.
 
 ### Example
-```tolk
+```tolk twoslash
 struct Foo {}
 
 fun Foo.bar(self, a: int): int {
+//          ^^^^ E009: method can be static
     return a + 1;
 }
 ```
@@ -36,4 +37,4 @@ fun Foo.bar(a: int): int {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/method_can_be_static.rs#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/method_can_be_static.rs#L37" />

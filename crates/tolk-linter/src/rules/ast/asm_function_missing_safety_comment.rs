@@ -15,8 +15,9 @@ use tolk_syntax::{FuncBody, FunctionLike, HasName, TopLevel};
 /// it is hard to review assumptions and soundness constraints.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun lowLevelLoad(x: slice): int asm "32 LDI";
+/// //                              ^^^ E015: asm function requires safety comment
 /// ```
 ///
 /// Use instead:

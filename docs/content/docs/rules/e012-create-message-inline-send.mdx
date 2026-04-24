@@ -20,8 +20,9 @@ Creating and sending message in one expression hides message intent.
 Prefer giving message a name before sending.
 
 ### Example
-```tolk
+```tolk twoslash
 createMessage({ ... }).send(SEND_MODE_REGULAR);
+//                    ^^^^^ E012: create named message before send
 ```
 
 Use instead:
@@ -30,4 +31,4 @@ val deployMessage = createMessage({ ... });
 deployMessage.send(SEND_MODE_REGULAR);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/message_entity_naming.rs#L59" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/message_entity_naming.rs#L61" />

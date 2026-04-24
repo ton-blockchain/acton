@@ -17,7 +17,7 @@ use tree_sitter::Node;
 /// when the compiler could inline a small body directly.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct Transfer {
 ///     amount: int32
 /// }
@@ -28,6 +28,7 @@ use tree_sitter::Node;
 ///         value: ton("0.1"),
 ///         dest,
 ///         body: Transfer { amount: 1 }.toCell(),
+///         //                          ^^^^^^^^^ E035: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
 ///     });
 /// }
 /// ```

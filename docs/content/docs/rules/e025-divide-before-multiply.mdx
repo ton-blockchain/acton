@@ -20,9 +20,10 @@ Division done too early may lose precision (especially for integer arithmetic)
 and can produce unintended results in subsequent multiplication.
 
 ### Example
-```tolk
+```tolk twoslash
 fun main(a: int, b: int, c: int): int {
     return a / b * c;
+    //     ^^^^^^^^^ E025: division before multiplication may cause precision loss
 }
 ```
 
@@ -39,4 +40,4 @@ The check uses CFG + dataflow:
 - tracks locals tainted by division through assignments and warns when
   such values are later used in multiplication.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/dfa/divide_before_multiply/mod.rs#L35" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/dfa/divide_before_multiply/mod.rs#L36" />
