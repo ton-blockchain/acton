@@ -77,7 +77,7 @@ jobs:
         id: archive-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
+          path: &linux-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
@@ -170,9 +170,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          path: *linux-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Upload TON objects artifact
@@ -211,7 +209,7 @@ jobs:
         id: archive-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
+          path: &macos-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
@@ -280,9 +278,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          path: *macos-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Upload TON objects artifact

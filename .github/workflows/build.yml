@@ -85,7 +85,8 @@ jobs:
         id: bun-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: &linux-build-ui-bun-cache-path |
+            ~/.bun/install/cache
           key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
@@ -114,7 +115,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
@@ -216,7 +217,8 @@ jobs:
         id: bun-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: &linux-lint-ui-bun-cache-path |
+            ~/.bun/install/cache
           key: ${{ runner.os }}-${{ runner.arch }}-lint-ui-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-lint-ui-
@@ -232,7 +234,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: *linux-lint-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
   build-macos:
@@ -292,7 +294,8 @@ jobs:
         id: bun-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: &macos-build-ui-bun-cache-path |
+            ~/.bun/install/cache
           key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
@@ -319,7 +322,7 @@ jobs:
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: *macos-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
