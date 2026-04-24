@@ -144,3 +144,33 @@ Fails if [index](#bigarray\<t>set) is out of bounds.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L123" />
 
+## `BigArray<T>.each`
+
+```tolk
+fun BigArray<T>.each(self, f: (T -> void)): void
+```
+
+Calls [f](#bigarray\<t>each) for every element in the [BigArray](#bigarray).
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L132" />
+
+## `BigArray<T>.map`
+
+```tolk
+fun BigArray<T>.map<U>(self, f: (T -> U)): BigArray<U>
+```
+
+Returns a new [BigArray](#bigarray) with [f](#bigarray\<t>each) applied to every element.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L141" />
+
+## `BigArray<T>.filter`
+
+```tolk
+fun BigArray<T>.filter(self, f: (T -> bool)): BigArray<T>
+```
+
+Returns a new [BigArray](#bigarray) containing only elements for which [f](#bigarray\<t>each) returns `true`.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/big_array.tolk#L152" />
+
