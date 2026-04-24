@@ -127,6 +127,7 @@ fun deployNftBatch(
     var deployList: map<uint64, BatchDeployDictItem> = [];
     var i = 0;
     val nextItemIndex = collection.getCollectionData().nextItemIndex;
+    val perItemAmount = ton("0.03");
 
     while (i < count) {
         val index = (nextItemIndex + i);
@@ -140,7 +141,7 @@ fun deployNftBatch(
         deployList.set(
             index,
             BatchDeployDictItem {
-                attachTonAmount: ton("0.03"),
+                attachTonAmount: perItemAmount,
                 initParams: NftItemInitAtDeployment {
                     ownerAddress: owner,
                     content,
@@ -150,11 +151,12 @@ fun deployNftBatch(
         i += 1;
     }
 
+    val messageValue = perItemAmount * count + ton("0.1");
     return collection.sendBatchDeployNfts(
         deployer.address,
         0,
         deployList,
-        { value: ton("0.15"), bounce: true },
+        { value: messageValue, bounce: true },
     );
 }
 
