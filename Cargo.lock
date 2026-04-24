@@ -6640,6 +6640,7 @@ dependencies = [
  "parse-changelog",
  "reqwest",
  "schemars 0.8.22",
+ "semver",
  "serde",
  "serde_json",
  "sha2",

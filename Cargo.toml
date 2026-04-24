@@ -32,6 +32,9 @@ documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
 repository = "https://github.com/ton-blockchain/acton"
 license = "MIT OR Apache-2.0"
 
+[workspace.metadata.acton]
+tolk-version = "1.3.0"
+
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
@@ -317,6 +320,7 @@ toncenter-keys = { workspace = true }
 chrono = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
+toml_edit = { workspace = true }
 
 # save ~15% of size (29mb -> 23mb), but very slow to compile/link
 [profile.release-size]

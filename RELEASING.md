@@ -20,6 +20,7 @@ The full maintainer `xtask` surface currently includes:
 - `dist`
 - `schema`
 - `sync-artifacts`
+- `toolchain-index`
 - `github-cleanup`
 - `ubicloud-cleanup`
 
@@ -61,6 +62,8 @@ cargo xtask retag --version 0.22.0
 - local `master` branch with no uncommitted changes
 - successful GitHub Actions build for the current `master` `HEAD`
 - release notes reviewed in `CHANGELOG.md`
+- `workspace.metadata.acton.tolk-version` in the root `Cargo.toml` reviewed
+  and updated when the bundled Tolk compiler changes
 - no unresolved release-blocking issues for the target version
 
 ## What the release xtask does
@@ -76,6 +79,8 @@ cargo xtask retag --version 0.22.0
 - verifies GitHub Actions builds succeeded for the current `HEAD`
 - updates versions in `Acton.toml`, `Cargo.toml`, and `package.json`
 - runs `cargo update --workspace`
+- updates `toolchain-index.json` with the release version and the bundled Tolk
+  version from `workspace.metadata.acton.tolk-version`
 - creates commit `chore(acton): bump to version \`X.Y.Z\``
 - creates tag `vX.Y.Z`
 - shows the created commit diff stat
@@ -101,5 +106,11 @@ when the tag already exists in `origin` and local `master` exactly matches
 - other `dist` subcommands currently exist but are still placeholders/TODO
 - `cargo xtask schema` regenerates `acton.schema.json`
 - `cargo xtask sync-artifacts` refreshes native TON artifacts and bundled stdlib assets
+- `cargo xtask toolchain-index check` validates `toolchain-index.json`
+- `cargo xtask toolchain-index add-release --version X.Y.Z` adds or refreshes
+  an index entry using the bundled Tolk version from
+  `workspace.metadata.acton.tolk-version`
+- `cargo xtask toolchain-index yank --version X.Y.Z --reason "..."`
+  marks a release as yanked while keeping it visible in the index
 - `cargo xtask github-cleanup` and `cargo xtask ubicloud-cleanup` prune caches;
   outside CI they default to dry-run safety mode

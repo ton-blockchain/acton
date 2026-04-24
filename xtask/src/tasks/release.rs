@@ -7,6 +7,9 @@ use crate::modules::release::{
     refresh_remote_master_ref,
 };
 use crate::modules::workflow::{Workflow, WorkflowStep};
+use crate::tasks::toolchain_index::{
+    TOOLCHAIN_INDEX_PATH, add_release_to_default_index, read_canonical_tolk_version,
+};
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use std::fs;
@@ -78,6 +81,10 @@ fn release_workflow() -> Workflow<'static, ReleaseContext> {
                 run: bump_versions_from_tag,
             },
             WorkflowStep {
+                name: "update toolchain index",
+                run: update_toolchain_index,
+            },
+            WorkflowStep {
                 name: "create version bump commit",
                 run: create_version_bump_commit,
             },
@@ -139,6 +146,7 @@ fn create_version_bump_commit(context: &ReleaseContext) -> Result<()> {
         CARGO_TOML_PATH,
         CARGO_LOCK_PATH,
         PACKAGE_JSON_PATH,
+        TOOLCHAIN_INDEX_PATH,
     ];
 
     context.git.add_files(&bump_files)?;
@@ -146,6 +154,11 @@ fn create_version_bump_commit(context: &ReleaseContext) -> Result<()> {
         &format!("chore(acton): bump to version `{}`", context.version),
         &[],
     )
+}
+
+fn update_toolchain_index(context: &ReleaseContext) -> Result<()> {
+    let tolk_version = read_canonical_tolk_version()?;
+    add_release_to_default_index(&context.version, &tolk_version)
 }
 
 fn show_created_commit_numstat(context: &ReleaseContext) -> Result<()> {

@@ -139,6 +139,8 @@ pub struct CustomNetworkConfig {
 pub struct ActonConfig {
     /// Package metadata for the Acton project
     pub package: PackageConfig,
+    /// Toolchain version pins used before command execution
+    pub toolchain: Option<ToolchainConfig>,
     /// Definition of contracts in the project
     pub contracts: Option<ContractsConfig>,
     /// Default settings for the test runner
@@ -227,6 +229,16 @@ pub struct PackageConfig {
     pub repository: Option<String>,
     /// The project's license identifier
     pub license: Option<String>,
+}
+
+/// Toolchain versions requested by the project
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ToolchainConfig {
+    /// Exact Acton CLI version requested by the project
+    pub acton: Option<String>,
+    /// Exact Tolk compiler version requested by the project
+    pub tolk: Option<String>,
 }
 
 /// Coverage settings for the test runner
@@ -598,6 +610,7 @@ impl Default for ActonConfig {
                 repository: None,
                 license: Some("MIT".to_string()),
             },
+            toolchain: None,
             test: None,
             lint: None,
             contracts: None,
@@ -1520,6 +1533,30 @@ rules-file = "mutation-rules.json"
     }
 
     #[test]
+    fn test_toolchain_config_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[toolchain]
+acton = "0.3.0"
+tolk = "1.3.0"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+
+        assert_eq!(
+            config.toolchain,
+            Some(ToolchainConfig {
+                acton: Some("0.3.0".to_string()),
+                tolk: Some("1.3.0".to_string()),
+            })
+        );
+    }
+
+    #[test]
     fn test_contract_config_serializes_display_name_key() {
         let config = ActonConfig {
             package: PackageConfig {
@@ -1529,6 +1566,7 @@ rules-file = "mutation-rules.json"
                 repository: None,
                 license: None,
             },
+            toolchain: None,
             contracts: Some(ContractsConfig {
                 contracts: BTreeMap::from([(
                     "counter".to_string(),
@@ -1569,6 +1607,7 @@ rules-file = "mutation-rules.json"
                 repository: None,
                 license: None,
             },
+            toolchain: None,
             contracts: None,
             test: None,
             lint: None,

@@ -5,11 +5,16 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+const CARGO_TOML_PATH: &str = "Cargo.toml";
+const TOLK_VERSION_METADATA_PATH: &str = "workspace.metadata.acton.tolk-version";
+
 fn main() {
     println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
+    println!("cargo:rerun-if-changed={CARGO_TOML_PATH}");
 
     compress_man();
     let pkg_version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set");
+    let tolk_version = read_tolk_version();
 
     let output = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
@@ -47,7 +52,54 @@ fn main() {
         pkg_version
     };
     println!("cargo:rustc-env=ACTON_SHORT_VERSION={short_version}");
-    println!("cargo:rustc-env=ACTON_LONG_VERSION={short_version} ({git_hash} {build_date})");
+    println!("cargo:rustc-env=TOLK_VERSION={tolk_version}");
+    println!(
+        "cargo:rustc-env=ACTON_LONG_VERSION={short_version} ({git_hash} {build_date}) with Tolk {tolk_version}"
+    );
+}
+
+fn read_tolk_version() -> String {
+    let contents = fs::read_to_string(CARGO_TOML_PATH)
+        .unwrap_or_else(|err| panic!("failed to read {CARGO_TOML_PATH}: {err}"));
+    let document = contents
+        .parse::<toml_edit::DocumentMut>()
+        .unwrap_or_else(|err| panic!("failed to parse {CARGO_TOML_PATH}: {err}"));
+    let version = document["workspace"]["metadata"]["acton"]["tolk-version"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing string `{TOLK_VERSION_METADATA_PATH}`"));
+
+    validate_exact_semver(version);
+
+    version.to_owned()
+}
+
+fn validate_exact_semver(version: &str) {
+    let parts: Vec<_> = version.split('.').collect();
+    if parts.len() != 3 {
+        panic!("{TOLK_VERSION_METADATA_PATH} must contain an exact X.Y.Z version, got `{version}`");
+    }
+
+    if parts.iter().any(|part| part.is_empty()) {
+        panic!(
+            "{TOLK_VERSION_METADATA_PATH} must not contain empty version parts, got `{version}`"
+        );
+    }
+
+    if parts
+        .iter()
+        .any(|part| part.len() > 1 && part.starts_with('0'))
+    {
+        panic!("{TOLK_VERSION_METADATA_PATH} must not contain leading zeroes, got `{version}`");
+    }
+
+    if parts
+        .iter()
+        .any(|part| !part.chars().all(|char| char.is_ascii_digit()))
+    {
+        panic!(
+            "{TOLK_VERSION_METADATA_PATH} must contain only numeric version parts, got `{version}`"
+        );
+    }
 }
 
 fn compress_man() {

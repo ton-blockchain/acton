@@ -84,6 +84,14 @@
         }
       ]
     },
+    "toolchain": {
+      "description": "Toolchain version pins used before command execution",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ToolchainConfig"
+        }
+      ]
+    },
     "wrappers": {
       "description": "Default settings for wrapper generation",
       "allOf": [
@@ -839,6 +847,21 @@
           "type": "string"
         }
       }
+    },
+    "ToolchainConfig": {
+      "description": "Toolchain versions requested by the project",
+      "type": "object",
+      "properties": {
+        "acton": {
+          "description": "Exact Acton CLI version requested by the project",
+          "type": "string"
+        },
+        "tolk": {
+          "description": "Exact Tolk compiler version requested by the project",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
     "TypescriptWrapperSettings": {
       "description": "Default settings for TypeScript wrapper generation",

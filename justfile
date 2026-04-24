@@ -52,6 +52,9 @@ test-update:
 docgen:
     cargo run -- docgen
 
+schema:
+    cargo run -p xtask -- schema
+
 fmt:
     cargo fmt --all
 

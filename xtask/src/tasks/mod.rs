@@ -5,4 +5,5 @@ pub(crate) mod release;
 pub(crate) mod retag;
 pub(crate) mod schema;
 pub(crate) mod sync_artifacts;
+pub(crate) mod toolchain_index;
 pub(crate) mod ubicloud_cleanup;

@@ -328,8 +328,10 @@ the updated `toolchain-index.json` together with `Acton.toml`, `Cargo.toml`,
 `add-release` behavior:
 
 - Read the Acton version from `--version`.
-- Read the bundled Tolk version from the same canonical source used to expose
-  `build_info::TOLK_VERSION`.
+- Read the bundled Tolk version from
+  `workspace.metadata.acton.tolk-version` in the root `Cargo.toml`, which is
+  the same canonical source used by the build script to expose
+  `build_info::TOLK_VERSION` and print `acton -V`.
 - Add or update one entry:
 
   ```json
@@ -858,7 +860,9 @@ least that Acton version as the bootstrap binary.
 ## Implementation Plan
 
 1. Add `ToolchainConfig` to `acton-config` and update the JSON schema.
-2. Add build-time `TOLK_VERSION` metadata exposed through `build_info`.
+2. Add `workspace.metadata.acton.tolk-version` in the root `Cargo.toml` as
+   the build-time source for `TOLK_VERSION` metadata exposed through
+   `build_info` and `acton -V`.
 3. Add pre-clap parsing for a leading `+<acton-version>` selector.
 4. Extract reusable release download/install primitives from `acton up`.
 5. Add toolchain index structs and resolver logic.

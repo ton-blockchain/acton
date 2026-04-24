@@ -21,6 +21,7 @@ enum CliCommand {
     Retag(tasks::retag::RetagArgs),
     Schema(tasks::schema::SchemaArgs),
     SyncArtifacts,
+    ToolchainIndex(tasks::toolchain_index::ToolchainIndexArgs),
     UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
 }
 
@@ -35,6 +36,7 @@ fn main() -> Result<()> {
         CliCommand::Retag(args) => tasks::retag::run(args),
         CliCommand::Schema(args) => tasks::schema::run(args),
         CliCommand::SyncArtifacts => tasks::sync_artifacts::run(),
+        CliCommand::ToolchainIndex(args) => tasks::toolchain_index::run(args),
         CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
     }
 }

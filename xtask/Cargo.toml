@@ -30,4 +30,5 @@ tar = { workspace = true }
 indicatif = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
+semver = { workspace = true }
 parse-changelog = { version = "0.6.15", default-features = false }

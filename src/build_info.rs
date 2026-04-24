@@ -4,6 +4,7 @@ pub const BUILD_DATE: &str = env!("BUILD_DATE");
 pub const TARGET_TRIPLE: &str = env!("TARGET_TRIPLE");
 pub const BUILD_PROFILE: &str = env!("BUILD_PROFILE");
 pub const RELEASE_CHANNEL: &str = env!("ACTON_RELEASE_CHANNEL");
+pub const TOLK_VERSION: &str = env!("TOLK_VERSION");
 pub const SHORT_VERSION: &str = env!("ACTON_SHORT_VERSION");
 pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
 
