@@ -11,9 +11,12 @@ depends = []
 
 [test]
 
+[lint]
+exclude = ["**/*.gen.tolk"]
+
 [fmt]
 width = 100
-ignore = []
+ignore = ["**/*.gen.tolk"]
 
 [scripts]
 deploy-emulation = "acton script scripts/deploy.tolk"

@@ -362,13 +362,21 @@ const fn default_max_warnings() -> usize {
     usize::MAX
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_default_max_warnings(v: &usize) -> bool {
+    *v == default_max_warnings()
+}
+
 /// Linter configuration for the project
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct LintConfig {
     /// Glob patterns for files to exclude from lint diagnostics
     pub exclude: Option<Vec<String>>,
-    #[serde(default = "default_max_warnings")]
+    #[serde(
+        default = "default_max_warnings",
+        skip_serializing_if = "is_default_max_warnings"
+    )]
     /// Maximum allowed warning count before `acton check` exits with a non-zero code
     pub max_warnings: usize,
     /// Output format for `acton check` diagnostics
