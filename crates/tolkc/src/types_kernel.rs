@@ -182,7 +182,7 @@ impl fmt::Display for Ty {
                 for (i, variant) in variants.iter().enumerate() {
                     let variant_ty = &variant.variant_ty;
                     if i > 0 {
-                        write!(f, ", ")?;
+                        write!(f, " | ")?;
                     }
                     write!(f, "{variant_ty}")?;
                 }

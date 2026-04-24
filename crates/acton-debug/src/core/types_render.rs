@@ -3295,7 +3295,7 @@ mod tests {
         else {
             panic!("expected UnionCase");
         };
-        assert_eq!(type_name, "cell, int");
+        assert_eq!(type_name, "cell | int");
         assert_eq!(variant_name, "#cell");
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
@@ -3379,7 +3379,7 @@ mod tests {
         let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
 
         assert_eq!(rendered.dap_parts().0, "union with unresolved layout");
-        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int, cell"));
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int | cell"));
     }
 
     #[test]
