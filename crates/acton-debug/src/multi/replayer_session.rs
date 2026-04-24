@@ -80,6 +80,13 @@ struct FrameLocator {
     snapshot_locals: Option<Vec<LocalVarRendered>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct StepFramePosition {
+    context_idx: usize,
+    file_id: usize,
+    line: usize,
+}
+
 struct ReplayerContext {
     label: Arc<str>,
     replayer: TolkReplayer,
@@ -131,6 +138,10 @@ pub struct ReplayerDebugSession {
     runtime_register_scope_requests: HashMap<i64, usize>,
     next_req_id: i64,
     stop_requested: bool,
+    /// Parent step state must survive nested child VM stepping.
+    active_step_start: Option<StepFramePosition>,
+    /// Set after child VM returns when the parent may first land on active_step_start.
+    skip_active_step_start_once: bool,
 }
 
 impl ReplayerDebugSession {
@@ -176,6 +187,8 @@ impl ReplayerDebugSession {
             runtime_register_scope_requests: HashMap::new(),
             next_req_id: 1_000_000,
             stop_requested: false,
+            active_step_start: None,
+            skip_active_step_start_once: false,
         }
     }
 
@@ -398,33 +411,76 @@ impl ReplayerDebugSession {
     }
 
     fn advance_active_context(&mut self, mode: StepMode) -> AdvanceOutcome {
+        let track_step_start = matches!(
+            mode,
+            StepMode::StepOver | StepMode::StepInto | StepMode::StepOut
+        );
+        // Nested child contexts run their own steps, so restore the parent state
+        // when this logical debugger action completes.
+        let previous_step = self.performing_step;
         self.performing_step = Some(mode);
+        let previous_step_start = self.active_step_start;
+        self.active_step_start = if track_step_start {
+            self.active_context().and_then(|ctx| {
+                let context_idx = self.contexts.len().checked_sub(1)?;
+                let ctx = ctx.try_borrow().ok()?;
+                Some(StepFramePosition {
+                    context_idx,
+                    file_id: ctx.replayer.current_file_id(),
+                    line: ctx.replayer.current_line(),
+                })
+            })
+        } else {
+            None
+        };
 
-        loop {
+        let outcome = loop {
             let is_end = self.step_active_context(mode);
+            let skip_active_step_start = std::mem::take(&mut self.skip_active_step_start_once);
             if is_end {
-                return AdvanceOutcome::Terminated;
+                break AdvanceOutcome::Terminated;
             }
 
             if let Some(exc) = self
                 .active_context()
                 .and_then(|ctx| ctx.try_borrow().ok()?.replayer.last_exception().cloned())
             {
-                return AdvanceOutcome::Stopped(StopReason::Exception(exc));
+                break AdvanceOutcome::Stopped(StopReason::Exception(exc));
+            }
+
+            // Child VM return can surface the original parent call line once.
+            // Skip it before breakpoint handling so that line does not re-stop.
+            if skip_active_step_start
+                && self.active_step_start.is_some_and(|start| {
+                    let current_context_idx = self.contexts.len().saturating_sub(1);
+                    current_context_idx == start.context_idx
+                        && self.active_context().is_some_and(|ctx| {
+                            ctx.try_borrow().is_ok_and(|ctx| {
+                                ctx.replayer.current_file_id() == start.file_id
+                                    && ctx.replayer.current_line() == start.line
+                            })
+                        })
+                })
+            {
+                continue;
             }
 
             match self.current_breakpoint_check() {
                 BreakpointCheck::Hit(stop) => {
-                    return AdvanceOutcome::Stopped(StopReason::Breakpoint(stop));
+                    break AdvanceOutcome::Stopped(StopReason::Breakpoint(stop));
                 }
                 BreakpointCheck::Skip if matches!(mode, StepMode::RunUntilBreakpoint) => {
                     continue;
                 }
                 BreakpointCheck::Skip | BreakpointCheck::None => {
-                    return AdvanceOutcome::Stopped(StopReason::Step);
+                    break AdvanceOutcome::Stopped(StopReason::Step);
                 }
             }
-        }
+        };
+
+        self.active_step_start = previous_step_start;
+        self.performing_step = previous_step;
+        outcome
     }
 
     fn stop_reason_for_active_context(&self) -> StopReason {
@@ -1189,8 +1245,16 @@ impl ReplayerDebugSession {
     }
 
     pub fn finish_child_context(&mut self, _thread_id: i64) -> anyhow::Result<()> {
-        if self.contexts.len() > 1 {
-            self.contexts.pop();
+        if self.contexts.len() <= 1 {
+            return Ok(());
+        }
+
+        self.contexts.pop();
+        if let Some(position) = self.active_step_start
+            && position.context_idx == self.contexts.len().saturating_sub(1)
+        {
+            // The next parent step may first report the original call line.
+            self.skip_active_step_start_once = true;
         }
         Ok(())
     }
@@ -1217,13 +1281,6 @@ impl ReplayerDebugSession {
 
     pub const fn performing_step(&self) -> Option<StepMode> {
         self.performing_step
-    }
-
-    /// Hook for a future synthetic "stop right after child returns" behavior.
-    /// The parent replayer currently resumes from its own next user-visible location,
-    /// so nested send/get calls do not require extra bookkeeping here.
-    pub const fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
-        Ok(())
     }
 }
 

@@ -969,16 +969,6 @@ fn send_transaction_debug(
         ctx.debug
             .finish_child_context(2)
             .context("Cannot finish nested debug context")?;
-
-        if !matches!(
-            ctx.debug.performing_step(),
-            Some(StepMode::RunUntilBreakpoint)
-        ) {
-            // When we step out from nested message/get method, stop on a line after send/call.
-            ctx.debug
-                .advance_parent_after_child_return()
-                .context("Cannot resume parent after nested debug context")?;
-        }
     }
 
     Emulator::finalize_send_transaction(
@@ -1983,16 +1973,6 @@ fn run_get_method_impl(
             ctx.debug
                 .finish_child_context(2)
                 .context("Cannot send response")?;
-
-            if !matches!(
-                ctx.debug.performing_step(),
-                Some(StepMode::RunUntilBreakpoint)
-            ) {
-                // When we step out from nested message/get method, stop on a line after call.
-                ctx.debug
-                    .advance_parent_after_child_return()
-                    .context("Cannot resume parent after nested debug context")?;
-            }
         }
 
         result

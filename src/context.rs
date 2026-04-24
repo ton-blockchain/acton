@@ -883,10 +883,6 @@ impl<'a> DebugCtx<'a> {
     pub fn performing_step(&mut self) -> Option<StepMode> {
         self.session().performing_step()
     }
-
-    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
-        self.session().advance_parent_after_child_return()
-    }
 }
 
 pub(crate) fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
