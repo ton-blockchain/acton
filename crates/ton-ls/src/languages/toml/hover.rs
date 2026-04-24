@@ -1,5 +1,6 @@
 use crate::backend::Backend;
 use crate::languages::engine::cache::ParsedSnapshot;
+use acton_config::schema::ACTON_SCHEMA_JSON;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind};
 use serde_json::Value as JsonValue;
 use std::path::Path;
@@ -9,10 +10,6 @@ use ton_json_schema::{SchemaDoc, SchemaPathSegment, SchemaStore};
 use tree_sitter::Node;
 
 static ACTON_SCHEMA_STORE: OnceLock<Option<SchemaStore>> = OnceLock::new();
-const ACTON_SCHEMA_JSON: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../acton.schema.json"
-));
 
 impl Backend {
     pub async fn handle_toml_hover(&self, params: HoverParams) -> Option<Hover> {
