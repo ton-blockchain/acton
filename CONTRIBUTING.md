@@ -48,11 +48,11 @@ For the minimal local build/test flow, install:
 1. Rust toolchain (`rustup`, `cargo`)
 2. `just` (task runner)
    ```bash
-   cargo install just --version 1.48.1 --locked
+   cargo install just --version 1.49.0 --locked
    ```
 3. `cargo-nextest` (required Rust test runner for non-doc tests)
    ```bash
-   cargo install cargo-nextest --version 0.9.132 --locked
+   cargo install cargo-nextest --version 0.9.133 --locked
    ```
 4. Bun (required for UI packages)
    ```bash
@@ -81,7 +81,7 @@ Optional CLI tools:
   ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install typos-cli --version 1.45.0 --locked
+  cargo install typos-cli --version 1.45.1 --locked
   ```
 - `cargo-llvm-cov` (optional, for coverage)
   ```bash

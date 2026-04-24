@@ -55,7 +55,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1
+          tool: just@1.49.0
           fallback: none
 
       - name: Install LLVM and Clang (don't cache)
@@ -99,7 +99,7 @@ jobs:
           cargo xtask dist archive --target "${TARGET_NAME}" --profile release-size
 
       - name: Upload Acton archive as artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ env.TARGET_NAME }}
           path: |
@@ -147,7 +147,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1
+          tool: just@1.49.0
           fallback: none
 
       - name: Download TON objects archive
@@ -181,7 +181,7 @@ jobs:
           cargo xtask dist archive --target "${TARGET_NAME}" --profile release-size
 
       - name: Upload Acton archive as artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ env.TARGET_NAME }}
           path: |
