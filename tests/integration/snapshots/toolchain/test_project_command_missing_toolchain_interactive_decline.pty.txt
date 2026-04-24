@@ -1,0 +1,3 @@
+? Project requires acton 0.4.0 (Tolk 1.4.0). Install it now? (Y/n)  ? Project requires acton 0.4.0 (Tolk 1.4.0). Install it now? (Y/n) n ? Project requires acton 0.4.0 (Tolk 1.4.0). Install it now? No
+Error: Acton 0.4.0 is required but is not installed.
+Run `acton toolchain install` from the project root or `acton toolchain install 0.4.0`.

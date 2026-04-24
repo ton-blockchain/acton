@@ -191,7 +191,7 @@ fn resolve_cmd() -> Result<()> {
     Ok(())
 }
 
-fn install_toolchain(report: &ToolchainResolveReport) -> Result<PathBuf> {
+pub fn install_toolchain(report: &ToolchainResolveReport) -> Result<PathBuf> {
     let target_dir = installed_toolchain_dir(&report.acton)?;
     let target_binary = installed_toolchain_binary_path(&report.acton)?;
     let store_dir = toolchain_store_dir()?;

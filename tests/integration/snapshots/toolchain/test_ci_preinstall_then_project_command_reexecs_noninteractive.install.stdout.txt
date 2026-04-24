@@ -1,0 +1,4 @@
+       Found [ACTON_ARCHIVE]
+       Found [ACTON_ARCHIVE_SHA256]
+    Verified [ACTON_ARCHIVE_SHA256]
+Installed Acton 0.4.0 (Tolk 1.4.0) at [ROOT]/.home/.acton/toolchains/0.4.0/acton

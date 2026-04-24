@@ -118,36 +118,139 @@ fn test_toolchain_which_missing_selected_version_snapshot() -> Result<()> {
 }
 
 #[test]
+fn test_project_command_missing_toolchain_noninteractive_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-project-command-missing", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .test()
+        .env("HOME", &home)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_missing_toolchain_noninteractive.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn test_project_command_missing_toolchain_interactive_accepts_install_and_reexecs_snapshot()
+-> Result<()> {
+    use expectrl::Eof;
+
+    let project =
+        project_with_toolchain("toolchain-project-command-interactive", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    let fake_acton = recording_fake_acton("fake acton reexec complete");
+    let bundle = release_bundle(&fake_acton)?;
+    let mock = mock_release_server("0.4.0", &bundle);
+
+    let home = home.to_string_lossy().into_owned();
+    let mut session = project
+        .acton()
+        .test()
+        .env("HOME", &home)
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .spawn_pty();
+
+    session.expect("Project requires acton 0.4.0 (Tolk 1.4.0). Install it now?");
+    session.send_line("y", "failed to confirm toolchain installation");
+    session.expect("fake acton reexec complete");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        ".toolchain-reexec.txt",
+        "integration/snapshots/toolchain/test_project_command_missing_toolchain_interactive_accepts_install_and_reexecs.reexec.txt",
+    );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn test_project_command_missing_toolchain_interactive_decline_snapshot() -> Result<()> {
+    use expectrl::Eof;
+
+    let project = project_with_toolchain("toolchain-project-command-decline", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    let home = home.to_string_lossy().into_owned();
+
+    let mut session = project.acton().test().env("HOME", &home).spawn_pty();
+
+    let mut transcript = Vec::new();
+    let prompt = expectrl::Session::expect(
+        &mut *session,
+        "Project requires acton 0.4.0 (Tolk 1.4.0). Install it now?",
+    )
+    .expect("expected toolchain install prompt");
+    transcript.extend_from_slice(prompt.as_bytes());
+
+    session.send_line("n", "failed to decline toolchain installation");
+
+    let output = expectrl::Session::expect(&mut *session, Eof)
+        .expect("expected process to exit after declining toolchain installation");
+    transcript.extend_from_slice(output.as_bytes());
+    assert_pty_transcript_snapshot_matches(
+        &project,
+        &transcript,
+        "integration/snapshots/toolchain/test_project_command_missing_toolchain_interactive_decline.pty.txt",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_ci_preinstall_then_project_command_reexecs_noninteractive_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-ci-preinstall", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    let fake_acton = recording_fake_acton("ci fake acton reexec complete");
+    let bundle = release_bundle(&fake_acton)?;
+    let mock = mock_release_server("0.4.0", &bundle);
+
+    toolchain_command(&project, &home)
+        .arg("install")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_ci_preinstall_then_project_command_reexecs_noninteractive.install.stdout.txt",
+        );
+
+    let home = home.to_string_lossy().into_owned();
+    project
+        .acton()
+        .test()
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_ci_preinstall_then_project_command_reexecs_noninteractive.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_ci_preinstall_then_project_command_reexecs_noninteractive.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
 fn test_toolchain_install_downloads_requested_release_snapshot() -> Result<()> {
     let project = ProjectBuilder::new("toolchain-install-download").build();
     let home = isolated_home(&project);
     write_toolchain_index(&home)?;
 
     let bundle = release_bundle("toolchain-acton-0.4.0")?;
-    let archive_name = supported_archive_name();
-    let mock = GitHubMockServer::spawn_with(|base_url| {
-        let release = release_response(
-            "v0.4.0",
-            &mock_assets(
-                base_url,
-                "0.4.0",
-                &archive_name,
-                bundle.archive_len(),
-                bundle.checksum_len(),
-            ),
-        );
-        vec![
-            ExpectedHttpRequest::json("/repos/ton-blockchain/acton/releases/tags/v0.4.0", release),
-            ExpectedHttpRequest::binary(
-                &format!("/download/0.4.0/{archive_name}"),
-                bundle.archive_bytes.clone(),
-            ),
-            ExpectedHttpRequest::binary(
-                &format!("/download/0.4.0/{archive_name}.sha256"),
-                bundle.checksum_bytes.clone(),
-            ),
-        ]
-    });
+    let mock = mock_release_server("0.4.0", &bundle);
 
     toolchain_command(&project, &home)
         .arg("install")
@@ -181,6 +284,23 @@ fn toolchain_command(project: &Project, home: &Path) -> crate::support::project:
 
 fn isolated_home(project: &Project) -> PathBuf {
     project.path().join(".home")
+}
+
+#[cfg(unix)]
+fn assert_pty_transcript_snapshot_matches(
+    project: &Project,
+    transcript: &[u8],
+    snapshot_path: &str,
+) {
+    let transcript = String::from_utf8_lossy(transcript);
+    let normalized = crate::support::snapshots::normalize_output(&transcript, project.path());
+
+    let mut snapshot_full_path = std::env::current_dir().expect("failed to get current dir");
+    snapshot_full_path.push("tests");
+    snapshot_full_path.push(snapshot_path);
+
+    let expected = snapbox::Data::read_from(&snapshot_full_path, None);
+    crate::common::assertion().eq(normalized, expected);
 }
 
 fn project_with_toolchain(name: &str, toolchain: &str) -> Project {
@@ -295,6 +415,52 @@ fn release_bundle(binary_contents: &str) -> Result<ReleaseBundle> {
     Ok(ReleaseBundle {
         archive_bytes,
         checksum_bytes,
+    })
+}
+
+fn recording_fake_acton(stdout_line: &str) -> String {
+    format!(
+        r#"#!/bin/sh
+{{
+  printf 'argv=%s\n' "$*"
+  printf 'requested_acton=%s\n' "$ACTON_TOOLCHAIN_REQUESTED_ACTON"
+  printf 'requested_tolk=%s\n' "$ACTON_TOOLCHAIN_REQUESTED_TOLK"
+  printf 'reexec_depth=%s\n' "$ACTON_TOOLCHAIN_REEXEC_DEPTH"
+  printf 'source=%s\n' "$ACTON_TOOLCHAIN_SOURCE"
+  printf 'cwd=%s\n' "$(pwd)"
+}} > .toolchain-reexec.txt
+printf '{stdout_line}\n'
+"#
+    )
+}
+
+fn mock_release_server(version: &str, bundle: &ReleaseBundle) -> GitHubMockServer {
+    let archive_name = supported_archive_name();
+    GitHubMockServer::spawn_with(|base_url| {
+        let release = release_response(
+            &format!("v{version}"),
+            &mock_assets(
+                base_url,
+                version,
+                &archive_name,
+                bundle.archive_len(),
+                bundle.checksum_len(),
+            ),
+        );
+        vec![
+            ExpectedHttpRequest::json(
+                &format!("/repos/ton-blockchain/acton/releases/tags/v{version}"),
+                release,
+            ),
+            ExpectedHttpRequest::binary(
+                &format!("/download/{version}/{archive_name}"),
+                bundle.archive_bytes.clone(),
+            ),
+            ExpectedHttpRequest::binary(
+                &format!("/download/{version}/{archive_name}.sha256"),
+                bundle.checksum_bytes.clone(),
+            ),
+        ]
     })
 }
 

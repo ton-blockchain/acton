@@ -20,7 +20,7 @@ use acton::commands::rpc::{RpcCommand, rpc_cmd};
 use acton::commands::run::run_cmd;
 use acton::commands::script::script_cmd;
 use acton::commands::test::{mutation, test_cmd};
-use acton::commands::toolchain::{ToolchainCommand, toolchain_cmd};
+use acton::commands::toolchain::{ToolchainCommand, install_toolchain, toolchain_cmd};
 use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
@@ -52,8 +52,10 @@ use clap_complete::engine::{
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
+use inquire::Confirm;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
@@ -1606,19 +1608,42 @@ fn apply_project_toolchain(
 
     let config = load_project_toolchain_config()?;
     let environment = ToolchainEnvironment::runtime()?;
-    let report = resolve_toolchain(config.as_ref(), selector, &environment)?;
+    let mut report = resolve_toolchain(config.as_ref(), selector, &environment)?;
 
     if report.current {
         return Ok(());
     }
 
     if report.install_required {
-        anyhow::bail!(
-            "Project requires acton {} (Tolk {}), but it is not installed.\nRun `acton toolchain install` from the project root or `acton toolchain install {}`.",
-            report.acton,
-            report.tolk,
-            report.acton
-        );
+        if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+            anyhow::bail!(
+                "Project requires acton {} (Tolk {}), but it is not installed.\nRun `acton toolchain install` from the project root or `acton toolchain install {}`.",
+                report.acton,
+                report.tolk,
+                report.acton
+            );
+        }
+
+        let confirmed = Confirm::new(&format!(
+            "Project requires acton {} (Tolk {}). Install it now?",
+            report.acton, report.tolk
+        ))
+        .with_default(true)
+        .prompt()
+        .context("Failed to read toolchain installation confirmation")?;
+
+        if !confirmed {
+            anyhow::bail!(
+                "Acton {} is required but is not installed.\nRun `acton toolchain install` from the project root or `acton toolchain install {}`.",
+                report.acton,
+                report.acton
+            );
+        }
+
+        let installed_path = install_toolchain(&report)?;
+        report.path = Some(installed_path.display().to_string());
+        report.installed = true;
+        report.install_required = false;
     }
 
     let path = report
