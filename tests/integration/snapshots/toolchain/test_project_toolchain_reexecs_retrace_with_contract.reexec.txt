@@ -1,0 +1,6 @@
+argv=retrace abcdef --contract counter
+requested_acton=0.4.0
+requested_tolk=1.4.0
+reexec_depth=1
+source=project-acton
+cwd=[ROOT]

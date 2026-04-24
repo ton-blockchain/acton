@@ -1602,6 +1602,13 @@ const fn toolchain_resolution_is_allowed(command: &Commands) -> bool {
             | Commands::Check { .. }
             | Commands::Fmt { .. }
             | Commands::Verify { .. }
+            | Commands::Library {
+                command: LibraryCommand::Publish { .. },
+            }
+            | Commands::Retrace {
+                contract: Some(_),
+                ..
+            }
     )
 }
 

@@ -1009,6 +1009,177 @@ fn test_project_command_cli_selector_overrides_conflicting_project_toolchain_sna
 }
 
 #[test]
+fn test_project_toolchain_reexecs_library_publish_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-library-publish-project", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "library publish reexec complete"),
+    )?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("library")
+        .arg("publish")
+        .arg("counter")
+        .arg("--duration")
+        .arg("1d")
+        .arg("--wallet")
+        .arg("test")
+        .arg("--yes")
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_toolchain_reexecs_library_publish.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_toolchain_reexecs_library_publish.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_command_cli_selector_reexecs_library_publish_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-library-publish-cli").build();
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "cli library publish reexec complete"),
+    )?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("+0.4.0")
+        .arg("library")
+        .arg("publish")
+        .arg("counter")
+        .arg("--duration")
+        .arg("1d")
+        .arg("--wallet")
+        .arg("test")
+        .arg("--yes")
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_cli_selector_reexecs_library_publish.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_command_cli_selector_reexecs_library_publish.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_toolchain_reexecs_retrace_with_contract_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-retrace-contract-project", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "retrace contract reexec complete"),
+    )?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("retrace")
+        .arg("abcdef")
+        .arg("--contract")
+        .arg("counter")
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_toolchain_reexecs_retrace_with_contract.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_toolchain_reexecs_retrace_with_contract.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_command_cli_selector_reexecs_retrace_with_contract_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-retrace-contract-cli").build();
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "cli retrace contract reexec complete"),
+    )?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("+0.4.0")
+        .arg("retrace")
+        .arg("abcdef")
+        .arg("--contract")
+        .arg("counter")
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_cli_selector_reexecs_retrace_with_contract.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_command_cli_selector_reexecs_retrace_with_contract.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_command_cli_selector_disallows_retrace_without_contract_snapshot() {
+    let project = ProjectBuilder::new("toolchain-retrace-no-contract-cli").build();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("+0.4.0")
+        .arg("retrace")
+        .arg("abcdef")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_cli_selector_disallows_retrace_without_contract.stderr.txt",
+        );
+}
+
+#[test]
 fn test_toolchain_install_fails_when_probe_reports_wrong_acton_snapshot() -> Result<()> {
     let project = ProjectBuilder::new("toolchain-install-probe-mismatch").build();
     let home = isolated_home(&project);
