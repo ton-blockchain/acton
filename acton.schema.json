@@ -347,7 +347,6 @@
         },
         "max-warnings": {
           "description": "Maximum allowed warning count before `acton check` exits with a non-zero code",
-          "default": 18446744073709551615,
           "type": "integer",
           "format": "uint",
           "minimum": 0.0

@@ -3,7 +3,7 @@ use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
+    ActonConfig, ContractConfig, ContractsConfig, FmtSettings, LintConfig, default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
@@ -241,6 +241,17 @@ pub fn new_cmd(
     );
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
+
+    config.fmt = Some(FmtSettings {
+        width: Some(100),
+        ignore: Some(vec!["**/*.gen.tolk".to_owned()]),
+        ..Default::default()
+    });
+
+    config.lint = Some(LintConfig {
+        exclude: Some(vec!["**/*.gen.tolk".to_owned()]),
+        ..Default::default()
+    });
 
     let mut acton_toml = toml::to_string_pretty(&config)?;
     acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
