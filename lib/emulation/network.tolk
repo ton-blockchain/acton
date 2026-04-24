@@ -173,22 +173,6 @@ fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
 }
 
-/// Returns LT of the first transaction in the list.
-fun SendResultList.firstTxLt(self): int? {
-    if (self.size() == 0) {
-        return null;
-    }
-    return self.at(0).lt;
-}
-
-/// Returns LT of the last transaction in the list.
-fun SendResultList.lastTxLt(self): int? {
-    if (self.size() == 0) {
-        return null;
-    }
-    return self.at(self.size() - 1).lt;
-}
-
 /// Give a custom name for a trace chain produced by [net.send].
 ///
 /// The custom name is used in the Test UI and gas/fee profiling reports instead of "trace N".
@@ -1146,21 +1130,19 @@ fun unknown.__getDeclaredPackPrefixLen(): int {
 }
 
 fun __acton_impl_findTransaction(txs: SendResultList, params: SearchParams): cell? {
-    val firstTxLt = txs.firstTxLt();
-    val lastTxLt = txs.lastTxLt();
-    if (firstTxLt == null || lastTxLt == null) {
+    if (txs.size() == 0) {
         return null;
     }
 
     return params.hasPredicates()
         ? ffi.findTransactionByPredicateParams(
-            firstTxLt as int,
-            lastTxLt as int,
+            txs.first().lt,
+            txs.last().lt,
             params.toPredicateFFITuple(),
         )
         : ffi.findTransactionByScalarParams(
-            firstTxLt as int,
-            lastTxLt as int,
+            txs.first().lt,
+            txs.last().lt,
             params.toScalarFFITuple(),
         );
 }
