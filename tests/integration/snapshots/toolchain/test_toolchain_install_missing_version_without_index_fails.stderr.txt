@@ -1,0 +1,2 @@
+Warning: failed to fetch toolchain index: GitHub contents API returned 500 Internal Server Error for i582/acton-public; GitHub contents API returned 500 Internal Server Error for ton-blockchain/acton
+Error: Could not resolve Acton toolchain version 0.4.0 because the toolchain index is unavailable and no installed metadata was found.

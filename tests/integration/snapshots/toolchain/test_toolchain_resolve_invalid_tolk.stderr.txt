@@ -1,0 +1,4 @@
+Error: [toolchain].tolk must be an exact X.Y.Z version
+
+Caused by:
+  unexpected end of input while parsing minor version number

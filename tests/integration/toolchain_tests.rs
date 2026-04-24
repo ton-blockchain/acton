@@ -108,6 +108,167 @@ fn test_toolchain_list_fetches_index_from_fallback_repo_snapshot() -> Result<()>
 }
 
 #[test]
+fn test_toolchain_list_uses_fresh_cached_index_without_network_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-list-fresh-cache").build();
+    let home = isolated_home(&project);
+    write_toolchain_index_json(&home, &remote_toolchain_index_json("0.6.0", "1.6.0"))?;
+    let mock = GitHubMockServer::spawn_with(|_| Vec::new());
+
+    toolchain_command(&project, &home)
+        .arg("list")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_uses_fresh_cached_index_without_network.stdout.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_list_refreshes_stale_cache_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-list-stale-cache-refresh").build();
+    let home = isolated_home(&project);
+    write_stale_toolchain_index_json(
+        &home,
+        &remote_toolchain_index_json("0.6.0", "1.6.0"),
+        "i582/acton-public",
+        None,
+        None,
+    )?;
+    let remote_index = remote_toolchain_index_json("0.6.1", "1.6.1");
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![ExpectedHttpRequest::json(
+            "/repos/i582/acton-public/contents/toolchain-index.json",
+            github_contents_response(&remote_index),
+        )]
+    });
+
+    toolchain_command(&project, &home)
+        .arg("list")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_refreshes_stale_cache.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".home/.acton/toolchains/index.json",
+            "integration/snapshots/toolchain/test_toolchain_list_refreshes_stale_cache.index.json",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_list_reuses_stale_cache_when_refresh_fails_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-list-stale-cache-fallback").build();
+    let home = isolated_home(&project);
+    write_stale_toolchain_index_json(
+        &home,
+        &remote_toolchain_index_json("0.6.0", "1.6.0"),
+        "i582/acton-public",
+        None,
+        None,
+    )?;
+    let mock = failing_toolchain_index_server();
+
+    toolchain_command(&project, &home)
+        .arg("list")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_reuses_stale_cache_when_refresh_fails.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_reuses_stale_cache_when_refresh_fails.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_list_not_modified_refreshes_cache_metadata_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-list-not-modified").build();
+    let home = isolated_home(&project);
+    write_stale_toolchain_index_json(
+        &home,
+        &remote_toolchain_index_json("0.6.0", "1.6.0"),
+        "i582/acton-public",
+        Some("\"test-etag\""),
+        Some("Fri, 24 Apr 2026 00:00:00 GMT"),
+    )?;
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::empty(
+                304,
+                "/repos/i582/acton-public/contents/toolchain-index.json",
+            )
+            .with_header("if-none-match", "\"test-etag\"")
+            .with_header("if-modified-since", "Fri, 24 Apr 2026 00:00:00 GMT"),
+        ]
+    });
+
+    toolchain_command(&project, &home)
+        .arg("list")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            ".home/.acton/toolchains/index-meta.json",
+            "integration/snapshots/toolchain/test_toolchain_list_not_modified_refreshes_cache_metadata.index-meta.json",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_list_invalid_fresh_index_keeps_cached_index_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-list-invalid-refresh").build();
+    let home = isolated_home(&project);
+    write_stale_toolchain_index_json(
+        &home,
+        &remote_toolchain_index_json("0.6.0", "1.6.0"),
+        "i582/acton-public",
+        None,
+        None,
+    )?;
+    let invalid_index = r#"{"schema":1,"generated_at":"2026-04-24T00:00:00Z","releases":[{"acton":"0.6.1","tolk":"1.6","tag":"v0.6.1","stable":true}]}"#;
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::json(
+                "/repos/i582/acton-public/contents/toolchain-index.json",
+                github_contents_response(invalid_index),
+            ),
+            ExpectedHttpRequest::empty(
+                404,
+                "/repos/ton-blockchain/acton/contents/toolchain-index.json",
+            ),
+        ]
+    });
+
+    toolchain_command(&project, &home)
+        .arg("list")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_invalid_fresh_index_keeps_cached_index.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_list_invalid_fresh_index_keeps_cached_index.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".home/.acton/toolchains/index.json",
+            "integration/snapshots/toolchain/test_toolchain_list_invalid_fresh_index_keeps_cached_index.index.json",
+        );
+
+    Ok(())
+}
+
+#[test]
 fn test_toolchain_install_current_version_noop_snapshot() {
     let project = ProjectBuilder::new("toolchain-install-current").build();
     let home = isolated_home(&project);
@@ -208,6 +369,146 @@ fn test_project_command_installed_yanked_metadata_fails_snapshot() -> Result<()>
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/toolchain/test_project_command_installed_yanked_metadata_fails.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_resolve_conflicting_pins_suggests_fix_snapshot() -> Result<()> {
+    let project = project_with_toolchain(
+        "toolchain-resolve-conflict",
+        "acton = \"0.3.1\"\ntolk = \"1.4.0\"",
+    );
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    toolchain_command(&project, &home)
+        .arg("resolve")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_resolve_conflicting_pins_suggests_fix.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_resolve_unknown_acton_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-resolve-unknown-acton", "acton = \"9.9.9\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    toolchain_command(&project, &home)
+        .arg("resolve")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_resolve_unknown_acton.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_resolve_unknown_tolk_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-resolve-unknown-tolk", "tolk = \"9.9.9\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    toolchain_command(&project, &home)
+        .arg("resolve")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_resolve_unknown_tolk.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_resolve_invalid_acton_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-resolve-invalid-acton", "acton = \"0.4\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    toolchain_command(&project, &home)
+        .arg("resolve")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_resolve_invalid_acton.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_resolve_invalid_tolk_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-resolve-invalid-tolk", "tolk = \"1.4\"");
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+
+    toolchain_command(&project, &home)
+        .arg("resolve")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_resolve_invalid_tolk.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_install_missing_version_without_index_fails_snapshot() -> Result<()> {
+    let project = ProjectBuilder::new("toolchain-install-index-unavailable").build();
+    let home = isolated_home(&project);
+    let mock = failing_toolchain_index_server();
+
+    toolchain_command(&project, &home)
+        .arg("install")
+        .arg("0.4.0")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_install_missing_version_without_index_fails.stderr.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_command_installed_exact_without_index_reexecs_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-installed-no-index", "acton = \"0.4.0\"");
+    let home = isolated_home(&project);
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "installed exact reexec complete"),
+    )?;
+    let mock = failing_toolchain_index_server();
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .test()
+        .env("HOME", &home)
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_installed_exact_without_index_reexecs.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_command_installed_exact_without_index_reexecs.reexec.txt",
         );
 
     Ok(())
@@ -334,6 +635,73 @@ fn test_ci_preinstall_then_project_command_reexecs_noninteractive_snapshot() -> 
         .assert_file_snapshot_matches(
             ".toolchain-reexec.txt",
             "integration/snapshots/toolchain/test_ci_preinstall_then_project_command_reexecs_noninteractive.reexec.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_toolchain_install_tolk_only_selects_newest_compatible_release_snapshot() -> Result<()> {
+    let project = project_with_toolchain("toolchain-install-tolk-only", "tolk = \"1.4.0\"");
+    let home = isolated_home(&project);
+    write_toolchain_index_json(
+        &home,
+        &toolchain_index_json(vec![
+            release_entry("0.4.0", "1.4.0", true, false),
+            release_entry("0.4.1", "1.4.0", true, false),
+            release_entry("0.4.2", "1.4.0", true, true),
+        ]),
+    )?;
+
+    let fake_acton = version_probe_fake_acton("0.4.1", "1.4.0", "toolchain-acton-0.4.1");
+    let bundle = release_bundle(&fake_acton)?;
+    let mock = mock_release_server("0.4.1", &bundle);
+
+    toolchain_command(&project, &home)
+        .arg("install")
+        .env(TEST_TOOLCHAIN_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_toolchain_install_tolk_only_selects_newest_compatible_release.stdout.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+fn test_project_command_cli_selector_overrides_conflicting_project_toolchain_snapshot() -> Result<()>
+{
+    let project = project_with_toolchain(
+        "toolchain-cli-selector-overrides-conflict",
+        "acton = \"0.3.1\"\ntolk = \"1.3.0\"",
+    );
+    let home = isolated_home(&project);
+    write_toolchain_index(&home)?;
+    write_installed_toolchain(
+        &home,
+        "0.4.0",
+        "1.4.0",
+        false,
+        None,
+        &recording_fake_acton("0.4.0", "1.4.0", "cli override reexec complete"),
+    )?;
+    let home = home.to_string_lossy().into_owned();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("+0.4.0")
+        .arg("test")
+        .env("HOME", &home)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/toolchain/test_project_command_cli_selector_overrides_conflicting_project_toolchain.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".toolchain-reexec.txt",
+            "integration/snapshots/toolchain/test_project_command_cli_selector_overrides_conflicting_project_toolchain.reexec.txt",
         );
 
     Ok(())
@@ -522,22 +890,60 @@ fn write_current_toolchain_index(home: &Path) -> Result<()> {
 }
 
 fn write_toolchain_index_json(home: &Path, index_json: &str) -> Result<()> {
+    write_toolchain_index_json_with_meta(
+        home,
+        index_json,
+        &chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "test-cache",
+        "test",
+        None,
+        None,
+    )
+}
+
+fn write_stale_toolchain_index_json(
+    home: &Path,
+    index_json: &str,
+    source_repo: &str,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<()> {
+    write_toolchain_index_json_with_meta(
+        home,
+        index_json,
+        "2020-01-01T00:00:00Z",
+        source_repo,
+        "test",
+        etag,
+        last_modified,
+    )
+}
+
+fn write_toolchain_index_json_with_meta(
+    home: &Path,
+    index_json: &str,
+    fetched_at: &str,
+    source_repo: &str,
+    source_ref: &str,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<()> {
     let index_dir = home.join(".acton/toolchains");
     fs::create_dir_all(&index_dir)?;
     fs::write(index_dir.join("index.json"), index_json)?;
-    fs::write(
-        index_dir.join("index-meta.json"),
-        format!(
-            "{:#}\n",
-            json!({
-                "schema": 1,
-                "fetched_at": chrono::Utc::now()
-                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-                "source_repo": "test-cache",
-                "source_ref": "test"
-            })
-        ),
-    )?;
+    let mut meta = json!({
+        "schema": 1,
+        "fetched_at": fetched_at,
+        "source_repo": source_repo,
+        "source_ref": source_ref
+    });
+    if let Some(etag) = etag {
+        meta["etag"] = json!(etag);
+    }
+    if let Some(last_modified) = last_modified {
+        meta["last_modified"] = json!(last_modified);
+    }
+    fs::write(index_dir.join("index-meta.json"), format!("{meta:#}\n"))?;
     Ok(())
 }
 
@@ -569,20 +975,30 @@ fn write_installed_toolchain(
 }
 
 fn remote_toolchain_index_json(acton: &str, tolk: &str) -> String {
+    toolchain_index_json(vec![release_entry(acton, tolk, true, false)])
+}
+
+fn toolchain_index_json(releases: Vec<Value>) -> String {
     json!({
         "schema": 1,
         "generated_at": "2026-04-24T00:00:00Z",
-        "releases": [
-            {
-                "acton": acton,
-                "tolk": tolk,
-                "tag": format!("v{acton}"),
-                "stable": true,
-                "yanked": false
-            }
-        ]
+        "releases": releases
     })
     .to_string()
+}
+
+fn release_entry(acton: &str, tolk: &str, stable: bool, yanked: bool) -> Value {
+    let mut release = json!({
+        "acton": acton,
+        "tolk": tolk,
+        "tag": format!("v{acton}"),
+        "stable": stable,
+        "yanked": yanked
+    });
+    if yanked {
+        release["yank_reason"] = json!("broken release");
+    }
+    release
 }
 
 fn github_contents_response(content: &str) -> String {
@@ -737,6 +1153,21 @@ fn mock_release_server(version: &str, bundle: &ReleaseBundle) -> GitHubMockServe
     })
 }
 
+fn failing_toolchain_index_server() -> GitHubMockServer {
+    GitHubMockServer::spawn_with(|_| {
+        vec![
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/i582/acton-public/contents/toolchain-index.json",
+            ),
+            ExpectedHttpRequest::empty(
+                500,
+                "/repos/ton-blockchain/acton/contents/toolchain-index.json",
+            ),
+        ]
+    })
+}
+
 fn archive_bytes(binary_contents: &str) -> Result<Vec<u8>> {
     let encoder = GzBuilder::new()
         .mtime(0)
@@ -758,6 +1189,7 @@ fn archive_bytes(binary_contents: &str) -> Result<Vec<u8>> {
 struct ExpectedHttpRequest {
     status: u16,
     path: String,
+    required_headers: Vec<(String, String)>,
     content_type: &'static str,
     body: Vec<u8>,
 }
@@ -767,6 +1199,7 @@ impl ExpectedHttpRequest {
         Self {
             status,
             path: path.to_owned(),
+            required_headers: Vec::new(),
             content_type: "text/plain",
             body: Vec::new(),
         }
@@ -776,6 +1209,7 @@ impl ExpectedHttpRequest {
         Self {
             status: 200,
             path: path.to_owned(),
+            required_headers: Vec::new(),
             content_type: "application/json",
             body: body.into().into_bytes(),
         }
@@ -785,9 +1219,16 @@ impl ExpectedHttpRequest {
         Self {
             status: 200,
             path: path.to_owned(),
+            required_headers: Vec::new(),
             content_type: "application/octet-stream",
             body,
         }
+    }
+
+    fn with_header(mut self, name: &str, value: &str) -> Self {
+        self.required_headers
+            .push((name.to_ascii_lowercase(), value.to_owned()));
+        self
     }
 }
 
@@ -833,12 +1274,25 @@ impl GitHubMockServer {
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .expect("failed to set GitHub mock read timeout");
 
-                let request_path = read_http_request_path(&stream);
+                let request = read_http_request(&stream);
                 assert_eq!(
-                    request_path, expected.path,
+                    request.path, expected.path,
                     "unexpected request path for {}",
                     expected.path
                 );
+                for (name, value) in &expected.required_headers {
+                    let actual = request
+                        .headers
+                        .iter()
+                        .find(|(header_name, _)| header_name == name)
+                        .map(|(_, header_value)| header_value.as_str());
+                    assert_eq!(
+                        actual,
+                        Some(value.as_str()),
+                        "unexpected `{name}` header for {}",
+                        expected.path
+                    );
+                }
 
                 write_http_response(
                     &mut stream,
@@ -874,7 +1328,12 @@ impl Drop for GitHubMockServer {
     }
 }
 
-fn read_http_request_path(stream: &std::net::TcpStream) -> String {
+struct RecordedHttpRequest {
+    path: String,
+    headers: Vec<(String, String)>,
+}
+
+fn read_http_request(stream: &std::net::TcpStream) -> RecordedHttpRequest {
     let mut reader = BufReader::new(
         stream
             .try_clone()
@@ -905,6 +1364,7 @@ fn read_http_request_path(stream: &std::net::TcpStream) -> String {
         }
     }
 
+    let mut headers = Vec::new();
     loop {
         let mut header_line = String::new();
         let read = reader
@@ -913,12 +1373,18 @@ fn read_http_request_path(stream: &std::net::TcpStream) -> String {
         if read == 0 || header_line == "\r\n" {
             break;
         }
+        if let Some((name, value)) = header_line.trim_end().split_once(':') {
+            headers.push((name.trim().to_ascii_lowercase(), value.trim().to_owned()));
+        }
     }
 
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default();
     assert_eq!(method, "GET", "unexpected GitHub mock request method");
-    parts.next().unwrap_or_default().to_owned()
+    RecordedHttpRequest {
+        path: parts.next().unwrap_or_default().to_owned(),
+        headers,
+    }
 }
 
 fn write_http_response(
@@ -928,6 +1394,7 @@ fn write_http_response(
     body: &[u8],
 ) {
     let status_text = match status {
+        304 => "Not Modified",
         404 => "Not Found",
         500 => "Internal Server Error",
         _ => "OK",

@@ -14,12 +14,19 @@ concurrency:
 env:
   PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
-permissions: { }
+permissions:
+  contents: read
 
 jobs:
   publish-mirror:
     runs-on: ubicloud-standard-2-ubuntu-2204
     steps:
+      - name: Checkout source repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          submodules: false
+          path: source
       - name: Download GitHub Artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -56,3 +63,26 @@ jobs:
             --title "$ANNOUNCEMENT_TITLE" \
             --notes-file "$RUNNER_TEMP/notes.txt" \
             artifacts/*
+
+      - name: Update public toolchain index
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_tag }}"
+        # language=Bash
+        run: |
+          public_repo="$RUNNER_TEMP/acton-public"
+          gh repo clone "$PUBLIC_ACTON_REPOSITORY" "$public_repo" -- --depth 1
+
+          cp source/toolchain-index.json "$public_repo/toolchain-index.json"
+
+          cd "$public_repo"
+          if git diff --quiet -- toolchain-index.json; then
+            echo "toolchain-index.json is already up to date in ${PUBLIC_ACTON_REPOSITORY}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add toolchain-index.json
+          git commit -m "chore: update toolchain index for ${RELEASE_TAG}"
+          git push

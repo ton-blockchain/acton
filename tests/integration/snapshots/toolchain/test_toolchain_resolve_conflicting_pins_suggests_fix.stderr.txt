@@ -1,0 +1,9 @@
+Error: Acton.toml requests acton 0.3.1 and tolk 1.4.0, but acton 0.3.1 ships tolk 1.3.0.
+Known Acton releases for Tolk 1.4.0: 0.4.0.
+Recommended fix:
+  [toolchain]
+  acton = "0.4.0"
+  tolk = "1.4.0"
+
+Or remove the `acton` pin and keep `tolk = "1.4.0"` so Acton can choose the newest supported release.
+Then run `acton toolchain install`.

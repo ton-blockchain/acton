@@ -14,7 +14,6 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const BUNDLED_TOOLCHAIN_INDEX_JSON: &str = include_str!("../toolchain-index.json");
 const TOOLCHAIN_INDEX_REPOSITORIES: [&str; 2] = ["i582/acton-public", "ton-blockchain/acton"];
 const TOOLCHAIN_INDEX_FILE: &str = "toolchain-index.json";
 const TOOLCHAIN_INDEX_CACHE_TTL_HOURS: i64 = 24;
@@ -106,7 +105,7 @@ pub struct ToolchainIndexCacheMeta {
 }
 
 struct ToolchainIndexLoad {
-    index: ToolchainIndex,
+    index: Option<ToolchainIndex>,
     warning: Option<String>,
 }
 
@@ -250,7 +249,7 @@ impl ToolchainEnvironment {
             current_acton: crate::build_info::PACKAGE_VERSION.to_owned(),
             current_tolk: crate::build_info::TOLK_VERSION.to_owned(),
             current_exe: env::current_exe().context("failed to resolve current executable")?,
-            index: Some(index.index),
+            index: index.index,
             index_warning: index.warning,
             installed: scan_installed_toolchains(),
         })
@@ -274,7 +273,7 @@ impl ToolchainIndex {
                 .is_some_and(toolchain_index_cache_is_fresh)
         {
             return Ok(ToolchainIndexLoad {
-                index: cached.index.clone(),
+                index: Some(cached.index.clone()),
                 warning: None,
             });
         }
@@ -285,7 +284,10 @@ impl ToolchainIndex {
                 let warning = write_toolchain_index_cache(&index, &meta).err().map(|err| {
                     format!("fetched toolchain index but failed to update cache: {err}")
                 });
-                Ok(ToolchainIndexLoad { index, warning })
+                Ok(ToolchainIndexLoad {
+                    index: Some(index),
+                    warning,
+                })
             }
             Ok(RemoteToolchainIndex::NotModified { meta }) => {
                 if let Some(cached) = cached {
@@ -295,28 +297,33 @@ impl ToolchainIndex {
                             format!("refreshed toolchain index metadata but failed to update cache: {err}")
                         });
                     Ok(ToolchainIndexLoad {
-                        index: cached.index,
+                        index: Some(cached.index),
                         warning,
                     })
                 } else {
-                    bundled_toolchain_index_load(Some(
-                        "remote toolchain index returned 304 but no local cache exists".to_owned(),
-                    ))
+                    Ok(ToolchainIndexLoad {
+                        index: None,
+                        warning: Some(
+                            "remote toolchain index returned 304 but no local cache exists"
+                                .to_owned(),
+                        ),
+                    })
                 }
             }
             Err(err) => {
                 if let Some(cached) = cached {
                     return Ok(ToolchainIndexLoad {
-                        index: cached.index,
+                        index: Some(cached.index),
                         warning: Some(format!(
                             "failed to refresh toolchain index, using cached index: {err}"
                         )),
                     });
                 }
 
-                bundled_toolchain_index_load(Some(format!(
-                    "failed to fetch toolchain index, using bundled index: {err}"
-                )))
+                Ok(ToolchainIndexLoad {
+                    index: None,
+                    warning: Some(format!("failed to fetch toolchain index: {err}")),
+                })
             }
         }
     }
@@ -421,13 +428,6 @@ impl ToolchainIndex {
         releases.sort_by(|(left, _), (right, _)| left.cmp(right));
         releases.into_iter().map(|(_, acton)| acton).collect()
     }
-}
-
-fn bundled_toolchain_index_load(warning: Option<String>) -> Result<ToolchainIndexLoad> {
-    Ok(ToolchainIndexLoad {
-        index: ToolchainIndex::from_json(BUNDLED_TOOLCHAIN_INDEX_JSON)?,
-        warning,
-    })
 }
 
 fn read_cached_toolchain_index() -> Result<Option<CachedToolchainIndex>> {
@@ -891,6 +891,12 @@ fn conflicting_project_pins_message(
 }
 
 fn unknown_acton_message(acton: &str, index: Option<&ToolchainIndex>) -> String {
+    if index.is_none() {
+        return format!(
+            "Could not resolve Acton toolchain version {acton} because the toolchain index is unavailable and no installed metadata was found."
+        );
+    }
+
     let mut message = format!("Unknown Acton toolchain version {acton}.");
     if let Some(index) = index {
         let known = index.known_acton_versions();

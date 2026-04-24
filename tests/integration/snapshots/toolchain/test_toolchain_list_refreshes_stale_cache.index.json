@@ -1,0 +1,14 @@
+{
+  "generated_at": "[DATE]",
+  "releases": [
+    {
+      "acton": "0.6.1",
+      "stable": true,
+      "tag": "v0.6.1",
+      "tolk": "1.6.1",
+      "yank_reason": null,
+      "yanked": false
+    }
+  ],
+  "schema": 1
+}

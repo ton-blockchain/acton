@@ -188,8 +188,13 @@ Acton resolves known Acton/Tolk mappings from the toolchain index.
 
 The index is fetched from the Acton GitHub repositories and cached under
 `~/.acton/toolchains/index.json`. If the cache is fresh, Acton uses it without a
-network request. If the cache cannot be refreshed, Acton can continue with the
-best available cached or bundled index and prints a warning.
+network request. If a stale cache cannot be refreshed, Acton continues with the
+cached index and prints a warning.
+
+If no index cache is available and the index cannot be fetched, commands that
+need release metadata fail. An explicitly pinned Acton version that is already
+installed can still run from its local `release.json` metadata unless that
+metadata marks it as yanked.
 
 Yanked releases are rejected during resolution when yank metadata is available.
 

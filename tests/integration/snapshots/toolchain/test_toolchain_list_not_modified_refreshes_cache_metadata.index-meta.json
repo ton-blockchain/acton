@@ -1,0 +1,8 @@
+{
+  "etag": "\"test-etag\"",
+  "fetched_at": "[DATE]",
+  "last_modified": "Fri, 24 Apr 2026 00:00:00 GMT",
+  "schema": 1,
+  "source_ref": "test",
+  "source_repo": "i582/acton-public"
+}
