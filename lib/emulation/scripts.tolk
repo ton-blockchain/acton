@@ -1,25 +1,25 @@
 /// Module for public API to be used in scripts (interacting with real blockchain).
-/// 
+///
 /// You write scripts to deploy and manage your contracts in a real blockchain.
 /// Use methods `scripts.xxx` in combination with `net.xxx` in `scripts/some-file.tolk`.
-/// 
+///
 /// Writing scripts that operate testnet/mainnet differs from writing tests.
 /// In scripts, you connect your real wallet to send transactions.
 /// In scripts, you are not able to set blockchain config or create an unlimited treasury.
 /// In scripts, you wait for network responses, which takes time.
 ///
 /// Any script can be run in either in emulation mode (without `--net`) or in a real blockchain (with `--net`).
-/// 
+///
 
 import "_impl_emul"
-import "../ffi"
-import "../impl"
-import "../crypto"
-import "../testing/assert"
-import "../types/transaction"
+import "config"
 import "network"
 import "testing"
-import "config"
+import "../crypto"
+import "../ffi"
+import "../impl"
+import "../testing/assert"
+import "../types/transaction"
 
 /// Root module for public API to be used in scripts along with `net.xxx` methods.
 struct scripts
@@ -136,7 +136,7 @@ fun scripts.wallet(name: string): ActonWallet {
 /// }
 /// ```
 fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
-    return impl.getAccountState(addr)
+    return impl.getAccountState(addr);
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -187,7 +187,7 @@ fun scripts.fetchShardAccount(addr: address): TlbShardAccount? {
 /// Returns a map of all blockchain configuration parameters indexed from 0-90.
 /// The configuration includes gas prices, storage costs, validator settings, and other
 /// network parameters. Use specialized getter functions like [BlockchainConfigMap.getGasPrices],
-/// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion] 
+/// [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion]
 /// to access specific parameters.
 ///
 /// For detailed information about blockchain configuration parameters, see the
@@ -229,7 +229,6 @@ fun scripts.fetchConfig(): BlockchainConfigMap {
 fun scripts.isContractDeployed(addr: address): bool {
     return ffi.isDeployed(addr.toCell());
 }
-
 
 fun ffi.getWalletByName(name: string): cell? asm "24 EXTCALL"
 fun ffi.getWalletKeyPair(addr: address): [int, int]? asm "45 EXTCALL"

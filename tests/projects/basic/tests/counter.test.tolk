@@ -1,7 +1,7 @@
 import "../contracts/counter_messages"
 
-import "../../../../lib/io"
 import "../../../../lib/build"
+import "../../../../lib/io"
 import "../../../../lib/emulation/network"
 import "../../../../lib/emulation/testing"
 import "../../../../lib/testing/expect"

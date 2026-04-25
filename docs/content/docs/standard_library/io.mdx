@@ -36,7 +36,14 @@ eprintln("Critical failure in setup!");
 ## `println`
 
 ```tolk
-fun println<T1, T2 = void, T3 = void, T4 = void, T5 = void, T6 = void>(
+fun println<
+    T1,
+    T2 = void,
+    T3 = void,
+    T4 = void,
+    T5 = void,
+    T6 = void,
+>(
     value1: T1,
     value2: T2,
     value3: T3,
@@ -97,5 +104,5 @@ Example:
 eprintln("Something went wrong");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L93" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/io.tolk#L100" />
 

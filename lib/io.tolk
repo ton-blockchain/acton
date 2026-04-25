@@ -60,7 +60,14 @@ import "ffi"
 /// - If arguments outnumber placeholders, extra arguments are appended after the formatted text.
 /// - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
 /// - `{:ton}` uses floating-point conversion, so very large values can be rounded.
-fun println<T1, T2 = void, T3 = void, T4 = void, T5 = void, T6 = void>(
+fun println<
+    T1,
+    T2 = void,
+    T3 = void,
+    T4 = void,
+    T5 = void,
+    T6 = void,
+>(
     value1: T1,
     value2: T2,
     value3: T3,
@@ -94,7 +101,21 @@ fun eprintln(str: string): void {
     ffi.eprintln(str);
 }
 
-fun ffi.println(type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple, type4: string, arg4: tuple, type5: string, arg5: tuple, type6: string, arg6: tuple): void
+fun ffi.println(
+    type1: string,
+    arg1: tuple,
+    type2: string,
+    arg2: tuple,
+    type3: string,
+    arg3: tuple,
+    type4: string,
+    arg4: tuple,
+    type5: string,
+    arg5: tuple,
+    type6: string,
+    arg6: tuple,
+): void
     asm "1 EXTCALL"
+
 fun ffi.eprintln(str: string): void
     asm "2 EXTCALL"

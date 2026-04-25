@@ -23,11 +23,11 @@
 
 import "@stdlib/reflection"
 import "message"
-import "../fmt"
 import "../ffi"
+import "../fmt"
 import "../impl"
-import "../testing/expect"
 import "../testing/assert"
+import "../testing/expect"
 
 /// Represents a node in the out list.
 /// This is an internal linked-list node, you should not use it directly.
@@ -332,7 +332,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                         reflect.serializationPrefixOf<Msg>().0,
                         opcode,
                         opcodeTypeName == null ? "" : format(" ({})", opcodeTypeName),
-                    )
+                    ),
                 );
                 return;
             }

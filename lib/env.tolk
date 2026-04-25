@@ -40,8 +40,8 @@
 /// ```
 
 import "@stdlib/reflection"
-import "fmt"
 import "ffi"
+import "fmt"
 import "testing/assert"
 
 /// Returns value of the environment variable with the given name
@@ -82,7 +82,7 @@ fun int.__env(name: string): int? {
 fun coins.__env(name: string): coins? {
     val value = ffi.envInt(name);
     if (value == null) {
-        return null
+        return null;
     }
     return value;
 }

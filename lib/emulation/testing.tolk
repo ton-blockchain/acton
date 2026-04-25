@@ -10,13 +10,13 @@
 ///
 
 import "_impl_emul"
-import "../ffi"
-import "../impl"
 import "config"
 import "network"
+import "../ffi"
+import "../impl"
 import "../testing/assert"
-import "../types/transaction"
 import "../types/out_actions"
+import "../types/transaction"
 
 /// Root module for public API to be used in tests along with `net.xxx` methods.
 struct testing
@@ -95,9 +95,7 @@ fun TxCursor.executeAllRemaining(self): SendResultList {
 /// This API is emulation-only and is intended for programmable partial execution workflows
 /// such as large cascades and interleaving multiple message chains.
 fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCursor {
-    return {
-        id: ffi.startMessageIter(message.messageCell, from.toCell()),
-    };
+    return { id: ffi.startMessageIter(message.messageCell, from.toCell()) };
 }
 
 /// Send a single message from a specified address.
@@ -205,7 +203,7 @@ fun impl.treasuryCode(): cell asm """
 /// }
 /// ```
 fun testing.getAccountState(addr: address): TlbAccountInfo? {
-    return impl.getAccountState(addr)
+    return impl.getAccountState(addr);
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -449,8 +447,8 @@ fun testing.setConfig(config: BlockchainConfigMap): bool {
         val basechainFwd = config.getMsgForwardPrices(BASECHAIN);
         unpacked.set(basechainFwd.toCell().beginParse(), 5);
 
-        params.set(root, 9);        // 9: root index in c7
-        params.set(unpacked, 14);   // 14: unpacked index in c7
+        params.set(root, 9);      // 9: root index in c7
+        params.set(unpacked, 14); // 14: unpacked index in c7
         c7.set(params, 0);
         testing.setC7OutsideContract(c7);
     }
@@ -516,7 +514,6 @@ fun testing.isDeployed(addr: address): bool {
 fun testing.outActions(): OutActionList {
     return impl.parseOutActions(impl.getC5());
 }
-
 
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
 fun ffi.startMessageIter(msg: cell, from: cell): int asm "39 EXTCALL"

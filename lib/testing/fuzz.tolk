@@ -18,8 +18,8 @@
 /// ```
 
 import "@stdlib/reflection"
-import "../fmt"
 import "assert"
+import "../fmt"
 
 /// Root module for fuzz-testing helpers.
 ///

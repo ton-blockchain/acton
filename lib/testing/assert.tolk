@@ -150,9 +150,7 @@ fun Assert.equalDecimal<T>(
     message: string = "",
     location: string = "",
 ): void {
-    assert (
-        ffi.assertDecimal(location, message, decimals, right, left)
-    ) throw ASSERTION_FAILED;
+    assert (ffi.assertDecimal(location, message, decimals, right, left)) throw ASSERTION_FAILED;
 }
 
 fun ffi.assertBin<V1, V2>(

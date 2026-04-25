@@ -99,7 +99,7 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 /// ```
 fun parseInt(x: string): int {
     val n = ffi.parseInt(x);
-    assert (n != null) throw 5;     // 5 = "integer out of range"
+    assert (n != null) throw 5; // 5 = "integer out of range"
     return n;
 }
 
@@ -130,8 +130,19 @@ fun parseCellFromHex(cellHex: string): cell {
     return ffi.cellFromHex(cellHex);
 }
 
-
-fun ffi.format(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple, type4: string, arg4: tuple, type5: string, arg5: tuple): string
+fun ffi.format(
+    fmt: string,
+    type1: string,
+    arg1: tuple,
+    type2: string,
+    arg2: tuple,
+    type3: string,
+    arg3: tuple,
+    type4: string,
+    arg4: tuple,
+    type5: string,
+    arg5: tuple,
+): string
     asm "200 EXTCALL"
 
 fun ffi.convertAddress(addr: string): cell

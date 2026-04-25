@@ -1,7 +1,7 @@
+import "@local-acton/impl"
 import "@local-acton/emulation/network"
 import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
-import "@local-acton/impl"
 import "@local-acton/types/message"
 import "@local-acton/types/out_actions"
 

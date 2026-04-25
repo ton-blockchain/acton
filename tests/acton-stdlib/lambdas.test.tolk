@@ -1,13 +1,13 @@
 import "@stdlib/reflection"
-import "@local-acton/types/array"
-import "@local-acton/io"
 import "@local-acton/build"
+import "@local-acton/ffi"
 import "@local-acton/fmt"
+import "@local-acton/io"
 import "@local-acton/emulation/network"
 import "@local-acton/emulation/testing"
-import "@local-acton/ffi"
 import "@local-acton/testing/assert"
 import "@local-acton/testing/expect"
+import "@local-acton/types/array"
 import "contracts/types"
 
 fun x2(x: int): int {

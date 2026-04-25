@@ -137,10 +137,12 @@ get fun `test run get method with objectt argument`() {
     val result: Pair = net.runGetMethod(
         counter.address,
         "doubleObject",
-        [Pair {
-            x: 100,
-            y: 200,
-        }],
+        [
+            Pair {
+                x: 100,
+                y: 200,
+            },
+        ],
     );
     expect(result).toEqual(Pair {
         x: 200,

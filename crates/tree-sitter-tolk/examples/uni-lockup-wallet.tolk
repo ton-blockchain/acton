@@ -1,44 +1,55 @@
+import "@stdlib/gas-payments"
 import "@stdlib/tvm-dicts"
 import "@stdlib/tvm-lowlevel"
-import "@stdlib/gas-payments"
 
 // Restricted wallet initialized by a third party (a variant of restricted-wallet3-code.fc)
 // Allows to add more locked budget after initialization
 
 @pure
 fun `err:wrong_signature`(): int
-    asm "31 PUSHINT";
+    asm "31 PUSHINT"
+
 @pure
 fun `err:wrong_config_signature`(): int
-    asm "32 PUSHINT";
+    asm "32 PUSHINT"
+
 @pure
 fun `err:value_is_too_small`(): int
-    asm "33 PUSHINT";
+    asm "33 PUSHINT"
+
 @pure
 fun `err:wrong_seqno`(): int
-    asm "34 PUSHINT";
+    asm "34 PUSHINT"
+
 @pure
 fun `err:wrong_subwallet_id`(): int
-    asm "35 PUSHINT";
+    asm "35 PUSHINT"
+
 @pure
 fun `err:replay_protection`(): int
-    asm "36 PUSHINT";
+    asm "36 PUSHINT"
+
 @pure
 fun `err:unknown_op`(): int
-    asm "40 PUSHINT";
+    asm "40 PUSHINT"
+
 @pure
 fun `err:unknown_cmd`(): int
-    asm "41 PUSHINT";
+    asm "41 PUSHINT"
 
 @pure
 fun `op:rwallet_op`(): int
-    asm "0x82eaf9c4 PUSHINT";
+    asm "0x82eaf9c4 PUSHINT"
+
 @pure
 fun `cmd:restricted_transfer`(): int
-    asm "0x373aa9f4 PUSHINT";
+    asm "0x373aa9f4 PUSHINT"
 
 fun isWhitelisted(addr: auto, allowedDestinations: auto) {
-    var (_, _, _, found: int) = allowedDestinations.prefixDictGet(addr.getRemainingBitsCount(), addr);
+    var (_, _, _, found: int) = allowedDestinations.prefixDictGet(
+        addr.getRemainingBitsCount(),
+        addr,
+    );
     return found;
 }
 
@@ -70,13 +81,23 @@ fun unpackData() {
         cs.loadCoins(),
         cs.loadDict(),
         cs.loadCoins(),
-        cs.loadDict()
+        cs.loadDict(),
     );
     cs.assertEndOfSlice();
     return res;
 }
 
-fun packData(seqno: int, subwalletId: int, publicKey: int, configPublicKey: int, allowedDestinations: cell, totalLockedValue: int, locked: cell, totalRestrictedValue: int, restricted: cell) {
+fun packData(
+    seqno: int,
+    subwalletId: int,
+    publicKey: int,
+    configPublicKey: int,
+    allowedDestinations: cell,
+    totalLockedValue: int,
+    locked: cell,
+    totalRestrictedValue: int,
+    restricted: cell,
+) {
     return beginCell()
         .storeInt(seqno, 32)
         .storeInt(subwalletId, 32)
@@ -86,7 +107,8 @@ fun packData(seqno: int, subwalletId: int, publicKey: int, configPublicKey: int,
         .storeCoins(totalLockedValue)
         .storeDict(locked)
         .storeCoins(totalRestrictedValue)
-        .storeDict(restricted).endCell();
+        .storeDict(restricted)
+        .endCell();
 }
 
 fun lockGrams(locked: cell, total: int, ts: int, value: int): (cell, int) {
@@ -115,13 +137,13 @@ fun unlockGrams(locked: cell, total: int, nowTs: int): (cell, int) {
             valueCs.assertEndOfSlice();
             total -= value;
         }
-    } while (!(~ f));
+    } while (!(~f));
     return (locked, total);
 }
 
 fun onInternalMessage(msgValue: int, inMsgCell: cell, inMsg: slice) {
     var cs = inMsgCell.beginParse();
-    var flags = cs.loadUint(4);  // int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    var flags = cs.loadUint(4); // int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
     if (flags & 1) {
         // ignore all bounced messages
         return;
@@ -135,43 +157,77 @@ fun onInternalMessage(msgValue: int, inMsgCell: cell, inMsg: slice) {
         // simple transfer with comment, return
         return;
     }
-    var (storedSeqno, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted) = unpackData();
+    var (
+        storedSeqno,
+        storedSubwallet,
+        publicKey,
+        configPublicKey,
+        allowedDestinations,
+        totalLockedValue,
+        locked,
+        totalRestrictedValue,
+        restricted,
+    ) = unpackData();
 
     if (isWhitelisted(sAddr, allowedDestinations) & (op != `op:rwallet_op`())) {
         return;
     }
 
-    assert(op == `op:rwallet_op`()) throw `err:unknown_op`();
-    assert(msgValue >= 1000000000) throw `err:value_is_too_small`();
-
-
+    assert (op == `op:rwallet_op`()) throw `err:unknown_op`();
+    assert (msgValue >= 1000000000) throw `err:value_is_too_small`();
 
     var signature = inMsg.loadBits(512);
-    assert(isSignatureValid(sliceHash(inMsg), signature, configPublicKey)) throw `err:wrong_config_signature`();
+    assert (
+        isSignatureValid(sliceHash(inMsg), signature, configPublicKey)
+    ) throw `err:wrong_config_signature`();
     var cmd: int = inMsg.loadUint(32);
-    assert(cmd == `cmd:restricted_transfer`()) throw `err:unknown_cmd`();
+    assert (cmd == `cmd:restricted_transfer`()) throw `err:unknown_cmd`();
     var (onlyRestrict, ts) = (inMsg.loadUint(1), inMsg.loadUint32());
     if (onlyRestrict) {
-        (restricted, totalRestrictedValue) = lockGrams(restricted, totalRestrictedValue, ts, msgValue);
-    } else if(true /* false */) {
+        (restricted, totalRestrictedValue) = lockGrams(
+            restricted,
+            totalRestrictedValue,
+            ts,
+            msgValue,
+        );
+    } else if (true /* false */) {
         (locked, totalLockedValue) = lockGrams(locked, totalLockedValue, ts, msgValue);
     }
 
-    setContractData(packData(storedSeqno, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted));
+    setContractData(
+        packData(
+            storedSeqno,
+            storedSubwallet,
+            publicKey,
+            configPublicKey,
+            allowedDestinations,
+            totalLockedValue,
+            locked,
+            totalRestrictedValue,
+            restricted,
+        ),
+    );
 }
 
 fun onExternalMessage(inMsg: slice) {
     var signature = inMsg.loadBits(512);
     var cs = inMsg;
     var (subwalletId, validUntil, msgSeqno) = (cs.loadUint(32), cs.loadUint32(), cs.loadUint(32));
-    assert(!(validUntil <= now())) throw `err:replay_protection`();
-    var (storedSeqno, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted) = unpackData();
-    assert(msgSeqno == storedSeqno) throw `err:wrong_seqno`();
-    assert(subwalletId == storedSubwallet) throw `err:wrong_subwallet_id`();
-    assert(isSignatureValid(sliceHash(inMsg), signature, publicKey)) throw `err:wrong_signature`();
+    assert (!(validUntil <= now())) throw `err:replay_protection`();
+    var (
+        storedSeqno,
+        storedSubwallet,
+        publicKey,
+        configPublicKey,
+        allowedDestinations,
+        totalLockedValue,
+        locked,
+        totalRestrictedValue,
+        restricted,
+    ) = unpackData();
+    assert (msgSeqno == storedSeqno) throw `err:wrong_seqno`();
+    assert (subwalletId == storedSubwallet) throw `err:wrong_subwallet_id`();
+    assert (isSignatureValid(sliceHash(inMsg), signature, publicKey)) throw `err:wrong_signature`();
     startPayingGasFromMyBalance();
 
     (restricted, totalRestrictedValue) = unlockGrams(restricted, totalRestrictedValue, now());
@@ -198,23 +254,34 @@ fun onExternalMessage(inMsg: slice) {
     }
     cs.assertEndOfSlice();
 
-    setContractData(packData(storedSeqno + 1, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted));
+    setContractData(
+        packData(
+            storedSeqno + 1,
+            storedSubwallet,
+            publicKey,
+            configPublicKey,
+            allowedDestinations,
+            totalLockedValue,
+            locked,
+            totalRestrictedValue,
+            restricted,
+        ),
+    );
 }
 
 // Get methods
 
-get seqno(): int {
+get fun seqno(): int {
     return getContractData().beginParse().preloadUint(32);
 }
 
-get wallet_id(): int {
+get fun wallet_id(): int {
     var ds = getContractData().beginParse();
     ds.loadUint32();
     return ds.preloadUint(32);
 }
 
-get get_public_key(): int {
+get fun get_public_key(): int {
     var ds = getContractData().beginParse();
     ds.loadUint(32 + 32);
     return ds.preloadUint(256);
@@ -222,16 +289,23 @@ get get_public_key(): int {
 
 // the next three methods are mostly for testing
 
-get get_balances_at(time: int): (int, int, int) {
-    var (storedSeqno, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted) = unpackData();
+get fun get_balances_at(time: int): (int, int, int) {
+    var (
+        storedSeqno,
+        storedSubwallet,
+        publicKey,
+        configPublicKey,
+        allowedDestinations,
+        totalLockedValue,
+        locked,
+        totalRestrictedValue,
+        restricted,
+    ) = unpackData();
     (restricted, totalRestrictedValue) = unlockGrams(restricted, totalRestrictedValue, time);
     (locked, totalLockedValue) = unlockGrams(locked, totalLockedValue, time);
     var tonBalance: int = getMyStartBalance();
-    try { } catch { }
-    return ( tonBalance,
-        totalRestrictedValue,
-        totalLockedValue );
+    try {} catch {}
+    return (tonBalance, totalRestrictedValue, totalLockedValue);
 }
 
 @method_id(123)
@@ -239,8 +313,17 @@ fun get_balances(): (int, int, int) {
     return get_balances_at(now());
 }
 
-get check_destination(destination: slice): int {
-    var (storedSeqno, storedSubwallet, publicKey, configPublicKey, allowedDestinations, totalLockedValue, locked,
-        totalRestrictedValue, restricted) = unpackData();
+get fun check_destination(destination: slice): int {
+    var (
+        storedSeqno,
+        storedSubwallet,
+        publicKey,
+        configPublicKey,
+        allowedDestinations,
+        totalLockedValue,
+        locked,
+        totalRestrictedValue,
+        restricted,
+    ) = unpackData();
     return isWhitelisted(destination, allowedDestinations);
 }

@@ -22,8 +22,8 @@
 /// ```
 
 import "@stdlib/reflection"
-import "../fmt"
 import "../ffi"
+import "../fmt"
 import "../impl"
 import "../testing/assert"
 import "../testing/expect"
@@ -319,7 +319,7 @@ struct SearchParams {
 fun impl.createEqFun<T>(arg: T): (T -> bool) {
     return fun(snd) {
         return arg == snd;
-    }
+    };
 }
 
 fun impl.isPredicate<T>(field: (T -> bool) | T | null): bool {
@@ -351,19 +351,17 @@ fun impl.toPredicate<T>(field: (T -> bool) | T | null): tuple {
 /// Check if user-provided SearchParams has any lambdas.
 /// If not (most common), fast FFI path will be used.
 fun SearchParams.hasPredicates(self): bool {
-    return impl.isPredicate(self.to)
-         | impl.isPredicate(self.from)
-         | impl.isPredicate(self.value)
-         | impl.isPredicate(self.exitCode)
-         | impl.isPredicate(self.success)
-         | impl.isPredicate(self.aborted)
-         | impl.isPredicate(self.deploy)
-         | impl.isPredicate(self.bounce)
-         | impl.isPredicate(self.bounced)
-         | impl.isPredicate(self.opcode)
-         | impl.isPredicate(self.actionExitCode)
-         | impl.isPredicate(self.computePhaseSkipped)
-         | impl.isPredicate(self.body);
+    return impl.isPredicate(self.to) | impl.isPredicate(self.from) | impl.isPredicate(self.value) |
+    impl.isPredicate(self.exitCode) |
+    impl.isPredicate(self.success) |
+    impl.isPredicate(self.aborted) |
+    impl.isPredicate(self.deploy) |
+    impl.isPredicate(self.bounce) |
+    impl.isPredicate(self.bounced) |
+    impl.isPredicate(self.opcode) |
+    impl.isPredicate(self.actionExitCode) |
+    impl.isPredicate(self.computePhaseSkipped) |
+    impl.isPredicate(self.body);
 }
 
 /// Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
@@ -481,7 +479,9 @@ fun SendResultList.findExternalOutMessage<TBody = unknown>(
                 return {
                     info: externalOut.info,
                     init: externalOut.init,
-                    body: TlbEitherLeft { value: TBody.__decodeExternalOutBody(externalOut.loadBody()) },
+                    body: TlbEitherLeft {
+                        value: TBody.__decodeExternalOutBody(externalOut.loadBody()),
+                    },
                 };
             }
 
@@ -503,7 +503,10 @@ fun SendResultList.findExternalOutMessage<TBody = unknown>(
 /// expect(result).toBeNotNull();
 /// val tx = result!;
 /// ```
-fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {}): TlbTransaction? {
+fun SendResultList.findTransaction<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): TlbTransaction? {
     val declaredPrefix = Msg.__getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -605,8 +608,8 @@ fun net.createExternalMessage<TBody>(
             },
             init,
             body: TlbEither<TBody, Cell<TBody>>.right(body.__asPayload()),
-        }.toCell()
-    }
+        }.toCell(),
+    };
 }
 
 /// Sends an external-in message to the specified destination address.
@@ -915,7 +918,12 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(
     params.success = true;
     params.deploy = true;
 
-    impl.findTransactionOrFail(self.value, params, "expect(<actual>).toHaveSuccessfulDeploy(<expected>)", self.location);
+    impl.findTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveSuccessfulDeploy(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction list to have a successful transaction.
@@ -948,7 +956,12 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(
         params.exitCode = 0;
     }
 
-    impl.findTransactionOrFail(self.value, params, "expect(<actual>).toHaveSuccessfulTx(<expected>)", self.location);
+    impl.findTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveSuccessfulTx(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction list to have a transaction with specified parameters.
@@ -971,7 +984,12 @@ fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchPara
         params.opcode = declaredPrefix;
     }
 
-    impl.findTransactionOrFail(self.value, params, "expect(<actual>).toHaveTx(<expected>)", self.location);
+    impl.findTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveTx(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction list to NOT have a transaction with specified parameters.
@@ -989,7 +1007,12 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchP
         params.opcode = declaredPrefix;
     }
 
-    impl.findNoTransactionOrFail(self.value, params, "expect(<actual>).toNotHaveTx(<expected>)", self.location);
+    impl.findNoTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toNotHaveTx(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction list to have a **bounced** transaction.
@@ -1011,7 +1034,12 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
     }
     params.bounced = true;
 
-    impl.findTransactionOrFail(self.value, params, "expect(<actual>).toHaveBouncedTx(<expected>)", self.location);
+    impl.findTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveBouncedTx(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction list to have a **failed** transaction.
@@ -1046,7 +1074,12 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
         self.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params");
     }
 
-    impl.findTransactionOrFail(self.value, params, "expect(<actual>).toHaveFailedTx(<expected>)", self.location);
+    impl.findTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveFailedTx(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect all transactions in the list to be successful.
@@ -1057,10 +1090,13 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
 /// expect(txs).toHaveAllSuccessfulTxs();
 /// ```
 fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
-    val params = SearchParams {
-        success: false
-    };
-    impl.findNoTransactionOrFail(self.value, params, "expect(<actual>).toHaveAllSuccessfulTxs(<expected>)", self.location);
+    val params = SearchParams { success: false };
+    impl.findNoTransactionOrFail(
+        self.value,
+        params,
+        "expect(<actual>).toHaveAllSuccessfulTxs(<expected>)",
+        self.location,
+    );
 }
 
 /// Expect the transaction to emit an external message of given type.
@@ -1093,7 +1129,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
             reflect.typeNameOf<Msg>(),
             reflect.typeNameOf<Msg>(),
             reflect.serializationPrefixOf<Msg>().0,
-        )
+        ),
     );
 }
 
@@ -1148,7 +1184,12 @@ fun impl.findTransaction(txs: SendResultList, params: SearchParams): cell? {
         );
 }
 
-fun impl.findTransactionOrFail(txs: SendResultList, params: SearchParams, message: string, location: string): void {
+fun impl.findTransactionOrFail(
+    txs: SendResultList,
+    params: SearchParams,
+    message: string,
+    location: string,
+): void {
     val tx = impl.findTransaction(txs, params);
     if (tx == null) {
         ffi.failToFindTransactionByParams(location, message, txs, params.toPredicateFFITuple());
@@ -1156,7 +1197,12 @@ fun impl.findTransactionOrFail(txs: SendResultList, params: SearchParams, messag
     }
 }
 
-fun impl.findNoTransactionOrFail(txs: SendResultList, params: SearchParams, message: string, location: string): void {
+fun impl.findNoTransactionOrFail(
+    txs: SendResultList,
+    params: SearchParams,
+    message: string,
+    location: string,
+): void {
     val tx = impl.findTransaction(txs, params);
     if (tx != null) {
         ffi.failToNotFindTransactionByParams(location, message, txs, params.toPredicateFFITuple());

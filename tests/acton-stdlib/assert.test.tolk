@@ -3,16 +3,20 @@ import "@local-acton/testing/expect"
 
 get fun `test consume less with lambda`() {
     Assert.consumesLessThan<int>(
-        fun(a: int) { return fun() {
-            return a + 10;
-        } }(random.range(100)),
+        fun(a: int) {
+            return fun() {
+                return a + 10;
+            };
+        }(random.range(100)),
         800,
     );
 
     Assert.consumesLessThan<int>(
-        fun(a: int, b: int) { return fun() {
-            return a + b;
-        } }(random.range(100), random.range(100)),
+        fun(a: int, b: int) {
+            return fun() {
+                return a + b;
+            };
+        }(random.range(100), random.range(100)),
         700,
     );
 }

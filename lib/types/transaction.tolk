@@ -29,10 +29,10 @@ import "../tlb/maybe"
 /// Type alias for transaction account status values used by [TlbTransaction.origStatus] and
 /// [TlbTransaction.endStatus].
 enum TlbAccountStatus: uint2 {
-    Uninitialized,
-    Frozen,
-    Active,
-    NonExisting,
+    Uninitialized
+    Frozen
+    Active
+    NonExisting
 }
 
 /// Represents depth and balance information for split accounts.
@@ -212,7 +212,9 @@ struct TlbTrStoragePhase {
 }
 
 struct (0b0) TlbAccUnchanged
+
 struct (0b10) TlbAccFrozen
+
 struct (0b11) TlbAccDeleted
 
 type TlbAccStatusChange = TlbAccUnchanged | TlbAccFrozen | TlbAccDeleted
@@ -255,8 +257,11 @@ type TlbTrComputePhase = TlbTrComputeSkipped | TlbTrComputeVm
 
 /// Represents reasons for skipping computation.
 struct (0b00) TlbCSkipNoState
+
 struct (0b01) TlbCSkipBadState
+
 struct (0b10) TlbCSkipNoGas
+
 struct (0b110) TlbCSkipSuspended
 
 type TlbComputeSkipReason = TlbCSkipNoState | TlbCSkipBadState | TlbCSkipNoGas | TlbCSkipSuspended

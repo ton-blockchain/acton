@@ -12,9 +12,9 @@
 /// 
 
 import "@stdlib/gas-payments"
-import "../types/transaction"
 import "../ffi"
 import "../impl"
+import "../types/transaction"
 
 fun impl.getAccountState(addr: address): TlbAccountInfo? {
     val cell = ffi.getAccountState(addr.toCell());
@@ -50,6 +50,8 @@ fun impl.getShardAccount(addr: address): TlbShardAccount? {
     return TlbShardAccount.fromCell(rawRes);
 }
 
+fun ffi.getAccountState(addr: cell): cell?
+    asm "17 EXTCALL"
 
-fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
-fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
+fun ffi.getShardAccount(addr: address): cell?
+    asm "33 EXTCALL"

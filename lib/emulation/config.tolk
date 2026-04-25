@@ -408,7 +408,11 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun BlockchainConfigMap.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int): void {
+fun BlockchainConfigMap.setMsgForwardPrices(
+    mutate self,
+    prices: MsgForwardPrices,
+    chainType: int,
+): void {
     val index = chainType == MASTERCHAIN
         ? MASTERCHAIN_MSG_FORWARD_PRICES_INDEX
         : BASECHAIN_MSG_FORWARD_PRICES_INDEX;
