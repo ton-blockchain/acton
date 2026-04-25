@@ -107,11 +107,7 @@ fun buildJettonMetadataCell(info: JettonMetadata): cell {
 
 fun promptJettonMinterStorage(admin: address): MinterStorage {
     return {
-        totalSupply: promptJettonCoins(
-            "JETTON_INITIAL_SUPPLY",
-            "Enter initial supply",
-            JETTON_DEFAULT_INITIAL_SUPPLY,
-        ),
+        totalSupply: 0,
         adminAddress: admin,
         nextAdminAddress: null,
         metadata: buildJettonMetadataCell(promptJettonMetadata(JETTON_DEFAULT_DESCRIPTION)),
