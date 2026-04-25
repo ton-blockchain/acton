@@ -126,7 +126,9 @@ fun deployWalletFromStorage(
             body: TopUpTons {},
         }),
     );
-    expect(deployResult).toHaveSuccessfulDeploy({ to: address });
+    expect(deployResult).toHaveSuccessfulDeploy({
+        to: address,
+    });
 
     return JettonWallet { address };
 }
@@ -213,7 +215,9 @@ fun setupTest(initialSupply: int = 0): (JettonMinter, Treasury, Treasury) {
     });
 
     val transactions = minter.sendDeploy(deployer.address, { value: ton("10") });
-    expect(transactions).toHaveSuccessfulDeploy({ to: minter.address });
+    expect(transactions).toHaveSuccessfulDeploy({
+        to: minter.address,
+    });
 
     return (minter, deployer, notDeployer);
 }

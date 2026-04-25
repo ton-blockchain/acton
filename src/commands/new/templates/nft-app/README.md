@@ -1,7 +1,5 @@
 # NFT App Template
 
-Original FunC: [ton-blockchain/nft-contract](https://github.com/ton-blockchain/nft-contract).
-
 This project was generated from Acton's `nft` template with
 TypeScript app scaffold enabled. It includes NFT collection and item contracts,
 Tolk tests and wrappers under `contracts/`, generated TypeScript wrappers in
@@ -16,7 +14,7 @@ Tolk tests and wrappers under `contracts/`, generated TypeScript wrappers in
 - `wrappers-ts/` contains generated TypeScript wrappers consumed by the app.
 - `app/` contains the React + Vite frontend with TON Connect wallet integration.
 - `package.json`, `tsconfig.json`, and `vite.config.ts` configure the app toolchain.
-- `package-lock.json` pins the npm dependency tree for reproducible installs.
+- `package-lock.json` pins the npm dependency tree for reproducible installations.
 
 ## Install
 
@@ -45,10 +43,11 @@ npm run dev
 
 ## Notes
 
-- `acton build` compiles the contracts using `contracts/src/NftCollection.tolk` and `contracts/src/NftItem.tolk`.
+- `acton build` compiles the contracts `contracts/src/NftCollection.tolk` and `contracts/src/NftItem.tolk`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
 - The app reads blockchain data through Toncenter. Set
-  `VITE_TONCENTER_API_KEY` in `.env` if you need higher rate limits. For Acton
-  CLI flows against testnet/mainnet, the generated `.env` is also the easiest
-  place to keep `TONCENTER_TESTNET_API_KEY` and `TONCENTER_MAINNET_API_KEY`.
+  `TONCENTER_TESTNET_API_KEY` and/or `TONCENTER_MAINNET_API_KEY` in `.env` if
+  you need higher rate limits. The same generated `.env` is used by Acton CLI
+  flows and by the Vite frontend; `vite.config.ts` allows the `TONCENTER_`
+  prefix via `envPrefix`.

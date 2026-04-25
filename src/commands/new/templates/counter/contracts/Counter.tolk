@@ -5,7 +5,10 @@ contract Counter {
     incomingMessages: AllowedMessage
 }
 
-type AllowedMessage = IncreaseCounter | DecreaseCounter | ResetCounter
+type AllowedMessage =
+    | IncreaseCounter
+    | DecreaseCounter
+    | ResetCounter
 
 fun onInternalMessage(in: InMessage) {
     val msg = lazy AllowedMessage.fromSlice(in.body);

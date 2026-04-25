@@ -98,7 +98,10 @@ get fun `test validation: malformed custom payload should be rejected`() {
         .endCell();
 
     val okRes = sendRawTransferPayload(deployer.address, wallet.address, validPayload);
-    expect(okRes).toHaveSuccessfulTx<AskToTransfer>({ from: deployer.address, to: wallet.address });
+    expect(okRes).toHaveSuccessfulTx<AskToTransfer>({
+        from: deployer.address,
+        to: wallet.address,
+    });
 }
 
 get fun `test validation: wallet cannot send to masterchain`() {
@@ -181,7 +184,10 @@ get fun `test validation: minter accepts burn notification only from wallet`() {
         null,
         { bounce: false, value: ton("0.2") },
     );
-    expect(burn).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
+    expect(burn).toHaveSuccessfulTx<AskToBurn>({
+        from: deployer.address,
+        to: wallet.address,
+    });
 }
 
 get fun `test validation: minter cannot force burn tokens`() {
@@ -216,7 +222,10 @@ get fun `test validation: minter cannot force burn tokens`() {
         null,
         { bounce: false, value: ton("0.2") },
     );
-    expect(ok).toHaveSuccessfulTx<AskToBurn>({ from: notDeployer.address, to: wallet.address });
+    expect(ok).toHaveSuccessfulTx<AskToBurn>({
+        from: notDeployer.address,
+        to: wallet.address,
+    });
 }
 
 get fun `test validation: minter cannot force transfer tokens`() {
@@ -257,5 +266,8 @@ get fun `test validation: minter cannot force transfer tokens`() {
         0,
         null,
     );
-    expect(ok).toHaveSuccessfulTx<AskToTransfer>({ from: notDeployer.address, to: wallet.address });
+    expect(ok).toHaveSuccessfulTx<AskToTransfer>({
+        from: notDeployer.address,
+        to: wallet.address,
+    });
 }

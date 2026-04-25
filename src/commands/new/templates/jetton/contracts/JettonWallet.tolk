@@ -14,7 +14,11 @@ contract JettonWallet {
     storage: WalletStorage
 }
 
-type AllowedMessageToWallet = AskToTransfer | AskToBurn | InternalTransferStep | TopUpTons
+type AllowedMessageToWallet =
+    | AskToTransfer
+    | AskToBurn
+    | InternalTransferStep
+    | TopUpTons
 
 type BounceOpToHandle = InternalTransferStep | BurnNotificationForMinter
 

@@ -1,15 +1,22 @@
 import { TonClient } from '@ton/ton';
 import { Address, beginCell } from '@ton/core';
 
+type Network = 'mainnet' | 'testnet';
+
 const clients: Record<string, TonClient> = {};
 
-function toncenterApiKey(network: 'mainnet' | 'testnet'): string | undefined {
+function toncenterApiKey(network: Network): string | undefined {
   return network === 'mainnet'
     ? import.meta.env.TONCENTER_MAINNET_API_KEY
     : import.meta.env.TONCENTER_TESTNET_API_KEY;
 }
 
-export function getTonClient(network: 'mainnet' | 'testnet'): TonClient {
+function toncenterApiHeaders(network: Network): HeadersInit | undefined {
+  const apiKey = toncenterApiKey(network);
+  return apiKey ? { 'X-API-Key': apiKey } : undefined;
+}
+
+export function getTonClient(network: Network): TonClient {
   if (!clients[network]) {
     const endpoint =
       network === 'mainnet'
@@ -52,10 +59,14 @@ const toncenterV3 = {
   testnet: 'https://testnet.toncenter.com/api/v3',
 };
 
-async function fetchWithRetry(url: string, maxRetries = 4): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  maxRetries = 4,
+): Promise<Response> {
   let delay = 1000;
   for (let i = 0; i <= maxRetries; i++) {
-    const res = await fetch(url);
+    const res = await fetch(url, init);
     if (res.status === 429 && i < maxRetries) {
       await new Promise((r) => setTimeout(r, delay));
       delay *= 2;
@@ -67,12 +78,13 @@ async function fetchWithRetry(url: string, maxRetries = 4): Promise<Response> {
 }
 
 export async function fetchJettonMaster(
-  network: 'mainnet' | 'testnet',
+  network: Network,
   address: string,
 ): Promise<JettonMasterInfo> {
   const base = toncenterV3[network];
   const res = await fetchWithRetry(
     `${base}/jetton/masters?address=${encodeURIComponent(address)}&limit=1&offset=0`,
+    { headers: toncenterApiHeaders(network) },
   );
   if (!res.ok) throw new Error(`Toncenter API error: ${res.status}`);
 

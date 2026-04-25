@@ -5,10 +5,13 @@ import { CHAIN } from '@tonconnect/ui-react';
 
 import type { Network } from './router';
 
+const TONCENTER_API_KEYS: Record<Network, string | undefined> = {
+  mainnet: import.meta.env.TONCENTER_MAINNET_API_KEY,
+  testnet: import.meta.env.TONCENTER_TESTNET_API_KEY,
+};
+
 export function toncenterApiKey(network: Network): string | undefined {
-  return network === 'testnet'
-    ? import.meta.env.TONCENTER_TESTNET_API_KEY
-    : import.meta.env.TONCENTER_MAINNET_API_KEY;
+  return TONCENTER_API_KEYS[network];
 }
 
 export function toncenterBaseUrl(network: Network): string {

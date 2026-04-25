@@ -196,7 +196,10 @@ get fun `test wallet: owner can burn jettons`() {
         null,
         { bounce: false, value: DEFAULT_BURN_MSG_VALUE },
     );
-    expect(res).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
+    expect(res).toHaveSuccessfulTx<AskToBurn>({
+        from: deployer.address,
+        to: wallet.address,
+    });
 
     expect(wallet.getJettonBalance()).toEqual(ton("7"));
     expect(minter.getTotalSupply()).toEqual(supplyBefore - burnAmount);

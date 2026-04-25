@@ -355,7 +355,10 @@ get fun `test gas: burn minimal value edge`() {
         null,
         { bounce: false, value: minimalTonValue },
     );
-    expect(enough).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
+    expect(enough).toHaveSuccessfulTx<AskToBurn>({
+        from: deployer.address,
+        to: wallet.address,
+    });
 
     val fail = wallet.sendAskToBurn(
         deployer.address,
@@ -390,7 +393,10 @@ get fun `test gas: burn custom payload should not affect minimal value`() {
         customPayload,
         { bounce: false, value: minimalTonValue },
     );
-    expect(enough).toHaveSuccessfulTx<AskToBurn>({ from: deployer.address, to: wallet.address });
+    expect(enough).toHaveSuccessfulTx<AskToBurn>({
+        from: deployer.address,
+        to: wallet.address,
+    });
 
     val fail = wallet.sendAskToBurn(
         deployer.address,
