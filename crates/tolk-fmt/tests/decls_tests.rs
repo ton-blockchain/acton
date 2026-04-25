@@ -1418,6 +1418,31 @@ fn test_imports_sorted_by_group_depth_and_name() {
 }
 
 #[test]
+fn test_import_sorting_keeps_file_header_before_imports() {
+    check(
+        r#"
+                /// Module docs.
+                ///
+                /// More details.
+
+                import "../tlb/either"
+                import "../tlb/maybe"
+                import "../impl"
+                fun foo() {}"#,
+        expect![[r#"
+            /// Module docs.
+            ///
+            /// More details.
+
+            import "../impl"
+            import "../tlb/either"
+            import "../tlb/maybe"
+
+            fun foo() {}"#]],
+    );
+}
+
+#[test]
 fn test_import_sorting_preserves_attached_comments_and_group_separators() {
     check_without_trees_with_import_group_separators(
         r#"

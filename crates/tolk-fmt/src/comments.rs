@@ -205,6 +205,17 @@ pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
             k => k,
         };
 
+        let is_file_header = final_kind == CommentKind::LeadingWithEmptyLine
+            && group_nodes
+                .first()
+                .is_some_and(|node| node.parent() == Some(root))
+            && prev_non_comment_sibling(group_nodes[0]).is_none();
+        let (owner, final_kind) = if is_file_header {
+            (root, CommentKind::Leading)
+        } else {
+            (owner, final_kind)
+        };
+
         comments_map.entry(owner).or_default().push(Comment {
             kind: final_kind,
             nodes: group_nodes,

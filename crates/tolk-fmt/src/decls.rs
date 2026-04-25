@@ -94,6 +94,13 @@ fn build_import_items<'tree>(
 pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcDoc<'a>> {
     let mut sections = vec![];
 
+    // file header section
+    let mut docs = vec![];
+    comments::print_leading_comments(ctx, &mut docs, ctx.comments.get(&file.tree.root_node()));
+    if !docs.is_empty() {
+        sections.push(docs);
+    }
+
     // tolk required version section
     let mut docs = vec![];
 
