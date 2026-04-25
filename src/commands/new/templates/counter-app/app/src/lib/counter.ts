@@ -2,7 +2,7 @@ import { Address, beginCell, storeStateInit, toNano } from '@ton/core';
 import { TonClient } from '@ton/ton';
 import type { SendTransactionParameters } from '@ton/appkit-react';
 
-import { Counter } from '../../../wrappers-ts/Counter';
+import { Counter } from '../../../wrappers-ts/Counter.gen';
 import {
   IS_TESTNET,
   TONCENTER_API_KEY,

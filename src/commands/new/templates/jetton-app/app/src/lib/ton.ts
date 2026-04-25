@@ -59,11 +59,7 @@ const toncenterV3 = {
   testnet: 'https://testnet.toncenter.com/api/v3',
 };
 
-async function fetchWithRetry(
-  url: string,
-  init?: RequestInit,
-  maxRetries = 4,
-): Promise<Response> {
+async function fetchWithRetry(url: string, init?: RequestInit, maxRetries = 4): Promise<Response> {
   let delay = 1000;
   for (let i = 0; i <= maxRetries; i++) {
     const res = await fetch(url, init);
@@ -115,8 +111,7 @@ export async function fetchJettonMaster(
     metadata: {
       name: metaEntry?.name || undefined,
       symbol: metaEntry?.symbol || undefined,
-      decimals:
-        metaEntry?.extra?.decimals || master.jetton_content?.decimals || undefined,
+      decimals: metaEntry?.extra?.decimals || master.jetton_content?.decimals || undefined,
       description: metaEntry?.description || undefined,
       image: metaEntry?.image || undefined,
     },

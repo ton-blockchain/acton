@@ -73,9 +73,7 @@ export function buildMintBody(params: {
 }
 
 export function buildChangeAdminBody(newAdmin: Address, queryId = 0n): Cell {
-  return ChangeMinterAdmin.toCell(
-    ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }),
-  );
+  return ChangeMinterAdmin.toCell(ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }));
 }
 
 export async function buildChangeContentBody(

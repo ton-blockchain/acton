@@ -216,6 +216,7 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "fetch failed",
         "getaddrinfo",
         "network request",
+        "Failed to execute `npx",
         "Exit handler never called!",
         "cb() never called!",
     ]
@@ -508,7 +509,8 @@ fn test_new_counter_project_with_app_flag() {
     ));
     assert!(!package_lock.contains(r#""name": "counter-project""#));
     assert!(project_dir.join("app/src/App.tsx").exists());
-    assert!(project_dir.join("wrappers-ts/Counter.ts").exists());
+    assert!(project_dir.join("wrappers-ts/Counter.gen.ts").exists());
+    assert!(!project_dir.join("wrappers-ts/Counter.ts").exists());
     assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir
@@ -1426,6 +1428,124 @@ fn test_new_counter_app_project_supports_npm_scripts() {
 
     assert!(project_dir.join("build/Counter.json").exists());
     assert!(project_dir.join("dist/index.html").exists());
+}
+
+#[cfg(unix)]
+fn create_app_project(workspace: &Project, project_dir: &Path, template: &str) {
+    let project_name = format!("{template}-app-project");
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg(&project_name)
+        .arg("--description")
+        .arg("app template check")
+        .arg("--template")
+        .arg(template)
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+}
+
+#[cfg(unix)]
+fn package_uses_eslint(package_json: &JsonValue) -> bool {
+    let has_eslint_dependency = ["dependencies", "devDependencies"].iter().any(|section| {
+        package_json
+            .get(section)
+            .and_then(JsonValue::as_object)
+            .is_some_and(|deps| {
+                deps.keys()
+                    .any(|name| name == "eslint" || name.contains("eslint"))
+            })
+    });
+
+    let has_eslint_script = package_json
+        .get("scripts")
+        .and_then(JsonValue::as_object)
+        .is_some_and(|scripts| {
+            scripts.values().any(|script| {
+                script
+                    .as_str()
+                    .is_some_and(|script| script.contains("eslint"))
+            })
+        });
+
+    has_eslint_dependency || has_eslint_script
+}
+
+#[cfg(unix)]
+fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
+    if !is_npm_available() {
+        eprintln!("Skipping npm app template checks: npm is not available in PATH");
+        return;
+    }
+
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+    let project_dir = workspace.path().join("generated");
+    create_app_project(&workspace, &project_dir, template);
+
+    let package_json: JsonValue =
+        serde_json::from_str(&fs::read_to_string(project_dir.join("package.json")).unwrap())
+            .unwrap();
+    let scripts = package_json["scripts"].as_object().unwrap();
+    assert!(
+        scripts.contains_key("fmt:check"),
+        "{template} app template must expose npm run fmt:check"
+    );
+
+    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
+    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
+        eprintln!(
+            "Skipping npm app template checks for {template} due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&install_output.stdout),
+            String::from_utf8_lossy(&install_output.stderr)
+        );
+        return;
+    }
+    assert!(
+        install_output.status.success(),
+        "npm ci failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&install_output.stdout),
+        String::from_utf8_lossy(&install_output.stderr)
+    );
+
+    if scripts.contains_key("lint") {
+        let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
+        assert!(
+            lint_output.status.success(),
+            "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&lint_output.stdout),
+            String::from_utf8_lossy(&lint_output.stderr)
+        );
+    } else {
+        assert!(
+            !package_uses_eslint(&package_json),
+            "{template} app template uses ESLint but does not expose npm run lint"
+        );
+    }
+
+    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    assert!(
+        fmt_output.status.success(),
+        "npm run fmt:check failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&fmt_output.stdout),
+        String::from_utf8_lossy(&fmt_output.stderr)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_app_templates_npm_quality_checks() {
+    for template in ["counter", "jetton", "nft"] {
+        assert_app_template_npm_quality_checks(
+            &format!("new-{template}-app-npm-quality-checks"),
+            template,
+        );
+    }
 }
 
 #[test]
@@ -2384,6 +2504,105 @@ fn create_project_and_check_wrappers_inner(
             "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
         );
     }
+}
+
+#[cfg(unix)]
+fn create_app_project_and_check_typescript_wrappers(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    if !is_npm_available() {
+        eprintln!("Skipping TypeScript wrapper generation check: npm is not available in PATH");
+        return;
+    }
+
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+
+    let project_dir = workspace.path().join("generated");
+    create_app_project(&workspace, &project_dir, template);
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in contracts_and_wrappers {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        let output = Command::new(acton_exe())
+            .args(["wrapper", contract_name, "--ts"])
+            .current_dir(&project_dir)
+            .output()
+            .unwrap();
+
+        if !output.status.success() && npm_failure_looks_environment_specific(&output) {
+            eprintln!(
+                "Skipping TypeScript wrapper generation check for {template}/{contract_name} due to environment-specific npx failure:\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        assert!(
+            output.status.success(),
+            "acton wrapper {contract_name} --ts failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template TypeScript wrapper `{template_wrapper_path}` does not match auto-generated `acton wrapper {contract_name} --ts` output"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_counter_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-counter-app-ts-wrapper-check",
+        "counter",
+        &[("Counter", "wrappers-ts/Counter.gen.ts")],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_jetton_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-jetton-app-ts-wrapper-check",
+        "jetton",
+        &[
+            ("JettonMinter", "wrappers-ts/JettonMinter.gen.ts"),
+            ("JettonWallet", "wrappers-ts/JettonWallet.gen.ts"),
+        ],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_nft_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-nft-app-ts-wrapper-check",
+        "nft",
+        &[
+            ("NftCollection", "wrappers-ts/NftCollection.gen.ts"),
+            ("NftItem", "wrappers-ts/NftItem.gen.ts"),
+        ],
+    );
 }
 
 #[test]

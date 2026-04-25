@@ -50,8 +50,7 @@ export function App() {
           className="flex items-center justify-between px-7 h-[60px] border-b sticky top-0 z-50 max-sm:px-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-2.5 max-sm:py-3"
           style={{
             background: theme === 'light' ? '#fff' : '#08080A',
-            borderBottomColor:
-              theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+            borderBottomColor: theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
           }}
         >
           <div className="flex items-center gap-6 max-sm:gap-2.5 max-sm:w-full max-sm:justify-between">
@@ -122,11 +121,7 @@ export function App() {
           {page === 'create' ? (
             <DeployPage network={network} />
           ) : (
-            <ManagePage
-              network={network}
-              initialAddress={address}
-              onAddressChange={setAddress}
-            />
+            <ManagePage network={network} initialAddress={address} onAddressChange={setAddress} />
           )}
         </main>
       </div>
@@ -183,4 +178,3 @@ function NetworkDropdown({
     </DropdownMenu>
   );
 }
-

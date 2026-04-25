@@ -138,8 +138,7 @@ export function DeployPage({ network }: Props) {
           <CardHeader>
             <CardTitle className="text-xl tracking-tight">Deploy New Jetton</CardTitle>
             <CardDescription>
-              Create a new Jetton token on{' '}
-              {network === 'mainnet' ? 'TON Mainnet' : 'TON Testnet'}
+              Create a new Jetton token on {network === 'mainnet' ? 'TON Mainnet' : 'TON Testnet'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -223,10 +222,7 @@ export function DeployPage({ network }: Props) {
                 <p className="text-xs text-muted-foreground">PNG recommended, 256x256px</p>
               </div>
 
-              <Button
-                className="w-full h-12 rounded-full text-[15px] font-bold"
-                disabled={loading}
-              >
+              <Button className="w-full h-12 rounded-full text-[15px] font-bold" disabled={loading}>
                 {loading ? (
                   <>
                     <span className="spinner" /> Deploying...
@@ -280,16 +276,9 @@ export function StatusAlert({
   );
 }
 
-function DeployedCard({
-  address,
-  network,
-}: {
-  address: string;
-  network: 'mainnet' | 'testnet';
-}) {
+function DeployedCard({ address, network }: { address: string; network: 'mainnet' | 'testnet' }) {
   const [copied, setCopied] = useState(false);
-  const base =
-    network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
+  const base = network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
 
   return (
     <Card>
@@ -359,11 +348,7 @@ function TokenPreview({
         <div className="flex items-center gap-3.5 mb-5">
           <Avatar className="size-14 border-2 border-border">
             {imageUrl.trim() && !imgError ? (
-              <AvatarImage
-                src={imageUrl.trim()}
-                alt={name}
-                onError={() => setImgError(true)}
-              />
+              <AvatarImage src={imageUrl.trim()} alt={name} onError={() => setImgError(true)} />
             ) : null}
             <AvatarFallback className="bg-[#0098EA] text-white text-xl font-extrabold">
               {initial}

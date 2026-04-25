@@ -26,8 +26,7 @@ import { useTheme } from '../App';
 
 const DEFAULT_JETTON_MAINNET = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
 const DEFAULT_JETTON_TESTNET = 'kQAzgQ4T081rhYewF9g19vJIX1iRCy_31OvgzFPtfEM3ivw0';
-const ZERO_ADDRESS =
-  '0:0000000000000000000000000000000000000000000000000000000000000000';
+const ZERO_ADDRESS = '0:0000000000000000000000000000000000000000000000000000000000000000';
 
 function tryParseAddress(raw: string): Address | null {
   try {
@@ -417,15 +416,8 @@ function shortenAddress(addr: string): string {
   return addr.slice(0, 4) + '...' + addr.slice(-4);
 }
 
-function AddressLink({
-  address,
-  network,
-}: {
-  address: string;
-  network: 'mainnet' | 'testnet';
-}) {
-  const base =
-    network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
+function AddressLink({ address, network }: { address: string; network: 'mainnet' | 'testnet' }) {
+  const base = network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
   return (
     <a
       href={`${base}/${address}`}
@@ -664,11 +656,7 @@ function TransferTab({
       });
 
       const client = getTonClient(network);
-      const walletAddr = await getWalletAddress(
-        client,
-        Address.parse(contractAddr),
-        ownerAddress,
-      );
+      const walletAddr = await getWalletAddress(client, Address.parse(contractAddr), ownerAddress);
 
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -780,11 +768,7 @@ function BurnTab({
       const body = buildBurnBody(burnAmount, ownerAddress);
 
       const client = getTonClient(network);
-      const walletAddr = await getWalletAddress(
-        client,
-        Address.parse(contractAddr),
-        ownerAddress,
-      );
+      const walletAddr = await getWalletAddress(client, Address.parse(contractAddr), ownerAddress);
 
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,

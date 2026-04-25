@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is([data-theme="dark"] *));
 
@@ -39,7 +39,9 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, Tahoma, Verdana, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, Tahoma, Verdana,
+    sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
 
   --animate-in: enter 0.2s ease-out;
@@ -53,7 +55,7 @@
   --card-foreground: oklch(0.141 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0 0);
-  --primary: #0098EA;
+  --primary: #0098ea;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.948 0.005 264.53);
   --secondary-foreground: oklch(0.141 0 0);
@@ -64,11 +66,11 @@
   --destructive: oklch(0.577 0.2 27.33);
   --border: oklch(0.906 0.005 264.53);
   --input: oklch(0.906 0.005 264.53);
-  --ring: #0098EA;
+  --ring: #0098ea;
   --radius: 0.625rem;
-  --success: #29CC6A;
-  --warning: #F5A73B;
-  --ton-accent: #0098EA;
+  --success: #29cc6a;
+  --warning: #f5a73b;
+  --ton-accent: #0098ea;
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -77,22 +79,22 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0 0);
-  --sidebar-primary: #0098EA;
+  --sidebar-primary: #0098ea;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.948 0.005 264.53);
   --sidebar-accent-foreground: oklch(0.141 0 0);
   --sidebar-border: oklch(0.906 0.005 264.53);
-  --sidebar-ring: #0098EA;
+  --sidebar-ring: #0098ea;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --background: oklch(0.141 0.005 285.82);
   --foreground: oklch(0.925 0.006 264.53);
   --card: oklch(0.121 0.005 285.82);
   --card-foreground: oklch(0.925 0.006 264.53);
   --popover: oklch(0.141 0.005 285.82);
   --popover-foreground: oklch(0.925 0.006 264.53);
-  --primary: #0098EA;
+  --primary: #0098ea;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.218 0.006 264.53);
   --secondary-foreground: oklch(0.925 0.006 264.53);
@@ -103,7 +105,7 @@
   --destructive: oklch(0.577 0.2 27.33);
   --border: oklch(0.25 0.006 264.53);
   --input: oklch(0.25 0.006 264.53);
-  --ring: #0098EA;
+  --ring: #0098ea;
 
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -112,20 +114,28 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.141 0.005 285.82);
   --sidebar-foreground: oklch(0.925 0.006 264.53);
-  --sidebar-primary: #0098EA;
+  --sidebar-primary: #0098ea;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.218 0.006 264.53);
   --sidebar-accent-foreground: oklch(0.925 0.006 264.53);
   --sidebar-border: oklch(0.25 0.006 264.53);
-  --sidebar-ring: #0098EA;
+  --sidebar-ring: #0098ea;
 }
 
 @layer base {
-  *, ::after, ::before, ::backdrop, ::file-selector-button {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
     border-color: var(--color-border, currentColor);
   }
 
-  html, body, #root { height: 100%; }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
   body {
     font-family: var(--font-sans);
@@ -136,23 +146,46 @@
   }
 }
 
-::selection { background: oklch(0.577 0.156 243.85 / 0.25); }
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::selection {
+  background: oklch(0.577 0.156 243.85 / 0.25);
+}
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
 
 @keyframes enter {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes exit {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-4px); }
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spinner {
@@ -169,7 +202,7 @@
 [data-tc-wallets-modal-container],
 [data-tc-dropdown-container],
 [data-tc-notification-container],
-div[class*="tc-"] {
+div[class*='tc-'] {
   z-index: 1000 !important;
 }
 

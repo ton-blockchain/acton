@@ -75,4 +75,3 @@ export async function buildOnchainMetadata(metadata: JettonMetadata): Promise<Ce
 
   return beginCell().storeUint(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict).endCell();
 }
-
