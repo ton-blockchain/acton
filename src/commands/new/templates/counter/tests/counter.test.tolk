@@ -5,6 +5,12 @@ import "@acton/testing/expect"
 import "@contracts/types"
 import "@wrappers/Counter.gen"
 
+get fun `test deploy exposes initial owner`() {
+    val (contract, deployer, _) = setupTest();
+
+    expect(contract.owner()).toEqual(deployer.address);
+}
+
 get fun `test increase counter`() {
     val (contract, deployer, _) = setupTest();
 
@@ -59,8 +65,40 @@ get fun `test decrease counter fails on underflow`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: 0x1001,
+        exitCode: Errors.CounterUnderflow as int,
     });
+}
+
+get fun `test decrease counter fails on overflow`() {
+    val (contract, deployer, _) = setupTest();
+
+    val res = contract.sendIncreaseCounter(deployer.address, 1);
+    expect(res).toHaveSuccessfulTx<IncreaseCounter>({
+        from: deployer.address,
+        to: contract.address,
+    });
+
+    val res2 = contract.sendDecreaseCounter(deployer.address, 0xffffffff);
+    expect(res2).toHaveFailedTx({
+        from: deployer.address,
+        to: contract.address,
+        exitCode: Errors.CounterUnderflow as int,
+    });
+
+    expect(contract.currentCounter()).toEqual(1);
+}
+
+get fun `test non-owner cannot change counter`() {
+    val (contract, _, notDeployer) = setupTest();
+
+    val res = contract.sendIncreaseCounter(notDeployer.address, 123);
+    expect(res).toHaveFailedTx({
+        from: notDeployer.address,
+        to: contract.address,
+        exitCode: Errors.NotOwner as int,
+    });
+
+    expect(contract.currentCounter()).toEqual(0);
 }
 
 get fun `test unknown message`() {
@@ -70,7 +108,7 @@ get fun `test unknown message`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: 0xFFFF,
+        exitCode: Errors.InvalidMessage as int,
     });
 
     val res2 = contract.sendAny(deployer.address, createEmptyCell());
@@ -81,7 +119,7 @@ fun setupTest(): (Counter, Treasury, Treasury) {
     val deployer = testing.treasury("deployer");
     val notDeployer = testing.treasury("not_deployer");
 
-    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val contract = Counter.fromStorage({ id: 0, owner: deployer.address, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 

@@ -33,7 +33,7 @@ get fun `test unknown message reject`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: 0xFFFF,
+        exitCode: Errors.InvalidMessage as int,
     });
 }
 
@@ -48,7 +48,7 @@ fun setupTest(): (Counter, Treasury, Treasury) {
     val deployer = testing.treasury("deployer");
     val notDeployer = testing.treasury("not_deployer");
 
-    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val contract = Counter.fromStorage({ id: 0, owner: deployer.address, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
@@ -838,7 +838,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .with_coverage_file("counter-template-all.txt")
         .run()
         .success()
-        .assert_passed(5)
+        .assert_passed(8)
         .assert_file_snapshot_matches(
             "counter-template-all.txt",
             "integration/snapshots/test_counter_template_coverage_all.txt",
@@ -868,7 +868,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .with_coverage_file("counter-template-non-branch.txt")
         .run()
         .success()
-        .assert_passed(4)
+        .assert_passed(5)
         .assert_file_snapshot_matches(
             "counter-template-non-branch.txt",
             "integration/snapshots/test_counter_template_coverage_non_branch.txt",

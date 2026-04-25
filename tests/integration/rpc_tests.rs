@@ -10,11 +10,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{thread, vec};
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::message::IntAddr;
 
 const RAW_INFO_ADDRESS: &str = "0:1111111111111111111111111111111111111111111111111111111111111111";
 const MATCHED_INFO_ADDRESS: &str =
     "0:2222222222222222222222222222222222222222222222222222222222222222";
+const MATCHED_INFO_OWNER_ADDRESS: &str =
+    "0:3333333333333333333333333333333333333333333333333333333333333333";
 const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
 kind = "v4r2"
 workchain = 0
@@ -40,6 +43,7 @@ fun main() {
     val wallet = scripts.wallet("deployer");
     val counterData = beginCell()
         .storeUint(7, 32)
+        .storeAddress(wallet.address)
         .storeUint(42, 32)
         .endCell();
 
@@ -152,7 +156,7 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
             1_234_000_000,
             code_boc64,
-            &counter_storage_boc64(7, 42),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
             "active",
             "",
             "999",
@@ -213,7 +217,7 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
         spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
             1_234_000_000,
             code_boc64,
-            &counter_storage_boc64(7, 42),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
             "active",
             "",
             "999",
@@ -561,9 +565,15 @@ fn test_cell_boc64(value: u32) -> String {
     Boc::encode_base64(&cell)
 }
 
-fn counter_storage_boc64(id: u32, counter: u32) -> String {
+fn counter_storage_boc64(id: u32, owner_address: &str, counter: u32) -> String {
+    let owner = owner_address
+        .parse::<IntAddr>()
+        .expect("owner address must parse");
     let mut builder = CellBuilder::new();
     builder.store_u32(id).expect("must store id");
+    owner
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("must store owner");
     builder.store_u32(counter).expect("must store counter");
     let cell = builder.build().expect("must build storage cell");
     Boc::encode_base64(&cell)

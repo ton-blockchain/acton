@@ -4,11 +4,14 @@
 
  TEST  [ROOT]/foobar
 
- > tests/counter.test.tolk (5 tests)
+ > tests/counter.test.tolk (8 tests)
+  ✓ deploy exposes initial owner [TIME]
   ✓ increase counter [TIME]
   ✓ reset counter [TIME]
   ✓ decrease counter [TIME]
   ✓ decrease counter fails on underflow [TIME]
+  ✓ decrease counter fails on overflow [TIME]
+  ✓ non-owner cannot change counter [TIME]
   ✓ unknown message [TIME]
 
- ✓ 5 passed in 1 file
+ ✓ 8 passed in 1 file

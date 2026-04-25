@@ -10,10 +10,10 @@ deployment script.
 - `contracts/types.tolk` defines storage and message types.
 - `wrappers/Counter.gen.tolk` is the generated wrapper used by tests and
   scripts.
-- `tests/counter.test.tolk` covers increment, decrement, reset, underflow, and
-  invalid-message flows.
-- `scripts/deploy.tolk` deploys the contract with initial counter state and
-  reads the counter back after deployment.
+- `tests/counter.test.tolk` covers owner checks, increment, decrement, reset,
+  underflow, and invalid-message flows.
+- `scripts/deploy.tolk` deploys the contract with the deployer wallet as owner,
+  then reads the owner and counter value back after deployment.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
   GitHub Actions.
 

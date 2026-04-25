@@ -59,6 +59,7 @@ type Theme = 'dark' | 'light';
 interface CounterValueState {
   status: 'idle' | 'loading' | 'ready' | 'missing' | 'error';
   value: bigint | null;
+  owner: string | null;
   message: string;
   fetchedAt: string | null;
 }
@@ -66,6 +67,7 @@ interface CounterValueState {
 const initialCounterValueState: CounterValueState = {
   status: 'idle',
   value: null,
+  owner: null,
   message: 'Enter a counter address and fetch the current value.',
   fetchedAt: null,
 };
@@ -101,9 +103,16 @@ export default function App() {
   }, [setAppKitTheme, theme]);
 
   const preview = useMemo(() => {
+    if (!walletAddress) {
+      return {
+        value: null,
+        error: 'Connect a wallet to derive the owner and deploy address.',
+      };
+    }
+
     try {
       return {
-        value: getCounterPreview(deferredCounterId),
+        value: getCounterPreview(deferredCounterId, walletAddress),
         error: null,
       };
     } catch (error) {
@@ -112,7 +121,7 @@ export default function App() {
         error: getErrorMessage(error),
       };
     }
-  }, [deferredCounterId]);
+  }, [deferredCounterId, walletAddress]);
 
   const displayWalletAddress = useMemo(() => {
     if (!walletAddress) {
@@ -144,6 +153,7 @@ export default function App() {
     setCounterValue({
       status: snapshot.isDeployed ? 'ready' : 'missing',
       value: snapshot.value,
+      owner: snapshot.owner,
       message: snapshot.isDeployed
         ? 'Latest value loaded from chain.'
         : 'This address is not deployed on the selected network yet.',
@@ -152,7 +162,7 @@ export default function App() {
   }
 
   async function handleDeploy() {
-    if (!walletReady) {
+    if (!walletAddress) {
       setStatusMessage('Connect a wallet before deploying a counter.');
       return;
     }
@@ -165,7 +175,11 @@ export default function App() {
     setPendingAction('deploy');
 
     try {
-      const deployment = buildDeployTransaction(counterId, deployValue);
+      const deployment = buildDeployTransaction(
+        counterId,
+        deployValue,
+        walletAddress,
+      );
       const alreadyDeployed = await isCounterDeployed(
         deployment.preview.contract.address,
       );
@@ -240,6 +254,7 @@ export default function App() {
       setCounterValue({
         status: 'error',
         value: null,
+        owner: null,
         message,
         fetchedAt: null,
       });
@@ -429,6 +444,11 @@ export default function App() {
                   <p className="break-all text-sm font-mono">
                     {preview.value?.address ?? preview.error}
                   </p>
+                  {preview.value ? (
+                    <p className="mt-3 break-all text-xs text-muted-foreground">
+                      Owner: {preview.value.owner}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -538,6 +558,11 @@ export default function App() {
                   <p className="mt-2 text-sm text-muted-foreground">
                     {counterValue.message}
                   </p>
+                  {counterValue.owner ? (
+                    <p className="mt-2 break-all text-xs text-muted-foreground">
+                      Owner: {counterValue.owner}
+                    </p>
+                  ) : null}
                   {counterValue.fetchedAt ? (
                     <p className="mt-2 text-xs font-medium text-muted-foreground">
                       Updated at {counterValue.fetchedAt}

@@ -2,13 +2,13 @@
 Remote Account
   Network:           localnet
   Address:           [WALLET_ADDRESS_BASE]
-  Raw Address:       0:b2c244f0c90ee4c666d515ce4468345527d77b97b082d1edef5a20d63821fa51
+  Raw Address:       0:f608af54ae24f900b806d102eeb24e18d36e6fb081d1569230c4be2d6a2aecc8
   Status:            active
-  Balance:           0.199716 TON
+  Balance:           0.1997232 TON
   Last Tx LT:        5
   Last Tx Hash:      [TX_HASH]
-  Code Hash:         0x944917d7f23ce599b9570ac6f35bf8bc0d689ec75b6b159698d425c3614cfdc6
-  Data Hash:         0x9f4fe898a7910db94963ae08b06f6ea70f78e1f2e083a5deb96fb5a12e7a7e26
+  Code Hash:         0x15407004a66e0cf95a67c39edbb54a531dfdb6df93fb7d365fae57a34b874747
+  Data Hash:         0x4863785a1c16f4cfa9c82e91c88f4d4f739411c3f7c96bd62dade3306248f8db
 
 Local Match
   Contract:          counter (counter)
@@ -17,3 +17,4 @@ Local Match
 Decoded Storage
   counter: 42
   id: 7
+  owner: [WALLET_ADDRESS_BASE]

@@ -27,11 +27,13 @@ export interface CounterPreview {
   address: string;
   contract: Counter;
   id: bigint;
+  owner: string;
 }
 
 export interface CounterSnapshot {
   address: string;
   isDeployed: boolean;
+  owner: string | null;
   value: bigint | null;
 }
 
@@ -108,14 +110,19 @@ export function normalizeCounterAddress(address: string): string {
   return formatAddress(Address.parse(address));
 }
 
-export function getCounterPreview(counterIdValue: string): CounterPreview {
+export function getCounterPreview(
+  counterIdValue: string,
+  ownerAddressValue: string,
+): CounterPreview {
   const id = parseUint32(counterIdValue, 'Counter ID');
-  const contract = Counter.fromStorage({ id, counter: 0n });
+  const owner = Address.parse(ownerAddressValue);
+  const contract = Counter.fromStorage({ id, owner, counter: 0n });
 
   return {
     address: formatAddress(contract.address),
     contract,
     id,
+    owner: formatAddress(owner),
   };
 }
 
@@ -134,16 +141,19 @@ export async function readCounter(
     return {
       address: normalizedAddress,
       isDeployed: false,
+      owner: null,
       value: null,
     };
   }
 
   const contract = tonClient.open(Counter.fromAddress(address));
+  const owner = await contract.getOwner();
   const value = await contract.getCurrentCounter();
 
   return {
     address: normalizedAddress,
     isDeployed: true,
+    owner: formatAddress(owner),
     value,
   };
 }
@@ -151,12 +161,13 @@ export async function readCounter(
 export function buildDeployTransaction(
   counterIdValue: string,
   deployAmountValue: string,
+  ownerAddressValue: string,
 ): {
   address: string;
   request: SendTransactionParameters;
   preview: CounterPreview;
 } {
-  const preview = getCounterPreview(counterIdValue);
+  const preview = getCounterPreview(counterIdValue, ownerAddressValue);
   const amount = parseTonAmount(deployAmountValue, 'Deploy value');
 
   return {

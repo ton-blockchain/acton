@@ -1,5 +1,12 @@
+enum Errors {
+    NotOwner = 100
+    CounterUnderflow = 0x1001
+    InvalidMessage = 0xFFFF
+}
+
 struct Storage {
     id: uint32
+    owner: address
     counter: uint32
 }
 

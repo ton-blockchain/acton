@@ -1,2 +1,3 @@
 Deployed counter to [WALLET_ADDRESS_BASE] (Counter)
+Counter owner is [WALLET_ADDRESS_BASE] (deployer)
 Counter value is 0

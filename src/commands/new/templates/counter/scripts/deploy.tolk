@@ -9,6 +9,7 @@ fun main() {
 
     val counter = Counter.fromStorage(Storage {
         id: 0,
+        owner: deployer.address,
         counter: 0,
     });
     val res = counter.deploy(deployer.address, { value: ton("0.005") });
@@ -17,5 +18,6 @@ fun main() {
     }
 
     println("Deployed counter to {}", counter.address);
+    println("Counter owner is {}", counter.owner());
     println("Counter value is {}", counter.currentCounter());
 }

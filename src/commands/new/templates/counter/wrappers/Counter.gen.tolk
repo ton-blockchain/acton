@@ -96,3 +96,7 @@ fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): S
 fun Counter.currentCounter(self): int {
     return net.runGetMethod(self.address, "currentCounter");
 }
+
+fun Counter.owner(self): address {
+    return net.runGetMethod(self.address, "owner");
+}
