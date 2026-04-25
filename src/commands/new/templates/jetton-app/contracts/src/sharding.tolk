@@ -1,0 +1,3 @@
+const MY_WORKCHAIN = BASECHAIN
+
+const SHARD_DEPTH = 8
