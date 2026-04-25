@@ -19,7 +19,7 @@ struct NftCollection {
 fun NftCollection.fromStorage(
     storage: NftCollectionStorage,
     toShard: AddressShardingOptions? = null,
-) {
+): NftCollection {
     val stateInit = ContractState {
         code: build("NftCollection"),
         data: storage.toCell(),
@@ -31,7 +31,7 @@ fun NftCollection.fromStorage(
 }
 
 /// Creates a contract wrapper instance from the address
-fun NftCollection.fromAddress(address: address) {
+fun NftCollection.fromAddress(address: address): NftCollection {
     return NftCollection { address };
 }
 

@@ -16,7 +16,7 @@ struct NftItem {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun NftItem.fromStorage(storage: NftItemStorage, toShard: AddressShardingOptions? = null) {
+fun NftItem.fromStorage(storage: NftItemStorage, toShard: AddressShardingOptions? = null): NftItem {
     val stateInit = ContractState {
         code: build("NftItem"),
         data: storage.toCell(),
@@ -28,7 +28,7 @@ fun NftItem.fromStorage(storage: NftItemStorage, toShard: AddressShardingOptions
 }
 
 /// Creates a contract wrapper instance from the address
-fun NftItem.fromAddress(address: address) {
+fun NftItem.fromAddress(address: address): NftItem {
     return NftItem { address };
 }
 

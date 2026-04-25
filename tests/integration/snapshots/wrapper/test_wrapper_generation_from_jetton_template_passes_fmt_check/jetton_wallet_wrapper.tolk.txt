@@ -16,7 +16,10 @@ struct JettonWallet {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun JettonWallet.fromStorage(storage: WalletStorage, toShard: AddressShardingOptions? = null) {
+fun JettonWallet.fromStorage(
+    storage: WalletStorage,
+    toShard: AddressShardingOptions? = null,
+): JettonWallet {
     val stateInit = ContractState {
         code: build("JettonWallet"),
         data: storage.toCell(),
@@ -28,7 +31,7 @@ fun JettonWallet.fromStorage(storage: WalletStorage, toShard: AddressShardingOpt
 }
 
 /// Creates a contract wrapper instance from the address
-fun JettonWallet.fromAddress(address: address) {
+fun JettonWallet.fromAddress(address: address): JettonWallet {
     return JettonWallet { address };
 }
 

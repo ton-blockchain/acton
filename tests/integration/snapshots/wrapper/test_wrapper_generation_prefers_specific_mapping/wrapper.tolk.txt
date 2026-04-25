@@ -14,7 +14,7 @@ struct Main {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun Main.fromStorage(toShard: AddressShardingOptions? = null) {
+fun Main.fromStorage(toShard: AddressShardingOptions? = null): Main {
     val stateInit = ContractState {
         code: build("main"),
         data: createEmptyCell(),
@@ -26,7 +26,7 @@ fun Main.fromStorage(toShard: AddressShardingOptions? = null) {
 }
 
 /// Creates a contract wrapper instance from the address
-fun Main.fromAddress(address: address) {
+fun Main.fromAddress(address: address): Main {
     return Main { address };
 }
 
