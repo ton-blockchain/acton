@@ -62,6 +62,8 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
   function setContractAddr(addr: string) {
     setContractAddrRaw(addr);
     onAddressChange(addr);
+    setJettonInfo(null);
+    setStatus(null);
   }
   const [jettonInfo, setJettonInfo] = useState<JettonInfo | null>(null);
   const [loading, setLoading] = useState(false);
