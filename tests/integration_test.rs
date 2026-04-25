@@ -58,6 +58,34 @@ fn test_acton_help_short_flag() {
 }
 
 #[test]
+fn test_acton_version_short_flags_match_long_flag() {
+    let long = Command::new(common::acton_exe())
+        .arg("--version")
+        .output()
+        .expect("failed to run acton --version");
+    let short = Command::new(common::acton_exe())
+        .arg("-v")
+        .output()
+        .expect("failed to run acton -v");
+    let alternative_short = Command::new(common::acton_exe())
+        .arg("-V")
+        .output()
+        .expect("failed to run acton -V");
+
+    assert!(long.status.success(), "acton --version failed: {long:?}");
+    assert!(short.status.success(), "acton -v failed: {short:?}");
+    assert!(alternative_short.status.success(), "acton -V failed: {alternative_short:?}");
+    assert_eq!(short.stdout, long.stdout, "acton -v output differed from --version");
+    assert_eq!(
+        alternative_short.stdout, long.stdout,
+        "acton -V output differed from --version"
+    );
+    assert!(long.stderr.is_empty(), "acton --version wrote to stderr");
+    assert!(short.stderr.is_empty(), "acton -v wrote to stderr");
+    assert!(alternative_short.stderr.is_empty(), "acton -V wrote to stderr");
+}
+
+#[test]
 fn test_acton_help_without_flag() {
     snapbox::cmd::Command::acton_ui()
         .assert()

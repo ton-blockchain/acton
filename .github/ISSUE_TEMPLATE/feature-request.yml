@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: Acton Version
-      description: Paste the output of `acton -V` if this request is related to current behavior.
+      description: Paste the output of `acton -v` if this request is related to current behavior.
       placeholder: 0.0.11 (abc1234 2026-03-14)
     validations:
       required: false
