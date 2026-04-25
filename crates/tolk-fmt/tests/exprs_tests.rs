@@ -280,6 +280,33 @@ fn test_single_long_string_argument_does_not_break() {
 }
 
 #[test]
+fn test_single_number_call_argument_does_not_break_in_chain() {
+    check_with_width(
+        "fun test() { val price = ((testing.getC7OutsideContract().get(0) as tuple).get(9) as BlockchainConfigMap).getMsgForwardPrices(BASECHAIN).lumpPrice; }",
+        expect![[r"
+                fun test() {
+                    val price = ((testing.getC7OutsideContract().get(0) as tuple).get(9) as BlockchainConfigMap)
+                        .getMsgForwardPrices(BASECHAIN)
+                        .lumpPrice;
+                }"]],
+        100,
+    );
+}
+
+#[test]
+fn test_single_bool_and_null_call_arguments_do_not_break() {
+    check_with_width(
+        "fun test() { check(true); fallback(null); }",
+        expect![[r"
+                fun test() {
+                    check(true);
+                    fallback(null);
+                }"]],
+        20,
+    );
+}
+
+#[test]
 fn test_object_literal() {
     check(
         "fun test() { x = Point { x: 10, y: 20 }; }",
@@ -970,6 +997,45 @@ fn test_single_string_call_argument_with_top_level_newline_stays_multiline() {
                         "hello",
                     );
                 }"#]],
+    );
+}
+
+#[test]
+fn test_single_number_call_argument_with_top_level_newline_stays_multiline() {
+    check(
+        r"
+            fun test() {
+                tuple.get(
+                    9);
+            }",
+        expect![[r"
+                fun test() {
+                    tuple.get(
+                        9,
+                    );
+                }"]],
+    );
+}
+
+#[test]
+fn test_single_bool_and_null_call_arguments_with_top_level_newline_stay_multiline() {
+    check(
+        r"
+            fun test() {
+                check(
+                    true);
+                fallback(
+                    null);
+            }",
+        expect![[r"
+                fun test() {
+                    check(
+                        true,
+                    );
+                    fallback(
+                        null,
+                    );
+                }"]],
     );
 }
 

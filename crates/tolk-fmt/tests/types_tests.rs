@@ -31,6 +31,21 @@ fn test_single_type_instantiated_ts_does_not_break_on_small_width() {
 }
 
 #[test]
+fn test_single_nested_multi_arg_type_instantiated_ts_breaks_outer_list() {
+    check_with_width(
+        "const x: Cell<TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>> = 0;",
+        expect![[r"
+                const x: Cell<
+                    TlbMessage<
+                        RemainingBitsAndRefs,
+                        TlbExternalOutMessageInfo,
+                    >,
+                > = 0"]],
+        60,
+    );
+}
+
+#[test]
 fn test_type_instantiated_ts_breaking() {
     check_with_width(
         "const x: VeryLongTypeName<FirstType, SecondType, ThirdType> = 0;",

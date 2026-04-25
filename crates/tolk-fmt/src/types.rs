@@ -199,8 +199,10 @@ pub fn print_type_instantiated_ts<'a>(
     let args = inst.arguments()?;
     let types: Vec<_> = args.types().collect();
 
-    if types.len() == 1 {
-        let single_type_doc = print_type(ctx, &types[0])?;
+    if let [single_type] = types.as_slice()
+        && single_type_argument_should_stay_inline(single_type)
+    {
+        let single_type_doc = print_type(ctx, single_type)?;
         return Some(RcDoc::concat([
             name_doc,
             RcDoc::text("<"),
@@ -219,4 +221,14 @@ pub fn print_type_instantiated_ts<'a>(
     )?;
 
     Some(RcDoc::concat([name_doc, types_doc]))
+}
+
+fn single_type_argument_should_stay_inline(typ: &Type) -> bool {
+    !matches!(
+        typ,
+        Type::TypeInstantiatedTs(inst)
+            if inst
+                .arguments()
+                .is_some_and(|args| args.types().nth(1).is_some())
+    )
 }

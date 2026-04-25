@@ -600,7 +600,14 @@ pub fn print_argument_list<'a>(
             ..Default::default()
         }
     } else {
-        common::ListOptions::default()
+        common::ListOptions {
+            never_break_if_items_lt: if matches!(args, [arg] if single_scalar_call_argument(arg)) {
+                2
+            } else {
+                0
+            },
+            ..Default::default()
+        }
     };
 
     common::print_list(
@@ -636,6 +643,13 @@ fn argument_list_has_top_level_newline(
 
 fn call_argument_contains_lambda(arg: &CallArgument) -> bool {
     matches!(arg.expr(), Some(Expr::Lambda(_)))
+}
+
+fn single_scalar_call_argument(arg: &CallArgument) -> bool {
+    matches!(
+        arg.expr(),
+        Some(Expr::NumberLit(_) | Expr::BoolLit(_) | Expr::NullLit(_))
+    )
 }
 
 fn print_instantiation_types<'a>(
