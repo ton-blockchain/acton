@@ -20,9 +20,7 @@ fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = nul
         code: build("Counter"),
         data: storage.toCell(),
     };
-    val address = toShard == null
-        ? AutoDeployAddress { stateInit }.calculateAddress()
-        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
     return Counter { address, stateInit };
 }
 

@@ -556,9 +556,9 @@ fn generate_from_storage(
     ));
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = toShard == null\n");
-    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
-    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
+    code.push_str(
+        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+    );
     code.push_str(&format!(
         "    return {contract_name} {{ address, stateInit }}\n",
     ));
@@ -593,9 +593,9 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     ));
     code.push_str("        data: createEmptyCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = toShard == null\n");
-    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
-    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
+    code.push_str(
+        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+    );
     code.push_str(&format!(
         "    return {contract_name} {{ address, stateInit }}\n"
     ));

@@ -24,9 +24,7 @@ fun JettonWallet.fromStorage(
         code: build("JettonWallet"),
         data: storage.toCell(),
     };
-    val address = toShard == null
-        ? AutoDeployAddress { stateInit }.calculateAddress()
-        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
     return JettonWallet { address, stateInit };
 }
 

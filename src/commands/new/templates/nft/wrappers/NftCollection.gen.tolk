@@ -24,9 +24,7 @@ fun NftCollection.fromStorage(
         code: build("NftCollection"),
         data: storage.toCell(),
     };
-    val address = toShard == null
-        ? AutoDeployAddress { stateInit }.calculateAddress()
-        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
     return NftCollection { address, stateInit };
 }
 

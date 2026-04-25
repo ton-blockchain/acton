@@ -19,9 +19,7 @@ fun Main.fromStorage(toShard: AddressShardingOptions? = null): Main {
         code: build("main"),
         data: createEmptyCell(),
     };
-    val address = toShard == null
-        ? AutoDeployAddress { stateInit }.calculateAddress()
-        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
     return Main { address, stateInit };
 }
 

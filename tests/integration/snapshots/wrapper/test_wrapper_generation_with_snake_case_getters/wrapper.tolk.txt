@@ -18,9 +18,7 @@ fun MyContract.fromStorage(toShard: AddressShardingOptions? = null): MyContract 
         code: build("my_contract"),
         data: createEmptyCell(),
     };
-    val address = toShard == null
-        ? AutoDeployAddress { stateInit }.calculateAddress()
-        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
     return MyContract { address, stateInit };
 }
 
