@@ -2,6 +2,7 @@ use acton_config::color::OwoColorize;
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -32,6 +33,9 @@ struct DocgenOutputPaths {
 }
 
 pub fn docgen_cmd(output: Option<String>, check: bool) -> Result<()> {
+    let repo_root = resolve_docgen_repo_root()?;
+    env::set_current_dir(&repo_root)?;
+
     let output_paths = resolve_output_paths(output);
 
     if check {
@@ -54,6 +58,32 @@ pub fn docgen_cmd(output: Option<String>, check: bool) -> Result<()> {
     }
 
     generate_docs(&output_paths)
+}
+
+fn resolve_docgen_repo_root() -> Result<PathBuf> {
+    let current_dir = env::current_dir()?;
+    if has_docgen_inputs(&current_dir) {
+        return Ok(current_dir);
+    }
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if has_docgen_inputs(&manifest_dir) {
+        return Ok(manifest_dir);
+    }
+
+    anyhow::bail!(
+        "acton docgen requires the Acton source checkout. Run it from the Acton repository root, or rebuild Acton from a checkout that still exists. Missing required inputs such as '{}', '{}', and '{}'.",
+        command_manuals::COMMAND_MANUAL_SOURCE_DIR,
+        "lib",
+        TOLK_STDLIB_SRC,
+    )
+}
+
+fn has_docgen_inputs(root: &Path) -> bool {
+    root.join(command_manuals::COMMAND_MANUAL_SOURCE_DIR)
+        .is_dir()
+        && root.join("lib").is_dir()
+        && root.join(TOLK_STDLIB_SRC).is_dir()
 }
 
 fn resolve_output_paths(output: Option<String>) -> DocgenOutputPaths {
