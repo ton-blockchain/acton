@@ -1,13 +1,13 @@
 
 Remote Account
   Network:           localnet
-  Address:           kQAmGPodyDzDs9Lx9GkUsLf20/Fch/asoTR5Wkq9DazU9A29
-  Raw Address:       0:2618fa1dc83cc3b3d2f1f46914b0b7f6d3f15c87f6aca134795a4abd0dacd4f4
+  Address:           [WALLET_ADDRESS_BASE]
+  Raw Address:       0:b2c244f0c90ee4c666d515ce4468345527d77b97b082d1edef5a20d63821fa51
   Status:            active
-  Balance:           0.199746 TON
+  Balance:           0.199716 TON
   Last Tx LT:        5
   Last Tx Hash:      [TX_HASH]
-  Code Hash:         0x1f6548a25e04497496242ad7804b653e6da9a47e474dc17436313ffa04e15f18
+  Code Hash:         0x944917d7f23ce599b9570ac6f35bf8bc0d689ec75b6b159698d425c3614cfdc6
   Data Hash:         0x9f4fe898a7910db94963ae08b06f6ea70f78e1f2e083a5deb96fb5a12e7a7e26
 
 Local Match
