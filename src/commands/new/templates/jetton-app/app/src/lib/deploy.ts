@@ -1,6 +1,13 @@
-import { Address, beginCell, Cell, contractAddress, storeStateInit, toNano } from '@ton/core';
-import { JettonMinter } from '@wrappers/JettonMinter.gen';
-import { JettonWallet } from '@wrappers/JettonWallet.gen';
+import { Address, beginCell, Cell, toNano } from '@ton/core';
+import {
+  JettonMinter,
+  MinterStorage,
+  MintNewJettons,
+  InternalTransferStep,
+  ChangeMinterAdmin,
+  ChangeMinterMetadata,
+} from '@wrappers/JettonMinter.gen';
+import { JettonWallet, AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
 import { buildOnchainMetadata, type JettonMetadata } from './jettonContent';
 
 export function parseUnits(amount: string, decimals: number): bigint {
@@ -9,30 +16,19 @@ export function parseUnits(amount: string, decimals: number): bigint {
   return BigInt(whole + frac);
 }
 
-const OP_MINT = 0x00000015;
-const OP_CHANGE_ADMIN = 0x00000003;
-const OP_CHANGE_CONTENT = 0x00000004;
-const OP_BURN = 0x595f07bc;
-const OP_TRANSFER = 0x0f8a7ea5;
-
 export async function buildDeployMessage(params: {
   metadata: JettonMetadata;
   ownerAddress: Address;
   mintAmount: bigint;
 }) {
   const content = await buildOnchainMetadata(params.metadata);
-  const walletCode = JettonWallet.CodeCell;
-  const minterCode = JettonMinter.CodeCell;
 
-  const data = beginCell()
-    .storeCoins(0n)
-    .storeAddress(params.ownerAddress)
-    .storeAddress(null)
-    .storeRef(content)
-    .endCell();
-
-  const stateInit = { code: minterCode, data };
-  const addr = contractAddress(0, stateInit);
+  const minter = JettonMinter.fromStorage({
+    totalSupply: 0n,
+    adminAddress: params.ownerAddress,
+    nextAdminAddress: null,
+    metadata: content,
+  });
 
   const mintBody = buildMintBody({
     toAddress: params.ownerAddress,
@@ -42,8 +38,8 @@ export async function buildDeployMessage(params: {
   });
 
   return {
-    contractAddress: addr,
-    stateInit,
+    contractAddress: minter.address,
+    stateInit: minter.init!,
     mintBody,
   };
 }
@@ -54,34 +50,32 @@ export function buildMintBody(params: {
   forwardTonAmount: bigint;
   totalTonAmount: bigint;
   queryId?: bigint;
-}) {
+}): Cell {
   const { toAddress, jettonAmount, forwardTonAmount, totalTonAmount, queryId = 0n } = params;
 
-  const transferBody = beginCell()
-    .storeUint(0x178d4519, 32)
-    .storeUint(queryId, 64)
-    .storeCoins(jettonAmount)
-    .storeAddress(null)
-    .storeAddress(toAddress)
-    .storeCoins(forwardTonAmount)
-    .storeUint(0, 1)
-    .endCell();
-
-  return beginCell()
-    .storeUint(OP_MINT, 32)
-    .storeUint(queryId, 64)
-    .storeAddress(toAddress)
-    .storeCoins(totalTonAmount)
-    .storeRef(transferBody)
-    .endCell();
+  return MintNewJettons.toCell(
+    MintNewJettons.create({
+      queryId,
+      mintRecipient: toAddress,
+      tonAmount: totalTonAmount,
+      internalTransferMsg: {
+        ref: InternalTransferStep.create({
+          queryId,
+          jettonAmount,
+          transferInitiator: null,
+          sendExcessesTo: null,
+          forwardTonAmount,
+          forwardPayload: beginCell().storeUint(0, 1).asSlice(),
+        }),
+      },
+    }),
+  );
 }
 
 export function buildChangeAdminBody(newAdmin: Address, queryId = 0n): Cell {
-  return beginCell()
-    .storeUint(OP_CHANGE_ADMIN, 32)
-    .storeUint(queryId, 64)
-    .storeAddress(newAdmin)
-    .endCell();
+  return ChangeMinterAdmin.toCell(
+    ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }),
+  );
 }
 
 export async function buildChangeContentBody(
@@ -89,16 +83,20 @@ export async function buildChangeContentBody(
   queryId = 0n,
 ): Promise<Cell> {
   const content = await buildOnchainMetadata(metadata);
-  return beginCell().storeUint(OP_CHANGE_CONTENT, 32).storeUint(queryId, 64).storeRef(content).endCell();
+  return ChangeMinterMetadata.toCell(
+    ChangeMinterMetadata.create({ queryId, newMetadata: content }),
+  );
 }
 
 export function buildBurnBody(amount: bigint, responseAddress: Address, queryId = 0n): Cell {
-  return beginCell()
-    .storeUint(OP_BURN, 32)
-    .storeUint(queryId, 64)
-    .storeCoins(amount)
-    .storeAddress(responseAddress)
-    .endCell();
+  return AskToBurn.toCell(
+    AskToBurn.create({
+      queryId,
+      jettonAmount: amount,
+      sendExcessesTo: responseAddress,
+      customPayload: null,
+    }),
+  );
 }
 
 export function buildTransferBody(params: {
@@ -118,20 +116,19 @@ export function buildTransferBody(params: {
     queryId = 0n,
   } = params;
 
-  const builder = beginCell()
-    .storeUint(OP_TRANSFER, 32)
-    .storeUint(queryId, 64)
-    .storeCoins(amount)
-    .storeAddress(toAddress)
-    .storeAddress(responseAddress)
-    .storeUint(0, 1)
-    .storeCoins(forwardTonAmount);
+  const payloadSlice = forwardPayload
+    ? beginCell().storeUint(1, 1).storeRef(forwardPayload).endCell().beginParse()
+    : beginCell().storeUint(0, 1).asSlice();
 
-  if (forwardPayload) {
-    builder.storeUint(1, 1).storeRef(forwardPayload);
-  } else {
-    builder.storeUint(0, 1);
-  }
-
-  return builder.endCell();
+  return AskToTransfer.toCell(
+    AskToTransfer.create({
+      queryId,
+      jettonAmount: amount,
+      transferRecipient: toAddress,
+      sendExcessesTo: responseAddress,
+      customPayload: null,
+      forwardTonAmount,
+      forwardPayload: payloadSlice,
+    }),
+  );
 }
