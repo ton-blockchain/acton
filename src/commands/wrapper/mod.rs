@@ -493,10 +493,11 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     code.push('\n');
 
-    if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path) {
-        let import_path = get_import_path(proot, root, storage_path, mappings);
-        let display = import_path.display().to_string();
-        let display = display.trim_start_matches("./").trim_end_matches(".tolk");
+    if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path)
+        && let Some(mapped) = resolve_mapped_import(proot, storage_path, mappings)
+    {
+        let display = mapped.display().to_string();
+        let display = display.trim_end_matches(".tolk");
         code.push_str(&format!(
             "/// Storage `{}` is defined in `{display}`\n",
             storage.name

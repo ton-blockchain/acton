@@ -8,7 +8,6 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "../contracts/my_contract"
 
-/// Storage `Storage` is defined in `../contracts/my_contract`
 struct MyContract {
     address: address
     stateInit: ContractState? = null

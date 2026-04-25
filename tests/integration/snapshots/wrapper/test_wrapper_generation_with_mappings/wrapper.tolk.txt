@@ -9,7 +9,6 @@ import "@acton/testing/assert"
 import "@core/types"
 import "../contracts/main"
 
-/// Storage `Storage` is defined in `../contracts/main`
 struct Main {
     address: address
     stateInit: ContractState? = null

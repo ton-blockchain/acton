@@ -10,7 +10,6 @@ import "../contracts/storage"
 import "../contracts/types"
 import "../contracts/types_other"
 
-/// Storage `Storage` is defined in `../contracts/storage`
 struct MyContract {
     address: address
     stateInit: ContractState? = null
