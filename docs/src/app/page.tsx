@@ -8,6 +8,7 @@ import DotGrid from "@/components/Grid";
 import {Typewriter} from '@/components/Typewriter';
 import {InstallationCodeBlock} from '@/components/InstallationCodeBlock';
 import {Header} from '@/components/Header';
+import {LandingVideo} from '@/components/LandingVideo';
 
 export const metadata: Metadata = {
   title: 'Acton — TON Development Toolkit',
@@ -266,12 +267,17 @@ export default function Home() {
                     <article
                       key={feature.title}
                       className={`grid gap-8 lg:items-start lg:gap-16 ${
-                      reversed
-                        ? 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]'
-                        : 'lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]'
-                    }`}>
-                      <div className={`space-y-6 ${reversed ? 'lg:order-2 lg:text-right' : 'lg:order-1'}`}>
-                        <div className={`space-y-4 ${reversed ? 'max-w-xl lg:ml-auto' : 'max-w-xl'}`}>
+                        reversed
+                          ? "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]"
+                          : "lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]"
+                      }`}
+                    >
+                      <div
+                        className={`space-y-6 ${reversed ? "lg:order-2 lg:text-right" : "lg:order-1"}`}
+                      >
+                        <div
+                          className={`space-y-4 ${reversed ? "max-w-xl lg:ml-auto" : "max-w-xl"}`}
+                        >
                           <h3 className="text-4xl font-light tracking-relaxed text-white md:text-4xl">
                             {feature.title}
                           </h3>
@@ -284,22 +290,23 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className={reversed ? 'lg:order-1' : 'lg:order-2'}>
+                      <div className={reversed ? "lg:order-1" : "lg:order-2"}>
                         <div className="landing-video-shell landing-video-shell-compact">
-                          <video
-                            className="landing-video landing-video-compact"
+                          <LandingVideo
+                            className="landing-video-compact"
                             controls
                             controlsList="nodownload noplaybackrate"
+                            playLabel={`Play ${feature.title} video`}
                             playsInline
                             preload="metadata"
                             src={feature.url}
                           >
                             Your browser does not support the video tag.
-                          </video>
+                          </LandingVideo>
                         </div>
                       </div>
                     </article>
-                  );
+                  )
                 })}
               </div>
             </section>

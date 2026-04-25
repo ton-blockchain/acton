@@ -259,6 +259,11 @@ code, pre {
   border-radius: 1rem;
 }
 
+.landing-video-frame {
+  position: relative;
+  z-index: 1;
+}
+
 .landing-video {
   display: block;
   width: 100%;
@@ -269,6 +274,42 @@ code, pre {
 
 .landing-video-compact {
   aspect-ratio: 16 / 10;
+}
+
+.landing-video-play-button {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  width: clamp(3rem, 6vw, 3.75rem);
+  height: clamp(3rem, 6vw, 3.75rem);
+  place-items: center;
+  margin: auto;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #050505;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.landing-video-play-button:hover {
+  border-color: rgba(0, 0, 0, 0.22);
+  background: white;
+}
+
+.landing-video-play-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 4px;
+}
+
+.landing-video-play-icon {
+  width: clamp(1.3rem, 2.6vw, 1.7rem);
+  height: clamp(1.3rem, 2.6vw, 1.7rem);
+  margin-left: 0.16rem;
 }
 
 .supporting-feature-card {
