@@ -47,9 +47,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -58,8 +58,8 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::Tuple;
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{ShardAccount, StdAddr};
@@ -952,11 +952,11 @@ fn compile_test_file(
     file: &str,
     need_debug_info: bool,
     acton_config: &ActonConfig,
-) -> anyhow::Result<tolkc::CompilerResult> {
+) -> anyhow::Result<tolk_compiler::CompilerResult> {
     let cache_entry = file_cache.get(file, need_debug_info, false, 0, "1.3");
     if let Some(cache_entry) = cache_entry {
-        return Ok(tolkc::CompilerResult::Success(
-            tolkc::compiler::CompilerResultSuccess {
+        return Ok(tolk_compiler::CompilerResult::Success(
+            tolk_compiler::compiler::CompilerResultSuccess {
                 fift_code: cache_entry.fift_code.unwrap_or_default(),
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
@@ -968,12 +968,12 @@ fn compile_test_file(
     }
 
     let mappings = acton_config.mappings();
-    let compiler = tolkc::Compiler::new(0)
+    let compiler = tolk_compiler::Compiler::new(0)
         .with_mappings(&mappings)
         .with_allow_no_entrypoint(true);
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             let cache_result = file_cache.put(file, result, need_debug_info, false, 0, "1.3");
             match cache_result {
                 Ok(()) => {}
@@ -982,7 +982,7 @@ fn compile_test_file(
                 }
             }
         }
-        tolkc::CompilerResult::Error(_) => {
+        tolk_compiler::CompilerResult::Error(_) => {
             // handled in caller
         }
     }
@@ -1027,8 +1027,8 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     );
 
     let result = match compilation_result {
-        tolkc::CompilerResult::Success(result) => result,
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Success(result) => result,
+        tolk_compiler::CompilerResult::Error(error) => {
             let trimmed_message = error.message.trim();
             anyhow::bail!(trimmed_message.to_string())
         }
@@ -1061,7 +1061,7 @@ fn run_file_tests(
     tests: Vec<TestDescriptor>,
     code: &Cell,
     abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
+    compiler_abi: Option<Arc<tolk_compiler::abi::ContractABI>>,
     source_map: Arc<TolkSourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
@@ -1215,7 +1215,7 @@ fn run_file_tests(
         let gas_used = outcome.gas_used;
         let vm_log_diff = match &get_result {
             GetMethodResult::Success(result) => {
-                let logs = vmlogs::convert_to_diff_logs(&result.vm_log);
+                let logs = tvm_logs::convert_to_diff_logs(&result.vm_log);
                 (!logs.trim().is_empty()).then_some(logs)
             }
             GetMethodResult::Error(_) => None,

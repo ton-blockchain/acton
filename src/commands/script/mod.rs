@@ -28,8 +28,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -39,12 +39,12 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, VmStackValue, vm_stack_value};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
-use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
 const ASSERTION_FAILED_EXIT_CODE: i32 = 567;
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
@@ -170,7 +170,7 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content.into(), file_path, mappings);
 
-    let compiler = tolkc::Compiler::new(2).with_mappings(mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(mappings);
     let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
     let mut verbosity = executor_verbosity_for_cli_level(verbose);
 
@@ -179,7 +179,7 @@ fn run_script_file(
     }
 
     match compiler.compile(Path::new(file_path), need_debug_info) {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
             let source_map = Arc::new(TolkSourceMap::from_code_cell(
@@ -206,7 +206,7 @@ fn run_script_file(
             )?;
             Ok(())
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!("Cannot compile script file {}", error.message)
         }
     }

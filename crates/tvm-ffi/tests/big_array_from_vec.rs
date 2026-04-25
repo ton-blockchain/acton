@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 
 #[test]
 fn big_array_from_vec_small_values() {

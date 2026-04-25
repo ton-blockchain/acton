@@ -2,10 +2,10 @@ use crate::abi_serde::{Data, DataField, DataObject};
 use crate::snake_string::parse_snake_string;
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
-use tolkc::abi::{
+use tolk_compiler::abi::{
     ABICustomPackUnpack, ABIDeclaration, ABIEnumMember, ContractABI, Ty, UnionVariant,
 };
-use tolkc::types_kernel::instantiate_generics;
+use tolk_compiler::types_kernel::instantiate_generics;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
 use tycho_types::dict;
 use tycho_types::models::{AnyAddr, IntAddr, StdAddr};
@@ -533,8 +533,8 @@ fn type_has_own_label(abi: &ContractABI, ty: &Ty) -> anyhow::Result<bool> {
 
 struct StructDeclRef<'a> {
     type_params: Option<&'a [String]>,
-    prefix: Option<&'a tolkc::abi::ABIOpcode>,
-    fields: &'a [tolkc::abi::ABIStructField],
+    prefix: Option<&'a tolk_compiler::abi::ABIOpcode>,
+    fields: &'a [tolk_compiler::abi::ABIStructField],
     custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
 }
 
@@ -604,7 +604,7 @@ fn find_enum_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<EnumDec
 mod tests {
     use super::*;
     use crate::snake_string::build_snake_bytes_cell;
-    use tolkc::abi::{
+    use tolk_compiler::abi::{
         ABIInternalMessage, ABIOpcode, ABIStorage, ABIStructField, ContractABI, UnionVariant,
     };
     use tycho_types::cell::{CellBuilder, CellFamily, Store};

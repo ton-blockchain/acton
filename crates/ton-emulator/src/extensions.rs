@@ -2,8 +2,8 @@
 #![allow(unsafe_code)]
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use tvmffi::from_stack::{ArgError, FromStack};
-use tvmffi::stack::Tuple;
+use tvm_ffi::from_stack::{ArgError, FromStack};
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -15,7 +15,7 @@ pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
 #[macro_export]
 macro_rules! pop_args {
     ($tuple:expr, $($ty:ty),+ $(,)?) => {{
-        let mut __errors: Option<tvmffi::from_stack::ArgError> = None;
+        let mut __errors: Option<tvm_ffi::from_stack::ArgError> = None;
         let __result = ( $(
             match $crate::extensions::pop_arg::<$ty>($tuple) {
                 Ok(v) => v,
@@ -39,11 +39,11 @@ macro_rules! extension {
         unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
                     let r: anyhow::Result<()> = $body(ctx, __t);
                     if let Err(e) = r {
                         ctx.asserts.fail(format!("{:#}", e));
-                        __t.push(tvmffi::stack::TupleItem::Null);
+                        __t.push(tvm_ffi::stack::TupleItem::Null);
                     }
                 })
             }
@@ -53,13 +53,13 @@ macro_rules! extension {
         unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
                     match $crate::extensions::pop_arg::<$ty>(__t) {
                         Ok($an) => {
                             let r: anyhow::Result<()> = $body(ctx, __t, $an);
                             if let Err(e) = r {
                                 ctx.asserts.fail(format!("{:#}", e));
-                                __t.push(tvmffi::stack::TupleItem::Null);
+                                __t.push(tvm_ffi::stack::TupleItem::Null);
                             }
                         }
                         Err(e) => {
@@ -76,7 +76,7 @@ macro_rules! extension {
                 debug_assert!(!ctx.is_null());
                 debug_assert!(!ptr.is_null());
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
                     match $crate::pop_args!(__t, $($ty),*) {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
@@ -84,7 +84,7 @@ macro_rules! extension {
                             let r: anyhow::Result<()> = $body(ctx, __t, $($an, )*);
                             if let Err(e) = r {
                                 ctx.asserts.fail(format!("{:#}", e));
-                                __t.push(tvmffi::stack::TupleItem::Null);
+                                __t.push(tvm_ffi::stack::TupleItem::Null);
                             }
                         }
                         Err(e) => {
@@ -120,12 +120,12 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
 
     let mut tuple = Boc::decode_base64(boc)
         .ok()
-        .and_then(|c| tvmffi::serde::parse_tuple(&c).ok())
+        .and_then(|c| tvm_ffi::serde::parse_tuple(&c).ok())
         .unwrap_or_else(Tuple::empty);
 
     f(&mut tuple);
 
-    cell_to_ffi_boc64(&tvmffi::serde::serialize_tuple(&tuple).expect("Failed to serialize tuple"))
+    cell_to_ffi_boc64(&tvm_ffi::serde::serialize_tuple(&tuple).expect("Failed to serialize tuple"))
 }
 
 #[macro_export]

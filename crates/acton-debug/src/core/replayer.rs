@@ -14,12 +14,12 @@ use super::types_render::{
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI;
-use tolkc::debug_marks_dict::DebugMarksDict;
-use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
-use tolkc::types_kernel::Ty;
-use vmlogs::parser::{VmLine, VmStackValue};
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::debug_marks_dict::DebugMarksDict;
+use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
+use tolk_compiler::types_kernel::Ty;
+use tvm_logs::parser::{VmLine, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // Types

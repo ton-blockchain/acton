@@ -70,7 +70,8 @@ fn run_type_test(test_case: &TestCase) -> String {
         fs::write(full_path, content).unwrap();
     }
 
-    let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tolkc/assets/tolk-stdlib");
+    let stdlib_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tolk-compiler/assets/tolk-stdlib");
     let file_db = FileDb::new(stdlib_path.clone(), None);
     let stdlib_path = dunce::canonicalize(stdlib_path).unwrap();
 

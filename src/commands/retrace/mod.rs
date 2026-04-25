@@ -6,17 +6,17 @@ use acton_config::config::{ActonConfig, project_root as configured_project_root}
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::serve_single_replayer_dap;
 use anyhow::{Context, anyhow};
-use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
+use ton_retrace::{ComputeInfo, Network, retrace};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
 
 struct ContractTraceArtifacts {
     code_cell: Cell,
-    source_map: tolkc::TolkSourceMap,
+    source_map: tolk_compiler::TolkSourceMap,
 }
 
 #[allow(unsafe_code)]
@@ -86,7 +86,7 @@ pub fn retrace_cmd(
 
                     if let Some(port) = debug_port {
                         let vm_logs = &result.emulated_tx.vm_logs;
-                        let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+                        let vm_lines = tvm_logs::parser::parse_lines(vm_logs);
                         let replayer = TolkReplayer::new(&artifacts.source_map, &vm_lines)
                             .with_context(|| {
                                 format!(
@@ -120,7 +120,7 @@ pub(crate) fn serve_prepared_retrace_dap(replayer: TolkReplayer, port: u16) -> a
 
 fn print_retrace_result(
     network: Network,
-    result: &retrace::TraceResult,
+    result: &ton_retrace::TraceResult,
     verbose: bool,
     logs_dir: Option<&String>,
 ) {
@@ -463,11 +463,11 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
     }
 
     let mappings = acton_config.mappings();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let compilation_result = compiler.compile(&contract_path, true);
 
     match compilation_result {
-        tolkc::CompilerResult::Success(res) => {
+        tolk_compiler::CompilerResult::Success(res) => {
             let code_cell = Boc::decode_base64(res.code_boc64)
                 .with_context(|| "Failed to decode compiled contract code BoC".to_string())?;
             let source_map = res.new_source_map.ok_or_else(|| {
@@ -484,7 +484,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
                 )
             })?;
 
-            let source_map = tolkc::TolkSourceMap::from_code_cell(
+            let source_map = tolk_compiler::TolkSourceMap::from_code_cell(
                 source_map,
                 &code_cell,
                 Some(&debug_mark_base64),
@@ -495,7 +495,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
                 source_map,
             })
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!(
                 "Failed to compile contract {} for source-level retrace: {}",
                 contract_name.yellow(),
@@ -507,7 +507,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
 
 fn ensure_contract_matches_transaction(
     contract_name: &str,
-    result: &retrace::TraceResult,
+    result: &ton_retrace::TraceResult,
     artifacts: &ContractTraceArtifacts,
 ) -> anyhow::Result<()> {
     let Some(tx_code_hash) = result

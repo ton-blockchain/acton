@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use retrace::trace::Trace;
+//! use ton_retrace::trace::Trace;
 //!
 //! // Create a trace from raw VM logs
 //! let vm_logs = "..."; // raw logs from emulator
@@ -41,11 +41,11 @@
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use tvm_logs::executor_parser::{ExecutorLine, parse_executor_lines};
+use tvm_logs::parser::{CellLike, VmLine, VmStack, VmStackValue};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::models::RelaxedMessage;
-use vmlogs::executor_parser::{ExecutorLine, parse_executor_lines};
-use vmlogs::parser::{CellLike, VmLine, VmStack, VmStackValue};
 
 /// A single step or event in the TVM execution trace.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -294,7 +294,7 @@ impl Trace {
     /// ```
     #[must_use]
     pub fn new(vm_logs: &str, start_gas: Option<usize>) -> Self {
-        let lines = vmlogs::parser::parse_lines(vm_logs);
+        let lines = tvm_logs::parser::parse_lines(vm_logs);
         Self::from_lines(lines, start_gas)
     }
 

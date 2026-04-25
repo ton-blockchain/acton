@@ -548,7 +548,7 @@ impl ReplayerDebugSession {
         };
         let file_id = top_frame.definition_loc.as_ref().map_or_else(
             || ctx.replayer.current_file_id(),
-            tolkc::source_map::SrcRange::file_id,
+            tolk_compiler::source_map::SrcRange::file_id,
         );
         let Some(path) = ctx.replayer.file_full_path(file_id) else {
             return true;
@@ -619,7 +619,7 @@ impl ReplayerDebugSession {
             && call_stack.iter().any(|frame| {
                 let file_id = frame.definition_loc.as_ref().map_or_else(
                     || replayer.current_file_id(),
-                    tolkc::source_map::SrcRange::file_id,
+                    tolk_compiler::source_map::SrcRange::file_id,
                 );
                 replayer.file_full_path(file_id).is_some_and(|path| {
                     Self::is_transparent_step_into_function(path, frame.f_name.as_str())

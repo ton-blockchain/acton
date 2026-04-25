@@ -65,7 +65,6 @@ dependencies = [
  "rand 0.8.6",
  "regex",
  "reqwest",
- "retrace",
  "ring",
  "rustc-hash 2.1.1",
  "semver",
@@ -78,15 +77,15 @@ dependencies = [
  "strip-ansi-escapes",
  "strsim 0.11.1",
  "tar",
- "tasm",
+ "tasm-core",
  "tempfile",
  "tokio",
+ "tolk-compiler",
+ "tolk-fmt",
  "tolk-linter",
  "tolk-resolver",
  "tolk-syntax",
  "tolk-ty",
- "tolkc",
- "tolkfmt",
  "toml",
  "toml_edit 0.24.0+spec-1.1.0",
  "ton",
@@ -96,14 +95,15 @@ dependencies = [
  "ton-executor",
  "ton-localnet",
  "ton-ls",
+ "ton-retrace",
  "ton-source-map",
  "toncenter-keys",
  "tower-http",
  "tower-lsp",
  "tree-sitter",
- "tvmffi",
+ "tvm-ffi",
+ "tvm-logs",
  "tycho-types",
- "vmlogs",
  "walkdir",
  "xxhash-rust",
 ]
@@ -133,13 +133,13 @@ dependencies = [
  "log",
  "num-bigint",
  "serde_json",
+ "tolk-compiler",
  "tolk-syntax",
- "tolkc",
  "ton-abi",
  "ton-executor",
- "tvmffi",
+ "tvm-ffi",
+ "tvm-logs",
  "tycho-types",
- "vmlogs",
 ]
 
 [[package]]
@@ -3812,25 +3812,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "retrace"
-version = "0.3.1"
-dependencies = [
- "anyhow",
- "base64",
- "log",
- "num-bigint",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "ton-executor",
- "ton-networks",
- "toncenter-keys",
- "tycho-types",
- "vmlogs",
-]
-
-[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4600,7 +4581,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tasm"
+name = "tasm-core"
 version = "0.3.1"
 dependencies = [
  "anyhow",
@@ -4609,7 +4590,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
- "tolkc",
+ "tolk-compiler",
  "ton-source-map",
  "tycho-types",
 ]
@@ -4939,12 +4920,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "tolk-compiler"
+version = "0.3.1"
+dependencies = [
+ "anyhow",
+ "dunce",
+ "include_dir",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
+ "ton-objs",
+ "ton-source-map",
+ "tycho-types",
+]
+
+[[package]]
 name = "tolk-dataflow"
 version = "0.3.1"
 dependencies = [
  "rustc-hash 2.1.1",
  "tolk-resolver",
  "tolk-syntax",
+]
+
+[[package]]
+name = "tolk-fmt"
+version = "0.3.1"
+dependencies = [
+ "anyhow",
+ "arrayvec",
+ "expect-test",
+ "tolk-syntax",
+ "tree-sitter",
+ "typed-arena",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -5015,34 +5024,6 @@ dependencies = [
  "tempfile",
  "tolk-resolver",
  "tolk-syntax",
-]
-
-[[package]]
-name = "tolkc"
-version = "0.3.1"
-dependencies = [
- "anyhow",
- "dunce",
- "include_dir",
- "rustc-hash 2.1.1",
- "serde",
- "serde_json",
- "ton-objs",
- "ton-source-map",
- "tycho-types",
-]
-
-[[package]]
-name = "tolkfmt"
-version = "0.3.1"
-dependencies = [
- "anyhow",
- "arrayvec",
- "expect-test",
- "tolk-syntax",
- "tree-sitter",
- "typed-arena",
- "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -5200,8 +5181,8 @@ dependencies = [
  "path-absolutize",
  "rustc-hash 2.1.1",
  "serde",
+ "tolk-compiler",
  "tolk-syntax",
- "tolkc",
  "tree-sitter",
  "tycho-types",
 ]
@@ -5218,7 +5199,7 @@ dependencies = [
  "serde_json",
  "ton-networks",
  "toncenter-keys",
- "tvmffi",
+ "tvm-ffi",
  "tycho-types",
  "urlencoding",
 ]
@@ -5236,7 +5217,7 @@ dependencies = [
  "ton-api",
  "ton-executor",
  "ton-networks",
- "tvmffi",
+ "tvm-ffi",
  "tycho-types",
 ]
 
@@ -5252,7 +5233,7 @@ dependencies = [
  "serde",
  "serde_json",
  "ton-objs",
- "tvmffi",
+ "tvm-ffi",
  "tycho-types",
 ]
 
@@ -5267,7 +5248,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "ton-executor",
- "tvmffi",
+ "tvm-ffi",
  "tycho-types",
 ]
 
@@ -5305,7 +5286,7 @@ dependencies = [
  "tower-http",
  "tower_governor",
  "tracing",
- "tvmffi",
+ "tvm-ffi",
  "tycho-types",
  "url",
 ]
@@ -5324,7 +5305,7 @@ dependencies = [
  "lsp-types",
  "rustc-hash 2.1.1",
  "serde_json",
- "tasm",
+ "tasm-core",
  "tasm-syntax",
  "tlb-syntax",
  "tokio",
@@ -5355,6 +5336,25 @@ dependencies = [
  "pkg-config",
  "sha2",
  "toml",
+]
+
+[[package]]
+name = "ton-retrace"
+version = "0.3.1"
+dependencies = [
+ "anyhow",
+ "base64",
+ "log",
+ "num-bigint",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "ton-executor",
+ "ton-networks",
+ "toncenter-keys",
+ "tvm-logs",
+ "tycho-types",
 ]
 
 [[package]]
@@ -5703,7 +5703,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
-name = "tvmffi"
+name = "tvm-ffi"
 version = "0.3.1"
 dependencies = [
  "anyhow",
@@ -5714,6 +5714,14 @@ dependencies = [
  "thiserror 2.0.18",
  "ton-abi",
  "tycho-types",
+]
+
+[[package]]
+name = "tvm-logs"
+version = "0.3.1"
+dependencies = [
+ "thiserror 2.0.18",
+ "winnow 0.7.13",
 ]
 
 [[package]]
@@ -5940,14 +5948,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "vmlogs"
-version = "0.3.1"
-dependencies = [
- "thiserror 2.0.18",
- "winnow 0.7.13",
-]
 
 [[package]]
 name = "vsimd"

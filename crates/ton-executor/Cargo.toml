@@ -19,7 +19,7 @@ hex = { workspace = true }
 tycho-types = { workspace = true }
 rustc-hash = { workspace = true }
 num-bigint = { workspace = true }
-tvmffi = { workspace = true }
+tvm-ffi = { workspace = true }
 parking_lot = { workspace = true }
 
 [lints]

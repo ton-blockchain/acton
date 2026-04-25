@@ -12,7 +12,7 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton_api::{GetMethodResult, Network, TonApiClient};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellSlice, CellSliceParts, HashBytes, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -65,15 +65,15 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings());
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
     let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
     let code_boc64 = match compilation_result {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             println!("  {} Compiled successfully", "✓".green().bold());
             result.code_boc64
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!(
                 "{}\nFix compilation error first to verify contract",
                 error.message
@@ -959,7 +959,7 @@ fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Resu
     }
 
     let tuple = result.parse_stack_tuple().with_context(|| {
-        format!("Failed to parse stack from '{method_name}' with tvmffi JSON stack parser")
+        format!("Failed to parse stack from '{method_name}' with tvm-ffi JSON stack parser")
     })?;
     let Some(item) = tuple.first() else {
         anyhow::bail!("Stack from '{method_name}' is empty");

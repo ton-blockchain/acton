@@ -38,7 +38,7 @@ acton-config = { path = "crates/acton-config" }
 acton-debug = { path = "crates/acton-debug" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
-tolkc = { path = "crates/tolkc" }
+tolk-compiler = { path = "crates/tolk-compiler" }
 ton-abi = { path = "crates/ton-abi" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
@@ -55,14 +55,14 @@ tolk-analysis = { path = "crates/tolk-analysis" }
 tolk-linter = { path = "crates/tolk-linter" }
 tolk-macros = { path = "crates/tolk-macros" }
 tolk-dataflow = { path = "crates/tolk-dataflow" }
-tvmffi = { path = "crates/tvmffi" }
-vmlogs = { path = "crates/vmlogs" }
-tasm = { path = "crates/tasm" }
+tvm-ffi = { path = "crates/tvm-ffi" }
+tvm-logs = { path = "crates/tvm-logs" }
+tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
-retrace = { path = "crates/retrace" }
+ton-retrace = { path = "crates/ton-retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
-tolkfmt = { path = "crates/tolkfmt" }
+tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
@@ -198,7 +198,7 @@ cc = "1.2"
 acton-config = { workspace = true }
 acton-debug = { workspace = true }
 acton-mdman = { workspace = true }
-tolkc = { workspace = true }
+tolk-compiler = { workspace = true }
 ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
@@ -209,13 +209,13 @@ tolk-linter = { workspace = true }
 ton-ls = { workspace = true }
 tower-lsp = { workspace = true }
 dashmap = { workspace = true }
-tvmffi = { workspace = true }
-vmlogs = { workspace = true }
-tasm = { workspace = true }
+tvm-ffi = { workspace = true }
+tvm-logs = { workspace = true }
+tasm-core = { workspace = true }
 ton-api = { workspace = true }
-retrace = { workspace = true }
+ton-retrace = { workspace = true }
 ton-source-map = { workspace = true }
-tolkfmt = { workspace = true }
+tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
 
 # remote crates

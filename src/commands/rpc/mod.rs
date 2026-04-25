@@ -9,7 +9,7 @@ use num_bigint::{BigInt, Sign};
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolkc::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::abi_serde::Data as CompilerAbiData;
 use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
 use ton_api::{Network, TonApiClient};
@@ -240,15 +240,15 @@ fn load_local_contract_candidate(
     let (code_boc64, compiler_abi) = if let Some(cached) = cached {
         (cached.code_boc64, cached.abi.map(Arc::new))
     } else {
-        let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings());
+        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
         match compiler.compile(&contract_path, false) {
-            tolkc::CompilerResult::Success(result) => {
+            tolk_compiler::CompilerResult::Success(result) => {
                 if let Some(cache) = file_cache.as_mut() {
                     let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.3");
                 }
                 (result.code_boc64, result.abi.map(Arc::new))
             }
-            tolkc::CompilerResult::Error(err) => {
+            tolk_compiler::CompilerResult::Error(err) => {
                 return Err(anyhow!(err.message)
                     .context(format!("Failed to compile {}", contract_path.display())));
             }

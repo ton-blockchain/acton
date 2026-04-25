@@ -5,10 +5,10 @@
 
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::message::step::StepExecutor;
-use tvmffi::serde::parse_tuple_item;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::serde::parse_tuple_item;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 use tycho_types::boc::Boc;
-use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugCodePosition {

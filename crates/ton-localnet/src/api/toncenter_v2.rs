@@ -7,8 +7,8 @@ use crate::storage::AccountStatus;
 use crate::types::{Addr, BocBytes};
 use base64::Engine;
 use serde_json::value::Value;
-use tvmffi::json_stack::{legacy_stack_to_json, stack_to_json};
-use tvmffi::stack::Tuple;
+use tvm_ffi::json_stack::{legacy_stack_to_json, stack_to_json};
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 

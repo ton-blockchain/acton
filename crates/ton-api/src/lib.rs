@@ -9,8 +9,8 @@ use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 pub use ton_networks::{CustomNetworkUrls, Network};
 use toncenter_keys::api_key as toncenter_api_key;
-use tvmffi::json_stack::{json_to_legacy_stack, json_to_stack};
-use tvmffi::stack::TupleItem;
+use tvm_ffi::json_stack::{json_to_legacy_stack, json_to_stack};
+use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
@@ -723,7 +723,7 @@ pub struct GetMethodResult {
 }
 
 impl GetMethodResult {
-    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvmffi::stack::Tuple> {
+    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvm_ffi::stack::Tuple> {
         match json_to_legacy_stack(self.stack.clone()) {
             Ok(tuple) => Ok(tuple),
             Err(legacy_err) => json_to_stack(self.stack.clone()).with_context(|| {

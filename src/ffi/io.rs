@@ -10,8 +10,8 @@ use num_traits::ToPrimitive;
 use std::io::{IsTerminal, stdin};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tvmffi::from_stack::FromStack;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::from_stack::FromStack;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
 extension!(println in (Context) with (arg6: TupleItem, type6: String, arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String) using println_impl);

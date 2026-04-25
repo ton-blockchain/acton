@@ -19,10 +19,10 @@ const TON_OBJS_ARTIFACTS_MANIFEST_PATH: &str = "crates/ton-objs/artifacts_manife
 const TON_STDLIB_ASSET_NAME: &str = "ton-stdlib.tar.gz";
 
 const TOLK_STDLIB_ARCHIVE_DIR: &str = "tolk-stdlib";
-const TOLK_STDLIB_DIR: &str = "crates/tolkc/assets/tolk-stdlib";
+const TOLK_STDLIB_DIR: &str = "crates/tolk-compiler/assets/tolk-stdlib";
 
 const FIFT_STDLIB_ARCHIVE_DIR: &str = "fift-stdlib";
-const FIFT_STDLIB_DIR: &str = "crates/tolkc/assets/fift-stdlib";
+const FIFT_STDLIB_DIR: &str = "crates/tolk-compiler/assets/fift-stdlib";
 const FIFT_STDLIB_FILES: &[&str] = &["Asm.fif", "Fift.fif"];
 
 pub(crate) fn run() -> Result<()> {

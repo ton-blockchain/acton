@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, Load};
 use tycho_types::dict::Dict;
 use tycho_types::models::IntAddr;

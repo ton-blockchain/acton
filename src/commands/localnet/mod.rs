@@ -3,7 +3,6 @@ use crate::wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::Context;
-use retrace::Network;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -13,6 +12,7 @@ use ton_localnet::node::StateSource;
 use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
 use ton_localnet::{Localnet, ServerArgs, run_server};
+use ton_retrace::Network;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellSliceParts};
 use tycho_types::models::{

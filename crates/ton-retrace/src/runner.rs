@@ -12,11 +12,11 @@ use std::sync::Arc;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 pub use ton_networks::Network;
+use tvm_logs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, Transaction};
 use tycho_types::num::Tokens;
-use vmlogs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
 
 /// Fully reproduce (re‑trace) a TON transaction inside a local TON Sandbox
 /// and return a structured report with VM logs, money flow, generated

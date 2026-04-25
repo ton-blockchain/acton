@@ -23,8 +23,8 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolkc::abi::ContractABI as CompilerContractABI;
-use tolkc::{CompilerResult, TolkSourceMap};
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -35,8 +35,8 @@ use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::Tuple;
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 
 mod debug_test;
@@ -181,7 +181,7 @@ pub(crate) fn run_script_file(
 
         let config = load_project_config(project_root);
 
-        let mut compiler = tolkc::Compiler::new(2);
+        let mut compiler = tolk_compiler::Compiler::new(2);
         if let Ok(config) = &config {
             let mappings = config.mappings();
             compiler = compiler.with_mappings(&mappings);

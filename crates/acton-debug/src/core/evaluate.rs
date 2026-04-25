@@ -3,13 +3,13 @@ use crate::types_render::{RenderedValue, render_cell_like_as_type};
 use anyhow::{Result, anyhow, bail};
 use num_bigint::BigInt;
 use std::cmp::Ordering;
+use tolk_compiler::source_map::{Declaration, SourceMap};
+use tolk_compiler::types_kernel::Ty;
 use tolk_syntax::{
     AstNode, DotAccessField, Expr, FuncBody, FunctionLike, Stmt, TopLevel, Type,
     parse_tolk_int_literal,
 };
-use tolkc::source_map::{Declaration, SourceMap};
-use tolkc::types_kernel::Ty;
-use vmlogs::parser::CellLike;
+use tvm_logs::parser::CellLike;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PathSegment {
@@ -646,10 +646,10 @@ mod tests {
     use crate::replayer::LocalVarRendered;
     use crate::types_render::{RenderedValue, render_runtime_vm_value};
     use anyhow::anyhow;
-    use tolkc::source_map::SourceMap;
+    use tolk_compiler::source_map::SourceMap;
+    use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
     use tycho_types::boc::Boc;
     use tycho_types::cell::CellBuilder;
-    use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
     fn parse_value_path(input: &str) -> anyhow::Result<ParsedValuePath> {
         let source_file = parse_wrapped_source(input)?;

@@ -10,8 +10,8 @@ use crate::types::Addr;
 use base64::Engine;
 use serde_json::value::Value;
 use std::collections::HashMap;
-use tvmffi::json_stack::stack_to_json;
-use tvmffi::stack::Tuple;
+use tvm_ffi::json_stack::stack_to_json;
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 
 #[allow(clippy::ptr_arg)]

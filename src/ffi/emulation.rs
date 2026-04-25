@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolkc::TolkSourceMap;
+use tolk_compiler::TolkSourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
@@ -37,8 +37,8 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
 use ton_executor::{MissingLibrariesContext, missing_library_callback};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::{ContData, Tuple, TupleItem};
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::{ContData, Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
 use tycho_types::dict::Dict;
@@ -217,13 +217,13 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     let compile_start = Instant::now();
 
     let mappings = ctx.env.config.mappings();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let result = compiler.compile(&path, ctx.build.need_debug_info);
 
     let compile_time = compile_start.elapsed();
 
     match result {
-        tolkc::CompilerResult::Success(success) => {
+        tolk_compiler::CompilerResult::Success(success) => {
             info!("Build {path_display} from source (compilation: {compile_time:?}");
 
             if let Err(err) = ctx.build.file_build_cache.put(
@@ -260,7 +260,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
 
             stk.push(TupleItem::Cell(code_cell));
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             info!(
                 "Build {path_display} failed after {compile_time:?}: {}",
                 error.message
@@ -1196,7 +1196,7 @@ fn save_trace_name_impl(
 /// Call a TVM predicate continuation with a single argument. Returns the bool result.
 fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> anyhow::Result<bool> {
     let mut cont_builder = CellBuilder::new();
-    tvmffi::serde::serialize_vm_cont(&mut cont_builder, cont)?;
+    tvm_ffi::serde::serialize_vm_cont(&mut cont_builder, cont)?;
     let cont_cell = cont_builder.build()?;
     let cont_boc = Boc::encode_base64(cont_cell);
 
@@ -2766,7 +2766,7 @@ fn call_tolk_function_impl(
 
     // Serialize the VmCont (with savelist, captured stack, code)
     let mut cont_builder = CellBuilder::new();
-    tvmffi::serde::serialize_vm_cont(&mut cont_builder, &cont)?;
+    tvm_ffi::serde::serialize_vm_cont(&mut cont_builder, &cont)?;
     let cont_cell = cont_builder.build()?;
     let cont_boc = Boc::encode_base64(cont_cell);
 

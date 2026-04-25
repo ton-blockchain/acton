@@ -13,7 +13,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tempfile::TempDir;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 
 pub(crate) fn render_variable_value(var: &dap::types::Variable) -> String {
     match (var.value.as_str(), var.type_field.as_deref()) {

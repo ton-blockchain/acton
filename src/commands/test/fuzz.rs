@@ -6,10 +6,10 @@ use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 use std::sync::Arc;
-use tolkc::TolkSourceMap;
-use tolkc::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
 use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 

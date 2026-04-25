@@ -1,6 +1,6 @@
 #![cfg(test)]
 use expect_test::Expect;
-use tolkfmt::{FormatOptions, format_source};
+use tolk_fmt::{FormatOptions, format_source};
 
 #[allow(dead_code)]
 pub(crate) fn check(code: &str, expect: Expect) {

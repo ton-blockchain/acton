@@ -6,7 +6,6 @@ use anyhow::{Context, anyhow};
 use hmac::{Hmac, Mac};
 use keyring::{Entry, Error as KeyringError};
 use rand::Rng;
-use retrace::Network;
 use ring::pbkdf2;
 use sha2::Sha512;
 use std::collections::{BTreeMap, HashMap};
@@ -20,6 +19,7 @@ use ton::ton_wallet::{
     Mnemonic, TonWallet, WALLET_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET,
     WORDLIST_EN_SET, WalletVersion,
 };
+use ton_retrace::Network;
 
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only

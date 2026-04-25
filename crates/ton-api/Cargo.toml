@@ -21,7 +21,7 @@ tycho-types = { workspace = true }
 ton-networks = { workspace = true }
 toncenter-keys = { workspace = true }
 log = { workspace = true }
-tvmffi = { workspace = true }
+tvm-ffi = { workspace = true }
 
 [lints]
 workspace = true

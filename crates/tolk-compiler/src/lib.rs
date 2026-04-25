@@ -6,12 +6,12 @@
 //! use std::path::Path;
 //!
 //! let tmp_test_filename = "file.tolk";
-//! let compilation_result = tolkc::compile(Path::new(&tmp_test_filename), false);
+//! let compilation_result = tolk_compiler::compile(Path::new(&tmp_test_filename), false);
 //! match compilation_result {
-//!     tolkc::CompilerResult::Success(result) => {
+//!     tolk_compiler::CompilerResult::Success(result) => {
 //!         // ... use result.code_boc64
 //!     }
-//!     tolkc::CompilerResult::Error(error) => {
+//!     tolk_compiler::CompilerResult::Error(error) => {
 //!         eprintln!("Cannot compile test file {}", error.message); // :(
 //!     }
 //! }

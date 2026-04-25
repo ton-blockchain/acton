@@ -14,8 +14,8 @@ use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tolkc::abi::ContractABI;
-use tolkc::compiler::CompilerResultSuccess;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::compiler::CompilerResultSuccess;
 use ton_abi;
 use xxhash_rust::xxh3::Xxh3;
 
@@ -32,7 +32,7 @@ pub struct CacheEntry {
     pub code_hash_hex: String,
     pub debug_mark_base64: Option<String>,
     pub fift_code: Option<String>,
-    pub new_source_map: Option<tolkc::SourceMap>,
+    pub new_source_map: Option<tolk_compiler::SourceMap>,
     pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,

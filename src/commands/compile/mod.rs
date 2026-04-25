@@ -9,8 +9,8 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use tolkc::abi::ContractABI;
-use tolkc::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
@@ -90,7 +90,7 @@ pub fn compile_cmd(
     let compile_start = Instant::now();
     let with_debug_info = source_map.is_some();
 
-    let mut compiler = tolkc::Compiler::new(2);
+    let mut compiler = tolk_compiler::Compiler::new(2);
     if let Some(acton_config) = &acton_config {
         let mappings = acton_config.mappings();
         compiler = compiler.with_mappings(&mappings);
@@ -101,7 +101,7 @@ pub fn compile_cmd(
     let compile_time = compile_start.elapsed();
 
     match compilation_result {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             let total_elapsed = start_time.elapsed();
             info!(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
@@ -131,7 +131,7 @@ pub fn compile_cmd(
                 Some(total_elapsed),
             )
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             let total_elapsed = start_time.elapsed();
             info!(
                 "Compile {} failed after {:?}: {}",

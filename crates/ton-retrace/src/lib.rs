@@ -41,7 +41,7 @@
 //! ### Basic Retrace
 //!
 //! ```rust,no_run
-//! use retrace::{Network, retrace};
+//! use ton_retrace::{Network, retrace};
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
@@ -59,8 +59,8 @@
 //! ### Analyzing Execution Trace
 //!
 //! ```rust,no_run
-//! use retrace::{Network, retrace};
-//! use retrace::trace::{Trace, TraceStep};
+//! use ton_retrace::{Network, retrace};
+//! use ton_retrace::trace::{Trace, TraceStep};
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
@@ -88,8 +88,8 @@
 //! ### Working with Actions
 //!
 //! ```rust,no_run
-//! use retrace::{Network, retrace};
-//! use retrace::trace::{Trace, ExecutedActions};
+//! use ton_retrace::{Network, retrace};
+//! use ton_retrace::trace::{Trace, ExecutedActions};
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {

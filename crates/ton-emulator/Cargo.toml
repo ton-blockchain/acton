@@ -11,7 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-tvmffi = { workspace = true }
+tvm-ffi = { workspace = true }
 ton-executor = { workspace = true }
 tycho-types = { workspace = true }
 anyhow = { workspace = true }

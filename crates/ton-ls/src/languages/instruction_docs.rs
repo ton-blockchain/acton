@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use tasm::spec::{FiftInstruction, GasConsumptionEntry, SpecInstruction, Specification};
+use tasm_core::spec::{FiftInstruction, GasConsumptionEntry, SpecInstruction, Specification};
 
 static INSTRUCTION_DOCS_INDEX: OnceLock<Option<InstructionDocsIndex>> = OnceLock::new();
 
@@ -12,7 +12,7 @@ pub struct InstructionDocsIndex {
 
 impl InstructionDocsIndex {
     fn load() -> serde_json::Result<Self> {
-        let specification = tasm::spec::load_tvm_specification()?;
+        let specification = tasm_core::spec::load_tvm_specification()?;
 
         let mut instructions_by_name = HashMap::with_capacity(specification.instructions.len());
         for (index, instruction) in specification.instructions.iter().enumerate() {

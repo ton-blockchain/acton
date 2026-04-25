@@ -3,7 +3,7 @@ use num_bigint::{BigInt, Sign};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
@@ -199,7 +199,7 @@ fn serialize_prev_blocks_info_as_stack_entry(
     let tuple_item = TupleItem::Tuple(Tuple(fields));
     let mut builder = CellBuilder::new();
 
-    tvmffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
+    tvm_ffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
         .context("failed to serialize prev_blocks_info tuple item")?;
 
     let cell = builder

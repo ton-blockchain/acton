@@ -7,12 +7,12 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolkc::{
+use tolk_compiler::{
     TolkSourceMap,
     source_map::{DebugMark, SrcRange},
 };
+use tvm_logs::parser::VmStackValue;
 use tycho_types::boc::Boc;
-use vmlogs::parser::VmStackValue;
 
 #[derive(Debug, Clone)]
 pub(super) struct Coverage {
@@ -190,7 +190,7 @@ fn collect_executed_lines_per_files(
         source_map, logs, ..
     } in data
     {
-        let vm_lines = vmlogs::parser::parse_lines(logs);
+        let vm_lines = tvm_logs::parser::parse_lines(logs);
         let Ok(mut replayer) = TolkReplayer::new(source_map, &vm_lines) else {
             continue;
         };
@@ -286,7 +286,7 @@ fn current_coverage_loc(
 }
 
 fn coverage_location_for_range(
-    source_map: &tolkc::SourceMap,
+    source_map: &tolk_compiler::SourceMap,
     range: &SrcRange,
 ) -> Option<(String, i64)> {
     let file = source_map

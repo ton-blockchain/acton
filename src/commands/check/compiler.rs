@@ -2,10 +2,10 @@ use crate::commands::check::pos;
 use acton_config::config::ActonConfig;
 use std::path::Path;
 use std::time::Instant;
+use tolk_compiler::Compiler;
 use tolk_linter::Rule;
 use tolk_linter::diagnostic::{Annotation, Diagnostic, Severity};
 use tolk_resolver::{FileDb, Span};
-use tolkc::Compiler;
 use tree_sitter::Point;
 
 pub(super) fn check_with_compiler(

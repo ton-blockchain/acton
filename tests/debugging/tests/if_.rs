@@ -1,6 +1,6 @@
 use crate::debugging::support::assertions::{DebugTestOutput, DebugTestOutputExt};
 use crate::debugging::support::debug::DebugBuilder;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 
 #[test]
 fn test_if_over_numbers_with_first_matching() -> anyhow::Result<()> {

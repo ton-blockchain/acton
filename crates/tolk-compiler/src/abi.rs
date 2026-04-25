@@ -751,7 +751,7 @@ mod tests {
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
             constants: Vec::new(),
-            compiler_name: "tolkc".to_owned(),
+            compiler_name: "tolk".to_owned(),
             compiler_version: "test".to_owned(),
         }
     }

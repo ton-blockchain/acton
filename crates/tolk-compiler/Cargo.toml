@@ -1,5 +1,5 @@
 [package]
-name = "tolkc"
+name = "tolk-compiler"
 description = "Tolk compiler crate"
 version = { workspace = true }
 publish = false

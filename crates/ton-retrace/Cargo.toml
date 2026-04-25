@@ -1,5 +1,5 @@
 [package]
-name = "retrace"
+name = "ton-retrace"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ton-executor = { workspace = true }
-vmlogs = { workspace = true }
+tvm-logs = { workspace = true }
 tycho-types = { workspace = true }
 num-bigint = { workspace = true }
 anyhow = { workspace = true }

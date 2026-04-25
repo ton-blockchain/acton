@@ -40,7 +40,7 @@ rough edges.
 - Parsed maps and storage diffs are now rendered more readably in transaction
   details and tree tooltips, and oversized trace selectors/tooltips are now
   scrollable instead of stretching the layout.
-- `tolkfmt` now preserves user-authored line breaks in function calls,
+- `tolk-fmt` now preserves user-authored line breaks in function calls,
   function parameter lists, and union type aliases.
 - `acton up` no longer special-cases Homebrew-style installation paths.
 

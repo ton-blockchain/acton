@@ -21,11 +21,11 @@ non-Cargo surfaces such as docs and UI packages.
 
 - Root `acton` crate (`src/`, root `Cargo.toml`): the CLI entrypoint and most
   end-user commands.
-- Tolk language/compiler stack: `tolkc`, `tolk-*`, `tree-sitter-*`, and the
+- Tolk language/compiler stack: `tolk-compiler`, `tolk-*`, `tree-sitter-*`, and the
   matching `*-syntax` crates.
 - Native/runtime bridge: `ton-objs`, `ton-executor`, `ton-emulator`, and
-  `tvmffi`.
-- Services and tooling: `ton-api`, `ton-localnet`, `ton-indexer`, `retrace`,
+  `tvm-ffi`.
+- Services and tooling: `ton-api`, `ton-localnet`, `ton-indexer`, `ton-retrace`,
   `ton-ls`, and `acton-debug`.
 - Repo tooling: `xtask` for release/schema/artifact maintenance workflows.
 - Non-Cargo surfaces: `docs/` (Next.js + Fumadocs), the Bun-built UI crates,
@@ -144,7 +144,7 @@ source of truth.
 
 - `just sync-artifacts` / `cargo xtask sync-artifacts` owns
   `crates/ton-objs/artifacts_manifest.toml`, `objs/`, and the bundled stdlib
-  assets under `crates/tolkc/assets/`.
+  assets under `crates/tolk-compiler/assets/`.
 - `crates/ton-objs/build.rs` verifies `libemulator.a` and `libtolk.a` against
   the SHA-256 values recorded in that manifest.
 - Only use the manual rebuild path when you are intentionally updating the
@@ -173,7 +173,7 @@ This command:
 - downloads and unpacks the matching `ton-objs-<target>.tar.gz` archive into
   `objs/`;
 - downloads a temporary `ton-stdlib.tar.gz`, replaces
-  `crates/tolkc/assets/tolk-stdlib/` and `crates/tolkc/assets/fift-stdlib/` from its
+  `crates/tolk-compiler/assets/tolk-stdlib/` and `crates/tolk-compiler/assets/fift-stdlib/` from its
   `tolk-stdlib/` directory and `fift-stdlib/Asm.fif` plus
   `fift-stdlib/Fift.fif`, then removes
   the temporary archive.
@@ -274,8 +274,8 @@ Notes:
 
 - `just test` uses `cargo nextest run` for Rust test targets and
   `cargo test --workspace --doc` for doctests.
-- `retrace` tests stay inside the shared workspace run, but the repo's nextest
-  config assigns `package(retrace)` to the `retrace-serial` group, so those
+- `ton-retrace` tests stay inside the shared workspace run, but the repo's nextest
+  config assigns `package(ton-retrace)` to the `retrace-serial` group, so those
   tests still run one at a time.
 - CI test behavior is slightly different: the `ci` nextest profile and
   `only_ci` feature are enabled in CI.
@@ -388,7 +388,7 @@ Source-of-truth map:
   terminal help text under `src/doc/man/generated_txt`, and installed manpages
   under `src/etc/man`
 - `lib/` -> `docs/content/docs/standard_library`
-- `crates/tolkc/assets/tolk-stdlib/` -> `docs/content/docs/tolk_standard_library`
+- `crates/tolk-compiler/assets/tolk-stdlib/` -> `docs/content/docs/tolk_standard_library`
 - linter rule metadata in `crates/tolk-linter/` and related macros ->
   `docs/content/docs/rules`
 
@@ -408,7 +408,7 @@ If your PR changes any docgen inputs, running `acton docgen` and committing
 generated documentation changes is required. This includes:
 
 - `lib/`
-- `crates/tolkc/assets/tolk-stdlib/`
+- `crates/tolk-compiler/assets/tolk-stdlib/`
 - linter rule metadata and mappings (for example `crates/tolk-linter/`,
   `crates/tolk-macros/`)
 
@@ -502,7 +502,7 @@ Use this as a quick local matrix before pushing:
 | Rust-only code                                                                                                            | `just check`                                                                                              |
 | UI code (`crates/acton-*-ui`, root `package.json`)                                                                        | `just check` + `just build-ui` + `just check-ui`                                                          |
 | Dependency or lockfile changes (`Cargo.lock`, `bun.lock`, `docs/`, tree-sitter/code extension/template package manifests) | `just check-security`                                                                                     |
-| Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata)                        | `just check` + `acton docgen` and  commit generated docs                                                  |
+| Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)                | `just check` + `acton docgen` and  commit generated docs                                                  |
 | Docs site content/config (`docs/`)                                                                                        | `cd docs && bun ci && bun run build`                                                                       |
 | Tree-sitter grammar (`crates/tree-sitter-*`)                                                                              | `just check` +`just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
 | Release preparation (maintainers)                                                                                         | Follow [RELEASING.md](RELEASING.md)                                                                       |

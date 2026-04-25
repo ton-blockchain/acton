@@ -52,8 +52,8 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
-use tasm::printer::FormatOptions;
-use tolkc::TolkSourceMap;
+use tasm_core::printer::FormatOptions;
+use tolk_compiler::TolkSourceMap;
 
 #[derive(Parser)]
 #[command(

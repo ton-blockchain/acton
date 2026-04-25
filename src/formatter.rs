@@ -18,13 +18,13 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
-use tolkc::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
+use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::SourceLocation;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
 use tycho_types::dict;
@@ -157,7 +157,9 @@ impl<'a> FormatterContext<'a> {
                 .declarations
                 .iter()
                 .find_map(|declaration| match declaration {
-                    tolkc::abi::ABIDeclaration::Enum { name, members, .. } if name == enum_name => {
+                    tolk_compiler::abi::ABIDeclaration::Enum { name, members, .. }
+                        if name == enum_name =>
+                    {
                         members
                             .iter()
                             .find(|member| member.name == member_name)
@@ -3149,7 +3151,7 @@ impl FormatterContext<'_> {
                     vm_log_diff: self
                         .emulations
                         .find_tx_logs(tx.lt)
-                        .map(vmlogs::convert_to_diff_logs)
+                        .map(tvm_logs::convert_to_diff_logs)
                         .unwrap_or_default(),
                     executor_logs: self
                         .emulations

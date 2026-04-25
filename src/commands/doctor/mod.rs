@@ -590,7 +590,7 @@ fn inspect_native_libraries() -> DoctorNativeLibraries {
         },
     };
 
-    let tolk = match tolkc::native_tolk_version() {
+    let tolk = match tolk_compiler::native_tolk_version() {
         Ok(version) => DoctorNativeLibrary {
             load_ok: true,
             version: Some(version.version),

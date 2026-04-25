@@ -31,7 +31,7 @@ pub fn build_cmd(
 
     // Prime native TVM codepage 0 with debug opcodes before any non-debug build
     // can freeze the process-wide singleton in no-debug mode.
-    tolkc::prime_debug_cp0()?;
+    tolk_compiler::prime_debug_cp0()?;
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -311,12 +311,12 @@ fn process_contract(
             println!("   {} {}", "Compiling".green().bold(), display_name);
 
             let mappings = acton_config.mappings();
-            let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+            let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
             let compilation_result = compiler.compile(contract_path, false);
             let compile_time = compile_start.elapsed();
 
             match compilation_result {
-                tolkc::CompilerResult::Success(result) => {
+                tolk_compiler::CompilerResult::Success(result) => {
                     if let Err(e) =
                         file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.3")
                     {
@@ -333,7 +333,7 @@ fn process_contract(
                         with_fift.then_some(result.fift_code),
                     )
                 }
-                tolkc::CompilerResult::Error(error) => {
+                tolk_compiler::CompilerResult::Error(error) => {
                     let message = rewrite_compiler_error_paths_for_display(
                         &error.message,
                         contract_src_display,

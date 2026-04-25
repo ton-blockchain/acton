@@ -1,7 +1,7 @@
 //! Simplified vendored variant of pretty.rs:
 //! https://github.com/Marwes/pretty.rs
 //!
-//! Adapted for tolkfmt and extended with `break parent` support via
+//! Adapted for tolk-fmt and extended with `break parent` support via
 //! `Doc::BreakParent`.
 use std::{
     borrow::Cow,
@@ -570,7 +570,7 @@ where
     /// Returns a value which implements `std::fmt::Display`
     ///
     /// ```
-    /// use tolkfmt::pretty::{Doc, RcDoc};
+    /// use tolk_fmt::pretty::{Doc, RcDoc};
     /// let doc = RcDoc::<()>::group(
     ///     RcDoc::text("hello").append(Doc::line()).append(Doc::text("world"))
     /// );
@@ -836,7 +836,7 @@ where
     /// Acts like `line` but behaves like `nil` if grouped on a single line
     ///
     /// ```
-    /// use tolkfmt::pretty::{Doc, RcDoc};
+    /// use tolk_fmt::pretty::{Doc, RcDoc};
     ///
     /// let doc = RcDoc::<()>::group(
     ///     RcDoc::text("(")
@@ -944,7 +944,7 @@ where
     /// Allocate a document that acts differently based on the position and page layout
     ///
     /// ```rust
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let alloc = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = alloc.text("prefix ")
@@ -961,7 +961,7 @@ where
     /// Allocate a document that acts differently based on the current nesting level
     ///
     /// ```rust
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let alloc = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = alloc.text("prefix ")
@@ -1088,8 +1088,8 @@ where
 /// `Pretty` trait, like `&str`)
 ///
 /// ```
-/// use tolkfmt::docs;
-/// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+/// use tolk_fmt::docs;
+/// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
 /// let alloc = &RcAllocator;
 /// let doc: DocBuilder<'_, RcAllocator, ()> = docs![
 ///     alloc,
@@ -1168,7 +1168,7 @@ where
     /// Acts as `self` when laid out on multiple lines and acts as `that` when laid out on a single line.
     ///
     /// ```
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let alloc = &RcAllocator;
     /// let body: DocBuilder<'_, RcAllocator, ()> = alloc.line().append("x");
@@ -1265,8 +1265,8 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use tolkfmt::docs;
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::docs;
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let arena = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = docs![
@@ -1299,7 +1299,7 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let arena = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix").append(arena.text(" "))
@@ -1323,7 +1323,7 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let arena = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix").append(arena.text(" "))
@@ -1364,7 +1364,7 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
+    /// use tolk_fmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let arena = &RcAllocator;
     /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix ")

@@ -9,8 +9,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use tolkc::CompilerResult;
-use tolkc::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
+use tolk_compiler::CompilerResult;
+use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
 use ton_abi::ContractAbi as LegacyContractAbi;
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
@@ -30,7 +30,7 @@ struct WrapperModel {
     wrapper_path: PathBuf,
     test_path: PathBuf,
     mappings: Option<BTreeMap<String, String>>,
-    format_options: tolkfmt::FormatOptions,
+    format_options: tolk_fmt::FormatOptions,
 }
 
 #[derive(Serialize)]
@@ -56,7 +56,7 @@ fn build_model(
         let separate_import_groups = fmt_settings
             .and_then(|s| s.separate_import_groups)
             .unwrap_or(false);
-        tolkfmt::FormatOptions {
+        tolk_fmt::FormatOptions {
             width,
             separate_import_groups,
         }
@@ -84,7 +84,7 @@ fn build_model(
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
     let mappings = config.mappings();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let (abi, code_boc64) = match compiler.compile(&contract_path, false) {
         CompilerResult::Success(result) => (
             result.abi.ok_or_else(|| {
@@ -170,7 +170,7 @@ fn format_generated_tolk(
     output_path: &Path,
     artifact_label: &str,
 ) -> String {
-    match tolkfmt::format_source(&raw, model.format_options) {
+    match tolk_fmt::format_source(&raw, model.format_options) {
         Ok(formatted) => formatted,
         Err(err) => {
             eprintln!(

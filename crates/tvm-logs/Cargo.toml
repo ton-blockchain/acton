@@ -1,5 +1,5 @@
 [package]
-name = "tolkfmt"
+name = "tvm-logs"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -11,15 +11,11 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-tolk-syntax = { workspace = true }
-tree-sitter = { workspace = true }
-anyhow = { workspace = true }
-arrayvec = "0.7.6"
-typed-arena = "2.0.2"
-unicode-width = "0.2.0"
-
-[dev-dependencies]
-expect-test = { workspace = true }
+thiserror = { workspace = true }
+winnow = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
-use tolkc::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
-use tolkc::source_map::{AbiStruct, Declaration, SourceMap};
-use tolkc::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
+use tolk_compiler::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
+use tolk_compiler::source_map::{AbiStruct, Declaration, SourceMap};
+use tolk_compiler::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
-use tvmffi::from_stack::FromStack;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::from_stack::FromStack;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
 use tycho_types::dict;
@@ -16,7 +17,6 @@ use tycho_types::models::{
     LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
     ReserveCurrencyFlags, SendMsgFlags, StateInit, StdAddr,
 };
-use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // RenderedValue — structured intermediate format for rendered values
@@ -2832,8 +2832,10 @@ fn source_map_declaration_to_abi(decl: &Declaration) -> Option<ABIDeclaration> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tolkc::abi::{ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField};
-    use tolkc::types_kernel::UnionVariant;
+    use tolk_compiler::abi::{
+        ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField,
+    };
+    use tolk_compiler::types_kernel::UnionVariant;
     use ton_abi::abi_serde::{DataField, DataObject};
     use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
