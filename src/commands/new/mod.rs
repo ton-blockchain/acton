@@ -3,8 +3,7 @@ use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig,
-    default_project_mappings,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
@@ -218,7 +217,13 @@ pub fn new_cmd(
             ContractConfig {
                 name: Some(contract.name.to_owned()),
                 src: contract.src.to_owned(),
-                depends: Some(vec![]),
+                depends: Some(
+                    contract
+                        .depends
+                        .iter()
+                        .map(|d| ContractDependency::Simple((*d).to_owned()))
+                        .collect(),
+                ),
                 output: None,
             },
         );
