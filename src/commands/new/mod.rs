@@ -3,7 +3,7 @@ use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, FmtSettings, LintConfig,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig,
     default_project_mappings,
 };
 use anyhow::anyhow;
@@ -218,13 +218,7 @@ pub fn new_cmd(
             ContractConfig {
                 name: Some(contract.name.to_owned()),
                 src: contract.src.to_owned(),
-                depends: Some(
-                    contract
-                        .depends
-                        .iter()
-                        .map(|d| ContractDependency::Simple((*d).to_owned()))
-                        .collect(),
-                ),
+                depends: Some(vec![]),
                 output: None,
             },
         );
@@ -248,17 +242,6 @@ pub fn new_cmd(
     );
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
-
-    config.fmt = Some(FmtSettings {
-        width: Some(100),
-        ignore: Some(vec!["**/*.gen.tolk".to_owned()]),
-        ..Default::default()
-    });
-
-    config.lint = Some(LintConfig {
-        exclude: Some(vec!["**/*.gen.tolk".to_owned()]),
-        ..Default::default()
-    });
 
     let mut acton_toml = toml::to_string_pretty(&config)?;
     acton_toml.push_str(ACTON_TOML_REFERENCE_FOOTER);
