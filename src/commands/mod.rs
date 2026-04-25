@@ -2,6 +2,7 @@ pub mod build;
 pub mod check;
 pub mod common;
 pub mod compile;
+pub mod create_app;
 pub mod disasm;
 pub mod doc;
 pub mod docgen;
