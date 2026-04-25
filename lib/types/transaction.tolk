@@ -96,9 +96,9 @@ fun TlbTransaction.loadBody<Msg>(self): Msg {
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
-/// exit code 63.
-fun TlbTransaction.loadInMsg<Msg>(self): TlbMessageRelaxed<Msg> {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
+/// exit code 63. Internal and external-in transaction messages are both supported.
+fun TlbTransaction.loadInMsg<Msg>(self): TlbMessage<Msg> {
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessage<Msg>>;
     return inMsgCell.load();
 }
 

@@ -67,16 +67,21 @@ fn prompt_int_and_address_validate_interactive_input_until_corrected() {
     session.expect("Enter retry count");
     session.send_line("abc", "failed to send invalid integer");
     session.expect("Enter a valid integer");
-    session.send_line("\u{15}7", "failed to correct integer");
+    session
+        .send("\x7f\x7f\x7f7\n")
+        .expect("failed to correct integer");
     session.expect("count=7");
 
     session.expect("Enter recipient");
     session.send_line("not-an-address", "failed to send invalid address");
     session.expect("Enter a valid TON address");
-    session.send_line(
-        "\u{15}0:0000000000000000000000000000000000000000000000000000000000000000",
-        "failed to correct address",
-    );
+    let corrected_address = "0:0000000000000000000000000000000000000000000000000000000000000000";
+    session
+        .send(format!(
+            "{}{corrected_address}\n",
+            "\x7f".repeat("not-an-address".len())
+        ))
+        .expect("failed to correct address");
     session.expect("recipient=");
     session.expect(Eof);
 }

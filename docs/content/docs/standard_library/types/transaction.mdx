@@ -108,7 +108,7 @@ Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), bec
 method unwraps it before typed decoding.
 
 After an inbound message exists, if message type does not match `Msg`, loading fails with
-exit code 63.
+exit code 63. Internal and external-in transaction bodies are both supported.
 
 Example:
 ```tolk
@@ -123,7 +123,7 @@ println(body.increaseBy);
 ## `TlbTransaction.loadInMsg`
 
 ```tolk
-fun TlbTransaction.loadInMsg<Msg>(self): TlbMessageRelaxed<Msg>
+fun TlbTransaction.loadInMsg<Msg>(self): TlbMessage<Msg>
 ```
 
 Loads the in message of the transaction with given type.
@@ -132,7 +132,7 @@ Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), bec
 method unwraps it before typed decoding.
 
 After an inbound message exists, if message type does not match `Msg`, loading fails with
-exit code 63.
+exit code 63. Internal and external-in transaction messages are both supported.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L100" />
 

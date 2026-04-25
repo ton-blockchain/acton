@@ -206,6 +206,33 @@ get fun `test transaction load body decodes external inbound body`() {
 }
 
 #[test]
+fn transaction_load_in_msg_decodes_external_inbound_message() {
+    run_snapshot_case(
+        "o-lib-api-transaction-load-in-msg-external-in",
+        r"
+get fun `test transaction load in msg decodes external inbound message`() {
+    val (harness, _) = deployHarness();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 8 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val inMsg = tx.loadInMsg<TriggerExternal>();
+    expect(inMsg.loadBody()).toEqual(TriggerExternal { id: 8 });
+    expect(inMsg.info is TlbExternalInMessageInfo).toBeTrue();
+    if (inMsg.info is TlbExternalInMessageInfo) {
+        expect(inMsg.info.dest).toEqual(harness.address);
+        expect(inMsg.info.importFee).toBeGreater(0);
+    }
+}
+",
+        "integration/snapshots/test-runner/api_external/transaction_load_in_msg_decodes_external_inbound_message.stdout.txt",
+    );
+}
+
+#[test]
 fn create_external_message_accepts_explicit_external_src() {
     run_success_case(
         "o-lib-api-create-external-explicit-src",
