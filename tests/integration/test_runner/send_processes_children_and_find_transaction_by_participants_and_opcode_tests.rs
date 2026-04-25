@@ -503,7 +503,8 @@ get fun `test ag find transaction bounced opcode`() {
 }
 
 #[test]
-fn wait_returns_true_in_emulation_mode_for_non_empty_and_empty_results() {
+fn wait_for_first_transaction_returns_non_null_in_emulation_for_non_empty_and_null_for_empty_results()
+ {
     run_network_success(
         "ag-stdlib-wait-in-emulation-mode",
         r#"
@@ -523,11 +524,11 @@ get fun `test ag wait in emulation mode`() {
         }),
     );
 
-    expect(txs.wait()).toEqual(true);
-    expect(txs.wait(true, 1, 1)).toEqual(true);
+    expect(txs.waitForFirstTransaction()).toBeNotNull();
+    expect(txs.waitForFirstTransaction(true, 1, 1)).toBeNotNull();
 
     val empty: SendResultList = SendResultList.createEmpty();
-    expect(empty.wait()).toEqual(true);
+    expect(empty.waitForFirstTransaction()).toBeNull();
 }
 "#,
         "integration/snapshots/test-runner/send_processes_children_and_find_transaction_by_participants_and_opcode/wait_returns_true_in_emulation_mode_for_non_empty_and_empty_results.stdout.txt",
@@ -535,14 +536,14 @@ get fun `test ag wait in emulation mode`() {
 }
 
 #[test]
-fn wait_returns_false_for_empty_list_in_broadcast_mode() {
+fn wait_for_first_transaction_returns_null_for_empty_list_in_broadcast_mode() {
     run_network_success(
         "ag-stdlib-wait-empty-broadcast-false",
         r"
 get fun `test ag wait empty list in broadcast mode`() {
     net.enableBroadcast();
     val empty: SendResultList = SendResultList.createEmpty();
-    expect(empty.wait()).toEqual(false);
+    expect(empty.waitForFirstTransaction()).toBeNull();
     net.disableBroadcast();
 }
 ",
@@ -551,7 +552,7 @@ get fun `test ag wait empty list in broadcast mode`() {
 }
 
 #[test]
-fn wait_rejects_zero_attempts_in_broadcast_mode() {
+fn wait_for_first_transaction_rejects_zero_attempts_in_broadcast_mode() {
     network_project(
         "ag-stdlib-wait-zero-attempts-rejected",
         r#"
@@ -572,7 +573,7 @@ get fun `test ag wait zero attempts rejected`() {
     );
 
     net.enableBroadcast();
-    txs.wait(true, 0, 1);
+    txs.waitForFirstTransaction(true, 0, 1);
 }
 "#,
     )

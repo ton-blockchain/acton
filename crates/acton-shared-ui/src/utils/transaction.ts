@@ -10,6 +10,7 @@ import {
 
 import type {BackendContractInfo,BackendTransaction, TransactionInfo} from "@/types"
 import type {ContractData} from "@/types/transaction"
+import {getMessageOpcode} from "@/utils/messageBody"
 
 const bigintToAddress = (addr: bigint | undefined): Address | undefined => {
   if (addr === undefined) return undefined
@@ -38,16 +39,7 @@ function parseActions(actionsBase64?: string): {
 
 export function getTransactionOpcode(tx: Transaction): number | undefined {
   const inMessage = tx.inMessage
-  if (!inMessage) return undefined
-
-  const slice = inMessage.body.asSlice()
-  if (slice.remainingBits < 32) return undefined
-
-  let opcode = slice.loadUint(32)
-  if (inMessage.info.type === "internal" && inMessage.info.bounced && slice.remainingBits >= 32) {
-    opcode = slice.loadUint(32)
-  }
-  return opcode
+  return inMessage ? getMessageOpcode(inMessage) : undefined
 }
 
 export function resolveTransactionOpcodeName(
@@ -66,6 +58,17 @@ export function resolveTransactionOpcodeName(
     ? contracts.get(inMessage.info.dest.toString())
     : targetContract
   const sourceContract = inMessage?.info.src ? contracts.get(inMessage.info.src.toString()) : undefined
+  const isBouncedInternal = inMessage?.info.type === "internal" && inMessage.info.bounced
+
+  if (isBouncedInternal) {
+    return (
+      targetContract?.outgoingMessageNamesByOpcode?.get(opcode) ??
+      sourceContract?.incomingMessageNamesByOpcode?.get(opcode) ??
+      findOpcodeNameInMessages(opcode, targetContract?.abi?.messages) ??
+      findOpcodeNameInMessages(opcode, sourceContract?.abi?.messages) ??
+      findOpcodeNameInContracts(opcode, allContracts)
+    )
+  }
 
   return (
     destinationContract?.incomingMessageNamesByOpcode?.get(opcode) ??
@@ -141,6 +144,38 @@ function findOpcodeNameInMessages(
   messages: readonly {readonly opcode: number | undefined; readonly name: string}[] | undefined,
 ): string | undefined {
   return messages?.find(message => message.opcode === opcode)?.name
+}
+
+export function getTransactionComputePhase(tx: Transaction) {
+  const description = tx.description
+  if (description.type === "generic" || description.type === "tick-tock") {
+    return description.computePhase
+  }
+  return
+}
+
+export function getTransactionActionPhase(tx: Transaction) {
+  const description = tx.description
+  if (description.type === "generic" || description.type === "tick-tock") {
+    return description.actionPhase
+  }
+  return
+}
+
+export function getTransactionTriggerLabel(tx: Transaction): string | undefined {
+  const description = tx.description
+  if (description.type === "tick-tock") {
+    return description.isTock ? "Tock" : "Tick"
+  }
+  return undefined
+}
+
+export function getTransactionSourceLabel(tx: Transaction): string | undefined {
+  const inMessage = tx.inMessage
+  if (inMessage?.info.type === "external-in") {
+    return "External In"
+  }
+  return getTransactionTriggerLabel(tx)
 }
 
 export function computeSendMode(tx: TransactionInfo): number | undefined {

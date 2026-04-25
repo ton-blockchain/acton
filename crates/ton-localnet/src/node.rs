@@ -1,4 +1,5 @@
 use crate::executor::{ExecContext, TvmExecutor};
+use crate::localnet::compute_normalized_ext_in_hash;
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
 use crate::storage::{
     self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta, NftItemMeta,
@@ -1346,6 +1347,33 @@ impl Node {
             .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
         trace.external_hash = external_hash;
         Ok(trace)
+    }
+
+    pub fn get_traces_by_message_hash(&self, msg_hash: &Hash256) -> anyhow::Result<TraceNode> {
+        let tx_hash = self
+            .find_trace_tx_hash_by_message_hash(msg_hash)
+            .ok_or_else(|| anyhow::anyhow!("Trace not found for message {}", msg_hash.to_hex()))?;
+        self.get_traces(&tx_hash)
+    }
+
+    fn find_trace_tx_hash_by_message_hash(&self, msg_hash: &Hash256) -> Option<Hash256> {
+        self.history.tx_by_hash.values().find_map(|tx| {
+            if tx.in_msg_hash == Some(*msg_hash) || tx.out_msg_hashes.contains(msg_hash) {
+                return Some(tx.tx_hash);
+            }
+
+            let in_msg_hash = tx.in_msg_hash?;
+            let msg_meta = self.history.msg_by_hash.get(&in_msg_hash)?;
+            if msg_meta.src.is_some() {
+                return None;
+            }
+
+            let msg_boc = self.cas.get(&msg_meta.msg_boc_hash)?;
+            let cell = Boc::decode(&msg_boc).ok()?;
+            let parsed = cell.parse::<Message<'_>>().ok()?;
+            let normalized = compute_normalized_ext_in_hash(&parsed).ok()?;
+            (normalized == *msg_hash).then_some(tx.tx_hash)
+        })
     }
 
     fn build_trace_node(&self, tx_hash: &Hash256) -> Option<TraceNode> {

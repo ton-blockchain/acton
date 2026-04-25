@@ -34,3 +34,7 @@ gen/
 wallets.toml
 global.wallets.toml
 toncenter-*.json
+libraries.toml
+AGENTS.md
+block.tlb
+debug.entitlements

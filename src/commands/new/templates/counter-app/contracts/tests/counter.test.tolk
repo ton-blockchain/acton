@@ -3,7 +3,7 @@ import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 import "@contracts/types"
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 
 get fun `test increase counter`() {
     val (contract, deployer, _) = setupTest();

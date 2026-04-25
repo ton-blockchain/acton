@@ -482,5 +482,5 @@ SEE ALSO
        o  acton help wrapper
 
        o  Test runner guide
-          <https://ton-blockchain.github.io/acton/docs/test-runner>
+          <https://ton-blockchain.github.io/acton/docs/testing/overview>
 

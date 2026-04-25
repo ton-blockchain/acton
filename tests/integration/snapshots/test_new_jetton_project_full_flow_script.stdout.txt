@@ -1,11 +1,13 @@
-Deploying Jetton with JettonInfo {
-    name: "StarterJetton",
-    description: "A starter jetton template",
-    symbol: "SJTN",
-    image: "https://ton.org/download/ton_symbol.svg"
-}
-Deploying Jetton contract...
-Deployed Jetton minter to [WALLET_ADDRESS_BASE] (JettonMinter)
-Minting tokens: 1000000000
-Successfully minted and transferred 1000000000 tokens to [WALLET_ADDRESS_BASE] (deployer)
-Total supply is 1000000000
+JETTON MINTER_ADDRESS=[WALLET_ADDRESS_BASE] (JettonMinter)
+JETTON TOTAL_SUPPLY=0
+JETTON MINTABLE=true
+JETTON ADMIN_ADDRESS=[WALLET_ADDRESS_BASE] (emulated-wallet)
+JETTON METADATA_name=Acton Sample Jetton
+JETTON METADATA_symbol=ACTON
+JETTON METADATA_description=Sample jetton deployed from acton-contracts scripts
+JETTON METADATA_image=https://ton.org/download/ton_symbol.png
+JETTON METADATA_decimals=9
+JETTON_ADMIN OWNER_ADDRESS=[WALLET_ADDRESS_BASE] (emulated-wallet)
+JETTON_ADMIN WALLET_ADDRESS=[WALLET_ADDRESS_BASE]
+JETTON_ADMIN WALLET_DEPLOYED=false
+JETTON_ADMIN WALLET_BALANCE=<unavailable>

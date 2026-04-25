@@ -49,7 +49,7 @@ This is an internal linked-list node, you should not use it directly.
 `prev` is stored in the list node itself and points to the previous list node.
 It is not a field of any `TlbOutAction*` payload.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L37" />
 
 ## `TlbOutActionSendMessage`
 
@@ -66,7 +66,7 @@ struct (0x0ec3c86d) TlbOutActionSendMessage {
 
 Represents send message action.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L45" />
 
 ## `TlbOutActionSendMessage.loadMessage`
 
@@ -91,7 +91,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L69" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L70" />
 
 ## `TlbOutActionSendMessage.loadBody`
 
@@ -113,7 +113,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L86" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L87" />
 
 ## `TlbOutActionSendMessage.loadGenericMessage`
 
@@ -136,7 +136,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L104" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L105" />
 
 ## `TlbOutActionSetCode`
 
@@ -149,7 +149,7 @@ struct (0xad4de08e) TlbOutActionSetCode {
 
 Represents set code action.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L109" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L110" />
 
 ## `TlbOutActionReserveCurrency`
 
@@ -164,7 +164,7 @@ struct (0x36e6b809) TlbOutActionReserveCurrency {
 
 Represents reserve currency action.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L115" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L116" />
 
 ## `TlbOutActionChangeLibrary`
 
@@ -179,7 +179,7 @@ struct (0x26fa1dd4) TlbOutActionChangeLibrary {
 
 Represents change library action.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L123" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L124" />
 
 ## `TlbLibRefHash`
 
@@ -192,7 +192,7 @@ struct (0b0) TlbLibRefHash {
 
 Represents library reference as a hash.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L131" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L132" />
 
 ## `TlbLibRefRef`
 
@@ -205,7 +205,7 @@ struct (0b1) TlbLibRefRef {
 
 Represents library reference as a cell reference.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L137" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L138" />
 
 ## `TlbLibRef`
 
@@ -216,7 +216,7 @@ type TlbLibRef = TlbLibRefHash | TlbLibRefRef
 Type alias for library reference used by [TlbOutActionChangeLibrary.libref](#tlboutactionchangelibrary).
 Value is either a hash-only reference ([TlbLibRefHash](#tlblibrefhash)) or an in-cell library ([TlbLibRefRef](#tlblibrefref)).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L144" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L145" />
 
 ## `TlbOutAction`
 
@@ -230,7 +230,7 @@ type TlbOutAction =
 
 Type alias for tagged union of all supported out action variants.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L147" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L148" />
 
 ## `TlbOutAction.kind`
 
@@ -246,7 +246,7 @@ Exact return values:
 - `"reserve-currency"` for [TlbOutActionReserveCurrency](#tlboutactionreservecurrency)
 - `"change-library"` for [TlbOutActionChangeLibrary](#tlboutactionchangelibrary)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L160" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L161" />
 
 ## `OutActionList`
 
@@ -256,9 +256,9 @@ type OutActionList = array<Cell<TlbOutAction>>
 
 Type alias for the out action list array.
 
-To get the out actions, use [testing.outActions](../../emulation/testing/#testingoutactions) method.
+To get the out actions, use [testing.outActions](/docs/standard_library/emulation/testing#testingoutactions) method.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L180" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L181" />
 
 ## `OutActionList.at`
 
@@ -270,7 +270,7 @@ Returns the out action at the given index.
 
 NOTE: this list is reversed, so the last action is at index 0.
 
-Fails with [Assert.fail](../../testing/assert/#assertfail) if the stored tuple element cannot be decoded as [TlbOutAction](#tlboutaction).
+Fails with [Assert.fail](/docs/standard_library/testing/assert#assertfail) if the stored tuple element cannot be decoded as [TlbOutAction](#tlboutaction).
 
 Example:
 ```tolk
@@ -279,7 +279,7 @@ val action = outActions.at(0);
 println(action.kind());
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L194" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L195" />
 
 ## `OutActionList.getSendMessageAt`
 
@@ -300,7 +300,7 @@ if (action != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L215" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L216" />
 
 ## `OutActionList.getSendMessageBodyAt`
 
@@ -325,7 +325,7 @@ if (body != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L239" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L240" />
 
 ## `OutMessage.outActions`
 
@@ -335,7 +335,7 @@ fun OutMessage.outActions(self, mode: int): OutActionList
 
 Returns the out actions for the message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L248" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L249" />
 
 ## `Expectation<OutActionList>.toBeSendMessageAt`
 
@@ -364,5 +364,5 @@ Failure diagnostics:
 - if typed load fails with opcode mismatch (exit code `63`), assertion includes expected type/prefix and actual opcode (plus known type name when available);
 - for other decode errors, assertion includes the decoder exit code.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L310" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/out_actions.tolk#L311" />
 

@@ -33,7 +33,22 @@ pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetTracesQuery>,
 ) -> impl IntoResponse {
-    handle_v3_result(node.get_traces(payload.hash), v3::map_traces).await
+    let tx_hash = match payload.hash.as_deref().map(parse_hash_any).transpose() {
+        Ok(hash) => hash,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let msg_hash = match payload.msg_hash.as_deref().map(parse_hash_any).transpose() {
+        Ok(hash) => hash,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+
+    if let Some(msg_hash) = msg_hash {
+        handle_v3_result(node.get_traces_by_message_hash(msg_hash), v3::map_traces).await
+    } else if let Some(tx_hash) = tx_hash {
+        handle_v3_result(node.get_traces(tx_hash), v3::map_traces).await
+    } else {
+        v3_bad_request("Either `msg_hash` or `hash` is required")
+    }
 }
 
 pub async fn get_address_information_v3(
@@ -635,6 +650,7 @@ fn filter_transactions_by_message_v3(
                 .any(|msg| {
                     if let Some(msg_hash) = query.msg_hash
                         && msg.hash != msg_hash
+                        && msg.hash_norm != Some(msg_hash)
                     {
                         return false;
                     }

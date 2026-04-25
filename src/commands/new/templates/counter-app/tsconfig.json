@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ESNext",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -15,7 +15,12 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@wrappers/*": ["wrappers-ts/*"],
+      "@/*": ["app/src/*"]
+    }
   },
-  "include": ["app/src", "wrapper-ts", "vite.config.ts"]
+  "include": ["app/src", "wrappers-ts", "vite.config.ts"]
 }

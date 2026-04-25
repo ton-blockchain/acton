@@ -423,15 +423,11 @@ impl WorldState {
             .accounts_state
             .accounts()
             .get(raw_addr)
-            .is_some_and(shard_account_exists);
+            .is_some_and(shard_account_is_active);
         if !deployed && matches!(self.accounts_state, AccountsState::Remote(_)) {
             // we need to populate address for the first time
             let account = self.get_account(raw_addr);
-            return account
-                .account
-                .load()
-                .map(|acc| acc.0.is_some())
-                .unwrap_or(false);
+            return shard_account_is_active(&account);
         }
         deployed
     }
@@ -581,6 +577,18 @@ fn shard_account_exists(account: &ShardAccount) -> bool {
         .account
         .load()
         .map(|loaded| loaded.0.is_some())
+        .unwrap_or(false)
+}
+
+fn shard_account_is_active(account: &ShardAccount) -> bool {
+    account
+        .account
+        .load()
+        .map(|loaded| {
+            loaded
+                .0
+                .is_some_and(|account| matches!(account.state, AccountState::Active(_)))
+        })
         .unwrap_or(false)
 }
 

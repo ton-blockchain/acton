@@ -15,8 +15,9 @@ use tolk_syntax::{LambdaParameter, Parameter, TryFromNode};
 /// Using immutable parameters makes the function contract clearer and reduces accidental mutations.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun increment(mutate value: int): int {
+/// //            ^^^^^^ E013: parameter can be immutable
 ///     return value + 1;
 /// }
 /// ```

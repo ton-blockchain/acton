@@ -177,7 +177,7 @@ fn collect_method_chain_doc<'a>(
             let callee = call.callee()?;
             let mut chain = collect_method_chain_doc(ctx, &callee, true)?;
             let args: Vec<_> = call.arguments().collect();
-            let args_doc = print_argument_list(ctx, &args)?;
+            let args_doc = print_argument_list(ctx, &args, call.0.field("arguments"))?;
 
             if chain.has_dot_link {
                 if let Some(last) = chain.links.last_mut() {
@@ -553,12 +553,21 @@ pub fn print_function_call<'a>(ctx: &Context<'_>, call: &Call) -> Option<RcDoc<'
     let callee = call.callee()?;
     let callee_doc = print_expression(ctx, &callee)?;
     let args: Vec<_> = call.arguments().collect();
-    let args_doc = print_argument_list(ctx, &args)?;
+    let args_doc = print_argument_list(ctx, &args, call.0.field("arguments"))?;
 
     Some(RcDoc::concat([callee_doc, args_doc]))
 }
 
-pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Option<RcDoc<'a>> {
+pub fn print_argument_list<'a>(
+    ctx: &Context<'_>,
+    args: &[CallArgument],
+    argument_list: Option<ArgumentList<'_>>,
+) -> Option<RcDoc<'a>> {
+    // Respect only explicit top-level line breaks in `(...)`.
+    // Newlines inside a single object/lambda argument should not force the whole call to break.
+    let has_top_level_newline = argument_list
+        .is_some_and(|argument_list| argument_list_has_top_level_newline(ctx, &argument_list));
+
     // We want to output:
     // ```
     // createMessage({
@@ -566,8 +575,10 @@ pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Opti
     // })
     // ```
     // Thus, without breaking the entire { ... } and without adding extra indentation
+    // Keep this compact form unless the user already split the argument list itself.
     // TODO: better way?
-    if args.len() == 1
+    if !has_top_level_newline
+        && args.len() == 1
         && let Some(single) = args.first()
         && matches!(
             single.expr(),
@@ -581,7 +592,9 @@ pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Opti
         ])));
     }
 
-    let list_options = if args.len() > 1 && args.iter().any(call_argument_contains_lambda) {
+    let list_options = if has_top_level_newline
+        || (args.len() > 1 && args.iter().any(call_argument_contains_lambda))
+    {
         common::ListOptions {
             multiline_threshold: 0,
             ..Default::default()
@@ -598,6 +611,27 @@ pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Opti
         |_| vec![],
         list_options,
     )
+}
+
+fn argument_list_has_top_level_newline(
+    ctx: &Context<'_>,
+    argument_list: &ArgumentList<'_>,
+) -> bool {
+    let source = ctx.code.as_ref().as_bytes();
+    let node = argument_list.0;
+    let close_paren_start = node.end_byte().saturating_sub(1);
+    let mut previous_end = node.start_byte().saturating_add(1);
+
+    // Scan only the gaps between top-level argument nodes and the parens.
+    // This ignores newlines nested inside an argument expression itself.
+    for argument in argument_list.arguments() {
+        if source[previous_end..argument.0.start_byte()].contains(&b'\n') {
+            return true;
+        }
+        previous_end = argument.0.end_byte();
+    }
+
+    source[previous_end..close_paren_start].contains(&b'\n')
 }
 
 fn call_argument_contains_lambda(arg: &CallArgument) -> bool {

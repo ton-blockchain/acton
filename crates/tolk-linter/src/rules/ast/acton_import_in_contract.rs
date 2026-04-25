@@ -12,8 +12,9 @@ use tolk_resolver::file_index::{FileId, Span};
 /// Such imports are environment-dependent and make contracts less portable.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// import "@acton/tlb/maybe";
+/// //      ^^^^^^^^^^^^^^^^ E014: contracts cannot import files from Acton standard library
 /// ```
 ///
 /// Use instead:

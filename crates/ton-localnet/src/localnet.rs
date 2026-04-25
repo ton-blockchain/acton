@@ -18,9 +18,10 @@ use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tvmffi::json_stack::json_to_legacy_item;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{Message, StdAddr, StdAddrFormat};
+use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo, StdAddr, StdAddrFormat};
+use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -106,6 +107,8 @@ pub struct LocalnetTransaction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
+    #[serde(default)]
+    pub hash_norm: Option<Hash256>,
     pub source: Option<Addr>,
     pub destination: Option<Addr>,
     pub value: u128,
@@ -155,6 +158,8 @@ pub struct LocalnetBlockTransactions {
     pub id: LocalnetBlockId,
     pub transactions: Vec<LocalnetTransaction>,
     pub msg_hash: Option<Hash256>,
+    #[serde(default)]
+    pub msg_hash_norm: Option<Hash256>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -264,6 +269,10 @@ pub(crate) enum Request {
     },
     GetTraces {
         tx_hash: Hash256,
+        resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
+    },
+    GetTracesByMessageHash {
+        msg_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
     EmulateTrace {
@@ -639,10 +648,20 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn get_traces(&self, tx_hash_str: String) -> anyhow::Result<storage::TraceNode> {
-        let tx_hash = Hash256::from_hex(&tx_hash_str)?;
+    pub async fn get_traces(&self, tx_hash: Hash256) -> anyhow::Result<storage::TraceNode> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn get_traces_by_message_hash(
+        &self,
+        msg_hash: Hash256,
+    ) -> anyhow::Result<storage::TraceNode> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetTracesByMessageHash { msg_hash, resp })
+            .await?;
         rx.await?
     }
 
@@ -997,6 +1016,10 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = node.get_traces(&tx_hash);
             let _ = resp.send(res);
         }
+        Request::GetTracesByMessageHash { msg_hash, resp } => {
+            let res = node.get_traces_by_message_hash(&msg_hash);
+            let _ = resp.send(res);
+        }
         Request::EmulateTrace {
             boc,
             ignore_chksig,
@@ -1098,6 +1121,7 @@ fn process_loop_request(node: &mut Node, req: Request) {
 }
 
 fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {
+    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?;
     let (msg_hash, tx_hash, seqno, _) = node.send_boc(boc)?;
 
     let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
@@ -1115,6 +1139,7 @@ fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlo
         id: block_header.block_id(),
         transactions: vec![tx_struct],
         msg_hash: Some(msg_hash),
+        msg_hash_norm,
     })
 }
 
@@ -1381,6 +1406,7 @@ pub(crate) fn convert_to_tx_struct(
     } else {
         LocalnetMessage {
             hash: Hash256([0; 32]),
+            hash_norm: None,
             source: None,
             destination: None,
             value: 0,
@@ -1419,19 +1445,60 @@ pub(crate) fn convert_to_tx_struct(
     })
 }
 
-fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LocalnetMessage> {
+pub(crate) fn compute_normalized_ext_in_hash(msg: &Message<'_>) -> anyhow::Result<Hash256> {
+    let MsgInfo::ExtIn(info) = &msg.info else {
+        anyhow::bail!("TEP-467 normalization only applies to external-in messages");
+    };
+
+    let mut body_builder = CellBuilder::new();
+    body_builder.store_slice(msg.body)?;
+    let body_cell = body_builder.build()?;
+
+    let normalized_info = ExtInMsgInfo {
+        src: None,
+        dst: info.dst.clone(),
+        import_fee: Tokens::ZERO,
+    };
+
+    let ctx = Cell::empty_context();
+    let mut builder = CellBuilder::new();
+    builder.store_small_uint(0b10, 2)?;
+    normalized_info.store_into(&mut builder, ctx)?;
+    builder.store_bit_zero()?;
+    builder.store_bit_one()?;
+    builder.store_reference(body_cell)?;
+    Ok(Hash256(*builder.build()?.repr_hash().as_array()))
+}
+
+fn normalized_ext_in_hash_from_boc(boc: &[u8]) -> anyhow::Result<Option<Hash256>> {
     let cell = Boc::decode(boc)?;
     let msg = cell.parse::<Message<'_>>()?;
+    if !matches!(&msg.info, MsgInfo::ExtIn(_)) {
+        return Ok(None);
+    }
+    Ok(Some(compute_normalized_ext_in_hash(&msg)?))
+}
+
+pub(crate) fn convert_to_message_struct(
+    meta: &MsgMeta,
+    boc: &[u8],
+) -> anyhow::Result<LocalnetMessage> {
+    let cell = Boc::decode(boc)?;
+    let msg = cell.parse::<Message<'_>>()?;
+    let hash_norm = match &msg.info {
+        MsgInfo::ExtIn(_) => Some(compute_normalized_ext_in_hash(&msg)?),
+        _ => None,
+    };
 
     // Extract body
-    let mut builder = tycho_types::cell::CellBuilder::new();
+    let mut builder = CellBuilder::new();
     builder.store_slice(msg.body)?;
     let body_cell = builder.build()?;
     let body_hash = Hash256(*body_cell.repr_hash().as_array());
     let body_bytes = Boc::encode(body_cell);
 
     let (fwd_fee, ihr_fee) = match &msg.info {
-        tycho_types::models::MsgInfo::Int(info) => (info.fwd_fee.into(), info.ihr_fee.into()),
+        MsgInfo::Int(info) => (info.fwd_fee.into(), info.ihr_fee.into()),
         _ => (0, 0),
     };
 
@@ -1446,7 +1513,7 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<Local
 
     let mut init_state_bytes = Vec::new();
     if let Some(init) = msg.init {
-        let mut builder = tycho_types::cell::CellBuilder::new();
+        let mut builder = CellBuilder::new();
         let _ = init.store_into(&mut builder, Cell::empty_context());
         if let Ok(cell) = builder.build() {
             init_state_bytes = Boc::encode(cell);
@@ -1455,6 +1522,7 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<Local
 
     Ok(LocalnetMessage {
         hash: meta.msg_hash,
+        hash_norm,
         source: meta.src,
         destination: meta.dst,
         value: meta.value.unwrap_or(0),
@@ -1509,6 +1577,7 @@ fn handle_get_block_transactions(
         id: block_id,
         transactions: result,
         msg_hash: None,
+        msg_hash_norm: None,
     })
 }
 

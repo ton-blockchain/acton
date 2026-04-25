@@ -21,7 +21,6 @@ pub fn up_cmd(
     trunk: bool,
     stable: bool,
     force: bool,
-    yes: bool,
     list: bool,
     check: bool,
 ) -> Result<()> {
@@ -58,7 +57,6 @@ pub fn up_cmd(
         version,
         trunk,
         stable,
-        yes,
         force,
     );
 
@@ -141,8 +139,6 @@ fn unicode_dash_flag_suggestion(arg: &str) -> Option<&'static str> {
         "force" => Some("--force"),
         "list" => Some("--list"),
         "check" => Some("--check"),
-        "yes" => Some("--yes"),
-        "y" => Some("-y"),
         "help" => Some("--help"),
         "h" => Some("-h"),
         _ => None,

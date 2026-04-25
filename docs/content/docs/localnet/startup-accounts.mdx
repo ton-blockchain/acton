@@ -1,0 +1,53 @@
+---
+title: "Startup Accounts"
+description: "Auto-fund and auto-deploy configured wallets when local node starts"
+---
+
+You can ask the local node to bootstrap selected wallets on startup.
+
+## What Happens on Startup
+
+For each wallet name in `accounts`:
+
+1. The node resolves the wallet from your configured wallets.
+2. The wallet receives startup funds from local faucet.
+3. If the wallet is not active yet, the node sends a deploy transaction based on wallet kind settings.
+
+This removes the manual "airdrop + first deploy transaction" bootstrap step from local development.
+
+## Configure in `Acton.toml`
+
+```toml title="Acton.toml"
+[localnet]
+accounts = ["deployer", "user"]
+```
+
+## Configure via CLI
+
+```bash
+acton localnet start --accounts deployer,user
+```
+
+CLI values override `Acton.toml` for the current run.
+
+## Wallet Configuration
+
+Wallets are resolved by name from your wallet config.
+See [Setup wallets](/docs/tutorial/setup-wallets) for full wallet setup.
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+```
+
+<Callout type="warn">
+If a wallet name from `accounts` is missing or invalid, startup will fail for that wallet setup step.
+</Callout>
+
+## When to Use
+
+- Local script development that expects pre-funded wallets.
+- Integration tests against local node API with realistic wallet addresses.
+- Reproducible team setups where everyone starts from the same account bootstrap.

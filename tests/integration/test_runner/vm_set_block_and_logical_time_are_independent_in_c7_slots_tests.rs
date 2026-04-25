@@ -11,6 +11,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const DJ_VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -39,14 +40,14 @@ get fun `test dj vm set block and logical time independent slots`() {
     val blockLtBefore = paramsBefore.get(4) as int;
     val logicalLtBefore = paramsBefore.get(5) as int;
 
-    __acton_impl_setConfigParam(blockLtBefore + 101, 4);
+    impl.setConfigParam(blockLtBefore + 101, 4);
     val c7AfterBlock = testing.getC7OutsideContract();
     val paramsAfterBlock = c7AfterBlock.get(0) as tuple;
     expect(paramsAfterBlock.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterBlock.get(4) as int).toEqual(blockLtBefore + 101);
     expect(paramsAfterBlock.get(5) as int).toEqual(logicalLtBefore);
 
-    __acton_impl_setConfigParam(logicalLtBefore + 202, 5);
+    impl.setConfigParam(logicalLtBefore + 202, 5);
     val c7AfterLogical = testing.getC7OutsideContract();
     val paramsAfterLogical = c7AfterLogical.get(0) as tuple;
     expect(paramsAfterLogical.get(3) as int).toEqual(nowBefore);
@@ -72,14 +73,14 @@ get fun `test dj vm set logical then block slot isolation`() {{
     val blockLtBefore = paramsBefore.get(4) as int;
     val logicalLtBefore = paramsBefore.get(5) as int;
 
-    __acton_impl_setConfigParam(logicalLtBefore + 303, 5);
+    impl.setConfigParam(logicalLtBefore + 303, 5);
     var c7AfterLogical = testing.getC7OutsideContract();
     var paramsAfterLogical = c7AfterLogical.get(0) as tuple;
     expect(paramsAfterLogical.get(3) as int).toEqual(nowBefore);
     expect(paramsAfterLogical.get(4) as int).toEqual(blockLtBefore);
     expect(paramsAfterLogical.get(5) as int).toEqual(logicalLtBefore + 303);
 
-    __acton_impl_setConfigParam(blockLtBefore + 404, 4);
+    impl.setConfigParam(blockLtBefore + 404, 4);
     val c7AfterBlock = testing.getC7OutsideContract();
     val paramsAfterBlock = c7AfterBlock.get(0) as tuple;
     expect(paramsAfterBlock.get(3) as int).toEqual(nowBefore);

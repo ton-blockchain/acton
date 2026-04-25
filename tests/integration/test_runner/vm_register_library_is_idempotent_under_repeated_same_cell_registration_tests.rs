@@ -10,6 +10,7 @@ const DV_IMPORTS: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
 "#;
@@ -37,14 +38,14 @@ fn vm_register_library_is_idempotent_under_repeated_same_cell_registration() {
 get fun `test dv stdlib vm register library repeated idempotent`() {
     val libraryCode = build("simple");
     val c7Before = testing.getC7OutsideContract();
-    val c5Before = __acton_impl_getC5();
+    val c5Before = impl.getC5();
 
     testing.registerLibrary(libraryCode);
     testing.registerLibrary(libraryCode);
     testing.registerLibrary(libraryCode);
 
     val c7After = testing.getC7OutsideContract();
-    val c5After = __acton_impl_getC5();
+    val c5After = impl.getC5();
     expect(c7After).toEqual(c7Before);
     expect(c5After).toEqual(c5Before);
 

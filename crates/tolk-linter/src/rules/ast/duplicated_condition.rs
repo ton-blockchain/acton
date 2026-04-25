@@ -14,12 +14,13 @@ use tolk_syntax::{Expr, If, IfAlt, NodeTraversalExt};
 /// copy-paste bug and can make branches unreachable.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// if (a < 1) {
 ///     return 1;
 /// } else if (a > 4) {
 ///     return 2;
 /// } else if (a > 4) {
+/// //         ^^^^^ E026: duplicated condition in conditional chain
 ///     return 3;
 /// }
 /// ```

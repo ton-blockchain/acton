@@ -14,8 +14,9 @@ use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 /// Omitting return types makes APIs less clear and can hide accidental signature changes.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun buildSlice() {
+/// //  ^^^^^^^^^^ S002: function return type should be explicit
 ///     return beginCell().toSlice();
 /// }
 /// ```

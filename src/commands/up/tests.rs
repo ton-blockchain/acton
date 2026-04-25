@@ -26,7 +26,6 @@ fn test_update_stable_to_stable_upgrade() -> Result<()> {
         false,
         true,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -51,7 +50,6 @@ fn test_update_stable_already_latest() -> Result<()> {
         None,
         false,
         true,
-        false,
         false,
     )?;
 
@@ -78,7 +76,6 @@ fn test_update_stable_from_trunk() -> Result<()> {
         false,
         true,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -104,7 +101,6 @@ fn test_update_trunk_to_trunk() -> Result<()> {
         true,
         None,
         true,
-        false,
         false,
         false,
     )?;
@@ -138,7 +134,6 @@ fn test_update_current_trunk_without_flags_keeps_trunk_channel() -> Result<()> {
         false,
         false,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -163,7 +158,6 @@ fn test_downgrade() -> Result<()> {
         current_version,
         false,
         Some("0.2.0".to_owned()),
-        false,
         false,
         false,
         false,
@@ -194,7 +188,6 @@ fn test_network_error() -> Result<()> {
         false,
         true,
         false,
-        false,
     );
 
     let err = result.expect_err("network error must fail");
@@ -216,7 +209,6 @@ fn test_custom_version() -> Result<()> {
         current_version,
         false,
         Some("0.0.5".to_string()),
-        false,
         false,
         false,
         false,
@@ -277,7 +269,6 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
         true,
         false,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -294,7 +285,6 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
         None,
         false,
         true,
-        false,
         false,
     )?;
 
@@ -323,7 +313,6 @@ fn test_install_versions() -> Result<()> {
         false,
         false,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -341,7 +330,6 @@ fn test_install_versions() -> Result<()> {
         current_version,
         false,
         None,
-        false,
         false,
         false,
         false,
@@ -374,7 +362,6 @@ fn test_install_trunk_versions() -> Result<()> {
         true,
         false,
         false,
-        false,
     )?;
 
     let content = fs::read_to_string(&bin_path)?;
@@ -393,7 +380,6 @@ fn test_install_trunk_versions() -> Result<()> {
         true,
         None,
         true,
-        false,
         false,
         false,
     )?;
@@ -423,7 +409,6 @@ fn test_backup_is_created_correctly() -> Result<()> {
         false,
         true,
         false,
-        false,
     )?;
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
@@ -444,7 +429,6 @@ fn test_force_reinstalls_latest_release_when_already_up_to_date() -> Result<()> 
         current_version,
         false,
         None,
-        false,
         false,
         false,
         true,
@@ -474,7 +458,6 @@ fn test_force_reinstalls_stable_release_when_explicit_stable_matches_current() -
         None,
         false,
         true,
-        false,
         true,
     )?;
 
@@ -531,7 +514,6 @@ fn test_update_fails_without_checksum_asset() -> Result<()> {
         false,
         true,
         false,
-        false,
     )
     .expect_err("missing checksum asset must fail");
 
@@ -558,7 +540,6 @@ fn test_update_fails_on_checksum_mismatch() -> Result<()> {
         None,
         false,
         true,
-        false,
         false,
     )
     .expect_err("checksum mismatch must fail");
@@ -596,7 +577,6 @@ fn test_update_fails_when_checksum_file_is_empty() -> Result<()> {
         None,
         false,
         true,
-        false,
         false,
     )
     .expect_err("empty checksum file must fail");
@@ -637,7 +617,6 @@ fn test_update_fails_when_checksum_file_has_invalid_digest() -> Result<()> {
         None,
         false,
         true,
-        false,
         false,
     )
     .expect_err("invalid checksum digest must fail");
@@ -685,7 +664,6 @@ fn test_update_fails_when_release_archive_is_invalid() -> Result<()> {
         false,
         true,
         false,
-        false,
     )
     .expect_err("invalid release archive must fail");
 
@@ -732,7 +710,6 @@ fn test_update_fails_when_archive_has_no_acton_binary() -> Result<()> {
         false,
         true,
         false,
-        false,
     )
     .expect_err("archive without acton binary must fail");
 
@@ -746,7 +723,7 @@ fn test_update_fails_when_archive_has_no_acton_binary() -> Result<()> {
 }
 
 #[test]
-fn test_homebrew_update_without_yes_fails_non_interactively() -> Result<()> {
+fn test_update_succeeds_for_homebrew_style_install_path() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let cellar_dir = dir.path().join("Cellar").join("acton").join("bin");
     fs::create_dir_all(&cellar_dir)?;
@@ -756,15 +733,12 @@ fn test_homebrew_update_without_yes_fails_non_interactively() -> Result<()> {
     let mut client = MockReleaseClient::new();
     client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
 
-    let err = workflow::run_update(
-        &client, &bin_path, "0.1.0", false, None, false, false, false, false,
-    )
-    .expect_err("homebrew update without --yes must fail in non-interactive tests");
+    workflow::run_update(
+        &client, &bin_path, "0.1.0", false, None, false, false, false,
+    )?;
 
-    assert_error_snapshot(
-        "test_homebrew_update_without_yes_fails_non_interactively",
-        err.to_string(),
-    );
+    assert_eq!(fs::read_to_string(&bin_path)?, "binary-data-0.2.0");
+    assert_backup_created(&bin_path, "0.1.0", "old_binary")?;
 
     Ok(())
 }

@@ -48,11 +48,11 @@ For the minimal local build/test flow, install:
 1. Rust toolchain (`rustup`, `cargo`)
 2. `just` (task runner)
    ```bash
-   cargo install just --locked
+   cargo install just --version 1.49.0 --locked
    ```
 3. `cargo-nextest` (required Rust test runner for non-doc tests)
    ```bash
-   cargo install cargo-nextest --locked
+   cargo install cargo-nextest --version 0.9.133 --locked
    ```
 4. Bun (required for UI packages)
    ```bash
@@ -73,15 +73,15 @@ Optional CLI tools:
 
 - `cargo-shear` (unused dependency linter for `just check-deps`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install cargo-shear --locked
+  cargo install cargo-shear --version 1.11.2 --locked
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
-  cargo install cargo-deny --locked
+  cargo install cargo-deny --version 0.19.4 --locked
   ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install typos-cli --locked
+  cargo install typos-cli --version 1.45.1 --locked
   ```
 - `cargo-llvm-cov` (optional, for coverage)
   ```bash
@@ -390,14 +390,14 @@ Source-of-truth map:
 - `lib/` -> `docs/content/docs/standard_library`
 - `crates/tolkc/assets/tolk-stdlib/` -> `docs/content/docs/tolk_standard_library`
 - linter rule metadata in `crates/tolk-linter/` and related macros ->
-  `docs/content/docs/linting/rules`
+  `docs/content/docs/rules`
 
 This updates generated trees under:
 
 - `docs/content/docs/commands`
 - `docs/content/docs/standard_library`
 - `docs/content/docs/tolk_standard_library`
-- `docs/content/docs/linting/rules`
+- `docs/content/docs/rules`
 - `src/etc/man`
 - `src/doc/man/generated_txt`
 

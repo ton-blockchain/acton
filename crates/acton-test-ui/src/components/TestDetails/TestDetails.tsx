@@ -17,6 +17,7 @@ import {
   type TransactionInfo,
 } from "@acton/shared-ui"
 import {
+  applyParsedBodies,
   fmt,
   getTransactionOpcode,
   processTransactions,
@@ -33,7 +34,6 @@ import {
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
-import {applyParsedBodies} from "../../utils/transactionBodies"
 
 import styles from "./TestDetails.module.css"
 
@@ -85,6 +85,18 @@ const MISSING_VM_LOG_HINT = [
 ].join("\n")
 
 const hasNonEmptyLog = (value: string | undefined): boolean => (value ?? "").trim().length > 0
+
+const getStatusDescription = (test: TestReport): string | undefined => {
+  if (test.status === TestStatus.Todo) {
+    return test.details ?? "TODO"
+  }
+
+  if (test.status === TestStatus.Skipped) {
+    return test.details
+  }
+
+  return undefined
+}
 
 export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoot}) => {
   const [activeTab, setActiveTab] = useState<"info" | "logs" | "transactions">(() => {
@@ -325,6 +337,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   }, [parsedTraceTransactionsWithBodies, selectedTraceIndex])
 
   const allContracts = useMemo(() => Object.values(backendContracts), [backendContracts])
+  const statusDescription = getStatusDescription(test)
 
   const traceFeeSummaries = useMemo((): TraceFeeSummary[] => {
     const getFirstTraceTransaction = (transactions: readonly TransactionInfo[]) => {
@@ -624,8 +637,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
           <div className={styles.infoGrid}>
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Status</div>
-              <div className={`${styles.infoValue} ${styles[test.status.toLowerCase()]}`}>
-                {test.status}
+              <div className={styles.infoValueGroup}>
+                <div className={`${styles.infoValue} ${styles[test.status.toLowerCase()]}`}>
+                  {test.status}
+                </div>
+                {statusDescription && <div className={styles.statusDescription}>{statusDescription}</div>}
               </div>
             </div>
             <div className={styles.infoItem}>

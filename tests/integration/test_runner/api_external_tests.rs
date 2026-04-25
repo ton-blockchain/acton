@@ -138,6 +138,20 @@ fn run_failure_case(project_name: &str, test_body: &str, test_name: &str) {
         .assert_contains(test_name);
 }
 
+fn run_snapshot_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+    let source = with_prelude(test_body);
+    ProjectBuilder::new(project_name)
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 #[test]
 fn send_external_collects_external_messages_with_deterministic_order() {
     run_success_case(
@@ -166,6 +180,55 @@ get fun `test send external collects externals`() {
 }
 ",
         "send external collects externals",
+    );
+}
+
+#[test]
+fn transaction_load_body_decodes_external_inbound_body() {
+    run_snapshot_case(
+        "o-lib-api-transaction-load-body-external-in",
+        r"
+get fun `test transaction load body decodes external inbound body`() {
+    val (harness, _) = deployHarness();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 7 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val body = tx.loadBody<TriggerExternal>();
+    expect(body).toEqual(TriggerExternal { id: 7 });
+}
+",
+        "integration/snapshots/test-runner/api_external/transaction_load_body_decodes_external_inbound_body.stdout.txt",
+    );
+}
+
+#[test]
+fn transaction_load_in_msg_decodes_external_inbound_message() {
+    run_snapshot_case(
+        "o-lib-api-transaction-load-in-msg-external-in",
+        r"
+get fun `test transaction load in msg decodes external inbound message`() {
+    val (harness, _) = deployHarness();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 8 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val inMsg = tx.loadInMsg<TriggerExternal>();
+    expect(inMsg.loadBody()).toEqual(TriggerExternal { id: 8 });
+    expect(inMsg.info is TlbExternalInMessageInfo).toBeTrue();
+    if (inMsg.info is TlbExternalInMessageInfo) {
+        expect(inMsg.info.dest).toEqual(harness.address);
+        expect(inMsg.info.importFee).toBeGreater(0);
+    }
+}
+",
+        "integration/snapshots/test-runner/api_external/transaction_load_in_msg_decodes_external_inbound_message.stdout.txt",
     );
 }
 

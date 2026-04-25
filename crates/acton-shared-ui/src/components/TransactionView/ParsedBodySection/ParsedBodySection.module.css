@@ -1,0 +1,49 @@
+.parsedBodySection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.parsedBodyTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.actionsToggleButton {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.actionsToggleButton:hover {
+  color: var(--text-primary);
+}
+
+.actionsToggleText {
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.parsedBodyTree {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
+}
+
+.parsedBodyContent {
+  width: max-content;
+  min-width: 100%;
+}

@@ -479,3 +479,252 @@ fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
             "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_opcode_requires_explicit_bounced_flag.stdout.txt",
         );
 }
+
+#[test]
+fn bounced_opcode_scalar_path_uses_second_word_when_bounced_flag_is_explicit() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test bounced opcode scalar path uses second word with bounced flag`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = testing.treasury("sender");
+
+                net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                }}));
+
+                val bouncedBody = beginCell()
+                    .storeUint(0xDEADBEEF, 32)
+                    .storeUint(0x12345678, 32)
+                    .endCell();
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: target,
+                    body: bouncedBody,
+                }}).bounced());
+
+                expect(txs).toHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: 0x12345678,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: 0xDEADBEEF,
+                }});
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-bounced-opcode-second-word-with-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_opcode_scalar_path_uses_second_word_when_bounced_flag_is_explicit.stdout.txt",
+        );
+}
+
+#[test]
+fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test bounced opcode scalar path supports fffffffe prefix`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = testing.treasury("sender");
+
+                net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                }}));
+
+                val bouncedBody = beginCell()
+                    .storeUint(0xFFFFFFFE, 32)
+                    .storeUint(0x12345678, 32)
+                    .endCell();
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: target,
+                    body: bouncedBody,
+                }}).bounced());
+
+                expect(txs).toHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: 0x12345678,
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: 0xFFFFFFFE,
+                }});
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-bounced-opcode-fffffffe")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_opcode_scalar_path_supports_new_fffffffe_prefix.stdout.txt",
+        );
+}
+
+#[test]
+fn bounced_opcode_predicate_path_uses_second_word_when_bounced_flag_is_explicit() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test bounced opcode predicate path uses second word with bounced flag`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = testing.treasury("sender");
+
+                net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                }}));
+
+                val bouncedBody = beginCell()
+                    .storeUint(0xDEADBEEF, 32)
+                    .storeUint(0x12345678, 32)
+                    .endCell();
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: target,
+                    body: bouncedBody,
+                }}).bounced());
+
+                expect(txs).toHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: fun(op: int): bool {{
+                        return op == 0x12345678;
+                    }},
+                }});
+                expect(txs).toNotHaveTx({{
+                    from: sender.address,
+                    to: target,
+                    bounced: true,
+                    opcode: fun(op: int): bool {{
+                        return op == 0xDEADBEEF;
+                    }},
+                }});
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-bounced-opcode-predicate-second-word")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_opcode_predicate_path_uses_second_word_when_bounced_flag_is_explicit.stdout.txt",
+        );
+}
+
+#[test]
+fn bounced_predicate_false_short_circuits_opcode_predicate() {
+    let test_code = format!(
+        r#"
+            {TEST_IMPORTS}
+
+            get fun `test bounced predicate false short circuits opcode predicate`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = testing.treasury("sender");
+
+                net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                }}));
+
+                val bouncedBody = beginCell()
+                    .storeUint(0xDEADBEEF, 32)
+                    .storeUint(0x12345678, 32)
+                    .endCell();
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("0.5"),
+                    dest: target,
+                    body: bouncedBody,
+                }}).bounced());
+
+                expect(txs).toNotHaveTx({{
+                    bounced: fun(flag: bool): bool {{
+                        return false;
+                    }},
+                    opcode: fun(op: int): bool {{
+                        expect(false).toBeTrue();
+                        return false;
+                    }},
+                }});
+            }}
+        "#,
+    );
+
+    ProjectBuilder::new("p-lib-api-bounced-predicate-false-short-circuits-opcode")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_transaction_matchers/lib_api_bounced_predicate_false_short_circuits_opcode_predicate.stdout.txt",
+        );
+}

@@ -93,16 +93,19 @@ fun parseInt(x: string): int
 
 Parse a decimal string into an int value.
 
-Accepts optional leading `-` sign followed by decimal digits.
-Invalid input (non-numeric characters, empty string) fails with an error.
+Leading and trailing whitespace is ignored before parsing.
+After trimming, accepts optional leading `-` sign followed by decimal digits.
+Invalid input (non-numeric characters, empty string, whitespace-only string)
+fails with an error.
 
 Example:
 ```tolk
 val n = parseInt("12345");
 val negative = parseInt("-42");
+val withWhitespace = parseInt(" 42 ");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L97" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L100" />
 
 ## `parseAddress`
 
@@ -110,7 +113,7 @@ val negative = parseInt("-42");
 fun parseAddress(addr: string): address
 ```
 
-Convert a string representation of address to an internal [address](../../tolk_standard_library/common/#address) value.
+Convert a string representation of address to an internal [address](/docs/tolk_standard_library/common#address) value.
 
 Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
 (base64/base64url with flags). Inputs copied from CLI output like
@@ -124,7 +127,7 @@ Example:
 val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L116" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L119" />
 
 ## `parseCellFromHex`
 
@@ -138,5 +141,5 @@ Decode a root cell from hex-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell hex <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L126" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L129" />
 

@@ -74,8 +74,11 @@ get fun `test db stdlib transaction load body nested inline`() {
 
     val inMsg = tx.loadInMsg<DbNestedPayload>();
     expect(inMsg.loadBody()).toEqual(payload);
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(destination);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(destination);
+    }
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
     expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>().0);
@@ -130,8 +133,11 @@ get fun `test db stdlib transaction load body nested fixture`() {
 
     val inMsg = tx.loadInMsg<DbNestedPayload>();
     expect(inMsg.loadBody()).toEqual(payload);
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(destination);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(destination);
+    }
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
     expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DbNestedPayload>().0);

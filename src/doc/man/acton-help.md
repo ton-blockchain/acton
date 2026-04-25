@@ -120,4 +120,4 @@ Nested command paths are not currently supported.
 
 - `acton --help`
 - `acton help new`
-- [Commands overview](https://ton-blockchain.github.io/acton/docs/commands)
+- [Commands overview](https://ton-blockchain.github.io/acton/docs/commands/overview)

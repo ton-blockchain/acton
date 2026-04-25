@@ -1,0 +1,498 @@
+---
+title: "Debugging"
+description: "Deep guide to source-level debugging, backtraces, traces, retrace, fork testing, snapshots, and debug output in Acton"
+icon: Bug
+---
+
+Acton has several debugging layers on purpose.
+
+Some are cheap and fast enough for everyday use. Some require source maps and
+debug metadata. Some only work for local execution. Others are designed for
+replaying real on-chain history. The fastest way to debug effectively is to
+pick the lightest tool that can answer your question.
+
+## Start Here
+
+| Question                                             | Best tool                                          | Why                                            |
+|------------------------------------------------------|----------------------------------------------------|------------------------------------------------|
+| I just need to print a value from a test or script   | `println(...)`                                     | Cheap host-side output                         |
+| I need to print from contract code running in the VM | `debug.print*`                                     | Raw VM-side debug logging                      |
+| I need to inspect a transaction tree quickly         | `println(txs)` / matcher output                    | Fastest transaction-level feedback             |
+| I need source locations, but not a live debugger     | `--backtrace full`                                 | Midweight source attribution                   |
+| I need breakpoints and stepping                      | `acton test --debug` or `acton script --debug`     | Live source-level debugging                    |
+| I need to debug a real historical transaction        | `acton retrace <HASH> --contract <NAME> [--debug]` | Highest-fidelity replay                        |
+| I need to stop a transaction chain between hops      | `testing.createTraceIterationCursor()` and `TxCursor` | Transaction-chain control, not source stepping |
+| I need real deployed state but local iteration speed | `--fork-net`                                       | Fetch remote accounts, execute locally         |
+| I need to freeze an expensive local setup            | world-state snapshots                              | Reuse prepared emulator state                  |
+| I need the richest offline test artifact             | `acton test --save-test-trace`                     | Reusable trace bundle for later inspection     |
+
+<Callout type="tip">
+Treat Acton's debugging story as a ladder, not as one giant tool. Start with
+terminal traces or Test UI, add `--backtrace full` when you need source
+locations, switch to `--debug` when you truly need stepping, and move to
+retrace or fork workflows only when the bug depends on real chain state.
+</Callout>
+
+## 1. Source-level Debugger
+
+Acton's source-level debugger speaks the Debug Adapter Protocol (DAP). You run
+an Acton command with `--debug`, Acton opens a local debug server on
+`127.0.0.1:<port>`, and your editor attaches to it.
+
+### Where it is available
+
+- `acton test --debug`
+- `acton script path/to/script.tolk --debug`
+- `acton retrace <HASH> --contract <NAME> --debug`
+
+These are not identical modes:
+
+- `acton test --debug` and `acton script --debug` debug a live local session.
+- `acton retrace --debug` debugs a replay reconstructed from VM logs.
+
+That distinction matters because live sessions can expose runtime registers and
+live nested calls, while retrace sessions are stricter and replay-only.
+
+For live contract debugging, Acton runs the same contract code path you ship in
+production. You do not need a separate debug-only contract variant, disabled
+optimizations, or a special "debug build" workflow just to attach and step
+through execution.
+
+### Starting a session
+
+```bash
+# Debug one test or a small filtered subset
+acton test tests/counter.test.tolk --filter "deploy" --debug
+
+# Debug a script
+acton script scripts/deploy.tolk --debug
+
+# Debug a historical on-chain transaction
+acton retrace <HASH> --contract Counter --debug --debug-port 4711
+```
+
+Acton prints when the server is listening. Then attach from your editor.
+
+### Connecting from an editor
+
+Acton works best with the official TON IDE integrations documented in
+[IDE support](/docs/ide-support/overview). Other DAP clients can attach
+too, but they should expect only the subset of requests and scopes that Acton
+implements today.
+
+Minimal VS Code-style setup:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "tolk",
+      "request": "launch",
+      "name": "Attach to Acton",
+      "debugServer": 4711
+    }
+  ]
+}
+```
+
+Start the matching Acton command first:
+
+```bash
+acton test tests/counter.test.tolk --debug --debug-port 4711
+```
+
+### Capabilities
+
+The current debugger supports:
+
+- source breakpoints
+- conditional breakpoints
+- continue, step over, step into, and step out
+- instruction-level stepping when the client requests instruction granularity
+- exception break filters for `Uncaught Exceptions` and `All Exceptions`
+- stack traces
+- locals inspection with current values
+- structured expansion for simple and complex values, including tuples, maps, arrays,
+  structs, addresses, cells, and unions
+- hover/watch/debug-console evaluation for a safe expression subset
+
+One of Acton's strongest features is that live debug sessions can cross common
+runtime boundaries. When you step into helpers such as `net.send*` or
+`net.runGetMethod()`, Acton can splice a child execution into the same logical
+debug session instead of making you start a separate debugger manually.
+
+Acton also shows the variables visible in the current context together with
+their current values, and it renders them in a detailed structured form rather
+than as opaque low-level blobs. That applies not only to simple values but also
+to complex nested types, so the `Variables` view is often enough to inspect
+real contract state directly at the current stop point.
+
+Live sessions also expose a `Registers` scope:
+
+- `c4 (storage)`
+- `c5 (output actions)`
+- `c7 (temporary data)`
+
+This is not just a raw register dump. Acton renders storage and output actions
+in a readable contract-aware form, which makes the register view practical for
+understanding runtime state instead of forcing you to decode low-level values
+by hand.
+
+In practice, the `Registers` scope is often the fastest way to answer
+questions like:
+
+- what storage shape does the contract have right now
+- which output actions have already been prepared
+- what temporary runtime data is currently visible
+
+This scope is available only for live execution. Replay sessions such as
+`acton retrace --debug` do not have the same live register view.
+
+### Important debugger semantics
+
+- Conditional breakpoints are fail-loud. If the condition cannot be evaluated,
+  Acton stops and reports the evaluation failure instead of silently ignoring it.
+- Nested send/get executions stay inside one logical debug session. The visible
+  stack can jump across child contexts even though the adapter still behaves
+  like a single thread to the client.
+- Some runtime glue in `emulation/network.tolk` is treated as transparent when
+  stepping into calls, so Acton may skip over it to land on a more useful stop.
+
+### Watches, hovers, and conditions
+
+Expression evaluation is intentionally limited to a side-effect-free subset.
+Supported shapes are roughly:
+
+- local variables, including shadowed locals from the selected frame
+- backticked identifiers
+- field access such as `foo.bar`
+- dot-based numeric indexing such as `foo.items.0`
+- parentheses
+- boolean, string, integer, and `null` literals
+- `!` and unary `-`
+- `&&` and `||`
+- `==`, `!=`, `<`, `<=`, `>`, `>=`
+- debugger-only typed cell casts of the form `someCell as Cell<Foo>` or
+  `someSlice as Cell<Foo>`, decoded from the current frame's `SourceMap`
+
+What is not supported:
+
+- function calls
+- arbitrary statement execution
+- mutating expressions
+- general arithmetic beyond the supported unary and comparison cases
+- general type casts; only `cell`/`slice` to `Cell<T>` is supported
+
+<Callout type="warn">
+`evaluate` is an inspection feature, not a full Tolk REPL. It operates on
+debug-rendered values, and some comparison behavior is renderer-driven rather
+than language-accurate execution semantics. Use it for watches, hovers, and
+conditional breakpoints, not for proving complicated logic.
+
+For typed cell casts, the debugger uses type declarations from the active
+frame's `SourceMap`. The cast succeeds only when the source expression resolves
+to a `cell` or `slice`, the target is `Cell<T>`, and the payload decodes fully
+as `T` without leftover bits or refs.
+</Callout>
+
+### Practical limits
+
+- Live stepping into remote or forked contracts may still run, but source-level
+  fidelity depends on having matching local debug info for that code.
+- `acton test --debug` is a poor fit for broad suite runs. In practice, narrow
+  to one test with `--filter`.
+- `acton script --debug` debugs the local script execution path. It does not
+  give you source-level stepping inside a real on-chain wallet broadcast after
+  the script hands control to the network.
+- `acton retrace --debug` is stricter than live debugging: it requires
+  `--contract`, a local `.tolk` contract, compiler-produced source maps and
+  debug marks, and matching local/on-chain code hash.
+- replay debug sessions are single-threaded and do not expose the live
+  `Registers` scope that local sessions can show
+- Acton currently supports source breakpoints, stepping, stacks, variables,
+  exception info, and evaluate, but not step-back, data breakpoints, function
+  breakpoints, or restart-style flows
+- breakpoint locations can slide to the next stoppable line while still being
+  reported as verified
+
+## 2. Backtraces Without the Debugger
+
+When you do not need a live debugger but still want precise source locations
+and the call path that led there, use full backtraces.
+
+```bash
+acton test --backtrace full
+acton script scripts/deploy.tolk --backtrace full
+```
+
+This is the middle layer between plain console output and a debugger. It gives
+you both source attribution and a source-level backtrace. It is the right
+choice when:
+
+- compute phase failed and you need a source location
+- action phase failed and Acton tells you to rerun with a backtrace
+- a matcher failure already gave you the right transaction tree, but not enough
+  source context
+
+In practice this often means more than a single source location. The backtrace
+can show the chain of nested contract-side calls that led to the failure, and
+for some nested message-driven failures Acton can also surface the caller path
+that led into the failing execution.
+
+Acton automatically prepares the required debug metadata when you use
+`--backtrace full`.
+
+This is stronger than `-v`: full backtraces require location and stack data,
+not just low-level executor logs. Coverage also raises internal verbosity for
+source mapping, but it does not print a backtrace unless you ask for one.
+
+<Callout type="warn">
+For test suites, do not treat `--backtrace full` as the default way to run
+everything. It is noticeably slower and more memory-hungry because Acton must
+compile with richer debug info and keep more verbose execution data. Prefer
+rerunning the relevant test file or narrowing the run with `--filter`.
+</Callout>
+
+## 3. Test UI, Terminal Traces, and Saved Traces
+
+For many bugs, these are the fastest tools in Acton.
+
+### Terminal-native debugging
+
+Acton can render transaction trees directly in the terminal:
+
+- `println(txs)` or `println(result)` in a test
+- failure output from transaction matchers
+- script output with `--show-bodies` when decoded message bodies matter
+
+Examples:
+
+```bash
+acton test --show-bodies
+acton script scripts/demo.tolk --show-bodies
+```
+
+Executor debug logs are hidden by default. Re-run with `acton test -v` or
+`acton script <path> -v` when you need level-1 executor output such as
+`debug.dumpStack()`. For richer debug output, use `--backtrace full` or
+`--debug`.
+
+These flags also change how much execution metadata Acton collects:
+
+- `-v` enables only level-1 executor logs.
+- `--coverage` raises internal verbosity to source-location mode so coverage can map VM execution back to files and lines, but it does not print backtraces or enable stepping by itself.
+- `--backtrace full` raises verbosity further to collect full source locations and call stacks for failures.
+- `--debug` uses the same rich location and stack data, then opens the live debug adapter on top.
+
+Strengths:
+
+- cheapest feedback loop
+- keeps transaction chains, actions, and debug logs close to the failing code
+- works well with matcher failures and quick `println(...)` probes
+
+For the exact output shape, see
+[Reading Transaction Chains](/docs/testing/reading-transaction-chains).
+
+### Test UI
+
+Run:
+
+```bash
+acton test --ui
+```
+
+Test UI is a post-run inspector, not a live debugger. It is good for:
+
+- failed test summaries
+- per-test stdout and stderr
+- top-level VM log output
+- coverage views when combined with `--coverage`
+- browsing saved trace artifacts after the run
+
+Useful variants:
+
+```bash
+acton test --ui --ui-port 23456
+acton test tests/counter.test.tolk --ui --filter "deploy"
+acton test --coverage --ui
+```
+
+<Callout type="warn">
+When you combine `--coverage` with `--ui`, Test UI adds a Coverage tab.
+</Callout>
+
+See:
+
+- [Test UI Quickstart](/docs/testing/test-ui/quickstart)
+- [Test UI Reference](/docs/testing/test-ui/reference)
+
+### Saved traces
+
+If you want reusable artifacts, export them:
+
+```bash
+acton test --save-test-trace
+acton test --save-test-trace build/traces
+```
+
+This is the richest offline inspection path. Use it when:
+
+- you want deterministic artifacts for later review
+- you want to share a failure with teammates
+- you want to inspect the same trace bundle shape that Test UI reads
+
+If you produce multiple traces in one test, name them with
+`txs.giveName(...)` so exported artifacts stay readable.
+
+Saved trace bundles use one `<test-name>_trace.json` file per executed test and
+a sibling `contracts/` directory with shared contract metadata. Relative paths
+are resolved from the project root.
+
+See [Saved Trace Bundles](/docs/testing/saved-trace-bundles) for the file
+layout and JSON schema overview.
+
+## 4. Step-by-step Transaction Control with `TxCursor`
+
+Acton also supports step-by-step transaction-chain control through
+[`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing#testingcreatetraceiterationcursor) and
+[`TxCursor`](/docs/standard_library/emulation/testing#txcursor). This is
+separate from the DAP debugger: it lets you decide when later hops in a
+transaction chain execute.
+
+This is useful when you want to:
+
+- inspect intermediate state after the first hop
+- stop when a specific downstream message appears
+- interleave two competing chains
+- stop before the remaining tail executes
+
+This mechanism is available in local emulation workflows and is useful in tests
+or locally emulated scripts.
+
+<Callout type="warn">
+`testing.createTraceIterationCursor()` is not source-level debugging. It is transaction-chain
+execution in local emulation. It is not available in broadcast mode. Under
+`--debug`, it still does not add source-level breakpoints or stepping.
+</Callout>
+
+See [Step-by-step Execution](/docs/testing/step-by-step-execution).
+
+## 5. Retrace, Fork Testing, and Snapshots
+
+These workflows matter when the bug depends on real or previously prepared
+state, not just on a fresh local test.
+
+### Retrace: closest to a real historical transaction
+
+Use `acton retrace` when the bug already happened on-chain and you want the
+closest Acton reproduction of that exact transaction.
+
+```bash
+acton retrace <HASH>
+acton retrace <HASH> --contract JettonMinter
+acton retrace <HASH> --contract JettonMinter --debug
+```
+
+Retrace is strong because it is not just “fetch state and run locally”. It
+replays real transaction context, including block configuration, seed, same-block
+prehistory, and library resolution, then can layer source-level replay on top
+when you provide a matching local contract.
+
+That makes retrace the highest-fidelity debugging path in Acton.
+
+Key tradeoffs:
+
+- `--debug` requires `--contract`
+- source-level retrace only works for a matching local `.tolk` contract
+- local code hash must match the retraced account code
+- retrace supports mainnet and testnet, not localnet/custom backends
+- the replay summary shows state-hash check status, but it is surfaced as output
+  rather than a hard failure
+
+See [acton retrace](/docs/commands/retrace).
+
+### Fork testing and `script --fork-net`
+
+Fork mode is much lighter than retrace. Tests and scripts still execute locally,
+but missing accounts are resolved remotely from testnet or mainnet.
+
+Examples:
+
+```bash
+acton test --fork-net testnet
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton test --fork-net mainnet
+acton script scripts/query.tolk --fork-net testnet
+```
+
+Strengths:
+
+- fast local iteration against real deployed account state
+- very useful for integration debugging
+- test runs share a suite-level remote cache, which helps repeated accesses
+- nested debug across `net.send*` and `net.runGetMethod()` still works for the
+  local parts of execution
+
+Important limits:
+
+- fork mode is not historical replay
+- `--fork-block-number` pins remote account reads, not the full chain
+  environment
+- time, randomness, and configuration still come from the local run model
+- remote lookup failures can degrade into what looks like a non-existing account
+- remote contracts may execute under debug but still lack useful local
+  source-level information
+
+See [Fork Testing](/docs/testing/fork-testing).
+
+## 6. Contract Debug Output vs Test Output
+
+Acton gives you two very different output channels, and mixing them up causes
+confusion.
+
+### Use `println(...)` in tests and scripts
+
+`println(...)` and `eprintln(...)` are host-side output. In tests they are
+captured and shown through console reporters and Test UI. In scripts they print
+directly as the script runs.
+
+Use them for:
+
+- test diagnostics
+- quick script progress output
+- printing transaction trees or matcher results
+
+### Use `debug.print*` inside contract code
+
+For contract code or other VM-executed Tolk code, use the built-in debug
+helpers:
+
+- [`debug.print<T>(x)`](/docs/tolk_standard_library/common#debugprint)
+- [`debug.printString(x)`](/docs/tolk_standard_library/common#debugprintstring)
+- [`debug.dumpStack()`](/docs/tolk_standard_library/common#debugdumpstack)
+
+These are raw VM-side debug helpers. They write `#DEBUG#:` lines into VM logs.
+
+Use them for:
+
+- quick value probes inside VM-executed code
+- branch confirmation in contracts
+- raw TVM-level inspection when higher-level formatting is not enough
+
+### Where `debug.print*` output appears
+
+This is the subtle part:
+
+- top-level test VM debug lines are appended into captured test output
+- nested contract transaction debug lines are best seen in transaction trees,
+  matcher diagnostics, saved traces, or Test UI log views
+- Test UI may show top-level VM debug output separately from per-transaction log
+  views
+- ordering relative to test-side `println(...)` is not guaranteed to look purely
+  chronological, because host output and VM debug output are surfaced through
+  different paths
+
+<Callout type="info">
+The safest rule is simple: use `println(...)` for tests and scripts, and use
+`debug.print*` only inside contracts or other code that runs inside the VM.
+</Callout>

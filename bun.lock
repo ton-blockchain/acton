@@ -30,6 +30,7 @@
         "@ton/core": "0.62.0",
         "@types/react-router-dom": "^5.3.3",
         "buffer": "^6.0.3",
+        "gen-typescript-from-tolk-dev": "^0.2.0",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
@@ -54,11 +55,14 @@
       "version": "1.0.0",
       "dependencies": {
         "@ton/core": "0.62.0",
+        "buffer": "^6.0.3",
         "clsx": "^2.1.1",
+        "gen-typescript-from-tolk-dev": "^0.2.0",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
         "shiki": "^3.22.0",
+        "ton-assembly": "^0.6.1",
       },
       "devDependencies": {
         "@types/react": "^19.2.7",
@@ -95,6 +99,9 @@
         "vite": "^7.3.0",
       },
     },
+  },
+  "overrides": {
+    "uuid": "14.0.0",
   },
   "packages": {
     "@acton/shared-ui": ["@acton/shared-ui@workspace:crates/acton-shared-ui"],
@@ -1223,7 +1230,7 @@
 
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 
-    "uuid": ["uuid@8.3.2", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg=="],
+    "uuid": ["uuid@14.0.0", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg=="],
 
     "validate-npm-package-license": ["validate-npm-package-license@3.0.4", "", { "dependencies": { "spdx-correct": "^3.0.0", "spdx-expression-parse": "^3.0.0" } }, "sha512-DpKm2Ui/xN7/HQKCtpZxoRWBhZ9Z0kqtygG8XCgNQ8ZlDnxuQmWhj566j8fN4Cu3/JmbhsDo7fcAJq4s9h27Ew=="],
 
@@ -1294,8 +1301,6 @@
     "eslint-plugin-react/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
     "eslint-plugin-unicorn/globals": ["globals@15.15.0", "", {}, "sha512-7ACyT3wmyp3I61S4fG682L0VA2RGD9otkqGJIwNUMF1SWUombIIk+af1unuDYgMm082aHYwD+mzJvv9Iu8dsgg=="],
-
-    "gen-typescript-from-tolk-dev/@ton/core": ["@ton/core@0.62.0", "", { "dependencies": { "symbol.inspect": "1.0.1" }, "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-GCYlzzx11rSESKkiHvNy9tL8zWth+ZtUbvV29WH478FvBp8xTw24AyoigwXWNV+OLCAcnwlGhZpTpxjD3wzCwA=="],
 
     "miller-rabin/bn.js": ["bn.js@4.12.3", "", {}, "sha512-fGTi3gxV/23FTYdAoUtLYp6qySe2KE3teyZitipKNRuVYcBkoP/bB3guXN/XVKUe9mxCHXnc9C4ocyz8OmgN0g=="],
 

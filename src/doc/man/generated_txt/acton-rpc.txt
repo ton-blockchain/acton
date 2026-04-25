@@ -153,5 +153,5 @@ SEE ALSO
        o  acton help script
 
        o  Command reference
-          <https://ton-blockchain.github.io/acton/docs/commands>
+          <https://ton-blockchain.github.io/acton/docs/commands/rpc>
 

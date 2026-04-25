@@ -14,9 +14,10 @@ use tree_sitter::Node;
 /// In most cases, `map<K, V>` communicates intent better and gives stronger type checking.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct State {
 ///     data: dict
+///     //    ^^^^ E033: low-level `dict` type should be replaced with typed `map<K, V>`
 /// }
 /// ```
 ///

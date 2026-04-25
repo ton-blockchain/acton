@@ -16,14 +16,15 @@ use tree_sitter::Node;
 /// may be removed in future versions.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// @deprecated
 /// fun oldFunction() {
 ///     // some deprecated logic
 /// }
 ///
 /// fun main() {
-///     oldFunction(); // <- error: usage of deprecated symbol
+///     oldFunction();
+/// //  ^^^^^^^^^^^ E004: usage of deprecated symbol
 /// }
 /// ```
 #[derive(ViolationMetadata)]

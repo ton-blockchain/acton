@@ -23,6 +23,7 @@
 
 import "../tlb/either"
 import "../tlb/maybe"
+import "../impl"
 
 /// Represents a generic relaxed message. Unlike [TlbMessageRelaxed], this message does not
 /// load the body of the message. Instead body is represented as a slice and can be parsed
@@ -47,12 +48,13 @@ struct TlbMessageRelaxedGeneric {
 /// Loads the opcode of the message.
 ///
 /// Returns `null` for malformed or too-short body data:
+/// - body does not contain the `TlbEither` branch bit;
 /// - body marks `TlbEitherRight` but does not contain a body reference;
 /// - decoded body has fewer than 32 bits for the first opcode;
-/// - [skipBounce] is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
-///   for the second opcode.
+/// - [skipBounce] is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
+///   and fewer than 32 bits remain for the second opcode.
 ///
-/// If [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped.
+/// If [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped.
 ///
 /// Example:
 /// ```tolk
@@ -65,7 +67,7 @@ struct TlbMessageRelaxedGeneric {
 /// }
 /// ```
 fun TlbMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
-    return __acton_impl_loadOpcode(self.body, skipBounce);
+    return impl.loadOpcode(self.body, skipBounce);
 }
 
 /// Represents a generic external message. Unlike [TlbExtMessageRelaxed], this message does not
@@ -81,10 +83,10 @@ struct TlbExtMessageRelaxedGeneric {
 ///
 /// Same behavior as [TlbMessageRelaxedGeneric.loadOpcode]:
 /// - returns the first 32-bit opcode by default;
-/// - if [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped;
+/// - if [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped;
 /// - returns `null` for malformed or too-short body data.
 fun TlbExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
-    return __acton_impl_loadOpcode(self.body, skipBounce);
+    return impl.loadOpcode(self.body, skipBounce);
 }
 
 /// Represents a generic message. Unlike [TlbMessageRelaxedGeneric], this message loads
@@ -260,8 +262,11 @@ fun TlbMessage<TBody, TInfo>.loadBody(self): TBody {
     };
 }
 
-fun __acton_impl_loadOpcode(body: slice, skipBounce: bool): int? {
+fun impl.loadOpcode(body: slice, skipBounce: bool): int? {
     var slice = body;
+    if (slice.remainingBitsCount() < 1) {
+        return null;
+    }
     if (slice.loadBool()) {
         // actual body in the ref
         if (slice.remainingRefsCount() == 0) {
@@ -276,7 +281,7 @@ fun __acton_impl_loadOpcode(body: slice, skipBounce: bool): int? {
     }
 
     val opcode = slice.loadUint(32);
-    if (skipBounce && opcode == 0xFFFFFFFF) {
+    if (skipBounce && (opcode == 0xFFFFFFFF || opcode == 0xFFFFFFFE)) {
         if (slice.remainingBitsCount() < 32) {
             return null;
         }

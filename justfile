@@ -71,7 +71,8 @@ check-docgen:
     cargo run -- docgen --check # always use latest acton
 
 check-schema:
-    cargo run -p xtask -- schema --check
+    cargo run -p xtask -- schema --schema acton-toml --check
+    cargo run -p xtask -- schema --schema mutation-rules --check
 
 check-deny:
     cargo deny check

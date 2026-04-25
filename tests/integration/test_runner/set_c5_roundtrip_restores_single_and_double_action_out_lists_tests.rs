@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CN_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
 import "../../lib/ffi"
@@ -38,7 +39,7 @@ get fun `test cn set c5 roundtrip non empty transitions`() {
         dest,
         body: beginCell().storeUint(0xC0FFEE01, 32).endCell().beginParse(),
     }).send(SEND_MODE_REGULAR);
-    val singleActionC5 = __acton_impl_getC5();
+    val singleActionC5 = impl.getC5();
 
     createMessage({
         bounce: false,
@@ -46,7 +47,7 @@ get fun `test cn set c5 roundtrip non empty transitions`() {
         dest,
         body: beginCell().storeUint(0xC0FFEE02, 32).endCell().beginParse(),
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
-    val doubleActionC5 = __acton_impl_getC5();
+    val doubleActionC5 = impl.getC5();
 
     val doubleActions = testing.outActions();
     expect(doubleActions.size()).toEqual(2);
@@ -88,7 +89,7 @@ fn set_c5_to_empty_cell_breaks_vm_out_actions_bug() {
         "cn-stdlib-set-c5-empty-cell-out-actions-bug",
         r"
 get fun `test cn set c5 empty cell out actions bug`() {
-    val emptyC5 = __acton_impl_getC5();
+    val emptyC5 = impl.getC5();
     overwriteC5(emptyC5);
 
     val parsed = testing.outActions();
@@ -105,7 +106,7 @@ fn parse_out_actions_direct_empty_cell_returns_empty_list() {
         "cn-stdlib-parse-out-actions-direct-empty-cell",
         r"
 get fun `test cn parse out actions direct empty cell`() {
-    val parsed = __acton_impl_parseOutActions(createEmptyCell());
+    val parsed = impl.parseOutActions(createEmptyCell());
     expect(parsed.size()).toEqual(0);
 }
 ",

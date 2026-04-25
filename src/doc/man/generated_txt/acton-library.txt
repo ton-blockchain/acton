@@ -256,5 +256,5 @@ EXAMPLES
 
 SEE ALSO
        o  Libraries guide
-          <https://ton-blockchain.github.io/acton/docs/advanced/libraries>
+          <https://ton-blockchain.github.io/acton/docs/libraries>
 

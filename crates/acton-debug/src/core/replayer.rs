@@ -47,6 +47,8 @@ pub enum ExceptionBreakMode {
     All,
 }
 
+const IGNORED_UNCAUGHT_EXCEPTION_ERRNO: &str = "65536"; // invalid message
+
 #[derive(Debug, Clone)]
 pub struct ExceptionInfo {
     pub errno: String,
@@ -1231,12 +1233,19 @@ impl TolkReplayer {
                 }
                 return self.exception_break_mode == ExceptionBreakMode::All;
             }
-            Tick::TvmExceptionHandler { .. } => {
+            Tick::TvmExceptionHandler { errno } => {
                 // "default exception handler, terminating vm with exit code N" from VM log.
                 // This always follows TvmException when the exception is NOT caught by try/catch.
                 if let Some(ref mut exc) = self.last_exception {
                     // last_exception may be None if mode=All (we already stopped, and step() cleared it)
                     exc.is_uncaught = true;
+                }
+                // The executor can report 65536 for "invalid message" for example for Jettons.
+                // This is unnecessary noise for the user so we just skip it completely
+                // and do not pause on it in the source-level uncaught-exception flow.
+                if errno == IGNORED_UNCAUGHT_EXCEPTION_ERRNO {
+                    self.last_exception = None;
+                    return false;
                 }
                 return self.exception_break_mode == ExceptionBreakMode::Uncaught;
             }
@@ -1439,13 +1448,19 @@ impl TolkReplayer {
             });
         }
 
-        // TODO: unify with `in.data`? Currently `in` uses only runtime data from c7, while `in.data` takes value from the stack
         if is_top_frame
             && frame.f_name == "onInternalMessage"
             && let Some(snapshot) = self.runtime_source.runtime_debug_snapshot()
             && let Some(c7) = snapshot.c7.as_ref()
-            && let Some(value) = render_runtime_in_message(c7)
+            && let Some(mut value) = render_runtime_in_message(c7)
         {
+            // `in.body` comes from the stack; other `in` fields come from c7.
+            if let RenderedValue::Struct { fields, .. } = &mut value
+                && let Some(idx) = result.iter().position(|local| local.var_name == "in.body")
+            {
+                let body = result.remove(idx).value;
+                fields.push(("body".to_owned(), body));
+            }
             result.insert(
                 0,
                 LocalVarRendered {

@@ -10,10 +10,8 @@
  > tests/predicate_matchers.test.tolk (1 test)
   ✓ predicate bounced transaction fields [TIME]
     └─ Test output:
-       bounced.opcode=0xffffffff
        bounced.flag=true
        bounced.opcode=0xae110002
-       bounced.flag=true
        bounced.from=[WALLET_ADDRESS_BASE] (sender)
        bounced.to=[WALLET_ADDRESS_BASE] (harness)
        bounced.exitCode=777

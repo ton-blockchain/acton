@@ -549,4 +549,4 @@ CLI flags override config values for the current invocation.
 ## See Also
 
 - `acton help wrapper`
-- [Test runner guide](https://ton-blockchain.github.io/acton/docs/test-runner)
+- [Test runner guide](https://ton-blockchain.github.io/acton/docs/testing/overview)

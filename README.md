@@ -107,7 +107,7 @@ acton build
 acton test
 ```
 
-For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/project-init/) article.
+For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/tutorial/project-init) article.
 
 ## Building from source
 

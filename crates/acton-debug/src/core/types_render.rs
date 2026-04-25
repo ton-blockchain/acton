@@ -1860,7 +1860,7 @@ fn debug_format(
                                 StackReader::new(&union_slots[variant_start..stack_width - 1]);
                             Some(debug_format(symbols, &mut sub, &variant.variant_ty, false))
                         };
-                        render_union_case(ty, format!("#{}", variant.variant_ty), value)
+                        render_union_case(ty, variant.variant_ty.to_string(), value)
                     } else {
                         // corrupted stack, type_id on a stack mismatches all variants
                         typed_leaf_for_ty(ty, "union with unknown variant")
@@ -3286,6 +3286,7 @@ mod tests {
         ];
 
         let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
+        let (dap_value, dap_type) = rendered.dap_parts();
 
         let RenderedValue::UnionCase {
             type_name,
@@ -3295,8 +3296,10 @@ mod tests {
         else {
             panic!("expected UnionCase");
         };
-        assert_eq!(type_name, "cell, int");
-        assert_eq!(variant_name, "#cell");
+        assert_eq!(type_name, "cell | int");
+        assert_eq!(variant_name, "cell");
+        assert_eq!(dap_value, "cell");
+        assert_eq!(dap_type.as_deref(), Some("cell | int"));
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
         let RenderedValue::CellLike { fields, .. } = &fields[0].1 else {
@@ -3346,7 +3349,7 @@ mod tests {
         else {
             panic!("expected UnionCase");
         };
-        assert_eq!(variant_name, "#null");
+        assert_eq!(variant_name, "null");
         assert!(fields.is_empty());
     }
 
@@ -3379,7 +3382,7 @@ mod tests {
         let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
 
         assert_eq!(rendered.dap_parts().0, "union with unresolved layout");
-        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int, cell"));
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int | cell"));
     }
 
     #[test]

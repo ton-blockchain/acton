@@ -149,4 +149,4 @@ project, but not guaranteed for arbitrary third-party deployments.
 - `acton help disasm`
 - `acton help retrace`
 - `acton help script`
-- [Command reference](https://ton-blockchain.github.io/acton/docs/commands)
+- [Command reference](https://ton-blockchain.github.io/acton/docs/commands/rpc)

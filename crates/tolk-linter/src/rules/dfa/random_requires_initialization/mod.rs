@@ -16,9 +16,10 @@ pub mod analysis;
 /// or invalid randomness behavior.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main() {
 ///     val x = random.uint256();
+///     //      ^^^^^^^^^^^^^^^^ E024: random generator must be initialized before `random.uint256`/`random.range` call
 /// }
 /// ```
 ///

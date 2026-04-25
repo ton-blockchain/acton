@@ -163,6 +163,36 @@ fn net_is_deployed_stays_false_for_explicit_null_shard_account() {
 }
 
 #[test]
+fn net_is_deployed_stays_false_for_prefunded_uninitialized_account() {
+    let snapshot_path = "integration/snapshots/test-runner/net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path/net_is_deployed_stays_false_for_prefunded_uninitialized_account.stdout.txt";
+    ProjectBuilder::new("cp-stdlib-net-is-deployed-prefunded-uninit")
+        .contract("probe", CP_SIMPLE_CONTRACT)
+        .test_file(
+            "is_deployed_prefunded_uninit",
+            &with_cp_imports(
+                r#"
+            get fun `test cp net is deployed prefunded uninit`() {
+                val target = randomAddress("cp_is_deployed_prefunded_uninit");
+
+                testing.topUp(target, ton("1"));
+
+                expect(testing.getAccountBalance(target)).toEqual(ton("1"));
+                expect(testing.isDeployed(target)).toBeFalse();
+                expect(deployedCodeOrNull(target)).toBeNull();
+            }
+        "#,
+            ),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
+#[test]
 fn net_is_deployed_transitions_false_to_true_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/cp_net_is_deployed_boundary.test.tolk";

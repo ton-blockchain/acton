@@ -25,6 +25,7 @@ import "@stdlib/reflection"
 import "message"
 import "../fmt"
 import "../ffi"
+import "../impl"
 import "../testing/expect"
 import "../testing/assert"
 
@@ -247,17 +248,17 @@ fun OutActionList.getSendMessageBodyAt<Msg>(self, i: int): Msg? {
 /// Returns the out actions for the message.
 fun OutMessage.outActions(self, mode: int): OutActionList {
     self.send(mode);
-    return __acton_impl_parseOutActions(__acton_impl_getC5());
+    return impl.parseOutActions(impl.getC5());
 }
 
-fun __acton_impl_getC5(): cell
+fun impl.getC5(): cell
     asm "c5 PUSHCTR"
 
 /// Parses the out actions from the raw cell (like C5 register).
 ///
 /// If [cell] is empty (no bits and no refs), returns an empty tuple.
 /// Fails with [Assert.fail] if list node layout is malformed.
-fun __acton_impl_parseOutActions(cell: cell): OutActionList {
+fun impl.parseOutActions(cell: cell): OutActionList {
     val rootSlice = cell.beginParse();
     if (rootSlice.remainingBitsCount() == 0 && rootSlice.remainingRefsCount() == 0) {
         return [];
@@ -318,7 +319,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                 val msg = action.loadGenericMessage();
                 val opcode = msg.loadOpcode(true);
                 if (opcode == null) {
-                    __acton_impl_failToFindOutMsg<Msg>(e, self.location);
+                    impl.failToFindOutMsg<Msg>(e, self.location);
                     return;
                 }
 
@@ -335,7 +336,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                 );
                 return;
             }
-            __acton_impl_failToFindOutMsg<Msg>(e, self.location);
+            impl.failToFindOutMsg<Msg>(e, self.location);
         }
         return;
     }
@@ -343,7 +344,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
     self.fail(format("Out action at index {} is not a send message", index));
 }
 
-fun __acton_impl_failToFindOutMsg<Msg>(exitCode: int, location: string): never {
+fun impl.failToFindOutMsg<Msg>(exitCode: int, location: string): never {
     Assert.fail(
         format(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",

@@ -344,7 +344,9 @@ fn execute_script(
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);
-        ctx.debug.process_incoming_requests(true)?;
+        if ctx.debug.process_incoming_requests(true)? {
+            return Ok(());
+        }
 
         let result = executor.finish(&params.code)?;
         print_script_result(

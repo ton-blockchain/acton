@@ -11,8 +11,8 @@
   ✓ predicate regular transaction fields [TIME]
     └─ Test output:
        deploy=false
-       opcode=0xae110001
        bounced=false
+       opcode=0xae110001
        bounce=true
        value=500000000
        from=[WALLET_ADDRESS_BASE] (sender)

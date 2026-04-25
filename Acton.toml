@@ -1,33 +1,21 @@
 [package]
 name = "Acton"
 description = "All-in-one toolkit for TON Blockchain smartcontract development"
-version = "0.3.0"
+version = "0.3.1"
 license = "MIT"
 
-[contracts.counter]
-display-name = "Counter"
-src = "counter.tolk"
-depends = []
-
-[contracts.jetton-minter]
-display-name = "Minter"
-src = ".jetton/contracts/jetton-minter-contract.tolk"
-depends = ["jetton-wallet"]
-
-[contracts.jetton-wallet]
-display-name = "Wallet"
-src = ".jetton/contracts/jetton-wallet-contract.tolk"
-depends = []
-
 [test]
-include = ["tests/acton-stdlib/**", ".jetton/**"]
+include = ["tests/acton-stdlib/**"]
 fail-on-diff = false
 
 [test.mutation]
 
+[lint]
+exclude = ["lib/**"]
+
 [localnet]
 port = 3010
-accounts = ["local-wallet"]
+accounts = []
 
 [networks.localnet]
 api = { v2 = "http://localhost:3010/api/v2", v3 = "http://localhost:3010/api/v3" }

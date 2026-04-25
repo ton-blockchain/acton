@@ -8,6 +8,49 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.3.1] - 23.04.2026
+
+Acton 0.3.1 is a focused follow-up to 0.3.0. It improves the test runner and
+both UI surfaces, expands transaction and action inspection in the Test UI and
+localnet explorer, and smooths a handful of scripting, formatting, and docs
+rough edges.
+
+### Added
+
+- Added support for `@test.skip("description")` in the test runner. Skip and
+  TODO reasons now flow through console output, the Test UI, JUnit, and
+  TeamCity reporting.
+- Added Nushell support to `acton completions`.
+- Added a new lint inspection that warns about explicit `.toCell()` inside
+  `createMessage({ body: ... })`, where the extra conversion is usually
+  unnecessary.
+- Added on-demand disassembly for `setCode` and embedded `changeLibrary`
+  actions in the Test UI and localnet explorer.
+
+### Changed
+
+- Expanded Test UI and localnet explorer transaction views for
+  `external-in` and `tick-tock` flows, including better root visualization,
+  richer phase and action details, and better handling of large traces.
+- Send-message actions now show ABI-decoded bodies, opcode chips, clearer
+  send-mode descriptions, and better fallback handling for raw and bounced
+  payloads.
+- `reserve`, `setCode`, and `changeLibrary` actions now render with clearer
+  mode details, failure context, and code/library inspection.
+- Parsed maps and storage diffs are now rendered more readably in transaction
+  details and tree tooltips, and oversized trace selectors/tooltips are now
+  scrollable instead of stretching the layout.
+- `tolkfmt` now preserves user-authored line breaks in function calls,
+  function parameter lists, and union type aliases.
+- `acton up` no longer special-cases Homebrew-style installation paths.
+
+### Fixed
+
+- Fixed `net.sendExternal()` on real networks and cleaned up the surrounding
+  wait-for-transaction flows used by templates and scripts.
+- Fixed a `404` on optional coverage loading in the Test UI.
+- Fixed several broken docs links and generated documentation references.
+
 ## [0.3.0] - 20.04.2026
 
 Acton 0.3.0 focuses on cleaning up and consolidating the surface introduced in
@@ -128,7 +171,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```
 
 - Default generated TypeScript wrapper output moved from `wrappers/` to
-  `wrapper-ts/`.
+  `wrappers-ts/`.
 
   If your frontend imports from the old directory, either update the import
   path or pin the old output directory:

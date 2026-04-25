@@ -46,7 +46,7 @@ enum TlbAccountStatus: uint2 {
 Type alias for transaction account status values used by [TlbTransaction.origStatus](#tlbtransaction) and
 [TlbTransaction.endStatus](#tlbtransaction).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L31" />
 
 ## `TlbDepthBalanceInfo`
 
@@ -59,7 +59,7 @@ struct TlbDepthBalanceInfo {
 
 Represents depth and balance information for split accounts.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L38" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L39" />
 
 ## `TlbTransaction`
 
@@ -94,7 +94,7 @@ struct (0b0111) TlbTransaction {
 
 Represents a transaction in the TON blockchain.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L45" />
 
 ## `TlbTransaction.loadBody`
 
@@ -108,7 +108,7 @@ Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), bec
 method unwraps it before typed decoding.
 
 After an inbound message exists, if message type does not match `Msg`, loading fails with
-exit code 63.
+exit code 63. Internal and external-in transaction bodies are both supported.
 
 Example:
 ```tolk
@@ -118,12 +118,12 @@ val body = tx.loadBody<IncreaseCounter>();
 println(body.increaseBy);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L86" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L87" />
 
 ## `TlbTransaction.loadInMsg`
 
 ```tolk
-fun TlbTransaction.loadInMsg<Msg>(self): TlbMessageRelaxed<Msg>
+fun TlbTransaction.loadInMsg<Msg>(self): TlbMessage<Msg>
 ```
 
 Loads the in message of the transaction with given type.
@@ -132,9 +132,9 @@ Fails if transaction has no inbound message (`messages.inMsg` is `TlbNone`), bec
 method unwraps it before typed decoding.
 
 After an inbound message exists, if message type does not match `Msg`, loading fails with
-exit code 63.
+exit code 63. Internal and external-in transaction messages are both supported.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L99" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L100" />
 
 ## `TlbTransaction.getUsedGas`
 
@@ -144,11 +144,11 @@ fun TlbTransaction.getUsedGas(self): int
 
 Returns consumed gas for ordinary transactions with VM compute phase.
 
-Fails with [Assert.fail](../../testing/assert/#assertfail):
+Fails with [Assert.fail](/docs/standard_library/testing/assert#assertfail):
 - if `description` is not [TlbTransOrd](#tlbtransord);
 - if `description.computePh` is [TlbTrComputeSkipped](#tlbtrcomputeskipped).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L109" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L110" />
 
 ## `TlbTransaction.getActionFee`
 
@@ -163,7 +163,7 @@ Behavior by variant:
 - [TlbTransOrd](#tlbtransord) and [TlbTransTickTock](#tlbtransticktock) with `action = TlbNone`: returns `null`;
 - all other [TlbTransactionDescr](#tlbtransactiondescr) variants: returns `null`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L128" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L129" />
 
 ## `TlbTransaction.getAccountAddress`
 
@@ -173,7 +173,7 @@ fun TlbTransaction.getAccountAddress(self, workchain: int = BASECHAIN): address
 
 Return address of account of this transaction.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L150" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L151" />
 
 ## `TlbTransactionMessages`
 
@@ -186,7 +186,7 @@ struct TlbTransactionMessages {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L159" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L160" />
 
 ## `TlbMerkleUpdate`
 
@@ -209,7 +209,7 @@ struct (0b0100) TlbMerkleUpdate<X> {
 
 Represents merkle update for proof-of-work.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L167" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L168" />
 
 ## `TlbHashUpdate`
 
@@ -224,7 +224,7 @@ struct (0b01110010) TlbHashUpdate<X> {
 
 Represents simple hash update.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L183" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L184" />
 
 ## `TlbMerkleProof`
 
@@ -241,7 +241,7 @@ struct (0b0011) TlbMerkleProof<X> {
 
 Represents merkle proof.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L191" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L192" />
 
 ## `TlbHashUpdateType`
 
@@ -251,7 +251,7 @@ type TlbHashUpdateType<X> = TlbMerkleUpdate<X> | TlbHashUpdate<X> | TlbMerklePro
 
 Union type for hash updates.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L201" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L202" />
 
 ## `TlbTrStoragePhase`
 
@@ -268,7 +268,7 @@ struct TlbTrStoragePhase {
 
 Represents storage phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L204" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L205" />
 
 ## `TlbAccUnchanged`
 
@@ -276,7 +276,7 @@ Represents storage phase of transaction processing.
 struct (0b0) TlbAccUnchanged
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L213" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L214" />
 
 ## `TlbAccFrozen`
 
@@ -284,7 +284,7 @@ struct (0b0) TlbAccUnchanged
 struct (0b10) TlbAccFrozen
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L214" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L215" />
 
 ## `TlbAccDeleted`
 
@@ -292,7 +292,7 @@ struct (0b10) TlbAccFrozen
 struct (0b11) TlbAccDeleted
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L215" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L216" />
 
 ## `TlbAccStatusChange`
 
@@ -300,7 +300,7 @@ struct (0b11) TlbAccDeleted
 type TlbAccStatusChange = TlbAccUnchanged | TlbAccFrozen | TlbAccDeleted
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L217" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L218" />
 
 ## `TlbTrCreditPhase`
 
@@ -315,7 +315,7 @@ struct TlbTrCreditPhase {
 
 Represents credit phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L220" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L221" />
 
 ## `TlbTrComputeSkipped`
 
@@ -327,7 +327,7 @@ struct (0b0) TlbTrComputeSkipped {
 
 Represents compute phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L228" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L229" />
 
 ## `TlbTrComputeVm`
 
@@ -341,7 +341,7 @@ struct (0b1) TlbTrComputeVm {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L232" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L233" />
 
 ## `TlbTrComputeVmRef`
 
@@ -359,7 +359,7 @@ struct TlbTrComputeVmRef {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L240" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L241" />
 
 ## `TlbTrComputePhase`
 
@@ -369,7 +369,7 @@ type TlbTrComputePhase = TlbTrComputeSkipped | TlbTrComputeVm
 
 Union type for compute phases.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L253" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L254" />
 
 ## `TlbCSkipNoState`
 
@@ -379,7 +379,7 @@ struct (0b00) TlbCSkipNoState
 
 Represents reasons for skipping computation.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L256" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L257" />
 
 ## `TlbCSkipBadState`
 
@@ -387,7 +387,7 @@ Represents reasons for skipping computation.
 struct (0b01) TlbCSkipBadState
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L257" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L258" />
 
 ## `TlbCSkipNoGas`
 
@@ -395,7 +395,7 @@ struct (0b01) TlbCSkipBadState
 struct (0b10) TlbCSkipNoGas
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L258" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L259" />
 
 ## `TlbCSkipSuspended`
 
@@ -403,7 +403,7 @@ struct (0b10) TlbCSkipNoGas
 struct (0b110) TlbCSkipSuspended
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L259" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L260" />
 
 ## `TlbComputeSkipReason`
 
@@ -411,7 +411,7 @@ struct (0b110) TlbCSkipSuspended
 type TlbComputeSkipReason = TlbCSkipNoState | TlbCSkipBadState | TlbCSkipNoGas | TlbCSkipSuspended
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L261" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L262" />
 
 ## `TlbTrActionPhase`
 
@@ -436,7 +436,7 @@ struct TlbTrActionPhase {
 
 Represents action phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L264" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L265" />
 
 ## `TlbTrBounceNegfunds`
 
@@ -446,7 +446,7 @@ struct (0b00) TlbTrBounceNegfunds
 
 Represents bounce phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L282" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L283" />
 
 ## `TlbTrBounceNofunds`
 
@@ -457,7 +457,7 @@ struct (0b01) TlbTrBounceNofunds {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L284" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L285" />
 
 ## `TlbTrBounceOk`
 
@@ -469,7 +469,7 @@ struct (0b1) TlbTrBounceOk {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L289" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L290" />
 
 ## `TlbTrBouncePhase`
 
@@ -479,7 +479,7 @@ type TlbTrBouncePhase = TlbTrBounceNegfunds | TlbTrBounceNofunds | TlbTrBounceOk
 
 Union type for bounce phases.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L296" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L297" />
 
 ## `TlbTransOrd`
 
@@ -499,7 +499,7 @@ struct (0b0000) TlbTransOrd {
 
 Represents ordinary transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L299" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L300" />
 
 ## `TlbTransStorage`
 
@@ -511,7 +511,7 @@ struct (0b0001) TlbTransStorage {
 
 Represents storage transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L312" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L313" />
 
 ## `TlbTransTickTock`
 
@@ -529,7 +529,7 @@ struct (0b001) TlbTransTickTock {
 
 Represents tick-tock transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L317" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L318" />
 
 ## `TlbSplitMergeInfo`
 
@@ -544,7 +544,7 @@ struct TlbSplitMergeInfo {
 
 Represents split-merge information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L328" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L329" />
 
 ## `TlbTransSplitPrepare`
 
@@ -562,7 +562,7 @@ struct (0b0100) TlbTransSplitPrepare {
 
 Represents split prepare transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L336" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L337" />
 
 ## `TlbTransSplitInstall`
 
@@ -576,7 +576,7 @@ struct (0b0101) TlbTransSplitInstall {
 
 Represents split install transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L347" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L348" />
 
 ## `TlbTransMergePrepare`
 
@@ -590,7 +590,7 @@ struct (0b0110) TlbTransMergePrepare {
 
 Represents merge prepare transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L354" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L355" />
 
 ## `TlbTransMergeInstall`
 
@@ -610,7 +610,7 @@ struct (0b0111) TlbTransMergeInstall {
 
 Represents merge install transaction description.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L361" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L362" />
 
 ## `TlbTransactionDescr`
 
@@ -627,7 +627,7 @@ type TlbTransactionDescr =
 
 Union type for all transaction descriptions.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L374" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L375" />
 
 ## `TlbVarUint7`
 
@@ -635,7 +635,7 @@ Union type for all transaction descriptions.
 type TlbVarUint7 = int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L383" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L384" />
 
 ## `TlbVarUint7.packToBuilder`
 
@@ -643,7 +643,7 @@ type TlbVarUint7 = int
 fun TlbVarUint7.packToBuilder(self, mutate b: builder): void
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L407" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L408" />
 
 ## `TlbVarUint7.unpackFromSlice`
 
@@ -651,7 +651,7 @@ fun TlbVarUint7.packToBuilder(self, mutate b: builder): void
 fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L415" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L416" />
 
 ## `TlbVarUint3`
 
@@ -659,7 +659,7 @@ fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7
 type TlbVarUint3 = int
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L420" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L421" />
 
 ## `TlbVarUint3.packToBuilder`
 
@@ -667,7 +667,7 @@ type TlbVarUint3 = int
 fun TlbVarUint3.packToBuilder(self, mutate b: builder): void
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L422" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L423" />
 
 ## `TlbVarUint3.unpackFromSlice`
 
@@ -675,7 +675,7 @@ fun TlbVarUint3.packToBuilder(self, mutate b: builder): void
 fun TlbVarUint3.unpackFromSlice(mutate s: slice): TlbVarUint3
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L430" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L431" />
 
 ## `TlbStorageUsed`
 
@@ -688,7 +688,7 @@ struct TlbStorageUsed {
 
 Represents storage used information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L436" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L437" />
 
 ## `TlbStorageExtraNone`
 
@@ -698,7 +698,7 @@ struct (0b000) TlbStorageExtraNone
 
 Represents storage extra information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L442" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L443" />
 
 ## `TlbStorageExtraDict`
 
@@ -708,7 +708,7 @@ struct (0b001) TlbStorageExtraDict {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L444" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L445" />
 
 ## `TlbStorageExtraInfo`
 
@@ -718,7 +718,7 @@ type TlbStorageExtraInfo = TlbStorageExtraNone | TlbStorageExtraDict
 
 Union type for storage extra information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L449" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L450" />
 
 ## `TlbStorageInfo`
 
@@ -737,7 +737,7 @@ struct TlbStorageInfo {
 
 Represents storage information.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L452" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L453" />
 
 ## `TlbAccountNone`
 
@@ -747,7 +747,7 @@ struct (0b0) TlbAccountNone
 
 Represents account.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L464" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L465" />
 
 ## `TlbAccountInfo`
 
@@ -762,7 +762,7 @@ struct (0b1) TlbAccountInfo {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L466" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L467" />
 
 ## `TlbAccount`
 
@@ -772,7 +772,7 @@ type TlbAccount = TlbAccountNone | TlbAccountInfo
 
 Union type for account.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L476" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L477" />
 
 ## `TlbAccountStateUninit`
 
@@ -782,7 +782,7 @@ struct (0b00) TlbAccountStateUninit
 
 Account state in [TlbAccountStorage](#tlbaccountstorage) (block.tlb `AccountState`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L479" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L480" />
 
 ## `TlbAccountStateActive`
 
@@ -792,7 +792,7 @@ struct (0b1) TlbAccountStateActive {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L481" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L482" />
 
 ## `TlbAccountStateFrozen`
 
@@ -802,7 +802,7 @@ struct (0b01) TlbAccountStateFrozen {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L485" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L486" />
 
 ## `TlbAccountState`
 
@@ -812,7 +812,7 @@ type TlbAccountState = TlbAccountStateUninit | TlbAccountStateActive | TlbAccoun
 
 Union type for account storage state.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L490" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L491" />
 
 ## `TlbAccountStorage`
 
@@ -829,7 +829,7 @@ struct TlbAccountStorage {
 
 Represents account storage.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L493" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L494" />
 
 ## `TlbShardAccount`
 
@@ -843,5 +843,5 @@ struct TlbShardAccount {
 
 Represents a shard account state.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L503" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/transaction.tolk#L504" />
 

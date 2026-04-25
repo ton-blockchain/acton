@@ -29,6 +29,20 @@ fn run_deploy_expect_failure(project_name: &str, test_body: &str, snapshot_path:
         .assert_snapshot_matches(snapshot_path);
 }
 
+fn run_deploy_expect_success(project_name: &str, test_body: &str, snapshot_path: &str) {
+    let source = format!("{DEPLOY_EXPECT_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .contract("receiver", RECEIVER_CONTRACT)
+        .test_file("deploy_expect", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 #[test]
 fn to_have_successful_deploy_rejects_non_deploy_success_transaction() {
     run_deploy_expect_failure(
@@ -110,5 +124,39 @@ get fun `test cg to have successful deploy formatting expected search params`() 
 }
 "#,
         "integration/snapshots/test-runner/to_have_successful_deploy_rejects_non_deploy_success_transaction/to_have_successful_deploy_failure_format_includes_expected_search_params.stdout.txt",
+    );
+}
+
+#[test]
+fn to_have_successful_deploy_accepts_prefunded_uninit_to_active_transaction() {
+    run_deploy_expect_success(
+        "cg-stdlib-to-have-successful-deploy-prefunded-uninit-to-active",
+        r#"
+get fun `test cg to have successful deploy accepts prefunded uninit to active`() {
+    val sender = testing.treasury("sender");
+
+    val deployState = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress { stateInit: deployState }.calculateAddress();
+
+    testing.topUp(receiverAddress, ton("1"));
+
+    val deployResult = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.1"),
+            dest: { stateInit: deployState },
+        }),
+    );
+    expect(deployResult).toHaveSuccessfulDeploy({
+        from: sender.address,
+        to: receiverAddress,
+    });
+}
+"#,
+        "integration/snapshots/test-runner/to_have_successful_deploy_rejects_non_deploy_success_transaction/to_have_successful_deploy_accepts_prefunded_uninit_to_active_transaction.stdout.txt",
     );
 }

@@ -9,6 +9,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -36,8 +37,8 @@ get fun `test cl stdlib set config param neighbor slots`() {
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeNow = paramsBefore.get(3) as int;
 
-    __acton_impl_setConfigParam(401234567, 4);
-    __acton_impl_setConfigParam(501234567, 5);
+    impl.setConfigParam(401234567, 4);
+    impl.setConfigParam(501234567, 5);
 
     val c7After = testing.getC7OutsideContract();
     val paramsAfter = c7After.get(0) as tuple;
@@ -62,7 +63,7 @@ get fun `test cl stdlib set config param slot three`() {
     val beforeBlockLogicalTime = paramsBefore.get(4) as int;
     val beforeLogicalTime = paramsBefore.get(5) as int;
 
-    __acton_impl_setConfigParam(1700002222, 3);
+    impl.setConfigParam(1700002222, 3);
 
     val c7After = testing.getC7OutsideContract();
     val paramsAfter = c7After.get(0) as tuple;
@@ -83,7 +84,7 @@ fn get_config_param_tuple_read_is_not_usable_bug() {
         "cl-stdlib-get-config-param-tuple-read-bug",
         r#"
 get fun `test cl stdlib get config param tuple read bug`() {
-    __acton_impl_setConfigParam(tuple [ton("9"), null], 7);
+    impl.setConfigParam(tuple [ton("9"), null], 7);
 
     val originalBalance = (testing.getC7OutsideContract().get(0) as tuple).get(7) as tuple;
     expect(originalBalance.get(0) as int).toEqual(ton("9"));

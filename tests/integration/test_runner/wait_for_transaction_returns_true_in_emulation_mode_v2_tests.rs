@@ -30,7 +30,7 @@ get fun `test bi stdlib wait for transaction missing hash before send`() {{
         }}),
     );
 
-    expect(txs.wait(true, 1, 1)).toEqual(true);
+    expect(txs.waitForFirstTransaction(true, 1, 1)).toBeNotNull();
 }}
 "#
     );

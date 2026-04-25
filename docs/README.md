@@ -27,7 +27,7 @@ bun run dev
 ```
 
 Open `http://localhost:3000` for the landing page and
-`http://localhost:3000/docs/welcome/` for the documentation entry point.
+`http://localhost:3000/docs/welcome` for the documentation entry point.
 
 ## Available scripts
 
@@ -35,8 +35,25 @@ Open `http://localhost:3000` for the landing page and
 - `bun run build`: produce the static production build.
 - `bun run start`: serve the production build locally.
 - `bun run lint`: run ESLint for the docs app.
+- `bun run lint:links`: validate MDX links with `next-validate-link`.
 
 Production deployment is handled by CI via `.github/workflows/deploy-docs.yml`.
+
+## Netlify deploy previews
+
+This repo also includes a root-level `netlify.toml` for Netlify Deploy
+Previews of the docs app. The Netlify build is scoped to `docs/`, publishes
+`docs/out`, and skips non-PR contexts so GitHub Pages remains the production
+host.
+
+To enable previews:
+
+1. Link the repository to a Netlify site with continuous deployment enabled.
+2. Keep Deploy Previews enabled for pull requests in the Netlify site settings.
+3. Leave the build settings managed by `netlify.toml`.
+
+With this setup, Netlify will post a Deploy Preview for pull requests that
+change files under `docs/`.
 
 ## Editing content
 
@@ -51,7 +68,7 @@ source-of-truth inputs live outside `docs/`:
 - `src/doc/man/*.md` -> command docs, terminal help text, and manpages
 - `lib/` -> `content/docs/standard_library`
 - `crates/tolkc/assets/tolk-stdlib/` -> `content/docs/tolk_standard_library`
-- linter rule metadata -> `content/docs/linting/rules`
+- linter rule metadata -> `content/docs/rules`
 
 After changing those inputs, rerun:
 

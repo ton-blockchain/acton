@@ -24,10 +24,13 @@ export interface StorageValueEntry {
   readonly value: StorageValue
 }
 
+export type StorageObjectKind = "object" | "array" | "map"
+
 export type StorageValue =
   | StorageLeafValue
   | {
       readonly kind: "object"
+      readonly objectKind: StorageObjectKind
       readonly typeName?: string
       readonly entries: readonly StorageValueEntry[]
     }
@@ -47,6 +50,7 @@ export type StorageDiffNode =
   | {
       readonly kind: "object"
       readonly status: StorageDiffStatus
+      readonly objectKind: StorageObjectKind
       readonly typeName?: string
       readonly entries: readonly StorageDiffEntry[]
     }
@@ -73,8 +77,10 @@ const booleanValue = (value: boolean): StorageLeafValue => ({
 const objectValue = (
   entries: readonly StorageValueEntry[],
   typeName?: string,
+  objectKind: StorageObjectKind = "object",
 ): Extract<StorageValue, {readonly kind: "object"}> => ({
   kind: "object",
+  objectKind,
   typeName,
   entries,
 })
@@ -130,6 +136,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
           value: normalizeParsedValue(item),
         })),
         "array",
+        "array",
       )
     }
     case "map": {
@@ -138,6 +145,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
           key: stringifyParsedValue(entry.key),
           value: normalizeParsedValue(entry.value),
         })),
+        "map",
         "map",
       )
     }
@@ -148,6 +156,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
           value: normalizeParsedValue(entry.value),
         })),
         value.typeName,
+        "object",
       )
     }
   }
@@ -160,7 +169,9 @@ const normalizeStorage = (value: ParsedContractStorage | undefined): StorageValu
 
   const normalized = normalizeParsedValue(value.value)
   if (normalized.kind === "object") {
-    return normalized.typeName ? normalized : objectValue(normalized.entries, value.name)
+    return normalized.typeName
+      ? normalized
+      : objectValue(normalized.entries, value.name, normalized.objectKind)
   }
 
   return objectValue([{key: "value", value: normalized}], value.name)
@@ -171,6 +182,7 @@ const toAddedDiff = (value: StorageValue): StorageDiffNode => {
     return {
       kind: "object",
       status: "added",
+      objectKind: value.objectKind,
       typeName: value.typeName,
       entries: value.entries.map(entry => ({
         key: entry.key,
@@ -192,6 +204,7 @@ const toRemovedDiff = (value: StorageValue): StorageDiffNode => {
     return {
       kind: "object",
       status: "removed",
+      objectKind: value.objectKind,
       typeName: value.typeName,
       entries: value.entries.map(entry => ({
         key: entry.key,
@@ -295,13 +308,16 @@ const diffStorageValues = (
   })
 
   const status: StorageDiffStatus =
-    before.typeName !== after.typeName || entries.some(entry => entry.value.status !== "unchanged")
+    before.typeName !== after.typeName ||
+    before.objectKind !== after.objectKind ||
+    entries.some(entry => entry.value.status !== "unchanged")
       ? "changed"
       : "unchanged"
 
   return {
     kind: "object",
     status,
+    objectKind: after.objectKind,
     typeName: after.typeName ?? before.typeName,
     entries,
   }

@@ -990,7 +990,7 @@ mod tests {
             ],
             stack_width: None,
         };
-        assert_eq!(nullable_union.render_type(), "null, continuation");
+        assert_eq!(nullable_union.render_type(), "null | continuation");
         assert_eq!(Ty::AddressAny.default_value(&abi), "createAddressNone()");
         assert_eq!(Ty::BitsN { n: 32 }.default_value(&abi), "\"\" as bits32");
         assert_eq!(Ty::Callable.default_value(&abi), "fun () {}");

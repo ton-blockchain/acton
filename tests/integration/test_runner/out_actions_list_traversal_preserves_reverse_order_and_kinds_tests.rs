@@ -8,6 +8,7 @@ import "../../lib/testing/expect"
 import "../../lib/types/message"
 import "../../lib/types/out_actions"
 import "../../lib/ffi"
+import "../../lib/impl"
 
 struct (0xA1100001) InlinePayload {
     queryId: uint64
@@ -105,7 +106,7 @@ get fun `test al parse out actions from c5`() {
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
 
     val viaVm = testing.outActions();
-    val viaRaw = __acton_impl_parseOutActions(__acton_impl_getC5());
+    val viaRaw = impl.parseOutActions(impl.getC5());
 
     expect(viaVm.size()).toEqual(2);
     expect(viaRaw.size()).toEqual(2);

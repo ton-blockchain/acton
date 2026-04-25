@@ -26,6 +26,21 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
 
+#[derive(Debug)]
+pub struct DebugStopRequested;
+
+impl std::fmt::Display for DebugStopRequested {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Debug session stopped")
+    }
+}
+
+impl std::error::Error for DebugStopRequested {}
+
+pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
+    err.downcast_ref::<DebugStopRequested>().is_some()
+}
+
 #[derive(Debug, Clone)]
 pub struct AssertBinFailure {
     pub operator: String,
@@ -49,6 +64,14 @@ impl AssertBinFailure {
 
 #[derive(Debug, Clone)]
 pub struct FailAssertFailure {
+    pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AssertDecimalFailure {
+    pub left: String,
+    pub right: String,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
 }
@@ -136,6 +159,7 @@ pub struct WalletNotFoundFailure {
 #[derive(Debug, Clone)]
 pub enum AssertFailure {
     Bin(AssertBinFailure),
+    Decimal(AssertDecimalFailure),
     Fail(FailAssertFailure),
     Assume(FailAssertFailure),
     GetMethod(GetMethodAssertFailure),
@@ -149,6 +173,7 @@ impl AssertFailure {
     pub fn message(&self) -> Option<String> {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
+            AssertFailure::Decimal(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
             AssertFailure::GetMethod(_) | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
@@ -161,6 +186,7 @@ impl AssertFailure {
     pub fn location(&self) -> Option<SourceLocation> {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
+            AssertFailure::Decimal(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.location.clone(),
             AssertFailure::GetMethod(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
@@ -827,7 +853,7 @@ impl<'a> DebugCtx<'a> {
         }
     }
 
-    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
+    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<bool> {
         self.session().process_incoming_requests(terminate_at_end)
     }
 
@@ -856,10 +882,6 @@ impl<'a> DebugCtx<'a> {
     #[must_use]
     pub fn performing_step(&mut self) -> Option<StepMode> {
         self.session().performing_step()
-    }
-
-    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
-        self.session().advance_parent_after_child_return()
     }
 }
 

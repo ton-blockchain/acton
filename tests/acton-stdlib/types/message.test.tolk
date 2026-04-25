@@ -92,6 +92,42 @@ get fun `test load opcode for bounced message`() {
     }
 }
 
+get fun `test load opcode for new bounced message prefix`() {
+    val dest = randomAddress("counter-new-bounce");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1.9999"),
+        dest,
+        body: beginCell()
+            .storeUint(0xFFFFFFFE, 32)
+            .storeUint(reflect.serializationPrefixOf<IncreaseCounter>().0, 32)
+            .endCell(),
+    });
+    msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    val out_actions = testing.outActions();
+    expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
+
+    val action = out_actions.at(0);
+    if (action is TlbOutActionSendMessage) {
+        val message = action.loadGenericMessage();
+        val opcode = message.loadOpcode(false);
+        expect(opcode).toEqual(0xFFFFFFFE);
+
+        val actual_opcode = message.loadOpcode(true);
+        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>().0);
+    }
+}
+
+get fun `test load opcode returns null for missing either tag`() {
+    val msg = TlbMessageRelaxedGeneric {
+        info: internalInfo(),
+        init: TlbMaybe.none(),
+        body: beginCell().endCell().beginParse(),
+    };
+
+    expect(msg.loadOpcode()).toBeNull();
+}
+
 get fun `test load body from inline and ref`() {
     val inlineMessage = TlbMessageRelaxed<DemoPayload> {
         info: internalInfo(),

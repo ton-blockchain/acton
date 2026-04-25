@@ -1,10 +1,10 @@
 use crate::localnet::{
     LocalnetAccountState, LocalnetBlockTransactions, LocalnetMessage, LocalnetRunGetMethodResult,
-    LocalnetTransaction,
+    LocalnetTransaction, convert_to_message_struct,
 };
 use crate::storage::{
-    AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta, MsgMeta, NftItemMeta,
-    TraceNode, TransactionInfo,
+    AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta, MessageInfo, MsgMeta,
+    NftItemMeta, TraceNode, TransactionInfo,
 };
 use crate::types::Addr;
 use base64::Engine;
@@ -203,9 +203,14 @@ pub fn map_send_message(bt: &LocalnetBlockTransactions) -> Value {
         .as_ref()
         .map(super::super::types::Hash256::to_base64)
         .unwrap_or_default();
+    let message_hash_norm = bt
+        .msg_hash_norm
+        .as_ref()
+        .map(super::super::types::Hash256::to_base64)
+        .unwrap_or_else(|| message_hash.clone());
     serde_json::json!({
         "message_hash": message_hash,
-        "message_hash_norm": message_hash,
+        "message_hash_norm": message_hash_norm,
     })
 }
 
@@ -275,7 +280,6 @@ fn map_v3_message(
 ) -> Value {
     let mut mapped = serde_json::json!({
         "hash": msg.hash.to_base64(),
-        "hash_norm": msg.hash.to_base64(),
         "source": msg.source.as_ref().map(ToString::to_string),
         "destination": msg.destination.as_ref().map(ToString::to_string),
         "value": msg.value.to_string(),
@@ -298,6 +302,15 @@ fn map_v3_message(
         && let Some(root) = mapped.as_object_mut()
     {
         root.insert("opcode".to_string(), Value::from(i64::from(opcode)));
+    }
+
+    if let Some(hash_norm) = msg
+        .hash_norm
+        .as_ref()
+        .map(super::super::types::Hash256::to_base64)
+        && let Some(root) = mapped.as_object_mut()
+    {
+        root.insert("hash_norm".to_string(), Value::String(hash_norm));
     }
 
     if !msg.init_state.is_empty()
@@ -751,16 +764,15 @@ fn map_trace_node(tn: &TraceNode) -> Value {
     serde_json::json!({
         "tx_hash": tn.transaction.meta.tx_hash.to_base64(),
         "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
-        "in_msg": tn.transaction.in_msg.as_ref().map(|m| map_message(&m.meta)),
+        "in_msg": tn.transaction.in_msg.as_ref().map(|m| {
+            map_trace_message_info(m, &tn.transaction.meta.tx_hash, tn.transaction.meta.now, true)
+        }),
         "transaction": map_transaction(&tn.transaction),
         "children": tn.children.iter().map(map_trace_node).collect::<Vec<_>>(),
     })
 }
 
 fn map_transaction(tx: &TransactionInfo) -> Value {
-    let b64 = base64::engine::general_purpose::STANDARD;
-    let raw_transaction = b64.encode(&tx.tx_boc);
-
     serde_json::json!({
         "account": tx.meta.account.to_string(),
         "hash": tx.meta.tx_hash.to_base64(),
@@ -784,17 +796,31 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
                 "result_code": tx.meta.action_result_code.unwrap_or(0),
             }
         },
-        "in_msg": tx.in_msg.as_ref().map(|m| map_message(&m.meta)),
-        "out_msgs": tx.out_msgs.iter().map(|m| map_message(&m.meta)).collect::<Vec<_>>(),
+        "in_msg": tx.in_msg.as_ref().map(|m| {
+            map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, true)
+        }),
+        "out_msgs": tx.out_msgs.iter().map(|m| {
+            map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false)
+        }).collect::<Vec<_>>(),
         "block_ref": {
             "workchain": 0,
             "shard": "-9223372036854775808",
             "seqno": tx.meta.block_seqno
         },
         "mc_block_seqno": tx.meta.block_seqno,
-        "raw_transaction": raw_transaction,
         "child_transactions": [],
     })
+}
+
+fn map_trace_message_info(
+    msg: &MessageInfo,
+    tx_hash: &crate::types::Hash256,
+    tx_utime: u32,
+    is_in_msg: bool,
+) -> Value {
+    convert_to_message_struct(&msg.meta, &msg.boc)
+        .map(|message| map_v3_message(&message, tx_hash, tx_utime, is_in_msg))
+        .unwrap_or_else(|_| map_message(&msg.meta))
 }
 
 fn map_message(msg: &MsgMeta) -> Value {

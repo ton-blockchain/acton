@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 use tolk_linter::{FixAvailability, Linter, RuleGroup};
 
+const RULES_BASE_PATH: &str = "/docs/rules";
+
 #[derive(Debug)]
 struct LinterRuleDoc {
     code: String,
@@ -86,7 +88,7 @@ fn clear_generated_linter_rule_pages(out_dir: &Path) -> anyhow::Result<()> {
             continue;
         };
 
-        if path.extension().is_some_and(|ext| ext == "mdx") && file_name != "index.mdx" {
+        if path.extension().is_some_and(|ext| ext == "mdx") && file_name != "overview.mdx" {
             fs::remove_file(path)?;
         }
     }
@@ -97,7 +99,7 @@ fn clear_generated_linter_rule_pages(out_dir: &Path) -> anyhow::Result<()> {
 fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result<()> {
     let mut mdx_content = String::new();
     mdx_content.push_str("---\n");
-    mdx_content.push_str("title: \"Rules\"\n");
+    mdx_content.push_str("title: \"Overview\"\n");
     mdx_content.push_str("description: \"Reference for all Tolk linter checks\"\n");
     mdx_content.push_str("---\n\n");
     mdx_content.push_str(
@@ -113,7 +115,7 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
         "Lifecycle states currently used in the catalog are mainly `Stable` and `Preview`. The generator also supports future `Deprecated` and `Removed` statuses when rules eventually transition.\n\n",
     );
     mdx_content.push_str(
-        "For setup, configuration, and CI usage, start with [Linting](/docs/linting).\n\n",
+        "For setup, configuration, and CI usage, start with [Linting](/docs/linting/overview).\n\n",
     );
 
     mdx_content.push_str("| Code | Rule | Status | Quick fix | What it does |\n");
@@ -121,7 +123,7 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
 
     for rule in rules {
         mdx_content.push_str(&format!(
-            "| [{}](./{}) | [`{}`](./{}) | {} | {} | {} |\n",
+            "| [{}]({RULES_BASE_PATH}/{}) | [`{}`]({RULES_BASE_PATH}/{}) | {} | {} | {} |\n",
             rule.code,
             rule.slug,
             rule.rule_name,
@@ -132,17 +134,22 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
         ));
     }
 
-    fs::write(out_dir.join("index.mdx"), mdx_content)?;
+    fs::write(out_dir.join("overview.mdx"), mdx_content)?;
 
     Ok(())
 }
 
 fn write_linter_meta(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result<()> {
-    let pages = rules
+    let mut pages = rules
         .iter()
         .map(|rule| rule.slug.clone())
         .collect::<Vec<_>>();
-    let content = serde_json::to_string_pretty(&serde_json::json!({ "pages": pages }))?;
+    pages.insert(0, "overview".to_string());
+    let content = serde_json::to_string_pretty(&serde_json::json!({
+        "title": "Linting rules",
+        "icon": "FileCheck",
+        "pages": pages,
+    }))?;
     fs::write(out_dir.join("meta.json"), format!("{content}\n"))?;
     Ok(())
 }

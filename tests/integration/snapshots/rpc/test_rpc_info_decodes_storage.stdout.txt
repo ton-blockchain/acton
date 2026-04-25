@@ -7,7 +7,7 @@ Remote Account
   Balance:           1.234 TON
   Last Tx LT:        999
   Last Tx Hash:      c0ffee
-  Code Hash:         0x1f6548a25e04497496242ad7804b653e6da9a47e474dc17436313ffa04e15f18
+  Code Hash:         0x944917d7f23ce599b9570ac6f35bf8bc0d689ec75b6b159698d425c3614cfdc6
   Data Hash:         0x9f4fe898a7910db94963ae08b06f6ea70f78e1f2e083a5deb96fb5a12e7a7e26
 
 Local Match

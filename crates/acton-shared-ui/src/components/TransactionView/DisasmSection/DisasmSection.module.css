@@ -1,0 +1,72 @@
+.disasmSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.disasmTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.actionsToggleButton {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.actionsToggleButton:hover {
+  color: var(--text-primary);
+}
+
+.actionsToggleText {
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.disasmBlock {
+  width: 100%;
+  max-height: min(32rem, 60vh);
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary-color);
+}
+
+.disasmCode {
+  margin: 0;
+  padding: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  color: var(--text-primary);
+  font-family: var(--font-mono), monospace;
+  white-space: pre;
+}
+
+.disasmLoading,
+.disasmError {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.disasmLoading {
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 85%, var(--bg-color));
+  color: var(--text-secondary);
+}
+
+.disasmError {
+  background-color: color-mix(in srgb, var(--color-failed-bg) 88%, var(--bg-color));
+  color: var(--color-failed-text);
+}

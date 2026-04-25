@@ -176,8 +176,9 @@ EXAMPLES
 SEE ALSO
        o  acton help fmt
 
-       o  Linting guide <https://ton-blockchain.github.io/acton/docs/linting>
+       o  Linting guide
+          <https://ton-blockchain.github.io/acton/docs/linting/overview>
 
        o  Linter rules
-          <https://ton-blockchain.github.io/acton/docs/linting/rules>
+          <https://ton-blockchain.github.io/acton/docs/rules/overview>
 

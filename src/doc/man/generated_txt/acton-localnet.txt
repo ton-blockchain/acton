@@ -177,5 +177,5 @@ SEE ALSO
        o  acton help wallet
 
        o  Local development node guide
-          <https://ton-blockchain.github.io/acton/docs/local-development-node>
+          <https://ton-blockchain.github.io/acton/docs/localnet/overview>
 

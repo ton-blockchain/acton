@@ -24,6 +24,7 @@ import "@stdlib/reflection"
 import "assert"
 import "../ffi"
 import "../fmt"
+import "../impl"
 import "../types/big_array"
 
 /// Internal struct to represent an expectation for a value.
@@ -298,7 +299,7 @@ fun Expectation<slice>.toBeEmpty(self): void {
 /// expect(nan()).toBeNaN();
 /// ```
 fun Expectation<int>.toBeNaN(self): void {
-    Assert.equal(self.value, __acton_impl_nan(), "expect(<actual>).toBeNaN()", self.location);
+    Assert.equal(self.value, impl.nan(), "expect(<actual>).toBeNaN()", self.location);
 }
 
 /// Asserts that actual value is not NaN.
@@ -308,7 +309,7 @@ fun Expectation<int>.toBeNaN(self): void {
 /// expect(0).toBeNonNaN();
 /// ```
 fun Expectation<int>.toBeNonNaN(self): void {
-    Assert.notEqual(self.value, __acton_impl_nan(), "expect(<actual>).toBeNonNaN()", self.location);
+    Assert.notEqual(self.value, impl.nan(), "expect(<actual>).toBeNonNaN()", self.location);
 }
 
 /// Asserts that actual value is true.
@@ -339,7 +340,7 @@ fun Expectation<bool>.toBeFalse(self): void {
 /// ```
 fun Expectation<any_address>.toBeInternalAddress(self): void {
     if (!self.value.isInternal()) {
-        self.fail("expect(<actual>).toBeInternalAddress(): Expected address to be internal");
+        self.fail("expect(<actual>).toBeInternalAddress(): Actual address is not internal");
     }
 }
 
@@ -351,7 +352,7 @@ fun Expectation<any_address>.toBeInternalAddress(self): void {
 /// ```
 fun Expectation<any_address>.toBeNoneAddress(self): void {
     if (!self.value.isNone()) {
-        self.fail("expect(<actual>).toBeNoneAddress(): Expected address to be none");
+        self.fail("expect(<actual>).toBeNoneAddress(): Actual address is not none");
     }
 }
 
@@ -363,7 +364,7 @@ fun Expectation<any_address>.toBeNoneAddress(self): void {
 /// ```
 fun Expectation<any_address>.toBeExternalAddress(self): void {
     if (!self.value.isExternal()) {
-        self.fail("expect(<actual>).toBeExternalAddress(): Expected address to be external");
+        self.fail("expect(<actual>).toBeExternalAddress(): Actual address is not external");
     }
 }
 
@@ -676,7 +677,7 @@ fun expectToEndWithExitCode(code: int): void
 ///
 /// Example:
 /// ```tolk
-/// expect(__acton_impl_nan()).toBeNaN();
+/// expect(impl.nan()).toBeNaN();
 /// ```
-fun __acton_impl_nan(): int
+fun impl.nan(): int
     asm "PUSHNAN"

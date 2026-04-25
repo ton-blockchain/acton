@@ -1,4 +1,6 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
+import { transformerTwoslash } from 'fumadocs-twoslash';
+import { createFileSystemTypesCache } from 'fumadocs-twoslash/cache-fs';
 import type { LanguageRegistration } from 'shiki';
 import tolkGrammarRaw from './grammars/grammar-tolk.json';
 import funcGrammarRaw from './grammars/grammar-func.json';
@@ -7,6 +9,7 @@ import tlbGrammarRaw from './grammars/grammar-tlb.json';
 import actonCliGrammarRaw from './grammars/grammar-acton-cli.json';
 import actonTraceGrammarRaw from './grammars/grammar-acton-trace.json';
 import lastModified from 'fumadocs-mdx/plugins/last-modified';
+import { tolkTwoslasher } from '@/lib/tolk-twoslash';
 
 export const docs = defineDocs({
     dir: 'content/docs',
@@ -53,6 +56,7 @@ const builtinLangs = [
   'bash',
   'fish',
   'json',
+  'nushell',
   'powershell',
   'toml',
   'yaml',
@@ -77,6 +81,13 @@ export default defineConfig({
                 actonCliGrammar,
                 actonTraceGrammar,
                 tlbGrammar,
+            ],
+            transformers: [
+                transformerTwoslash({
+                    typesCache: createFileSystemTypesCache(),
+                    langs: ['tolk'],
+                    twoslasher: tolkTwoslasher,
+                }),
             ],
         },
     },

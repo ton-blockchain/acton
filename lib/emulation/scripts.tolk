@@ -13,6 +13,7 @@
 
 import "_impl_emul"
 import "../ffi"
+import "../impl"
 import "../crypto"
 import "../testing/assert"
 import "../types/transaction"
@@ -98,7 +99,7 @@ fun ActonWallet.rawSign(self, data: int): slice {
 ///     });
 ///
 ///     val result = counter.deploy(deployer.address, ton("0.05"));
-///     result.wait();
+///     result.waitForFirstTransaction();
 ///
 ///     println("Deployed counter to {}", counter.address);
 /// }
@@ -135,7 +136,7 @@ fun scripts.wallet(name: string): ActonWallet {
 /// }
 /// ```
 fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
-    return __acton_impl_getAccountState(addr)
+    return impl.getAccountState(addr)
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -150,7 +151,7 @@ fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
 /// }
 /// ```
 fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
-    return __acton_impl_getAccountStorageFee(addr, seconds);
+    return impl.getAccountStorageFee(addr, seconds);
 }
 
 /// Get the balance of an address.
@@ -163,7 +164,7 @@ fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
 /// println("{:ton}", balance);
 /// ```
 fun scripts.fetchAccountBalance(of: address): coins {
-    return __acton_impl_getAccountBalance(of);
+    return impl.getAccountBalance(of);
 }
 
 /// Returns the shard account state for an address.
@@ -178,7 +179,7 @@ fun scripts.fetchAccountBalance(of: address): coins {
 /// }
 /// ```
 fun scripts.fetchShardAccount(addr: address): TlbShardAccount? {
-    return __acton_impl_getShardAccount(addr);
+    return impl.getShardAccount(addr);
 }
 
 /// Retrieves the current blockchain configuration.

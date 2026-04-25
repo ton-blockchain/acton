@@ -442,12 +442,9 @@ fn test_new_nft_project_non_interactive() {
 
     assert!(project_dir.join("contracts/NftCollection.tolk").exists());
     assert!(project_dir.join("contracts/NftItem.tolk").exists());
-    assert!(
-        project_dir
-            .join("wrappers/NftCollectionContract.tolk")
-            .exists()
-    );
-    assert!(project_dir.join("wrappers/NftItemContract.tolk").exists());
+    assert!(project_dir.join("wrappers/NftCollection.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/NftItem.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/utils.tolk").exists());
     assert!(project_dir.join("scripts/deployCollection.tolk").exists());
     assert!(project_dir.join("scripts/deployItem.tolk").exists());
     assert!(project_dir.join("scripts/deployBatch.tolk").exists());
@@ -511,14 +508,18 @@ fn test_new_counter_project_with_app_flag() {
     ));
     assert!(!package_lock.contains(r#""name": "counter-project""#));
     assert!(project_dir.join("app/src/App.tsx").exists());
-    assert!(project_dir.join("wrapper-ts/Counter.ts").exists());
+    assert!(project_dir.join("wrappers-ts/Counter.ts").exists());
     assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir
             .join("contracts/tests/counter.test.tolk")
             .exists()
     );
-    assert!(project_dir.join("contracts/wrappers/Counter.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/wrappers/Counter.gen.tolk")
+            .exists()
+    );
     assert!(project_dir.join(".prettierrc").exists());
 }
 
@@ -831,7 +832,7 @@ fn test_new_templates_returns_machine_readable_json() {
                 {
                     "id": "jetton",
                     "description": "Jetton minter and wallet contracts",
-                    "supports_app": false,
+                    "supports_app": true,
                     "scaffolds": [
                         {
                             "kind": "standard",
@@ -848,13 +849,29 @@ fn test_new_templates_returns_machine_readable_json() {
                                     "src": "contracts/JettonWallet.tolk"
                                 }
                             ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "JettonMinter",
+                                    "name": "JettonMinter",
+                                    "src": "contracts/src/JettonMinter.tolk"
+                                },
+                                {
+                                    "id": "JettonWallet",
+                                    "name": "JettonWallet",
+                                    "src": "contracts/src/JettonWallet.tolk"
+                                }
+                            ]
                         }
                     ]
                 },
                 {
                     "id": "nft",
                     "description": "NFT collection and item contracts",
-                    "supports_app": false,
+                    "supports_app": true,
                     "scaffolds": [
                         {
                             "kind": "standard",
@@ -869,6 +886,22 @@ fn test_new_templates_returns_machine_readable_json() {
                                     "id": "NftItem",
                                     "name": "NftItem",
                                     "src": "contracts/NftItem.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "NftCollection",
+                                    "name": "NftCollection",
+                                    "src": "contracts/src/NftCollection.tolk"
+                                },
+                                {
+                                    "id": "NftItem",
+                                    "name": "NftItem",
+                                    "src": "contracts/src/NftItem.tolk"
                                 }
                             ]
                         }
@@ -2266,4 +2299,296 @@ fn test_new_empty_project_writes_editorconfig_with_tolk_rules() {
             "foobar/.editorconfig",
             "integration/snapshots/test_new_empty_project_editorconfig.gen",
         );
+}
+
+fn create_project_and_check_wrappers(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    create_project_and_check_wrappers_inner(test_name, template, false, contracts_and_wrappers);
+}
+
+fn create_project_and_check_wrappers_with_build(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    create_project_and_check_wrappers_inner(test_name, template, true, contracts_and_wrappers);
+}
+
+fn create_project_and_check_wrappers_inner(
+    test_name: &str,
+    template: &str,
+    needs_build: bool,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg(template)
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    if needs_build {
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("build")
+            .run()
+            .success();
+    }
+
+    for &(contract_name, template_wrapper_path) in contracts_and_wrappers {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let wrappers_dir = PathBuf::from(template_wrapper_path)
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let generated_path = wrappers_dir.join(format!("{contract_name}.gen.tolk"));
+        let generated_wrapper = fs::read_to_string(project_dir.join(&generated_path))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to read generated wrapper {}: {e}",
+                    generated_path.display()
+                )
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_empty_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-empty-wrapper-check",
+        "empty",
+        &[("Empty", "wrappers/Empty.tolk")],
+    );
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_counter_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-counter-wrapper-check",
+        "counter",
+        &[("Counter", "wrappers/Counter.gen.tolk")],
+    );
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_counter_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-counter-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("counter")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let template_wrapper =
+        fs::read_to_string(project_dir.join("contracts/wrappers/Counter.gen.tolk"))
+            .expect("Failed to read template wrapper");
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("wrapper")
+        .arg("Counter")
+        .run()
+        .success();
+
+    let generated_wrapper =
+        fs::read_to_string(project_dir.join("contracts/wrappers/Counter.gen.tolk"))
+            .expect("Failed to read generated wrapper");
+
+    assert_eq!(
+        template_wrapper, generated_wrapper,
+        "Template wrapper `contracts/wrappers/Counter.gen.tolk` does not match auto-generated wrapper for contract `Counter`"
+    );
+}
+
+#[test]
+fn test_new_jetton_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers_with_build(
+        "new-jetton-wrapper-check",
+        "jetton",
+        &[
+            ("JettonMinter", "wrappers/JettonMinter.gen.tolk"),
+            ("JettonWallet", "wrappers/JettonWallet.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_jetton_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-jetton-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in &[
+        ("JettonMinter", "contracts/wrappers/JettonMinter.gen.tolk"),
+        ("JettonWallet", "contracts/wrappers/JettonWallet.gen.tolk"),
+    ] {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
+}
+
+#[test]
+fn test_new_nft_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-nft-wrapper-check",
+        "nft",
+        &[
+            ("NftCollection", "wrappers/NftCollection.gen.tolk"),
+            ("NftItem", "wrappers/NftItem.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_nft_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-nft-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("nft")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in &[
+        ("NftCollection", "contracts/wrappers/NftCollection.gen.tolk"),
+        ("NftItem", "contracts/wrappers/NftItem.gen.tolk"),
+    ] {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
 }

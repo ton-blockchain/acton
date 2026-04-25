@@ -15,7 +15,7 @@ CLI.
 <Callout>
     New to Acton? Start with [Installation](/docs/installation), then follow
     the [Quickstart](/docs/quickstart). If you already have a repository, start
-    with `acton init` and the [Project initialization](/docs/project-init)
+    with `acton init` and the [Project initialization](/docs/tutorial/project-init)
     guide instead of creating a new scaffold.
 </Callout>
 
@@ -36,7 +36,7 @@ CLI.
     <Card href="/docs/quickstart" title="Quickstart">
         Build, test, deploy, and verify your first Tolk smart contract.
     </Card>
-    <Card href="/docs/project-init" title="Project initialization">
+    <Card href="/docs/tutorial/project-init" title="Project initialization">
         Choose between `acton new` for fresh scaffolds and `acton init` for
         existing repositories.
     </Card>
@@ -45,19 +45,19 @@ CLI.
 ## First production workflow
 
 <Cards>
-    <Card href="/docs/test-runner" title="Test Runner">
+    <Card href="/docs/testing/overview" title="Test Runner">
         Write unit and integration tests in Tolk, inspect traces, and measure
         coverage.
     </Card>
-    <Card href="/docs/setup-wallets" title="Wallet setup">
+    <Card href="/docs/tutorial/setup-wallets" title="Wallet setup">
         Create local or global wallets and prepare them for deployment
         workflows.
     </Card>
-    <Card href="/docs/contract-deployment" title="Contract deployment">
+    <Card href="/docs/tutorial/contract-deployment" title="Contract deployment">
         Deploy compiled contracts through scripts and understand the required
         inputs.
     </Card>
-    <Card href="/docs/contract-verification" title="Contract verification">
+    <Card href="/docs/tutorial/contract-verification" title="Contract verification">
         Verify that deployed bytecode matches your source code.
     </Card>
 </Cards>
@@ -65,24 +65,24 @@ CLI.
 ## Go deeper
 
 <Cards>
-    <Card href="/docs/commands" title="Commands reference">
+    <Card href="/docs/commands/overview" title="Commands reference">
         Browse all Acton CLI commands, flags, and related workflows.
     </Card>
-    <Card href="/docs/build-system" title="Build system">
+    <Card href="/docs/building/overview" title="Build system">
         Understand contract configuration, dependency handling, and build
         outputs.
     </Card>
-    <Card href="/docs/scripting" title="Scripting">
+    <Card href="/docs/scripting/overview" title="Scripting">
         Run standalone Tolk scripts for deployment, automation, and blockchain
         interaction.
     </Card>
-    <Card href="/docs/local-development-node" title="Local development node">
+    <Card href="/docs/localnet/overview" title="Local development node">
         Use a local node with faucet, persistence, snapshots, and fork mode.
     </Card>
-    <Card href="/docs/linting" title="Linting">
+    <Card href="/docs/linting/overview" title="Linting">
         Check Tolk code, configure rules, and integrate checks into CI.
     </Card>
-    <Card href="/docs/standard_library" title="Standard library">
+    <Card href="/docs/standard_library/overview" title="Standard library">
         Explore the built-in Acton and Tolk libraries available in your
         projects.
     </Card>
@@ -96,13 +96,13 @@ CLI.
         `acton --version` works in a fresh shell.
     </Step>
     <Step title="Create or open a project">
-        Use [Project initialization](/docs/project-init) to decide whether you
+        Use [Project initialization](/docs/tutorial/project-init) to decide whether you
         should run `acton new` or `acton init`. Existing repositories do not
         need to be recreated from a template.
     </Step>
     <Step title="Build and test locally">
         Follow the [Quickstart](/docs/quickstart) and the
-        [Test Runner](/docs/test-runner) docs to get a reliable local feedback
+        [Test Runner](/docs/testing/overview) docs to get a reliable local feedback
         loop first.
     </Step>
     <Step title="Prepare deployment">
@@ -119,11 +119,11 @@ CLI.
 
 - Want the shortest path to a running project? Go to
   [Quickstart](/docs/quickstart).
-- Looking for command syntax? Open [Commands](/docs/commands).
+- Looking for command syntax? Open [Commands](/docs/commands/overview).
 - Need help reading CLI help? Use `acton --help` for the overview,
   `acton help <command>` for the long manual, and `<nested> --help` for exact
   nested subcommand help such as `acton wallet list --help`.
-- Working on tests? Start with [Test Runner](/docs/test-runner).
+- Working on tests? Start with [Test Runner](/docs/testing/overview).
 - Need environment and dependency details? Read
-  [Acton.toml](/docs/acton-toml) and [Build system](/docs/build-system).
+  [Acton.toml](/docs/acton-toml) and [Build system](/docs/building/overview).
 - If setup or path resolution looks wrong, run `acton doctor`.

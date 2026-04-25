@@ -1,8 +1,8 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, append_localnet_network,
-    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
+    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
+    spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
     toncenter_v2_seqno_ok_response,
 };
 
@@ -14,6 +14,205 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+const WAIT_FOR_TRACE_MESSAGES: &str = r"
+struct (0x91000001) TriggerForward {
+    target: address
+}
+";
+
+const WAIT_FOR_TRACE_RECEIVER_CONTRACT: &str = r"
+struct Storage {
+    received: uint32
+}
+
+fun loadStorage() {
+    val data = contract.getData();
+    val slice = data.beginParse();
+    if (slice.remainingBitsCount() == 0 && slice.remainingRefsCount() == 0) {
+        return Storage { received: 0 };
+    }
+    return Storage.fromCell(data);
+}
+
+fun saveStorage(data: Storage) {
+    contract.setData(data.toCell());
+}
+
+fun onInternalMessage(_: InMessage) {
+    var storage = loadStorage();
+    storage.received = storage.received + 1;
+    saveStorage(storage);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun received(): int {
+    return loadStorage().received;
+}
+";
+
+const WAIT_FOR_TRACE_FORWARDER_CONTRACT: &str = r#"
+import "wait_for_trace_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy TriggerForward.fromSlice(in.body);
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: msg.target,
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const WAIT_FOR_TRACE_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../../lib/types/big_array"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            target: receiverAddress,
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 30, 100);
+    if (trace == null) {
+        println("TRACE_NULL");
+        return;
+    }
+
+    val receiverCount: int = net.runGetMethod(receiverAddress, "received");
+    println("TRACE_READY=true");
+    println("RECEIVER_COUNT={}", receiverCount);
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
+const WAIT_FOR_FIRST_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            target: receiverAddress,
+        },
+    }));
+
+    val root = txs.waitForFirstTransaction(true, 30, 100);
+    if (root == null) {
+        println("ROOT_NULL");
+        return;
+    }
+
+    println("ROOT_READY=true");
+    println("ROOT_PARENT_LT_NULL={}", root.parentLt == null);
+    println("ROOT_CHILD_TXS={}", root.childTxs.size());
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
 const REMOTE_GLOBAL_VERSION: u32 = 777;
 const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
 
@@ -186,6 +385,38 @@ keys = {{ mnemonic-file = "mnemonic.txt" }}
         ),
     )
     .expect("failed to write wallets.toml");
+}
+
+fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
+    let (v2_url, v3_url) = if let Some(root_url) = base_url.strip_suffix("/api/v2") {
+        (format!("{root_url}/api/v2"), format!("{root_url}/api/v3"))
+    } else {
+        (format!("{base_url}/api/v2"), format!("{base_url}/api/v3"))
+    };
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str(&format!(
+        r#"
+
+[networks.localnet]
+api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
+"#
+    ));
+    fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
+}
+
+fn build_localnet_wait_project(
+    project_name: &str,
+    script_name: &str,
+    script_code: &str,
+) -> Project {
+    ProjectBuilder::new(project_name)
+        .file("contracts/wait_for_trace_messages", WAIT_FOR_TRACE_MESSAGES)
+        .contract("receiver", WAIT_FOR_TRACE_RECEIVER_CONTRACT)
+        .contract("forwarder", WAIT_FOR_TRACE_FORWARDER_CONTRACT)
+        .script_file(script_name, script_code)
+        .build()
 }
 
 fn extract_marker_value(output: &str, marker: &str) -> String {
@@ -1974,7 +2205,7 @@ fun main() {
         value: ton("0.05"),
         dest: { stateInit: init },
     }));
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 
@@ -2050,6 +2281,88 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
         );
+}
+
+#[test]
+fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-trace-localnet",
+        "wait_for_trace",
+        WAIT_FOR_TRACE_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_trace.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
+    );
+
+    let stdout = output.get_stdout();
+    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+
+    node.stop();
+}
+
+#[test]
+fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-first-transaction-localnet",
+        "wait_for_first_transaction",
+        WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_first_transaction.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
+    );
+
+    let stdout = output.get_stdout();
+    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+
+    node.stop();
 }
 
 #[test]

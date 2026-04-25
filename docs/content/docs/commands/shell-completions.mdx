@@ -42,7 +42,7 @@ Shell to generate completions for.
 
 <CommandOptionMeta label="Possible values">
 
-`bash`, `elvish`, `fish`, `powershell`, `zsh`
+`bash`, `elvish`, `fish`, `powershell`, `zsh`, `nushell`
 
 </CommandOptionMeta>
 
@@ -217,6 +217,18 @@ Then load it from `~/.elvish/rc.elv`:
 
 ```bash
 use completions/acton
+```
+
+### Nushell
+
+```bash
+acton completions nushell | save --force ~/.config/nushell/completions/acton.nu
+```
+
+Then load it from `config.nu`:
+
+```nu
+source ~/.config/nushell/completions/acton.nu
 ```
 
 ## Verifying Installation

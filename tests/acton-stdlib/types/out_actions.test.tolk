@@ -1,6 +1,7 @@
 import "@local-acton/emulation/network"
 import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
+import "@local-acton/impl"
 import "@local-acton/types/message"
 import "@local-acton/types/out_actions"
 
@@ -103,7 +104,7 @@ get fun `test out message out actions helper`() {
 }
 
 get fun `test parse empty out actions`() {
-    val actions = __acton_impl_parseOutActions(createEmptyCell());
+    val actions = impl.parseOutActions(createEmptyCell());
     expect(actions).toHaveLength(0);
 }
 

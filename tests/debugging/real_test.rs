@@ -2,9 +2,9 @@ use crate::debugging::support::assertions::{DebugTestOutput, DebugTestOutputExt}
 use crate::debugging::support::debug::{DebugBuilder, DebugSession};
 use crate::support::project::ProjectBuilder;
 
-const COUNTER: &str = r#"import "counter_messages"
+const COUNTER: &str = r#"import "../counter_messages"
 
-type AllowedMessage = IncreaseCounter | ResetCounter | OneMoreMessage
+type AllowedMessage = IncreaseCounter | ResetCounter
 
 fun handleIncreaseCounter(increaseBy: int) {
     var storage = lazy Storage.load();
@@ -42,12 +42,6 @@ fun onInternalMessage(in: InMessage) {
         }
 
         ResetCounter => {
-            var storage = lazy Storage.load();
-            storage.counter = 0;
-            storage.save();
-        }
-
-        OneMoreMessage => {
             var storage = lazy Storage.load();
             storage.counter = 0;
             storage.save();

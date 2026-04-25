@@ -15,7 +15,7 @@ use ton_abi::ContractAbi as LegacyContractAbi;
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
-const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrapper-ts";
+const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
 struct WrapperModel {
     project_root: PathBuf,
@@ -356,7 +356,11 @@ fn resolve_test_path(
 }
 
 fn wrapper_file_name(contract_name: &str, generate_typescript: bool) -> String {
-    let extension = if generate_typescript { "ts" } else { "tolk" };
+    let extension = if generate_typescript {
+        "gen.ts"
+    } else {
+        "gen.tolk"
+    };
     format!("{contract_name}.{extension}")
 }
 
@@ -468,12 +472,9 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     let mut code = String::new();
 
-    code.push_str("import \"@stdlib/gas-payments\"\n");
     code.push_str(&import_stdlib("build"));
     code.push_str(&import_stdlib("emulation/network"));
     code.push_str(&import_stdlib("testing/assert"));
-    code.push_str(&import_stdlib("testing/expect"));
-    code.push_str(&import_stdlib("types/message"));
 
     if let Some(storage_path) = &model.storage_path {
         let storage_import = get_import_path(proot, root, storage_path, mappings);
@@ -492,6 +493,16 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     code.push('\n');
 
+    if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path) {
+        let display_path = storage_path
+            .strip_prefix(proot)
+            .unwrap_or(storage_path)
+            .display();
+        code.push_str(&format!(
+            "/// Storage `{}` is defined in `{display_path}`\n",
+            storage.name
+        ));
+    }
     code.push_str(&format!("struct {contract} {{\n"));
     code.push_str("    address: address\n");
     code.push_str("    stateInit: ContractState? = null\n");
@@ -538,7 +549,7 @@ fn generate_from_storage(
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null) {{\n",
+        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null): {contract_name} {{\n",
     ));
     code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
@@ -562,7 +573,7 @@ fn generate_from_address(contract_name: &str) -> String {
 
     code.push_str("/// Creates a contract wrapper instance from the address\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromAddress(address: address) {{\n"
+        "fun {contract_name}.fromAddress(address: address): {contract_name} {{\n"
     ));
     code.push_str(&format!("    return {contract_name} {{ address }}\n",));
     code.push_str("}\n");
@@ -575,7 +586,7 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null) {{\n"
+        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null): {contract_name} {{\n"
     ));
     code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
@@ -907,7 +918,9 @@ fn generate_setup_test(
         "/// Initializes the test environment, creating a fresh instance of the contract.\n",
     );
     code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).\n");
-    code.push_str("fun setupTest() {\n");
+    code.push_str(&format!(
+        "fun setupTest(): ({contract_name}, Treasury, Treasury) {{\n"
+    ));
 
     code.push_str("    // Create a treasury account for deployment (typically the owner)\n");
     code.push_str("    val deployer = testing.treasury(\"deployer\");\n");

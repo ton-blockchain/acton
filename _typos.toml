@@ -5,7 +5,11 @@ extend-exclude = [
   "block.tlb",
   "crates/tasm/spec/**",
   "crates/tolkc/assets/**",
+  "src/ffi/testdata/**",
   "tests/**/snapshots/**",
+  "src/commands/new/templates/*/app/**",
+  "src/commands/new/templates/*/wrappers-ts/**",
+  "src/commands/new/templates/*/package-lock.json",
 ]
 
 [default]

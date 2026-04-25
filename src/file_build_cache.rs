@@ -102,11 +102,8 @@ impl FileBuildCache {
         })
     }
 
-    pub fn dummy() -> Result<Self> {
+    pub fn temporary_for_project(project_root: PathBuf, config: ActonConfig) -> Result<Self> {
         let tmp_dir = tempfile::TempDir::new()?;
-        let config = ActonConfig::load().unwrap_or_default();
-
-        let project_root = configured_project_root().to_path_buf();
         let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {

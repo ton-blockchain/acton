@@ -320,7 +320,7 @@ fn run_single_mutation(
                 id: mutation.id,
                 rule_name: mutation.rule.name.clone(),
                 rule_description: mutation.rule.description.clone(),
-                rule_level: mutation.rule.level.label().to_owned(),
+                rule_level: mutation.rule.level.as_str().to_owned(),
                 rule_group: mutation.rule.group.clone(),
                 rule_explanation: mutation.rule.explanation.clone(),
                 line: pos.row + 1,
@@ -372,7 +372,7 @@ fn run_single_mutation(
             id: mutation.id,
             rule_name: mutation.rule.name.clone(),
             rule_description: mutation.rule.description.clone(),
-            rule_level: mutation.rule.level.label().to_owned(),
+            rule_level: mutation.rule.level.as_str().to_owned(),
             rule_group: mutation.rule.group.clone(),
             rule_explanation: mutation.rule.explanation.clone(),
             line: pos.row + 1,
@@ -841,12 +841,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     };
     let filtered_rules: Vec<MutationRule> = mutation_rules
         .into_iter()
-        .filter(|rule| !all_disable_rules.contains(&rule.name.clone()))
+        .filter(|rule| !all_disable_rules.contains(&rule.name))
         .filter(|rule| {
-            selected_mutation_levels.is_empty()
-                || selected_mutation_levels
-                    .iter()
-                    .any(|level| level.as_str() == rule.level.label())
+            selected_mutation_levels.is_empty() || selected_mutation_levels.contains(&rule.level)
         })
         .collect();
 

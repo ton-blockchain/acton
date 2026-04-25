@@ -12,10 +12,11 @@ use tolk_resolver::file_index::FileId;
 /// Using it later is misleading and makes code harder to read.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main() {
 ///     val _value = 10;
 ///     _value;
+/// //  ^^^^^^ E010: identifier marked as unused is used
 /// }
 /// ```
 ///

@@ -1,6 +1,6 @@
 {
   "name": "acton",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
@@ -18,6 +18,9 @@
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
     "lint:fix": "bun --filter '*' lint:fix"
+  },
+  "overrides": {
+    "uuid": "14.0.0"
   },
   "prettier": {
     "arrowParens": "avoid",

@@ -1,0 +1,16 @@
+warning[E035]: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
+   --> [ROOT]/contracts/main[LINE]
+   |
+ 7 |                 val msg = createMessage({
+   |                           ------------- in this createMessage call
+   .
+11 |                     body: Transfer { amount: 1 }.toCell(),
+   |                     ----  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ remove the explicit `.toCell()` here
+   |                     |      
+   |                     `createMessage` already serializes `body` automatically
+   |
+   = compiler can inline small bodies or wrap large ones into a cell automatically
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E035

@@ -184,7 +184,7 @@ SEE ALSO
        o  acton help wrapper
 
        o  Build system configuration reference
-          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+          <https://ton-blockchain.github.io/acton/docs/building/reference>
 
        o  Acton.toml reference
           <https://ton-blockchain.github.io/acton/docs/acton-toml>

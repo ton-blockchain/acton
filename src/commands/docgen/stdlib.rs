@@ -45,29 +45,39 @@ pub(super) fn generate_stdlib_docs(
 
 fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
     fs::create_dir_all(stdlib_out_dir)?;
-    let index_article = stdlib_out_dir.join("index.mdx");
+    let index_article = stdlib_out_dir.join("overview.mdx");
     fs::write(
         &index_article,
         render_generated_index_page(
-            "Acton standard library",
-            "Learn about available functions/struct/constants available in Acton standard library",
-            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](../tolk_standard_library).\n",
+            "Overview",
+            "All available functions, structs, constants, and other entities available in Acton standard library",
+            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](/docs/tolk_standard_library/overview).\n",
         ),
     )?;
+    let meta_file = stdlib_out_dir.join("meta.json");
+    let _ = fs::write(
+        &meta_file,
+        "{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
+    );
     Ok(())
 }
 
 fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path) -> Result<()> {
     fs::create_dir_all(tolk_stdlib_out_dir)?;
-    let index_article = tolk_stdlib_out_dir.join("index.mdx");
+    let index_article = tolk_stdlib_out_dir.join("overview.mdx");
     fs::write(
         &index_article,
         render_generated_index_page(
-            "Tolk standard library",
-            "Learn about bundled Tolk stdlib modules used by Acton standard library",
+            "Overview",
+            "Bundled Tolk stdlib modules used by Acton standard library",
             "This section contains documentation of Tolk standard library.\n",
         ),
     )?;
+    let meta_file = tolk_stdlib_out_dir.join("meta.json");
+    let _ = fs::write(
+        &meta_file,
+        "{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
+    );
     Ok(())
 }
 
@@ -101,10 +111,7 @@ fn collect_docs(
 
         let content = fs::read_to_string(path)?;
         let relative_path = path.strip_prefix(source_dir)?;
-        if relative_path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().starts_with('_'))
-        {
+        if should_skip_stdlib_doc(relative_path) {
             continue;
         }
         let file_stem = relative_path
@@ -122,6 +129,7 @@ fn collect_docs(
             docs.push(FileDoc {
                 source_path: path.to_path_buf(),
                 output_stem_path: output_root.join(relative_path.with_extension("")),
+                docs_url: build_docs_url(source_kind.docs_url_root(), relative_path),
                 title: file_stem.clone(),
                 description: format!("{}.tolk {}", file_stem, source_kind.description_suffix()),
                 symbols,
@@ -133,12 +141,20 @@ fn collect_docs(
     Ok(docs)
 }
 
+fn should_skip_stdlib_doc(relative_path: &Path) -> bool {
+    relative_path.file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        name.starts_with('_') || name == "impl.tolk"
+    })
+}
+
 fn build_symbol_map(docs: &[FileDoc]) -> HashMap<String, Vec<LinkTarget>> {
     let mut symbol_map: HashMap<String, Vec<LinkTarget>> = HashMap::new();
     for doc in docs {
         for symbol in &doc.symbols {
             let link_target = LinkTarget {
                 path: doc.output_stem_path.clone(),
+                url: doc.docs_url.clone(),
                 anchor: symbol.name.clone(),
             };
             insert_link_target(&mut symbol_map, symbol.name.clone(), link_target.clone());
@@ -210,15 +226,10 @@ fn write_doc_page(
                                     normalize_symbol_link(&link_target.anchor)
                                 )
                             } else {
-                                let relative_link_path =
-                                    pathdiff::diff_paths(target_path, current_file_stem_path)
-                                        .unwrap_or_else(|| target_path.clone());
-
-                                let link = relative_link_path.to_string_lossy().to_string();
                                 format!(
-                                    "[{}]({}/#{})",
+                                    "[{}]({}#{})",
                                     name,
-                                    link,
+                                    link_target.url,
                                     normalize_symbol_link(&link_target.anchor)
                                 )
                             }
@@ -249,9 +260,7 @@ fn write_doc_page(
 }
 
 fn render_generated_index_page(title: &str, description: &str, body: &str) -> String {
-    format!(
-        "---\ntitle: {title:?}\ndescription: {description:?}\nicon: FileCode\n---\n\n{GENERATED_NOTICE}{body}"
-    )
+    format!("---\ntitle: {title:?}\ndescription: {description:?}\n---\n\n{GENERATED_NOTICE}{body}")
 }
 
 fn normalize_symbol_link(link: &str) -> String {
@@ -295,6 +304,7 @@ struct SymbolInfo {
 struct FileDoc {
     source_path: PathBuf,
     output_stem_path: PathBuf,
+    docs_url: String,
     title: String,
     description: String,
     symbols: Vec<SymbolInfo>,
@@ -313,12 +323,26 @@ impl SourceKind {
             Self::Tolk => "Tolk standard library file",
         }
     }
+
+    const fn docs_url_root(&self) -> &'static str {
+        match self {
+            Self::Acton => "/docs/standard_library",
+            Self::Tolk => "/docs/tolk_standard_library",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LinkTarget {
     path: PathBuf,
+    url: String,
     anchor: String,
+}
+
+fn build_docs_url(root: &str, relative_path: &Path) -> String {
+    let path = relative_path.with_extension("");
+    let path = path.to_string_lossy().replace('\\', "/");
+    format!("{root}/{path}")
 }
 
 fn extract_symbols(source_file: &SourceFile, source: &str) -> Vec<SymbolInfo> {

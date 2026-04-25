@@ -40,16 +40,26 @@ jobs:
 
       - name: Restore Bun cache
         id: bun-cache
-        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-docs-${{ hashFiles('docs/bun.lock') }}
+          path: &build-docs-bun-cache-paths |
+            ~/.bun/install/cache
+            ${{ github.workspace }}/docs/.next/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-docs-${{ hashFiles('docs/bun.lock') }}-${{ hashFiles('docs/**.[jt]s', 'docs/**.[jt]sx') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-bun-docs-
+            ${{ runner.os }}-${{ runner.arch }}-bun-docs-${{ hashFiles('docs/bun.lock') }}-
 
       - name: Install docs dependencies
         working-directory: docs
         run: bun ci
+
+      - name: Generated source
+        working-directory: docs
+        run: bun run generated-source
+
+      - name: Lint Check links
+        working-directory: docs
+        run: bun run lint:links
 
       - name: Build docs
         working-directory: docs
@@ -59,9 +69,9 @@ jobs:
 
       - name: Save Bun cache
         if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.bun/install/cache
+          path: *build-docs-bun-cache-paths
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Upload GitHub Pages artifact

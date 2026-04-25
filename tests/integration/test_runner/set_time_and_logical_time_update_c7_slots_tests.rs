@@ -12,6 +12,7 @@ import "../../lib/emulation/config"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
 import "../../lib/fmt"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 "#;
 
@@ -58,8 +59,8 @@ fn set_time_and_logical_time_update_c7_slots() {
         r"
 get fun `test aj stdlib vm set time and logical slots 3 4 5`() {
     testing.setNow(1700001234);
-    __acton_impl_setConfigParam(123456789, 4);
-    __acton_impl_setConfigParam(223456789, 5);
+    impl.setConfigParam(123456789, 4);
+    impl.setConfigParam(223456789, 5);
 
     val c7 = testing.getC7OutsideContract();
     val params = c7.get(0) as tuple;
@@ -80,7 +81,7 @@ fn set_original_balance_updates_balance_tuple_with_and_without_extra_dict() {
         "aj-stdlib-vm-set-original-balance-slot-7",
         r#"
 get fun `test aj stdlib vm set original balance slot 7`() {
-    __acton_impl_setConfigParam(tuple [ton("3"), null], 7);
+    impl.setConfigParam(tuple [ton("3"), null], 7);
     var c7 = testing.getC7OutsideContract();
     var params = c7.get(0) as tuple;
     val withoutExtra = params.get(7) as tuple;
@@ -88,7 +89,7 @@ get fun `test aj stdlib vm set original balance slot 7`() {
     expect(withoutExtra.get(1) as dict?).toBeNull();
 
     val extraCurrencies = testing.getConfig().toLowLevelDict();
-    __acton_impl_setConfigParam(tuple [ton("5"), extraCurrencies], 7);
+    impl.setConfigParam(tuple [ton("5"), extraCurrencies], 7);
     c7 = testing.getC7OutsideContract();
     params = c7.get(0) as tuple;
     val withExtra = params.get(7) as tuple;
@@ -112,7 +113,7 @@ get fun `test aj stdlib vm set config root slot 9`() {
     config.setGlobalVersion(version);
 
     val root = config.toLowLevelDict();
-    __acton_impl_setConfigParam(root, 9);
+    impl.setConfigParam(root, 9);
 
     val c7 = testing.getC7OutsideContract();
     val params = c7.get(0) as tuple;
@@ -138,7 +139,7 @@ get fun `test aj stdlib vm config unpacked slot 14`() {
     unpacked.push("aj-unpacked");
     unpacked.push(false);
 
-    __acton_impl_setConfigParam(unpacked, 14);
+    impl.setConfigParam(unpacked, 14);
     val actual = (testing.getC7OutsideContract().get(0) as tuple).get(14) as tuple;
 
     expect(actual.size()).toEqual(3);

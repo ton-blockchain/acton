@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Get TON commit hash
         id: ton-commit
+        # language=Bash
         run: |
           TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" "repos/${TON_REPOSITORY}/commits/${TON_BRANCH}")
           echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
@@ -37,6 +38,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Show TON commit hash
+        # language=Bash
         run: |
           echo "Resolved ${TON_REPOSITORY}@${TON_BRANCH} to ${TON_COMMIT}"
           {
@@ -75,15 +77,16 @@ jobs:
     steps:
       - name: Restore TON objects archive cache
         id: archive-cache
-        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
+          path: &linux-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Install LLVM and Clang
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -92,6 +95,7 @@ jobs:
 
       - name: Install system dependencies
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        # language=Bash
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
@@ -114,6 +118,7 @@ jobs:
           CXX: clang++-16
           AR: llvm-ar-16
           RANLIB: llvm-ranlib-16
+        # language=Bash
         run: |
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
@@ -146,6 +151,7 @@ jobs:
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        # language=Bash
         run: |
           ls -lh artifacts
           test -f artifacts/libemulator.a
@@ -168,15 +174,13 @@ jobs:
 
       - name: Save TON objects archive cache
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          path: *linux-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Upload TON objects artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -209,9 +213,9 @@ jobs:
     steps:
       - name: Restore TON objects archive cache
         id: archive-cache
-        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
+          path: &macos-ton-objs-archive-cache-paths |
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
             dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
@@ -228,6 +232,7 @@ jobs:
 
       - name: Build TON static libraries
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        # language=Bash
         run: |
           cp assembly/native/build-macos-static.sh .
           chmod +x build-macos-static.sh
@@ -256,6 +261,7 @@ jobs:
 
       - name: Validate TON objects
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        # language=Bash
         run: |
           ls -lh artifacts
           test -f artifacts/libemulator.a
@@ -278,15 +284,13 @@ jobs:
 
       - name: Save TON objects archive cache
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
-            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          path: *macos-ton-objs-archive-cache-paths
           key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Upload TON objects artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ton-objs-${{ env.TARGET_NAME }}
           path: |
@@ -321,6 +325,7 @@ jobs:
           persist-credentials: false
 
       - name: Install LLVM and Clang
+        # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -328,6 +333,7 @@ jobs:
           rm llvm.sh
 
       - name: Install system dependencies
+        # language=Bash
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
@@ -453,7 +459,7 @@ jobs:
           cat dist/artifacts_manifest.toml
 
       - name: Upload TON artifacts manifest
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ton-objs-manifest
           path: dist/artifacts_manifest.toml
@@ -512,7 +518,7 @@ jobs:
           shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
 
       - name: Upload TON stdlib artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ton-stdlib
           path: |
@@ -548,17 +554,17 @@ jobs:
       - name: Delete previous release-objs release and tag
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           gh release delete release-objs --repo "${GITHUB_REPOSITORY}" --cleanup-tag -y || true
 
-          gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/release-objs \
-            -X DELETE || true
+          gh api repos/${GITHUB_REPOSITORY}/git/refs/tags/release-objs -X DELETE || true
 
       - name: Create release-objs release
         env:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        # language=Bash
         run: |
           release_notes=$(cat <<EOF
           Generated from TON commit: https://github.com/${TON_REPOSITORY}/commit/${TON_COMMIT}
@@ -577,18 +583,18 @@ jobs:
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        # language=Bash
         run: |
           gh release delete release-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
 
-          gh api \
-            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/release-objs \
-            -X DELETE || true
+          gh api repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/release-objs -X DELETE || true
 
       - name: Create release-objs release (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        # language=Bash
         run: |
           release_notes=$(cat <<EOF
           Generated from TON commit: https://github.com/${TON_REPOSITORY}/commit/${TON_COMMIT}

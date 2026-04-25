@@ -1,0 +1,35 @@
+---
+title: "E027: identical-conditional-branches"
+description: "Detects conditionals where both branches are structurally identical."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E027`
+- `Rule`: `identical-conditional-branches`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Detects conditionals where both branches are structurally identical.
+
+### Why is this bad?
+Such condition has no effect on behavior and usually indicates a bug or a
+copy-paste mistake.
+
+### Example
+```tolk twoslash
+if (flag) {
+    checkAccess();
+} else {
+    checkAccess();
+//  ^^^^^^^^^^^^^ E027: conditional branches are identical
+}
+
+val result = flag ? value + 1 : value + 1;
+//                              ^^^^^^^^^ E027: conditional branches are identical
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/identical_conditional_branches.rs#L28" />

@@ -799,6 +799,7 @@ pub struct TonCenterMessage {
     pub fwd_fee: Option<String>,
     pub ihr_fee: Option<String>,
     pub created_lt: Option<String>,
+    pub hash: Option<String>,
     pub body_hash: Option<String>,
     pub message: Option<String>,
 }
@@ -808,6 +809,274 @@ struct TonCenterErrorResponse {
     #[allow(dead_code)]
     ok: bool,
     error: String,
+}
+
+/// TonCenter v3 transaction summary returned by `/api/v3/transactionsByMessage` and
+/// embedded inside `/api/v3/traces` responses.
+///
+/// `/traces` does not ship the raw Transaction BoC — callers reconstruct a synthetic
+/// `Transaction` cell from the structured fields below.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3TransactionSummary {
+    pub account: String,
+    pub hash: String,
+    pub lt: String,
+    #[serde(default)]
+    pub now: u32,
+    #[serde(default)]
+    pub prev_trans_hash: Option<String>,
+    #[serde(default)]
+    pub prev_trans_lt: Option<String>,
+    #[serde(default)]
+    pub orig_status: Option<String>,
+    #[serde(default)]
+    pub end_status: Option<String>,
+    #[serde(default)]
+    pub total_fees: Option<String>,
+    #[serde(default)]
+    pub total_fees_extra_currencies: HashMap<String, String>,
+    #[serde(default)]
+    pub description: Option<V3TxDescription>,
+    #[serde(default)]
+    pub in_msg: Option<V3MessageSummary>,
+    #[serde(default)]
+    pub out_msgs: Vec<V3MessageSummary>,
+    #[serde(default)]
+    pub account_state_before: Option<V3AccountStateRef>,
+    #[serde(default)]
+    pub account_state_after: Option<V3AccountStateRef>,
+}
+
+/// Opaque pointer to the account state before/after the transaction executed. Only the
+/// `hash` is used today — it feeds `state_update` so synthesized tx cells match their
+/// on-chain `repr_hash`.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3AccountStateRef {
+    #[serde(default)]
+    pub hash: Option<String>,
+}
+
+/// v3 transaction description. Only the subset of fields consumed during synthesis is
+/// deserialized; everything else is skipped so unknown flags from future toncenter
+/// versions don't break us.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3TxDescription {
+    #[serde(default, rename = "type")]
+    pub ty: Option<String>,
+    #[serde(default)]
+    pub aborted: Option<bool>,
+    #[serde(default)]
+    pub destroyed: Option<bool>,
+    #[serde(default)]
+    pub credit_first: Option<bool>,
+    #[serde(default)]
+    pub compute_ph: Option<V3ComputePhase>,
+    #[serde(default)]
+    pub action: Option<V3ActionPhase>,
+    #[serde(default)]
+    pub storage_ph: Option<V3StoragePhase>,
+    #[serde(default)]
+    pub credit_ph: Option<V3CreditPhase>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3CreditPhase {
+    #[serde(default)]
+    pub due_fees_collected: Option<String>,
+    #[serde(default)]
+    pub credit: Option<String>,
+    #[serde(default)]
+    pub credit_extra_currencies: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3ComputePhase {
+    #[serde(default)]
+    pub skipped: Option<bool>,
+    #[serde(default)]
+    pub success: Option<bool>,
+    #[serde(default)]
+    pub msg_state_used: Option<bool>,
+    #[serde(default)]
+    pub account_activated: Option<bool>,
+    #[serde(default)]
+    pub gas_fees: Option<String>,
+    #[serde(default)]
+    pub gas_used: Option<String>,
+    #[serde(default)]
+    pub gas_limit: Option<String>,
+    #[serde(default)]
+    pub gas_credit: Option<String>,
+    #[serde(default)]
+    pub mode: Option<i8>,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub exit_arg: Option<i32>,
+    #[serde(default)]
+    pub vm_steps: Option<u32>,
+    #[serde(default)]
+    pub vm_init_state_hash: Option<String>,
+    #[serde(default)]
+    pub vm_final_state_hash: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3ActionPhase {
+    #[serde(default)]
+    pub success: Option<bool>,
+    #[serde(default)]
+    pub valid: Option<bool>,
+    #[serde(default)]
+    pub no_funds: Option<bool>,
+    #[serde(default)]
+    pub status_change: Option<String>,
+    #[serde(default)]
+    pub result_code: Option<i32>,
+    #[serde(default)]
+    pub result_arg: Option<i32>,
+    // `tot_actions` is the on-wire name; `total_actions` is accepted as a fallback so old
+    // fixtures and forks that never shortened the key still deserialize.
+    #[serde(default, alias = "total_actions")]
+    pub tot_actions: Option<u16>,
+    #[serde(default)]
+    pub spec_actions: Option<u16>,
+    #[serde(default)]
+    pub skipped_actions: Option<u16>,
+    #[serde(default)]
+    pub msgs_created: Option<u16>,
+    #[serde(default)]
+    pub total_fwd_fees: Option<String>,
+    #[serde(default)]
+    pub total_action_fees: Option<String>,
+    #[serde(default)]
+    pub action_list_hash: Option<String>,
+    #[serde(default)]
+    pub tot_msg_size: Option<V3StorageUsedShort>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3StorageUsedShort {
+    #[serde(default)]
+    pub cells: Option<String>,
+    #[serde(default)]
+    pub bits: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3StoragePhase {
+    #[serde(default)]
+    pub storage_fees_collected: Option<String>,
+    #[serde(default)]
+    pub storage_fees_due: Option<String>,
+    #[serde(default)]
+    pub status_change: Option<String>,
+}
+
+/// v3 message summary (embedded in `in_msg` / `out_msgs` of each transaction). Contains
+/// enough to reconstruct a full `Message` cell without querying raw BoCs.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3MessageSummary {
+    #[serde(default)]
+    pub hash: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub destination: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub value_extra_currencies: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub fwd_fee: Option<String>,
+    #[serde(default)]
+    pub ihr_fee: Option<String>,
+    #[serde(default)]
+    pub created_lt: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub ihr_disabled: Option<bool>,
+    #[serde(default)]
+    pub bounce: Option<bool>,
+    #[serde(default)]
+    pub bounced: Option<bool>,
+    #[serde(default)]
+    pub import_fee: Option<String>,
+    #[serde(default)]
+    pub message_content: Option<V3MessageContent>,
+    #[serde(default)]
+    pub init_state: Option<V3MessageContent>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3MessageContent {
+    #[serde(default)]
+    pub hash: Option<String>,
+    #[serde(default)]
+    pub body: Option<String>,
+}
+
+/// TonCenter v3 trace envelope returned by `/api/v3/traces`.
+///
+/// Only the fields actually used by acton are deserialized. `transactions_order` lists
+/// transactions in their natural parent-first order; each entry keys into `transactions`.
+#[derive(Deserialize, Debug, Clone)]
+pub struct V3Trace {
+    pub trace_id: String,
+    pub transactions_order: Vec<String>,
+    pub transactions: HashMap<String, V3TransactionSummary>,
+    /// Set by the indexer when the trace exceeds its `MaxTraceTransactions` threshold —
+    /// in that case `transactions`/`transactions_order` are truncated and retries won't
+    /// help, so callers should bail rather than return a partial `SendResultList`.
+    #[serde(default)]
+    pub is_incomplete: bool,
+}
+
+impl TonApiClient {
+    /// Fetch traces that include a message with the given hash using toncenter v3.
+    ///
+    /// `msg_hash` is accepted in hex, base64, or base64url form. A transaction may be part
+    /// of at most one trace, so callers typically want the first (or only) result. Pass
+    /// the TEP-467 `hash_norm` from `sendBocReturnHash` to avoid indexer false-misses on
+    /// cell-layout variations.
+    pub fn get_traces_by_msg_hash(
+        &self,
+        msg_hash: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<V3Trace>> {
+        let url = format!(
+            "{}/traces",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+
+        let params: Vec<(&str, String)> = vec![
+            ("msg_hash", msg_hash.to_owned()),
+            ("limit", limit.to_string()),
+        ];
+
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(&params),
+            "Failed to send traces request",
+        )?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "TonCenter v3 traces returned status: {}",
+                response.status()
+            ));
+        }
+
+        #[derive(Deserialize)]
+        struct Resp {
+            traces: Vec<V3Trace>,
+        }
+
+        let data: Resp = response.json().context("Failed to parse traces response")?;
+        Ok(data.traces)
+    }
 }
 
 fn should_disable_system_proxy() -> bool {

@@ -5,6 +5,7 @@ const DK_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 "#;
 
@@ -42,7 +43,7 @@ get fun `test dk stdlib vm config unpacked after root dict mutation`() {
     storagePrices.setInitial(updatedStorage);
     config.setStoragePrices(storagePrices);
 
-    __acton_impl_setConfigParam(config.toLowLevelDict(), 9);
+    impl.setConfigParam(config.toLowLevelDict(), 9);
 
     val c7 = testing.getC7OutsideContract();
     val params = c7.get(0) as tuple;

@@ -5,6 +5,7 @@ mod integration;
 #[cfg(test)]
 mod support;
 
+use acton_config::schema::{ACTON_SCHEMA_JSON, MUTATION_RULES_SCHEMA_JSON};
 use common::ActonCommandExt;
 use std::{fs, process::Command};
 
@@ -269,8 +270,8 @@ fn test_commands_index_links_all_documented_command_pages() {
         .expect("failed to read commands meta.json");
     let meta: CommandsMeta =
         serde_json::from_str(&meta).expect("failed to parse commands meta.json");
-    let index = fs::read_to_string("docs/content/docs/commands/index.mdx")
-        .expect("failed to read commands index.mdx");
+    let index = fs::read_to_string("docs/content/docs/commands/overview.mdx")
+        .expect("failed to read commands overview.mdx");
 
     for page in meta.pages {
         let href = format!("href=\"/docs/commands/{page}\"");
@@ -279,4 +280,47 @@ fn test_commands_index_links_all_documented_command_pages() {
             "commands index is missing a card for {page} ({href})"
         );
     }
+}
+
+#[test]
+fn test_acton_meta_get_schema_prints_embedded_schema() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let output = Command::new(common::acton_exe())
+        .args(["meta", "get-schema"])
+        .current_dir(temp_dir.path())
+        .output()
+        .unwrap_or_else(|err| panic!("failed to run acton meta get-schema: {err}"));
+
+    assert!(
+        output.status.success(),
+        "acton meta get-schema failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    assert_eq!(String::from_utf8_lossy(&output.stdout), ACTON_SCHEMA_JSON);
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+}
+
+#[test]
+fn test_acton_meta_get_schema_prints_mutation_rules_schema() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let output = Command::new(common::acton_exe())
+        .args(["meta", "get-schema", "mutation-rules"])
+        .current_dir(temp_dir.path())
+        .output()
+        .unwrap_or_else(|err| panic!("failed to run acton meta get-schema mutation-rules: {err}"));
+
+    assert!(
+        output.status.success(),
+        "acton meta get-schema mutation-rules failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        MUTATION_RULES_SCHEMA_JSON
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
 }

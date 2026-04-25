@@ -17,8 +17,14 @@ static COUNTER_APP_TEMPLATE_DIR: Dir<'static> =
 static JETTON_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/jetton");
 
+static JETTON_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/jetton-app");
+
 static NFT_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft");
+
+static NFT_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft-app");
 
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
 const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
@@ -73,6 +79,7 @@ pub(super) struct ContractTemplate {
     pub id: &'static str,
     pub name: &'static str,
     pub src: &'static str,
+    pub depends: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -138,18 +145,21 @@ const EMPTY_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
     id: "Empty",
     name: "Empty",
     src: "contracts/Empty.tolk",
+    depends: &[],
 }];
 
 const COUNTER_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
     id: "Counter",
     name: "Counter",
     src: "contracts/Counter.tolk",
+    depends: &[],
 }];
 
 const COUNTER_APP_CONTRACTS: [ContractTemplate; 1] = [ContractTemplate {
     id: "Counter",
     name: "Counter",
     src: "contracts/src/Counter.tolk",
+    depends: &[],
 }];
 
 const JETTON_CONTRACTS: [ContractTemplate; 2] = [
@@ -157,11 +167,28 @@ const JETTON_CONTRACTS: [ContractTemplate; 2] = [
         id: "JettonMinter",
         name: "JettonMinter",
         src: "contracts/JettonMinter.tolk",
+        depends: &["JettonWallet"],
     },
     ContractTemplate {
         id: "JettonWallet",
         name: "JettonWallet",
         src: "contracts/JettonWallet.tolk",
+        depends: &[],
+    },
+];
+
+const JETTON_APP_CONTRACTS: [ContractTemplate; 2] = [
+    ContractTemplate {
+        id: "JettonMinter",
+        name: "JettonMinter",
+        src: "contracts/src/JettonMinter.tolk",
+        depends: &["JettonWallet"],
+    },
+    ContractTemplate {
+        id: "JettonWallet",
+        name: "JettonWallet",
+        src: "contracts/src/JettonWallet.tolk",
+        depends: &[],
     },
 ];
 
@@ -170,11 +197,28 @@ const NFT_CONTRACTS: [ContractTemplate; 2] = [
         id: "NftCollection",
         name: "NftCollection",
         src: "contracts/NftCollection.tolk",
+        depends: &[],
     },
     ContractTemplate {
         id: "NftItem",
         name: "NftItem",
         src: "contracts/NftItem.tolk",
+        depends: &[],
+    },
+];
+
+const NFT_APP_CONTRACTS: [ContractTemplate; 2] = [
+    ContractTemplate {
+        id: "NftCollection",
+        name: "NftCollection",
+        src: "contracts/src/NftCollection.tolk",
+        depends: &[],
+    },
+    ContractTemplate {
+        id: "NftItem",
+        name: "NftItem",
+        src: "contracts/src/NftItem.tolk",
+        depends: &[],
     },
 ];
 
@@ -206,11 +250,25 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     deploy_script: "scripts/deploy.tolk",
 };
 
+const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    dir: &JETTON_APP_TEMPLATE_DIR,
+    layout: ProjectLayout::App,
+    contracts: &JETTON_APP_CONTRACTS,
+    deploy_script: "contracts/scripts/deploy.tolk",
+};
+
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     dir: &NFT_TEMPLATE_DIR,
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deployCollection.tolk",
+};
+
+const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    dir: &NFT_APP_TEMPLATE_DIR,
+    layout: ProjectLayout::App,
+    contracts: &NFT_APP_CONTRACTS,
+    deploy_script: "contracts/scripts/deployCollection.tolk",
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -261,12 +319,12 @@ const COUNTER_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
 
 const JETTON_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     default_scaffold: JETTON_SCAFFOLD,
-    app_scaffold: None,
+    app_scaffold: Some(JETTON_APP_SCAFFOLD),
 };
 
 const NFT_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     default_scaffold: NFT_SCAFFOLD,
-    app_scaffold: None,
+    app_scaffold: Some(NFT_APP_SCAFFOLD),
 };
 
 const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefinition {

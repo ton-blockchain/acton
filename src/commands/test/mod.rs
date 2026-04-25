@@ -17,7 +17,7 @@ use crate::commands::test::reporting::{
 };
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
-    EmulationsState, Env, IoContext, KnownAddresses,
+    DebugStopRequested, EmulationsState, Env, IoContext, KnownAddresses, is_debug_stop_requested,
 };
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
@@ -391,7 +391,9 @@ impl<'a> TestRunner<'a> {
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);
 
-                ctx.debug.process_incoming_requests(true)?;
+                if ctx.debug.process_incoming_requests(true)? {
+                    return Err(DebugStopRequested.into());
+                }
 
                 let get_result = executor.finish(&params.code)?;
 
@@ -637,6 +639,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 total_failed += stats.failed;
                 total_skipped += stats.skipped;
                 total_todo += stats.todo;
+
+                if stats.stopped {
+                    break;
+                }
 
                 if index + 1 < test_files.len()
                     && config.report_formats.contains(&ReportFormat::Console)
@@ -938,6 +944,7 @@ struct TestStats {
     failed: usize,
     skipped: usize,
     todo: usize,
+    stopped: bool,
 }
 
 fn compile_test_file(
@@ -1083,6 +1090,7 @@ fn run_file_tests(
     let mut failed = 0;
     let mut skipped = 0;
     let mut todo = 0;
+    let mut stopped = false;
     let mappings = runner.acton_config.mappings();
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
@@ -1118,7 +1126,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
-            test_report.details = test.todo_description.clone();
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
@@ -1126,6 +1134,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
@@ -1154,6 +1163,15 @@ fn run_file_tests(
         );
         let result = match result {
             Ok(result) => result,
+            Err(err) if is_debug_stop_requested(&err) => {
+                test_report.status = TestStatus::Skipped;
+                test_report.details = Some("Debug session stopped".to_string());
+                test_report.duration = start_time.elapsed();
+                runner.reporter_manager.on_test_finished(&test_report)?;
+                skipped += 1;
+                stopped = true;
+                break;
+            }
             Err(err) => {
                 test_report.status = TestStatus::Failed;
                 test_report.message = Some(format!("Cannot execute test '{}': {err}", test.name));
@@ -1343,6 +1361,7 @@ fn run_file_tests(
         failed,
         skipped,
         todo,
+        stopped,
     })
 }
 
@@ -1384,7 +1403,7 @@ pub struct TestDescriptor {
     fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
-    pub todo_description: Option<String>,
+    pub status_description: Option<String>,
     pub declared_parameter_count: usize,
     parameters: Vec<FuzzParameter>,
     pub pos: Pos,
@@ -1417,7 +1436,7 @@ fn find_all_test(
                     fuzz: test_annotations.fuzz,
                     expected_exit_code: test_annotations.expected_exit_code,
                     gas_limit: test_annotations.gas_limit,
-                    todo_description: test_annotations.todo_description,
+                    status_description: test_annotations.status_description,
                     declared_parameter_count,
                     parameters: Vec::new(),
                     pos: Pos {

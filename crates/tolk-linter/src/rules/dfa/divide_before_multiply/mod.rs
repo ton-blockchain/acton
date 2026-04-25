@@ -14,9 +14,10 @@ pub mod analysis;
 /// and can produce unintended results in subsequent multiplication.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main(a: int, b: int, c: int): int {
 ///     return a / b * c;
+///     //     ^^^^^^^^^ E025: division before multiplication may cause precision loss
 /// }
 /// ```
 ///

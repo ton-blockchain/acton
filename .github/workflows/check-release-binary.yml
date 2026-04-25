@@ -59,6 +59,7 @@ jobs:
       - name: Check Acton target binary
         shell: bash
         working-directory: ${{ runner.temp }}
+        # language=Bash
         run: |
           python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
             --binary "${PWD}/acton-bin/acton" \

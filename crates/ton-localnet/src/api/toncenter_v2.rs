@@ -268,10 +268,19 @@ pub fn map_send_boc_return_hash(bt: &LocalnetBlockTransactions) -> Value {
         .as_ref()
         .map(super::super::types::Hash256::to_base64)
         .unwrap_or_default();
-    serde_json::json!({
+    let mut mapped = serde_json::json!({
         "@type": "ok",
         "hash": msg_hash
-    })
+    });
+    if let Some(hash_norm) = bt
+        .msg_hash_norm
+        .as_ref()
+        .map(super::super::types::Hash256::to_base64)
+        && let Some(root) = mapped.as_object_mut()
+    {
+        root.insert("hash_norm".to_string(), Value::String(hash_norm));
+    }
+    mapped
 }
 
 #[must_use]

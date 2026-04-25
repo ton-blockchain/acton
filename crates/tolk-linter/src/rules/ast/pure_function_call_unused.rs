@@ -15,12 +15,13 @@ use tolk_ty::InferenceResult;
 /// `@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// @pure
 /// fun add(a: int, b: int): int { return a + b; }
 ///
 /// fun main() {
-///     add(1, 2); // Warning: result of @pure function is not used
+///     add(1, 2);
+/// //  ^^^^^^^^^ E007: result of pure function is not used
 /// }
 /// ```
 #[derive(ViolationMetadata)]

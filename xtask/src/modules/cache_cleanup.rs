@@ -105,13 +105,16 @@ where
         println!("Deleted {}  {}  {}", entry.id, entry.branch, entry.key);
     }
 
-    let deleted_size = to_delete.iter().map(|entry| entry.size).sum::<u64>();
+    let deleted_size = total_entries_size(&to_delete);
+    let kept_size = total_entries_size(&to_keep);
+    let total_cache_size = deleted_size + kept_size;
 
     println!();
     println!(
-        "Deleted {} cache entries, freed {}, kept {}.",
+        "Deleted {} cache entries, freed {} of {} total, kept {}.",
         to_delete.len(),
         human_size(deleted_size),
+        human_size(total_cache_size),
         to_keep.len()
     );
 
@@ -150,12 +153,15 @@ fn print_prune_plan(
         to_delete,
     );
 
-    let delete_size = to_delete.iter().map(|entry| entry.size).sum::<u64>();
-    let keep_size = to_keep.iter().map(|entry| entry.size).sum::<u64>();
+    let delete_size = total_entries_size(to_delete);
+    let keep_size = total_entries_size(to_keep);
+    let total_cache_size = delete_size + keep_size;
 
     println!();
     println!(
-        "Summary: keep {} cache entries ({}), delete {} cache entries ({}).",
+        "Summary: found {} cache entries ({} total), keep {} cache entries ({}), delete {} cache entries ({}).",
+        to_keep.len() + to_delete.len(),
+        human_size(total_cache_size),
         to_keep.len(),
         human_size(keep_size),
         to_delete.len(),
@@ -281,4 +287,8 @@ fn human_size(bytes: u64) -> String {
     }
 
     format!("{value:.1} {}", UNITS[unit_index])
+}
+
+fn total_entries_size(entries: &[ActionsCacheEntry]) -> u64 {
+    entries.iter().map(|entry| entry.size).sum()
 }

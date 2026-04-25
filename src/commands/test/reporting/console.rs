@@ -187,12 +187,23 @@ impl TestReporter for ConsoleReporter {
         }
 
         if test.status == TestStatus::Skipped {
-            println!(
-                "  {} {} {}",
-                "○".dimmed(),
-                beautified_name,
-                "skipped".dimmed()
-            );
+            if let Some(description) = test.details.as_deref() {
+                println!(
+                    "  {} {} {}{}{}",
+                    "○".dimmed(),
+                    beautified_name,
+                    "[".dimmed(),
+                    description.dimmed(),
+                    "]".dimmed()
+                );
+            } else {
+                println!(
+                    "  {} {} {}",
+                    "○".dimmed(),
+                    beautified_name,
+                    "skipped".dimmed()
+                );
+            }
         }
 
         if test.status == TestStatus::Todo {
@@ -428,6 +439,11 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
 
         println!("        Actual:   {}", left.red());
         println!("        Expected: {}", right.green());
+    }
+
+    if let AssertFailure::Decimal(failure) = &failure {
+        println!("        Actual:   {}", failure.left.red());
+        println!("        Expected: {}", failure.right.green());
     }
 
     if let AssertFailure::TransactionNotFound(failure) = &failure {

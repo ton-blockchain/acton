@@ -11,6 +11,7 @@
 
 import "_impl_emul"
 import "../ffi"
+import "../impl"
 import "config"
 import "network"
 import "../testing/assert"
@@ -29,7 +30,7 @@ fun testing.setC7OutsideContract(c7: tuple): void
     asm "c7 POPCTR"
 
 /// Generic helper to overwrite a single config parameter.
-fun __acton_impl_setConfigParam<T>(value: T, index: int): void {
+fun impl.setConfigParam<T>(value: T, index: int): void {
     var c7 = testing.getC7OutsideContract();
     var params = c7.get(0) as tuple;
     params.set(value, index);
@@ -166,7 +167,7 @@ fun testing.treasury(name: string): Treasury {
     }
 
     val stateInit: ContractState = {
-        code: __acton_impl_treasuryCode(),
+        code: impl.treasuryCode(),
         data: beginCell().storeSlice(name.beginParse()).endCell(),
     };
 
@@ -184,7 +185,7 @@ fun testing.treasury(name: string): Treasury {
     return Treasury { address };
 }
 
-fun __acton_impl_treasuryCode(): cell asm """
+fun impl.treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
@@ -204,7 +205,7 @@ fun __acton_impl_treasuryCode(): cell asm """
 /// }
 /// ```
 fun testing.getAccountState(addr: address): TlbAccountInfo? {
-    return __acton_impl_getAccountState(addr)
+    return impl.getAccountState(addr)
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -219,7 +220,7 @@ fun testing.getAccountState(addr: address): TlbAccountInfo? {
 /// }
 /// ```
 fun testing.getAccountStorageFee(addr: address, seconds: int): coins? {
-    return __acton_impl_getAccountStorageFee(addr, seconds);
+    return impl.getAccountStorageFee(addr, seconds);
 }
 
 /// Set the current Unix timestamp for time forwarding emulation.
@@ -241,7 +242,7 @@ fun testing.getAccountStorageFee(addr: address, seconds: int): coins? {
 /// ```
 fun testing.setNow(now: uint32): void {
     // Update C7[0][3] (unixtime) FIRST so blockchain.now() stays in sync
-    __acton_impl_setConfigParam(now, 3);
+    impl.setConfigParam(now, 3);
     // Then update the WorldState time for tick-tock transactions
     ffi.setNow(now);
 }
@@ -292,7 +293,7 @@ fun testing.topUp(to: address, amount: coins): void {
 /// println("{:ton}", balance);
 /// ```
 fun testing.getAccountBalance(of: address): coins {
-    return __acton_impl_getAccountBalance(of);
+    return impl.getAccountBalance(of);
 }
 
 /// Returns the shard account state for an address.
@@ -307,7 +308,7 @@ fun testing.getAccountBalance(of: address): coins {
 /// }
 /// ```
 fun testing.getShardAccount(addr: address): TlbShardAccount? {
-    return __acton_impl_getShardAccount(addr);
+    return impl.getShardAccount(addr);
 }
 
 /// Sets the shard account state for an address in emulation.
@@ -513,7 +514,7 @@ fun testing.isDeployed(addr: address): bool {
 /// println(outActions.size());
 /// ```
 fun testing.outActions(): OutActionList {
-    return __acton_impl_parseOutActions(__acton_impl_getC5());
+    return impl.parseOutActions(impl.getC5());
 }
 
 

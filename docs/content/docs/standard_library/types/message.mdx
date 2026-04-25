@@ -57,7 +57,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L41" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L42" />
 
 ## `TlbMessageRelaxedGeneric.loadOpcode`
 
@@ -68,12 +68,13 @@ fun TlbMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int?
 Loads the opcode of the message.
 
 Returns `null` for malformed or too-short body data:
+- body does not contain the `TlbEither` branch bit;
 - body marks `TlbEitherRight` but does not contain a body reference;
 - decoded body has fewer than 32 bits for the first opcode;
-- [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
-  for the second opcode.
+- [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
+  and fewer than 32 bits remain for the second opcode.
 
-If [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, the `0xFFFFFFFF` prefix is skipped.
+If [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped.
 
 Example:
 ```tolk
@@ -86,7 +87,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L67" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L69" />
 
 ## `TlbExtMessageRelaxedGeneric`
 
@@ -102,7 +103,7 @@ Represents a generic external message. Unlike [TlbExtMessageRelaxed](#tlbextmess
 load the body of the message. Instead body is represented as a slice and can be parsed
 later manually (for example to load the opcode).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L74" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L76" />
 
 ## `TlbExtMessageRelaxedGeneric.loadOpcode`
 
@@ -114,10 +115,10 @@ Loads the opcode of the message.
 
 Same behavior as [TlbMessageRelaxedGeneric.loadOpcode](#tlbmessagerelaxedgenericloadopcode):
 - returns the first 32-bit opcode by default;
-- if [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, the `0xFFFFFFFF` prefix is skipped;
+- if [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped;
 - returns `null` for malformed or too-short body data.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L86" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L88" />
 
 ## `TlbMessageRelaxed`
 
@@ -146,7 +147,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L105" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L107" />
 
 ## `TlbMessageRelaxed<X>.loadBody`
 
@@ -173,7 +174,7 @@ if (action is TlbOutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L130" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L132" />
 
 ## `TlbExtMessageRelaxed`
 
@@ -191,7 +192,7 @@ loads the body of the message with passed type.
 
 If actual message body has a different type, loading will fail with exit code 63.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L141" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L143" />
 
 ## `TlbExtMessageRelaxed<X>.loadBody`
 
@@ -207,7 +208,7 @@ Decoding branch behavior:
 
 Note that if message type mismatch, loading will fail with exit code 63.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L155" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L157" />
 
 ## `TlbIntMsgInfoRelaxed`
 
@@ -228,7 +229,7 @@ struct (0b0) TlbIntMsgInfoRelaxed {
 
 Represents common message info for internal relaxed message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L163" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L165" />
 
 ## `TlbExtMsgInfoRelaxed`
 
@@ -243,7 +244,7 @@ struct (0b11) TlbExtMsgInfoRelaxed {
 
 Represents common message info for external relaxed message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L177" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L179" />
 
 ## `TlbCurrencyCollection`
 
@@ -258,7 +259,7 @@ struct TlbCurrencyCollection {
 
 Represents a currency collection as TON amount + extra currencies.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L185" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L187" />
 
 ## `TlbInternalMessage`
 
@@ -284,7 +285,7 @@ int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
                created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L198" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L200" />
 
 ## `TlbExternalInMessageInfo`
 
@@ -301,7 +302,7 @@ ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
                    import_fee:Grams = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L215" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L217" />
 
 ## `TlbExternalOutMessageInfo`
 
@@ -319,7 +320,7 @@ ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
                     created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L225" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L227" />
 
 ## `TlbCommonMessageInfo`
 
@@ -334,7 +335,7 @@ Runtime variant is selected by the leading tag:
 - `0b10`: [TlbExternalInMessageInfo](#tlbexternalinmessageinfo)
 - `0b11`: [TlbExternalOutMessageInfo](#tlbexternaloutmessageinfo)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L238" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L240" />
 
 ## `TlbMessage`
 
@@ -352,7 +353,7 @@ Generic message structure with configurable body and info types.
 `TInfo` defaults to [TlbCommonMessageInfo](#tlbcommonmessageinfo), so when [TlbMessage](#tlbmessage) is loaded with default generic
 arguments, `info` is decoded as one of the `CommonMsgInfo` tagged variants above.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L244" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L246" />
 
 ## `TlbMessage<TBody, TInfo>.loadBody`
 
@@ -366,5 +367,5 @@ Decoding branch behavior:
 - `TlbEitherLeft`: body is already in this cell and is returned directly.
 - `TlbEitherRight`: body is loaded from referenced cell.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L256" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L258" />
 

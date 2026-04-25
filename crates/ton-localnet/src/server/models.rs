@@ -118,7 +118,8 @@ pub struct FaucetRequest {
 
 #[derive(Deserialize)]
 pub struct GetTracesQuery {
-    pub hash: String,
+    pub hash: Option<String>,
+    pub msg_hash: Option<String>,
 }
 
 #[derive(Deserialize)]

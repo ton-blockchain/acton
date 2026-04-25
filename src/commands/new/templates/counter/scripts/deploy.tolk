@@ -2,8 +2,7 @@ import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@contracts/types"
-
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 
 fun main() {
     val deployer = scripts.wallet("deployer");
@@ -13,7 +12,7 @@ fun main() {
         counter: 0,
     });
     val res = counter.deploy(deployer.address, { value: ton("0.005") });
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 

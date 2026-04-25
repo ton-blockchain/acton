@@ -41,10 +41,6 @@ Install the latest stable release.
 Install the selected release even if Acton is already up to date.
 {{/option}}
 
-{{#option "`-y`, `--yes`" }}
-Skip confirmation prompts.
-{{/option}}
-
 {{#option "`--list`" }}
 List available release tags and exit.
 {{/option}}
@@ -80,22 +76,9 @@ When installing a release, Acton:
 
 `acton up --list` is read-only and skips download or replacement.
 
-## Homebrew Installations
-
-If the current binary path looks like a Homebrew installation, Acton warns and
-recommends using:
-
-```bash
-brew upgrade acton
-```
-
-Without `--yes`, Acton asks whether to continue with the built-in updater.
-
 ## Interactivity
 
 - `--force` bypasses the usual up-to-date short-circuit for the selected release
-- `--yes` suppresses confirmation prompts for non-interactive use
-- Homebrew-style installs prompt before replacement unless `--yes` is passed
 - up-to-date checks and `--list` can succeed without making local changes
 
 ## Channel Selection
@@ -111,8 +94,8 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
 
 - `0`: The requested release information was listed, Acton was already up to
   date, or the selected version was installed successfully.
-- `1`: Release lookup failed, checksum verification failed, archive replacement
-  failed, or the update was cancelled or could not be confirmed.
+- `1`: Release lookup failed, checksum verification failed, or archive
+  replacement failed.
 
 ## Examples
 
@@ -146,10 +129,10 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
    acton up --force
    ```
 
-6. Update non-interactively in CI or bootstrap scripts:
+6. Update to the latest stable release explicitly:
 
    ```bash
-   acton up --stable -y
+   acton up --stable
    ```
 
 ## See Also

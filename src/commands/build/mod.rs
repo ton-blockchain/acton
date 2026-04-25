@@ -83,7 +83,7 @@ display-name = \"MyContract\"
 src = \"contracts/MyContract.tolk\"
 depends = []
 
-See https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
+See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-section for more information"
                 );
         return Ok(());
     };

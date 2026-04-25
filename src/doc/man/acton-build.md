@@ -153,5 +153,5 @@ built successfully, the successful artifacts remain on disk.
 ## See Also
 
 - `acton help wrapper`
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)
 - [Acton.toml reference](https://ton-blockchain.github.io/acton/docs/acton-toml)

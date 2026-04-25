@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (2 tests)
+  ○ skip described [Waiting for parser cleanup]
+  ✓ not skipped [TIME]
+
+ ✓ 1 passed, ○ 1 skipped in 1 file

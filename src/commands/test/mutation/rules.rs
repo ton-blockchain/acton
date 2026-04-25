@@ -1,6 +1,9 @@
+use acton_config::mutation_rules::{
+    CustomMutationEdit, CustomMutationMatcher, CustomMutationRule, CustomMutationRulesFile,
+};
+use acton_config::test::MutationLevel;
 use anyhow::Context;
 use path_absolutize::Absolutize;
-use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -603,24 +606,6 @@ pub(super) enum MutationEdit {
     Replace { replacement: String },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(super) enum MutationLevel {
-    Critical,
-    Major,
-    Minor,
-}
-
-impl MutationLevel {
-    pub(crate) const fn label(self) -> &'static str {
-        match self {
-            MutationLevel::Critical => "critical",
-            MutationLevel::Major => "major",
-            MutationLevel::Minor => "minor",
-        }
-    }
-}
-
 pub(super) type NodePredicate = for<'a> fn(Node<'a>, &str) -> anyhow::Result<bool>;
 
 #[derive(Clone, Debug)]
@@ -688,46 +673,6 @@ impl MutationRule {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum MutationRulesFile {
-    Bare(Vec<CustomMutationRule>),
-    Wrapped { rules: Vec<CustomMutationRule> },
-}
-
-impl MutationRulesFile {
-    fn into_rules(self) -> Vec<CustomMutationRule> {
-        match self {
-            Self::Bare(rules) | Self::Wrapped { rules } => rules,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct CustomMutationRule {
-    name: String,
-    description: String,
-    explanation: String,
-    level: MutationLevel,
-    group: String,
-    matcher: CustomMutationMatcher,
-    edit: CustomMutationEdit,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum CustomMutationMatcher {
-    Query { query: String, capture: String },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum CustomMutationEdit {
-    Remove,
-    Replace { replacement: String },
-}
-
 impl From<CustomMutationRule> for MutationRule {
     fn from(rule: CustomMutationRule) -> Self {
         let matcher = match rule.matcher {
@@ -767,12 +712,13 @@ pub(super) fn load_custom_rules(
             resolved_path.display()
         )
     })?;
-    let file: MutationRulesFile = serde_json::from_str(&file_contents).with_context(|| {
-        format!(
-            "Failed to parse custom mutation rules file '{}' as JSON",
-            resolved_path.display()
-        )
-    })?;
+    let file: CustomMutationRulesFile =
+        serde_json::from_str(&file_contents).with_context(|| {
+            format!(
+                "Failed to parse custom mutation rules file '{}' as JSON",
+                resolved_path.display()
+            )
+        })?;
 
     let custom_rules = file.into_rules();
     let mut seen_names = HashSet::new();

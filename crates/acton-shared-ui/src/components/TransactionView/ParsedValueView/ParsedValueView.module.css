@@ -1,0 +1,119 @@
+.parsedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.parsedBadge {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: var(--border-radius-full);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary-color);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.parsedTypeLabel {
+  align-self: flex-start;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: var(--font-weight-medium);
+}
+
+.parsedNested {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--spacing-sm);
+  grid-auto-rows: minmax(25px, auto);
+  row-gap: var(--spacing-xs);
+  min-width: 0;
+  padding-left: var(--spacing-mds);
+  padding-bottom: var(--spacing-mds);
+  border-left: 1px solid var(--border-color);
+}
+
+.parsedNestedMap {
+  grid-template-columns: 800px;
+  column-gap: 0;
+}
+
+.parsedEntryKey {
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: left;
+  align-self: center;
+}
+
+.parsedEntryValue {
+  min-width: 0;
+  align-self: center;
+}
+
+.parsedScalar {
+  font-family: var(--font-mono), monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.parsedPlainScalar,
+.parsedNull,
+.parsedEmpty {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.parsedNull,
+.parsedEmpty {
+  color: var(--text-muted);
+}
+
+.parsedMapEntry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-secondary-color);
+}
+
+.parsedMapSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.parsedMapSectionLabel {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.parsedMapSectionValue {
+  min-width: 0;
+}
+
+.booleanTrue {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-passed);
+  font-size: var(--font-size-sm);
+}
+
+.booleanFalse {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-failed);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .parsedEntryKey {
+    white-space: normal;
+    text-align: left;
+  }
+}

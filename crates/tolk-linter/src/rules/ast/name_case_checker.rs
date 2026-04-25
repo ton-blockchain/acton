@@ -20,14 +20,18 @@ use tolk_ty::GlobalUsages;
 /// - `SCREAMING_SNAKE_CASE` for constants
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct low_struct {
+/// //     ^^^^^^^^^^ S001: name should be in the expected case
 ///     TheBad: int
+/// //  ^^^^^^ S001: name should be in the expected case
 /// }
 ///
 /// const iAmConst_variable = 1
+/// //    ^^^^^^^^^^^^^^^^^ S001: name should be in the expected case
 ///
 /// fun BadFunctionName() {}
+/// //  ^^^^^^^^^^^^^^^ S001: name should be in the expected case
 /// ```
 ///
 /// Use instead:

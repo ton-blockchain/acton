@@ -8,6 +8,7 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
             "prompt_wrappers",
             r#"
             import "../../lib/prompts"
+            import "../../lib/fmt"
             import "../../lib/testing/expect"
 
             get fun `test prompt select confirm fallbacks`() {
@@ -15,6 +16,10 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
                 expect(prompt("Enter your name:", "type your name", "John")).toEqual("John");
                 expect(select("Choose network:", ["Mainnet", "Testnet", "Local"])).toEqual("");
                 expect(confirm("Proceed with deployment?", false, "Safe default should be false.")).toEqual(false);
+                expect(promptInt("Enter retry count:", "42")).toEqual(42);
+
+                val defaultAddress = parseAddress("0:0000000000000000000000000000000000000000000000000000000000000000");
+                expect(promptAddress("Enter recipient:", defaultAddress)).toEqual(defaultAddress);
             }
         "#,
         )
@@ -27,6 +32,58 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/prompts_return_deterministic_fallbacks_in_non_interactive_runner/prompts_return_deterministic_fallbacks_in_non_interactive_runner.stdout.txt",
         );
+}
+
+#[cfg(unix)]
+#[test]
+fn prompt_int_and_address_validate_interactive_input_until_corrected() {
+    use expectrl::Eof;
+    use std::time::Duration;
+
+    let project = ProjectBuilder::new("stdlib-prompts-typed-validation")
+        .script_file(
+            "typed_prompts",
+            r#"
+            import "../../lib/prompts"
+            import "../../lib/io"
+
+            fun main() {
+                val count = promptInt("Enter retry count", "1");
+                println("count={}", count);
+
+                val recipient = promptAddress("Enter recipient");
+                println("recipient={}", recipient);
+            }
+        "#,
+        )
+        .build();
+
+    let mut session = project
+        .acton()
+        .script("scripts/typed_prompts.tolk")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(10)));
+
+    session.expect("Enter retry count");
+    session.send_line("abc", "failed to send invalid integer");
+    session.expect("Enter a valid integer");
+    session
+        .send("\x7f\x7f\x7f7\n")
+        .expect("failed to correct integer");
+    session.expect("count=7");
+
+    session.expect("Enter recipient");
+    session.send_line("not-an-address", "failed to send invalid address");
+    session.expect("Enter a valid TON address");
+    let corrected_address = "0:0000000000000000000000000000000000000000000000000000000000000000";
+    session
+        .send(format!(
+            "{}{corrected_address}\n",
+            "\x7f".repeat("not-an-address".len())
+        ))
+        .expect("failed to correct address");
+    session.expect("recipient=");
+    session.expect(Eof);
 }
 
 #[test]

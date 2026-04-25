@@ -86,13 +86,16 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 
 /// Parse a decimal string into an int value.
 ///
-/// Accepts optional leading `-` sign followed by decimal digits.
-/// Invalid input (non-numeric characters, empty string) fails with an error.
+/// Leading and trailing whitespace is ignored before parsing.
+/// After trimming, accepts optional leading `-` sign followed by decimal digits.
+/// Invalid input (non-numeric characters, empty string, whitespace-only string)
+/// fails with an error.
 ///
 /// Example:
 /// ```tolk
 /// val n = parseInt("12345");
 /// val negative = parseInt("-42");
+/// val withWhitespace = parseInt(" 42 ");
 /// ```
 fun parseInt(x: string): int {
     val n = ffi.parseInt(x);

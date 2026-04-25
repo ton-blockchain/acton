@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CJ_OUT_ACTIONS_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
 
@@ -36,7 +37,7 @@ get fun `test cj parse out actions preserves kinds`() {
     changeLib(beginCell().storeUint(0xAB, 8).endCell(), 2);
 
     val viaVm = testing.outActions();
-    val viaRaw = __acton_impl_parseOutActions(__acton_impl_getC5());
+    val viaRaw = impl.parseOutActions(impl.getC5());
 
     expect(viaVm.size()).toEqual(2);
     expect(viaRaw.size()).toEqual(2);

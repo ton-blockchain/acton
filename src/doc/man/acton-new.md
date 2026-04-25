@@ -143,7 +143,7 @@ When `acton new --template counter --app` is used, the project includes:
 - `contracts/src` for contract sources and shared Tolk types
 - `contracts/tests` for tests and generated Tolk wrappers
 - `contracts/scripts` for deployment and utility scripts
-- `wrapper-ts/` for the generated TypeScript wrapper used by the app
+- `wrappers-ts/` for the generated TypeScript wrapper used by the app
 - `app/` for the React + Vite frontend
 - top-level `package.json` and `package-lock.json` for the frontend toolchain
 
@@ -219,5 +219,5 @@ The command does not create a commit and does not modify parent directories.
 ## See Also
 
 - `acton help init`
-- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/tutorial/project-init)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

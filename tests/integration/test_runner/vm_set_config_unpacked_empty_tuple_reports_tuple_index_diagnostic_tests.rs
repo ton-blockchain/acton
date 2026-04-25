@@ -11,6 +11,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const DL_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 "#;
 
@@ -36,7 +37,7 @@ fn vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic() {
         "dl-stdlib-vm-set-config-unpacked-empty-tuple-diagnostic",
         r"
 get fun `test dl vm set config unpacked empty tuple diagnostic`() {
-    __acton_impl_setConfigParam([], 14);
+    impl.setConfigParam([], 14);
 
     var config = testing.getConfig();
     val applied = testing.setConfig(config);
@@ -56,7 +57,7 @@ fn vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fi
 get fun `test dl vm set config unpacked single item tuple diagnostic`() {{
     var malformed = [];
     malformed.push(1);
-    __acton_impl_setConfigParam(malformed, 14);
+    impl.setConfigParam(malformed, 14);
 
     var config = testing.getConfig();
     val applied = testing.setConfig(config);

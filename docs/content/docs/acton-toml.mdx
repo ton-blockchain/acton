@@ -1,5 +1,5 @@
 ---
-title: Acton Manifest
+title: Acton.toml
 description: Detailed reference for the Acton.toml configuration file
 icon: FileText
 ---
@@ -171,7 +171,7 @@ generate-test = true
 test-output-dir = "tests"
 
 [wrappers.typescript]
-output-dir = "app/src/wrapper-ts"
+output-dir = "app/src/wrappers-ts"
 ```
 
 Override rules:
@@ -294,7 +294,7 @@ Per-test annotations can override individual values with
 
 The `[test.mutation]` subsection configures default filters for
 `acton test --mutate`. Available rule IDs are documented in
-[Mutation Rules](/docs/test-runner/mutation-testing/rules).
+[Mutation Rules](/docs/testing/mutation-testing/rules).
 
 | Field             | Type       | Description                                                       |
 |:------------------|:-----------|:------------------------------------------------------------------|
@@ -320,6 +320,8 @@ The `[test.mutation]` subsection configures default filters for
   applied.
 - `rules-file` adds custom query-based rules from JSON. If a custom rule uses
   the same ID as a built-in rule, it overrides the built-in one.
+  Run `acton meta get-schema mutation-rules` to print the JSON schema for that
+  file format.
 
 All filters compose, and the reported mutation score reflects only the mutants
 that remain after filtering. Compile errors are excluded from the score, and
@@ -366,7 +368,7 @@ override these defaults for the current run.
 Configures the Tolk linter (`acton check`).
 
 Use `[lint]` for linter-wide settings and `[lint.rules]` for rule severities.
-For practical workflows and CI usage, see [Linting](/docs/linting).
+For practical workflows and CI usage, see [Linting](/docs/linting/overview).
 
 ### General Settings
 

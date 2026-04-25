@@ -14,12 +14,13 @@ use tolk_syntax::{AstNode, InstanceArg};
 /// It's redundant and can be simplified using the shorthand syntax.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct Foo { bar: int }
 ///
 /// fun main() {
 ///     val bar = 1;
 ///     val foo = Foo { bar: bar };
+///     //              ^^^^^^^^ E001: field initialization can be folded
 /// }
 /// ```
 ///

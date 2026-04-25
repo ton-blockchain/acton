@@ -164,8 +164,11 @@ get fun `test am transaction load body and load in msg`() {
     val inMsg = tx.loadInMsg<Ping>();
     val inBody = inMsg.loadBody();
     expect(inBody).toEqual(body);
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(workerAddress);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(workerAddress);
+    }
 }
 ",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints.stdout.txt",

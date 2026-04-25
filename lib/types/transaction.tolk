@@ -22,6 +22,7 @@
 /// ```
 
 import "message"
+import "../impl"
 import "../testing/assert"
 import "../tlb/maybe"
 
@@ -74,7 +75,7 @@ struct (0b0111) TlbTransaction {
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
-/// exit code 63.
+/// exit code 63. Internal and external-in transaction bodies are both supported.
 ///
 /// Example:
 /// ```tolk
@@ -84,7 +85,7 @@ struct (0b0111) TlbTransaction {
 /// println(body.increaseBy);
 /// ```
 fun TlbTransaction.loadBody<Msg>(self): Msg {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessage<Msg>>;
     val inMsg = inMsgCell.load();
     return inMsg.loadBody();
 }
@@ -95,9 +96,9 @@ fun TlbTransaction.loadBody<Msg>(self): Msg {
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
-/// exit code 63.
-fun TlbTransaction.loadInMsg<Msg>(self): TlbMessageRelaxed<Msg> {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
+/// exit code 63. Internal and external-in transaction messages are both supported.
+fun TlbTransaction.loadInMsg<Msg>(self): TlbMessage<Msg> {
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessage<Msg>>;
     return inMsgCell.load();
 }
 
@@ -382,7 +383,7 @@ type TlbTransactionDescr =
 
 type TlbVarUint7 = int
 
-fun __acton_impl_varUintSize(value: int, maxBytes: int): int {
+fun impl.varUintSize(value: int, maxBytes: int): int {
     if (value < 0) {
         Assert.fail("VarUInteger value must be non-negative");
     }
@@ -405,7 +406,7 @@ fun __acton_impl_varUintSize(value: int, maxBytes: int): int {
 }
 
 fun TlbVarUint7.packToBuilder(self, mutate b: builder): void {
-    val size = __acton_impl_varUintSize(self, 7);
+    val size = impl.varUintSize(self, 7);
     b.storeUint(size, 3);
     if (size > 0) {
         b.storeUint(self, size * 8);
@@ -420,7 +421,7 @@ fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
 type TlbVarUint3 = int
 
 fun TlbVarUint3.packToBuilder(self, mutate b: builder): void {
-    val size = __acton_impl_varUintSize(self, 3);
+    val size = impl.varUintSize(self, 3);
     b.storeUint(size, 2);
     if (size > 0) {
         b.storeUint(self, size * 8);

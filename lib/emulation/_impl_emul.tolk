@@ -14,8 +14,9 @@
 import "@stdlib/gas-payments"
 import "../types/transaction"
 import "../ffi"
+import "../impl"
 
-fun __acton_impl_getAccountState(addr: address): TlbAccountInfo? {
+fun impl.getAccountState(addr: address): TlbAccountInfo? {
     val cell = ffi.getAccountState(addr.toCell());
     if (cell == null) {
         return null;
@@ -24,8 +25,8 @@ fun __acton_impl_getAccountState(addr: address): TlbAccountInfo? {
     return typedCell.load();
 }
 
-fun __acton_impl_getAccountStorageFee(addr: address, seconds: int): coins? {
-    val state = __acton_impl_getAccountState(addr);
+fun impl.getAccountStorageFee(addr: address, seconds: int): coins? {
+    val state = impl.getAccountState(addr);
     if (state == null) {
         return null;
     }
@@ -33,15 +34,15 @@ fun __acton_impl_getAccountStorageFee(addr: address, seconds: int): coins? {
     return calculateStorageFee(BASECHAIN, seconds, usedStorage.bits, usedStorage.cells);
 }
 
-fun __acton_impl_getAccountBalance(of: address): coins {
-    val state = __acton_impl_getAccountState(of);
+fun impl.getAccountBalance(of: address): coins {
+    val state = impl.getAccountState(of);
     if (state == null) {
         return 0;
     }
     return state.storage.balance.grams;
 }
 
-fun __acton_impl_getShardAccount(addr: address): TlbShardAccount? {
+fun impl.getShardAccount(addr: address): TlbShardAccount? {
     val rawRes = ffi.getShardAccount(addr);
     if (rawRes == null) {
         return null;

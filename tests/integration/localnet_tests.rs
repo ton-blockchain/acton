@@ -2,15 +2,27 @@ use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
+use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
+use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
+use ton_api::Network;
 use ton_localnet::types::Hash256;
-use tycho_types::boc::Boc;
+use tycho_types::boc::{Boc, BocRepr};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
+use tycho_types::models::{
+    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, OwnedMessage, StdAddr,
+};
+use tycho_types::num::Tokens;
+use tycho_types::prelude::HashBytes;
 
 const CHILD_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -100,6 +112,7 @@ kind = "v4r2"
 workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
+const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 
 const V3_GETTER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -1156,12 +1169,17 @@ fn localnet_supports_config_endpoints() {
 #[test]
 fn localnet_supports_v3_message_endpoint() {
     let project = ProjectBuilder::new("localnet-v3-message-endpoint").build();
-    let node = project.localnet().start();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    let message_boc = build_localnet_ext_in_boc();
+    let (expected_hash, expected_hash_norm) = compute_message_hashes_base64(&message_boc);
 
     let response = node.post_json(
         "/api/v3/message",
         &json!({
-            "boc": V3_MESSAGE_TEST_BOC
+            "boc": message_boc
         }),
     );
 
@@ -1184,7 +1202,8 @@ fn localnet_supports_v3_message_endpoint() {
         "Expected non-empty message_hash in v3 message response:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
-    assert_eq!(message_hash_norm, message_hash);
+    assert_eq!(message_hash, expected_hash);
+    assert_eq!(message_hash_norm, expected_hash_norm);
 
     let (invalid_status, invalid) = node.post_json_with_status(
         "/api/v3/message",
@@ -1206,6 +1225,82 @@ fn localnet_supports_v3_message_endpoint() {
             .contains("Invalid BOC base64"),
         "Unexpected error for invalid v3 message payload:\n{}",
         serde_json::to_string_pretty(&invalid).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
+    let project = ProjectBuilder::new("localnet-send-boc-return-hash-norm").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    let message_boc = build_localnet_ext_in_boc();
+    let (expected_hash, expected_hash_norm) = compute_message_hashes_base64(&message_boc);
+
+    let response = node.post_json(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": message_boc
+        }),
+    );
+    assert!(
+        is_success_response(&response),
+        "sendBocReturnHash failed: {}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let payload = response_payload(&response);
+    let message_hash = payload["hash"]
+        .as_str()
+        .expect("sendBocReturnHash hash must be a string");
+    let message_hash_norm = payload["hash_norm"]
+        .as_str()
+        .expect("sendBocReturnHash hash_norm must be a string");
+
+    assert_eq!(message_hash, expected_hash);
+    assert_eq!(message_hash_norm, expected_hash_norm);
+
+    let normalized_hash_query = encode_query_component(message_hash_norm);
+
+    let traces = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/traces?msg_hash={normalized_hash_query}"),
+        Duration::from_secs(12),
+    );
+    let traces_payload = response_payload(&traces)["traces"]
+        .as_array()
+        .expect("v3 traces must contain a traces array");
+    assert!(
+        !traces_payload.is_empty(),
+        "Expected at least one trace for normalized msg_hash:\n{}",
+        serde_json::to_string_pretty(&traces).unwrap_or_default()
+    );
+    assert_eq!(
+        traces_payload[0]["external_hash"].as_str(),
+        Some(message_hash)
+    );
+
+    let by_msg_hash = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
+        ),
+        Duration::from_secs(12),
+    );
+    let matched = v3_transactions_from_response(&by_msg_hash);
+    assert!(
+        !matched.is_empty(),
+        "Expected transactionsByMessage to match normalized msg_hash:\n{}",
+        serde_json::to_string_pretty(&by_msg_hash).unwrap_or_default()
+    );
+    assert_eq!(
+        matched[0]["in_msg"]["hash_norm"].as_str(),
+        Some(message_hash_norm),
+        "Expected normalized hash in matched inbound message:\n{}",
+        serde_json::to_string_pretty(&by_msg_hash).unwrap_or_default()
     );
 
     node.stop();
@@ -1947,19 +2042,43 @@ fn localnet_supports_v3_account_states_endpoint() {
             "src/commands/new/templates/jetton/contracts/storage.tolk",
         )
         .file_from_path(
-            "wrappers/JettonMinter",
-            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
+            "contracts/sharding",
+            "src/commands/new/templates/jetton/contracts/sharding.tolk",
         )
         .file_from_path(
-            "wrappers/JettonWallet",
-            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
+            "wrappers/JettonMinter.gen",
+            "src/commands/new/templates/jetton/wrappers/JettonMinter.gen.tolk",
+        )
+        .file_from_path(
+            "wrappers/JettonWallet.gen",
+            "src/commands/new/templates/jetton/wrappers/JettonWallet.gen.tolk",
+        )
+        .file_from_path(
+            "wrappers/utils",
+            "src/commands/new/templates/jetton/wrappers/utils.tolk",
         )
         .file_from_path(
             "scripts/deploy",
             "src/commands/new/templates/jetton/scripts/deploy.tolk",
         )
+        .file_from_path(
+            "scripts/mint",
+            "src/commands/new/templates/jetton/scripts/mint.tolk",
+        )
+        .file_from_path(
+            "scripts/utils/common",
+            "src/commands/new/templates/jetton/scripts/utils/common.tolk",
+        )
         .build();
     project.acton().init().run().success();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let acton_toml = fs::read_to_string(&acton_toml_path).unwrap();
+    let acton_toml = acton_toml.replace(
+        "[contracts.JettonMinter]\ndisplay-name = \"JettonMinter\"\nsrc = \"contracts/JettonMinter.tolk\"\ndepends = []",
+        "[contracts.JettonMinter]\ndisplay-name = \"JettonMinter\"\nsrc = \"contracts/JettonMinter.tolk\"\ndepends = [\"JettonWallet\"]",
+    );
+    fs::write(&acton_toml_path, acton_toml).unwrap();
 
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("Failed to write wallets.toml");
@@ -1987,12 +2106,23 @@ fn localnet_supports_v3_account_states_endpoint() {
         "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
     );
 
-    let minter_address = extract_prefixed_line_value(&script_stdout, "Deployed Jetton minter to ");
-    let owner_address = extract_prefixed_line_value(
-        &script_stdout,
-        "Successfully minted and transferred 1000000000 tokens to ",
-    );
+    let minter_address = extract_prefixed_line_value(&script_stdout, "JETTON MINTER_ADDRESS=")
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_owned();
+    let owner_address = extract_prefixed_line_value(&script_stdout, "JETTON_ADMIN OWNER_ADDRESS=");
     wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
+
+    let mint_result = project
+        .acton()
+        .script("scripts/mint.tolk")
+        .verify_network("localnet")
+        .env("JETTON_ADMIN", "deployer")
+        .env("JETTON_MINTER_ADDRESS", &minter_address)
+        .run();
+    let mint_status = mint_result.output.get_output().status.code().unwrap_or(1);
+    assert_eq!(mint_status, 0, "Mint script failed");
 
     let wallets_response = wait_for_ok_response(
         &node,
@@ -2576,6 +2706,112 @@ fn v3_transactions_from_response(response: &Value) -> &[Value] {
 
 fn hashes_equivalent(left: &str, right: &str) -> bool {
     normalize_hash_to_bytes(left) == normalize_hash_to_bytes(right)
+}
+
+fn build_localnet_ext_in_boc() -> String {
+    let mnemonic = Mnemonic::from_str(DEPLOYER_MNEMONIC, None).expect("invalid deployer mnemonic");
+    let key_pair = mnemonic
+        .to_key_pair()
+        .expect("deployer mnemonic to keypair failed");
+    let version = WalletVersion::V4R2;
+    let wallet_id = wallets::wallet_id(version, &Network::Localnet);
+    let wallet =
+        TonWallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
+
+    let wallet_addr = ton_address_to_std_addr(&wallet.address);
+    let message = OwnedMessage {
+        info: MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: IntAddr::Std(wallet_addr.clone()),
+            dst: IntAddr::Std(wallet_addr),
+            value: CurrencyCollection::new(50_000_000),
+            ihr_fee: Default::default(),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        }),
+        init: None,
+        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
+        layout: None,
+    };
+
+    let internal_boc = BocRepr::encode(message).expect("must encode internal message boc");
+    let internal_cell = TonCell::from_boc(internal_boc).expect("must decode internal TonCell");
+    let expire_at = (SystemTime::now() + Duration::from_secs(600))
+        .duration_since(UNIX_EPOCH)
+        .expect("current time must be after unix epoch")
+        .as_secs() as u32;
+    wallet
+        .create_ext_in_msg(vec![internal_cell], 1, expire_at, false)
+        .expect("must build external-in message")
+        .to_boc_base64()
+        .expect("must encode external-in message boc")
+}
+
+fn compute_message_hashes_base64(boc_b64: &str) -> (String, String) {
+    let boc = base64::engine::general_purpose::STANDARD
+        .decode(boc_b64)
+        .expect("message boc must be valid base64");
+    let cell = Boc::decode(&boc).expect("message boc must decode");
+    let message = cell
+        .parse::<Message<'_>>()
+        .expect("message boc must parse as Message");
+
+    (
+        Hash256(*cell.repr_hash().as_array()).to_base64(),
+        compute_normalized_ext_in_hash_for_test(&message).to_base64(),
+    )
+}
+
+fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
+    StdAddr {
+        anycast: None,
+        address: HashBytes(
+            <[u8; 32]>::try_from(address.hash.as_slice())
+                .expect("TonAddress hash must be exactly 32 bytes"),
+        ),
+        workchain: address.workchain as i8,
+    }
+}
+
+fn compute_normalized_ext_in_hash_for_test(msg: &Message<'_>) -> Hash256 {
+    let MsgInfo::ExtIn(info) = &msg.info else {
+        panic!("TEP-467 normalization only applies to external-in messages");
+    };
+
+    let mut body_builder = CellBuilder::new();
+    body_builder
+        .store_slice(msg.body)
+        .expect("must store message body");
+    let body_cell = body_builder.build().expect("must build message body cell");
+
+    let normalized_info = ExtInMsgInfo {
+        src: None,
+        dst: info.dst.clone(),
+        import_fee: Tokens::ZERO,
+    };
+
+    let mut builder = CellBuilder::new();
+    builder
+        .store_small_uint(0b10, 2)
+        .expect("must store ext-in tag");
+    normalized_info
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("must store normalized ext-in info");
+    builder.store_bit_zero().expect("must clear init");
+    builder.store_bit_one().expect("must store body as ref");
+    builder
+        .store_reference(body_cell)
+        .expect("must store normalized body ref");
+    Hash256(
+        *builder
+            .build()
+            .expect("must build normalized message")
+            .repr_hash()
+            .as_array(),
+    )
 }
 
 fn normalize_hash_to_bytes(hash: &str) -> Option<[u8; 32]> {

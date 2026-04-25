@@ -1,0 +1,187 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Acton Custom Mutation Rules Schema",
+  "description": "JSON file format accepted by `acton test --mutation-rules-file`.",
+  "anyOf": [
+    {
+      "description": "A bare array of custom mutation rules.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CustomMutationRule"
+      }
+    },
+    {
+      "description": "A wrapper object containing custom mutation rules.",
+      "type": "object",
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "rules": {
+          "description": "Custom mutation rules.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustomMutationRule"
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "CustomMutationEdit": {
+      "description": "Serializable edit for custom mutation rules.",
+      "oneOf": [
+        {
+          "description": "Remove the matched source range.",
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "remove"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Replace the matched source range with a literal string.",
+          "type": "object",
+          "required": [
+            "replacement",
+            "type"
+          ],
+          "properties": {
+            "replacement": {
+              "description": "Replacement text.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "replace"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CustomMutationMatcher": {
+      "description": "Serializable matcher for custom mutation rules.",
+      "oneOf": [
+        {
+          "description": "Tree-sitter query matcher.",
+          "type": "object",
+          "required": [
+            "capture",
+            "query",
+            "type"
+          ],
+          "properties": {
+            "capture": {
+              "description": "Capture name whose node span should be mutated.",
+              "type": "string"
+            },
+            "query": {
+              "description": "Tree-sitter query run against Tolk source.",
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "query"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CustomMutationRule": {
+      "description": "Query-based mutation rule loaded from a JSON file.",
+      "type": "object",
+      "required": [
+        "description",
+        "edit",
+        "explanation",
+        "group",
+        "level",
+        "matcher",
+        "name"
+      ],
+      "properties": {
+        "description": {
+          "description": "Short human-readable rule description.",
+          "type": "string"
+        },
+        "edit": {
+          "description": "Edit applied to each matched source range.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CustomMutationEdit"
+            }
+          ]
+        },
+        "explanation": {
+          "description": "Explanation shown when this mutation survives.",
+          "type": "string"
+        },
+        "group": {
+          "description": "Rule group used in mutation reports.",
+          "type": "string"
+        },
+        "level": {
+          "description": "Mutation level used by mutation level filters.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MutationLevel"
+            }
+          ]
+        },
+        "matcher": {
+          "description": "Tree-sitter matcher that selects source ranges to mutate.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CustomMutationMatcher"
+            }
+          ]
+        },
+        "name": {
+          "description": "Unique rule ID. Custom rules override built-in rules with the same ID.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MutationLevel": {
+      "description": "Mutation levels supported by mutation testing filters",
+      "oneOf": [
+        {
+          "description": "Security-sensitive control-flow, persistence, and upgrade mutations",
+          "type": "string",
+          "enum": [
+            "critical"
+          ]
+        },
+        {
+          "description": "High-signal behavioral mutations such as arithmetic and comparisons",
+          "type": "string",
+          "enum": [
+            "major"
+          ]
+        },
+        {
+          "description": "Broader low-priority mutations such as bitwise variants",
+          "type": "string",
+          "enum": [
+            "minor"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -2,6 +2,7 @@ use acton::commands;
 use acton::commands::build::build_cmd;
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
+use acton::commands::create_app::create_app_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
@@ -14,6 +15,7 @@ use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
+use acton::commands::meta::{BuiltinSchema, print_schema_cmd};
 use acton::commands::new::{ProjectTemplate, new_cmd};
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::rpc::{RpcCommand, rpc_cmd};
@@ -140,6 +142,15 @@ enum Commands {
             ]
         )]
         templates: bool,
+    },
+    #[command(
+        about = "Create a TypeScript app scaffold",
+        long_about = "Create a TypeScript app scaffold in the specified directory. Defaults to ./app.",
+        after_help = detailed_help_pointer("create-app")
+    )]
+    CreateApp {
+        #[arg(help = "Directory to create the app in (default: app)")]
+        path: Option<PathBuf>,
     },
     #[command(
         about = "Print this message or the help of a given top-level command",
@@ -458,11 +469,11 @@ enum Commands {
         ui_port: u16,
     },
     #[command(
-        about = "Generate wrapper and optionally stub test file for a contract",
+        about = "Generate wrappers and optionally a stub test file for a contract",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrapper", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(
             long,
@@ -872,8 +883,6 @@ enum Commands {
             conflicts_with_all = ["list", "check"]
         )]
         force: bool,
-        #[arg(short, long, help = "Skip confirmation prompts")]
-        yes: bool,
         #[arg(long, help = "List available versions", conflicts_with = "check")]
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
@@ -913,8 +922,13 @@ enum Commands {
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
-        #[clap(value_enum)]
-        shell: clap_complete::Shell,
+        #[arg(value_parser = ["bash", "elvish", "fish", "powershell", "zsh", "nushell"])]
+        shell: String,
+    },
+    #[command(hide = true)]
+    Meta {
+        #[command(subcommand)]
+        command: MetaCommand,
     },
     #[command(
         about = "Internal command to generate MDX documentation from standard library",
@@ -1092,6 +1106,15 @@ pub enum DocCommand {
     },
 }
 
+#[derive(Subcommand, Clone)]
+pub enum MetaCommand {
+    #[command(about = "Print a built-in JSON schema")]
+    GetSchema {
+        #[arg(value_enum, default_value = "acton-toml", help = "Schema to print")]
+        schema: BuiltinSchema,
+    },
+}
+
 #[inline]
 const fn get_acton_version() -> &'static str {
     acton::build_info::LONG_VERSION
@@ -1226,7 +1249,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("init", "")];
+    let core_commands = vec![("new", "[PATH]"), ("create-app", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -1615,8 +1638,10 @@ fn main() {
         command,
         Commands::Init
             | Commands::New { .. }
+            | Commands::CreateApp { .. }
             | Commands::Help { .. }
             | Commands::Rpc { .. }
+            | Commands::Meta { .. }
             | Commands::Lint { .. }
     ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
@@ -1626,7 +1651,7 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Ls { .. } | Commands::Help { .. } | Commands::Lint { .. }
+        Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
     ) && let Err(err) = setup_logging()
     {
         eprintln!(
@@ -1637,6 +1662,7 @@ fn main() {
 
     let result = match command {
         Commands::Init => init_cmd(),
+        Commands::CreateApp { path } => create_app_cmd(path.as_deref()),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::Rpc { command } => {
@@ -1987,11 +2013,10 @@ fn main() {
             trunk,
             stable,
             force,
-            yes,
             list,
             check,
         } => {
-            let result = up_cmd(version, trunk, stable, force, yes, list, check);
+            let result = up_cmd(version, trunk, stable, force, list, check);
             if check {
                 report_error_as_json(result);
                 return;
@@ -2017,14 +2042,28 @@ fn main() {
         Commands::Hooks { command } => hooks_cmd(command),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
-            clap_complete::generate(
-                shell,
-                &mut base_cli_command(),
-                "acton",
-                &mut std::io::stdout(),
-            );
+            if shell == "nushell" {
+                clap_complete::generate(
+                    clap_complete_nushell::Nushell,
+                    &mut base_cli_command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            } else {
+                let shell = clap_complete::Shell::from_str(&shell)
+                    .expect("validated completion shell should parse");
+                clap_complete::generate(
+                    shell,
+                    &mut base_cli_command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            }
             Ok(())
         }
+        Commands::Meta { command } => match command {
+            MetaCommand::GetSchema { schema } => print_schema_cmd(schema),
+        },
         Commands::Docgen { output, check } => docgen_cmd(output, check),
         Commands::Ls {
             port,

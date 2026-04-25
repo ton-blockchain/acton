@@ -58,11 +58,8 @@ pub(super) fn run_update<C: ReleaseClient>(
     version: Option<String>,
     trunk: bool,
     stable: bool,
-    yes: bool,
     force: bool,
 ) -> Result<()> {
-    check_homebrew(current_exe, yes)?;
-
     let current_version = Version::parse(current_version_str);
     let use_trunk_release = version.is_none() && !stable && (trunk || current_is_trunk);
 
@@ -208,37 +205,6 @@ fn print_forced_install_release(
     let subject = if stable { "stable version" } else { "version" };
 
     println!("  {action} {subject} {target_version} (current: {current_display})");
-}
-
-fn check_homebrew(exe: &Path, yes: bool) -> Result<()> {
-    let path_str = exe.to_string_lossy();
-    if path_str.contains("Cellar") || path_str.contains("homebrew") {
-        eprintln!(
-            "{}",
-            "Warning: Acton seems to be installed via Homebrew.".yellow()
-        );
-        eprintln!("It is recommended to update using `brew upgrade acton`.");
-
-        if yes {
-            return Ok(());
-        }
-
-        let ans = inquire::Confirm::new("Do you want to proceed with built-in update anyway?")
-            .with_default(false)
-            .prompt();
-
-        match ans {
-            Ok(true) => Ok(()),
-            Ok(false) => bail!(
-                "Built-in update cancelled. Use `brew upgrade acton` to update a Homebrew installation."
-            ),
-            Err(_) => bail!(
-                "Could not read the confirmation prompt. Re-run with `--yes` or use `brew upgrade acton`."
-            ),
-        }
-    } else {
-        Ok(())
-    }
 }
 
 fn find_asset(release: &Release) -> Result<&Asset> {

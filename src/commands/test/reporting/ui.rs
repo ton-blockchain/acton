@@ -370,7 +370,7 @@ async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl Into
 
 async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     let Some(coverage_lcov) = &state.coverage_lcov else {
-        return (StatusCode::NOT_FOUND, "Coverage not enabled").into_response();
+        return StatusCode::NO_CONTENT.into_response();
     };
 
     (

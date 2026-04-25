@@ -94,6 +94,37 @@ fn test_skip_annotation_dotted_repeated() {
 }
 
 #[test]
+fn test_skip_annotation_with_description() {
+    ProjectBuilder::new("skip-description")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test.skip("Waiting for parser cleanup")
+            get fun `test skip described`() {
+                expect(1).toEqual(2); // This should not run
+            }
+
+            get fun `test not skipped`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_skipped(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/annotations/skip_annotation_with_description.stdout.txt",
+        );
+}
+
+#[test]
 fn test_todo_annotation_dotted() {
     ProjectBuilder::new("todo-string")
         .contract("simple", SIMPLE_CONTRACT)
