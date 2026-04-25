@@ -118,6 +118,16 @@ get fun `test load opcode for new bounced message prefix`() {
     }
 }
 
+get fun `test load opcode returns null for missing either tag`() {
+    val msg = TlbMessageRelaxedGeneric {
+        info: internalInfo(),
+        init: TlbMaybe.none(),
+        body: beginCell().endCell().beginParse(),
+    };
+
+    expect(msg.loadOpcode()).toBeNull();
+}
+
 get fun `test load body from inline and ref`() {
     val inlineMessage = TlbMessageRelaxed<DemoPayload> {
         info: internalInfo(),

@@ -802,7 +802,7 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
 /// val address = randomAddress("random_user");
 /// val masterchainAddress = randomAddress("random_user", -1);
 /// ```
-fun randomAddress(name: string? = null, wc: int = 0): address {
+fun randomAddress(name: string? = null, wc: int = BASECHAIN): address {
     var builder = beginCell();
     builder.storeUint(0b10, 2);
     builder.storeUint(0b0, 1);

@@ -9,9 +9,12 @@ contract NftItem {
     description: "Standard NFT Item. TEP-62 and TEP-64 compliant"
     incomingMessages: AllowedMessageToNftItem
     storage: NftItemStorage
+    storageAtDeployment: NftItemStorageNotInitialized
 }
 
-type AllowedMessageToNftItem = AskToChangeOwnership | RequestStaticData
+type AllowedMessageToNftItem =
+    | AskToChangeOwnership
+    | RequestStaticData
 
 fun onInternalMessage(in: InMessage) {
     var loadingStorage = NftItemStorage.startLoading();
@@ -54,9 +57,8 @@ fun onInternalMessage(in: InMessage) {
                 restAmount -= fwdFee;
             }
 
-            assert (
-                restAmount >= 0
-            ) throw Errors.TooSmallRestAmount;                        // base nft spends fixed amount of gas, will not check for response
+            // base nft spends fixed amount of gas, will not check for response
+            assert (restAmount >= 0) throw Errors.TooSmallRestAmount;
 
             if (msg.forwardTonAmount) {
                 val ownershipMsg = createMessage({

@@ -48,6 +48,7 @@ struct TlbMessageRelaxedGeneric {
 /// Loads the opcode of the message.
 ///
 /// Returns `null` for malformed or too-short body data:
+/// - body does not contain the `TlbEither` branch bit;
 /// - body marks `TlbEitherRight` but does not contain a body reference;
 /// - decoded body has fewer than 32 bits for the first opcode;
 /// - [skipBounce] is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
@@ -263,6 +264,9 @@ fun TlbMessage<TBody, TInfo>.loadBody(self): TBody {
 
 fun impl.loadOpcode(body: slice, skipBounce: bool): int? {
     var slice = body;
+    if (slice.remainingBitsCount() < 1) {
+        return null;
+    }
     if (slice.loadBool()) {
         // actual body in the ref
         if (slice.remainingRefsCount() == 0) {

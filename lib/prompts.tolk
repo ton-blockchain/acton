@@ -9,6 +9,10 @@
 /// - `select(...)`: returns `""` in non-interactive mode or on prompt failure
 /// - `confirm(...)`: returns `false` in non-interactive mode or on prompt
 ///   failure, even if `default` is `true`
+/// - `promptInt(...)`: parses `default` in non-interactive mode; invalid
+///   interactive input is rejected until corrected
+/// - `promptAddress(...)`: parses `default` in non-interactive mode; invalid
+///   interactive input is rejected until corrected
 /// - `promptWallet(...)`: returns `"emulated-wallet"` in emulate mode; in
 ///   broadcast mode it auto-selects the only configured wallet, but otherwise
 ///   fails when no wallet is available or wallet choice cannot be collected
@@ -31,6 +35,7 @@
 /// ```
 
 import "ffi"
+import "fmt"
 
 /// Prompts the user for input.
 ///
@@ -91,6 +96,44 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
     return ffi.confirm(message, default, helpMessage);
 }
 
+/// Prompts the user for an integer.
+///
+/// Interactive behavior:
+/// - Invalid input is rejected by the host prompt validator until the user
+///   corrects it.
+/// - Pressing Enter accepts `default` when it is non-empty.
+///
+/// Non-interactive fallback:
+/// - Parses and returns `default`.
+/// - If `default` is empty or invalid, execution fails with the same integer
+///   parser error as `parseInt(...)`.
+fun promptInt(message: string, default: string = "", placeholder: string = ""): int {
+    return ffi.promptInt(message, placeholder, default);
+}
+
+/// Prompts the user for a TON address.
+///
+/// Interactive behavior:
+/// - Invalid input is rejected by the host prompt validator until the user
+///   corrects it.
+/// - Pressing Enter accepts `default` when it is not `null`.
+///
+/// Non-interactive fallback:
+/// - Parses and returns `default`.
+/// - If `default` is `null` or invalid, execution fails with the same address
+///   parser error as `parseAddress(...)`.
+fun promptAddress(
+    message: string,
+    default: address? = null,
+    placeholder: string = "EQ... / kQ...",
+): address {
+    return ffi.promptAddress(
+        message,
+        placeholder,
+        default == null ? "" : format("{}", default),
+    );
+}
+
 /// Prompts the user to select a wallet from the configured wallets.
 ///
 /// Behavior (broadcast mode, i.e. `--net` is set):
@@ -120,3 +163,5 @@ fun ffi.prompt(message: string, placeholder: string, default: string): string as
 fun ffi.select(message: string, variants: array<string>, defaultIndex: int): string asm "206 EXTCALL"
 fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
 fun ffi.promptWallet(message: string): string? asm "208 EXTCALL"
+fun ffi.promptInt(message: string, placeholder: string, default: string): int asm "209 EXTCALL"
+fun ffi.promptAddress(message: string, placeholder: string, default: string): address asm "210 EXTCALL"

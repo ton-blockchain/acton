@@ -4,6 +4,7 @@ Usage: acton[EXE] <command> [...flags] [...args]
 
 Commands:
   new              [PATH]              Create a new project in a specified directory
+  create-app       [PATH]              Create a TypeScript app scaffold
   init                                 Initialize a new project in the current directory
 
   test             [PATH]              Execute tests in file or directory

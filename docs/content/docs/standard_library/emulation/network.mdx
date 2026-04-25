@@ -710,7 +710,7 @@ val data = net.runGetMethod<JettonDataReply>(wallet.address, "get_jetton_data");
 ## `randomAddress`
 
 ```tolk
-fun randomAddress(name: string? = null, wc: int = 0): address
+fun randomAddress(name: string? = null, wc: int = BASECHAIN): address
 ```
 
 Generate a random address.

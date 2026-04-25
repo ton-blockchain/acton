@@ -8,6 +8,7 @@ mod color_output_tests;
 mod compile_tests;
 mod config_tests;
 mod coverage_tests;
+mod create_app_tests;
 mod diff_tests;
 mod disasm_tests;
 mod doc;

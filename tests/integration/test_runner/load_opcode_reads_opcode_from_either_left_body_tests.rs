@@ -228,6 +228,25 @@ get fun `test ak stdlib load opcode new bounce prefix with skip`() {
 }
 
 #[test]
+fn load_opcode_returns_null_for_missing_either_tag() {
+    run_message_case(
+        "ak-stdlib-load-opcode-missing-either-tag",
+        r"
+get fun `test ak stdlib load opcode missing either tag`() {
+    val msg = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body: beginCell().endCell().beginParse(),
+    };
+
+    expect(msg.loadOpcode()).toBeNull();
+}
+",
+        "integration/snapshots/test-runner/load_opcode_reads_opcode_from_either_left_body/load_opcode_returns_null_for_missing_either_tag.stdout.txt",
+    );
+}
+
+#[test]
 fn message_relaxed_load_body_returns_either_left_value() {
     run_message_case(
         "ak-stdlib-message-load-body-left",

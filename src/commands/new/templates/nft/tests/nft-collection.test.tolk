@@ -9,12 +9,6 @@ import "@contracts/types"
 import "@wrappers/NftCollection.gen"
 import "@wrappers/NftItem.gen"
 
-struct Royalty {
-    numerator: int
-    denominator: int
-    royaltyAddress: address
-}
-
 get fun `test nft: report royalty params`() {
     val (nftCollection, _, royaltyParams) = setupTest();
     val randomTreasury = testing.treasury("random treasury");
@@ -65,72 +59,18 @@ get fun `test nft: should not allow any other opcode not from owner`() {
     [1, 2, 3, 0x42].each(shouldNotAllowAnyOtherOpcodeNotFromOwner);
 }
 
-fun nftFixture(nftCollection: NftCollection, nftOwnerAddress: address): NftItem {
-    val deployer = testing.treasury("deployer");
-    val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
-    val nftDeployResult = nftCollection.sendDeployNft(
-        deployer.address,
-        0,
-        nextItemIndex,
-        ton("0.02"),
-        { ownerAddress: nftOwnerAddress, content: "" },
-        { value: ton("0.05"), bounce: true },
-    );
-
-    expect(nftDeployResult).toHaveSuccessfulTx({
-        from: deployer.address,
-        to: nftCollection.address,
-    });
-
-    val nftAddress = nftCollection.getNftAddressByIndex(nextItemIndex);
-
-    expect(nftDeployResult).toHaveSuccessfulDeploy({ from: nftCollection.address, to: nftAddress });
-
-    return NftItem.fromAddress(nftAddress);
-}
-
-/// Initializes the test environment, creating a fresh instance of the contract.
-/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).
-fun setupTest(): (NftCollection, Treasury, RoyaltyParams) {
-    val deployer = testing.treasury("deployer");
-
-    val royaltyParams = RoyaltyParams {
-        numerator: 16,
-        denominator: 2,
-        royaltyAddress: randomAddress(),
-    };
-
-    // Initialize and deploy the contract with default values
-    val nftCollection = NftCollection.fromStorage({
-        adminAddress: deployer.address,
-        nextItemIndex: 0,
-        content: CollectionContent {
-            collectionMetadata: createEmptyCell(),
-            commonContent: "",
-        }.toCell(),
-        nftItemCode: build("NftItem"),
-        royaltyParams: royaltyParams.toCell(),
-    });
-
-    val deployRes = nftCollection.deploy(deployer.address, { value: ton("0.05"), bounce: false });
-
-    expect(deployRes).toHaveSuccessfulDeploy({ to: nftCollection.address });
-
-    return (nftCollection, deployer, royaltyParams);
-}
-
 get fun `test nft: should deploy nft`() {
     val (nftCollection, deployer, _) = setupTest();
     val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
-    val nftOwnerAddress = randomAddress();
-    val content: string = "Content";
+    val ownerAddress = randomAddress();
+    val content = "Content";
 
     val nftDeployResult = nftCollection.sendDeployNft(
         deployer.address,
         0,
         nextItemIndex,
         ton("0.02"),
-        { ownerAddress: nftOwnerAddress, content },
+        { ownerAddress, content },
         { value: ton("0.05"), bounce: true },
     );
 
@@ -151,7 +91,7 @@ get fun `test nft: should deploy nft`() {
 
     expect(data.isInitialized).toBeTrue();
     expect(data.itemIndex).toEqual(nextItemIndex);
-    expect(data.ownerAddress!).toEqual(nftOwnerAddress);
+    expect(data.ownerAddress!).toEqual(ownerAddress);
     expect(data.collectionAddress).toEqual(nftCollection.address);
     expect(data.content).toEqual(content);
 }
@@ -239,11 +179,11 @@ get fun `test nft: should not increment item index if not last`() {
 get fun `test nft: should deploy some nfts via batch deploy`() {
     val (nftCollection, deployer, _) = setupTest();
     val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
-    val nftOwnerAddress = randomAddress();
-    val content: string = "Content";
+    val ownerAddress = randomAddress();
+    val content = "Content";
 
     var deployList: map<uint64, BatchDeployDictItem> = [];
-    val indexes: array<int> = [nextItemIndex, nextItemIndex + 1, nextItemIndex + 2];
+    val indexes = [nextItemIndex, nextItemIndex + 1, nextItemIndex + 2];
 
     var i = 0;
     while (i < 3) {
@@ -251,10 +191,7 @@ get fun `test nft: should deploy some nfts via batch deploy`() {
             indexes.get(i),
             BatchDeployDictItem {
                 attachTonAmount: ton("0.02"),
-                initParams: NftItemInitAtDeployment {
-                    ownerAddress: nftOwnerAddress,
-                    content,
-                }.toCell(),
+                initParams: NftItemInitAtDeployment { ownerAddress, content }.toCell(),
             },
         );
         i += 1;
@@ -288,7 +225,7 @@ get fun `test nft: should deploy some nfts via batch deploy`() {
 
         expect(data.isInitialized).toBeTrue();
         expect(data.itemIndex).toEqual(index);
-        expect(data.ownerAddress!).toEqual(nftOwnerAddress);
+        expect(data.ownerAddress!).toEqual(ownerAddress);
         expect(data.collectionAddress).toEqual(nftCollection.address);
         expect(data.content).toEqual(content);
 
@@ -317,4 +254,61 @@ get fun `test nft: should change owner`() {
 
     expect(oldOwnerAddress).toNotEqual(newOwnerAddress);
     expect(newOwnerAddress).toEqual(newOwner.address);
+}
+
+fun nftFixture(nftCollection: NftCollection, ownerAddress: address): NftItem {
+    val deployer = testing.treasury("deployer");
+    val nextItemIndex = nftCollection.getCollectionData().nextItemIndex;
+    val nftDeployResult = nftCollection.sendDeployNft(
+        deployer.address,
+        0,
+        nextItemIndex,
+        ton("0.02"),
+        { ownerAddress, content: "" },
+        { value: ton("0.05"), bounce: true },
+    );
+
+    expect(nftDeployResult).toHaveSuccessfulTx({
+        from: deployer.address,
+        to: nftCollection.address,
+    });
+
+    val nftAddress = nftCollection.getNftAddressByIndex(nextItemIndex);
+
+    expect(nftDeployResult).toHaveSuccessfulDeploy({
+        from: nftCollection.address,
+        to: nftAddress,
+    });
+
+    return NftItem.fromAddress(nftAddress);
+}
+
+fun setupTest(): (NftCollection, Treasury, RoyaltyParams) {
+    val deployer = testing.treasury("deployer");
+
+    val royaltyParams = RoyaltyParams {
+        numerator: 16,
+        denominator: 2,
+        royaltyAddress: randomAddress(),
+    };
+
+    // Initialize and deploy the contract with default values
+    val nftCollection = NftCollection.fromStorage({
+        adminAddress: deployer.address,
+        nextItemIndex: 0,
+        content: CollectionContent {
+            collectionMetadata: createEmptyCell(),
+            commonContent: "",
+        }.toCell(),
+        nftItemCode: build("NftItem"),
+        royaltyParams: royaltyParams.toCell(),
+    });
+
+    val deployRes = nftCollection.deploy(deployer.address, { value: ton("0.05"), bounce: false });
+
+    expect(deployRes).toHaveSuccessfulDeploy({
+        to: nftCollection.address,
+    });
+
+    return (nftCollection, deployer, royaltyParams);
 }

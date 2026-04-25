@@ -1,7 +1,9 @@
 use crate::commands::common::error_fmt;
-use crate::context::Context;
+use crate::context::{Context, to_cell};
+use crate::ffi::emulation::normalize_address_input;
 use crate::formatter::FormatterContext;
-use anyhow::bail;
+use anyhow::{Context as AnyhowContext, bail};
+use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -10,6 +12,7 @@ use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 extension!(println in (Context) with (arg6: TupleItem, type6: String, arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String) using println_impl);
 #[allow(clippy::too_many_arguments)]
@@ -304,6 +307,86 @@ fn prompt_impl(
     Ok(())
 }
 
+fn parse_prompt_int(input: &str) -> anyhow::Result<BigInt> {
+    input
+        .trim()
+        .parse::<BigInt>()
+        .with_context(|| format!("Failed to parse integer from '{input}'"))
+}
+
+extension!(prompt_int in (Context) with (default: String, placeholder: String, message: String) using prompt_int_impl);
+fn prompt_int_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    default: String,
+    placeholder: String,
+    message: String,
+) -> anyhow::Result<()> {
+    let input = if stdin().is_terminal() {
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+
+        text.with_validator(|input: &str| {
+            if parse_prompt_int(input).is_ok() {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    "Enter a valid integer".to_owned(),
+                )))
+            }
+        })
+        .prompt()
+        .unwrap_or_else(|_| default.clone())
+    } else {
+        default
+    };
+
+    stack.push(TupleItem::Int(parse_prompt_int(&input)?));
+    Ok(())
+}
+
+fn parse_prompt_address(input: &str) -> anyhow::Result<StdAddr> {
+    let (addr, _) = StdAddr::from_str_ext(normalize_address_input(input), StdAddrFormat::any())
+        .with_context(|| format!("Cannot parse address: {input}"))?;
+    Ok(addr)
+}
+
+extension!(prompt_address in (Context) with (default: String, placeholder: String, message: String) using prompt_address_impl);
+fn prompt_address_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    default: String,
+    placeholder: String,
+    message: String,
+) -> anyhow::Result<()> {
+    let input = if stdin().is_terminal() {
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+
+        text.with_validator(|input: &str| {
+            if parse_prompt_address(input).is_ok() {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    "Enter a valid TON address".to_owned(),
+                )))
+            }
+        })
+        .prompt()
+        .unwrap_or_else(|_| default.clone())
+    } else {
+        default
+    };
+
+    let addr = parse_prompt_address(&input)?;
+    stack.push(TupleItem::Slice(to_cell(&addr)));
+    Ok(())
+}
+
 extension!(select in (Context) with (default_index: BigInt, variants: Vec<String>, message: String) using select_impl);
 fn select_impl(
     _ctx: &mut Context,
@@ -405,5 +488,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         206 => select : 3,
         207 => confirm : 3,
         208 => prompt_wallet : 1,
+        209 => prompt_int : 3,
+        210 => prompt_address : 3,
     });
 }

@@ -1,6 +1,5 @@
 import "@stdlib/strings"
 import "@acton/build"
-import "@acton/fmt"
 import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
@@ -27,15 +26,11 @@ struct NftCollectionInfo {
     image: string
 }
 
-fun string.toSnakeString(self): cell {
-    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell();
-}
-
 fun buildOnchainMetadata(info: NftCollectionInfo): cell {
-    var dict: map<uint256, cell> = [];
-    dict.set("name".sha256(), info.name.toSnakeString());
-    dict.set("description".sha256(), info.description.toSnakeString());
-    dict.set("image".sha256(), info.image.toSnakeString());
+    var dict: map<uint256, string_prefixed0x> = [];
+    dict.set("name".sha256(), info.name.prefixWith00());
+    dict.set("description".sha256(), info.description.prefixWith00());
+    dict.set("image".sha256(), info.image.prefixWith00());
     return beginCell()
         .storeUint(ONCHAIN_CONTENT_PREFIX, 8)
         .storeDict(dict.toLowLevelDict())
@@ -47,8 +42,7 @@ fun promptNftWallet(message: string): ActonWallet {
 }
 
 fun promptNftAddress(message: string, default: address? = null): address {
-    val s = default == null ? prompt(message, "") : prompt(message, "", format("{}", default));
-    return parseAddress(s);
+    return promptAddress(message, default);
 }
 
 fun promptNftCollectionInfo(): NftCollectionInfo {
@@ -60,17 +54,11 @@ fun promptNftCollectionInfo(): NftCollectionInfo {
 }
 
 fun promptNftCollection(message: string): NftCollection {
-    val s = prompt(message, "EQ... / kQ...", "");
-    return NftCollection.fromAddress(parseAddress(s));
+    return NftCollection.fromAddress(promptAddress(message));
 }
 
 fun promptNftItem(message: string): NftItem {
-    val s = prompt(message, "EQ... / kQ...", "");
-    return NftItem.fromAddress(parseAddress(s));
-}
-
-fun promptInt(message: string, default: string): int {
-    return parseInt(prompt(message, "", default));
+    return NftItem.fromAddress(promptAddress(message));
 }
 
 fun makeNftCollectionStorage(admin: address, info: NftCollectionInfo): NftCollectionStorage {

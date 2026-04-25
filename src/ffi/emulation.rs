@@ -2168,7 +2168,7 @@ fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: Cell) -> anyhow
 }
 
 /// Normalize CLI-rendered addresses like "<address> (deployer)" to plain address.
-fn normalize_address_input(input: &str) -> &str {
+pub(crate) fn normalize_address_input(input: &str) -> &str {
     let trimmed = input.trim();
     if let Some((address, suffix)) = trimmed.rsplit_once(" (")
         && suffix.ends_with(')')

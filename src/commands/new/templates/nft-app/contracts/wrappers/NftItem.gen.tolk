@@ -9,14 +9,17 @@ import "@acton/testing/assert"
 import "@contracts/messages"
 import "@contracts/types"
 
-/// Storage `NftItemStorage` is defined in `contracts/src/types.tolk`
+/// Storage `NftItemStorageNotInitialized` is defined in `contracts/src/types.tolk`
 struct NftItem {
     address: address
     stateInit: ContractState? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun NftItem.fromStorage(storage: NftItemStorage, toShard: AddressShardingOptions? = null): NftItem {
+fun NftItem.fromStorage(
+    storage: NftItemStorageNotInitialized,
+    toShard: AddressShardingOptions? = null,
+): NftItem {
     val stateInit = ContractState {
         code: build("NftItem"),
         data: storage.toCell(),

@@ -75,7 +75,7 @@ struct (0b0111) TlbTransaction {
 /// method unwraps it before typed decoding.
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
-/// exit code 63.
+/// exit code 63. Internal and external-in transaction bodies are both supported.
 ///
 /// Example:
 /// ```tolk
@@ -85,7 +85,7 @@ struct (0b0111) TlbTransaction {
 /// println(body.increaseBy);
 /// ```
 fun TlbTransaction.loadBody<Msg>(self): Msg {
-    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessageRelaxed<Msg>>;
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<TlbMessage<Msg>>;
     val inMsg = inMsgCell.load();
     return inMsg.loadBody();
 }

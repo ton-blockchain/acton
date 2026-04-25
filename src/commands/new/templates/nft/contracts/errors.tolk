@@ -1,6 +1,6 @@
 // these error codes are quite strange, but they are exactly the same as in FunC implementation
 
-enum Errors: int32 {
+enum Errors {
     BatchLimitExceeded = 399
     InvalidWorkchain = 333
     NotFromAdmin = 401

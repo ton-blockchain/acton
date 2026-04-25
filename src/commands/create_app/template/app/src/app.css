@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial,
+    Tahoma, Verdana, sans-serif;
+  --font-mono:
+    'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, SFMono-Regular,
+    monospace;
+
+  --animate-in: enter 0.2s ease-out;
+  --animate-out: exit 0.15s ease-in;
+}
+
+/* ─── Light theme (default) ─── */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0 0);
+  --primary: #0098ea;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.948 0.005 264.53);
+  --secondary-foreground: oklch(0.141 0 0);
+  --muted: oklch(0.948 0.005 264.53);
+  --muted-foreground: oklch(0.55 0.02 264.53);
+  --accent: oklch(0.948 0.005 264.53);
+  --accent-foreground: oklch(0.141 0 0);
+  --destructive: oklch(0.577 0.2 27.33);
+  --border: oklch(0.906 0.005 264.53);
+  --input: oklch(0.906 0.005 264.53);
+  --ring: #0098ea;
+  --radius: 0.625rem;
+  --success: #29cc6a;
+  --warning: #f5a73b;
+}
+
+/* ─── Dark theme ─── */
+[data-theme='dark'] {
+  --background: oklch(0.141 0.005 285.82);
+  --foreground: oklch(0.925 0.006 264.53);
+  --card: oklch(0.121 0.005 285.82);
+  --card-foreground: oklch(0.925 0.006 264.53);
+  --popover: oklch(0.141 0.005 285.82);
+  --popover-foreground: oklch(0.925 0.006 264.53);
+  --primary: #0098ea;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.218 0.006 264.53);
+  --secondary-foreground: oklch(0.925 0.006 264.53);
+  --muted: oklch(0.218 0.006 264.53);
+  --muted-foreground: oklch(0.55 0.02 264.53);
+  --accent: oklch(0.218 0.006 264.53);
+  --accent-foreground: oklch(0.925 0.006 264.53);
+  --destructive: oklch(0.577 0.2 27.33);
+  --border: oklch(0.25 0.006 264.53);
+  --input: oklch(0.25 0.006 264.53);
+  --ring: #0098ea;
+}
+
+/* ─── Base styles ─── */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentColor);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+::selection {
+  background: oklch(0.577 0.156 243.85 / 0.25);
+}
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* ─── Animations for shadcn ─── */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Spinner ─── */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.55s linear infinite;
+  display: inline-block;
+  opacity: 0.6;
+}
+
+/* ─── TonConnect overrides ─── */
+[data-tc-wallets-modal-container],
+[data-tc-dropdown-container],
+[data-tc-notification-container],
+div[class*='tc-'] {
+  z-index: 1000 !important;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 100 !important;
+}
