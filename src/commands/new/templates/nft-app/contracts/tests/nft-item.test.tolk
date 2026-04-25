@@ -246,7 +246,7 @@ get fun `test nft: should fail when response address in different workchain`() {
     val (nftCollection, _, _) = setupTest();
     val nftOwner = testing.treasury("nft-owner");
     val nftReceiverAddress = randomAddress();
-    val excessesAddress = randomAddress("excesses", -1); // masterchain
+    val excessesAddress = randomAddress("excesses", MASTERCHAIN);
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
 
@@ -337,8 +337,8 @@ get fun `test nft: should fail with incomplete transfer body`() {
 
 get fun `test nft: bench should deploy 100 nfts via batch deploy`() {
     val (nftCollection, deployer, _) = setupTest();
-    val nftOwnerAddress = randomAddress();
-    val content: string = "Content";
+    val ownerAddress = randomAddress();
+    val content = "Content";
 
     var deployList: map<uint64, BatchDeployDictItem> = [];
 
@@ -348,10 +348,7 @@ get fun `test nft: bench should deploy 100 nfts via batch deploy`() {
             i,
             BatchDeployDictItem {
                 attachTonAmount: ton("0.02"),
-                initParams: NftItemInitAtDeployment {
-                    ownerAddress: nftOwnerAddress,
-                    content,
-                }.toCell(),
+                initParams: NftItemInitAtDeployment { ownerAddress, content }.toCell(),
             },
         );
         i += 1;

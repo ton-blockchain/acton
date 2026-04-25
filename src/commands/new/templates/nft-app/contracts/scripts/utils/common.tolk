@@ -27,15 +27,11 @@ struct NftCollectionInfo {
     image: string
 }
 
-fun string.toSnakeString(self): cell {
-    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell();
-}
-
 fun buildOnchainMetadata(info: NftCollectionInfo): cell {
-    var dict: map<uint256, cell> = [];
-    dict.set("name".sha256(), info.name.toSnakeString());
-    dict.set("description".sha256(), info.description.toSnakeString());
-    dict.set("image".sha256(), info.image.toSnakeString());
+    var dict: map<uint256, string_prefixed0x> = [];
+    dict.set("name".sha256(), info.name.prefixWith00());
+    dict.set("description".sha256(), info.description.prefixWith00());
+    dict.set("image".sha256(), info.image.prefixWith00());
     return beginCell()
         .storeUint(ONCHAIN_CONTENT_PREFIX, 8)
         .storeDict(dict.toLowLevelDict())
