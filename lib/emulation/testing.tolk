@@ -515,18 +515,47 @@ fun testing.outActions(): OutActionList {
     return impl.parseOutActions(impl.getC5());
 }
 
-fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
-fun ffi.startMessageIter(msg: cell, from: cell): int asm "39 EXTCALL"
-fun ffi.executeMessageIterN(cursorId: int, n: int): SendResultList asm "40 EXTCALL"
-fun ffi.executeMessageIterTill(cursorId: int, params: tuple): SendResultList? asm "41 EXTCALL"
-fun ffi.executeMessageIterFrom(cursorId: int): SendResultList asm "42 EXTCALL"
-fun ffi.isMessageIterDone(cursorId: int): bool asm "43 EXTCALL"
-fun ffi.closeMessageIter(cursorId: int): void asm "44 EXTCALL"
-fun ffi.setNow(now: int): void asm "28 EXTCALL"
-fun ffi.getNow(): int asm "29 EXTCALL"
-fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
-fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL"
-fun ffi.registerLibrary(cell: cell): void asm "18 EXTCALL"
-fun ffi.saveWorldStateSnapshot(path: string): bool asm "37 EXTCALL"
-fun ffi.loadWorldStateSnapshot(path: string): bool asm "38 EXTCALL"
-fun ffi.runTickTock(onAccount: address, isTock: bool): SendResultList asm "36 EXTCALL"
+fun ffi.sendSingleMessage(msg: cell, from: cell): tuple?
+    asm "30 EXTCALL"
+
+fun ffi.startMessageIter(msg: cell, from: cell): int
+    asm "39 EXTCALL"
+
+fun ffi.executeMessageIterN(cursorId: int, n: int): SendResultList
+    asm "40 EXTCALL"
+
+fun ffi.executeMessageIterTill(cursorId: int, params: tuple): SendResultList?
+    asm "41 EXTCALL"
+
+fun ffi.executeMessageIterFrom(cursorId: int): SendResultList
+    asm "42 EXTCALL"
+
+fun ffi.isMessageIterDone(cursorId: int): bool
+    asm "43 EXTCALL"
+
+fun ffi.closeMessageIter(cursorId: int): void
+    asm "44 EXTCALL"
+
+fun ffi.setNow(now: int): void
+    asm "28 EXTCALL"
+
+fun ffi.getNow(): int
+    asm "29 EXTCALL"
+
+fun ffi.setConfig(config: dict): bool
+    asm "32 EXTCALL"
+
+fun ffi.setShardAccount(addr: address, account: cell?): void
+    asm "34 EXTCALL"
+
+fun ffi.registerLibrary(cell: cell): void
+    asm "18 EXTCALL"
+
+fun ffi.saveWorldStateSnapshot(path: string): bool
+    asm "37 EXTCALL"
+
+fun ffi.loadWorldStateSnapshot(path: string): bool
+    asm "38 EXTCALL"
+
+fun ffi.runTickTock(onAccount: address, isTock: bool): SendResultList
+    asm "36 EXTCALL"

@@ -159,9 +159,20 @@ fun promptWallet(message: string): string {
     return name;
 }
 
-fun ffi.prompt(message: string, placeholder: string, default: string): string asm "205 EXTCALL"
-fun ffi.select(message: string, variants: array<string>, defaultIndex: int): string asm "206 EXTCALL"
-fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"
-fun ffi.promptWallet(message: string): string? asm "208 EXTCALL"
-fun ffi.promptInt(message: string, placeholder: string, default: string): int asm "209 EXTCALL"
-fun ffi.promptAddress(message: string, placeholder: string, default: string): address asm "210 EXTCALL"
+fun ffi.prompt(message: string, placeholder: string, default: string): string
+    asm "205 EXTCALL"
+
+fun ffi.select(message: string, variants: array<string>, defaultIndex: int): string
+    asm "206 EXTCALL"
+
+fun ffi.confirm(message: string, default: bool, helpMessage: string): bool
+    asm "207 EXTCALL"
+
+fun ffi.promptWallet(message: string): string?
+    asm "208 EXTCALL"
+
+fun ffi.promptInt(message: string, placeholder: string, default: string): int
+    asm "209 EXTCALL"
+
+fun ffi.promptAddress(message: string, placeholder: string, default: string): address
+    asm "210 EXTCALL"

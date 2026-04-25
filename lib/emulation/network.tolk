@@ -1210,22 +1210,86 @@ fun impl.findNoTransactionOrFail(
     }
 }
 
-fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList? asm "9 EXTCALL"
-fun ffi.runGetMethod(addr: cell, code: cell, methodId: int, methodName: string, returnType: string, args: tuple): tuple? asm "8 EXTCALL"
-fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
-fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
-fun ffi.registerAddress(address: cell, name: string): void asm "15 EXTCALL"
-fun ffi.registerCodeCell(cell: cell, name: string): void asm "16 EXTCALL"
-fun ffi.findTransactionByScalarParams(firstTxLt: int, lastTxLt: int, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.findTransactionByPredicateParams(firstTxLt: int, lastTxLt: int, params: tuple): cell? asm "48 EXTCALL"
-fun ffi.failToFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "103 EXTCALL"
-fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "104 EXTCALL"
-fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
-fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
-fun ffi.waitForTransaction(pseudoTxCell: cell, quiet: bool, attempts: int, sleepDuration: int): SendResultList? asm "25 EXTCALL"
-fun ffi.waitForTrace(pseudoTxCell: cell, quiet: bool, attempts: int, sleepDuration: int): SendResultList? asm "49 EXTCALL"
-fun ffi.enableBroadcast(): void asm "26 EXTCALL"
-fun ffi.disableBroadcast(): void asm "27 EXTCALL"
-fun ffi.getConfig(): dict asm "31 EXTCALL"
-fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";
-fun ffi.crc16(data: string): int asm "13 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList?
+    asm "9 EXTCALL"
+
+fun ffi.runGetMethod(
+    addr: cell,
+    code: cell,
+    methodId: int,
+    methodName: string,
+    returnType: string,
+    args: tuple,
+): tuple?
+    asm "8 EXTCALL"
+
+fun ffi.isDeployed(addr: cell): bool
+    asm "11 EXTCALL"
+
+fun ffi.getDeployedCode(addr: cell): cell?
+    asm "12 EXTCALL"
+
+fun ffi.registerAddress(address: cell, name: string): void
+    asm "15 EXTCALL"
+
+fun ffi.registerCodeCell(cell: cell, name: string): void
+    asm "16 EXTCALL"
+
+fun ffi.findTransactionByScalarParams(firstTxLt: int, lastTxLt: int, params: tuple): cell?
+    asm "10 EXTCALL"
+
+fun ffi.findTransactionByPredicateParams(firstTxLt: int, lastTxLt: int, params: tuple): cell?
+    asm "48 EXTCALL"
+
+fun ffi.failToFindTransactionByParams(
+    location: string,
+    message: string,
+    txs: SendResultList,
+    params: tuple,
+): tuple?
+    asm "103 EXTCALL"
+
+fun ffi.failToNotFindTransactionByParams(
+    location: string,
+    message: string,
+    txs: SendResultList,
+    params: tuple,
+): tuple?
+    asm "104 EXTCALL"
+
+fun ffi.loadLibrary(hash: string): cell?
+    asm "21 EXTCALL"
+
+fun ffi.isBroadcasting(): bool
+    asm "23 EXTCALL"
+
+fun ffi.waitForTransaction(
+    pseudoTxCell: cell,
+    quiet: bool,
+    attempts: int,
+    sleepDuration: int,
+): SendResultList?
+    asm "25 EXTCALL"
+
+fun ffi.waitForTrace(
+    pseudoTxCell: cell,
+    quiet: bool,
+    attempts: int,
+    sleepDuration: int,
+): SendResultList?
+    asm "49 EXTCALL"
+
+fun ffi.enableBroadcast(): void
+    asm "26 EXTCALL"
+
+fun ffi.disableBroadcast(): void
+    asm "27 EXTCALL"
+
+fun ffi.getConfig(): dict
+    asm "31 EXTCALL"
+
+fun ffi.saveTraceName(txs: SendResultList, name: string): void
+    asm "35 EXTCALL"
+
+fun ffi.crc16(data: string): int
+    asm "13 EXTCALL"

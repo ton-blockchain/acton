@@ -21,9 +21,9 @@
 /// }
 /// ```
 
+import "../impl"
 import "../tlb/either"
 import "../tlb/maybe"
-import "../impl"
 
 /// Represents a generic relaxed message. Unlike [TlbMessageRelaxed], this message does not
 /// load the body of the message. Instead body is represented as a slice and can be parsed

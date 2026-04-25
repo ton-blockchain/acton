@@ -188,8 +188,17 @@ fun crypto.seedToKeyPair(seed: uint256): KeyPair {
     return KeyPair { privateKey, publicKey };
 }
 
-fun ffi.seedToKeyPair(seed: uint256): [int, int] asm "404 EXTCALL";
-fun ffi.createMnemonic(): Mnemonic asm "401 EXTCALL"
-fun ffi.mnemonicToKeyPair(words: Mnemonic): [int, int] asm "402 EXTCALL";
-fun ffi.getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
-fun ffi.rawSign(privateKey: int, data: int): slice asm "403 EXTCALL";
+fun ffi.seedToKeyPair(seed: uint256): [int, int]
+    asm "404 EXTCALL"
+
+fun ffi.createMnemonic(): Mnemonic
+    asm "401 EXTCALL"
+
+fun ffi.mnemonicToKeyPair(words: Mnemonic): [int, int]
+    asm "402 EXTCALL"
+
+fun ffi.getSecureRandomBytes(bytesNum: uint16): slice
+    asm "400 EXTCALL"
+
+fun ffi.rawSign(privateKey: int, data: int): slice
+    asm "403 EXTCALL"

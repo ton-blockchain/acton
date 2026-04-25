@@ -13,6 +13,9 @@ fail-on-diff = false
 [lint]
 exclude = ["lib/**"]
 
+[fmt]
+ignore = ["crates/tolk-compiler/**"]
+
 [localnet]
 port = 3010
 accounts = []

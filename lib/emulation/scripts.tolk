@@ -230,7 +230,14 @@ fun scripts.isContractDeployed(addr: address): bool {
     return ffi.isDeployed(addr.toCell());
 }
 
-fun ffi.getWalletByName(name: string): cell? asm "24 EXTCALL"
-fun ffi.getWalletKeyPair(addr: address): [int, int]? asm "45 EXTCALL"
-fun ffi.getWalletId(addr: address): int? asm "46 EXTCALL"
-fun ffi.failWalletNotFound(walletName: string, location: string): bool asm "105 EXTCALL"
+fun ffi.getWalletByName(name: string): cell?
+    asm "24 EXTCALL"
+
+fun ffi.getWalletKeyPair(addr: address): [int, int]?
+    asm "45 EXTCALL"
+
+fun ffi.getWalletId(addr: address): int?
+    asm "46 EXTCALL"
+
+fun ffi.failWalletNotFound(walletName: string, location: string): bool
+    asm "105 EXTCALL"
