@@ -18,6 +18,10 @@ Deterministic fallback matrix:
 - `select(...)`: returns `""` in non-interactive mode or on prompt failure
 - `confirm(...)`: returns `false` in non-interactive mode or on prompt
   failure, even if `default` is `true`
+- `promptInt(...)`: parses `default` in non-interactive mode; invalid
+  interactive input is rejected until corrected
+- `promptAddress(...)`: parses `default` in non-interactive mode; invalid
+  interactive input is rejected until corrected
 - `promptWallet(...)`: returns `"emulated-wallet"` in emulate mode; in
   broadcast mode it auto-selects the only configured wallet, but otherwise
   fails when no wallet is available or wallet choice cannot be collected
@@ -65,7 +69,7 @@ val name = prompt("What is your name?", "type your name", "John");
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L52" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L57" />
 
 ## `select`
 
@@ -90,7 +94,7 @@ val name = select("What is your name?", ["John", "Jane", "Jim"], 1);
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L72" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L77" />
 
 ## `confirm`
 
@@ -113,7 +117,51 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L90" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L95" />
+
+## `promptInt`
+
+```tolk
+fun promptInt(message: string, default: string = "", placeholder: string = ""): int
+```
+
+Prompts the user for an integer.
+
+Interactive behavior:
+- Invalid input is rejected by the host prompt validator until the user
+  corrects it.
+- Pressing Enter accepts `default` when it is non-empty.
+
+Non-interactive fallback:
+- Parses and returns `default`.
+- If `default` is empty or invalid, execution fails with the same integer
+  parser error as `parseInt(...)`.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L110" />
+
+## `promptAddress`
+
+```tolk
+fun promptAddress(
+    message: string,
+    default: address? = null,
+    placeholder: string = "EQ... / kQ...",
+): address
+```
+
+Prompts the user for a TON address.
+
+Interactive behavior:
+- Invalid input is rejected by the host prompt validator until the user
+  corrects it.
+- Pressing Enter accepts `default` when it is not `null`.
+
+Non-interactive fallback:
+- Parses and returns `default`.
+- If `default` is `null` or invalid, execution fails with the same address
+  parser error as `parseAddress(...)`.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L125" />
 
 ## `promptWallet`
 
@@ -139,5 +187,5 @@ Example:
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L111" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L154" />
 

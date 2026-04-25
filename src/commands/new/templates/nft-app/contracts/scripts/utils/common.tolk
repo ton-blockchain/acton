@@ -1,6 +1,5 @@
 import "@stdlib/strings"
 import "@acton/build"
-import "@acton/fmt"
 import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
@@ -43,8 +42,7 @@ fun promptNftWallet(message: string): ActonWallet {
 }
 
 fun promptNftAddress(message: string, default: address? = null): address {
-    val s = default == null ? prompt(message, "") : prompt(message, "", format("{}", default));
-    return parseAddress(s);
+    return promptAddress(message, default);
 }
 
 fun promptNftCollectionInfo(): NftCollectionInfo {
@@ -56,17 +54,11 @@ fun promptNftCollectionInfo(): NftCollectionInfo {
 }
 
 fun promptNftCollection(message: string): NftCollection {
-    val s = prompt(message, "EQ... / kQ...", "");
-    return NftCollection.fromAddress(parseAddress(s));
+    return NftCollection.fromAddress(promptAddress(message));
 }
 
 fun promptNftItem(message: string): NftItem {
-    val s = prompt(message, "EQ... / kQ...", "");
-    return NftItem.fromAddress(parseAddress(s));
-}
-
-fun promptInt(message: string, default: string): int {
-    return parseInt(prompt(message, "", default));
+    return NftItem.fromAddress(promptAddress(message));
 }
 
 fun makeNftCollectionStorage(admin: address, info: NftCollectionInfo): NftCollectionStorage {
