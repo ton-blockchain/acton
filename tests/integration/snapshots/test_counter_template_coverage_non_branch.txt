@@ -1,66 +1,76 @@
 Coverage Summary:
-Lines: 15/15 (100.00%)
-Total Hits: 58
+Lines: 20/20 (100.00%)
+Total Hits: 71
 
 File: [ROOT]/contracts/Counter.tolk
 Annotated Code:
- 1   | import "types"                                                               |
- 2   |                                                                              |
- 3   | contract Counter {                                                           |
- 4   |     storage: Storage                                                         |
- 5   |     incomingMessages: AllowedMessage                                         |
- 6   | }                                                                            |
- 7   |                                                                              |
- 8   | type AllowedMessage = IncreaseCounter | ResetCounter                         |
- 9   |                                                                              |
-10 ✓ | fun onInternalMessage(in: InMessage) {                                       | hits:8 branches:true=0 false=8
-11 ✓ |     val msg = lazy AllowedMessage.fromSlice(in.body);                        | hits:8
-12   |                                                                              |
-13 ✓ |     match (msg) {                                                            | hits:8 branches:site0 true=1 false=4; site1 true=3 false=5
-14 ✓ |         IncreaseCounter => {                                                 | hits:3
-15 ✓ |             var storage = lazy Storage.load();                               | hits:3
-16 ✓ |             storage.counter += msg.increaseBy;                               | hits:3
-17 ✓ |             storage.save();                                                  | hits:3
-18   |         }                                                                    |
-19 ✓ |         ResetCounter => {                                                    | hits:1
-20 ✓ |             var storage = lazy Storage.load();                               | hits:1
-21 ✓ |             storage.counter = 0;                                             | hits:1
-22 ✓ |             storage.save();                                                  | hits:1
-23   |         }                                                                    |
-24   |         else => {                                                            |
-25 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;          | hits:4 branches:throw=0 continue=4
-26   |         }                                                                    |
-27   |     }                                                                        |
-28   | }                                                                            |
-29   |                                                                              |
-30   | fun onBouncedMessage(_in: InMessageBounced) {}                               |
-31   |                                                                              |
-32   | get fun currentCounter(): int {                                              |
-33 ✓ |     val storage = lazy Storage.load();                                       | hits:5
-34 ✓ |     return storage.counter;                                                  | hits:5
-35   | }                                                                            |
+ 1   | import "types"                                                                  |
+ 2   |                                                                                 |
+ 3   | contract Counter {                                                              |
+ 4   |     storage: Storage                                                            |
+ 5   |     incomingMessages: AllowedMessage                                            |
+ 6   | }                                                                               |
+ 7   |                                                                                 |
+ 8   | type AllowedMessage = IncreaseCounter | DecreaseCounter | ResetCounter          |
+ 9   |                                                                                 |
+10 ✓ | fun onInternalMessage(in: InMessage) {                                          | hits:10 branches:true=0 false=10
+11 ✓ |     val msg = lazy AllowedMessage.fromSlice(in.body);                           | hits:10
+12   |                                                                                 |
+13 ✓ |     match (msg) {                                                               | hits:10 branches:site0 true=1 false=4; site1 true=2 false=5; site2 true=3 false=7
+14 ✓ |         IncreaseCounter => {                                                    | hits:3
+15 ✓ |             var storage = lazy Storage.load();                                  | hits:3
+16   |                                                                                 |
+17 ✓ |             storage.counter += msg.increaseBy;                                  | hits:3
+18 ✓ |             storage.save();                                                     | hits:3
+19   |         }                                                                       |
+20 ✓ |         DecreaseCounter => {                                                    | hits:2
+21 ✓ |             var storage = lazy Storage.load();                                  | hits:2
+22   |                                                                                 |
+23 ✓ |             assert (storage.counter >= msg.decreaseBy) throw 0x1001;            | hits:2 branches:throw=1 continue=1
+24 ✓ |             storage.counter -= msg.decreaseBy;                                  | hits:1
+25 ✓ |             storage.save();                                                     | hits:1
+26   |         }                                                                       |
+27 ✓ |         ResetCounter => {                                                       | hits:1
+28 ✓ |             var storage = lazy Storage.load();                                  | hits:1
+29   |                                                                                 |
+30 ✓ |             storage.counter = 0;                                                | hits:1
+31 ✓ |             storage.save();                                                     | hits:1
+32   |         }                                                                       |
+33   |         else => {                                                               |
+34 ✓ |             assert (in.body.isEmpty()) throw 0xFFFF;                            | hits:4 branches:throw=0 continue=4
+35   |         }                                                                       |
+36   |     }                                                                           |
+37   | }                                                                               |
+38   |                                                                                 |
+39   | fun onBouncedMessage(_in: InMessageBounced) {}                                  |
+40   |                                                                                 |
+41   | get fun currentCounter(): int {                                                 |
+42 ✓ |     val storage = lazy Storage.load();                                          | hits:4
+43   |                                                                                 |
+44 ✓ |     return storage.counter;                                                     | hits:4
+45   | }                                                                               |
 
 File: [ROOT]/contracts/types.tolk
 Annotated Code:
- 1   | enum Errors {                                             |
- 2   |     InvalidMessage = 0xFFFF                               |
- 3   | }                                                         |
- 4   |                                                           |
- 5   | struct Storage {                                          |
- 6   |     id: uint32                                            |
- 7   |     counter: uint32                                       |
+ 1   | struct Storage {                                          |
+ 2   |     id: uint32                                            |
+ 3   |     counter: uint32                                       |
+ 4   | }                                                         |
+ 5   |                                                           |
+ 6   | fun Storage.load(): Storage {                             |
+ 7   |     return Storage.fromCell(contract.getData());          |
  8   | }                                                         |
  9   |                                                           |
-10   | fun Storage.load(): Storage {                             |
-11   |     return Storage.fromCell(contract.getData());          |
+10   | fun Storage.save(self) {                                  |
+11 ✓ |     contract.setData(self.toCell());                      | hits:5
 12   | }                                                         |
 13   |                                                           |
-14   | fun Storage.save(self) {                                  |
-15 ✓ |     contract.setData(self.toCell());                      | hits:4
+14   | struct (0x7e8764ef) IncreaseCounter {                     |
+15   |     increaseBy: uint32                                    |
 16   | }                                                         |
 17   |                                                           |
-18   | struct (0x7e8764ef) IncreaseCounter {                     |
-19   |     increaseBy: uint32                                    |
+18   | struct (0x283b4c3f) DecreaseCounter {                     |
+19   |     decreaseBy: uint32                                    |
 20   | }                                                         |
 21   |                                                           |
 22   | struct (0x3a752f06) ResetCounter {}                       |

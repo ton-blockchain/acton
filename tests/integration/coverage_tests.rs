@@ -14,7 +14,7 @@ const COUNTER_TEMPLATE_CONTRACT: &str =
 const COUNTER_TEMPLATE_TYPES: &str =
     include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
 const COUNTER_TEMPLATE_WRAPPER: &str =
-    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.gen.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
 
@@ -24,7 +24,7 @@ import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 import "@contracts/types"
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 
 get fun `test unknown message reject`() {
     val (contract, deployer, _) = setupTest();
@@ -33,7 +33,7 @@ get fun `test unknown message reject`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: Errors.InvalidMessage as int,
+        exitCode: 0xFFFF,
     });
 }
 
@@ -61,7 +61,7 @@ fn build_counter_template_project(name: &str, test_source: &str) -> Project {
         .without_acton_toml()
         .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
-        .file("wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
+        .file("wrappers/Counter.gen", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
         .build();
     project.acton().init().run().success();
@@ -862,7 +862,7 @@ fn test_counter_template_coverage_text_snapshots() {
     project
         .acton()
         .test()
-        .filter("test deploy starts at zero|test increase counter|test any account can increase counter|test reset counter")
+        .filter("test increase counter|test reset counter|test decrease counter")
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("counter-template-non-branch.txt")

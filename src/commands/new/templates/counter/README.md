@@ -1,14 +1,17 @@
 # Counter Template
 
 This project was generated from Acton's `counter` template. It includes a small
-counter contract, wrapper helpers, tests, and a ready-to-run deployment script.
+counter contract, generated wrapper helpers, tests, and a ready-to-run
+deployment script.
 
 ## What Is Included
 
 - `contracts/Counter.tolk` implements the counter contract.
-- `contracts/types.tolk` defines storage, message types, and starter errors.
-- `wrappers/Counter.tolk` is the wrapper used by tests and scripts.
-- `tests/counter.test.tolk` covers increment, reset, and invalid-message flows.
+- `contracts/types.tolk` defines storage and message types.
+- `wrappers/Counter.gen.tolk` is the generated wrapper used by tests and
+  scripts.
+- `tests/counter.test.tolk` covers increment, decrement, reset, underflow, and
+  invalid-message flows.
 - `scripts/deploy.tolk` deploys the contract with initial counter state and
   reads the counter back after deployment.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
@@ -36,7 +39,7 @@ acton run deploy-emulation
 
 1. Extend `contracts/types.tolk` with your storage, messages, and errors.
 2. Update `contracts/Counter.tolk` with your contract logic.
-3. Adjust `wrappers/Counter.tolk` to match the new ABI, or regenerate it
+3. Adjust `wrappers/Counter.gen.tolk` to match the new ABI, or regenerate it
    with `acton wrapper Counter`.
 4. Extend `tests/counter.test.tolk` with the scenarios you care about.
 5. Update `scripts/deploy.tolk` with the storage and deployment flow you want.

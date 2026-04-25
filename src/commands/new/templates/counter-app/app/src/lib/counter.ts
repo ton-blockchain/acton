@@ -217,7 +217,7 @@ export function getErrorMessage(error: unknown): string {
       status === 429 ||
       errorWithStatus.message?.includes('status code 429')
     ) {
-      return 'Toncenter rate limit reached (HTTP 429). This app reads chain data through Toncenter, so wait a bit and try again, or add VITE_TONCENTER_API_KEY for higher limits.';
+      return 'Toncenter rate limit reached (HTTP 429). This app reads chain data through Toncenter, so wait a bit and try again, or add TONCENTER_TESTNET_API_KEY / TONCENTER_MAINNET_API_KEY for higher limits.';
     }
   }
 

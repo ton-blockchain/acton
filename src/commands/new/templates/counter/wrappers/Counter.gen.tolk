@@ -5,31 +5,43 @@
 
 import "@acton/build"
 import "@acton/emulation/network"
+import "@acton/testing/assert"
 import "@contracts/types"
 
+/// Storage `Storage` is defined in `contracts/types.tolk`
 struct Counter {
     address: address
-    init: ContractState
+    stateInit: ContractState? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun Counter.fromStorage(storage: Storage): Counter {
-    val init = ContractState {
+fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): Counter {
+    val stateInit = ContractState {
         code: build("Counter"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Counter { address, init };
+    val address = toShard == null
+        ? AutoDeployAddress { stateInit }.calculateAddress()
+        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    return Counter { address, stateInit };
+}
+
+/// Creates a contract wrapper instance from the address
+fun Counter.fromAddress(address: address): Counter {
+    return Counter { address };
 }
 
 /// Deploys the contract to the blockchain
 fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList {
-    val deployMsg = createMessage({
+    if (self.stateInit == null) {
+        Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
+    }
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.init },
+        dest: { stateInit: self.stateInit },
     });
-    return net.send(from, deployMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Counter.sendIncreaseCounter(
@@ -38,13 +50,13 @@ fun Counter.sendIncreaseCounter(
     increaseBy: uint32,
     config: SendParams = {},
 ): SendResultList {
-    val increaseMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body: IncreaseCounter { increaseBy },
     });
-    return net.send(from, increaseMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Counter.sendDecreaseCounter(
@@ -53,33 +65,34 @@ fun Counter.sendDecreaseCounter(
     decreaseBy: uint32,
     config: SendParams = {},
 ): SendResultList {
-    val decreaseMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body: DecreaseCounter { decreaseBy },
     });
-    return net.send(from, decreaseMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Counter.sendResetCounter(self, from: address, config: SendParams = {}): SendResultList {
-    val resetMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body: ResetCounter {},
     });
-    return net.send(from, resetMsg);
+    return net.send(from, genericMsg);
 }
 
+/// Send message to the contract with a custom body cell
 fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
-    val anyMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body,
     });
-    return net.send(from, anyMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Counter.currentCounter(self): int {

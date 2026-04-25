@@ -2,7 +2,7 @@ import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@contracts/types"
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 
 fun main() {
     val deployer = scripts.wallet("deployer");
