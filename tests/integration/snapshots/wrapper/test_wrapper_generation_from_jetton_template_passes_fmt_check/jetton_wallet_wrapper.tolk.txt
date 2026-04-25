@@ -48,33 +48,6 @@ fun JettonWallet.deploy(self, from: address, config: SendParams = {}): SendResul
     return net.send(from, genericMsg);
 }
 
-fun JettonWallet.sendInternalTransferStep(
-    self,
-    from: address,
-    queryId: uint64,
-    jettonAmount: coins,
-    transferInitiator: address?,
-    sendExcessesTo: address?,
-    forwardTonAmount: coins,
-    forwardPayload: ForwardPayloadRemainder,
-    config: SendParams = {},
-): SendResultList {
-    val genericMsg = createMessage({
-        bounce: config.bounce,
-        value: config.value,
-        dest: self.address,
-        body: InternalTransferStep {
-            queryId,
-            jettonAmount,
-            transferInitiator,
-            sendExcessesTo,
-            forwardTonAmount,
-            forwardPayload,
-        },
-    });
-    return net.send(from, genericMsg);
-}
-
 fun JettonWallet.sendAskToTransfer(
     self,
     from: address,
@@ -118,6 +91,43 @@ fun JettonWallet.sendAskToBurn(
         value: config.value,
         dest: self.address,
         body: AskToBurn { queryId, jettonAmount, sendExcessesTo, customPayload },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWallet.sendInternalTransferStep(
+    self,
+    from: address,
+    queryId: uint64,
+    jettonAmount: coins,
+    transferInitiator: address?,
+    sendExcessesTo: address?,
+    forwardTonAmount: coins,
+    forwardPayload: ForwardPayloadRemainder,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: InternalTransferStep {
+            queryId,
+            jettonAmount,
+            transferInitiator,
+            sendExcessesTo,
+            forwardTonAmount,
+            forwardPayload,
+        },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWallet.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: TopUpTons {},
     });
     return net.send(from, genericMsg);
 }

@@ -20,7 +20,7 @@ struct (0x7362d09c) TransferNotificationForRecipient {
 struct (0x178d4519) InternalTransferStep {
     queryId: uint64
     jettonAmount: coins
-    transferInitiator: address? // is null when minting (not initiated by another wallet)
+    transferInitiator: address?
     sendExcessesTo: address?
     forwardTonAmount: coins
     forwardPayload: ForwardPayloadRemainder
@@ -56,34 +56,42 @@ struct (0xd1735400) ResponseWalletAddress {
     ownerAddress: Cell<address>?
 }
 
-struct (0x00000015) MintNewJettons {
+struct (0x642b7d07) MintNewJettons {
     queryId: uint64
     mintRecipient: address
     tonAmount: coins
     internalTransferMsg: Cell<InternalTransferStep>
 }
 
-struct (0x00000003) ChangeMinterAdmin {
+struct (0x6501f354) ChangeMinterAdmin {
     queryId: uint64
     newAdminAddress: address
 }
 
-struct (0x00000004) ChangeMinterContent {
+struct (0xfb88e119) ClaimMinterAdmin {
     queryId: uint64
-    newContent: cell
 }
 
-struct JettonWalletDataReply {
-    jettonBalance: coins
-    ownerAddress: address
-    minterAddress: address
-    jettonWalletCode: cell
+struct (0x7431f221) DropMinterAdmin {
+    queryId: uint64
 }
 
-struct JettonDataReply {
-    totalSupply: int
-    mintable: bool
-    adminAddress: address
-    jettonContent: cell
-    jettonWalletCode: cell
+struct (0x2508d66a) UpgradeMinterCode {
+    queryId: uint64
+    newData: cell
+    newCode: cell
+}
+
+struct (0xcb862902) ChangeMinterMetadata {
+    queryId: uint64
+    newMetadata: cell
+}
+
+struct (0xd372158c) TopUpTons {}
+
+fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self) {
+    var mutableCopy = self;
+    if (mutableCopy.loadMaybeRef() != null) {
+        mutableCopy.assertEnd();
+    }
 }

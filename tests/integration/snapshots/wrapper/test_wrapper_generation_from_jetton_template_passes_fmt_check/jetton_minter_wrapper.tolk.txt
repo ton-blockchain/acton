@@ -48,6 +48,29 @@ fun JettonMinter.deploy(self, from: address, config: SendParams = {}): SendResul
     return net.send(from, genericMsg);
 }
 
+fun JettonMinter.sendMintNewJettons(
+    self,
+    from: address,
+    queryId: uint64,
+    mintRecipient: address,
+    tonAmount: coins,
+    internalTransferMsg: InternalTransferStep,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: MintNewJettons {
+            queryId,
+            mintRecipient,
+            tonAmount,
+            internalTransferMsg: internalTransferMsg.toCell(),
+        },
+    });
+    return net.send(from, genericMsg);
+}
+
 fun JettonMinter.sendBurnNotificationForMinter(
     self,
     from: address,
@@ -83,29 +106,6 @@ fun JettonMinter.sendRequestWalletAddress(
     return net.send(from, genericMsg);
 }
 
-fun JettonMinter.sendMintNewJettons(
-    self,
-    from: address,
-    queryId: uint64,
-    mintRecipient: address,
-    tonAmount: coins,
-    internalTransferMsg: InternalTransferStep,
-    config: SendParams = {},
-): SendResultList {
-    val genericMsg = createMessage({
-        bounce: config.bounce,
-        value: config.value,
-        dest: self.address,
-        body: MintNewJettons {
-            queryId,
-            mintRecipient,
-            tonAmount,
-            internalTransferMsg: internalTransferMsg.toCell(),
-        },
-    });
-    return net.send(from, genericMsg);
-}
-
 fun JettonMinter.sendChangeMinterAdmin(
     self,
     from: address,
@@ -122,18 +122,75 @@ fun JettonMinter.sendChangeMinterAdmin(
     return net.send(from, genericMsg);
 }
 
-fun JettonMinter.sendChangeMinterContent(
+fun JettonMinter.sendClaimMinterAdmin(
     self,
     from: address,
     queryId: uint64,
-    newContent: cell,
     config: SendParams = {},
 ): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: ChangeMinterContent { queryId, newContent },
+        body: ClaimMinterAdmin { queryId },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinter.sendDropMinterAdmin(
+    self,
+    from: address,
+    queryId: uint64,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: DropMinterAdmin { queryId },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinter.sendChangeMinterMetadata(
+    self,
+    from: address,
+    queryId: uint64,
+    newMetadata: cell,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: ChangeMinterMetadata { queryId, newMetadata },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinter.sendUpgradeMinterCode(
+    self,
+    from: address,
+    queryId: uint64,
+    newData: cell,
+    newCode: cell,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: UpgradeMinterCode { queryId, newData, newCode },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonMinter.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: TopUpTons {},
     });
     return net.send(from, genericMsg);
 }
@@ -155,4 +212,8 @@ fun JettonMinter.getJettonData(self): JettonDataReply {
 
 fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
     return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
+}
+
+fun JettonMinter.getNextAdminAddress(self): address? {
+    return net.runGetMethod(self.address, "get_next_admin_address");
 }

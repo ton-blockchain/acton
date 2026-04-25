@@ -2042,19 +2042,43 @@ fn localnet_supports_v3_account_states_endpoint() {
             "src/commands/new/templates/jetton/contracts/storage.tolk",
         )
         .file_from_path(
-            "wrappers/JettonMinter",
-            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
+            "contracts/sharding",
+            "src/commands/new/templates/jetton/contracts/sharding.tolk",
         )
         .file_from_path(
-            "wrappers/JettonWallet",
-            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
+            "wrappers/JettonMinter.gen",
+            "src/commands/new/templates/jetton/wrappers/JettonMinter.gen.tolk",
+        )
+        .file_from_path(
+            "wrappers/JettonWallet.gen",
+            "src/commands/new/templates/jetton/wrappers/JettonWallet.gen.tolk",
+        )
+        .file_from_path(
+            "wrappers/utils",
+            "src/commands/new/templates/jetton/wrappers/utils.tolk",
         )
         .file_from_path(
             "scripts/deploy",
             "src/commands/new/templates/jetton/scripts/deploy.tolk",
         )
+        .file_from_path(
+            "scripts/mint",
+            "src/commands/new/templates/jetton/scripts/mint.tolk",
+        )
+        .file_from_path(
+            "scripts/utils/common",
+            "src/commands/new/templates/jetton/scripts/utils/common.tolk",
+        )
         .build();
     project.acton().init().run().success();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let acton_toml = fs::read_to_string(&acton_toml_path).unwrap();
+    let acton_toml = acton_toml.replace(
+        "[contracts.JettonMinter]\ndisplay-name = \"JettonMinter\"\nsrc = \"contracts/JettonMinter.tolk\"\ndepends = []",
+        "[contracts.JettonMinter]\ndisplay-name = \"JettonMinter\"\nsrc = \"contracts/JettonMinter.tolk\"\ndepends = [\"JettonWallet\"]",
+    );
+    fs::write(&acton_toml_path, acton_toml).unwrap();
 
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("Failed to write wallets.toml");
@@ -2082,12 +2106,23 @@ fn localnet_supports_v3_account_states_endpoint() {
         "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
     );
 
-    let minter_address = extract_prefixed_line_value(&script_stdout, "Deployed Jetton minter to ");
-    let owner_address = extract_prefixed_line_value(
-        &script_stdout,
-        "Successfully minted and transferred 1000000000 tokens to ",
-    );
+    let minter_address = extract_prefixed_line_value(&script_stdout, "JETTON MINTER_ADDRESS=")
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_owned();
+    let owner_address = extract_prefixed_line_value(&script_stdout, "JETTON_ADMIN OWNER_ADDRESS=");
     wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
+
+    let mint_result = project
+        .acton()
+        .script("scripts/mint.tolk")
+        .verify_network("localnet")
+        .env("JETTON_ADMIN", "deployer")
+        .env("JETTON_MINTER_ADDRESS", &minter_address)
+        .run();
+    let mint_status = mint_result.output.get_output().status.code().unwrap_or(1);
+    assert_eq!(mint_status, 0, "Mint script failed");
 
     let wallets_response = wait_for_ok_response(
         &node,

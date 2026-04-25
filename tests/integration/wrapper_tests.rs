@@ -369,6 +369,13 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
 
     assert!(generated_project_path.join("Acton.toml").exists());
 
+    workspace
+        .acton()
+        .current_dir(&generated_project_path)
+        .arg("build")
+        .run()
+        .success();
+
     let tests_dir = generated_project_path.join("tests");
     if tests_dir.exists() {
         fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
