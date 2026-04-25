@@ -4,7 +4,7 @@ Remote Account
   Address:           kQAmGPodyDzDs9Lx9GkUsLf20/Fch/asoTR5Wkq9DazU9A29
   Raw Address:       0:2618fa1dc83cc3b3d2f1f46914b0b7f6d3f15c87f6aca134795a4abd0dacd4f4
   Status:            active
-  Balance:           [BALANCE] TON
+  Balance:           0.199746 TON
   Last Tx LT:        5
   Last Tx Hash:      [TX_HASH]
   Code Hash:         0x1f6548a25e04497496242ad7804b653e6da9a47e474dc17436313ffa04e15f18

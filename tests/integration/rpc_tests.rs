@@ -660,8 +660,6 @@ fn normalize_localnet_rpc_stdout(stdout: &str) -> String {
     for line in stdout.lines() {
         if let Some((prefix, _)) = line.split_once("Last Tx Hash:") {
             normalized_lines.push(format!("{prefix}Last Tx Hash:      [TX_HASH]"));
-        } else if let Some((prefix, _)) = line.split_once("Balance:") {
-            normalized_lines.push(format!("{prefix}Balance:           [BALANCE] TON"));
         } else {
             normalized_lines.push(line.to_owned());
         }
