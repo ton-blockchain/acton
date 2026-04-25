@@ -3,26 +3,17 @@
 import React, {useState, useEffect} from 'react';
 import {Copy, Check} from 'lucide-react';
 
-const TABS = ['macOS / Linux', 'Windows'];
+const TABS = ['macOS / Linux'];
 const COMMANDS: Record<string, string> = {
   "macOS / Linux":
-    "curl -fsSL https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh",
-  Windows: 'powershell -c "irm acton.sh/install.ps1 | iex"',
+    "curl -LsSf https://ton.org/acton/install.sh | sh",
 }
 
 const highlightCommand = (command: string) => {
   if (command.includes('curl')) {
     return command
       .replace('curl', '<span class="text-purple-400">curl</span>')
-      .replace('|', '<span class="text-white/50">|</span>')
-      .replace('bash', '<span class="text-purple-400">bash</span>');
-  }
-  if (command.includes('powershell')) {
-    return command
-      .replace('powershell', '<span class="text-purple-400">powershell</span>')
-      .replace('-c', '<span class="text-blue-400">-c</span>')
-      .replace('"irm acton.sh/install.ps1 | iex"', '<span class="text-green-400">"irm acton.sh/install.ps1 | iex"</span>')
-      .replace('|', '<span class="text-white/50">|</span>');
+      .replace('| sh', '<span class="text-white/50">|</span> <span class="text-purple-400">sh</span>')
   }
   return command;
 };
@@ -42,7 +33,7 @@ export const InstallationCodeBlock: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <div className="relative max-w-4xl mx-auto mt-16">
+    <div className="relative max-w-xl mx-auto mt-16">
       <div
         className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-500 rounded-2xl blur opacity-20 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
       <div className="relative bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl shadow-lg">
