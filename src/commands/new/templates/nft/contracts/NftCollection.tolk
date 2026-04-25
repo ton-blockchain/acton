@@ -74,11 +74,11 @@ fun onInternalMessage(in: InMessage) {
                 counter += 1;
                 assert (counter < BATCH_SIZE_LIMIT) throw Errors.BatchLimitExceeded;
 
+                // Error cast is used to replicate exit codes from FunC version
                 val itemIndex = r.getKey();
                 assert (
                     itemIndex <= storage.nextItemIndex
-                ) throw (Errors.NotFromAdmin as int) +
-                counter;                                                                                  // This cast is used to replicate error codes from FunC version
+                ) throw (Errors.NotFromAdmin as int) + counter;
 
                 val dictItem = r.loadValue();
                 deployNftItem(
