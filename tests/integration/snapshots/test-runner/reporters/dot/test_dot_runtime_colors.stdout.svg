@@ -1,0 +1,81 @@
+<svg width="740px" height="506px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .fg-bright-red { fill: #FF5555 }
+    .fg-green { fill: #00AA00 }
+    .fg-red { fill: #AA0000 }
+    .fg-yellow { fill: #AA5500 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    .bold { font-weight: bold; }
+    .dimmed { opacity: 0.7; }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library [ACTON_VERSION]</tspan>
+</tspan>
+    <tspan x="10px" y="46px"><tspan>   </tspan><tspan class="fg-green bold">Compiling</tspan><tspan> contracts</tspan>
+</tspan>
+    <tspan x="10px" y="64px"><tspan>   </tspan><tspan class="fg-green bold">Compiling</tspan><tspan> simple</tspan>
+</tspan>
+    <tspan x="10px" y="82px"><tspan>    </tspan><tspan class="fg-green">Finished</tspan><tspan> in [TIME]</tspan>
+</tspan>
+    <tspan x="10px" y="100px"><tspan>    </tspan><tspan class="fg-green bold">Finished</tspan><tspan> in [TIME]</tspan>
+</tspan>
+    <tspan x="10px" y="118px"><tspan>     </tspan><tspan class="fg-green bold">Running</tspan><tspan> tests</tspan>
+</tspan>
+    <tspan x="10px" y="136px"><tspan class="fg-red">x</tspan>
+</tspan>
+    <tspan x="10px" y="154px">
+</tspan>
+    <tspan x="10px" y="172px"><tspan class="fg-red">✗</tspan><tspan> test dot colored runtime details</tspan>
+</tspan>
+    <tspan x="10px" y="190px"><tspan>  Cannot execute get method </tspan><tspan class="fg-yellow">currentCounterFail</tspan><tspan> </tspan><tspan class="dimmed">(83805)</tspan>
+</tspan>
+    <tspan x="10px" y="208px"><tspan>  exit_code=</tspan><tspan class="fg-yellow">10</tspan>
+</tspan>
+    <tspan x="10px" y="226px"><tspan>  at contracts/simple[LINE]</tspan>
+</tspan>
+    <tspan x="10px" y="244px"><tspan>  Backtrace:</tspan>
+</tspan>
+    <tspan x="10px" y="262px"><tspan>    </tspan><tspan class="fg-green">currentCounterFail  </tspan><tspan> at </tspan><tspan class="dimmed">contracts/simple[LINE]</tspan>
+</tspan>
+    <tspan x="10px" y="280px"><tspan>  Called from:</tspan>
+</tspan>
+    <tspan x="10px" y="298px"><tspan>    </tspan><tspan class="fg-green">net.runGetMethod&lt;int&gt;             </tspan><tspan> at </tspan><tspan class="dimmed">../lib/emulation/network[LINE]</tspan>
+</tspan>
+    <tspan x="10px" y="316px"><tspan>    </tspan><tspan class="fg-green">test dot colored runtime details  </tspan><tspan> at </tspan><tspan class="dimmed">tests/test.test[LINE]</tspan>
+</tspan>
+    <tspan x="10px" y="334px"><tspan>  Description: Dictionary error</tspan>
+</tspan>
+    <tspan x="10px" y="352px"><tspan>  Phase: Compute phase</tspan>
+</tspan>
+    <tspan x="10px" y="370px">
+</tspan>
+    <tspan x="10px" y="388px"><tspan>stderr | [ROOT]/tests/test.test.tolk &gt; test dot colored runtime details</tspan>
+</tspan>
+    <tspan x="10px" y="406px"><tspan class="fg-bright-red">colored stderr line</tspan>
+</tspan>
+    <tspan x="10px" y="424px">
+</tspan>
+    <tspan x="10px" y="442px"><tspan> </tspan><tspan class="fg-red bold">✗</tspan><tspan> </tspan><tspan class="fg-red bold">1</tspan><tspan> </tspan><tspan class="fg-red bold">failed</tspan><tspan> </tspan><tspan class="dimmed">in</tspan><tspan> </tspan><tspan class="fg-green">1</tspan><tspan> </tspan><tspan class="fg-green dimmed">file</tspan>
+</tspan>
+    <tspan x="10px" y="460px">
+</tspan>
+    <tspan x="10px" y="478px"><tspan class="fg-red">Some tests failed.</tspan>
+</tspan>
+    <tspan x="10px" y="496px">
+</tspan>
+  </text>
+
+</svg>

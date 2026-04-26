@@ -1267,7 +1267,11 @@ fn run_file_tests(
                 network: None,
             };
 
-            if let Some(failure) = &assert_failure {
+            if let Some(gas_limit) = test.gas_limit.filter(|limit| gas_used > *limit) {
+                test_report.message = Some(format!(
+                    "Gas limit exceeded: used {gas_used}, limit {gas_limit}"
+                ));
+            } else if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
                 if test_report.message.is_none()
                     && let AssertFailure::GetMethod(get_method_failure) = failure

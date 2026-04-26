@@ -1,9 +1,11 @@
 use crate::commands::test::TestDescriptor;
 use crate::commands::test::trace::TransactionInfo;
 use crate::context::{AssertFailure, BuildCache, EmulationsState, KnownAddresses};
+use crate::formatter::FormatterContext;
 use acton_config::test::BacktraceMode;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -288,6 +290,25 @@ pub(super) fn extract_suite_name(file_path: &Path) -> Arc<str> {
         .and_then(|n| n.to_str())
         .unwrap_or_else(|| file_path.to_str().unwrap_or(""))
         .into()
+}
+
+pub(super) fn formatter_for_failed_test<'a>(test: &'a TestReport) -> Option<FormatterContext<'a>> {
+    let failure = test.execution.as_ref()?.failure.as_ref()?;
+
+    Some(FormatterContext {
+        contract_abi: test.abi.clone(),
+        accounts: Cow::Borrowed(&failure.accounts),
+        build_cache: Cow::Borrowed(&failure.build_cache),
+        emulations: Cow::Borrowed(&failure.emulations),
+        known_addresses: Cow::Borrowed(&failure.known_addresses),
+        known_code_cells: Cow::Borrowed(&failure.known_code_cells),
+        show_bodies: test.show_bodies,
+        has_wallets_config: false,
+        available_wallets: vec![],
+        backtrace: test.backtrace,
+        fork_net: None,
+        network: None,
+    })
 }
 
 pub(super) fn escape_xml(input: &str) -> String {

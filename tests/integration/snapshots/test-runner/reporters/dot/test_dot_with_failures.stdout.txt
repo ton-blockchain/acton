@@ -1,0 +1,35 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+xx
+
+✗ test should increase counter
+  expect(actual).toHaveSuccessfulTx(expected)
+  N/A -> deployer A
+  └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+      └── Compute phase failed: Dictionary error
+  
+  Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+  with:
+      success=true
+      exit_code=0
+  at tests/counter.test[LINE]
+
+✗ test should reset counter
+  expect(actual).toHaveSuccessfulTx(expected)
+  N/A -> deployer A
+  └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+      └── Compute phase failed: Dictionary error
+  
+  Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+  with:
+      success=true
+      exit_code=0
+  at tests/counter.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

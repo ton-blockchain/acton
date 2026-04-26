@@ -1,11 +1,10 @@
 use super::{
     TestReport, TestReporter, TestStatus, TestSuiteStats, extract_suite_name,
-    format_fuzz_failure_context,
+    format_fuzz_failure_context, formatter_for_failed_test,
 };
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
-use std::borrow::Cow;
 use std::path::Path;
 
 pub(crate) struct TeamCityReporter;
@@ -25,25 +24,6 @@ impl TeamCityReporter {
             .replace('\'', "|'")
     }
 
-    fn formatter_for_test<'a>(&self, test: &'a TestReport) -> Option<FormatterContext<'a>> {
-        let failure = test.execution.as_ref()?.failure.as_ref()?;
-
-        Some(FormatterContext {
-            contract_abi: test.abi.clone(),
-            accounts: Cow::Borrowed(&failure.accounts),
-            build_cache: Cow::Borrowed(&failure.build_cache),
-            emulations: Cow::Borrowed(&failure.emulations),
-            known_addresses: Cow::Borrowed(&failure.known_addresses),
-            known_code_cells: Cow::Borrowed(&failure.known_code_cells),
-            show_bodies: test.show_bodies,
-            has_wallets_config: false,
-            available_wallets: vec![],
-            backtrace: test.backtrace,
-            fork_net: None,
-            network: None,
-        })
-    }
-
     fn format_test_failure(
         &self,
         test: &TestReport,
@@ -52,7 +32,7 @@ impl TeamCityReporter {
         let mut details = String::new();
         let mut expected: Option<String> = None;
         let mut actual: Option<String> = None;
-        let formatter = self.formatter_for_test(test);
+        let formatter = formatter_for_failed_test(test);
 
         if let Some(exec) = &test.execution
             && let Some(ref assert_failure) = exec.assert_failure

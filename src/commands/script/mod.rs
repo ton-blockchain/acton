@@ -47,8 +47,6 @@ use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
 
 const ASSERTION_FAILED_EXIT_CODE: i32 = 567;
-const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
-const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
 
 fn resolve_script_networks(
     net: Option<&str>,
@@ -452,11 +450,7 @@ fn format_nonzero_script_exit_code_details<'a>(
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
     let exit_code_info = retrace::find_exception_info(&result.vm_log, &script_result.source_map);
-    let custom_exit_code_info = if matches!(
-        exit_code,
-        CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT
-            | CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE
-    ) {
+    let custom_exit_code_info = if FormatterContext::is_special_get_method_exit_code(exit_code) {
         None
     } else {
         FormatterContext::find_custom_exit_code_info(
@@ -503,15 +497,8 @@ fn format_nonzero_script_exit_code_details<'a>(
         writeln!(details, "Phase: {}", "Compute phase".dimmed()).ok();
     }
 
-    if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
-        writeln!(
-            details,
-            "Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
-            "--fork-net".yellow(),
-        )
-        .ok();
-    } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
-        writeln!(details, "Cannot run method of contract without code").ok();
+    if let Some(message) = FormatterContext::special_get_method_exit_code_message(exit_code) {
+        writeln!(details, "{message}").ok();
     }
 
     if formatter.backtrace.is_none() {

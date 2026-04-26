@@ -5,3 +5,5 @@
     Finished in [TIME]
      Running tests
 ··
+
+ ✓ 2 passed in 1 file

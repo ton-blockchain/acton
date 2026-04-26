@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+xx
+
+✗ test dot gas limit exceeded: Gas limit exceeded: used 122166, limit 100
+
+✗ test dot wrong expected [EXIT_STATUS]: Expected exit_code=42, got=99
+  exit_code=99
+  Re-run with --backtrace full to get more information
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

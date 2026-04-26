@@ -9,11 +9,20 @@
 stdout | [ROOT]/tests/first_test.test.tolk > test first
 First test output
 
-FAIL test second fail: expect(<actual>).toEqual(<expected>)
-  tests/second_test.test[LINE]
+✗ test second fail
+  expect(actual).toEqual(expected)
+  (
+      1,
+      2
+  )
+  at tests/second_test.test[LINE]
 
 stdout | [ROOT]/tests/second_test.test.tolk > test second fail
 This test will fail
 
 stderr | [ROOT]/tests/second_test.test.tolk > test second fail
 Error output
+
+ ✓ 2 passed, ✗ 1 failed in 2 files
+
+Some tests failed.

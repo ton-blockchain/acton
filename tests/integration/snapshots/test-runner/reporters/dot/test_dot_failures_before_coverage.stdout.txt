@@ -1,0 +1,27 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+x
+
+✗ test dot coverage failing
+  expect(actual).toEqual(expected)
+  (
+      true,
+      false
+  )
+  at tests/test.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
+
+ COVERAGE  
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                  Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score 
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                         2             3     66.7%                  1                2        50.0%   60.0% 
+ code/validator.tolk               2             3     66.7%                  1                2        50.0%   60.0% 

@@ -1,0 +1,23 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+x
+
+✗ test get method failure with backtrace
+  Cannot execute get method currentCounterFail (83805)
+  exit_code=10
+  at contracts/simple[LINE]
+  Backtrace:
+    currentCounterFail   at contracts/simple[LINE]
+  Called from:
+    net.runGetMethod<int>                    at ../lib/emulation/network[LINE]
+    test get method failure with backtrace   at tests/test.test[LINE]
+  Description: Dictionary error
+  Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

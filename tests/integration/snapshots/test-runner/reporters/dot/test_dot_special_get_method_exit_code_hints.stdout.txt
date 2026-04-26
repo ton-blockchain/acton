@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+xx
+
+✗ test dot not deployed get method hint
+  exit_code=678
+  Re-run with --backtrace full to get more information
+  Cannot run method of not deployed contract, make sure you're deployed contract first or passed --fork-net
+
+✗ test dot contract without code get method hint
+  exit_code=679
+  Re-run with --backtrace full to get more information
+  Cannot run method of contract without code
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

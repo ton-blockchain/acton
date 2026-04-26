@@ -35,6 +35,9 @@ use tycho_types::models::{
 };
 use tycho_types::num::Tokens;
 
+const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
+const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
+
 #[derive(Debug, Clone)]
 struct SendResult {
     tx: Transaction,
@@ -3343,7 +3346,7 @@ impl FormatterContext<'_> {
             if !backtrace_lines.is_empty() {
                 writeln!(output, "  Backtrace:").ok();
                 for line in backtrace_lines {
-                    writeln!(output, "    {}", strip_ansi_codes(&line)).ok();
+                    writeln!(output, "    {line}").ok();
                 }
             }
         }
@@ -3361,7 +3364,7 @@ impl FormatterContext<'_> {
                     writeln!(output, "Backtrace:").ok();
                 }
                 for line in backtrace_lines {
-                    writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
+                    writeln!(output, "  {line}").ok();
                 }
             } else if get_method_info.is_some() {
                 writeln!(output, "  at {}", Self::format_location(&info.loc)).ok();
@@ -3378,15 +3381,16 @@ impl FormatterContext<'_> {
         if let Some(info) = exit_codes::find(exit_code) {
             writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
-        } else if let Some(info) = self
-            .find_code_custom_exit_code_info(result.code.as_ref(), exit_code)
-            .or_else(|| {
-                Self::find_custom_exit_code_info(
-                    exit_code,
-                    Some(test.abi.as_ref()),
-                    test.compiler_abi.as_deref(),
-                )
-            })
+        } else if !Self::is_special_get_method_exit_code(exit_code)
+            && let Some(info) = self
+                .find_code_custom_exit_code_info(result.code.as_ref(), exit_code)
+                .or_else(|| {
+                    Self::find_custom_exit_code_info(
+                        exit_code,
+                        Some(test.abi.as_ref()),
+                        test.compiler_abi.as_deref(),
+                    )
+                })
         {
             writeln!(output, "Description: {}", info.description).ok();
             if info.symbolic_name != info.description {
@@ -3402,7 +3406,34 @@ impl FormatterContext<'_> {
             writeln!(output, "Description: {description}").ok();
         }
 
+        if let Some(message) = Self::special_get_method_exit_code_message(exit_code) {
+            writeln!(output, "{message}").ok();
+        }
+
         output.trim().to_string()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_special_get_method_exit_code(exit_code: i32) -> bool {
+        matches!(
+            exit_code,
+            CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT
+                | CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn special_get_method_exit_code_message(exit_code: i32) -> Option<String> {
+        match exit_code {
+            CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT => Some(format!(
+                "Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
+                "--fork-net".yellow()
+            )),
+            CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE => {
+                Some("Cannot run method of contract without code".to_string())
+            }
+            _ => None,
+        }
     }
 }
 

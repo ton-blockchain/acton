@@ -1,0 +1,12 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+○□·
+
+○ test dot skipped [not relevant for this run]
+□ test dot todo [cover later]
+
+ ✓ 1 passed, ○ 1 skipped, □ 1 todo in 1 file

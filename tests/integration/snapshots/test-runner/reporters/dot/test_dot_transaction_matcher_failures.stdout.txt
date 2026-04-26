@@ -1,0 +1,34 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling failing
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+xx
+
+✗ test dot missing successful tx tree
+  expect(actual).toHaveSuccessfulTx(expected)
+  N/A -> sender A
+  └── 0x1 1 TON -> failing B                                                      gas=332 exit_code=77 aborted
+      └── account created
+  
+  Cannot find transaction from <any> to <any>
+  with:
+      success=true
+      exit_code=0
+  at tests/tx_failures.test[LINE]
+
+✗ test dot unexpected failed tx tree
+  expect(actual).toHaveAllSuccessfulTxs(expected)
+  N/A -> sender A
+  └── 0x1 1 TON -> failing B                                                      gas=332 exit_code=77 aborted
+      └── account created
+  
+  Unexpected transaction
+  with:
+      success=false
+  at tests/tx_failures.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

@@ -9,9 +9,6 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 
-const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
-const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
-
 #[derive(Debug, Clone)]
 pub(crate) struct ConsoleConfig {
     pub show_output: bool,
@@ -575,20 +572,8 @@ fn process_nonzero_exit_code(
         groups.push((description.dimmed().to_string(), Vec::new()));
     }
 
-    // Special throw exit codes
-    if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
-        groups.push((
-            format!(
-                "Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
-                "--fork-net".yellow()
-            ),
-            Vec::new(),
-        ));
-    } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
-        groups.push((
-            "Cannot run method of contract without code".to_string(),
-            Vec::new(),
-        ));
+    if let Some(message) = FormatterContext::special_get_method_exit_code_message(exit_code) {
+        groups.push((message, Vec::new()));
     }
 
     for (idx, (line, nested)) in groups.iter().enumerate() {
