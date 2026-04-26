@@ -206,14 +206,12 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
             continue;
         }
 
-        let content = match fs::read_to_string(path) {
-            Ok(content) => content,
-            Err(_) => continue,
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
         };
 
-        let tree = match tolk_syntax::parse(&content) {
-            Ok(tree) => tree,
-            Err(_) => continue,
+        let Ok(tree) = tolk_syntax::parse(&content) else {
+            continue;
         };
 
         // treat all files with onInternalMessage as a contract entry file

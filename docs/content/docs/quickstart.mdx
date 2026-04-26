@@ -13,6 +13,10 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
     We won't dive deep into the specific details of the contract logic here. To learn more about Tolk and smart contract development, check out [Your first smart contract](https://docs.ton.org/contract-dev/first-smart-contract) in the official documentation.
 </Callout>
 
+<Callout type="info" title="Already have a repository?">
+    This quickstart uses `acton new` because it is the fastest way to get a working sample project. If you are adding Acton to an existing repository instead, start with `acton init` and then come back to the build/test/deploy steps below. The existing-project flow is documented in [Project initialization](/docs/tutorial/project-init).
+</Callout>
+
 ## Get started
 
 <Steps>
@@ -45,6 +49,10 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         ```
 
         The project is already set up with `contracts/Counter.tolk` and `contracts/types.tolk`.
+        The generated `Acton.toml` also includes ready-to-run script aliases:
+
+        - `deploy-emulation`
+        - `deploy-testnet`
     </Step>
 
     <Step title="Build contract">
@@ -136,10 +144,22 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
             If secure storage is unavailable, or if you disable it with `--secure false`, your mnemonic will be written to `wallets.toml`. **Never commit it to git.** Acton adds it to `.gitignore` automatically.
         </Callout>
 
-        After creating a wallet, the `--airdrop` flag automatically requests 2 TON on the testnet.
+        After creating a wallet, the `--airdrop` flag automatically requests testnet funds from the configured faucet.
         <Callout type="warn">
             If you don't use `--airdrop`, or if the faucet request fails, you can still fund the wallet through the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending it your wallet address.
         </Callout>
+
+        For day-to-day work, the broader wallet lifecycle is also worth
+        knowing:
+
+        - `acton wallet import` to reuse an existing mnemonic
+        - `acton wallet list --balance` to inspect configured wallets
+        - `acton wallet sign` to sign an external body without running a script
+        - `acton wallet export-mnemonic` for interactive export
+        - `acton wallet remove -y` to remove a wallet non-interactively
+
+        The full reference is in [Setup wallets](/docs/tutorial/setup-wallets) and
+        [`acton wallet`](/docs/commands/wallet).
     </Step>
 
     <Step title="Deploying contract">
@@ -150,13 +170,14 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         ```tolk title="scripts/deploy.tolk"
         import "@acton/io"
         import "@acton/emulation/network"
-        import "@acton/build/build"
+        import "@acton/emulation/scripts"
+        import "@acton/build"
 
         import "@wrappers/Counter"
         import "@contracts/types"
 
         fun main() {
-            val deployer = net.wallet("deployer");
+            val deployer = scripts.wallet("deployer");
 
             val counter = Counter.fromStorage({
                 id: 0,
@@ -198,10 +219,17 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
 Congratulations! You've successfully built, tested, deployed, and verified a smart contract on the TON blockchain using Acton!
 
+<Callout type="info" title="Troubleshooting">
+    If build/test/wallet resolution does not match your expectations, run
+    `acton doctor` before filing an issue. It prints resolved paths, manifest
+    status, stdlib health, overlay status, native library metadata, and
+    relevant environment variables.
+</Callout>
+
 ## Next Steps
 
 Explore more advanced topics:
 
-- **[Testing Guide](/docs/test-runner)** — deep dive into writing comprehensive tests.
-- **[Standard Library](/docs/standard_library)** — learn about the built-in functions available in Acton.
-- **[Commands Reference](/docs/commands)** — detailed documentation for all CLI commands.
+- **[Testing Guide](/docs/testing/overview)** — deep dive into writing comprehensive tests.
+- **[Standard Library](/docs/standard_library/overview)** — learn about the built-in functions available in Acton.
+- **[Commands Reference](/docs/commands/overview)** — detailed documentation for all CLI commands.

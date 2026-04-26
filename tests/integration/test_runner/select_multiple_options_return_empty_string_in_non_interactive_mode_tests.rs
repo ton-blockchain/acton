@@ -2,7 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 const PROMPTS_IMPORTS: &str = r#"
-import "../../lib/promts/prompts"
+import "../../lib/prompts"
 import "../../lib/testing/expect"
 "#;
 
@@ -25,7 +25,7 @@ fn select_multiple_options_return_empty_string_in_non_interactive_mode() {
         "ap-stdlib-select-multiple-options-fallback",
         r#"
 get fun `test ap stdlib select multiple options fallback`() {
-    val selected = select("Choose network:", ["Mainnet", "Testnet", "Local"] as tuple);
+    val selected = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
     expect(selected).toEqual("");
 }
 "#,
@@ -39,7 +39,7 @@ fn select_does_not_honor_starting_cursor_index_zero_in_non_interactive_mode_bug(
         "ap-stdlib-select-starting-cursor-index-zero-bug",
         r#"
 get fun `test ap stdlib select starting cursor index zero bug`() {
-    val selected = select("Choose deployment profile:", ["Safe", "Fast", "Experimental"] as tuple);
+    val selected = select("Choose deployment profile:", ["Safe", "Fast", "Experimental"]);
     expect(selected).toEqual("");
 }
 "#,

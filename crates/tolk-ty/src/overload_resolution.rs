@@ -38,7 +38,7 @@ pub(crate) struct ShapeScore {
 }
 
 impl ShapeScore {
-    pub(crate) fn is_shape_better_than(&self, other: &ShapeScore) -> bool {
+    pub(crate) fn is_shape_better_than(self, other: ShapeScore) -> bool {
         match self.kind.cmp(&other.kind) {
             Ordering::Greater => true,
             Ordering::Less => false,
@@ -237,7 +237,7 @@ pub(crate) fn resolve_methods_for_call(
     };
     for candidate in &viable {
         let s = calculate_shape_score(candidate.original_receiver, type_db.intrn);
-        if s.is_shape_better_than(&best_shape) {
+        if s.is_shape_better_than(best_shape) {
             best_shape = s;
         }
     }

@@ -1,18 +1,17 @@
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/vm/vm"
 
 get fun `test get config`() {
-    val config = net.getConfig();
+    val config = testing.getConfig();
 
     expect(config.getGlobalVersion().version).toBeGreaterOrEqual(12);
 }
 
 get fun `test set config`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var storagePricesBefore = config.getStoragePrices();
     var baseStorage = storagePricesBefore.getInitial();
@@ -22,10 +21,10 @@ get fun `test set config`() {
     storagePricesBefore.setInitial(baseStorage);
     config.setStoragePrices(storagePricesBefore);
 
-    val result = net.setConfig(config);
+    val result = testing.setConfig(config);
     expect(result).toBeTrue();
 
-    val updatedConfig = net.getConfig();
+    val updatedConfig = testing.getConfig();
     val pricesAfter = updatedConfig.getStoragePrices();
     val actual = pricesAfter.getInitial();
 
@@ -33,11 +32,11 @@ get fun `test set config`() {
 }
 
 get fun `test bad config`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     config.setParamRaw(8, beginCell().endCell());
 
-    val result = net.setConfig(config);
+    val result = testing.setConfig(config);
     expect(result).toBeFalse();
 }
 
@@ -53,7 +52,7 @@ get fun `test get executor config`() {
         value: ton("1"),
     });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val res = net.send(deployer.address, deployMsg);
 
     expect(res).toHaveSuccessfulDeploy({
@@ -63,13 +62,13 @@ get fun `test get executor config`() {
 
     val firstRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var storagePricesBefore = config.getGasPrices(BASECHAIN);
     storagePricesBefore.flatGasPrice += 100;
     config.setGasPrices(storagePricesBefore, BASECHAIN);
 
-    val result = net.setConfig(config);
+    val result = testing.setConfig(config);
     expect(result).toBeTrue();
 
     val secondRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
@@ -83,20 +82,24 @@ get fun `test current config`() {
     val gas = 100;
     val before = calculateForwardFeeLocal(BASECHAIN, gas, gas);
 
-    val priceBefore = ((vm.getC7().get(0) as tuple).get(9) as Config)
+    val priceBefore = ((testing
+        .getC7OutsideContract()
+        .get(0) as tuple).get(9) as BlockchainConfigMap)
         .getMsgForwardPrices(BASECHAIN)
         .lumpPrice;
-    var config = net.getConfig();
+    var config = testing.getConfig();
 
     var storagePricesBefore = config.getMsgForwardPrices(BASECHAIN);
 
     storagePricesBefore.lumpPrice += 2000;
 
     config.setMsgForwardPrices(storagePricesBefore, BASECHAIN);
-    val result = net.setConfig(config);
+    val result = testing.setConfig(config);
     expect(result).toBeTrue();
 
-    val priceAfter = ((vm.getC7().get(0) as tuple).get(9) as Config)
+    val priceAfter = ((testing
+        .getC7OutsideContract()
+        .get(0) as tuple).get(9) as BlockchainConfigMap)
         .getMsgForwardPrices(BASECHAIN)
         .lumpPrice;
     expect(priceBefore).toNotEqual(priceAfter);

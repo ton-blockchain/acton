@@ -8,6 +8,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
+use toncenter_keys::{
+    TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV, custom_env_var_name,
+};
 
 pub(crate) struct ProjectBuilder {
     name: String,
@@ -1105,6 +1108,7 @@ impl Project {
             compile_boc: None,
             compile_fift: None,
             compile_source_map: None,
+            compile_allow_no_entrypoint: false,
             test_reporters: Vec::new(),
             junit_merge: false,
             test_exclude_patterns: Vec::new(),
@@ -1155,6 +1159,7 @@ pub(crate) struct ActonCommand {
     pub(crate) compile_boc: Option<String>,
     pub(crate) compile_fift: Option<String>,
     pub(crate) compile_source_map: Option<String>,
+    pub(crate) compile_allow_no_entrypoint: bool,
     pub(crate) test_reporters: Vec<String>,
     pub(crate) junit_merge: bool,
     pub(crate) test_exclude_patterns: Vec<String>,
@@ -1361,7 +1366,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify API key for `TonCenter` requests
+    /// Specify TonCenter API key env value for test requests
     ///
     /// # Examples
     /// ```
@@ -1372,7 +1377,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify network for library fetching (testnet or mainnet)
+    /// Specify network for remote fetching (mainnet, testnet, or custom:<name>)
     ///
     /// # Examples
     /// ```
@@ -1438,6 +1443,11 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn allow_no_entrypoint(mut self) -> Self {
+        self.compile_allow_no_entrypoint = true;
+        self
+    }
+
     /// Specify path to test file or directory
     ///
     /// # Examples
@@ -1460,6 +1470,11 @@ impl ActonCommand {
     /// ```
     pub(crate) fn filter(mut self, pattern: &str) -> Self {
         self.filter = Some(pattern.to_string());
+        self
+    }
+
+    pub(crate) fn verbose(mut self) -> Self {
+        self.cmd = self.cmd.arg("--verbose");
         self
     }
 
@@ -1502,7 +1517,7 @@ impl ActonCommand {
         self
     }
 
-    /// Require a minimum total line coverage percentage.
+    /// Require a minimum final coverage score percentage.
     pub(crate) fn with_coverage_minimum_percent(mut self, percent: f64) -> Self {
         self.cmd = self
             .cmd
@@ -1846,7 +1861,19 @@ impl ActonCommand {
         }
 
         if let Some(api_key) = self.disasm_api_key {
-            self.cmd = self.cmd.arg("--api-key").arg(api_key);
+            self.cmd = self
+                .cmd
+                .env(TONCENTER_MAINNET_API_KEY_ENV, &api_key)
+                .env(TONCENTER_TESTNET_API_KEY_ENV, &api_key);
+
+            if let Some(custom_network_name) = self
+                .disasm_net
+                .as_deref()
+                .and_then(|net| net.strip_prefix("custom:"))
+                .and_then(custom_env_var_name)
+            {
+                self.cmd = self.cmd.env(&custom_network_name, &api_key);
+            }
         }
 
         if let Some(net) = self.disasm_net {
@@ -1883,6 +1910,10 @@ impl ActonCommand {
 
         if let Some(source_map_path) = self.compile_source_map {
             self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
+        }
+
+        if self.compile_allow_no_entrypoint {
+            self.cmd = self.cmd.arg("--allow-no-entrypoint");
         }
 
         if let Some(mode) = self.color_mode {

@@ -43,7 +43,7 @@ impl<'a> TypeFormatter<'a> {
             TyData::UntypedTuple => "tuple".to_string(),
             TyData::Bits { size } => format!("bits{size}"),
             TyData::Bytes { size } => format!("bytes{size}"),
-            TyData::Builtin { name } => name.to_string(),
+            TyData::Builtin { name } | TyData::Enum { name, .. } => name.to_string(),
             TyData::Tuple(elements) => {
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
                 format!("[{}]", parts.join(", "))
@@ -120,7 +120,6 @@ impl<'a> TypeFormatter<'a> {
                 }
                 name.to_string()
             }
-            TyData::Enum { name, .. } => name.to_string(),
             TyData::TypeParameter { name, .. } => name.clone(),
             TyData::GenericTypeWithTs { inner_ty, types } => {
                 let a = types

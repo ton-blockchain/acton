@@ -1,1 +1,1 @@
-   Generated wrappers/MyContract.tolk
+   Generated wrappers/MyContract.gen.tolk

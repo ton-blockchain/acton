@@ -1,0 +1,36 @@
+---
+title: "E022: negated-is-type-can-use-not-is"
+description: "Detects negated type checks written as `!(a is T)`."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E022`
+- `Rule`: `negated-is-type-can-use-not-is`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: always available
+
+### What it does
+Detects negated type checks written as `!(a is T)`.
+
+### Why is this bad?
+Tolk has a dedicated `!is` operator, which is clearer than negating `is`.
+
+### Example
+```tolk twoslash
+if (!(value is int)) {
+//  ^^^^^^^^^^^^^^^ E022: negated `is` type check can use `!is`
+    return;
+}
+```
+
+Use instead:
+```tolk
+if (value !is int) {
+    return;
+}
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/negated_is_type_can_use_not_is.rs#L30" />

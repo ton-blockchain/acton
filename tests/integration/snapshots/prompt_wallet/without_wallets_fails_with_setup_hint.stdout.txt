@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 1
+  Description: Alternative successful execution [EXIT_STATUS]. Reserved, but does not occur
+  Phase: Compute phase
+  Re-run with --backtrace full to get more information
+No wallets configured in wallets.toml or global.wallets.toml.
+To add a wallet use acton wallet new or add the following to wallets.toml manually:
+
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { [MNEMONIC] }
+
+See [ACTON_DOCS_URL]/tutorial/setup-wallets for more information

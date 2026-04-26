@@ -1,0 +1,32 @@
+[package]
+name = "ton-retrace"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ton-executor = { workspace = true }
+tvm-logs = { workspace = true }
+tycho-types = { workspace = true }
+num-bigint = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+ton-networks = { workspace = true }
+toncenter-keys = { workspace = true }
+log = { workspace = true }
+
+[features]
+only_ci = []
+
+[lints]
+workspace = true

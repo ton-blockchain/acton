@@ -1,0 +1,25 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ foo [TIME]
+    └─ Cannot execute get method currentCounterCustomFail (116765)
+      ├─ exit_code=709
+      ├─ at contracts/simple[LINE]
+      ├─ Backtrace:
+      │     currentCounterCustomFail   at contracts/simple[LINE]
+      ├─ Called from:
+      │     net.runGetMethod<int>   at ../lib/emulation/network[LINE]
+      │     test foo                at tests/test.test[LINE]
+      ├─ Description: Errors.AbiFailure
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

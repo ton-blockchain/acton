@@ -1,0 +1,31 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external_forwarder
+    Finished in [TIME]
+   Compiling forwarder
+    Finished in [TIME]
+   Compiling race
+    Finished in [TIME]
+   Compiling receiver
+    Finished in [TIME]
+   Compiling relay
+    Finished in [TIME]
+   Compiling router
+    Finished in [TIME]
+   Compiling sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ send iter execute till predicate search params [TIME]
+    └─ Test output:
+       executeTill.opcode=0x3100f001
+       executeTill.opcode=0x3100f002
+       executeTill.from=[WALLET_ADDRESS_BASE] (forwarder)
+       executeTill.to=[WALLET_ADDRESS_BASE] (receiver)
+       executeTill.success=true
+
+ ✓ 1 passed in 1 file

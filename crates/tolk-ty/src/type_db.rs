@@ -167,8 +167,9 @@ impl<'a> TypeDb<'a> {
             TyData::TypeAlias { inner_ty, .. } => self.find_struct(*inner_ty),
             TyData::GenericTypeWithTs { inner_ty, .. } => match self.intrn.data(*inner_ty) {
                 TyData::Struct { def, .. } => Some(*def),
-                TyData::TypeAlias { inner_ty, .. } => self.find_struct(*inner_ty),
-                TyData::GenericTypeWithTs { inner_ty, .. } => self.find_struct(*inner_ty),
+                TyData::TypeAlias { inner_ty, .. } | TyData::GenericTypeWithTs { inner_ty, .. } => {
+                    self.find_struct(*inner_ty)
+                }
                 _ => None,
             },
             _ => None,

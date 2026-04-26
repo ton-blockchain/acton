@@ -1,0 +1,46 @@
+---
+title: "Forking from Network"
+description: "Run local node with testnet/mainnet state, including historical block forks"
+---
+
+Fork mode lets the local node resolve account state from a remote network while keeping execution local.
+
+## Basic Forking
+
+```bash
+# Fork from testnet
+acton localnet start --fork-net testnet
+
+# Fork from mainnet
+acton localnet start --fork-net mainnet
+```
+
+## Historical Fork at a Specific Block
+
+```bash
+acton localnet start --fork-net testnet --fork-block-number 55000000
+```
+
+This is useful for deterministic debugging of historical behavior.
+
+## API Key
+
+Use the TonCenter env var that matches the forked network:
+
+```bash
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton localnet start --fork-net testnet
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton localnet start --fork-net mainnet
+```
+
+Acton reads these env vars automatically for the built-in `testnet` and
+`mainnet` fork backends.
+
+## Configure Defaults in `Acton.toml`
+
+```toml title="Acton.toml"
+[localnet]
+fork-net = "testnet"
+fork-block-number = 55000000
+```
+
+Now `acton localnet start` automatically uses these defaults.

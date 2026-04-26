@@ -1,14 +1,14 @@
 use crate::commands::test::{Pos, TestDescriptor};
 use crate::context::{BuildCache, Emulations, FailedSendMessageResult, KnownAddresses, to_cell};
-use retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
+use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use tycho_types::boc::Boc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -202,7 +202,7 @@ pub(super) fn dump_test_transactions(
                             .collect(),
                         shard_account_before: Boc::encode_base64(to_cell(&tx.shard_account_before)),
                         shard_account: Boc::encode_base64(to_cell(&tx.shard_account)),
-                        vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
+                        vm_log_diff: tvm_logs::convert_to_diff_logs(&tx.vm_log),
                         executor_logs: tx.executor_logs.clone(),
                         executor_actions: parse_executor_actions(&tx.executor_logs),
                         actions: tx.actions.clone(),
@@ -297,7 +297,10 @@ fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
 
     FailedMessageInfo {
         error: message.error.clone(),
-        vm_log_diff: message.vm_log.as_deref().map(vmlogs::convert_to_diff_logs),
+        vm_log_diff: message
+            .vm_log
+            .as_deref()
+            .map(tvm_logs::convert_to_diff_logs),
         vm_exit_code: message.vm_exit_code,
         executor_logs: message.executor_logs.clone(),
         missing_libraries,

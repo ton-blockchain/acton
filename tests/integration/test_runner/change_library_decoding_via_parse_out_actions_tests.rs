@@ -4,7 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CX_OUT_ACTIONS_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
 
 fun changeLib(code: cell, mode: int): void asm "SETLIBCODE"
 "#;
@@ -30,17 +30,17 @@ get fun `test cx change library decoding via parse out actions`() {
     val libraryCell = beginCell().storeUint(0xC0DECAFE, 32).endCell();
     changeLib(libraryCell, 2);
 
-    val parsed = vm.parseOutActions(vm.getC5());
+    val parsed = testing.outActions();
     expect(parsed.size()).toEqual(1);
 
     val parsedAction = parsed.at(0);
     expect(parsedAction.kind()).toEqual("change-library");
-    expect(parsedAction is OutActionChangeLibrary).toBeTrue();
+    expect(parsedAction is TlbOutActionChangeLibrary).toBeTrue();
 
-    if (parsedAction is OutActionChangeLibrary) {
+    if (parsedAction is TlbOutActionChangeLibrary) {
         expect(parsedAction.mode).toEqual(2);
-        expect(parsedAction.libref is LibRefRef).toBeTrue();
-        if (parsedAction.libref is LibRefRef) {
+        expect(parsedAction.libref is TlbLibRefRef).toBeTrue();
+        if (parsedAction.libref is TlbLibRefRef) {
             expect(parsedAction.libref.library).toEqual(libraryCell);
         }
     }

@@ -72,7 +72,7 @@ fn test_wrapper_generation_defaults() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_defaults/wrapper.tolk.txt",
@@ -100,7 +100,7 @@ fn test_wrapper_generation_without_test_stub() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_without_test_stub/wrapper.tolk.txt",
@@ -125,13 +125,13 @@ fn test_wrapper_generation_uses_tolk_config_defaults() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("tests/generated-wrappers/MyContract.tolk")
+        .assert_contains("tests/generated-wrappers/MyContract.gen.tolk")
         .assert_contains("tests/generated-tests/my_contract.test.tolk");
 
     assert!(
         project
             .path()
-            .join("tests/generated-wrappers/MyContract.tolk")
+            .join("tests/generated-wrappers/MyContract.gen.tolk")
             .exists()
     );
     assert!(
@@ -170,7 +170,7 @@ fn test_wrapper_generation_test_output_dir_flag() {
 
 #[cfg(unix)]
 #[test]
-fn test_wrapper_generation_typescript_defaults_to_wrappers_dir() {
+fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
     let project = make_typescript_wrapper_project("wrapper_typescript");
     let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
 
@@ -188,10 +188,10 @@ fn test_wrapper_generation_typescript_defaults_to_wrappers_dir() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrappers/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.gen.ts");
 
     assert_eq!(
-        fs::read_to_string(project.path().join("wrappers/MyContract.ts")).unwrap(),
+        fs::read_to_string(project.path().join("wrappers-ts/MyContract.gen.ts")).unwrap(),
         "// generated ts wrapper\nexport const marker = \"ts\";\n"
     );
 
@@ -211,7 +211,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrappers_dir() {
 fn test_wrapper_generation_typescript_uses_config_output_dir_relative_to_project_root() {
     let project = ProjectBuilder::new("wrapper_typescript_config_output_dir")
         .contract("my_contract", SIMPLE_CONTRACT)
-        .with_wrappers_typescript_output_dir("./wrappers")
+        .with_wrappers_typescript_output_dir("./wrappers-ts")
         .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
         .build();
     let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
@@ -234,10 +234,10 @@ fn test_wrapper_generation_typescript_uses_config_output_dir_relative_to_project
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrappers/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.gen.ts");
 
     assert_eq!(
-        fs::read_to_string(project.path().join("wrappers/MyContract.ts")).unwrap(),
+        fs::read_to_string(project.path().join("wrappers-ts/MyContract.gen.ts")).unwrap(),
         "// generated ts wrapper\nexport const marker = \"ts\";\n"
     );
 }
@@ -267,16 +267,16 @@ fn test_wrapper_generation_typescript_output_dir_flag_overrides_config() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrappers-cli/MyContract.ts");
+        .assert_contains("wrappers-cli/MyContract.gen.ts");
 
     assert_eq!(
-        fs::read_to_string(project.path().join("wrappers-cli/MyContract.ts")).unwrap(),
+        fs::read_to_string(project.path().join("wrappers-cli/MyContract.gen.ts")).unwrap(),
         "// generated ts wrapper\nexport const marker = \"ts\";\n"
     );
     assert!(
         !project
             .path()
-            .join("wrappers-config/MyContract.ts")
+            .join("wrappers-config/MyContract.gen.ts")
             .exists(),
         "CLI output dir should override config output dir"
     );
@@ -289,7 +289,7 @@ fn test_wrapper_generation_typescript_ignores_tolk_test_defaults() {
         .contract("my_contract", SIMPLE_CONTRACT)
         .with_wrappers_tolk_generate_test(true)
         .with_wrappers_tolk_test_output_dir("tests/generated-tests")
-        .with_wrappers_typescript_output_dir("./wrappers")
+        .with_wrappers_typescript_output_dir("./wrappers-ts")
         .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
         .build();
     let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
@@ -308,9 +308,14 @@ fn test_wrapper_generation_typescript_ignores_tolk_test_defaults() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("wrappers/MyContract.ts");
+        .assert_contains("wrappers-ts/MyContract.gen.ts");
 
-    assert!(project.path().join("wrappers/MyContract.ts").exists());
+    assert!(
+        project
+            .path()
+            .join("wrappers-ts/MyContract.gen.ts")
+            .exists()
+    );
     assert!(
         !project
             .path()
@@ -364,6 +369,13 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
 
     assert!(generated_project_path.join("Acton.toml").exists());
 
+    workspace
+        .acton()
+        .current_dir(&generated_project_path)
+        .arg("build")
+        .run()
+        .success();
+
     let tests_dir = generated_project_path.join("tests");
     if tests_dir.exists() {
         fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
@@ -395,12 +407,12 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
 
     assert!(
         generated_project_path
-            .join("wrappers/JettonMinter.tolk")
+            .join("wrappers/JettonMinter.gen.tolk")
             .exists()
     );
     assert!(
         generated_project_path
-            .join("wrappers/JettonWallet.tolk")
+            .join("wrappers/JettonWallet.gen.tolk")
             .exists()
     );
     assert!(
@@ -417,14 +429,14 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
     wallet_output
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("wrappers/JettonMinter.tolk")
+                .join("wrappers/JettonMinter.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_minter_wrapper.tolk.txt",
         )
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("wrappers/JettonWallet.tolk")
+                .join("wrappers/JettonWallet.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_wallet_wrapper.tolk.txt",
@@ -506,7 +518,7 @@ fn test_wrapper_generation_with_types_and_storage_in_the_same_file() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_types_and_storage_in_the_same_file/wrapper.tolk.txt",
@@ -576,7 +588,7 @@ fn test_wrapper_generation_with_several_storages() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/first_wrapper.tolk.txt",
@@ -653,7 +665,7 @@ fn test_wrapper_generation_with_typed_cell_field_in_storage() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_field_in_storage/wrapper.tolk.txt",
@@ -736,7 +748,7 @@ fn test_wrapper_generation_with_typed_cell_field() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_field/wrapper.tolk.txt",
@@ -814,7 +826,7 @@ fn test_wrapper_generation_with_typed_cell_param() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_param/wrapper.tolk.txt",
@@ -850,7 +862,7 @@ fn test_wrapper_generation_with_snake_case_getters() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_snake_case_getters/wrapper.tolk.txt",
@@ -904,11 +916,11 @@ fn test_wrapper_output_dir_places_wrapper_in_directory() {
 
     output
         .assert_contains("Generated")
-        .assert_contains("custom/MyContract.tolk")
+        .assert_contains("custom/MyContract.gen.tolk")
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("custom/MyContract.tolk")
+                .join("custom/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_without_test_stub/wrapper.tolk.txt",
@@ -916,7 +928,7 @@ fn test_wrapper_output_dir_places_wrapper_in_directory() {
 
     let test_code = fs::read_to_string(project.path().join("tests/my_contract.test.tolk")).unwrap();
     assert!(
-        test_code.contains("import \"../custom/MyContract\""),
+        test_code.contains("import \"../custom/MyContract.gen\""),
         "test stub should import wrapper from custom directory:\n{test_code}"
     );
 }
@@ -1033,7 +1045,7 @@ fn test_with_several_files_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_with_several_files_contract/wrapper.tolk.txt",
@@ -1079,7 +1091,7 @@ fn test_wrapper_with_storage_in_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_with_storage_in_contract/wrapper.tolk.txt",
@@ -1125,7 +1137,7 @@ fn test_wrapper_with_message_in_contract() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_with_message_in_contract/wrapper.tolk.txt",
@@ -1306,7 +1318,7 @@ fn test_wrapper_generation_with_mappings() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/Main.tolk")
+                .join("wrappers/Main.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_mappings/wrapper.tolk.txt",
@@ -1370,7 +1382,7 @@ fn test_wrapper_generation_with_wrappers_mapping() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/Main.tolk")
+                .join("tests/wrappers/Main.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_wrappers_mapping/wrapper.tolk.txt",
@@ -1430,7 +1442,7 @@ fn test_wrapper_generation_prefers_specific_mapping() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/Main.tolk")
+                .join("wrappers/Main.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_prefers_specific_mapping/wrapper.tolk.txt",
@@ -1495,7 +1507,7 @@ fn test_wrapper_generation_with_import_mappings() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("tests/wrappers/MyContract.tolk")
+                .join("tests/wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_import_mappings/wrapper.tolk.txt",
@@ -1553,7 +1565,7 @@ fn test_wrapper_generation_with_conflicting_field_names() {
         .assert_file_snapshot_matches(
             project
                 .path()
-                .join("wrappers/MyContract.tolk")
+                .join("wrappers/MyContract.gen.tolk")
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_conflicting_field_names/wrapper.tolk.txt",

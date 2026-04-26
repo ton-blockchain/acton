@@ -10,11 +10,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{thread, vec};
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::message::IntAddr;
 
 const RAW_INFO_ADDRESS: &str = "0:1111111111111111111111111111111111111111111111111111111111111111";
 const MATCHED_INFO_ADDRESS: &str =
     "0:2222222222222222222222222222222222222222222222222222222222222222";
+const MATCHED_INFO_OWNER_ADDRESS: &str =
+    "0:3333333333333333333333333333333333333333333333333333333333333333";
 const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
 kind = "v4r2"
 workchain = 0
@@ -22,22 +25,25 @@ keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region sh
 "#;
 const PRINT_DEPLOYER_ADDRESS_SCRIPT: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
     println("DEPLOYER_ADDRESS={}", wallet.address);
 }
 "#;
 const DEPLOY_COUNTER_SCRIPT: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 
 fun main() {
-    val wallet = net.wallet("deployer");
+    val wallet = scripts.wallet("deployer");
     val counterData = beginCell()
         .storeUint(7, 32)
+        .storeAddress(wallet.address)
         .storeUint(42, 32)
         .endCell();
 
@@ -87,8 +93,7 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
         .arg(RAW_INFO_ADDRESS)
         .arg("--net")
         .arg("custom:mock")
-        .arg("--api-key")
-        .arg("test-api-key")
+        .env("MOCK_API_KEY", "custom-mock-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run();
 
@@ -112,8 +117,8 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
     );
     assert_eq!(
         header_value(&captured[0].headers, "X-API-Key"),
-        Some("test-api-key"),
-        "rpc info should forward the provided API key",
+        Some("custom-mock-api-key"),
+        "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
     );
 }
 
@@ -151,7 +156,7 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
             1_234_000_000,
             code_boc64,
-            &counter_storage_boc64(7, 42),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
             "active",
             "",
             "999",
@@ -167,8 +172,6 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         .arg(MATCHED_INFO_ADDRESS)
         .arg("--net")
         .arg("custom:mock")
-        .arg("--api-key")
-        .arg("test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success()
@@ -214,7 +217,7 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
         spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
             1_234_000_000,
             code_boc64,
-            &counter_storage_boc64(7, 42),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
             "active",
             "",
             "999",
@@ -230,8 +233,6 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
         .arg(MATCHED_INFO_ADDRESS)
         .arg("--net")
         .arg("custom:mock")
-        .arg("--api-key")
-        .arg("test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success()
@@ -285,21 +286,19 @@ fn test_rpc_info_rejects_invalid_address() {
 }
 
 #[test]
-fn test_rpc_info_reads_wallet_account_from_litenode() {
-    let project = ProjectBuilder::new("rpc-info-litenode-wallet")
+fn test_rpc_info_reads_wallet_account_from_localnet() {
+    let project = ProjectBuilder::new("rpc-info-localnet-wallet")
         .script_file("print_deployer_address", PRINT_DEPLOYER_ADDRESS_SCRIPT)
         .build();
     write_deployer_wallets(project.path());
 
-    let node = start_litenode_with_localnet(&project);
+    let node = start_localnet_with_localnet(&project);
     let log_dir = prepare_log_dir(project.path());
 
     let script_output = project
         .acton()
         .script("scripts/print_deployer_address.tolk")
         .verify_network("localnet")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run();
     let script_stdout = stdout(&script_output);
@@ -315,22 +314,20 @@ fn test_rpc_info_reads_wallet_account_from_litenode() {
         .arg(&deployer_address)
         .arg("--net")
         .arg("localnet")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success();
-    assert_litenode_rpc_snapshot(
+    assert_localnet_rpc_snapshot(
         &output,
-        "integration/snapshots/rpc/test_rpc_info_litenode_wallet.stdout.txt",
+        "integration/snapshots/rpc/test_rpc_info_localnet_wallet.stdout.txt",
     );
 
     node.stop();
 }
 
 #[test]
-fn test_rpc_info_decodes_storage_from_litenode() {
-    let project = ProjectBuilder::new("rpc-info-litenode-storage")
+fn test_rpc_info_decodes_storage_from_localnet() {
+    let project = ProjectBuilder::new("rpc-info-localnet-storage")
         .file_from_path(
             "contracts/types",
             "src/commands/new/templates/counter/contracts/types.tolk",
@@ -344,7 +341,7 @@ fn test_rpc_info_decodes_storage_from_litenode() {
     write_deployer_wallets(project.path());
 
     let node = project
-        .litenode()
+        .localnet()
         .before_start(ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
@@ -355,8 +352,6 @@ fn test_rpc_info_decodes_storage_from_litenode() {
         .acton()
         .script("scripts/deploy_counter.tolk")
         .verify_network("localnet")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run();
     let deploy_stdout = stdout(&deploy_output);
@@ -373,14 +368,12 @@ fn test_rpc_info_decodes_storage_from_litenode() {
         .arg(&counter_address)
         .arg("--net")
         .arg("localnet")
-        .arg("--api-key")
-        .arg("local-test-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
         .success();
-    assert_litenode_rpc_snapshot(
+    assert_localnet_rpc_snapshot(
         &output,
-        "integration/snapshots/rpc/test_rpc_info_litenode_storage.stdout.txt",
+        "integration/snapshots/rpc/test_rpc_info_localnet_storage.stdout.txt",
     );
 
     node.stop();
@@ -572,9 +565,15 @@ fn test_cell_boc64(value: u32) -> String {
     Boc::encode_base64(&cell)
 }
 
-fn counter_storage_boc64(id: u32, counter: u32) -> String {
+fn counter_storage_boc64(id: u32, owner_address: &str, counter: u32) -> String {
+    let owner = owner_address
+        .parse::<IntAddr>()
+        .expect("owner address must parse");
     let mut builder = CellBuilder::new();
     builder.store_u32(id).expect("must store id");
+    owner
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("must store owner");
     builder.store_u32(counter).expect("must store counter");
     let cell = builder.build().expect("must build storage cell");
     Boc::encode_base64(&cell)
@@ -594,8 +593,8 @@ fn write_deployer_wallets(project_root: &Path) {
         .expect("failed to write wallets.toml");
 }
 
-fn start_litenode_with_localnet(project: &Project) -> crate::support::litenode::LiteNodeHandle {
-    let node = project.litenode().args(["--accounts", "deployer"]).start();
+fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::LocalnetHandle {
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
     append_localnet_network(project.path(), &node.base_url());
     node
 }
@@ -629,7 +628,7 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
 }
 
 fn wait_until_address_state_active(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     address: &str,
     timeout: Duration,
 ) {
@@ -655,18 +654,18 @@ fn prepare_log_dir(project_root: &Path) -> String {
     log_dir.to_string_lossy().into_owned()
 }
 
-fn assert_litenode_rpc_snapshot(
+fn assert_localnet_rpc_snapshot(
     output: &crate::support::assertions::TestSuccess,
     snapshot_path: &str,
 ) {
-    let normalized = normalize_litenode_rpc_stdout(&output.get_normalized_stdout());
+    let normalized = normalize_localnet_rpc_stdout(&output.get_normalized_stdout());
     let expected_path = Path::new("tests").join(snapshot_path);
     let expected =
-        fs::read_to_string(&expected_path).expect("lite-node rpc snapshot file must exist");
+        fs::read_to_string(&expected_path).expect("localnet rpc snapshot file must exist");
     assertion().eq(normalized, expected);
 }
 
-fn normalize_litenode_rpc_stdout(stdout: &str) -> String {
+fn normalize_localnet_rpc_stdout(stdout: &str) -> String {
     let mut normalized_lines = Vec::new();
     for line in stdout.lines() {
         if let Some((prefix, _)) = line.split_once("Last Tx Hash:") {

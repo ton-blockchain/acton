@@ -9,8 +9,8 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use tolkc::abi::ContractABI;
-use tolkc::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
@@ -22,6 +22,7 @@ pub fn compile_cmd(
     fift: Option<String>,
     source_map: Option<String>,
     abi: Option<String>,
+    allow_no_entrypoint: bool,
     clear_cache: bool,
 ) -> anyhow::Result<()> {
     if clear_cache {
@@ -54,7 +55,13 @@ pub fn compile_cmd(
         .ok();
 
     let need_debug_info = source_map.is_some();
-    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.3") {
+    let need_fift = fift.is_some();
+    let cache_profile = if allow_no_entrypoint {
+        "1.3+allow-no-entrypoint"
+    } else {
+        "1.3"
+    };
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, need_fift, 2, cache_profile) {
         let elapsed = start_time.elapsed();
         info!(
             "Compile {path} from file cache ({}) in {elapsed:?}",
@@ -83,23 +90,25 @@ pub fn compile_cmd(
     let compile_start = Instant::now();
     let with_debug_info = source_map.is_some();
 
-    let mut compiler = tolkc::Compiler::new(2);
+    let mut compiler = tolk_compiler::Compiler::new(2);
     if let Some(acton_config) = &acton_config {
         let mappings = acton_config.mappings();
         compiler = compiler.with_mappings(&mappings);
     }
+    compiler = compiler.with_allow_no_entrypoint(allow_no_entrypoint);
 
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
     let compile_time = compile_start.elapsed();
 
     match compilation_result {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             let total_elapsed = start_time.elapsed();
             info!(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.3")
+            if let Err(e) =
+                file_cache.put(path, &result, with_debug_info, need_fift, 2, cache_profile)
                 && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");
@@ -108,7 +117,7 @@ pub fn compile_cmd(
             handle_compilation_result(
                 result.code_boc64,
                 result.code_hash_hex,
-                result.fift_code,
+                need_fift.then_some(result.fift_code),
                 result.debug_mark_base64,
                 result.new_source_map,
                 result.abi,
@@ -122,7 +131,7 @@ pub fn compile_cmd(
                 Some(total_elapsed),
             )
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             let total_elapsed = start_time.elapsed();
             info!(
                 "Compile {} failed after {:?}: {}",
@@ -147,7 +156,7 @@ pub fn compile_cmd(
 fn handle_compilation_result(
     code_boc64: String,
     code_hash_hex: String,
-    fift_code: String,
+    fift_code: Option<String>,
     debug_mark_base64: Option<String>,
     new_source_map: Option<TolkCompilerSourceMap>,
     abi: Option<ContractABI>,
@@ -173,6 +182,12 @@ fn handle_compilation_result(
     }
 
     if let Some(fift_path) = &fift {
+        let Some(fift_code) = fift_code.as_deref() else {
+            anyhow::bail!(
+                "Internal error: requested Fift output is missing from compilation result"
+            );
+        };
+
         if let Some(parent_dir) = Path::new(&fift_path).parent()
             && let Err(err) = fs::create_dir_all(parent_dir)
         {
@@ -183,7 +198,7 @@ fn handle_compilation_result(
             );
         }
 
-        fs::write(fift_path, &fift_code)
+        fs::write(fift_path, fift_code)
             .map_err(|err| anyhow!("Failed to save Fift file {}: {err}", fift_path.yellow()))?;
     }
 

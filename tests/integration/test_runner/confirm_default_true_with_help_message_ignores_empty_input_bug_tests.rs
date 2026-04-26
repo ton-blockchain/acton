@@ -7,7 +7,7 @@ fn confirm_default_true_with_help_message_ignores_empty_input_bug() {
         .test_file(
             "confirm_empty_input_bug",
             r#"
-            import "../../lib/promts/prompts"
+            import "../../lib/prompts"
             import "../../lib/testing/expect"
 
             get fun `test confirm empty input defaults`() {

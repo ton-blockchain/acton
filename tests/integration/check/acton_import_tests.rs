@@ -11,7 +11,7 @@ fn test_check_acton_import_in_contract_direct() {
             import "../.acton/tlb/maybe.tolk";
 
             fun onInternalMessage(_: InMessage) {
-                val maybeValue = Maybe<int>.none();
+                val maybeValue = TlbMaybe<int>.none();
                 maybeValue.unwrapOr(0);
             }
         "#,
@@ -38,7 +38,7 @@ fn test_check_acton_import_in_transitive_dependency() {
                 import "../.acton/tlb/maybe.tolk";
 
                 fun useMaybe() {
-                    val maybeValue = Maybe<int>.some(1);
+                    val maybeValue = TlbMaybe<int>.just(1);
                     maybeValue.unwrapOr(0);
                 }
             "#,
@@ -58,7 +58,7 @@ fn test_check_acton_import_with_mappings_direct() {
             import "@acton/tlb/maybe";
 
             fun onInternalMessage(_: InMessage) {
-                val maybeValue = Maybe<int>.none();
+                val maybeValue = TlbMaybe<int>.none();
                 maybeValue.unwrapOr(0);
             }
         "#,
@@ -100,7 +100,7 @@ fn test_check_acton_import_with_mappings_transitive_dependency() {
             import "@acton/tlb/maybe";
 
             fun useMaybe() {
-                val maybeValue = Maybe<int>.some(1);
+                val maybeValue = TlbMaybe<int>.just(1);
                 maybeValue.unwrapOr(0);
             }
         "#,
@@ -131,7 +131,7 @@ fn test_check_acton_import_rule_is_disabled_for_test_files() {
                 import "../.acton/tlb/maybe.tolk";
 
                 get fun `test noop`() {
-                    val maybeValue = Maybe<int>.none();
+                    val maybeValue = TlbMaybe<int>.none();
                     maybeValue.unwrapOr(0);
                 }
             "#,

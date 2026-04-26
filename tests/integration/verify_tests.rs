@@ -10,6 +10,7 @@ use crate::support::verifier::{VerifierMockResponse, spawn_verifier_mock};
 use expectrl::Eof;
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
@@ -52,6 +53,16 @@ fn write_deployer_wallets(project_path: &Path) {
 fn write_multiple_wallets(project_path: &Path) {
     std::fs::write(project_path.join("wallets.toml"), MULTI_WALLET_CONFIG)
         .expect("failed to write wallets.toml");
+}
+
+fn replace_contract_display_name(project_path: &Path, from: &str, to: &str) {
+    let acton_toml_path = project_path.join("Acton.toml");
+    let acton_toml = std::fs::read_to_string(&acton_toml_path).expect("failed to read Acton.toml");
+    let updated = acton_toml.replace(
+        &format!("display-name = \"{from}\""),
+        &format!("display-name = \"{to}\""),
+    );
+    std::fs::write(&acton_toml_path, updated).expect("failed to write Acton.toml");
 }
 
 fn build_verify_backend_project(name: &str) -> Project {
@@ -98,6 +109,24 @@ fn test_verify_contract_not_found() {
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_verify_contract_not_found.stderr.txt",
+        );
+}
+
+#[test]
+fn test_verify_contract_display_name_shows_contract_id_hint() {
+    let project = ProjectBuilder::new("verify-contract-display-name-hint")
+        .contract("simple_id", SIMPLE_CONTRACT)
+        .build();
+    replace_contract_display_name(project.path(), "simple_id", "Visible Simple");
+
+    project
+        .acton()
+        .verify()
+        .verify_contract("Visible Simple")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_verify_contract_display_name_shows_contract_id_hint.stderr.txt",
         );
 }
 
@@ -808,8 +837,7 @@ fn test_verify_dry_run_collects_signature_from_override_backend() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .arg("--dry-run")
         .run()
         .success();
@@ -903,8 +931,7 @@ fn test_verify_fails_when_signer_backends_do_not_reach_quorum() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .arg("--dry-run")
         .run()
         .failure();
@@ -982,8 +1009,7 @@ fn test_verify_send_transaction_successfully_after_mocked_prepare_flow() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .success();
 
@@ -1066,8 +1092,7 @@ fn test_verify_send_transaction_successfully_on_testnet() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("testnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_TESTNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .success();
 
@@ -1135,8 +1160,7 @@ fn test_verify_reports_send_boc_failure() {
         .verify_address(VERIFY_TEST_ADDRESS)
         .verify_network("mainnet")
         .wallet("deployer")
-        .arg("--api-key")
-        .arg(VERIFY_TEST_API_KEY)
+        .env(TONCENTER_MAINNET_API_KEY_ENV, VERIFY_TEST_API_KEY)
         .run()
         .failure();
 

@@ -75,13 +75,13 @@
       - any-glob-to-any-file:
           - "src/formatter.rs"
 
-"litenode":
+"localnet":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-litenode-ui/**"
+          - "crates/acton-localnet-ui/**"
           - "crates/ton-indexer/**"
-          - "crates/ton-litenode/**"
-          - "src/commands/litenode/**"
+          - "crates/ton-localnet/**"
+          - "src/commands/localnet/**"
 
 "wallets":
   - changed-files:

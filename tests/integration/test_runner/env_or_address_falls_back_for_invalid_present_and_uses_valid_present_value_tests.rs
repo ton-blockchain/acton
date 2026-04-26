@@ -19,8 +19,8 @@ fn env_or_address_falls_back_for_invalid_present_and_uses_valid_present_value() 
                 val fallbackAddress = address("0:1111111111111111111111111111111111111111111111111111111111111111");
                 val expectedAddress = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
 
-                val resolvedFromInvalidPresent = envOr<address>("EH_ENV_OR_ADDRESS_INVALID", fallbackAddress);
-                val resolvedFromValidPresent = envOr<address>("EH_ENV_OR_ADDRESS_VALID", fallbackAddress);
+                val resolvedFromInvalidPresent = env<address>("EH_ENV_OR_ADDRESS_INVALID") ?? fallbackAddress;
+                val resolvedFromValidPresent = env<address>("EH_ENV_OR_ADDRESS_VALID") ?? fallbackAddress;
 
                 expect(resolvedFromInvalidPresent).toEqual(fallbackAddress);
                 expect(resolvedFromValidPresent).toEqual(expectedAddress);
@@ -57,11 +57,11 @@ fn env_or_cell_falls_back_for_invalid_present_and_uses_valid_present_value() {
             get fun `test eh stdlib env or cell fallback vs valid precedence`() {
                 val fallbackCell = beginCell().storeUint(0xCAFE, 16).endCell();
 
-                val resolvedFromInvalidPresent = envOr<cell>("EH_ENV_OR_CELL_INVALID", fallbackCell);
+                val resolvedFromInvalidPresent = env<cell>("EH_ENV_OR_CELL_INVALID") ?? fallbackCell;
                 var invalidSlice = resolvedFromInvalidPresent.beginParse();
                 expect(invalidSlice.loadUint(16)).toEqual(0xCAFE);
 
-                val resolvedFromValidPresent = envOr<cell>("EH_ENV_OR_CELL_VALID", fallbackCell);
+                val resolvedFromValidPresent = env<cell>("EH_ENV_OR_CELL_VALID") ?? fallbackCell;
                 var validSlice = resolvedFromValidPresent.beginParse();
                 expect(validSlice.loadUint(16)).toEqual(0xBEEF);
             }

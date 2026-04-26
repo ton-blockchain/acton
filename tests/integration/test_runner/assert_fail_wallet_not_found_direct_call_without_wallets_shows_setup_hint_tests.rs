@@ -3,7 +3,9 @@ use crate::support::project::ProjectBuilder;
 use tempfile::TempDir;
 
 const ASSERT_IMPORTS: &str = r#"
+import "../../lib/ffi"
 import "../../lib/testing/assert"
+import "../../lib/emulation/scripts"
 "#;
 
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
@@ -21,7 +23,7 @@ fn wallet_not_found_script_source(location: &str) -> String {
 {ASSERT_IMPORTS}
 
 fun main() {{
-    Assert.failWalletNotFound("el_missing_wallet", "{location}");
+    ffi.failWalletNotFound("el_missing_wallet", "{location}");
 }}
 "#,
     )
@@ -54,7 +56,7 @@ fn assert_fail_wallet_not_found_direct_call_without_wallets_shows_setup_hint() {
             "Wallet el_missing_wallet not found in wallets.toml or global.wallets.toml. Wallets are not configured yet.",
         )
         .assert_stderr_contains(
-            "See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information",
+            "See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more information",
         )
         .assert_contains("at scripts/el_assert_fail_wallet_not_found.tolk:5:5");
 }

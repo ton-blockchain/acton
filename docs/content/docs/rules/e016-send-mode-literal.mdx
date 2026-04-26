@@ -1,0 +1,33 @@
+---
+title: "E016: send-mode-literal"
+description: "Warns when `send` mode is passed as numeric literal instead of `SEND_MODE_*` constants."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E016`
+- `Rule`: `send-mode-literal`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Warns when `send` mode is passed as numeric literal instead of `SEND_MODE_*` constants.
+
+### Why is this bad?
+Numeric send modes are hard to read and easy to misuse.
+Named constants make intent explicit and reduce mistakes.
+
+### Example
+```tolk twoslash
+outMsg.send(3);
+//          ^ E016: send mode should use SEND_MODE_* constants
+```
+
+Use instead:
+```tolk
+outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/send_mode_literal.rs#L30" />

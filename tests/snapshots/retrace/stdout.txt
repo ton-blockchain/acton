@@ -1,6 +1,6 @@
 Retrace a transaction by its hash
 
-Usage: acton retrace [OPTIONS] <HASH>
+Usage: acton[EXE] retrace [OPTIONS] <HASH>
 
 Arguments:
   <HASH>  Transaction hash in hex format to retrace
@@ -8,11 +8,10 @@ Arguments:
 Options:
       --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
       --net <NET>             Network to use
-      --api-key <API_KEY>     TonCenter API key for blockchain queries
       --manifest-path <PATH>  Path to Acton.toml
-      --project-root <PATH>   Path to project root
-  -v, --verbose               Show full cell hex instead of hashes in out actions
+      --verbose               Show full cell hex instead of hashes in out actions
       --logs-dir <LOGS_DIR>   Directory to save VM and executor logs
+      --project-root <PATH>   Path to project root
       --contract <CONTRACT>   Contract name from Acton.toml used to build a source-level trace for the transaction
   -h, --help                  Print help
 

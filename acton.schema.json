@@ -46,11 +46,11 @@
         }
       ]
     },
-    "litenode": {
-      "description": "Default settings for `acton litenode` commands",
+    "localnet": {
+      "description": "Default settings for `acton localnet` commands",
       "allOf": [
         {
-          "$ref": "#/definitions/LitenodeSettings"
+          "$ref": "#/definitions/LocalnetSettings"
         }
       ]
     },
@@ -261,11 +261,11 @@
       "type": "object",
       "properties": {
         "v2": {
-          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<localnet.port>/api/v2` with `5411` as the fallback port",
           "type": "string"
         },
         "v3": {
-          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<localnet.port>/api/v3` with `5411` as the fallback port",
           "type": "string"
         }
       },
@@ -347,7 +347,6 @@
         },
         "max-warnings": {
           "description": "Maximum allowed warning count before `acton check` exits with a non-zero code",
-          "default": 18446744073709551615,
           "type": "integer",
           "format": "uint",
           "minimum": 0.0
@@ -423,25 +422,25 @@
         "$ref": "#/definitions/LintEntry"
       }
     },
-    "LitenodeSettings": {
-      "description": "Default settings for `acton litenode` commands",
+    "LocalnetSettings": {
+      "description": "Default settings for `acton localnet` commands",
       "type": "object",
       "properties": {
         "accounts": {
-          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton litenode start`",
+          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton localnet start`",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "fork-block-number": {
-          "description": "Block sequence number used by `acton litenode start` when forking from historical state",
+          "description": "Block sequence number used by `acton localnet start` when forking from historical state",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
         "fork-net": {
-          "description": "Network to fork from used by `acton litenode start`",
+          "description": "Network to fork from used by `acton localnet start`",
           "allOf": [
             {
               "$ref": "#/definitions/Network"
@@ -449,7 +448,7 @@
           ]
         },
         "port": {
-          "description": "Litenode port used by `acton litenode` commands",
+          "description": "Localnet port used by `acton localnet` commands",
           "default": 3000,
           "type": "integer",
           "format": "uint16",
@@ -457,7 +456,7 @@
           "minimum": 0.0
         },
         "rate-limit": {
-          "description": "Maximum number of API requests per second served by `LiteNode` `/api` endpoints",
+          "description": "Maximum number of API requests per second served by `Localnet` `/api` endpoints",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -682,7 +681,7 @@
       }
     },
     "TestFuzzSettings": {
-      "description": "Fuzz settings for parameterized tests marked with `@test({ fuzz: ... })`",
+      "description": "Fuzz settings for parameterized tests marked with dotted `@test.fuzz` annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`",
       "type": "object",
       "properties": {
         "max-test-rejects": {
@@ -709,10 +708,6 @@
       "description": "Default settings for the test runner",
       "type": "object",
       "properties": {
-        "api-key": {
-          "description": "API key for the network provider when forking",
-          "type": "string"
-        },
         "backtrace": {
           "description": "Enable stack traces for failed tests",
           "allOf": [

@@ -7,7 +7,7 @@ Error: In child:
 In parent:
 
 [ROOT]/contracts/parent[LINE]: error: Failed to import: [NOT_FOUND]
-   2 |                 import "../gen/child_code.tolk"
+   2 |                 import "../gen/child.code.tolk"
      |                        ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Build failed with 2 errors

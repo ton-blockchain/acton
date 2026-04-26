@@ -1,6 +1,6 @@
   Installing standard library [ACTON_VERSION]
 Exiting with code 2
 Script finished with [EXIT_STATUS] 2
-Re-run with --backtrace full to get more information
-Description: Stack underflow
-Phase: Compute phase
+  Description: Stack underflow
+  Phase: Compute phase
+  Re-run with --backtrace full to get more information

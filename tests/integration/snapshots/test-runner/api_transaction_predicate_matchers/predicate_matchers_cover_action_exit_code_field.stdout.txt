@@ -1,0 +1,20 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate action [EXIT_STATUS] field [TIME]
+    └─ Test output:
+       action.from=[WALLET_ADDRESS_BASE] (sender)
+       action.to=[WALLET_ADDRESS_BASE] (harness)
+       action.aborted=true
+       action.actionExitCode=37
+       action.exitCode=0
+       action.success=false
+
+ ✓ 1 passed in 1 file

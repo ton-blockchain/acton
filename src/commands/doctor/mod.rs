@@ -7,6 +7,7 @@ use acton_config::config::{
     resolved_paths_diagnostics,
 };
 use anyhow::Result;
+use reqwest::header::USER_AGENT;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -589,7 +590,7 @@ fn inspect_native_libraries() -> DoctorNativeLibraries {
         },
     };
 
-    let tolk = match tolkc::native_tolk_version() {
+    let tolk = match tolk_compiler::native_tolk_version() {
         Ok(version) => DoctorNativeLibrary {
             load_ok: true,
             version: Some(version.version),
@@ -871,7 +872,7 @@ fn send_doctor_api_request(
         (DoctorApiMethod::PostJson, Some(body)) => client.post(&target.url).json(body),
         (DoctorApiMethod::PostJson, None) => client.post(&target.url),
     }
-    .header("User-Agent", "acton-doctor")
+    .header(USER_AGENT, build_info::user_agent())
     .send()
 }
 

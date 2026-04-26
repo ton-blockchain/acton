@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate failed transaction fields [TIME]
+    └─ Test output:
+       failed.opcode=0xae110001
+       failed.from=[WALLET_ADDRESS_BASE] (sender)
+       failed.to=[WALLET_ADDRESS_BASE] (harness)
+       failed.bodyHash=0xf4c232f8a1fe71680605647df5d6dd7befad18d57ae549b1878f6d50498f5b4e
+       failed.aborted=true
+       failed.exitCode=701
+       failed.success=false
+
+ ✓ 1 passed in 1 file

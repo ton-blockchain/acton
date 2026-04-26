@@ -137,7 +137,7 @@ export const App: React.FC = () => {
 
     void fetch("/api/coverage.lcov", {signal: coverageController.signal})
       .then(async response => {
-        if (response.status === 404) {
+        if (response.status === 204) {
           setCoverageLcov(undefined)
           setCoverageLoaded(true)
           return

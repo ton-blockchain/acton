@@ -9,10 +9,23 @@ fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const PROJECT_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/io"
+import "../../lib/types/transaction"
+
+fun deployedCodeOrNull(addr: address): cell? {
+    val state = testing.getAccountState(addr);
+    if (state == null) {
+        return null;
+    }
+    if (state.storage.state is TlbAccountStateActive) {
+        return state.storage.state.stateInit.code;
+    }
+    return null;
+}
 "#;
 
 #[test]
@@ -22,7 +35,7 @@ fn get_deployed_code_transitions_from_null_to_non_null_in_project_builder() {
 {PROJECT_IMPORTS}
 
 get fun `test co get deployed code transition project builder`() {{
-    val deployer = net.treasury("co_deployer_project_builder");
+    val deployer = testing.treasury("co_deployer_project_builder");
     val init = ContractState {{
         code: build("simple"),
         data: createEmptyCell(),
@@ -31,8 +44,8 @@ get fun `test co get deployed code transition project builder`() {{
         stateInit: init,
     }}.calculateAddress();
 
-    expect(net.isDeployed(target)).toBeFalse();
-    val before = net.getDeployedCode(target);
+    expect(testing.isDeployed(target)).toBeFalse();
+    val before = deployedCodeOrNull(target);
     expect(before).toBeNull();
     println("co-before-deploy-code-is-null");
 
@@ -45,8 +58,8 @@ get fun `test co get deployed code transition project builder`() {{
     }});
     net.send(deployer.address, deploy);
 
-    expect(net.isDeployed(target)).toBeTrue();
-    val after = net.getDeployedCode(target);
+    expect(testing.isDeployed(target)).toBeTrue();
+    val after = deployedCodeOrNull(target);
     expect(after).toBeNotNull();
     println("co-after-deploy-code-is-not-null");
 }}
@@ -75,13 +88,26 @@ fn get_deployed_code_transitions_from_null_to_non_null_in_fixture_project() {
     let test_path = "tests/co_get_deployed_code_transition.test.tolk";
 
     let source = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/io"
+import "../../lib/types/transaction"
+
+fun deployedCodeOrNull(addr: address): cell? {
+    val state = testing.getAccountState(addr);
+    if (state == null) {
+        return null;
+    }
+    if (state.storage.state is TlbAccountStateActive) {
+        return state.storage.state.stateInit.code;
+    }
+    return null;
+}
 
 get fun `test co get deployed code transition fixture project`() {
-    val deployer = net.treasury("co_deployer_fixture_project");
+    val deployer = testing.treasury("co_deployer_fixture_project");
     val init = ContractState {
         code: build("counter"),
         data: createEmptyCell(),
@@ -90,8 +116,8 @@ get fun `test co get deployed code transition fixture project`() {
         stateInit: init,
     }.calculateAddress();
 
-    expect(net.isDeployed(target)).toBeFalse();
-    val before = net.getDeployedCode(target);
+    expect(testing.isDeployed(target)).toBeFalse();
+    val before = deployedCodeOrNull(target);
     expect(before).toBeNull();
     println("co-fixture-before-deploy-code-is-null");
 
@@ -104,8 +130,8 @@ get fun `test co get deployed code transition fixture project`() {
     });
     net.send(deployer.address, deploy);
 
-    expect(net.isDeployed(target)).toBeTrue();
-    val after = net.getDeployedCode(target);
+    expect(testing.isDeployed(target)).toBeTrue();
+    val after = deployedCodeOrNull(target);
     expect(after).toBeNotNull();
     println("co-fixture-after-deploy-code-is-not-null");
 }

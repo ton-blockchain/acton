@@ -1,5 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::commands::test::reporting::{FuzzExecutionContext, TestReport, TestReporter};
+use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use anyhow::Context;
 use axum::{
@@ -82,11 +83,11 @@ impl From<&TestReport> for UiTestReport {
             column: test.column,
             duration: test.duration,
             status: test.status.clone(),
-            message: test.message.clone(),
-            detailed_message: test.detailed_message.clone(),
+            message: sanitize_optional_text(test.message.as_deref()),
+            detailed_message: sanitize_optional_text(test.detailed_message.as_deref()),
             failed_transactions: test.failed_transactions.clone(),
             failed_transaction_context: test.failed_transaction_context.clone(),
-            details: test.details.clone(),
+            details: sanitize_optional_text(test.details.as_deref()),
             location: test.location.clone(),
             execution: test.execution.as_ref().and_then(|execution| {
                 execution
@@ -369,7 +370,7 @@ async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl Into
 
 async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     let Some(coverage_lcov) = &state.coverage_lcov else {
-        return (StatusCode::NOT_FOUND, "Coverage not enabled").into_response();
+        return StatusCode::NO_CONTENT.into_response();
     };
 
     (
@@ -435,5 +436,10 @@ fn resolve_path_within_root(root: &Path, requested: &Path) -> Option<PathBuf> {
 }
 
 fn non_empty_text(value: &str) -> Option<String> {
-    (!value.trim().is_empty()).then(|| value.to_owned())
+    let sanitized = FormatterContext::strip_ansi_text(value);
+    (!sanitized.trim().is_empty()).then_some(sanitized)
+}
+
+fn sanitize_optional_text(value: Option<&str>) -> Option<String> {
+    value.and_then(non_empty_text)
 }

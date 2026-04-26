@@ -14,12 +14,13 @@ use tolk_syntax::{Expr, If, IfAlt, NodeTraversalExt};
 /// copy-paste bug and can make branches unreachable.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// if (a < 1) {
 ///     return 1;
 /// } else if (a > 4) {
 ///     return 2;
 /// } else if (a > 4) {
+/// //         ^^^^^ E026: duplicated condition in conditional chain
 ///     return 3;
 /// }
 /// ```
@@ -201,10 +202,7 @@ mod tests {
             |if_stmt, _| {
                 assert!(!is_else_if(&if_stmt));
 
-                let nested_if = if let Some(tolk_syntax::IfAlt::If(next_if)) = if_stmt.alternative()
-                {
-                    next_if
-                } else {
+                let Some(tolk_syntax::IfAlt::If(nested_if)) = if_stmt.alternative() else {
                     panic!("expected else-if branch");
                 };
                 assert!(is_else_if(&nested_if));

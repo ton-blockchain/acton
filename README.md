@@ -97,6 +97,18 @@ acton script scripts/deploy.tolk --net testnet
 For a step-by-step walkthrough, see the
 [quickstart guide](https://ton-blockchain.github.io/acton/docs/quickstart).
 
+Already have a repository instead of starting from a template? The existing
+project path is:
+
+```bash
+cd your-repo
+acton init
+acton build
+acton test
+```
+
+For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/tutorial/project-init) article.
+
 ## Building from source
 
 Source builds are intended for contributors and local development. See

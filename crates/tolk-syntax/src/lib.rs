@@ -116,9 +116,8 @@ mod tests {
 
         // Let's get the function body.
         let body = func.body().expect("function should have a body");
-        let block = match body {
-            ast::FuncBody::Block(b) => b,
-            _ => panic!("expected block statement"),
+        let ast::FuncBody::Block(block) = body else {
+            panic!("expected block statement");
         };
 
         // We can iterate over statements in the block.
@@ -128,9 +127,8 @@ mod tests {
             .expect("block should have at least one statement");
 
         // Statements are also enums.
-        let expr_stmt = match stmt {
-            ast::Stmt::ExprStmt(s) => s,
-            _ => panic!("expected expression statement"),
+        let ast::Stmt::ExprStmt(expr_stmt) = stmt else {
+            panic!("expected expression statement");
         };
 
         let expr = expr_stmt
@@ -138,9 +136,8 @@ mod tests {
             .expect("expression statement should have an expression");
 
         // Expressions are enums too.
-        let bin_expr = match expr {
-            ast::Expr::Bin(e) => e,
-            _ => panic!("expected binary operator"),
+        let ast::Expr::Bin(bin_expr) = expr else {
+            panic!("expected binary operator");
         };
 
         // Besides the "typed" AST API, there's the underlying tree-sitter node.

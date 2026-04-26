@@ -464,19 +464,19 @@ impl TypeInterner {
         match (da, db) {
             (TyData::Int(ia), TyData::Int(ib)) => ia == ib,
             (TyData::Bool { value: va }, TyData::Bool { value: vb }) => va == vb,
-            (TyData::Cell, TyData::Cell) => true,
-            (TyData::Slice, TyData::Slice) => true,
-            (TyData::Builder, TyData::Builder) => true,
-            (TyData::Continuation, TyData::Continuation) => true,
+            (TyData::Cell, TyData::Cell)
+            | (TyData::Slice, TyData::Slice)
+            | (TyData::Builder, TyData::Builder)
+            | (TyData::Continuation, TyData::Continuation)
+            | (TyData::Void, TyData::Void)
+            | (TyData::Null, TyData::Null)
+            | (TyData::Never, TyData::Never)
+            | (TyData::Undefined, TyData::Undefined)
+            | (TyData::Unknown, TyData::Unknown)
+            | (TyData::UntypedTuple, TyData::UntypedTuple) => true,
             (TyData::Address(ka), TyData::Address(kb)) => ka == kb,
-            (TyData::Void, TyData::Void) => true,
-            (TyData::Null, TyData::Null) => true,
-            (TyData::Never, TyData::Never) => true,
-            (TyData::Undefined, TyData::Undefined) => true,
-            (TyData::Unknown, TyData::Unknown) => true,
-            (TyData::UntypedTuple, TyData::UntypedTuple) => true,
-            (TyData::Bits { size: sa }, TyData::Bits { size: sb }) => sa == sb,
-            (TyData::Bytes { size: sa }, TyData::Bytes { size: sb }) => sa == sb,
+            (TyData::Bits { size: sa }, TyData::Bits { size: sb })
+            | (TyData::Bytes { size: sa }, TyData::Bytes { size: sb }) => sa == sb,
             (TyData::Builtin { name: na }, TyData::Builtin { name: nb }) => na == nb,
             (
                 TyData::Struct {
@@ -652,7 +652,8 @@ impl TypeInterner {
                 ur.iter()
                     .all(|&variant| self.can_rhs_be_assigned(lhs, variant))
             }
-            (TyData::Int(IntTy::IntN { .. }), TyData::Int(IntTy::Int)) => true,
+            (TyData::Int(IntTy::IntN { .. }), TyData::Int(IntTy::Int))
+            | (TyData::Int(IntTy::VarIntN { .. }), TyData::Int(IntTy::Int)) => true,
             (
                 TyData::Int(IntTy::IntN {
                     size: sl,
@@ -668,7 +669,6 @@ impl TypeInterner {
                 // `int8` is NOT assignable to `int32` without `as`
                 sl == sr && ul == ur
             }
-            (TyData::Int(IntTy::VarIntN { .. }), TyData::Int(IntTy::Int)) => true,
             (
                 TyData::Int(IntTy::VarIntN {
                     size: sl,
@@ -774,8 +774,8 @@ impl TypeInterner {
                 self.equals(lhs, rhs)
             }
             (TyData::Enum { def: dl, .. }, TyData::Enum { def: dr, .. }) => dl == dr,
-            (TyData::Bits { size: sl }, TyData::Bits { size: sr }) => sl == sr,
-            (TyData::Bytes { size: sl }, TyData::Bytes { size: sr }) => sl == sr,
+            (TyData::Bits { size: sl }, TyData::Bits { size: sr })
+            | (TyData::Bytes { size: sl }, TyData::Bytes { size: sr }) => sl == sr,
             _ => false,
         }
     }
@@ -802,10 +802,8 @@ impl TypeInterner {
         let lhs_unwrapped = self.unwrap_alias(lhs_inner);
         let rhs_unwrapped = self.unwrap_alias(rhs_inner);
         match (self.data(lhs_unwrapped), self.data(rhs_unwrapped)) {
-            (TyData::Struct { def: lhs_def, .. }, TyData::Struct { def: rhs_def, .. }) => {
-                lhs_def == rhs_def
-            }
-            (TyData::TypeAlias { def: lhs_def, .. }, TyData::TypeAlias { def: rhs_def, .. }) => {
+            (TyData::Struct { def: lhs_def, .. }, TyData::Struct { def: rhs_def, .. })
+            | (TyData::TypeAlias { def: lhs_def, .. }, TyData::TypeAlias { def: rhs_def, .. }) => {
                 lhs_def == rhs_def
             }
             _ => false,
@@ -853,15 +851,34 @@ impl TypeInterner {
         }
 
         match (df, dt) {
-            (TyData::Int(_), TyData::Int(_)) => true, // int as intN, intN as int, etc.
-            (TyData::Int(_), TyData::Enum { .. }) => true, // int as Color (all enums are integer)
-            (TyData::Bool { .. }, TyData::Int(IntTy::Int)) => true, // bool as int
-            (
+            // int as intN, intN as int, etc.
+            // int as Color (all enums are integer)
+            // bool as int
+            // bool as intN (not uint)
+            (TyData::Int(_), TyData::Int(_))
+            | (TyData::Int(_), TyData::Enum { .. })
+            | (TyData::Bool { .. }, TyData::Int(IntTy::Int))
+            | (
                 TyData::Bool { .. },
                 TyData::Int(IntTy::IntN {
                     unsigned: false, ..
                 }),
-            ) => true, // bool as intN (not uint)
+            )
+            // `slice` to `bytes32` / `slice` to `bits8`
+            // `slice` to `address`
+            // `any_address` as `address` and any other casts are ok
+            // all enums are integers, they can be `as` cast to each other
+            | (TyData::Slice, TyData::Bits { .. })
+            | (TyData::Slice, TyData::Bytes { .. })
+            | (TyData::Slice, TyData::Address(_))
+            | (TyData::Address(_), TyData::Slice)
+            | (TyData::Address(_), TyData::Bits { .. })
+            | (TyData::Address(_), TyData::Address(_))
+            | (TyData::Enum { .. }, TyData::Int(_))
+            | (TyData::Enum { .. }, TyData::Enum { .. })
+            // `[int, int]` as `tuple`
+            | (TyData::Tuple(_), TyData::UntypedTuple)
+            | (TyData::Never, _) => true,
             (TyData::Cell, TyData::GenericTypeWithTs { inner_ty, .. }) => {
                 // cell as Cell<T>
                 if let TyData::Struct { name, .. } = self.data(*inner_ty) {
@@ -869,25 +886,15 @@ impl TypeInterner {
                 }
                 false
             }
-            (TyData::Slice, TyData::Bits { .. }) => true, // `slice` to `bytes32` / `slice` to `bits8`
-            (TyData::Slice, TyData::Bytes { .. }) => true,
-            (TyData::Slice, TyData::Address(_)) => true, // `slice` to `address`
-            (TyData::Address(_), TyData::Slice) => true,
-            (TyData::Address(_), TyData::Bits { .. }) => true,
-            (TyData::Address(_), TyData::Address(_)) => true, // `any_address` as `address` and any other casts are ok
-            (TyData::Enum { .. }, TyData::Int(_)) => true,
-            (TyData::Enum { .. }, TyData::Enum { .. }) => true, // all enums are integers, they can be `as` cast to each other
             (TyData::Tuple(tf), TyData::Tuple(tt)) if tf.len() == tt.len() => tf
                 .iter()
                 .zip(tt.iter())
                 .all(|(&f, &t)| self.can_be_casted_with_as_operator(f, t)),
-            (TyData::Tuple(_), TyData::UntypedTuple) => true, // `[int, int]` as `tuple`
             (TyData::Tensor(tf), TyData::Tensor(tt)) if tf.len() == tt.len() => tf
                 .iter()
                 .zip(tt.iter())
                 .all(|(&f, &t)| self.can_be_casted_with_as_operator(f, t)),
             (TyData::Unknown | TyData::Undefined, _) => self.get_width_on_stack(to) == 1,
-            (TyData::Never, _) => true,
             _ => false,
         }
     }
@@ -900,11 +907,6 @@ impl TypeInterner {
     pub fn get_width_on_stack(&self, id: TyId) -> usize {
         match self.data(id) {
             TyData::TypeAlias { inner_ty, .. } => self.get_width_on_stack(*inner_ty),
-            TyData::Struct { .. } => {
-                // This usually requires looking up field types.
-                // For simplicity, we assume 1 if not known, but properly it should be sum of fields.
-                1
-            }
             TyData::Tensor(items) | TyData::Tuple(items) => {
                 items.iter().map(|&t| self.get_width_on_stack(t)).sum()
             }
@@ -928,7 +930,11 @@ impl TypeInterner {
                 1
             }
             TyData::Never | TyData::Void => 0,
-            _ => 1,
+            _ => {
+                // Most types, including structs, occupy a single stack slot.
+                // Struct width can be refined later if field-level accounting becomes necessary.
+                1
+            }
         }
     }
 
@@ -973,8 +979,7 @@ impl TypeInterner {
                     false
                 }
             }
-            TyData::MapKV { .. } => false, // map is an optional cell, so `map?` requires a nullable presence slot
-            TyData::Never | TyData::Void => false,
+            TyData::MapKV { .. } | TyData::Never | TyData::Void => false,
             _ => true,
         }
     }
@@ -1145,9 +1150,8 @@ impl TypeInterner {
             return self.ty_unknown;
         }
 
-        let lhs_union = match self.collect_union_variants_for_subtract(ty, 0) {
-            Some(variants) => variants,
-            None => return self.ty_never,
+        let Some(lhs_union) = self.collect_union_variants_for_subtract(ty, 0) else {
+            return self.ty_never;
         };
 
         let mut rest_variants = Vec::new();

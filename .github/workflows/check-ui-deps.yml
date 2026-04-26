@@ -1,7 +1,16 @@
 name: Check UI Dependencies
 
 on:
+  workflow_call:
   pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui-deps.yml"
+      - "bun.lock"
+      - "package.json"
+      - "crates/acton-**-ui/**"
+  push:
     branches:
       - master
     paths:

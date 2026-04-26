@@ -12,6 +12,16 @@ pub(crate) struct ExceptionOverview {
     pub full_type_name: String,
 }
 
+fn exception_display_name(exc: &ExceptionInfo) -> Option<&str> {
+    exc.symbolic_name.as_deref().or_else(|| {
+        exc.errno
+            .parse::<i32>()
+            .ok()
+            .and_then(exit_codes::find)
+            .map(|info| info.name)
+    })
+}
+
 pub(crate) fn exception_overview(exc: &ExceptionInfo) -> ExceptionOverview {
     let kind = if exc.is_uncaught {
         "Uncaught TVM exception"
@@ -31,8 +41,8 @@ pub(crate) fn exception_overview(exc: &ExceptionInfo) -> ExceptionOverview {
     }
     .to_string();
 
-    let summary = match exc.errno.parse::<i32>().ok().and_then(exit_codes::find) {
-        Some(info) => format!("{kind} {} ({})", exc.errno, info.name),
+    let summary = match exception_display_name(exc) {
+        Some(name) => format!("{kind} {} ({name})", exc.errno),
         None => format!("{kind} {}", exc.errno),
     };
 
@@ -63,5 +73,47 @@ pub(crate) fn build_exception_details(exc: &ExceptionInfo) -> ExceptionDetails {
         evaluate_name: None,
         stack_trace: None,
         inner_exception: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_exception_details, exception_overview};
+    use crate::core::replayer::ExceptionInfo;
+
+    #[test]
+    fn custom_symbolic_name_takes_priority_in_exception_overview() {
+        let exc = ExceptionInfo {
+            errno: "402".to_owned(),
+            symbolic_name: Some("Errors.NotEnoughTon".to_owned()),
+            is_uncaught: true,
+        };
+
+        let overview = exception_overview(&exc);
+        assert_eq!(
+            overview.stop_text,
+            "Uncaught TVM exception 402 (Errors.NotEnoughTon)"
+        );
+
+        let details = build_exception_details(&exc);
+        let message = details.message.expect("message");
+        assert!(message.contains("Uncaught TVM exception 402 (Errors.NotEnoughTon)"));
+    }
+
+    #[test]
+    fn standard_exit_code_name_is_used_as_fallback() {
+        let exc = ExceptionInfo {
+            errno: "7".to_owned(),
+            symbolic_name: None,
+            is_uncaught: false,
+        };
+
+        let overview = exception_overview(&exc);
+        assert_eq!(overview.stop_text, "TVM exception 7 (Type Check Error)");
+
+        let details = build_exception_details(&exc);
+        let message = details.message.expect("message");
+        assert!(message.contains("Type check error"));
+        assert!(message.contains("Phase: Compute phase"));
     }
 }

@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate compute phase skipped true [TIME]
+    └─ Test output:
+       skipped.bounce=false
+       skipped.from=[WALLET_ADDRESS_BASE] (sender)
+       skipped.to=[WALLET_ADDRESS_BASE]
+       skipped.bodyHash=0x46dc76a90241d0cd0dfeedf3e0daf2a041808a8892acec2193a78e43e0e9ed94
+       skipped.computePhaseSkipped=true
+
+ ✓ 1 passed in 1 file

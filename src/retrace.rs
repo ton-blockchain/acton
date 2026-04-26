@@ -1,10 +1,10 @@
-pub use ::retrace::trace::{
+pub use ::ton_retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
 use acton_debug::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
-use tolkc::TolkSourceMap;
+use tolk_compiler::TolkSourceMap;
 use ton_source_map::SourceLocation;
-use vmlogs::parser::VmLine;
+use tvm_logs::parser::VmLine;
 
 #[derive(Debug, Clone)]
 pub struct TolkBacktraceFrame {
@@ -28,7 +28,7 @@ pub struct TolkExceptionInfo {
 
 #[must_use]
 pub fn find_exception_info(vm_logs: &str, source_map: &TolkSourceMap) -> Option<TolkExceptionInfo> {
-    let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+    let vm_lines = tvm_logs::parser::parse_lines(vm_logs);
     let description = exception_description(&vm_lines);
     let mut replayer = TolkReplayer::new(source_map, &vm_lines).ok()?;
     replayer.set_exception_breakpoints(ExceptionBreakMode::Uncaught);
@@ -65,7 +65,7 @@ pub fn find_exception_info(vm_logs: &str, source_map: &TolkSourceMap) -> Option<
 
 #[must_use]
 pub fn find_execution_trace(vm_logs: &str, source_map: &TolkSourceMap) -> Option<TolkTraceInfo> {
-    let vm_lines = vmlogs::parser::parse_lines(vm_logs);
+    let vm_lines = tvm_logs::parser::parse_lines(vm_logs);
     let mut replayer = TolkReplayer::new(source_map, &vm_lines).ok()?;
 
     while !replayer.is_finished() {
@@ -100,7 +100,7 @@ fn exception_description(vm_lines: &[Result<VmLine<'_>, String>]) -> String {
 }
 
 fn find_backtrace(
-    source_map: &tolkc::SourceMap,
+    source_map: &tolk_compiler::SourceMap,
     call_stack: &[CallFrameInfo],
     current_loc: &SourceLocation,
 ) -> Vec<TolkBacktraceFrame> {
@@ -129,8 +129,8 @@ fn find_backtrace(
 }
 
 fn src_range_to_source_location(
-    source_map: &tolkc::SourceMap,
-    range: &tolkc::source_map::SrcRange,
+    source_map: &tolk_compiler::SourceMap,
+    range: &tolk_compiler::source_map::SrcRange,
 ) -> SourceLocation {
     to_source_location(
         source_map,
@@ -141,7 +141,7 @@ fn src_range_to_source_location(
 }
 
 fn to_source_location(
-    source_map: &tolkc::SourceMap,
+    source_map: &tolk_compiler::SourceMap,
     file_id: usize,
     line: usize,
     column: usize,
@@ -176,5 +176,5 @@ pub fn find_source_loc(
 
 #[must_use]
 pub fn find_installed_actions(vm_logs: &str) -> InstalledActions {
-    ::retrace::trace::Trace::new(vm_logs, None).actions()
+    ::ton_retrace::trace::Trace::new(vm_logs, None).actions()
 }

@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, Load};
 use tycho_types::dict::Dict;
@@ -76,14 +76,12 @@ pub fn get_jetton_wallet_data(address: String, code: Cell, data: Cell) -> Option
 
 #[must_use]
 pub fn parse_jetton_content(content_cell: Cell) -> Value {
-    let mut parser = match content_cell.as_slice() {
-        Ok(p) => p,
-        Err(_) => return json!({}),
+    let Ok(mut parser) = content_cell.as_slice() else {
+        return json!({});
     };
 
-    let prefix = match parser.load_uint(8) {
-        Ok(p) => p,
-        Err(_) => return json!({}),
+    let Ok(prefix) = parser.load_uint(8) else {
+        return json!({});
     };
 
     if prefix == 0x01 {

@@ -16,10 +16,11 @@ pub mod analysis;
 /// arbitrary inbound senders to mutate contract storage.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun onInternalMessage(in: InMessage) {
 ///     val storage = lazy Storage.fromCell(contract.getData());
 ///     storage.save();
+///     //      ^^^^ E017: possible storage write without admin sender check
 /// }
 /// ```
 ///

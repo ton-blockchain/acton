@@ -6,7 +6,7 @@
 use crate::file_db::FileDb;
 use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -165,15 +165,20 @@ impl ProjectIndex {
         let mut queue = VecDeque::new();
         queue.push_back(file_id);
 
+        let mut visited = FxHashSet::default();
+        visited.insert(file_id);
         let mut result = vec![file_id];
         while let Some(file_id) = queue.pop_front() {
             let Some(imports) = self.imports.get(&file_id) else {
                 continue;
             };
 
-            let imported_files = imports.iter().filter_map(|import| import.target);
-            result.extend(imported_files.clone());
-            queue.extend(imported_files);
+            for imported_file in imports.iter().filter_map(|import| import.target) {
+                if visited.insert(imported_file) {
+                    result.push(imported_file);
+                    queue.push_back(imported_file);
+                }
+            }
         }
 
         result
@@ -286,11 +291,8 @@ impl ProjectIndex {
             return Ok(file_db.canonicalize(&abs_path)?);
         }
 
-        let dir = match file.parent() {
-            Some(dir) => dir,
-            None => {
-                anyhow::bail!("No parent directory found");
-            }
+        let Some(dir) = file.parent() else {
+            anyhow::bail!("No parent directory found");
         };
         let abs_path = dir.join(import.as_ref());
         let abs_path = Self::append_tolk_extension_if_needed(abs_path);
@@ -298,11 +300,13 @@ impl ProjectIndex {
     }
 
     fn append_tolk_extension_if_needed(abs_path: PathBuf) -> PathBuf {
-        if abs_path.ends_with(".tolk") {
-            abs_path
-        } else {
-            abs_path.with_extension("tolk")
+        if abs_path.extension().is_some_and(|ext| ext == "tolk") {
+            return abs_path;
         }
+
+        let mut abs_path = abs_path;
+        abs_path.as_mut_os_string().push(".tolk");
+        abs_path
     }
 }
 

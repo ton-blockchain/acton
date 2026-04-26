@@ -1,0 +1,101 @@
+---
+title: "Fork Testing"
+description: "Learn how to test contracts against real blockchain state by forking testnet or mainnet"
+---
+
+Fork testing allows you to run tests against real blockchain state by loading accounts and libraries from TON's testnet or mainnet. This enables testing contract interactions with real deployed contracts without needing to set up a complex local environment.
+
+## What is Fork Testing?
+
+Fork testing creates a local "fork" of the real blockchain state for your tests. When your test code accesses an account that exists on testnet or mainnet, the test runner automatically:
+
+1. Fetches the account's state from the network
+2. Caches it locally for the test run
+3. Uses that real state in your test execution
+
+This is particularly useful for:
+- Testing integrations with existing contracts
+- Verifying behavior against real contract code
+- Debugging issues with deployed contracts
+- Testing edge cases with real on-chain data
+
+## Enabling Fork Testing
+
+### Basic Usage
+
+To enable fork testing, use the `--fork-net` flag when running tests:
+
+```bash
+# Fork from testnet
+acton test --fork-net testnet
+
+# Fork from mainnet
+acton test --fork-net mainnet
+```
+
+### Configuring API Access
+
+Access to TonCenter API requires an API key to avoid rate limiting. Set the env
+var that matches the forked network:
+
+```bash
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton test --fork-net mainnet
+```
+
+<Callout type="info" title="Getting an API Key">
+You can obtain a free TonCenter API key from [toncenter.com](https://toncenter.com).
+</Callout>
+
+## How Fork Testing Works
+
+When a test accesses an account while fork testing is enabled:
+
+1. **Check Local Cache** — The system first checks if the account was already loaded
+2. **Fetch from Network** — If not cached and `--fork-net` is specified, it queries TonCenter API
+3. **Load State** — Account state (balance, code, data, status) is downloaded and deserialized
+4. **Cache for Reuse** — The state is cached for subsequent accesses during the test run
+5. **Execute Locally** — Tests execute using this real state in the local emulator
+
+This hybrid approach gives you real data with local execution speed.
+
+<Callout type="warn" title="Network Latency">
+The first access to each unique account will make a network request, which adds latency. Subsequent accesses use the cache. Consider this when writing tests that access many different accounts.
+</Callout>
+
+## Cache Scope and Refresh Behavior
+
+Forked account snapshots are cached only in memory for the current `acton test`
+invocation.
+
+- The cache key is the tuple of fork network, optional pinned block number, and
+  account address.
+- The cache is shared across tests in the same run, so the second test that
+  touches the same account does not re-fetch it.
+- The cache is not persisted to disk. A fresh `acton test --fork-net ...` run
+  starts with an empty remote snapshot cache.
+- Failed lookups are not cached. If a request errors, the next access can try
+  the network again.
+
+If you need to refetch network state, rerun the test command. Mutations made by
+the local emulator do not invalidate and re-download the remote snapshot.
+
+<Callout type="info" title="Local State Priority">
+Accounts that were deployed or modified within your test will **not** be overwritten by network state. Fork testing only loads accounts that don't exist in the local test environment.
+</Callout>
+
+That precedence also applies after an account is fetched once. Once the account
+exists in the emulated world state, later reads and message execution use the
+local copy from that world state rather than querying the network again.
+
+## Library Lookup Precedence
+
+Library lookup follows the same "local first" rule.
+
+When code asks to resolve a library hash, Acton first checks libraries already
+registered in the current emulated world state, for example via
+`testing.registerLibrary(...)`. Only if the library is still missing does it
+fall back to the configured fork network.
+
+This matters when you intentionally override a real network library during a
+forked test: the locally registered library wins for the rest of that run.

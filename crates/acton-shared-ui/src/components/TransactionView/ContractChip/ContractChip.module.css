@@ -1,10 +1,11 @@
 .contractChip {
   display: inline-flex;
   align-items: center;
+  height: 20px;
   gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
   position: relative;
-  padding: var(--spacing-xs);
+  padding: var(--spacing-xs) 0;
   border-radius: var(--border-radius-sm);
   transition:
     background-color var(--transition-duration-fast) ease-out,

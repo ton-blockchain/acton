@@ -1,10 +1,10 @@
 import "../contracts/counter_messages"
 
+import "../../../../lib/build"
 import "../../../../lib/io"
-import "../../../../lib/build/build"
 import "../../../../lib/emulation/network"
+import "../../../../lib/emulation/testing"
 import "../../../../lib/testing/expect"
-import "../../../../lib/testing/transaction_expect"
 
 struct Counter {
     address: address
@@ -50,7 +50,7 @@ fun Counter.getCounter(self): int {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -62,7 +62,7 @@ fun setupTest(): (Counter, Treasury) {
     return (counter, deployer);
 }
 
-// SLOT_1: @test({gas_limit: 100})
+// SLOT_1: @test.gas_limit(100)
 get fun `test should increase counter`() {
     val (counter, deployer) = setupTest();
 
@@ -74,7 +74,7 @@ get fun `test should increase counter`() {
     // SLOT_6: eprintln("error output")
 }
 
-// SLOT_3: @test({fail_with: 100})
+// SLOT_3: @test.fail_with(100)
 get fun `test should reset counter`() {
     // SLOT_4: if (true) { throw 9 }
     val (counter, deployer) = setupTest();

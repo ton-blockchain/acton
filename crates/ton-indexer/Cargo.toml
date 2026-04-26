@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ton-executor = { workspace = true }
-tvmffi = { workspace = true }
+tvm-ffi = { workspace = true }
 tycho-types = { workspace = true }
 base64 = { workspace = true }
 anyhow = { workspace = true }

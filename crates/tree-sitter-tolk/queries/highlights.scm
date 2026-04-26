@@ -1,6 +1,8 @@
 "do" @keyword
 "if" @keyword
 "as" @keyword
+"is" @keyword
+"!is" @keyword
 "fun" @keyword
 "asm" @keyword
 "get" @keyword
@@ -9,7 +11,12 @@
 "val" @keyword
 "lazy" @keyword
 "else" @keyword
+"type" @keyword
 "enum" @keyword
+"struct" @keyword
+"contract" @keyword
+"readonly" @keyword
+"private" @keyword
 "true" @keyword
 "tolk" @keyword
 "const" @keyword
@@ -18,6 +25,7 @@
 "redef" @keyword
 "while" @keyword
 "catch" @keyword
+"match" @keyword
 "return" @keyword
 "assert" @keyword
 "import" @keyword

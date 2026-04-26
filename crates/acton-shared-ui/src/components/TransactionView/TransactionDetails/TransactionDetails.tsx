@@ -1,15 +1,28 @@
 import * as React from "react"
-import {useEffect, useState} from "react"
+import {useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
+import type {Cell} from "@ton/core"
 
 import type {BackendContractInfo} from "@/types"
-import type {ContractData, ParsedValue, TransactionInfo} from "@/types/transaction"
-import {fmt} from "@/index"
-import {computeSendMode, getTransactionOpcode} from "@/utils/transaction"
+import type {ContractData, TransactionInfo} from "@/types/transaction"
+import {DataBlock, fmt} from "@/index"
+import {decodeStateInitData} from "@/utils/messageBody"
+import {
+  computeSendMode,
+  getTransactionActionPhase,
+  getTransactionComputePhase,
+  getTransactionOpcode,
+  getTransactionSourceLabel,
+  getTransactionTriggerLabel,
+  resolveTransactionOpcodeName,
+} from "@/utils/transaction"
 
+import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
+import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 
 import {ActionsSummary} from "./ActionsSummary"
@@ -22,155 +35,6 @@ export interface TransactionDetailsProps {
   readonly onContractClick?: (address: string) => void
 }
 
-const DECIMAL_SCALAR_PATTERN = /^-?\d+(?:\.\d+)?$/
-
-function ParsedTypeLabel({typeName}: {readonly typeName: string}): React.JSX.Element {
-  return <span className={styles.parsedTypeLabel}>{typeName}</span>
-}
-
-function ParsedValueRow({
-  label,
-  value,
-  contracts,
-  onContractClick,
-}: {
-  readonly label: string
-  readonly value: ParsedValue
-  readonly contracts: Map<string, ContractData>
-  readonly onContractClick?: (address: string) => void
-}): React.JSX.Element {
-  return (
-    <>
-      <div className={styles.parsedEntryKey}>{label}:</div>
-      <div className={styles.parsedEntryValue}>
-        <ParsedValueView value={value} contracts={contracts} onContractClick={onContractClick} />
-      </div>
-    </>
-  )
-}
-
-function ParsedValueView({
-  value,
-  contracts,
-  onContractClick,
-  fallbackTypeName,
-}: {
-  readonly value: ParsedValue
-  readonly contracts: Map<string, ContractData>
-  readonly onContractClick?: (address: string) => void
-  readonly fallbackTypeName?: string
-}): React.JSX.Element {
-  switch (value.kind) {
-    case "null": {
-      return <span className={styles.parsedNull}>null</span>
-    }
-    case "address": {
-      return (
-        <ContractChip
-          address={value.value}
-          contracts={contracts}
-          onContractClick={onContractClick}
-        />
-      )
-    }
-    case "boolean": {
-      return (
-        <span className={value.value ? styles.booleanTrue : styles.booleanFalse}>
-          {value.value ? "true" : "false"}
-        </span>
-      )
-    }
-    case "scalar": {
-      return (
-        <span
-          className={
-            DECIMAL_SCALAR_PATTERN.test(value.value)
-              ? styles.parsedPlainScalar
-              : styles.parsedScalar
-          }
-        >
-          {value.value}
-        </span>
-      )
-    }
-    case "array": {
-      if (value.items.length === 0) {
-        return <span className={styles.parsedEmpty}>[]</span>
-      }
-
-      return (
-        <div className={styles.parsedContainer}>
-          <span className={styles.parsedBadge}>array</span>
-          <div className={styles.parsedNested}>
-            {value.items.map((item, index) => (
-              <ParsedValueRow
-                key={`array-item-${index}`}
-                label={`[${index}]`}
-                value={item}
-                contracts={contracts}
-                onContractClick={onContractClick}
-              />
-            ))}
-          </div>
-        </div>
-      )
-    }
-    case "object": {
-      const typeName = value.typeName ?? fallbackTypeName
-
-      return (
-        <div className={styles.parsedContainer}>
-          {typeName && <ParsedTypeLabel typeName={typeName} />}
-          {value.entries.length === 0 ? (
-            <span className={styles.parsedEmpty}>{"{}"}</span>
-          ) : (
-            <div className={styles.parsedNested}>
-              {value.entries.map(entry => (
-                <ParsedValueRow
-                  key={entry.key}
-                  label={entry.key}
-                  value={entry.value}
-                  contracts={contracts}
-                  onContractClick={onContractClick}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )
-    }
-    case "map": {
-      return (
-        <div className={styles.parsedContainer}>
-          <span className={styles.parsedBadge}>map</span>
-          {value.entries.length === 0 ? (
-            <span className={styles.parsedEmpty}>{"{}"}</span>
-          ) : (
-            <div className={styles.parsedNested}>
-              {value.entries.map((entry, index) => (
-                <div key={`map-entry-${index}`} className={styles.parsedMapEntry}>
-                  <ParsedValueRow
-                    label="key"
-                    value={entry.key}
-                    contracts={contracts}
-                    onContractClick={onContractClick}
-                  />
-                  <ParsedValueRow
-                    label="value"
-                    value={entry.value}
-                    contracts={contracts}
-                    onContractClick={onContractClick}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )
-    }
-  }
-}
-
 export function TransactionDetails({
   tx,
   contracts,
@@ -178,14 +42,10 @@ export function TransactionDetails({
   onContractClick,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
-  const [showParsedBody, setShowParsedBody] = useState(false)
-
-  useEffect(() => {
-    setShowParsedBody(false)
-  }, [tx.lt])
+  const [showStateInit, setShowStateInit] = useState(false)
 
   const description = tx.transaction.description
-  if (description.type !== "generic") {
+  if (description.type !== "generic" && description.type !== "tick-tock") {
     return (
       <div className={styles.transactionDetailsContainer}>
         <div className={styles.detailRow}>
@@ -197,60 +57,135 @@ export function TransactionDetails({
     )
   }
 
-  const computePhase = description.computePhase
-  const actionPhase = description.actionPhase
+  const isTickTock = description.type === "tick-tock"
+  const tickTockDescription = description.type === "tick-tock" ? description : undefined
+  const computePhase = getTransactionComputePhase(tx.transaction)
+  const actionPhase = getTransactionActionPhase(tx.transaction)
+  const triggerLabel = getTransactionTriggerLabel(tx.transaction)
+
+  if (!computePhase) {
+    return (
+      <div className={styles.transactionDetailsContainer}>
+        <div className={styles.detailRow}>
+          <div className={styles.detailValue}>
+            Transaction compute phase unavailable (Type: {description.type})
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const formatBoolean = (v: boolean): React.JSX.Element => (
     <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
   )
+  const formatStatusChange = (value: "unchanged" | "frozen" | "deleted"): string => {
+    switch (value) {
+      case "unchanged": {
+        return "Unchanged"
+      }
+      case "frozen": {
+        return "Frozen"
+      }
+      case "deleted": {
+        return "Deleted"
+      }
+    }
+  }
 
   const inMessage = tx.transaction.inMessage ?? undefined
+  const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
+  const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
     inMessage != undefined &&
     (() => {
       const body = inMessage.body.asSlice()
       return body.remainingBits > 0 || body.remainingRefs > 0
     })()
+  const stateInitCode = inMessage?.init?.code ?? undefined
+  const stateInitData = inMessage?.init?.data ?? undefined
+  const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const parsedStateInitData = decodeStateInitData(
+    stateInitData,
+    targetContract,
+    tx.contractName,
+    allContracts,
+  )
   const sendMode = computeSendMode(tx)
 
   const opcode = getTransactionOpcode(tx.transaction)
-
-  const thisAddress = tx.address
-  const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-  let typeAbi = targetContract?.abi?.messages.find(it => it.opcode === opcode)
-  if (typeAbi === undefined) {
-    for (const contract of allContracts) {
-      typeAbi = contract.abi?.messages.find(it => it.opcode === opcode)
-    }
-  }
-  const opcodeName = typeAbi?.name
+  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
 
   const sentTotal = [...tx.transaction.outMessages.values()].reduce(
     (accumulator: bigint, message) =>
       accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
     0n,
   )
+  const tickTockStorageFeesDue = tickTockDescription?.storagePhase.storageFeesDue
 
   return (
     <div className={styles.transactionDetailsContainer}>
       <div className={styles.detailRow}>
-        <div className={styles.detailLabel}>Message Route</div>
-        <div className={styles.detailValue}>
-          <ContractChip
-            address={tx.transaction.inMessage?.info.src?.toString()}
-            contracts={contracts}
-            onContractClick={onContractClick}
-          />
-          {" → "}
-          <ContractChip
-            address={tx.transaction.inMessage?.info.dest?.toString()}
-            contracts={contracts}
-            onContractClick={onContractClick}
-          />
+        <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message Route"}</div>
+        <div className={styles.heightDetailValue}>
+          {isTickTock ? (
+            <span className={styles.triggerRoute}>
+              <span className={styles.triggerKind}>{triggerLabel ?? "Tick-Tock"}</span>
+              <span aria-hidden="true">→</span>
+              <ContractChip
+                address={tx.address?.toString()}
+                contracts={contracts}
+                onContractClick={onContractClick}
+              />
+            </span>
+          ) : (
+            <span className={styles.triggerRoute}>
+              {sourceLabel ? (
+                <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
+              ) : (
+                <ContractChip
+                  address={tx.transaction.inMessage?.info.src?.toString()}
+                  contracts={contracts}
+                  onContractClick={onContractClick}
+                />
+              )}
+              {" → "}
+              <ContractChip
+                address={tx.transaction.inMessage?.info.dest?.toString()}
+                contracts={contracts}
+                onContractClick={onContractClick}
+              />
+            </span>
+          )}
         </div>
       </div>
 
-      {inMessage && inMessage.info.type === "internal" && (
+      {isTickTock && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Tick-Tock</div>
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Kind</div>
+                <div className={styles.multiColumnItemValue}>{triggerLabel ?? "Tick-Tock"}</div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Aborted</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(tickTockDescription?.aborted ?? false)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Destroyed</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(tickTockDescription?.destroyed ?? false)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isTickTock && inMessage && inMessage.info.type === "internal" && (
         <div className={styles.labeledSectionRow}>
           <div className={styles.labeledSectionTitle}>In Message</div>
 
@@ -297,51 +232,79 @@ export function TransactionDetails({
         </div>
       )}
 
-      <div className={styles.labeledSectionRow}>
-        <div className={styles.labeledSectionTitle}>Message Data</div>
-        <div className={styles.labeledSectionContent}>
-          <div className={styles.multiColumnRow}>
-            <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Opcode</div>
-              <div className={styles.multiColumnItemValue}>
-                <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
-              </div>
-            </div>
-          </div>
-          {tx.parsedBody && hasMessageBody && (
-            <div className={styles.parsedBodySection}>
-              <div className={styles.parsedBodyTitle}>
-                Parsed Body
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowParsedBody(!showParsedBody)
-                  }}
-                  className={styles.actionsToggleButton}
-                  aria-label={showParsedBody ? "Hide parsed body" : "Show parsed body"}
-                >
-                  {showParsedBody ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                  <span className={styles.actionsToggleText}>
-                    {showParsedBody ? "Hide" : "Show"}
-                  </span>
-                </button>
-              </div>
-              {showParsedBody && (
-                <div className={styles.parsedBodyTree}>
-                  <div className={styles.parsedBodyContent}>
-                    <ParsedValueView
-                      value={tx.parsedBody.value}
-                      contracts={contracts}
-                      onContractClick={onContractClick}
-                      fallbackTypeName={tx.parsedBody.name}
-                    />
-                  </div>
+      {!isTickTock && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Message Data</div>
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Opcode</div>
+                <div className={styles.multiColumnItemValue}>
+                  <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
                 </div>
-              )}
+              </div>
             </div>
-          )}
+            {tx.parsedBody && hasMessageBody && (
+              <ParsedBodySection
+                key={tx.lt}
+                parsedBody={tx.parsedBody}
+                contracts={contracts}
+                onContractClick={onContractClick}
+              />
+            )}
+            {(stateInitCode || stateInitData) && (
+              <div className={styles.parsedBodySection}>
+                <div className={styles.parsedBodyTitle}>
+                  State Init
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStateInit(!showStateInit)
+                    }}
+                    className={styles.actionsToggleButton}
+                    aria-label={showStateInit ? "Hide state init" : "Show state init"}
+                  >
+                    {showStateInit ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                    <span className={styles.actionsToggleText}>
+                      {showStateInit ? "Hide" : "Show"}
+                    </span>
+                  </button>
+                </div>
+                {showStateInit && (
+                  <div className={styles.stateInitSection}>
+                    {stateInitCode && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>Code</div>
+                        <DataBlock data={stateInitCodeBocHex!} />
+                        <DisasmSection bocHex={stateInitCodeBocHex!} title="Code Disassembly" />
+                      </div>
+                    )}
+                    {stateInitData && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>Data</div>
+                        {parsedStateInitData ? (
+                          <div className={styles.parsedBodyTree}>
+                            <div className={styles.parsedBodyContent}>
+                              <ParsedValueView
+                                value={parsedStateInitData.value}
+                                contracts={contracts}
+                                onContractClick={onContractClick}
+                                fallbackTypeName={parsedStateInitData.name}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <DataBlock data={formatCellBocHex(stateInitData)} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Fees & Sent</div>
@@ -377,6 +340,36 @@ export function TransactionDetails({
         </div>
       </div>
 
+      {tickTockDescription && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Storage Phase</div>
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Storage Fee</div>
+                <div className={styles.multiColumnItemValue}>
+                  {fmt.formatCurrency(tickTockDescription.storagePhase.storageFeesCollected)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Storage Due</div>
+                <div className={styles.multiColumnItemValue}>
+                  {typeof tickTockStorageFeesDue === "bigint"
+                    ? fmt.formatCurrency(tickTockStorageFeesDue)
+                    : "—"}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Status Change</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatStatusChange(tickTockDescription.storagePhase.statusChange)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Compute Phase</div>
         <div className={styles.labeledSectionContent}>
@@ -393,7 +386,11 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
+                  <ExitCodeChip
+                    exitCode={computePhase.exitCode}
+                    abi={targetContract?.abi}
+                    compilerAbi={targetContract?.compilerAbi}
+                  />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -436,6 +433,7 @@ export function TransactionDetails({
                   <ExitCodeChip
                     exitCode={actionPhase.resultCode}
                     abi={targetContract?.abi}
+                    compilerAbi={targetContract?.compilerAbi}
                     phase="action"
                   />
                 </div>
@@ -490,6 +488,10 @@ export function TransactionDetails({
       </div>
     </div>
   )
+}
+
+function formatCellBocHex(cell: Cell): string {
+  return cell.toBoc({idx: false, crc32: false}).toString("hex")
 }
 
 function formatDetailedTimestamp(

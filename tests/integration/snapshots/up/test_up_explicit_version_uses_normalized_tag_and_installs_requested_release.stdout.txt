@@ -1,0 +1,5 @@
+  Installing v0.1.5
+       Found [ACTON_ARCHIVE]
+       Found [ACTON_ARCHIVE_SHA256]
+    Verified [ACTON_ARCHIVE_SHA256]
+     Updated to v0.1.5

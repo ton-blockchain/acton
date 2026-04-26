@@ -46,9 +46,9 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const EXTERNAL_API_TEST_PRELUDE: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
 
@@ -80,7 +80,7 @@ fun ExternalHarness.create() {
 
 fun deployHarness() {
     val harness = ExternalHarness.create();
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployRes = net.send(
         deployer.address,
         createMessage({
@@ -138,6 +138,20 @@ fn run_failure_case(project_name: &str, test_body: &str, test_name: &str) {
         .assert_contains(test_name);
 }
 
+fn run_snapshot_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+    let source = with_prelude(test_body);
+    ProjectBuilder::new(project_name)
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 #[test]
 fn send_external_collects_external_messages_with_deterministic_order() {
     run_success_case(
@@ -147,7 +161,7 @@ get fun `test send external collects externals`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 1 }),
+        net.createExternalMessage(harness.address, TriggerExternal { id: 1 }),
     )!;
 
     expect(txs).toHaveLength(1);
@@ -170,6 +184,55 @@ get fun `test send external collects externals`() {
 }
 
 #[test]
+fn transaction_load_body_decodes_external_inbound_body() {
+    run_snapshot_case(
+        "o-lib-api-transaction-load-body-external-in",
+        r"
+get fun `test transaction load body decodes external inbound body`() {
+    val (harness, _) = deployHarness();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 7 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val body = tx.loadBody<TriggerExternal>();
+    expect(body).toEqual(TriggerExternal { id: 7 });
+}
+",
+        "integration/snapshots/test-runner/api_external/transaction_load_body_decodes_external_inbound_body.stdout.txt",
+    );
+}
+
+#[test]
+fn transaction_load_in_msg_decodes_external_inbound_message() {
+    run_snapshot_case(
+        "o-lib-api-transaction-load-in-msg-external-in",
+        r"
+get fun `test transaction load in msg decodes external inbound message`() {
+    val (harness, _) = deployHarness();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 8 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val inMsg = tx.loadInMsg<TriggerExternal>();
+    expect(inMsg.loadBody()).toEqual(TriggerExternal { id: 8 });
+    expect(inMsg.info is TlbExternalInMessageInfo).toBeTrue();
+    if (inMsg.info is TlbExternalInMessageInfo) {
+        expect(inMsg.info.dest).toEqual(harness.address);
+        expect(inMsg.info.importFee).toBeGreater(0);
+    }
+}
+",
+        "integration/snapshots/test-runner/api_external/transaction_load_in_msg_decodes_external_inbound_message.stdout.txt",
+    );
+}
+
+#[test]
 fn create_external_message_accepts_explicit_external_src() {
     run_success_case(
         "o-lib-api-create-external-explicit-src",
@@ -178,7 +241,7 @@ get fun `test create external message with external src`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(
+        net.createExternalMessage(
             harness.address,
             TriggerExternal { id: 2 },
             null,
@@ -206,10 +269,10 @@ get fun `test send external repeatable`() {
     val (harness, _) = deployHarness();
 
     val first = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 3 }),
+        net.createExternalMessage(harness.address, TriggerExternal { id: 3 }),
     )!;
     val second = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 4 }),
+        net.createExternalMessage(harness.address, TriggerExternal { id: 4 }),
     )!;
 
     expect(first).toHaveLength(1);
@@ -235,17 +298,23 @@ fn send_external_returns_null_when_deployed_contract_has_too_low_balance() {
 get fun `test send external low balance rejected`() {
     val (harness, _) = deployHarness();
 
-    val tinyBalanceSource = net.randomAddress("o_external_tiny_balance_source");
-    net.topUp(tinyBalanceSource, 1);
+    val tinyBalanceSource = randomAddress("o_external_tiny_balance_source");
+    testing.topUp(tinyBalanceSource, 1);
 
-    val harnessAcc = net.getAccount(harness.address);
-    val tinyBalanceAcc = net.getAccount(tinyBalanceSource);
+    val harnessShard = testing.getShardAccount(harness.address);
+    val tinyBalanceShard = testing.getShardAccount(tinyBalanceSource);
 
-    expect(harnessAcc is AccountInfo).toBeTrue();
-    expect(tinyBalanceAcc is AccountInfo).toBeTrue();
+    expect(harnessShard).toBeNotNull();
+    expect(tinyBalanceShard).toBeNotNull();
 
-    if (harnessAcc is AccountInfo && tinyBalanceAcc is AccountInfo) {
-        val lowBalanceAcc = AccountInfo {
+    val harnessAcc = harnessShard!.account.load();
+    val tinyBalanceAcc = tinyBalanceShard!.account.load();
+
+    expect(harnessAcc is TlbAccountInfo).toBeTrue();
+    expect(tinyBalanceAcc is TlbAccountInfo).toBeTrue();
+
+    if (harnessAcc is TlbAccountInfo && tinyBalanceAcc is TlbAccountInfo) {
+        val lowBalanceAcc = TlbAccountInfo {
             addr: harness.address,
             storageStat: harnessAcc.storageStat,
             storage: {
@@ -254,13 +323,15 @@ get fun `test send external low balance rejected`() {
                 state: harnessAcc.storage.state,
             },
         };
-        net.setAccount(harness.address, lowBalanceAcc);
+        var lowBalanceShard = harnessShard!;
+        lowBalanceShard.account = (lowBalanceAcc as TlbAccount).toCell();
+        testing.setShardAccount(harness.address, lowBalanceShard);
     }
 
-    expect(net.balance(harness.address)).toEqual(1);
+    expect(testing.getAccountBalance(harness.address)).toEqual(1);
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 6 }),
+        net.createExternalMessage(harness.address, TriggerExternal { id: 6 }),
     );
     expect(txs == null).toBeTrue();
 }
@@ -277,7 +348,7 @@ fn create_external_message_rejects_internal_src() {
 get fun `test create external message rejects internal src`() {
     val (harness, deployer) = deployHarness();
 
-    createExternalMessage(
+    net.createExternalMessage(
         harness.address,
         TriggerExternal { id: 5 },
         null,
@@ -298,7 +369,7 @@ get fun `test find external out message bug`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 5 }),
+        net.createExternalMessage(harness.address, TriggerExternal { id: 5 }),
     );
 
     val found = txs!.findExternalOutMessage<ExternalAlpha>({
@@ -306,7 +377,7 @@ get fun `test find external out message bug`() {
         to: createAddressNone(),
     });
 
-    expect(found).toBeDefined();
+    expect(found).toBeNotNull();
 }
 ",
         "find external out message bug",

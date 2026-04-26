@@ -4,7 +4,7 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const CRYPTO_IMPORTS: &str = r#"
-import "../../lib/crypto/crypto"
+import "../../lib/crypto"
 import "../../lib/testing/expect"
 "#;
 

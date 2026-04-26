@@ -1,4 +1,6 @@
-use crate::commands::common::error_fmt;
+use crate::commands::common::{
+    error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
+};
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
@@ -26,8 +28,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -37,12 +39,12 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, VmStackValue, vm_stack_value};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
-use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
 const ASSERTION_FAILED_EXIT_CODE: i32 = 567;
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
@@ -76,12 +78,12 @@ fn resolve_script_networks(
 pub fn script_cmd(
     path: &String,
     args: Vec<String>,
+    verbose: u8,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_port: u16,
     clear_cache: bool,
     fork_net: Option<String>,
-    api_key: Option<String>,
     fork_block_number: Option<u64>,
     net: Option<String>,
     explorer: Option<Explorer>,
@@ -133,11 +135,11 @@ pub fn script_cmd(
         &content,
         &mappings,
         stack,
+        verbose,
         debug,
         backtrace,
         debug_listener,
         fork_net,
-        api_key,
         fork_block_number,
         network,
         explorer,
@@ -156,11 +158,11 @@ fn run_script_file(
     content: &str,
     mappings: &Option<BTreeMap<String, String>>,
     stack: Tuple,
+    verbose: u8,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
     fork_net: Option<Network>,
-    api_key: Option<String>,
     fork_block_number: Option<u64>,
     net: Option<Network>,
     explorer: Option<Explorer>,
@@ -168,11 +170,16 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content.into(), file_path, mappings);
 
-    let compiler = tolkc::Compiler::new(2).with_mappings(mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(mappings);
     let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
+    let mut verbosity = executor_verbosity_for_cli_level(verbose);
+
+    if debug || backtrace == Some(BacktraceMode::Full) {
+        verbosity = max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStackVerbose);
+    }
 
     match compiler.compile(Path::new(file_path), need_debug_info) {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
             let source_map = Arc::new(TolkSourceMap::from_code_cell(
@@ -190,9 +197,8 @@ fn run_script_file(
                 debug,
                 backtrace,
                 debug_listener,
-                ExecutorVerbosity::FullLocationStackVerbose,
+                verbosity,
                 fork_net,
-                api_key,
                 fork_block_number,
                 net.as_ref(),
                 explorer,
@@ -200,7 +206,7 @@ fn run_script_file(
             )?;
             Ok(())
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!("Cannot compile script file {}", error.message)
         }
     }
@@ -209,6 +215,7 @@ fn run_script_file(
 struct ScriptResult {
     result: GetMethodResult,
     source_map: Arc<TolkSourceMap>,
+    compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -224,7 +231,6 @@ fn execute_script(
     debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     fork_net: Option<Network>,
-    api_key: Option<String>,
     fork_block_number: Option<u64>,
     net: Option<&Network>,
     explorer: Option<Explorer>,
@@ -260,7 +266,6 @@ fn execute_script(
         Some(net) => AccountsState::Remote(RemoteAccountState::new(
             net.clone(),
             fork_block_number,
-            api_key.clone(),
             RemoteSnapshotCache::new(),
         )),
         None => AccountsState::Local(LocalAccountsState::new()),
@@ -290,8 +295,11 @@ fn execute_script(
             build_override: BTreeMap::new(),
             explorer,
             fork_net,
-            api_key,
             running_id: "script".into(),
+            // The script's own compiled code contains any user-defined predicate
+            // lambdas (e.g. those built by `expect(...).toHaveTx({ ... })`), so
+            // we reuse it as the code cell for evaluating predicate continuations.
+            test_code: Some(code_cell.clone()),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -332,14 +340,23 @@ fn execute_script(
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
         let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-        replayer.set_compiler_abi(compiler_abi);
+        replayer.set_compiler_abi(compiler_abi.clone());
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);
-        ctx.debug.process_incoming_requests(true)?;
+        if ctx.debug.process_incoming_requests(true)? {
+            return Ok(());
+        }
 
         let result = executor.finish(&params.code)?;
-        print_script_result(&ctx, ScriptResult { result, source_map });
+        print_script_result(
+            &ctx,
+            ScriptResult {
+                result,
+                source_map,
+                compiler_abi,
+            },
+        );
         return Ok(());
     }
 
@@ -347,7 +364,14 @@ fn execute_script(
     ffi::register(&mut executor, &mut ctx);
     let result = executor.run_get_method(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
 
-    print_script_result(&ctx, ScriptResult { result, source_map });
+    print_script_result(
+        &ctx,
+        ScriptResult {
+            result,
+            source_map,
+            compiler_abi,
+        },
+    );
     Ok(())
 }
 
@@ -428,6 +452,19 @@ fn format_nonzero_script_exit_code_details<'a>(
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
     let exit_code_info = retrace::find_exception_info(&result.vm_log, &script_result.source_map);
+    let custom_exit_code_info = if matches!(
+        exit_code,
+        CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT
+            | CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE
+    ) {
+        None
+    } else {
+        FormatterContext::find_custom_exit_code_info(
+            exit_code,
+            Some(ctx.env.abi.as_ref()),
+            script_result.compiler_abi.as_deref(),
+        )
+    };
 
     if let Some(info) = &exit_code_info {
         writeln!(
@@ -445,16 +482,9 @@ fn format_nonzero_script_exit_code_details<'a>(
             }
         }
 
-        if !info.description.is_empty() {
+        if !info.description.is_empty() && custom_exit_code_info.is_none() {
             writeln!(details, "Description: {}", info.description.dimmed()).ok();
         }
-    } else if formatter.backtrace.is_none() {
-        writeln!(
-            details,
-            "Re-run with {} to get more information",
-            "--backtrace full".yellow()
-        )
-        .ok();
     }
 
     if let Some(info) = exit_codes::find(exit_code) {
@@ -465,6 +495,12 @@ fn format_nonzero_script_exit_code_details<'a>(
             writeln!(details, "Description: {}", info.description.dimmed()).ok();
         }
         writeln!(details, "Phase: {}", info.phase.dimmed()).ok();
+    } else if let Some(info) = custom_exit_code_info {
+        writeln!(details, "Description: {}", info.description.dimmed()).ok();
+        if info.symbolic_name != info.description {
+            writeln!(details, "Error: {}", info.symbolic_name.dimmed()).ok();
+        }
+        writeln!(details, "Phase: {}", "Compute phase".dimmed()).ok();
     }
 
     if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
@@ -478,7 +514,25 @@ fn format_nonzero_script_exit_code_details<'a>(
         writeln!(details, "Cannot run method of contract without code").ok();
     }
 
-    details.trim().to_string()
+    if formatter.backtrace.is_none() {
+        writeln!(
+            details,
+            "Re-run with {} to get more information",
+            "--backtrace full".yellow()
+        )
+        .ok();
+    }
+
+    let details = details.trim();
+    if details.is_empty() {
+        String::new()
+    } else {
+        details
+            .lines()
+            .map(|line| format!("  {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 fn contract_address(code: &Cell) -> anyhow::Result<StdAddr> {
@@ -565,8 +619,7 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue) -> anyhow::Result<TupleIt
 
 fn convert_cell_like(cell_like: CellLike) -> anyhow::Result<Cell> {
     match cell_like {
-        CellLike::Cell(hex) => Ok(Boc::decode_hex(hex)?),
-        CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),
+        CellLike::Cell(hex) | CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),
     }
 }
 

@@ -1,14 +1,14 @@
-//! DebugExecutorHandle normalizes the live step executors used by runtime debugging.
+//! `DebugExecutorHandle` normalizes the live step executors used by runtime debugging.
 //! The replayer only cares about "where execution is now / what is on stack / which
 //! runtime registers are visible", regardless of whether the boundary came from
 //! `send_message` or `run_get_method`.
 
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::message::step::StepExecutor;
-use tvmffi::serde::parse_tuple_item;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::serde::parse_tuple_item;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 use tycho_types::boc::Boc;
-use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugCodePosition {
@@ -193,6 +193,7 @@ fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
         TupleItem::TypedTuple { inner, .. } => {
             VmStackValue::Tuple(inner.iter().map(tuple_item_to_vm_stack_value).collect())
         }
+        TupleItem::Cont(item) => VmStackValue::Continuation(Boc::encode_base64(item.code.clone())),
     }
 }
 

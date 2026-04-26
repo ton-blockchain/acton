@@ -1,0 +1,13 @@
+{
+  "title": "Tutorial",
+  "icon": "School",
+  "pages": [
+    "overview.mdx",
+    "project-init.mdx",
+    "your-first-unit-test-in-tolk",
+    "your-first-integration-test-in-tolk",
+    "setup-wallets.mdx",
+    "contract-deployment.mdx",
+    "contract-verification.mdx"
+  ]
+}

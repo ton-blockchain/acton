@@ -69,7 +69,7 @@ fn expect_to_end_with_exit_code_overrides_fail_with_annotation() {
             r#"
             import "../../lib/testing/expect"
 
-            @test({ fail_with: 12 })
+            @test.fail_with(12)
             get fun `test-exit-code-dynamic-overrides-annotation`() {
                 expectToEndWithExitCode(24);
                 throw 24;

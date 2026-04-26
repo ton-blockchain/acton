@@ -14,8 +14,9 @@ use tolk_syntax::{AstNode, TryFromNode};
 /// Repeating `!` is redundant: after the first not-null assertion the value is already non-null.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// val x = foo!!;
+/// //         ^^ E019: several not-null assertions in a row
 /// ```
 ///
 /// Use instead:

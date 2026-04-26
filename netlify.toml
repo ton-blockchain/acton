@@ -1,0 +1,9 @@
+[build]
+base = "docs"
+command = "bun ci && bun run generated-source && bun run lint:links && bun run build"
+publish = "out"
+ignore = "bash ./scripts/netlify-ignore-build.sh"
+
+[build.environment]
+BUN_VERSION = "1.3.5"
+NEXT_TELEMETRY_DISABLED = "1"

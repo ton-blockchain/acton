@@ -2,9 +2,9 @@ use crate::debugging::support::assertions::{DebugTestOutput, DebugTestOutputExt}
 use crate::debugging::support::debug::{DebugBuilder, DebugSession};
 use crate::support::project::ProjectBuilder;
 
-const COUNTER: &str = r#"import "counter_messages"
+const COUNTER: &str = r#"import "../counter_messages"
 
-type AllowedMessage = IncreaseCounter | ResetCounter | OneMoreMessage
+type AllowedMessage = IncreaseCounter | ResetCounter
 
 fun handleIncreaseCounter(increaseBy: int) {
     var storage = lazy Storage.load();
@@ -42,12 +42,6 @@ fun onInternalMessage(in: InMessage) {
         }
 
         ResetCounter => {
-            var storage = lazy Storage.load();
-            storage.counter = 0;
-            storage.save();
-        }
-
-        OneMoreMessage => {
             var storage = lazy Storage.load();
             storage.counter = 0;
             storage.save();
@@ -105,14 +99,14 @@ struct ResetData {}
 
 const MAIN_CODE: &str = r#"
 import "../lib/io"
-import "../lib/build/build"
+import "../lib/build"
 import "../lib/emulation/network"
+import "../lib/emulation/testing"
 import "../lib/testing/expect"
-import "../lib/testing/transaction_expect"
 import "../lib/types/message"
 import "../lib/types/out_actions"
-import "../lib/vm/vm"
 import "../lib/fmt"
+
 
 import "counter_messages"
 
@@ -157,7 +151,7 @@ fun Counter.getCounter(self): int {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -174,10 +168,10 @@ fun setupTest(): (Counter, Treasury) {
 fun main() {
     val (counter, deployer) = setupTest();
 
-    val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+    val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
     println("Counter: {}", counterRes);
 
-    val info = net.getAccountState(counter.address)!;
+    val info = testing.getAccountState(counter.address)!;
     println("Balance: {:ton}", info.storage.balance.grams);
 
     val res = counter.sendIncrease(deployer.address, 100);

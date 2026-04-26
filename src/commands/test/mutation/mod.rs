@@ -312,16 +312,15 @@ fn run_single_mutation(
 
         let main_contract_relative_path = &sources[0].relative_path;
         let main_contract_dest_path = workspace_path.join(main_contract_relative_path);
-        let code_b64 = match compile_file(&main_contract_dest_path.to_string_lossy())? {
-            Some(code_b64) => code_b64,
-            None => return Ok(MutationExecution::Interrupted),
+        let Some(code_b64) = compile_file(&main_contract_dest_path.to_string_lossy())? else {
+            return Ok(MutationExecution::Interrupted);
         };
         if code_b64.is_empty() {
             let record = MutationRecord {
                 id: mutation.id,
                 rule_name: mutation.rule.name.clone(),
                 rule_description: mutation.rule.description.clone(),
-                rule_level: mutation.rule.level.label().to_owned(),
+                rule_level: mutation.rule.level.as_str().to_owned(),
                 rule_group: mutation.rule.group.clone(),
                 rule_explanation: mutation.rule.explanation.clone(),
                 line: pos.row + 1,
@@ -373,7 +372,7 @@ fn run_single_mutation(
             id: mutation.id,
             rule_name: mutation.rule.name.clone(),
             rule_description: mutation.rule.description.clone(),
-            rule_level: mutation.rule.level.label().to_owned(),
+            rule_level: mutation.rule.level.as_str().to_owned(),
             rule_group: mutation.rule.group.clone(),
             rule_explanation: mutation.rule.explanation.clone(),
             line: pos.row + 1,
@@ -389,9 +388,8 @@ fn run_single_mutation(
     let restore_result = fs::write(&dest_path, &source.content);
     match (result, restore_result) {
         (Ok(execution), Ok(())) => Ok(execution),
-        (Err(err), Ok(())) => Err(err),
         (Ok(_), Err(err)) => Err(err.into()),
-        (Err(err), Err(_)) => Err(err),
+        (Err(err), Ok(())) | (Err(err), Err(_)) => Err(err),
     }
 }
 
@@ -777,10 +775,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
 
     let mut sources = Vec::new();
 
-    let main_path = Path::new(&contract.src)
-        .absolutize_from(&project_root)
-        .unwrap_or_else(|_| Path::new(&contract.src).into())
-        .to_path_buf();
+    let main_path = contract.absolute_source_path(&project_root);
     let main_path = dunce::canonicalize(&main_path).unwrap_or(main_path);
 
     let main_content = match fs::read_to_string(&main_path) {
@@ -846,12 +841,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     };
     let filtered_rules: Vec<MutationRule> = mutation_rules
         .into_iter()
-        .filter(|rule| !all_disable_rules.contains(&rule.name.clone()))
+        .filter(|rule| !all_disable_rules.contains(&rule.name))
         .filter(|rule| {
-            selected_mutation_levels.is_empty()
-                || selected_mutation_levels
-                    .iter()
-                    .any(|level| level.as_str() == rule.level.label())
+            selected_mutation_levels.is_empty() || selected_mutation_levels.contains(&rule.level)
         })
         .collect();
 

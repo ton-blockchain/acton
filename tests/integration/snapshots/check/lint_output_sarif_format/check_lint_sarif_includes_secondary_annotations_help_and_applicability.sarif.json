@@ -164,19 +164,19 @@
           "rules": [
             {
               "fullDescription": {
-                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk\nfun main() {\n    val _value = 10;\n    _value;\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
-                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
+                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk twoslash\nfun main() {\n    val _value = 10;\n    _value;\n//  ^^^^^^ E010: identifier marked as unused is used\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
+                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n//  ^^^^^^ E010: identifier marked as unused is used\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
               },
               "help": {
-                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk\nfun main() {\n    val _value = 10;\n    _value;\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
-                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
+                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk twoslash\nfun main() {\n    val _value = 10;\n    _value;\n//  ^^^^^^ E010: identifier marked as unused is used\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
+                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n//  ^^^^^^ E010: identifier marked as unused is used\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
               },
               "helpUri": "[ACTON_DOCS_URL]/linting/rules/e010-used-ignored-identifier",
               "id": "E010",
               "name": "used-ignored-identifier",
               "properties": {
                 "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/used_ignored_identifier.rs",
-                "actonDefinitionLine": 29,
+                "actonDefinitionLine": 30,
                 "actonFixAvailability": "Always",
                 "actonRuleGroupSince": "v0.0.1",
                 "actonRuleGroupStatus": "stable"
@@ -188,19 +188,19 @@
             },
             {
               "fullDescription": {
-                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk\nfun main(a: int, b: int) {\n    a != b;\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
-                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
+                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk twoslash\nfun main(a: int, b: int) {\n    a != b;\n//  ^^^^^^^ E032: unused expression has no effect\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
+                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n//  ^^^^^^^ E032: unused expression has no effect\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
               },
               "help": {
-                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk\nfun main(a: int, b: int) {\n    a != b;\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
-                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
+                "markdown": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk twoslash\nfun main(a: int, b: int) {\n    a != b;\n//  ^^^^^^^ E032: unused expression has no effect\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```\n",
+                "text": "What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\nWhy is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using !=\ninstead of = or +=.\n\nExample\nfun main(a: int, b: int) {\n    a != b;\n//  ^^^^^^^ E032: unused expression has no effect\n}\n\nUse instead:\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n"
               },
               "helpUri": "[ACTON_DOCS_URL]/linting/rules/e032-unused-expression",
               "id": "E032",
               "name": "unused-expression",
               "properties": {
                 "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/unused_expression.rs",
-                "actonDefinitionLine": 28,
+                "actonDefinitionLine": 29,
                 "actonFixAvailability": "None",
                 "actonRuleGroupSince": "v0.0.1",
                 "actonRuleGroupStatus": "stable"

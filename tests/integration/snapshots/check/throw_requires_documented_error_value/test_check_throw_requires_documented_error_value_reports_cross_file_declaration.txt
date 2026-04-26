@@ -1,0 +1,17 @@
+warning[E036]: enum value used as throw code should be documented
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 throw Errors.NotOwner;
+  |                              ^^^^^^^^ `Errors.NotOwner` has no enum value documentation
+  |
+  = add a `/// ...` doc comment immediately above the enum value explaining when this [EXIT_STATUS] is thrown
+
+help[E036]: enum value is declared here
+  --> [ROOT]/contracts/errors[LINE]
+  |
+3 |                     NotOwner = 401
+  |                     ^^^^^^^^ document this enum value
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E036

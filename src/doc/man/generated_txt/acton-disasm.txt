@@ -44,9 +44,6 @@ OPTIONS
            Fetch contract code from the blockchain by address and disassemble
            it.
 
-       --api-key key
-           TonCenter API key for blockchain queries.
-
        --net network
            Network to use for --address and library lookups.
 
@@ -59,8 +56,11 @@ OPTIONS
            testnet.
 
        --follow-libraries
-           If the code references a library, fetch and disassemble the actual
-           library code instead of showing only the library hash reference.
+           If the input disassembles to exactly one top-level exotic
+           library-reference cell, fetch and disassemble the actual library
+           code instead of showing only the library hash reference.
+
+           This is not a general recursive library-follow mode.
 
    Display Options
        --color when
@@ -90,24 +90,39 @@ BLOCKCHAIN LOOKUPS
 
        o  Without --net, Acton tries mainnet first and then testnet
 
-       o  --api-key helps avoid TonCenter rate limits
-
-       o  --follow-libraries resolves library references when possible
+       o  with --address, --follow-libraries reuses the network that returned
+          the contract code
 
        When --follow-libraries is used with a local file or --string, Acton
        uses the explicit --net if provided; otherwise library fetches default
        to testnet.
+
+TONCENTER API KEYS
+       Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY, depending on the selected network.
+
+       For custom:<name>, Acton reads <NORMALIZED_NAME>_API_KEY. Custom network
+       names are uppercased and non-alphanumeric characters are replaced with
+       _, so custom:mock-remote becomes MOCK_REMOTE_API_KEY.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 INPUT PRECEDENCE
        o  BOC_FILE and --string are mutually exclusive
 
        o  --address is used only when neither a file nor --string is provided
 
-       o  --follow-libraries only replaces the input when the fetched code is a
-          single library reference and the library lookup succeeds
+       o  --follow-libraries only replaces the input when the initial
+          disassembly is exactly one top-level exotic library-reference cell
+          and the lookup succeeds
+
+       o  ordinary code, mixed instruction streams, or nested library
+          references are a no-op for --follow-libraries
 
        o  if library lookup fails, Acton warns and disassembles the original
-          code
+          code instead; this still exits successfully
 
 SOURCE MAPS
        If you compiled a contract with acton compile --source-map, you can pass
@@ -149,10 +164,10 @@ EXAMPLES
 
               acton disasm contract.boc --output build/disasm/contract.tasm
 
-       7. Resolve library references for a local BoC using a configured custom
+       7. Resolve a top-level library-reference cell using a configured custom
           network:
 
-              acton disasm contract.boc --follow-libraries --net custom:staging
+              acton disasm library-ref.boc --follow-libraries --net custom:staging
 
 SEE ALSO
        o  acton help compile

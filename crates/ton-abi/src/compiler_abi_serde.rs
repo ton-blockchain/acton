@@ -1,10 +1,11 @@
 use crate::abi_serde::{Data, DataField, DataObject};
+use crate::snake_string::parse_snake_string;
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
-use tolkc::abi::{
+use tolk_compiler::abi::{
     ABICustomPackUnpack, ABIDeclaration, ABIEnumMember, ContractABI, Ty, UnionVariant,
 };
-use tolkc::types_kernel::instantiate_generics;
+use tolk_compiler::types_kernel::instantiate_generics;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
 use tycho_types::dict;
 use tycho_types::models::{AnyAddr, IntAddr, StdAddr};
@@ -21,7 +22,12 @@ fn decode_type(data: &mut CellSlice<'_>, abi: &ContractABI, ty: &Ty) -> anyhow::
         Ty::Slice => unsupported_type("slice"),
         Ty::Builder => unsupported_type("builder"),
         Ty::Callable => unsupported_type("callable"),
-        Ty::String => unsupported_type("string"),
+        Ty::String => {
+            let cell = data.load_reference_cloned()?;
+            let string =
+                parse_snake_string(&cell).ok_or_else(|| anyhow!("expected snake string"))?;
+            Ok(Data::String(string))
+        }
         Ty::Coins => Ok(Data::Number(data.load_var_bigint(4, false)?)),
         Ty::Void => unsupported_type("void"),
         Ty::Address => Ok(Data::Address(IntAddr::load_from(data)?)),
@@ -527,8 +533,8 @@ fn type_has_own_label(abi: &ContractABI, ty: &Ty) -> anyhow::Result<bool> {
 
 struct StructDeclRef<'a> {
     type_params: Option<&'a [String]>,
-    prefix: Option<&'a tolkc::abi::ABIOpcode>,
-    fields: &'a [tolkc::abi::ABIStructField],
+    prefix: Option<&'a tolk_compiler::abi::ABIOpcode>,
+    fields: &'a [tolk_compiler::abi::ABIStructField],
     custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
 }
 
@@ -597,7 +603,8 @@ fn find_enum_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<EnumDec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tolkc::abi::{
+    use crate::snake_string::build_snake_bytes_cell;
+    use tolk_compiler::abi::{
         ABIInternalMessage, ABIOpcode, ABIStorage, ABIStructField, ContractABI, UnionVariant,
     };
     use tycho_types::cell::{CellBuilder, CellFamily, Store};
@@ -950,5 +957,19 @@ mod tests {
 
         let data = decode(&mut slice, &abi, &Ty::AddressAny).unwrap();
         assert!(matches!(data, Data::Address(_)));
+    }
+
+    #[test]
+    fn decodes_string_from_ref_cell() {
+        let abi = empty_abi();
+        let string_cell = build_snake_bytes_cell(b"hello");
+
+        let mut builder = CellBuilder::new();
+        builder.store_reference(string_cell).unwrap();
+        let cell = builder.build().unwrap();
+        let mut slice = cell.as_slice_allow_exotic();
+
+        let data = decode(&mut slice, &abi, &Ty::String).unwrap();
+        assert!(matches!(data, Data::String(value) if value == "hello"));
     }
 }

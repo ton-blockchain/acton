@@ -52,11 +52,23 @@ Stop after the first failing test.
 .RS 4
 Seed for reproducible fuzz runs.
 .RE
+.sp
+\fB\-\-verbose\fR
+.RS 4
+Enable executor debug logs at verbosity level \fB1\fR\&.
+.sp
+Currently only level \fB1\fR is supported. Pass \fB\-\-verbose\fR at most once.
+Use this for low\-level executor output such as \fBdebug.dumpStack()\fR\&. For richer
+debug output, use \fB\-\-backtrace full\fR or \fB\-\-debug\fR\&.
+.RE
 .SS "Debugging Options"
 .sp
 \fB\-\-debug\fR
 .RS 4
 Enable debug mode.
+.sp
+This also raises executor verbosity to collect full source locations and stack
+context for live stepping.
 .RE
 .sp
 \fB\-\-debug\-port\fR \fIport\fR
@@ -69,12 +81,18 @@ Debug server port.
 Enable execution backtraces.
 .sp
 Currently supported value: \fBfull\fR\&.
+Full backtraces also raise executor verbosity to collect source locations and
+call stacks without opening the debugger.
 .RE
 .SS "Coverage Options"
 .sp
 \fB\-\-coverage\fR
 .RS 4
 Generate a coverage profile.
+.sp
+Coverage also raises internal executor verbosity enough to map executed
+locations back to source files and lines, but it does not enable stepping or
+print backtraces by itself.
 .RE
 .sp
 \fB\-\-coverage\-format\fR \fIformat\fR
@@ -91,7 +109,7 @@ Output file for the coverage report.
 .sp
 \fB\-\-coverage\-minimum\-percent\fR \fIpercent\fR
 .RS 4
-Fail when total line coverage is below this percentage.
+Fail when the final coverage score is below this percentage.
 .sp
 Valid range: \fB0\fR to \fB100\fR\&.
 .sp
@@ -175,11 +193,6 @@ Fork remote blockchain state for account resolution.
 .RS 4
 Historical block sequence number to fork from.
 .RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.RE
 .SS "Tracing Options"
 .sp
 \fB\-\-save\-test\-trace\fR [\fIdir\fR]
@@ -187,7 +200,23 @@ TonCenter API key for blockchain queries.
 Save transaction traces to a directory.
 .sp
 If passed without a value, Acton uses \fBbuild/traces\fR\&.
+Acton writes one \fB<test\-name>_trace.json\fR file per executed test and stores
+shared contract metadata under \fBcontracts/<contract\-name>.json\fR\&.
+These filenames are derived only from the test name and contract name, so
+duplicate names overwrite earlier artifacts in the same output directory.
+Relative paths are resolved from the project root.
 .RE
+.SH "TONCENTER API KEYS"
+When tests fork from the built\-in \fBmainnet\fR/\fBtestnet\fR backends, authenticated
+requests read \fBTONCENTER_MAINNET_API_KEY\fR or \fBTONCENTER_TESTNET_API_KEY\fR\&.
+.sp
+When tests fork from \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&.
+Custom network names are uppercased and non\-alphanumeric characters are
+replaced with \fB_\fR, so \fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SS "Mutation Testing Options"
 .sp
 \fB\-\-mutate\fR
@@ -348,8 +377,33 @@ directory is \fBtest\-results\fR
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'executor debug logs are hidden by default; re\-run with \fB\-\-verbose\fR when you need
+level\-1 executor output such as \fBdebug.dumpStack()\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-verbose\fR is only low\-level executor logging; \fB\-\-coverage\fR also collects
+source\-location data, while \fB\-\-backtrace full\fR and \fB\-\-debug\fR collect richer
+location and stack data
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-coverage\-file\fR matters only with \fB\-\-coverage\fR; without an explicit path,
 Acton writes \fBlcov.info\fR for \fBlcov\fR and \fBcoverage.txt\fR for \fBtext\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'coverage summaries show line and branch columns plus a blended \fBScore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'LCOV export includes \fBBRDA\fR, \fBBRF\fR, and \fBBRH\fR records when branch sites were
+observed for a file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-coverage\-minimum\-percent\fR checks the final blended \fBScore\fR shown in the
+summary, not just \fB% Lines\fR
 .RE
 .sp
 .RS 4
@@ -362,13 +416,38 @@ use \fB\-\-coverage\-include\-tests\fR or \fB\-\-coverage\-include\-wrappers\fR 
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'each executed test produces its own \fB<test\-name>_trace.json\fR artifact
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'exported bundles also include \fBcontracts/<contract\-name>.json\fR files with
+code, source maps, and ABI metadata reused across tests in the same bundle
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'trace chains default to names like \fBTrace 1\fR; use \fBtxs.giveName("...")\fR when
+you want stable human\-readable names in exported artifacts and the Test UI
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when you split execution with \fBtesting.createTraceIterationCursor()\fR,
+exported traces still merge batches that belong to the same logical root
+transaction chain
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-ui\fR also enables the default trace bundle directory when
+\fB\-\-save\-test\-trace\fR is otherwise absent
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'gas snapshot files are written only to the explicit paths passed to
 \fB\-\-snapshot\fR or \fB\-\-baseline\-snapshot\fR
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB[test.fuzz]\fR applies only to parameterized tests that explicitly opt in with
-\fB@test({ fuzz: true })\fR or \fB@test({ fuzz: ... })\fR
+\fB@test.fuzz\fR, \fB@test.fuzz(<runs>)\fR, or \fB@test.fuzz({ ... })\fR
 .RE
 .sp
 .RS 4
@@ -524,7 +603,17 @@ acton test \-\-filter "wallet.*"
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Generate coverage and JUnit output:
+\h'-04' 3.\h'+01'Show executor debug logs from \fBdebug.*\fR helpers:
+.sp
+.RS 4
+.nf
+acton test \-\-verbose \-\-filter "debug.*"
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Generate coverage and JUnit output:
 .sp
 .RS 4
 .nf
@@ -534,7 +623,7 @@ acton test \-\-coverage \-\-coverage\-format lcov \-\-reporter junit \-\-junit\-
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Fail the run when line coverage drops below 85%:
+\h'-04' 5.\h'+01'Fail the run when line coverage drops below 85%:
 .sp
 .RS 4
 .nf
@@ -544,7 +633,7 @@ acton test \-\-coverage \-\-coverage\-minimum\-percent 85
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Compare gas usage against a baseline:
+\h'-04' 6.\h'+01'Compare gas usage against a baseline:
 .sp
 .RS 4
 .nf
@@ -554,7 +643,7 @@ acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Run mutation testing for one contract:
+\h'-04' 7.\h'+01'Run mutation testing for one contract:
 .sp
 .RS 4
 .nf
@@ -564,7 +653,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Run mutation testing only for changed lines in the current worktree:
+\h'-04' 8.\h'+01'Run mutation testing only for changed lines in the current worktree:
 .sp
 .RS 4
 .nf
@@ -574,7 +663,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff worktree
 .RE
 .sp
 .RS 4
-\h'-04' 8.\h'+01'Run mutation testing for selected levels on the current branch:
+\h'-04' 9.\h'+01'Run mutation testing for selected levels on the current branch:
 .sp
 .RS 4
 .nf
@@ -584,17 +673,17 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \-\-
 .RE
 .sp
 .RS 4
-\h'-04' 9.\h'+01'Re\-run one specific mutant from a previous report:
+\h'-04' 10.\h'+01'Re\-run one specific mutant from a previous report:
+.RE
 .sp
 .RS 4
 .nf
 acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-id 2
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 10.\h'+01'Resume an unfinished mutation session:
+\h'-04' 11.\h'+01'Resume an unfinished mutation session:
 .RE
 .sp
 .RS 4
@@ -604,7 +693,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wall
 .RE
 .sp
 .RS 4
-\h'-04' 11.\h'+01'Fail the run when mutation score drops below 85%:
+\h'-04' 12.\h'+01'Fail the run when mutation score drops below 85%:
 .RE
 .sp
 .RS 4
@@ -614,7 +703,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-minimum\-percent
 .RE
 .sp
 .RS 4
-\h'-04' 12.\h'+01'Limit mutation testing to four workers:
+\h'-04' 13.\h'+01'Limit mutation testing to four workers:
 .RE
 .sp
 .RS 4
@@ -624,7 +713,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-workers 4
 .RE
 .sp
 .RS 4
-\h'-04' 13.\h'+01'Debug a forked\-state failure with traces and the UI:
+\h'-04' 14.\h'+01'Debug a forked\-state failure with traces and the UI:
 .RE
 .sp
 .RS 4
@@ -634,7 +723,7 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \-\-fork\-block\-number 
 .RE
 .sp
 .RS 4
-\h'-04' 14.\h'+01'Enforce a gas baseline in CI:
+\h'-04' 15.\h'+01'Enforce a gas baseline in CI:
 .RE
 .sp
 .RS 4
@@ -649,5 +738,5 @@ acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff \-
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fITest runner guide\fR <https://ton\-blockchain.github.io/acton/docs/test\-runner>
+\h'-04'\(bu\h'+03'\fITest runner guide\fR <https://ton\-blockchain.github.io/acton/docs/testing/overview>
 .RE

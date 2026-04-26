@@ -13,10 +13,22 @@ get fun ping(): int {
 ";
 
 const CP_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
+import "../../lib/types/transaction"
+
+fun deployedCodeOrNull(addr: address): cell? {
+    val state = testing.getAccountState(addr);
+    if (state == null) {
+        return null;
+    }
+    if (state.storage.state is TlbAccountStateActive) {
+        return state.storage.state.stateInit.code;
+    }
+    return null;
+}
 "#;
 
 fn with_cp_imports(body: &str) -> String {
@@ -50,9 +62,9 @@ fn net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path() {
 
             get fun `test cp net is deployed deterministic transition`() {
                 val probe = Probe.withSeed(17);
-                expect(net.isDeployed(probe.address)).toBeFalse();
+                expect(testing.isDeployed(probe.address)).toBeFalse();
 
-                val deployer = net.treasury("cp_deployer");
+                val deployer = testing.treasury("cp_deployer");
                 val deployMsg = createMessage({
                     bounce: false,
                     value: ton("1"),
@@ -63,10 +75,10 @@ fn net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path() {
                 val deployTxs = net.send(deployer.address, deployMsg);
 
                 expect(deployTxs).toHaveSuccessfulDeploy({ to: probe.address });
-                expect(net.isDeployed(probe.address)).toBeTrue();
+                expect(testing.isDeployed(probe.address)).toBeTrue();
 
                 val other = Probe.withSeed(18);
-                expect(net.isDeployed(other.address)).toBeFalse();
+                expect(testing.isDeployed(other.address)).toBeFalse();
             }
         "#,
             ),
@@ -90,21 +102,21 @@ fn net_is_deployed_stays_false_after_read_only_lookups_on_missing_address() {
             &with_cp_imports(
                 r#"
             get fun `test cp net is deployed read only cache miss`() {
-                val target = net.randomAddress("cp_is_deployed_cache_only_target");
+                val target = randomAddress("cp_is_deployed_cache_only_target");
 
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(testing.isDeployed(target)).toBeFalse();
 
-                expect(net.balance(target)).toEqual(0);
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(testing.getAccountBalance(target)).toEqual(0);
+                expect(testing.isDeployed(target)).toBeFalse();
 
-                expect(net.getAccountState(target)).toBeNull();
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(testing.getAccountState(target)).toBeNull();
+                expect(testing.isDeployed(target)).toBeFalse();
 
-                expect(net.getShardAccount(target)).toBeNotNull();
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(testing.getShardAccount(target)).toBeNotNull();
+                expect(testing.isDeployed(target)).toBeFalse();
 
-                expect(net.getDeployedCode(target)).toBeNull();
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(deployedCodeOrNull(target)).toBeNull();
+                expect(testing.isDeployed(target)).toBeFalse();
             }
         "#,
             ),
@@ -128,15 +140,45 @@ fn net_is_deployed_stays_false_for_explicit_null_shard_account() {
             &with_cp_imports(
                 r#"
             get fun `test cp net is deployed explicit null shard account`() {
-                val target = net.randomAddress("cp_is_deployed_null_shard_target");
+                val target = randomAddress("cp_is_deployed_null_shard_target");
 
-                net.setShardAccount(target, null);
+                testing.setShardAccount(target, null);
 
-                expect(net.getShardAccount(target)).toBeNotNull();
-                expect(net.getAccountState(target)).toBeNull();
-                expect(net.balance(target)).toEqual(0);
-                expect(net.getDeployedCode(target)).toBeNull();
-                expect(net.isDeployed(target)).toBeFalse();
+                expect(testing.getShardAccount(target)).toBeNotNull();
+                expect(testing.getAccountState(target)).toBeNull();
+                expect(testing.getAccountBalance(target)).toEqual(0);
+                expect(deployedCodeOrNull(target)).toBeNull();
+                expect(testing.isDeployed(target)).toBeFalse();
+            }
+        "#,
+            ),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
+#[test]
+fn net_is_deployed_stays_false_for_prefunded_uninitialized_account() {
+    let snapshot_path = "integration/snapshots/test-runner/net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path/net_is_deployed_stays_false_for_prefunded_uninitialized_account.stdout.txt";
+    ProjectBuilder::new("cp-stdlib-net-is-deployed-prefunded-uninit")
+        .contract("probe", CP_SIMPLE_CONTRACT)
+        .test_file(
+            "is_deployed_prefunded_uninit",
+            &with_cp_imports(
+                r#"
+            get fun `test cp net is deployed prefunded uninit`() {
+                val target = randomAddress("cp_is_deployed_prefunded_uninit");
+
+                testing.topUp(target, ton("1"));
+
+                expect(testing.getAccountBalance(target)).toEqual(ton("1"));
+                expect(testing.isDeployed(target)).toBeFalse();
+                expect(deployedCodeOrNull(target)).toBeNull();
             }
         "#,
             ),
@@ -176,9 +218,9 @@ fn net_is_deployed_transitions_false_to_true_in_fixture_project() {
 
         get fun `test cp net is deployed fixture transition`() {
             val counter = Counter.fromStorage({ id: 77, counter: 0 });
-            expect(net.isDeployed(counter.address)).toBeFalse();
+            expect(testing.isDeployed(counter.address)).toBeFalse();
 
-            val deployer = net.treasury("cp_fixture_deployer");
+            val deployer = testing.treasury("cp_fixture_deployer");
             val deployMsg = createMessage({
                 bounce: false,
                 value: ton("1"),
@@ -189,7 +231,7 @@ fn net_is_deployed_transitions_false_to_true_in_fixture_project() {
 
             val deployTxs = net.send(deployer.address, deployMsg);
             expect(deployTxs).toHaveSuccessfulDeploy({ to: counter.address });
-            expect(net.isDeployed(counter.address)).toBeTrue();
+            expect(testing.isDeployed(counter.address)).toBeTrue();
         }
     "#,
         ),

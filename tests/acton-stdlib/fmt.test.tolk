@@ -105,8 +105,8 @@ get fun `test format struct with very nested`() {
 }
 
 get fun `test format message`() {
-    val src = net.randomAddress("src");
-    val dest = net.randomAddress("counter");
+    val src = randomAddress("src");
+    val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
         value: ton("1.9999"),
@@ -117,20 +117,20 @@ get fun `test format message`() {
     val tx = first.tx.load();
 
     val inMsg = tx.messages.load().inMsg;
-    if (inMsg is Value<Cell<MessageRelaxedGeneric>>) {
+    if (inMsg is TlbJust<Cell<TlbMessageRelaxedGeneric>>) {
         var loaded = inMsg.value.load();
         loaded.info.createdLt = 0;
         loaded.info.createdAt = 0;
         expect(
             format("{}", loaded),
-        ).toEqual("""MessageRelaxedGeneric {
-    info: IntMsgInfoRelaxed {
+        ).toEqual("""TlbMessageRelaxedGeneric {
+    info: TlbIntMsgInfoRelaxed {
         ihrDisabled: true,
         bounce: false,
         bounced: false,
         src: kQC5PHBsPEHzypAUMCGXCD5pNDAA2DozF5CZxqKiB1_dtgb3,
         dest: kQC0663BO7-gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
-        value: CurrencyCollection {
+        value: TlbCurrencyCollection {
             grams: 1999900000,
             other: map<int32, varuint32> {}
         },

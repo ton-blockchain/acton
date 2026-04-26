@@ -26,7 +26,7 @@ OPTIONS
        shell
            Shell to generate completions for.
 
-           Possible values: bash, elvish, fish, powershell, zsh
+           Possible values: bash, elvish, fish, powershell, zsh, nushell
 
    Display Options
        --color when
@@ -112,6 +112,13 @@ STATIC INSTALLATION
        Then load it from ~/.elvish/rc.elv:
 
            use completions/acton
+
+   Nushell
+           acton completions nushell | save --force ~/.config/nushell/completions/acton.nu
+
+       Then load it from config.nu:
+
+           source ~/.config/nushell/completions/acton.nu
 
 VERIFYING INSTALLATION
        After installation, try:

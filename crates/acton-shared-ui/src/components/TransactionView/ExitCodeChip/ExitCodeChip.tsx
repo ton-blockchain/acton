@@ -1,4 +1,4 @@
-import type {Abi} from "@/types"
+import type {Abi, CompilerAbi} from "@/types"
 import {Tooltip} from "@/index"
 
 import styles from "./ExitCodeViewer.module.css"
@@ -7,28 +7,92 @@ import {EXIT_CODE_DESCRIPTIONS, getExitCodeDocsUrl, type ExitCodeDescription} fr
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined
   readonly abi?: Abi | undefined
+  readonly compilerAbi?: CompilerAbi | undefined
   readonly phase?: "compute" | "action"
 }
 
-export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeViewerProps) {
+interface CustomExitCodeInfo {
+  readonly symbolicName: string
+  readonly description: string
+}
+
+interface FallbackExitCodeInfo {
+  readonly name: string
+  readonly description: string
+  readonly origin: string
+}
+
+const getCompilerAbiSymbolDescription = (
+  compilerAbi: CompilerAbi | undefined,
+  symbol: string,
+): string | undefined => {
+  const enumMatch = symbol.split(".")
+  if (enumMatch.length >= 2) {
+    const memberName = enumMatch.at(-1)
+    const enumName = enumMatch.at(-2)
+    const enumDeclaration = compilerAbi?.declarations?.find(
+      declaration => declaration.kind === "enum" && declaration.name === enumName,
+    )
+    const memberDescription = enumDeclaration?.members?.find(
+      member => member.name === memberName && member.description,
+    )?.description
+    if (memberDescription) {
+      return memberDescription
+    }
+  }
+
+  return compilerAbi?.constants?.find(constant => constant.name === symbol && constant.description)
+    ?.description
+}
+
+const getCustomExitCodeInfo = (
+  exitCode: number,
+  abi: Abi | undefined,
+  compilerAbi: CompilerAbi | undefined,
+): CustomExitCodeInfo | undefined => {
+  const thrownError = compilerAbi?.thrown_errors?.find(error => error.err_code === exitCode)
+  const symbolicName =
+    thrownError?.name ||
+    abi?.exitCodes?.find(candidate => candidate.value === exitCode)?.constantName
+
+  if (!symbolicName) {
+    return
+  }
+
+  return {
+    symbolicName,
+    description: getCompilerAbiSymbolDescription(compilerAbi, symbolicName) ?? symbolicName,
+  }
+}
+
+const getFallbackExitCodeInfo = (
+  phase: "compute" | "action",
+): FallbackExitCodeInfo => ({
+  name: "Custom Exit Code",
+  description:
+    "Contract returned a user-defined exit code that is not declared in the ABI, so no symbolic description is available for this value.",
+  origin: phase === "action" ? "Action phase" : "Compute phase",
+})
+
+export function ExitCodeChip({exitCode, abi, compilerAbi, phase = "compute"}: ExitCodeViewerProps) {
   if (exitCode === undefined) {
     return <span className={styles.exitCode}>—</span>
   }
 
   const standardDescription = (EXIT_CODE_DESCRIPTIONS as Record<number, ExitCodeDescription>)[
     exitCode
-  ] ?? {
-    name: "Custom error",
-    description: "User defined error",
-    phase: "Compute phase",
-  }
-
-  const customErrorDescription = abi?.exitCodes?.[exitCode]
-
-  const displayName = standardDescription?.name ?? (customErrorDescription ? "Custom error" : "")
-  const description = customErrorDescription ?? standardDescription?.description
-  const origin = standardDescription?.phase
-  const docsUrl = getExitCodeDocsUrl(exitCode)
+  ]
+  const customExitCode = getCustomExitCodeInfo(exitCode, abi, compilerAbi)
+  const fallbackExitCode =
+    standardDescription || customExitCode ? undefined : getFallbackExitCodeInfo(phase)
+  const displayName =
+    standardDescription?.name ?? customExitCode?.symbolicName ?? fallbackExitCode?.name ?? ""
+  const description =
+    standardDescription?.description ?? customExitCode?.description ?? fallbackExitCode?.description
+  const origin =
+    standardDescription?.phase ??
+    (customExitCode ? (phase === "action" ? "Action phase" : "Compute phase") : fallbackExitCode?.origin)
+  const docsUrl = standardDescription ? getExitCodeDocsUrl(exitCode) : undefined
 
   const tooltipContent = (
     <div className={styles.tooltipContent}>
@@ -50,6 +114,12 @@ export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeViewerP
         <div className={styles.tooltipSection}>
           <div className={styles.tooltipLabel}>Origin:</div>
           <div className={styles.tooltipPhase}>{origin}</div>
+        </div>
+      )}
+      {customExitCode && customExitCode.symbolicName !== description && (
+        <div className={styles.tooltipSection}>
+          <div className={styles.tooltipLabel}>Error:</div>
+          <div className={styles.tooltipDescription}>{customExitCode.symbolicName}</div>
         </div>
       )}
     </div>

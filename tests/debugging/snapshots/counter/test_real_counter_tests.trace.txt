@@ -6,7 +6,7 @@ Step 1 (before):
      70|     val (counter, deployer) = setupTest();
                                        ^^^^^^^^^^^
      71| 
-     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
      73|     println("Counter: {}", counterRes);
 
 Step 2 (step_over):
@@ -14,11 +14,11 @@ Step 2 (step_over):
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
      71| 
-     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-                                                                            ^^^^^^^^^^^^^^^^
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
+                                                                     ^^^^^^^^^^^^^^^^
      73|     println("Counter: {}", counterRes);
      74| 
-     75|     val info = net.getAccountState(counter.address)!;
+     75|     val info = testing.getAccountState(counter.address)!;
   Variables:
     counter = Counter
     deployer = Treasury
@@ -27,11 +27,11 @@ Step 3 (step_over):
   Code:
      70|     val (counter, deployer) = setupTest();
      71| 
-     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
      73|     println("Counter: {}", counterRes);
                      ^^^^^^^^^^^^^
      74| 
-     75|     val info = net.getAccountState(counter.address)!;
+     75|     val info = testing.getAccountState(counter.address)!;
      76|     println("Balance: {:ton}", info.storage.balance.grams);
   Variables:
     counter = Counter
@@ -40,11 +40,11 @@ Step 3 (step_over):
 
 Step 4 (step_over):
   Code:
-     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
      73|     println("Counter: {}", counterRes);
      74| 
-     75|     val info = net.getAccountState(counter.address)!;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     75|     val info = testing.getAccountState(counter.address)!;
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      76|     println("Balance: {:ton}", info.storage.balance.grams);
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
@@ -57,7 +57,7 @@ Step 5 (step_over):
   Code:
      73|     println("Counter: {}", counterRes);
      74| 
-     75|     val info = net.getAccountState(counter.address)!;
+     75|     val info = testing.getAccountState(counter.address)!;
      76|     println("Balance: {:ton}", info.storage.balance.grams);
                      ^^^^^^^^^^^^^^^^^
      77| 
@@ -67,11 +67,11 @@ Step 5 (step_over):
     counter = Counter
     deployer = Treasury
     counterRes = 0 (last seen)
-    info = AccountInfo
+    info = TlbAccountInfo
 
 Step 6 (step_over):
   Code:
-     75|     val info = net.getAccountState(counter.address)!;
+     75|     val info = testing.getAccountState(counter.address)!;
      76|     println("Balance: {:ton}", info.storage.balance.grams);
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
@@ -83,7 +83,7 @@ Step 6 (step_over):
     counter = Counter
     deployer = Treasury
     counterRes = 0 (last seen)
-    info = AccountInfo
+    info = TlbAccountInfo
 
 Step 7 (step_over):
   Code:
@@ -99,5 +99,5 @@ Step 7 (step_over):
     counter = Counter
     deployer = Treasury (last seen)
     counterRes = 0 (last seen)
-    info = AccountInfo
+    info = TlbAccountInfo
     res = BigArray<SendResult>

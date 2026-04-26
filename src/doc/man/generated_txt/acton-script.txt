@@ -22,6 +22,13 @@ OPTIONS
        args…
            Arguments passed through to the script.
 
+       --verbose
+           Enable executor debug logs at verbosity level 1.
+
+           Currently only level 1 is supported. Pass --verbose at most once.
+           Use this for low-level executor output such as debug.dumpStack().
+           For richer debug output, use --backtrace full or --debug.
+
    Debugging Options
        --debug
            Enable debug mode.
@@ -46,9 +53,6 @@ OPTIONS
 
        --fork-block-number seqno
            Historical block sequence number to fork from.
-
-       --api-key key
-           TonCenter API key for blockchain queries.
 
    Broadcasting Options
        --net network
@@ -114,6 +118,9 @@ SIDE EFFECTS
        --net, it can send real blockchain transactions; without --net,
        execution stays local even when --fork-net is used.
 
+       Executor debug logs are hidden by default. Re-run with --verbose when
+       you need level-1 executor output such as debug.dumpStack().
+
 EXIT STATUS
        o  0: The script completed successfully, including successful broadcast
           flows.
@@ -137,24 +144,40 @@ EXAMPLES
 
               acton script scripts/deploy.tolk
 
-       2. Broadcast to testnet:
+       2. Show executor debug logs from debug.* helpers:
+
+              acton script scripts/deploy.tolk --verbose
+
+       3. Broadcast to testnet:
 
               acton script scripts/deploy.tolk --net testnet
 
-       3. Query mainnet state without broadcasting:
+       4. Query mainnet state without broadcasting:
 
-              acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+              TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
 
-       4. Broadcast a deploy flow and print explorer links:
+       5. Broadcast a deploy flow and print explorer links:
 
-              acton script scripts/deploy.tolk --net testnet --explorer tonviewer
+              acton script scripts/deploy.tolk --net testnet --explorer tonscan
+
+TONCENTER API KEYS
+       Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY, depending on the selected network.
+
+       For custom:<name>, Acton reads <NORMALIZED_NAME>_API_KEY. Custom network
+       names are uppercased and non-alphanumeric characters are replaced with
+       _, so custom:mock-remote becomes MOCK_REMOTE_API_KEY.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 SEE ALSO
        o  acton help run
 
        o  Scripting guide
-          <https://ton-blockchain.github.io/acton/docs/scripting>
+          <https://ton-blockchain.github.io/acton/docs/scripting/overview>
 
        o  Wallet setup
-          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>
 

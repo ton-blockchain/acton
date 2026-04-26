@@ -22,7 +22,7 @@ Defaults to `[build].out-dir` when configured, otherwise `build/`.
 
 {{#option "`--gen-dir` _dir_" }}
 Directory for generated dependency helper files such as
-`gen/<dependency>_code.tolk`.
+`gen/<dependency>.code.tolk`.
 
 Defaults to `[build].gen-dir` when configured, otherwise `gen/`.
 {{/option}}

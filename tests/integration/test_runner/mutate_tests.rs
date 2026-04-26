@@ -29,7 +29,7 @@ get fun `test always pass`() {
 "#;
 
 const DEPENDENT_MUTATION_CONTRACT: &str = r#"
-import "../gen/dependency_code.tolk"
+import "../gen/dependency.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     assert (in.valueCoins > 0) throw 5;

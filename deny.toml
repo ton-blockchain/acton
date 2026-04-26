@@ -9,9 +9,9 @@ allow = [
   "BSL-1.0",
   "ISC",
   "MIT",
+  "MIT-0",
   "Unicode-3.0",
   "Zlib",
-  "MIT-0",
 ]
 confidence-threshold = 0.8
 exceptions = []
@@ -20,7 +20,6 @@ unused-license-exception = "deny"
 
 [advisories]
 ignore = [
-  "RUSTSEC-2025-0052", # async-std via auto_pool -> ton
   "RUSTSEC-2024-0388", # derivative via ton_liteapi -> ton
 ]
 

@@ -1,6 +1,9 @@
+use acton_config::mutation_rules::{
+    CustomMutationEdit, CustomMutationMatcher, CustomMutationRule, CustomMutationRulesFile,
+};
+use acton_config::test::MutationLevel;
 use anyhow::Context;
 use path_absolutize::Absolutize;
-use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -603,24 +606,6 @@ pub(super) enum MutationEdit {
     Replace { replacement: String },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(super) enum MutationLevel {
-    Critical,
-    Major,
-    Minor,
-}
-
-impl MutationLevel {
-    pub(crate) const fn label(&self) -> &'static str {
-        match self {
-            MutationLevel::Critical => "critical",
-            MutationLevel::Major => "major",
-            MutationLevel::Minor => "minor",
-        }
-    }
-}
-
 pub(super) type NodePredicate = for<'a> fn(Node<'a>, &str) -> anyhow::Result<bool>;
 
 #[derive(Clone, Debug)]
@@ -688,47 +673,6 @@ impl MutationRule {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum MutationRulesFile {
-    Bare(Vec<CustomMutationRule>),
-    Wrapped { rules: Vec<CustomMutationRule> },
-}
-
-impl MutationRulesFile {
-    fn into_rules(self) -> Vec<CustomMutationRule> {
-        match self {
-            Self::Bare(rules) => rules,
-            Self::Wrapped { rules } => rules,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct CustomMutationRule {
-    name: String,
-    description: String,
-    explanation: String,
-    level: MutationLevel,
-    group: String,
-    matcher: CustomMutationMatcher,
-    edit: CustomMutationEdit,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum CustomMutationMatcher {
-    Query { query: String, capture: String },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum CustomMutationEdit {
-    Remove,
-    Replace { replacement: String },
-}
-
 impl From<CustomMutationRule> for MutationRule {
     fn from(rule: CustomMutationRule) -> Self {
         let matcher = match rule.matcher {
@@ -768,12 +712,13 @@ pub(super) fn load_custom_rules(
             resolved_path.display()
         )
     })?;
-    let file: MutationRulesFile = serde_json::from_str(&file_contents).with_context(|| {
-        format!(
-            "Failed to parse custom mutation rules file '{}' as JSON",
-            resolved_path.display()
-        )
-    })?;
+    let file: CustomMutationRulesFile =
+        serde_json::from_str(&file_contents).with_context(|| {
+            format!(
+                "Failed to parse custom mutation rules file '{}' as JSON",
+                resolved_path.display()
+            )
+        })?;
 
     let custom_rules = file.into_rules();
     let mut seen_names = HashSet::new();
@@ -811,4 +756,525 @@ pub(super) fn merge_rules(
     }
 
     merged_rules
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::test::mutation::{
+        MutationSpan, collect_mutations, remove_span_from_source, replace_span_in_source,
+    };
+    use tree_sitter::Parser;
+
+    fn parse_fixture(source: &str) -> tree_sitter::Tree {
+        let mut parser = Parser::new();
+        parser
+            .set_language(&tolk_syntax::language())
+            .expect("tolk grammar should load");
+        let tree = parser.parse(source, None).expect("fixture should parse");
+        assert!(
+            !tree.root_node().has_error(),
+            "fixture should not contain syntax errors"
+        );
+        tree
+    }
+
+    fn apply_candidate(
+        source: &str,
+        candidate: &crate::commands::test::mutation::MutationCandidate<'_>,
+    ) -> String {
+        let span = MutationSpan::from_node(&candidate.node);
+        match &candidate.rule.edit {
+            MutationEdit::Remove => remove_span_from_source(source, span),
+            MutationEdit::Replace { replacement } => {
+                replace_span_in_source(source, span, replacement)
+            }
+        }
+    }
+
+    fn find_rule(rule_name: &str) -> MutationRule {
+        rules()
+            .into_iter()
+            .find(|rule| rule.name == rule_name)
+            .unwrap_or_else(|| panic!("rule '{rule_name}' should exist"))
+    }
+
+    fn assert_rule_mutates_to(rule_name: &str, before: &str, after: &str) {
+        let tree = parse_fixture(before);
+        let rule = find_rule(rule_name);
+
+        let candidates = collect_mutations(tree.root_node(), before, std::slice::from_ref(&rule))
+            .unwrap_or_else(|err| panic!("rule '{rule_name}' should collect candidates: {err}"));
+
+        assert_eq!(
+            candidates.len(),
+            1,
+            "rule '{rule_name}' should match exactly once"
+        );
+
+        let mutated = apply_candidate(before, &candidates[0]);
+        assert_eq!(
+            mutated, after,
+            "rule '{rule_name}' produced unexpected mutated source"
+        );
+
+        parse_fixture(&mutated);
+    }
+
+    #[test]
+    fn remove_assert_changes_source() {
+        let before = "\
+fun f(a: int, b: int) {
+    val keep = 1;
+    assert (a == b) throw 1;
+    val result = keep;
+}
+";
+        let after = "\
+fun f(a: int, b: int) {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_assert", before, after);
+    }
+
+    #[test]
+    fn remove_throw_changes_source() {
+        let before = "\
+fun f() {
+    if (true) {
+        val keep = 1;
+        throw 42;
+    }
+}
+";
+        let after = "\
+fun f() {
+    if (true) {
+        val keep = 1;
+    }
+}
+";
+        assert_rule_mutates_to("remove_throw", before, after);
+    }
+
+    #[test]
+    fn remove_storage_save_call_changes_source() {
+        let before = "\
+fun f() {
+    val keep = 1;
+    storage.save();
+    val result = keep;
+}
+";
+        let after = "\
+fun f() {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_storage_save_call", before, after);
+    }
+
+    #[test]
+    fn remove_set_data_call_changes_source() {
+        let before = "\
+fun f() {
+    val keep = 1;
+    contract.setData(createEmptyCell());
+    val result = keep;
+}
+";
+        let after = "\
+fun f() {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_set_data_call", before, after);
+    }
+
+    #[test]
+    fn remove_accept_external_message_changes_source() {
+        let before = "\
+fun f() {
+    val keep = 1;
+    acceptExternalMessage();
+    val result = keep;
+}
+";
+        let after = "\
+fun f() {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_accept_external_message", before, after);
+    }
+
+    #[test]
+    fn remove_commit_contract_data_and_actions_changes_source() {
+        let before = "\
+fun f() {
+    val keep = 1;
+    commitContractDataAndActions();
+    val result = keep;
+}
+";
+        let after = "\
+fun f() {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_commit_contract_data_and_actions", before, after);
+    }
+
+    #[test]
+    fn remove_set_code_postponed_changes_source() {
+        let before = "\
+fun f() {
+    val keep = 1;
+    contract.setCodePostponed(createEmptyCell());
+    val result = keep;
+}
+";
+        let after = "\
+fun f() {
+    val keep = 1;
+    val result = keep;
+}
+";
+        assert_rule_mutates_to("remove_set_code_postponed", before, after);
+    }
+
+    #[test]
+    fn flip_plus_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a + b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a - b; }"#;
+        assert_rule_mutates_to("flip_plus", before, after);
+    }
+
+    #[test]
+    fn flip_minus_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a - b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a + b; }"#;
+        assert_rule_mutates_to("flip_minus", before, after);
+    }
+
+    #[test]
+    fn flip_mul_div_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a * b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a / b; }"#;
+        assert_rule_mutates_to("flip_mul_div", before, after);
+    }
+
+    #[test]
+    fn flip_div_mul_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a / b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a * b; }"#;
+        assert_rule_mutates_to("flip_div_mul", before, after);
+    }
+
+    #[test]
+    fn flip_eq_ne_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a == b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a != b; }"#;
+        assert_rule_mutates_to("flip_eq_ne", before, after);
+    }
+
+    #[test]
+    fn flip_ne_eq_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a != b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a == b; }"#;
+        assert_rule_mutates_to("flip_ne_eq", before, after);
+    }
+
+    #[test]
+    fn flip_lt_le_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a < b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
+        assert_rule_mutates_to("flip_lt_le", before, after);
+    }
+
+    #[test]
+    fn flip_gt_ge_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a > b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
+        assert_rule_mutates_to("flip_gt_ge", before, after);
+    }
+
+    #[test]
+    fn flip_le_lt_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a < b; }"#;
+        assert_rule_mutates_to("flip_le_lt", before, after);
+    }
+
+    #[test]
+    fn flip_ge_gt_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a > b; }"#;
+        assert_rule_mutates_to("flip_ge_gt", before, after);
+    }
+
+    #[test]
+    fn invert_bool_true_changes_source() {
+        let before = r#"fun f() { val result = true; }"#;
+        let after = r#"fun f() { val result = false; }"#;
+        assert_rule_mutates_to("invert_bool_true", before, after);
+    }
+
+    #[test]
+    fn invert_bool_false_changes_source() {
+        let before = r#"fun f() { val result = false; }"#;
+        let after = r#"fun f() { val result = true; }"#;
+        assert_rule_mutates_to("invert_bool_false", before, after);
+    }
+
+    #[test]
+    fn flip_plus_assign_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
+        assert_rule_mutates_to("flip_plus_assign", before, after);
+    }
+
+    #[test]
+    fn flip_minus_assign_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
+        assert_rule_mutates_to("flip_minus_assign", before, after);
+    }
+
+    #[test]
+    fn flip_logical_and_changes_source() {
+        let before = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
+        let after = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
+        assert_rule_mutates_to("flip_logical_and", before, after);
+    }
+
+    #[test]
+    fn flip_logical_or_changes_source() {
+        let before = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
+        let after = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
+        assert_rule_mutates_to("flip_logical_or", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_and_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        assert_rule_mutates_to("flip_bitwise_and", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_or_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        assert_rule_mutates_to("flip_bitwise_or", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_and_xor_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        assert_rule_mutates_to("flip_bitwise_and_xor", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_or_xor_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        assert_rule_mutates_to("flip_bitwise_or_xor", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_xor_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        assert_rule_mutates_to("flip_bitwise_xor", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_xor_or_changes_source() {
+        let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        assert_rule_mutates_to("flip_bitwise_xor_or", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_and_assign_or_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_and_assign_or", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_and_assign_xor_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_and_assign_xor", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_or_assign_and_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_or_assign_and", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_or_assign_xor_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_or_assign_xor", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_xor_assign_and_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_xor_assign_and", before, after);
+    }
+
+    #[test]
+    fn flip_bitwise_xor_assign_or_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        assert_rule_mutates_to("flip_bitwise_xor_assign_or", before, after);
+    }
+
+    #[test]
+    fn flip_lshift_assign_changes_source() {
+        let before = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
+        let after = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
+        assert_rule_mutates_to("flip_lshift_assign", before, after);
+    }
+
+    #[test]
+    fn flip_rshift_assign_changes_source() {
+        let before = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
+        let after = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
+        assert_rule_mutates_to("flip_rshift_assign", before, after);
+    }
+
+    #[test]
+    fn flip_lshift_changes_source() {
+        let before = r#"fun f(value: int) { val result = value << 1; }"#;
+        let after = r#"fun f(value: int) { val result = value >> 1; }"#;
+        assert_rule_mutates_to("flip_lshift", before, after);
+    }
+
+    #[test]
+    fn flip_rshift_changes_source() {
+        let before = r#"fun f(value: int) { val result = value >> 1; }"#;
+        let after = r#"fun f(value: int) { val result = value << 1; }"#;
+        assert_rule_mutates_to("flip_rshift", before, after);
+    }
+
+    #[test]
+    fn remove_logical_not_changes_source() {
+        let before = r#"fun f(flag: bool) { val result = !flag; }"#;
+        let after = r#"fun f(flag: bool) { val result = flag; }"#;
+        assert_rule_mutates_to("remove_logical_not", before, after);
+    }
+
+    #[test]
+    fn remove_bitwise_not_changes_source() {
+        let before = r#"fun f(value: int) { val result = ~value; }"#;
+        let after = r#"fun f(value: int) { val result = value; }"#;
+        assert_rule_mutates_to("remove_bitwise_not", before, after);
+    }
+
+    #[test]
+    fn flip_mul_assign_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
+        assert_rule_mutates_to("flip_mul_assign", before, after);
+    }
+
+    #[test]
+    fn flip_div_assign_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        assert_rule_mutates_to("flip_div_assign", before, after);
+    }
+
+    #[test]
+    fn flip_mul_assign_mod_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
+        assert_rule_mutates_to("flip_mul_assign_mod", before, after);
+    }
+
+    #[test]
+    fn flip_mod_assign_changes_source() {
+        let before = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
+        let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        assert_rule_mutates_to("flip_mod_assign", before, after);
+    }
+
+    #[test]
+    fn remove_unary_minus_changes_source() {
+        let before = r#"fun f(value: int) { val result = -value; }"#;
+        let after = r#"fun f(value: int) { val result = value; }"#;
+        assert_rule_mutates_to("remove_unary_minus", before, after);
+    }
+
+    #[test]
+    fn if_condition_true_changes_source() {
+        let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
+        let after = r#"fun f(flag: bool) { if (true) { throw 1; } }"#;
+        assert_rule_mutates_to("if_condition_true", before, after);
+    }
+
+    #[test]
+    fn if_condition_false_changes_source() {
+        let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
+        let after = r#"fun f(flag: bool) { if (false) { throw 1; } }"#;
+        assert_rule_mutates_to("if_condition_false", before, after);
+    }
+
+    #[test]
+    fn while_condition_false_changes_source() {
+        let before = r#"fun f(flag: bool) { var keep = flag; while (keep) { keep = false; } }"#;
+        let after = r#"fun f(flag: bool) { var keep = flag; while (false) { keep = false; } }"#;
+        assert_rule_mutates_to("while_condition_false", before, after);
+    }
+
+    #[test]
+    fn remove_throw_does_not_target_throw_inside_assert() {
+        let before = "\
+fun f(a: int, b: int) {
+    assert (a == b) throw 1;
+    if (true) {
+        val keep = 1;
+        throw 42;
+    }
+}
+";
+        let after = "\
+fun f(a: int, b: int) {
+    assert (a == b) throw 1;
+    if (true) {
+        val keep = 1;
+    }
+}
+";
+        let tree = parse_fixture(before);
+        let rule = find_rule("remove_throw");
+
+        let candidates = collect_mutations(tree.root_node(), before, std::slice::from_ref(&rule))
+            .expect("remove_throw should collect candidates");
+
+        assert_eq!(
+            candidates.len(),
+            1,
+            "fixture should expose one standalone throw"
+        );
+
+        let mutated = apply_candidate(before, &candidates[0]);
+        assert_eq!(mutated, after);
+    }
 }

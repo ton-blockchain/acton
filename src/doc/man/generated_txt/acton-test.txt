@@ -40,9 +40,19 @@ OPTIONS
        --fuzz-seed seed
            Seed for reproducible fuzz runs.
 
+       --verbose
+           Enable executor debug logs at verbosity level 1.
+
+           Currently only level 1 is supported. Pass --verbose at most once.
+           Use this for low-level executor output such as debug.dumpStack().
+           For richer debug output, use --backtrace full or --debug.
+
    Debugging Options
        --debug
            Enable debug mode.
+
+           This also raises executor verbosity to collect full source locations
+           and stack context for live stepping.
 
        --debug-port port
            Debug server port.
@@ -50,11 +60,17 @@ OPTIONS
        --backtrace level
            Enable execution backtraces.
 
-           Currently supported value: full.
+           Currently supported value: full. Full backtraces also raise executor
+           verbosity to collect source locations and call stacks without
+           opening the debugger.
 
    Coverage Options
        --coverage
            Generate a coverage profile.
+
+           Coverage also raises internal executor verbosity enough to map
+           executed locations back to source files and lines, but it does not
+           enable stepping or print backtraces by itself.
 
        --coverage-format format
            Coverage output format.
@@ -65,7 +81,7 @@ OPTIONS
            Output file for the coverage report.
 
        --coverage-minimum-percent percent
-           Fail when total line coverage is below this percentage.
+           Fail when the final coverage score is below this percentage.
 
            Valid range: 0 to 100.
 
@@ -123,14 +139,30 @@ OPTIONS
        --fork-block-number seqno
            Historical block sequence number to fork from.
 
-       --api-key key
-           TonCenter API key for blockchain queries.
-
    Tracing Options
        --save-test-trace [dir]
            Save transaction traces to a directory.
 
-           If passed without a value, Acton uses build/traces.
+           If passed without a value, Acton uses build/traces. Acton writes one
+           <test-name>_trace.json file per executed test and stores shared
+           contract metadata under contracts/<contract-name>.json. These
+           filenames are derived only from the test name and contract name, so
+           duplicate names overwrite earlier artifacts in the same output
+           directory. Relative paths are resolved from the project root.
+
+TONCENTER API KEYS
+       When tests fork from the built-in mainnet/testnet backends,
+       authenticated requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY.
+
+       When tests fork from custom:<name>, Acton reads
+       <NORMALIZED_NAME>_API_KEY. Custom network names are uppercased and
+       non-alphanumeric characters are replaced with _, so custom:mock-remote
+       becomes MOCK_REMOTE_API_KEY.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
    Mutation Testing Options
        --mutate
@@ -247,19 +279,51 @@ REPORTING AND ARTIFACTS
        o  --junit-path matters when the JUnit reporter is enabled; the default
           output directory is test-results
 
+       o  executor debug logs are hidden by default; re-run with --verbose when
+          you need level-1 executor output such as debug.dumpStack()
+
+       o  --verbose is only low-level executor logging; --coverage also
+          collects source-location data, while --backtrace full and --debug
+          collect richer location and stack data
+
        o  --coverage-file matters only with --coverage; without an explicit
           path, Acton writes lcov.info for lcov and coverage.txt for text
+
+       o  coverage summaries show line and branch columns plus a blended Score
+
+       o  LCOV export includes BRDA, BRF, and BRH records when branch sites
+          were observed for a file
+
+       o  --coverage-minimum-percent checks the final blended Score shown in
+          the summary, not just % Lines
 
        o  coverage excludes .test.tolk files and @wrappers sources by default;
           use --coverage-include-tests or --coverage-include-wrappers to opt in
 
        o  --save-test-trace without a value writes traces to build/traces
 
+       o  each executed test produces its own <test-name>_trace.json artifact
+
+       o  exported bundles also include contracts/<contract-name>.json files
+          with code, source maps, and ABI metadata reused across tests in the
+          same bundle
+
+       o  trace chains default to names like Trace 1; use txs.giveName("...")
+          when you want stable human-readable names in exported artifacts and
+          the Test UI
+
+       o  when you split execution with testing.createTraceIterationCursor(),
+          exported traces still merge batches that belong to the same logical
+          root transaction chain
+
+       o  --ui also enables the default trace bundle directory when
+          --save-test-trace is otherwise absent
+
        o  gas snapshot files are written only to the explicit paths passed to
           --snapshot or --baseline-snapshot
 
        o  [test.fuzz] applies only to parameterized tests that explicitly opt
-          in with @test({ fuzz: true }) or @test({ fuzz: ... })
+          in with @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
 
        o  --fuzz-seed overrides [test.fuzz].seed for the current run
 
@@ -361,51 +425,55 @@ EXAMPLES
 
               acton test --filter "wallet.*"
 
-       3. Generate coverage and JUnit output:
+       3. Show executor debug logs from debug.* helpers:
+
+              acton test --verbose --filter "debug.*"
+
+       4. Generate coverage and JUnit output:
 
               acton test --coverage --coverage-format lcov --reporter junit --junit-path test-results
 
-       4. Fail the run when line coverage drops below 85%:
+       5. Fail the run when line coverage drops below 85%:
 
               acton test --coverage --coverage-minimum-percent 85
 
-       5. Compare gas usage against a baseline:
+       6. Compare gas usage against a baseline:
 
               acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff
 
-       6. Run mutation testing for one contract:
+       7. Run mutation testing for one contract:
 
               acton test --mutate --mutate-contract Wallet
 
-       7. Run mutation testing only for changed lines in the current worktree:
+       8. Run mutation testing only for changed lines in the current worktree:
 
               acton test --mutate --mutate-contract Wallet --mutation-diff worktree
 
-       8. Run mutation testing for selected levels on the current branch:
+       9. Run mutation testing for selected levels on the current branch:
 
               acton test --mutate --mutate-contract Wallet --mutation-diff branch --mutation-levels critical,major
 
-       9. Re-run one specific mutant from a previous report:
+       10. Re-run one specific mutant from a previous report:
 
-              acton test --mutate --mutate-contract Wallet --mutation-id 2
+           acton test --mutate --mutate-contract Wallet --mutation-id 2
 
-       10. Resume an unfinished mutation session:
+       11. Resume an unfinished mutation session:
 
            acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
 
-       11. Fail the run when mutation score drops below 85%:
+       12. Fail the run when mutation score drops below 85%:
 
            acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
 
-       12. Limit mutation testing to four workers:
+       13. Limit mutation testing to four workers:
 
            acton test --mutate --mutate-contract Wallet --mutation-workers 4
 
-       13. Debug a forked-state failure with traces and the UI:
+       14. Debug a forked-state failure with traces and the UI:
 
            acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
 
-       14. Enforce a gas baseline in CI:
+       15. Enforce a gas baseline in CI:
 
            acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff --reporter console,junit
 
@@ -413,5 +481,5 @@ SEE ALSO
        o  acton help wrapper
 
        o  Test runner guide
-          <https://ton-blockchain.github.io/acton/docs/test-runner>
+          <https://ton-blockchain.github.io/acton/docs/testing/overview>
 

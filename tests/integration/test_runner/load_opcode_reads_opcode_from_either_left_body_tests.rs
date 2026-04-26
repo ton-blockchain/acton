@@ -12,19 +12,19 @@ struct (0x1234ABCD) AkPayload {
     amount: uint32
 }
 
-fun akNoInit(): Maybe<Either<StateInit, Cell<StateInit>>> {
-    return Maybe<Either<StateInit, Cell<StateInit>>>.none();
+fun akNoInit(): TlbMaybe<TlbEither<StateInit, Cell<StateInit>>> {
+    return TlbMaybe.none();
 }
 
-fun akIntInfo(): IntMsgInfoRelaxed {
-    return IntMsgInfoRelaxed {
+fun akIntInfo(): TlbIntMsgInfoRelaxed {
+    return TlbIntMsgInfoRelaxed {
         ihrDisabled: true,
         bounce: false,
         bounced: false,
         src: address("0:00000000000000000000000000000000000000000000000000000000000000AA")
             as any_address,
         dest: address("0:00000000000000000000000000000000000000000000000000000000000000BB"),
-        value: CurrencyCollection {
+        value: TlbCurrencyCollection {
             grams: 0,
             other: createEmptyMap<int32, varuint32>(),
         },
@@ -63,7 +63,7 @@ get fun `test ak stdlib load opcode left`() {
         .endCell()
         .beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -93,7 +93,7 @@ get fun `test ak stdlib load opcode right ref`() {
         .endCell()
         .beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -114,7 +114,7 @@ fn load_opcode_returns_null_for_either_right_without_ref() {
 get fun `test ak stdlib load opcode right without ref`() {
     val body = beginCell().storeBool(true).endCell().beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -135,7 +135,7 @@ fn load_opcode_returns_null_when_body_too_short() {
 get fun `test ak stdlib load opcode short body`() {
     val body = beginCell().storeBool(false).storeUint(0b1010, 4).endCell().beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -161,7 +161,7 @@ get fun `test ak stdlib load opcode bounce prefix without skip`() {
         .endCell()
         .beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -187,7 +187,7 @@ get fun `test ak stdlib load opcode bounce prefix with skip`() {
         .endCell()
         .beginParse();
 
-    val msg = MessageRelaxedGeneric {
+    val msg = TlbMessageRelaxedGeneric {
         info: akIntInfo(),
         init: akNoInit(),
         body,
@@ -197,6 +197,52 @@ get fun `test ak stdlib load opcode bounce prefix with skip`() {
 }
 ",
         "integration/snapshots/test-runner/load_opcode_reads_opcode_from_either_left_body/load_opcode_with_skip_bounce_returns_nested_opcode.stdout.txt",
+    );
+}
+
+#[test]
+fn load_opcode_with_skip_bounce_supports_new_fffffffe_prefix() {
+    run_message_case(
+        "ak-stdlib-load-opcode-new-bounce-prefix-with-skip",
+        r"
+get fun `test ak stdlib load opcode new bounce prefix with skip`() {
+    val body = beginCell()
+        .storeBool(false)
+        .storeUint(0xFFFFFFFE, 32)
+        .storeUint(0x3456CDEF, 32)
+        .endCell()
+        .beginParse();
+
+    val msg = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body,
+    };
+
+    expect(msg.loadOpcode(false)).toEqual(0xFFFFFFFE);
+    expect(msg.loadOpcode(true)).toEqual(0x3456CDEF);
+}
+",
+        "integration/snapshots/test-runner/load_opcode_reads_opcode_from_either_left_body/load_opcode_with_skip_bounce_supports_new_fffffffe_prefix.stdout.txt",
+    );
+}
+
+#[test]
+fn load_opcode_returns_null_for_missing_either_tag() {
+    run_message_case(
+        "ak-stdlib-load-opcode-missing-either-tag",
+        r"
+get fun `test ak stdlib load opcode missing either tag`() {
+    val msg = TlbMessageRelaxedGeneric {
+        info: akIntInfo(),
+        init: akNoInit(),
+        body: beginCell().endCell().beginParse(),
+    };
+
+    expect(msg.loadOpcode()).toBeNull();
+}
+",
+        "integration/snapshots/test-runner/load_opcode_reads_opcode_from_either_left_body/load_opcode_returns_null_for_missing_either_tag.stdout.txt",
     );
 }
 
@@ -211,10 +257,10 @@ get fun `test ak stdlib message load body left`() {
         amount: 22,
     };
 
-    val msg = MessageRelaxed<AkPayload> {
+    val msg = TlbMessageRelaxed<AkPayload> {
         info: akIntInfo(),
         init: akNoInit(),
-        body: Either<AkPayload, Cell<AkPayload>>.left(payload),
+        body: TlbEither<AkPayload, Cell<AkPayload>>.left(payload),
     };
 
     expect(msg.loadBody()).toEqual(payload);
@@ -236,10 +282,10 @@ get fun `test ak stdlib message load body right`() {
     };
     val payloadCell = payload.toCell() as Cell<AkPayload>;
 
-    val msg = MessageRelaxed<AkPayload> {
+    val msg = TlbMessageRelaxed<AkPayload> {
         info: akIntInfo(),
         init: akNoInit(),
-        body: Either<AkPayload, Cell<AkPayload>>.right(payloadCell),
+        body: TlbEither<AkPayload, Cell<AkPayload>>.right(payloadCell),
     };
 
     expect(msg.loadBody()).toEqual(payload);

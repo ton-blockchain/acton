@@ -6,10 +6,9 @@ use tolk_resolver::{FileDb, FileInfo};
 
 const fn severity_to_annotation_level(severity: Severity) -> &'static str {
     match severity {
-        Severity::Info => "notice",
         Severity::Warning => "warning",
         Severity::Error | Severity::Fatal => "error",
-        Severity::Help => "notice",
+        Severity::Info | Severity::Help => "notice",
     }
 }
 

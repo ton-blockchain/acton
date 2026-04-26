@@ -1,17 +1,264 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    append_custom_network, append_localnet_network, spawn_toncenter_v2_mock,
-    toncenter_v2_error_response, toncenter_v2_seqno_ok_response,
+    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
+    spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
+    toncenter_v2_seqno_ok_response,
 };
 
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
+use ton_executor::DEFAULT_CONFIG_DICT;
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+const WAIT_FOR_TRACE_MESSAGES: &str = r"
+struct (0x91000001) TriggerForward {
+    target: address
+}
+";
+
+const WAIT_FOR_TRACE_RECEIVER_CONTRACT: &str = r"
+struct Storage {
+    received: uint32
+}
+
+fun loadStorage() {
+    val data = contract.getData();
+    val slice = data.beginParse();
+    if (slice.remainingBitsCount() == 0 && slice.remainingRefsCount() == 0) {
+        return Storage { received: 0 };
+    }
+    return Storage.fromCell(data);
+}
+
+fun saveStorage(data: Storage) {
+    contract.setData(data.toCell());
+}
+
+fun onInternalMessage(_: InMessage) {
+    var storage = loadStorage();
+    storage.received = storage.received + 1;
+    saveStorage(storage);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun received(): int {
+    return loadStorage().received;
+}
+";
+
+const WAIT_FOR_TRACE_FORWARDER_CONTRACT: &str = r#"
+import "wait_for_trace_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy TriggerForward.fromSlice(in.body);
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: msg.target,
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const WAIT_FOR_TRACE_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../../lib/types/big_array"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            target: receiverAddress,
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 30, 100);
+    if (trace == null) {
+        println("TRACE_NULL");
+        return;
+    }
+
+    val receiverCount: int = net.runGetMethod(receiverAddress, "received");
+    println("TRACE_READY=true");
+    println("RECEIVER_COUNT={}", receiverCount);
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
+const WAIT_FOR_FIRST_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            target: receiverAddress,
+        },
+    }));
+
+    val root = txs.waitForFirstTransaction(true, 30, 100);
+    if (root == null) {
+        println("ROOT_NULL");
+        return;
+    }
+
+    println("ROOT_READY=true");
+    println("ROOT_PARENT_LT_NULL={}", root.parentLt == null);
+    println("ROOT_CHILD_TXS={}", root.childTxs.size());
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+const REMOTE_GLOBAL_VERSION: u32 = 777;
+const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+fn build_global_version_cell(version: u32, capabilities: u64) -> Cell {
+    let mut builder = CellBuilder::new();
+    builder
+        .store_u8(0xc4)
+        .expect("must store GlobalVersion tag");
+    builder
+        .store_u32(version)
+        .expect("must store GlobalVersion version");
+    builder
+        .store_u64(capabilities)
+        .expect("must store GlobalVersion capabilities");
+    builder.build().expect("must build GlobalVersion cell")
+}
+
+fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
+    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
+    config
+        .set(8, build_global_version_cell(version, capabilities))
+        .expect("must update global version config param");
+    let root = config
+        .root()
+        .clone()
+        .expect("default blockchain config must have a root");
+    Boc::encode_base64(root)
+}
+
+fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "configInfo",
+                "config": {
+                    "@type": "tvm.cell",
+                    "bytes": config_boc64
+                },
+                "@extra": "mocked-live-shape"
+            }
+        })
+        .to_string(),
+    }
+}
 
 fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
     let project = ProjectBuilder::new(project_name)
@@ -19,9 +266,11 @@ fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
             "deploy",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 net.send(wallet.address, createMessage({
                     bounce: false,
                     value: ton("0.05"),
@@ -82,13 +331,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .script_file(
             "print_txs",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../contracts/script_body_messages"
 
 fun main() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("script_body_sink"),
         data: createEmptyCell(),
@@ -136,6 +387,38 @@ keys = {{ mnemonic-file = "mnemonic.txt" }}
     .expect("failed to write wallets.toml");
 }
 
+fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
+    let (v2_url, v3_url) = if let Some(root_url) = base_url.strip_suffix("/api/v2") {
+        (format!("{root_url}/api/v2"), format!("{root_url}/api/v3"))
+    } else {
+        (format!("{base_url}/api/v2"), format!("{base_url}/api/v3"))
+    };
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str(&format!(
+        r#"
+
+[networks.localnet]
+api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
+"#
+    ));
+    fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
+}
+
+fn build_localnet_wait_project(
+    project_name: &str,
+    script_name: &str,
+    script_code: &str,
+) -> Project {
+    ProjectBuilder::new(project_name)
+        .file("contracts/wait_for_trace_messages", WAIT_FOR_TRACE_MESSAGES)
+        .contract("receiver", WAIT_FOR_TRACE_RECEIVER_CONTRACT)
+        .contract("forwarder", WAIT_FOR_TRACE_FORWARDER_CONTRACT)
+        .script_file(script_name, script_code)
+        .build()
+}
+
 fn extract_marker_value(output: &str, marker: &str) -> String {
     output
         .lines()
@@ -145,7 +428,7 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
 }
 
 fn wait_until_address_state_active(
-    node: &crate::support::litenode::LiteNodeHandle,
+    node: &crate::support::localnet::LocalnetHandle,
     address: &str,
     timeout: Duration,
 ) {
@@ -183,6 +466,80 @@ fn test_script_simple_execution() {
     let output = project.acton().script("scripts/hello.tolk").run().code(0);
 
     output.assert_contains("Hello from script!");
+}
+
+#[test]
+fn test_script_debug_logs_are_hidden_without_verbose_flag() {
+    let project = ProjectBuilder::new("script-debug-logs-default-off")
+        .script_file(
+            "debug_logs",
+            r"
+            fun main() {
+                debug.dumpStack();
+            }
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/debug_logs.tolk")
+        .run()
+        .success()
+        .assert_not_contains("stack(0 values)")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_debug_logs_are_hidden_without_verbose_flag.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_verbose_flag_is_accepted() {
+    let project = ProjectBuilder::new("script-debug-logs-verbose")
+        .script_file(
+            "debug_logs",
+            r"
+            fun main() {
+                debug.dumpStack();
+            }
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/debug_logs.tolk")
+        .arg("--verbose")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_verbose_flag_is_accepted.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_rejects_verbose_level_above_one() {
+    let project = ProjectBuilder::new("script-debug-logs-verbose-level")
+        .script_file(
+            "debug_logs",
+            r"
+            fun main() {
+                debug.dumpStack();
+            }
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/debug_logs.tolk")
+        .arg("--verbose")
+        .arg("--verbose")
+        .run()
+        .failure()
+        .assert_stderr_contains("Verbosity levels above 1 are not supported yet")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_rejects_verbose_level_above_one.stderr.txt",
+        );
 }
 
 #[test]
@@ -364,6 +721,39 @@ fn test_script_with_args() {
         .assert_contains("20")
         .assert_contains("Sum:")
         .assert_contains("30");
+}
+
+#[test]
+fn test_script_missing_args_uses_main_definition_for_backtrace() {
+    let project = ProjectBuilder::new("script-missing-args")
+        .script_file(
+            "args",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: int, b: int) {
+                println("Arg A:");
+                println(a);
+                println("Arg B:");
+                println(b);
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .script("scripts/args.tolk")
+        .with_backtrace("full")
+        .run()
+        .failure();
+
+    output
+        .assert_contains("Script finished with exit code 2")
+        .assert_contains("at scripts/args.tolk:")
+        .assert_contains("Backtrace:")
+        .assert_contains("main")
+        .assert_not_contains("unknown-file");
 }
 
 #[test]
@@ -824,6 +1214,37 @@ fn test_script_custom_exit_code() {
 }
 
 #[test]
+fn test_script_custom_exit_code_from_abi_shows_single_name() {
+    let project = ProjectBuilder::new("script-exit-abi")
+        .script_file(
+            "exit_abi",
+            r#"
+            import "../../lib/io"
+
+            enum Errors {
+                AbiFailure = 709
+            }
+
+            fun main() {
+                println("Exiting with code 709");
+                throw Errors.AbiFailure
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_abi.tolk")
+        .run()
+        .code(1)
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_success_exit_code() {
     let project = ProjectBuilder::new("script-success")
         .script_file(
@@ -907,6 +1328,45 @@ fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
 }
 
 #[test]
+fn test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name() {
+    let project = ProjectBuilder::new("script-exit-abi-backtrace")
+        .script_file(
+            "exit_abi_backtrace",
+            r#"
+            import "../../lib/io"
+
+            enum Errors {
+                AbiFailure = 709
+            }
+
+            fun explode() {
+                throw Errors.AbiFailure
+            }
+
+            fun nested() {
+                explode();
+            }
+
+            fun main() {
+                nested();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_abi_backtrace.tolk")
+        .with_backtrace("full")
+        .run()
+        .code(1)
+        .assert_not_contains("Error: Errors.AbiFailure")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_invalid_message_exit_code_shows_description_and_phase() {
     let project = ProjectBuilder::new("script-invalid-message-exit")
         .script_file(
@@ -979,13 +1439,14 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
         .script_file(
             "tx_not_found",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
             import "../../lib/testing/expect"
-            import "../../lib/testing/transaction_expect"
 
             fun main() {
-                val sender = net.treasury("sender");
+                val sender = testing.treasury("sender");
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -1026,9 +1487,11 @@ fn test_script_run_get_method_on_undeployed_contract_shows_actionable_error() {
             "get_undeployed",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val target = net.randomAddress("target");
+                val target = randomAddress("target");
                 val _: int = net.runGetMethod(target, "seqno");
             }
         "#,
@@ -1052,9 +1515,11 @@ fn test_script_run_get_method_on_contract_without_code_shows_actionable_error() 
             "get_null_code",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val deployer = net.treasury("deployer");
+                val deployer = testing.treasury("deployer");
                 val address = AutoDeployAddress {
                     stateInit: beginCell()
                         .storeBool(false) // fixed_prefix_length:(Maybe (## 5))
@@ -1267,11 +1732,13 @@ fn test_script_broadcast_with_nonexistent_wallet_with_wallets() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1320,11 +1787,13 @@ fn test_script_broadcast_with_nonexistent_wallet_no_config() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1363,11 +1832,13 @@ fn test_script_broadcast_with_nonexistent_wallet_empty_config() {
             r#"
             import "../../lib/io"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
                 println("Attempting to deploy with nonexistent wallet");
                 // This should fail because wallet "nonexistent" is not defined
-                val wallet = net.wallet("nonexistent");
+                val wallet = scripts.wallet("nonexistent");
                 println("Wallet found: {}", wallet.address);
             }
         "#,
@@ -1406,10 +1877,12 @@ fn test_script_broadcast_wallet_exposes_key_helpers_for_v5() {
             "wallet_keys",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
             import "../../lib/io"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 val keyPair = wallet.toKeyPair();
 
                 if (keyPair.privateKey == 0) {
@@ -1472,9 +1945,11 @@ fn test_script_wallet_key_pair_requires_open_broadcast_wallet() {
             "wallet_keys_error",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 wallet.toKeyPair();
             }
         "#,
@@ -1499,9 +1974,11 @@ fn test_script_wallet_id_requires_open_broadcast_wallet() {
             "wallet_id_error",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                val wallet = net.wallet("deployer");
+                val wallet = scripts.wallet("deployer");
                 wallet.walletId();
             }
         "#,
@@ -1526,9 +2003,11 @@ fn test_script_broadcast_treasury_recommends_wallet_api() {
             "deploy",
             r#"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/emulation/scripts"
 
             fun main() {
-                net.treasury("deployer");
+                testing.treasury("deployer");
             }
         "#,
         )
@@ -1564,8 +2043,6 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1595,8 +2072,6 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1626,8 +2101,6 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("localnet")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1711,13 +2184,15 @@ get fun currentCounter(): int {
         .script_file(
             "deploy_counter",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
 import "../../lib/io"
 import "../contracts/types"
 
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     val init = ContractState {
         code: build("counter"),
         data: Storage {
@@ -1731,7 +2206,7 @@ fun main() {
         value: ton("0.05"),
         dest: { stateInit: init },
     }));
-    if (!res.wait()) {
+    if (res.waitForFirstTransaction() == null) {
         return;
     }
 
@@ -1743,7 +2218,7 @@ fun main() {
 
     write_localnet_wallet_config(&project, "deployer");
 
-    let node = project.litenode().args(["--accounts", "deployer"]).start();
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
     append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
 
     let deploy_output = project
@@ -1810,6 +2285,88 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
 }
 
 #[test]
+fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-trace-localnet",
+        "wait_for_trace",
+        WAIT_FOR_TRACE_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_trace.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
+    );
+
+    let stdout = output.get_stdout();
+    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+
+    node.stop();
+}
+
+#[test]
+fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-first-transaction-localnet",
+        "wait_for_first_transaction",
+        WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_first_transaction.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
+    );
+
+    let stdout = output.get_stdout();
+    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+
+    node.stop();
+}
+
+#[test]
 fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint() {
     let project =
         build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-with-init");
@@ -1832,8 +2389,6 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account-with-init")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -1867,8 +2422,6 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
         .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-wallet-rejection-with-init")
-        .arg("--api-key")
-        .arg("test-api-key")
         .run()
         .failure();
 
@@ -2151,7 +2704,7 @@ fn test_script_env_vars_support_coins() {
                     println("coins: {:ton}", amount);
                 }
 
-                val fallback = envOr<coins>("TEST_COINS_MISSING", ton("0.75"));
+                val fallback = env<coins>("TEST_COINS_MISSING") ?? ton("0.75");
                 println("coins_default: {:ton}", fallback);
             }
         "#,
@@ -2179,16 +2732,16 @@ fn test_script_env_or_vars() {
             import "../../lib/env"
 
             fun main() {
-                val i = envOr<int>("TEST_INT", 42);
+                val i = env<int>("TEST_INT") ?? 42;
                 println("int: {}", i);
 
-                val b = envOr<bool>("TEST_BOOL", false);
+                val b = env<bool>("TEST_BOOL") ?? false;
                 println("bool: {}", b);
 
-                val s = envOr<string>("TEST_SLICE", "default");
+                val s = env<string>("TEST_SLICE") ?? "default";
                 println("string: {}", s);
 
-                val a = envOr<address>("TEST_ADDRESS", address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
+                val a = env<address>("TEST_ADDRESS") ?? address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 println("address: {}", a);
             }
         "#,
@@ -2539,4 +3092,397 @@ fn test_println_map_struct_value_falls_back_to_raw_hex() {
         .assert_snapshot_matches(
             "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
         );
+}
+
+#[test]
+fn test_script_allows_predicate_based_transaction_matchers() {
+    // `expect(...).toHaveTx({ ... })` builds predicate continuations that the matcher
+    // runtime evaluates against the compiled code cell of the currently running script.
+    // Previously `acton script` left `test_code` unset, so this matcher bailed with an
+    // "only available under `acton test`" error. This test pins down that the matcher
+    // now works in script mode for both the positive and the negative path.
+    let project = ProjectBuilder::new("script-predicate-matchers")
+        .file(
+            "contracts/types",
+            r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "expect_in_script",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../contracts/types"
+
+fun main() {
+    val deployer = testing.treasury("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage { id: 0, counter: 0 }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+
+    val increaseRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: counterAddress,
+        body: IncreaseCounter { increaseBy: 42 },
+    }));
+    expect(increaseRes).toHaveTx({ to: counterAddress });
+    expect(increaseRes).toHaveSuccessfulTx({
+        from: deployer.address,
+        to: counterAddress,
+    });
+
+    println("EXPECT_IN_SCRIPT_OK");
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/expect_in_script.tolk")
+        .run()
+        .success()
+        .assert_contains("EXPECT_IN_SCRIPT_OK");
+}
+
+#[test]
+fn test_script_predicate_transaction_matchers_snapshot() {
+    let project = ProjectBuilder::new("script-predicate-matchers-snapshot")
+        .file(
+            "contracts/types",
+            r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "predicate_snapshot",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../contracts/types"
+
+fun main() {
+    val deployer = testing.treasury("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage { id: 0, counter: 0 }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+
+    val expectedBody = IncreaseCounter { increaseBy: 42 }.toCell();
+    val increaseRes = net.send(deployer.address, createMessage({
+        bounce: true,
+        value: ton("0.1"),
+        dest: counterAddress,
+        body: IncreaseCounter { increaseBy: 42 },
+    }));
+
+    val found = increaseRes.findTransaction({
+        from: fun(addr: address): bool {
+            println("script.from={}", addr);
+            return addr == deployer.address;
+        },
+        to: fun(addr: address): bool {
+            println("script.to={}", addr);
+            return addr == counterAddress;
+        },
+        value: fun(value: coins): bool {
+            println("script.value={}", value);
+            return value == ton("0.1");
+        },
+        bounce: fun(flag: bool): bool {
+            println("script.bounce={}", flag);
+            return flag;
+        },
+        opcode: fun(op: uint32): bool {
+            println("script.opcode=0x{:x}", op);
+            return op == IncreaseCounter.__getDeclaredPackPrefix();
+        },
+        body: fun(body: cell): bool {
+            println("script.bodyHash=0x{:x}", body.hash());
+            return body.hash() == expectedBody.hash();
+        },
+    });
+    expect(found).toBeNotNull();
+
+    expect(increaseRes).toNotHaveTx({
+        to: fun(addr: address): bool {
+            println("script.negated.to={}", addr);
+            return false;
+        },
+    });
+
+    println("SCRIPT_PREDICATES_OK");
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/predicate_snapshot.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_predicate_transaction_matchers_snapshot.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_predicate_transaction_matchers_vm_exit_snapshot() {
+    let project = ProjectBuilder::new("script-predicate-matchers-vm-exit")
+        .file(
+            "contracts/types",
+            r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+",
+        )
+        .contract(
+            "counter",
+            r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "predicate_vm_exit",
+            r#"
+	import "../../lib/build"
+	import "../../lib/emulation/network"
+	import "../../lib/emulation/testing"
+	import "../../lib/io"
+	import "../../lib/testing/expect"
+	import "../contracts/types"
+
+fun main() {
+    val deployer = testing.treasury("deployer");
+    val init = ContractState {
+        code: build("counter"),
+        data: Storage { id: 0, counter: 0 }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+
+    val increaseRes = net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: counterAddress,
+        body: IncreaseCounter { increaseBy: 42 },
+    }));
+
+    expect(increaseRes).toHaveTx({
+        to: fun(addr: address): bool {
+            println("script.vm-exit.to={}", addr);
+            throw 777;
+        },
+    });
+}
+"#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .script("scripts/predicate_vm_exit.tolk")
+        .run()
+        .failure();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
+        );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn script_broadcast_get_config_uses_remote_network() {
+    let config_boc64 = mocked_config_boc64(REMOTE_GLOBAL_VERSION, REMOTE_GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock_with_capture(vec![toncenter_v2_get_config_all_ok_response(
+            &config_boc64,
+        )]);
+
+    let project = ProjectBuilder::new("script-broadcast-get-config-uses-remote-network")
+        .script_file(
+            "show_config",
+            r#"
+import "../../lib/emulation/config"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val version = testing.getConfig().getGlobalVersion();
+    println("remote-version={}, remote-capabilities={}", version.version, version.capabilities);
+}
+"#,
+        )
+        .build();
+
+    append_custom_network(project.path(), "mock-v2-config", &mock_url);
+
+    let output = project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .script("scripts/show_config.tolk")
+        .verify_network("custom:mock-v2-config")
+        .run()
+        .success();
+
+    output.assert_contains(&format!(
+        "remote-version={REMOTE_GLOBAL_VERSION}, remote-capabilities={REMOTE_GLOBAL_CAPABILITIES}"
+    ));
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_eq!(captured[0].method, "GET");
+    assert!(
+        captured[0].path.starts_with("/getConfigAll"),
+        "expected getConfigAll request, got {}",
+        captured[0].path
+    );
 }

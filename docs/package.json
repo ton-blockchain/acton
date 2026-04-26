@@ -7,19 +7,20 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "deploy": "rm -rf out .next && next build && echo '' > out/.nojekyll && bun x gh-pages -d out --dotfiles"
+    "generated-source": "bunx fumadocs-mdx",
+    "lint:links": "bun ./scripts/validate-link.ts"
   },
   "dependencies": {
-    "@orama/orama": "^3.1.16",
-    "@types/mdx": "^2.0.13",
+    "@orama/orama": "^3.1.18",
     "class-variance-authority": "^0.7.1",
-    "fumadocs-core": "^16.2.2",
-    "fumadocs-mdx": "^14.0.4",
-    "fumadocs-ui": "^16.2.2",
+    "fumadocs-core": "^16.7.14",
+    "fumadocs-mdx": "^14.2.13",
+    "fumadocs-twoslash": "^3.2.0",
+    "fumadocs-ui": "^16.7.14",
     "geist": "^1.5.1",
     "gsap": "^3.13.0",
     "lucide-react": "^0.555.0",
-    "next": "16.0.6",
+    "next": "16.2.3",
     "ogl": "^1.0.11",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -27,18 +28,21 @@
     "remark-directive": "^4.0.0",
     "remark-directive-rehype": "^0.4.2",
     "tailwind-merge": "^3.4.0",
+    "twoslash": "^0.3.8",
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "@types/bun": "^1.3.12",
+    "@types/mdx": "^2.0.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
+    "next-validate-link": "^1.6.4",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
-  },
-  "packageManager": "yarn@4.10.3+sha512.c38cafb5c7bb273f3926d04e55e1d8c9dfa7d9c3ea1f36a4868fa028b9e5f72298f0b7f401ad5eb921749eb012eb1c3bb74bf7503df3ee43fd600d14a018266f"
+  }
 }

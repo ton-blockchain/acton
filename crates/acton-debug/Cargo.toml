@@ -10,18 +10,23 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+doctest = false
+
 [dependencies]
 anyhow = { workspace = true }
 crossbeam-channel = { workspace = true }
 dap = { workspace = true }
 log = { workspace = true }
+num-bigint = { workspace = true }
 serde_json = { workspace = true }
-tolkc = { workspace = true }
+tolk-syntax = { workspace = true }
+tolk-compiler = { workspace = true }
 ton-abi = { workspace = true }
 ton-executor = { workspace = true }
-tvmffi = { workspace = true }
+tvm-ffi = { workspace = true }
 tycho-types = { workspace = true }
-vmlogs = { workspace = true }
+tvm-logs = { workspace = true }
 
 [lints]
 workspace = true

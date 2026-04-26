@@ -1,14 +1,14 @@
 # acton-rpc(1)
 
-## NAME
+## Name
 
 acton-rpc --- Inspect remote account state and decode contract storage
 
-## SYNOPSIS
+## Synopsis
 
 `acton rpc` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Query blockchain account state through a configured network endpoint.
 
@@ -25,7 +25,7 @@ When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton rpc info
 
@@ -52,10 +52,6 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 `custom:<name>`.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{/options}}
 
 #### Output
@@ -72,24 +68,37 @@ TonCenter API key for blockchain queries.
 If no local ABI match is found, Acton still prints the raw remote account
 information and reports that decoded storage is unavailable.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-pass-through }}
 
-## NETWORK RESOLUTION
+## Network Resolution
 
 - `mainnet` and `testnet` use the built-in TonCenter endpoints
-- `localnet` uses the configured local LiteNode or its default URL
+- `localnet` uses the configured localnet or its default URL
 - `custom:<name>` resolves through `[networks.<name>]` in `Acton.toml`
 
 For `custom:<name>`, Acton needs access to the selected project or manifest so
 it can read the custom network configuration.
 
-## ABI MATCHING
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
+names are uppercased and non-alphanumeric characters are replaced with `_`, so
+`custom:mock` becomes `MOCK_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
+
+## ABI Matching
 
 Storage decoding is best-effort and depends on local project context.
 
@@ -103,13 +112,13 @@ Acton attempts to:
 This means decoding is robust for contracts you control in the current Acton
 project, but not guaranteed for arbitrary third-party deployments.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected RPC query completed successfully.
 - `1`: The address was invalid, the network could not be resolved, the remote
   request failed, or local ABI decoding encountered an unrecoverable error.
 
-## EXAMPLES
+## Examples
 
 1. Inspect a testnet account quickly:
 
@@ -117,10 +126,10 @@ project, but not guaranteed for arbitrary third-party deployments.
    acton rpc info EQC...
    ```
 
-2. Inspect a mainnet account with an API key:
+2. Inspect a mainnet account with an API key from the environment:
 
    ```bash
-   acton rpc info EQC... --net mainnet --api-key $TONCENTER_API_KEY
+   TONCENTER_MAINNET_API_KEY=your-key acton rpc info EQC... --net mainnet
    ```
 
 3. Inspect a localnet deployment and decode storage with the current project:
@@ -135,9 +144,9 @@ project, but not guaranteed for arbitrary third-party deployments.
    acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help disasm`
 - `acton help retrace`
 - `acton help script`
-- [Command reference](https://ton-blockchain.github.io/acton/docs/commands)
+- [Command reference](https://ton-blockchain.github.io/acton/docs/commands/rpc)

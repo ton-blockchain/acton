@@ -70,11 +70,6 @@ Network to use.
 Defaults to \fBtestnet\fR\&.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain interactions.
-.RE
-.sp
 \fB\-\-amount\fR \fIton\fR
 .RS 4
 Explicit TON amount to send.
@@ -127,11 +122,6 @@ Network to use.
 Defaults to \fBtestnet\fR\&.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain interactions.
-.RE
-.sp
 \fB\-\-json\fR
 .RS 4
 Emit JSON output for raw library fetches.
@@ -149,11 +139,6 @@ Show information about a deployed library.
 Library name to inspect.
 .sp
 If omitted, Acton can prompt from the available library metadata.
-.RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for balance checks.
 .RE
 .sp
 The output includes publication time, last top\-up time, current balance, and
@@ -186,11 +171,6 @@ Overrides duration\-based estimation.
 Wallet to use for the top\-up transaction.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain interactions.
-.RE
-.sp
 \fB\-y\fR, \fB\-\-yes\fR
 .RS 4
 Skip confirmation prompts.
@@ -198,6 +178,17 @@ Skip confirmation prompts.
 .sp
 After a successful top\-up, Acton updates \fBlast_topup_timestamp\fR in the stored
 library metadata.
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
+names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so
+\fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -377,5 +368,5 @@ acton library fetch <HASH> \-\-output build/math\-lib.boc
 .SH "SEE ALSO"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fILibraries guide\fR <https://ton\-blockchain.github.io/acton/docs/advanced/libraries>
+\h'-04'\(bu\h'+03'\fILibraries guide\fR <https://ton\-blockchain.github.io/acton/docs/libraries>
 .RE

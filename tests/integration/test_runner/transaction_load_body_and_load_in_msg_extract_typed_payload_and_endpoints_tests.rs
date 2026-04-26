@@ -60,17 +60,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 const AM_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
 import "../../lib/tlb/maybe"
 import "../contracts/messages"
 
 fun deployAmHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
 
     val workerInit = ContractState {
         code: build("worker"),
@@ -154,7 +154,7 @@ get fun `test am transaction load body and load in msg`() {
     val tx = txs.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     val body = tx.loadBody<Ping>();
     expect(body.queryId).toEqual(11);
@@ -164,8 +164,11 @@ get fun `test am transaction load body and load in msg`() {
     val inMsg = tx.loadInMsg<Ping>();
     val inBody = inMsg.loadBody();
     expect(inBody).toEqual(body);
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(workerAddress);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(workerAddress);
+    }
 }
 ",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints.stdout.txt",
@@ -183,7 +186,7 @@ get fun `test am transaction load body mismatch`() {
     val tx = txs.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     expectToEndWithExitCode(63);
     tx.loadBody<Other>();
@@ -204,7 +207,7 @@ get fun `test am transaction load in msg mismatch`() {
     val tx = txs.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     expectToEndWithExitCode(63);
     tx.loadInMsg<Other>().loadBody();
@@ -228,12 +231,12 @@ get fun `test am transaction get used gas for root and child`() {
     val rootTx = txs.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
     val childTx = txs.findTransaction<Notify>({
         from: workerAddress,
         to: receiverAddress,
         success: true,
-    }).unwrap();
+    })!;
 
     expect(rootTx.getUsedGas()).toEqual(txs.at(0).gasUsed);
     expect(childTx.getUsedGas()).toEqual(txs.at(1).gasUsed);
@@ -251,8 +254,8 @@ fn transaction_get_used_gas_reports_skipped_compute_phase_for_undeployed_destina
         "am-stdlib-transaction-get-used-gas-skipped-compute",
         r#"
 get fun `test am transaction get used gas skipped compute`() {
-    val sender = net.treasury("sender");
-    val undeployed = net.randomAddress("am_skip_compute_target");
+    val sender = testing.treasury("sender");
+    val undeployed = randomAddress("am_skip_compute_target");
 
     val txs = net.send(
         sender.address,
@@ -271,7 +274,7 @@ get fun `test am transaction get used gas skipped compute`() {
     val tx = txs.findTransaction<Ping>({
         from: sender.address,
         to: undeployed,
-    }).unwrap();
+    })!;
 
     expectToEndWithExitCode(567);
     tx.getUsedGas();
@@ -286,21 +289,21 @@ fn transaction_get_action_fee_matches_transaction_description_and_none_branch() 
     run_success_case(
         "am-stdlib-transaction-get-action-fee-match-and-none",
         r"
-fun expectedActionFee(tx: Transaction): Maybe<coins> {
+fun expectedActionFee(tx: TlbTransaction): coins? {
     val descr = tx.description.load();
-    if (descr is TransOrd) {
-        if (descr.action is None) {
-            return None{};
+    if (descr is TlbTransOrd) {
+        if (descr.action is TlbNone) {
+            return null;
         }
-        return descr.action.value.load().totalActionFees;
+        return descr.action.unwrap().load().totalActionFees.unwrapOr(null);
     }
-    if (descr is TransTickTock) {
-        if (descr.action is None) {
-            return None{};
+    if (descr is TlbTransTickTock) {
+        if (descr.action is TlbNone) {
+            return null;
         }
-        return descr.action.value.load().totalActionFees;
+        return descr.action.unwrap().load().totalActionFees.unwrapOr(null);
     }
-    return None{};
+    return null;
 }
 
 get fun `test am transaction get action fee match and none`() {
@@ -310,16 +313,16 @@ get fun `test am transaction get action fee match and none`() {
     val withActionTx = withAction.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
     expect(withActionTx.getActionFee()).toEqual(expectedActionFee(withActionTx));
 
     val noAction = sendPing(sender, workerAddress, receiverAddress, 62, 0);
     val noActionTx = noAction.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
     expect(noActionTx.getActionFee()).toEqual(expectedActionFee(noActionTx));
-    expect(noActionTx.getActionFee()).toBeNone();
+    expect(noActionTx.getActionFee()).toBeNull();
 }
 ",
         "integration/snapshots/test-runner/transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints/transaction_get_action_fee_matches_transaction_description_and_none_branch.stdout.txt",
@@ -338,7 +341,7 @@ get fun `test am transaction get account address workchain override`() {
     val tx = txs.findTransaction<Ping>({
         from: sender.address,
         to: workerAddress,
-    }).unwrap();
+    })!;
 
     expect(tx.getAccountAddress()).toEqual(workerAddress);
     expect(tx.getAccountAddress(BASECHAIN)).toEqual(workerAddress);
@@ -355,11 +358,11 @@ fn transaction_varuint7_roundtrip_for_storage_used_large_values_bug() {
         "am-stdlib-transaction-varuint7-roundtrip-bug",
         r"
 get fun `test am transaction varuint7 roundtrip bug`() {
-    val original = StorageUsed {
+    val original = TlbStorageUsed {
         cells: 1024,
         bits: 511,
     };
-    val decoded = StorageUsed.fromCell(original.toCell());
+    val decoded = TlbStorageUsed.fromCell(original.toCell());
 
     expect(decoded.cells).toEqual(original.cells);
     expect(decoded.bits).toEqual(original.bits);

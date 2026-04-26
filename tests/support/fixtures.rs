@@ -129,6 +129,7 @@ impl FixtureProject {
             compile_boc: None,
             compile_fift: None,
             compile_source_map: None,
+            compile_allow_no_entrypoint: false,
             test_reporters: vec![],
             junit_merge: false,
             test_exclude_patterns: vec![],

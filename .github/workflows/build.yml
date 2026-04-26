@@ -1,4 +1,4 @@
-name: CI
+name: Trunk Build
 
 on:
   pull_request:
@@ -21,7 +21,7 @@ env:
 
 jobs:
   build-linux:
-    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}${{ matrix.abi && format('-{0}', matrix.abi) || '' }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}${{ matrix.abi }})
     strategy: &runner_linux_strategy
       matrix:
         include:
@@ -54,13 +54,15 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1,nextest@0.9.132
+          tool: just@1.49.0,nextest@0.9.133
+          fallback: none
 
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
@@ -71,6 +73,7 @@ jobs:
           tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Install LLVM and Clang
+        # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -80,11 +83,22 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-build-ui-bun-cache-path |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-build-ui-
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
           CC: clang-16
           CXX: clang++-16
+        # language=Bash
         run: |
           just build-ui
           cargo build --release --locked --target "${TARGET_NAME}" --bin acton
@@ -100,9 +114,12 @@ jobs:
         run: |
           just test
 
-      - name: Run Acton tests
-        run: |
-          acton test
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-build-ui-bun-cache-path
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -111,7 +128,7 @@ jobs:
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ env.TARGET_NAME }}
           path: |
@@ -122,6 +139,7 @@ jobs:
 
       - name: Check Acton target binary
         shell: bash
+        # language=Bash
         run: |
           python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
             --binary "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" \
@@ -154,13 +172,15 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1,cargo-shear@1.11.2,typos@1.45.0
+          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.45.1
+          fallback: none
 
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
@@ -190,12 +210,23 @@ jobs:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1
+          tool: just@1.49.0
+          fallback: none
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-lint-ui-bun-cache-path |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-lint-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-lint-ui-
 
       - name: Install UI dependencies
         run: bun ci
@@ -203,6 +234,13 @@ jobs:
       - name: Run UI checks
         run: |
           just check-ui-ci
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-lint-ui-bun-cache-path
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
   build-macos:
     name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
@@ -237,13 +275,15 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2.71.2
+        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
         with:
-          tool: just@1.48.1,nextest@0.9.132
+          tool: just@1.49.0,nextest@0.9.133
+          fallback: none
 
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
@@ -255,6 +295,16 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &macos-build-ui-bun-cache-path |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-build-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
       - name: Build acton binary
         env:
@@ -274,9 +324,12 @@ jobs:
         run: |
           just test
 
-      - name: Run Acton tests
-        run: |
-          acton test
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *macos-build-ui-bun-cache-path
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -285,7 +338,7 @@ jobs:
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ env.TARGET_NAME }}
           path: |
@@ -296,6 +349,7 @@ jobs:
 
       - name: Check Acton target binary
         shell: bash
+        # language=Bash
         run: |
           python3 "${GITHUB_WORKSPACE}/.github/scripts/check-rust-target-binary.py" \
             --binary "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" \
@@ -320,7 +374,7 @@ jobs:
           merge-multiple: true
 
       - name: Delete download artifacts
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ github.token }}
           # language=JavaScript
@@ -355,16 +409,16 @@ jobs:
       - name: Delete previous trunk
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           gh release delete trunk --repo "${GITHUB_REPOSITORY}" --cleanup-tag -y || true
 
-          gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk \
-            -X DELETE || true
+          gh api repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk -X DELETE || true
 
       - name: Create trunk release
         env:
           GH_TOKEN: ${{ github.token }}
+        # language=Bash
         run: |
           release_notes=$(cat <<EOF
           Automated trunk build of Acton.
@@ -385,17 +439,17 @@ jobs:
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        # language=Bash
         run: |
           gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" --cleanup-tag -y || true
 
-          gh api \
-            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk \
-            -X DELETE || true
+          gh api repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk -X DELETE || true
 
       - name: Create trunk release (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        # language=Bash
         run: |
           release_notes=$(cat <<EOF
           Automated trunk build of Acton.

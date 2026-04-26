@@ -63,10 +63,10 @@ fun onBouncedMessage(_: InMessageBounced) {
 "#;
 
 const TEST_PRELUDE: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 import "../../lib/types/message"
 import "../contracts/messages"
 
@@ -89,7 +89,7 @@ fun Harness.create() {
 }
 
 fun deployHarness() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val harness = Harness.create();
 
     val deployMsg = createMessage({
@@ -238,7 +238,7 @@ get fun `test ae bounced tx opcode filter`() {
         dest: harness.address,
         body: Ping { queryId: 40 },
     });
-    val sendSingleRes = net.sendSingle(sender.address, trigger);
+    val sendSingleRes = testing.processSingleTraceStep(sender.address, trigger);
     expect(sendSingleRes.outMessages.size()).toEqual(1);
 
     val noticeBody = sendSingleRes.outMessages.at<BounceNotice>(0).loadBody().toCell();
@@ -319,6 +319,25 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
 }
 ",
         "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_failed_tx_requires_non_null_exit_code_param.stdout.txt",
+    );
+}
+
+#[test]
+fn to_have_successful_tx_failure_shows_contract_abi_exit_code_name() {
+    run_failure_case(
+        "ae-stdlib-successful-tx-failure-shows-abi-exit-code",
+        r"
+get fun `test ae successful tx failure shows abi exit code`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 10);
+
+    expect(res).toHaveSuccessfulTx<Ping>({
+        from: sender.address,
+        to: harness.address,
+    });
+}
+",
+        "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_successful_tx_failure_shows_contract_abi_exit_code_name.stdout.txt",
     );
 }
 

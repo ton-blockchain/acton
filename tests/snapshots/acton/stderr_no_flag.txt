@@ -4,6 +4,7 @@ Usage: acton[EXE] <command> [...flags] [...args]
 
 Commands:
   new              [PATH]              Create a new project in a specified directory
+  create-app       [PATH]              Create a TypeScript app scaffold
   init                                 Initialize a new project in the current directory
 
   test             [PATH]              Execute tests in file or directory
@@ -16,12 +17,12 @@ Commands:
   rpc              <COMMAND>           Inspect remote account and contract state
   verify           [CONTRACT_NAME]     Verify contract source code on verifier.ton.org
   library          <COMMAND>           Manage TON libraries
-  litenode         <COMMAND>           Manage lightweight TON node
+  localnet         <COMMAND>           Manage local TON network
   retrace          <TX_HASH>           Retrace a transaction by its hash
 
   run              <SCRIPT> [ARGS...]  Run a script defined in Acton.toml
   compile          <PATH>              Compile a Tolk file
-  wrapper          <CONTRACT_NAME>     Generate wrapper and optionally stub test file for a contract
+  wrapper          <CONTRACT_NAME>     Generate wrappers and optionally a stub test file for a contract
   disasm           [BOC_FILE]          Disassemble TVM bitcode to human-readable TASM
   doc              tvm <QUERY...>      Lookup reference documentation
 

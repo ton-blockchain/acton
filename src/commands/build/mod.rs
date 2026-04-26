@@ -31,7 +31,7 @@ pub fn build_cmd(
 
     // Prime native TVM codepage 0 with debug opcodes before any non-debug build
     // can freeze the process-wide singleton in no-debug mode.
-    tolkc::prime_debug_cp0()?;
+    tolk_compiler::prime_debug_cp0()?;
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -73,9 +73,7 @@ pub fn build_cmd(
         fs::create_dir_all(&out_dir)?;
     }
 
-    let contracts = if let Some(contracts) = config.contracts() {
-        contracts
-    } else {
+    let Some(contracts) = config.contracts() else {
         println!(
                     "No contracts section found in Acton.toml. Add at least one contract.
 To add a contract add the following section to Acton.toml:
@@ -85,7 +83,7 @@ display-name = \"MyContract\"
 src = \"contracts/MyContract.tolk\"
 depends = []
 
-See https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
+See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-section for more information"
                 );
         return Ok(());
     };
@@ -139,7 +137,9 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
         let Some(contract_config) = contracts.get(&parent_contract) else {
             continue;
         };
-        let contract_path = resolve_project_config_path(project_root, &contract_config.src);
+        let contract_path = contract_config.absolute_source_path(project_root);
+        let contract_source_key = contract_path.to_string_lossy().to_string();
+        let contract_source_display = contract_config.src.as_str();
 
         generate_dependency_files(
             &parent_contract,
@@ -155,9 +155,11 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
             &mut file_cache,
             &parent_contract,
             contract_config,
-            &contract_config.src,
+            contract_source_display,
+            &contract_source_key,
             &contract_path,
             &config,
+            output_fift_dir.is_some(),
         ) {
             Ok((code, hash, fift_code)) => (code, hash, fift_code),
             Err(err) => {
@@ -171,7 +173,7 @@ See https://ton-blockchain.github.io/acton/docs/build-system/configuration-refer
 
         if show_info {
             build_info.push((
-                contract_config.display_name_owned(&parent_contract),
+                contract_config.display_name(&parent_contract).to_owned(),
                 code_boc64.clone(),
                 code_hash.clone(),
             ));
@@ -265,15 +267,18 @@ fn record_contract_error(
         .push(error.to_string());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_contract(
     file_cache: &mut FileBuildCache,
     contract_id: &str,
     contract_config: &ContractConfig,
-    contract_src: &str,
+    contract_src_display: &str,
+    contract_cache_key: &str,
     contract_path: &Path,
     acton_config: &ActonConfig,
+    with_fift: bool,
 ) -> anyhow::Result<(String, String, Option<String>)> {
-    let (code_boc64, code_hash, fift_code) = if contract_src.ends_with(".boc") {
+    let (code_boc64, code_hash, fift_code) = if contract_src_display.ends_with(".boc") {
         debug!("Loading BoC file: {}", contract_path.display());
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
@@ -282,22 +287,22 @@ fn process_contract(
                     (code_boc64, boc.repr_hash().to_string(), None)
                 }
                 Err(e) => {
-                    anyhow::bail!("Failed to decode BoC file {contract_src}: {e}");
+                    anyhow::bail!("Failed to decode BoC file {contract_src_display}: {e}");
                 }
             },
             Err(e) => {
-                anyhow::bail!("Failed to read BoC file {contract_src}: {e}");
+                anyhow::bail!("Failed to read BoC file {contract_src_display}: {e}");
             }
         }
     } else {
-        let cached_result = file_cache.get(contract_src, false, 2, "1.3");
+        let cached_result = file_cache.get(contract_cache_key, false, with_fift, 2, "1.3");
 
         if let Some(cached_result) = cached_result {
-            debug!("Cache hit, use cached result for '{contract_src}'");
+            debug!("Cache hit, use cached result for '{contract_cache_key}'");
             (
                 cached_result.code_boc64,
                 cached_result.code_hash_hex,
-                Some(cached_result.fift_code),
+                cached_result.fift_code,
             )
         } else {
             debug!("Cache miss, recompile '{}'", contract_path.display());
@@ -306,16 +311,17 @@ fn process_contract(
             println!("   {} {}", "Compiling".green().bold(), display_name);
 
             let mappings = acton_config.mappings();
-            let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+            let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
             let compilation_result = compiler.compile(contract_path, false);
             let compile_time = compile_start.elapsed();
 
             match compilation_result {
-                tolkc::CompilerResult::Success(result) => {
-                    if let Err(e) = file_cache.put(contract_src, &result, false, 2, "1.3") {
+                tolk_compiler::CompilerResult::Success(result) => {
+                    if let Err(e) =
+                        file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.3")
+                    {
                         eprintln!(
-                            "Warning: Failed to cache compilation result for {}: {}",
-                            display_name, e
+                            "Warning: Failed to cache compilation result for {display_name}: {e}"
                         );
                     }
 
@@ -324,13 +330,13 @@ fn process_contract(
                     (
                         result.code_boc64,
                         result.code_hash_hex,
-                        Some(result.fift_code),
+                        with_fift.then_some(result.fift_code),
                     )
                 }
-                tolkc::CompilerResult::Error(error) => {
+                tolk_compiler::CompilerResult::Error(error) => {
                     let message = rewrite_compiler_error_paths_for_display(
                         &error.message,
-                        contract_src,
+                        contract_src_display,
                         contract_path,
                     );
                     anyhow::bail!(message);
@@ -518,7 +524,7 @@ fn generate_single_dependency_file(
     let output_path = if let Some(output_path) = dependency.compiled_code_out_path() {
         resolve_project_config_path(project_root, output_path)
     } else {
-        gen_dir.join(format!("{dependency_contract}_code.tolk"))
+        gen_dir.join(format!("{dependency_contract}.code.tolk"))
     };
     let dir = output_path.parent();
 

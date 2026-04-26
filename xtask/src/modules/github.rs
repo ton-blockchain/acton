@@ -13,11 +13,7 @@ impl Github {
         Self
     }
 
-    pub(crate) fn ensure_branch_builds_succeeded(
-        &self,
-        branch: &str,
-        head_sha: &str,
-    ) -> Result<()> {
+    pub(crate) fn ensure_branch_builds_succeeded(self, branch: &str, head_sha: &str) -> Result<()> {
         let runs = self.json_output::<Vec<WorkflowRun>>(&[
             "run",
             "list",
@@ -54,7 +50,7 @@ impl Github {
         Ok(())
     }
 
-    pub(crate) fn download_release_asset(&self, tag: &str, asset_name: &str) -> Result<Vec<u8>> {
+    pub(crate) fn download_release_asset(self, tag: &str, asset_name: &str) -> Result<Vec<u8>> {
         let output = self
             .command_output(&[
                 "release",
@@ -74,7 +70,7 @@ impl Github {
         Ok(output.stdout)
     }
 
-    pub(crate) fn list_cache_entries(&self) -> Result<Vec<GithubCacheEntry>> {
+    pub(crate) fn list_cache_entries(self) -> Result<Vec<GithubCacheEntry>> {
         self.json_output(&[
             "cache",
             "list",
@@ -85,12 +81,12 @@ impl Github {
         ])
     }
 
-    pub(crate) fn delete_cache_entry(&self, cache_entry_id: &str) -> Result<()> {
+    pub(crate) fn delete_cache_entry(self, cache_entry_id: &str) -> Result<()> {
         self.command_output(&["cache", "delete", cache_entry_id])
             .map(|_| ())
     }
 
-    pub(crate) fn ensure_release_does_not_exist(&self, tag: &str) -> Result<()> {
+    pub(crate) fn ensure_release_does_not_exist(self, tag: &str) -> Result<()> {
         let output = Command::new("gh")
             .args(["release", "view", tag])
             .output()
@@ -115,7 +111,7 @@ impl Github {
         );
     }
 
-    pub(crate) fn latest_release_workflow_run_for_tag(&self, tag: &str) -> Result<WorkflowRun> {
+    pub(crate) fn latest_release_workflow_run_for_tag(self, tag: &str) -> Result<WorkflowRun> {
         let runs = self.json_output::<Vec<WorkflowRun>>(&[
             "run",
             "list",
@@ -137,7 +133,7 @@ impl Github {
     }
 
     pub(crate) fn ensure_workflow_run_completed_with_conclusion(
-        &self,
+        self,
         run: &WorkflowRun,
         ref_name: &str,
         expected_conclusions: &[&str],
@@ -163,7 +159,7 @@ impl Github {
         Ok(())
     }
 
-    fn json_output<T>(&self, args: &[&str]) -> Result<T>
+    fn json_output<T>(self, args: &[&str]) -> Result<T>
     where
         T: DeserializeOwned,
     {
@@ -173,7 +169,7 @@ impl Github {
             .with_context(|| format!("failed to parse JSON from gh {}", args.join(" ")))
     }
 
-    fn command_output(&self, args: &[&str]) -> Result<std::process::Output> {
+    fn command_output(self, args: &[&str]) -> Result<std::process::Output> {
         let output = Command::new("gh")
             .args(args)
             .output()
@@ -208,6 +204,8 @@ pub(crate) struct WorkflowRun {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GithubCacheEntry {
     pub(crate) id: u64,
+    #[serde(rename = "ref")]
+    pub(crate) branch: String,
     pub(crate) key: String,
     pub(crate) size_in_bytes: u64,
     pub(crate) created_at: DateTime<Utc>,

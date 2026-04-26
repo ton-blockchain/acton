@@ -14,12 +14,13 @@ license = { workspace = true }
 profiling = []
 
 [dependencies]
+acton-config = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-syntax = { workspace = true }
 tolk-linter = { workspace = true }
 tasm-syntax = { workspace = true }
-tasm = { workspace = true }
+tasm-core = { workspace = true }
 fift-syntax = { workspace = true }
 toml-syntax = { workspace = true }
 tlb-syntax = { workspace = true }

@@ -4,9 +4,9 @@ use anyhow::anyhow;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
-use tasm::decompile::Disassembler;
-use tasm::printer::FormatOptions;
-use tasm::types::Instruction;
+use tasm_core::decompile::Disassembler;
+use tasm_core::printer::FormatOptions;
+use tasm_core::types::Instruction;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::HashBytes;
@@ -20,7 +20,6 @@ pub fn disasm_cmd(
     output_file: Option<String>,
     opts: FormatOptions,
     address: Option<String>,
-    api_key: Option<String>,
     net: Option<String>,
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
@@ -61,7 +60,7 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
-        let fetched = remote::fetch_contract_boc(network, &addr, api_key.as_deref())?;
+        let fetched = remote::fetch_contract_boc(network, &addr)?;
         resolved_network = Some(fetched.network);
         fetched.boc
     } else {
@@ -103,7 +102,6 @@ pub fn disasm_cmd(
             let client = TonApiClient::new(
                 resolved_network.unwrap_or(Network::Testnet),
                 custom_networks,
-                api_key,
             )?;
             match client.get_library_by_hash(&lib_hash) {
                 Ok(lib_cell) => {
@@ -153,7 +151,6 @@ fn extract_library_hash_from_instruction(instruction: &Instruction) -> Option<Ha
 
             None
         }
-        Instruction::Plain(_) => None,
-        Instruction::Ref(_) => None,
+        Instruction::Plain(_) | Instruction::Ref(_) => None,
     }
 }

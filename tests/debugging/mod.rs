@@ -1,14 +1,15 @@
 use acton::context::{
-    AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, EmulationsState,
-    Env, IoContext, KnownAddresses,
+    AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, DebugStopRequested,
+    EmulationsState, Env, IoContext, KnownAddresses, is_debug_stop_requested,
 };
 use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
-use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_config::config::{ActonConfig, LibrariesConfig, WalletsConfig, normalize_mappings};
 use acton_debug::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::{start_dap_server, start_dap_server_with_listener};
+use anyhow::Context as AnyhowContext;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -22,8 +23,8 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolkc::abi::ContractABI as CompilerContractABI;
-use tolkc::{CompilerResult, TolkSourceMap};
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::{CompilerResult, TolkSourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -34,8 +35,8 @@ use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::Tuple;
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 
 mod debug_test;
@@ -164,6 +165,7 @@ fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
 pub(crate) fn run_script_file(
     file_path: &str,
     content: &str,
+    project_root: &Path,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
     stack: Tuple,
@@ -177,9 +179,9 @@ pub(crate) fn run_script_file(
 
         let abi = contract_abi(content.into(), file_path, &None);
 
-        let config = ActonConfig::load();
+        let config = load_project_config(project_root);
 
-        let mut compiler = tolkc::Compiler::new(2);
+        let mut compiler = tolk_compiler::Compiler::new(2);
         if let Ok(config) = &config {
             let mappings = config.mappings();
             compiler = compiler.with_mappings(&mappings);
@@ -205,7 +207,7 @@ pub(crate) fn run_script_file(
     };
 
     let data_cell = TonCell::empty().clone();
-    let (script_result, io, formatter) = execute_script(
+    let execution = execute_script(
         &code_cell,
         &data_cell,
         abi.into(),
@@ -215,7 +217,13 @@ pub(crate) fn run_script_file(
         debug_listener,
         ExecutorVerbosity::FullLocationStackVerbose,
         stack,
-    )?;
+        project_root,
+    );
+    let (script_result, io, formatter) = match execution {
+        Ok(result) => result,
+        Err(err) if is_debug_stop_requested(&err) => return Ok(String::new()),
+        Err(err) => return Err(err),
+    };
     get_script_result(script_result, io, formatter)
 }
 
@@ -230,6 +238,7 @@ fn execute_script<'a>(
     debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
+    project_root: &Path,
 ) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
     let dest_address = contract_address(code_cell)?;
 
@@ -258,8 +267,10 @@ fn execute_script<'a>(
     let mut world_state =
         WorldState::new(AccountsState::Local(LocalAccountsState::new()), config_b64)?;
     let mut build_cache = BuildCache::new();
+    let config = load_project_config(project_root)?;
     let mut file_build_cache =
-        FileBuildCache::dummy().expect("Failed to create file cache for script execution");
+        FileBuildCache::temporary_for_project(project_root.to_path_buf(), config.clone())
+            .expect("Failed to create file cache for script execution");
     let mut known_addresses = KnownAddresses::new();
     let mut known_code_cell = FxHashMap::default();
     let mut emulations = EmulationsState::new();
@@ -267,12 +278,14 @@ fn execute_script<'a>(
     let mut assert_failure = None;
     let mut expected_exit_code = None;
 
-    let config = ActonConfig::load()?;
+    // `code_cell` is a `TonCell` (from `ton::ton_core::cell`) but `Env.test_code` expects a
+    // `tycho_types::cell::Cell`. The two cell libraries don't interop directly, so we round-trip
+    let test_code_cell = Boc::decode_base64(code_cell.to_boc_base64()?)?;
 
     let mut ctx = Context {
         env: Env {
             config: &config,
-            project_root: configured_project_root().to_path_buf(),
+            project_root: project_root.to_path_buf(),
             abi: abi.clone(),
             show_bodies: false,
             default_log_level: verbosity,
@@ -281,8 +294,8 @@ fn execute_script<'a>(
             build_override: BTreeMap::new(),
             explorer: None,
             fork_net: None,
-            api_key: None,
             running_id: "script".into(),
+            test_code: Some(test_code_cell),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -328,7 +341,9 @@ fn execute_script<'a>(
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 
-    ctx.debug.process_incoming_requests(true)?;
+    if ctx.debug.process_incoming_requests(true)? {
+        return Err(DebugStopRequested.into());
+    }
 
     let result = executor.finish(&params.code)?;
     let Context { io, .. } = ctx;
@@ -346,10 +361,31 @@ fn execute_script<'a>(
         backtrace: None,
         fork_net: None,
         network: None,
-        api_key: None,
     };
 
     Ok((result, io, formatter))
+}
+
+fn load_project_config(project_root: &Path) -> anyhow::Result<ActonConfig> {
+    let manifest_path = project_root.join("Acton.toml");
+    if !manifest_path.exists() {
+        return Ok(ActonConfig::load().unwrap_or_default());
+    }
+
+    let content = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+    let mut config: ActonConfig = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", manifest_path.display()))?;
+    config.mappings = normalize_mappings(&config.mappings, project_root);
+
+    config.wallets = Some(WalletsConfig {
+        wallets: BTreeMap::new(),
+    });
+    config.libraries = Some(LibrariesConfig {
+        libraries: BTreeMap::new(),
+    });
+
+    Ok(config)
 }
 
 fn get_script_result(

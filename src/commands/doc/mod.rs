@@ -1,6 +1,6 @@
 use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, anyhow};
-use tasm::spec::{SpecInstruction, load_tvm_specification};
+use tasm_core::spec::{SpecInstruction, load_tvm_specification};
 
 const FIELD_LABEL_WIDTH: usize = 14;
 

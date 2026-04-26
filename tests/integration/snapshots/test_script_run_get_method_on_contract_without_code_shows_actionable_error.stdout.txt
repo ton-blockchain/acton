@@ -1,4 +1,4 @@
   Installing standard library [ACTON_VERSION]
 Script finished with [EXIT_STATUS] 679
-Re-run with --backtrace full to get more information
-Cannot run method of contract without code
+  Cannot run method of contract without code
+  Re-run with --backtrace full to get more information

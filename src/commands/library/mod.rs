@@ -11,11 +11,11 @@ use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
-use tasm::printer::FormatOptions;
+use tasm_core::printer::FormatOptions;
 use tempfile::TempDir;
-use tolkc::CompilerResult;
+use tolk_compiler::CompilerResult;
 use toml_edit::{DocumentMut, Item, Table, value};
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -34,7 +34,6 @@ pub fn publish_cmd(
     code_arg: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
-    api_key: Option<String>,
     net: String,
     amount_arg: Option<String>,
     yes: bool,
@@ -58,8 +57,7 @@ pub fn publish_cmd(
         let contract = config
             .get_contract(&contract_key)
             .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
-        let contract_path = dunce::canonicalize(contract.src.clone())
-            .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
+        let contract_path = contract.absolute_source_path(project_root());
 
         if contract_path.extension() != Some("tolk".as_ref()) {
             anyhow::bail!("Contract source must be a {} file", ".tolk".yellow());
@@ -69,7 +67,7 @@ pub fn publish_cmd(
 
         println!("  {} Compiling contract", "→".blue().bold());
         let mappings = config.mappings();
-        let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
         let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
         match compilation_result {
@@ -190,7 +188,7 @@ pub fn publish_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
@@ -283,7 +281,6 @@ fn calculate_cell_size(cell: &dyn CellImpl, seen: &mut HashSet<HashBytes>) -> (u
 pub fn fetch_cmd(
     hash: String,
     disasm: bool,
-    api_key: Option<String>,
     output: Option<String>,
     net: String,
     json: bool,
@@ -291,7 +288,7 @@ pub fn fetch_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let network = Network::from_str(&net)?;
-    let client = TonApiClient::new(network, custom_networks, api_key)?;
+    let client = TonApiClient::new(network, custom_networks)?;
 
     if !json {
         println!("  {} Fetching library: 0x{hash}", "→".blue().bold());
@@ -312,7 +309,6 @@ pub fn fetch_cmd(
             Some(boc_hex),
             output.clone(), // If output provided, disasm writes to it
             FormatOptions::default(),
-            None,
             None,
             Some(net),
             false,
@@ -347,7 +343,7 @@ pub fn fetch_cmd(
     Ok(())
 }
 
-pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result<()> {
+pub fn info_cmd(name: Option<String>) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
     let libraries = config
         .libraries()
@@ -370,7 +366,7 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
 
     let custom_networks = config.custom_networks();
     let network = Network::from_str(&lib.network.to_string())?;
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks)?;
 
     let last_topup_timestamp = &lib.last_topup_timestamp;
     let mut balance_u128: Option<u128> = None;
@@ -469,7 +465,6 @@ pub fn topup_cmd(
     name: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
-    api_key: Option<String>,
     amount_arg: Option<String>,
     yes: bool,
 ) -> anyhow::Result<()> {
@@ -556,7 +551,7 @@ pub fn topup_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let network_name = network.to_string();
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
@@ -929,7 +924,7 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<Cell> {
     tmp_file.write_all(content.as_bytes())?;
 
     let acton_config = ActonConfig::load();
-    let mut compiler = tolkc::Compiler::new(2);
+    let mut compiler = tolk_compiler::Compiler::new(2);
     if let Ok(config) = &acton_config {
         let mappings = config.mappings();
         compiler = compiler.with_mappings(&mappings);

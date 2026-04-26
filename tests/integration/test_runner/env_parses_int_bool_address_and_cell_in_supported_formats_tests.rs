@@ -30,16 +30,16 @@ fn env_parses_int_bool_address_and_cell_in_supported_formats() {
                 expect(env<bool>("Z_ENV_BOOL_ZERO")).toEqual(false);
 
                 val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
-                val parsedAddress = envOr<address>("Z_ENV_ADDRESS_RAW", fallbackAddress);
+                val parsedAddress = env<address>("Z_ENV_ADDRESS_RAW") ?? fallbackAddress;
                 expect(parsedAddress).toEqual(address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147"));
 
                 val fallbackCell = beginCell().storeUint(999, 16).endCell();
 
-                val cellFromHex = envOr<cell>("Z_ENV_CELL_HEX", fallbackCell);
+                val cellFromHex = env<cell>("Z_ENV_CELL_HEX") ?? fallbackCell;
                 var hexSlice = cellFromHex.beginParse();
                 expect(hexSlice.loadUint(16)).toEqual(0xBEEF);
 
-                val cellFromB64 = envOr<cell>("Z_ENV_CELL_B64", fallbackCell);
+                val cellFromB64 = env<cell>("Z_ENV_CELL_B64") ?? fallbackCell;
                 var b64Slice = cellFromB64.beginParse();
                 expect(b64Slice.loadUint(16)).toEqual(0xBEEF);
             }
@@ -78,8 +78,8 @@ fn env_parses_coins_and_env_or_coins_in_supported_formats() {
                 expect(env<coins>("Z_ENV_COINS_HEX")).toEqual(26);
                 expect(env<coins>("Z_ENV_COINS_MISSING")).toBeNull();
 
-                expect(envOr<coins>("Z_ENV_COINS_BAD", ton("0.25"))).toEqual(ton("0.25"));
-                expect(envOr<coins>("Z_ENV_COINS_MISSING", ton("0.75"))).toEqual(ton("0.75"));
+                expect(env<coins>("Z_ENV_COINS_BAD") ?? ton("0.25")).toEqual(ton("0.25"));
+                expect(env<coins>("Z_ENV_COINS_MISSING") ?? ton("0.75")).toEqual(ton("0.75"));
             }
         "#,
         )
@@ -146,24 +146,24 @@ fn env_or_uses_defaults_only_for_null_paths() {
             import "../../lib/testing/expect"
 
             get fun `test z stdlib env or defaults`() {
-                expect(envOr<int>("Z_OR_MISSING_INT", 42)).toEqual(42);
-                expect(envOr<int>("Z_OR_BAD_INT", 42)).toEqual(42);
-                expect(envOr<coins>("Z_OR_MISSING_COINS", ton("0.1"))).toEqual(ton("0.1"));
-                expect(envOr<coins>("Z_OR_BAD_COINS", ton("0.2"))).toEqual(ton("0.2"));
+                expect(env<int>("Z_OR_MISSING_INT") ?? 42).toEqual(42);
+                expect(env<int>("Z_OR_BAD_INT") ?? 42).toEqual(42);
+                expect(env<coins>("Z_OR_MISSING_COINS") ?? ton("0.1")).toEqual(ton("0.1"));
+                expect(env<coins>("Z_OR_BAD_COINS") ?? ton("0.2")).toEqual(ton("0.2"));
 
-                expect(envOr<bool>("Z_OR_MISSING_BOOL", true)).toEqual(true);
-                expect(envOr<bool>("Z_OR_BAD_BOOL", true)).toEqual(false);
+                expect(env<bool>("Z_OR_MISSING_BOOL") ?? true).toEqual(true);
+                expect(env<bool>("Z_OR_BAD_BOOL") ?? true).toEqual(false);
 
                 val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
-                expect(envOr<address>("Z_OR_MISSING_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
-                expect(envOr<address>("Z_OR_BAD_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
+                expect(env<address>("Z_OR_MISSING_ADDRESS") ?? fallbackAddress).toEqual(fallbackAddress);
+                expect(env<address>("Z_OR_BAD_ADDRESS") ?? fallbackAddress).toEqual(fallbackAddress);
 
                 val fallbackCell = beginCell().storeUint(777, 16).endCell();
-                val resolvedMissingCell = envOr<cell>("Z_OR_MISSING_CELL", fallbackCell);
+                val resolvedMissingCell = env<cell>("Z_OR_MISSING_CELL") ?? fallbackCell;
                 var missingSlice = resolvedMissingCell.beginParse();
                 expect(missingSlice.loadUint(16)).toEqual(777);
 
-                val resolvedCell = envOr<cell>("Z_OR_BAD_CELL", fallbackCell);
+                val resolvedCell = env<cell>("Z_OR_BAD_CELL") ?? fallbackCell;
                 var slice = resolvedCell.beginParse();
                 expect(slice.loadUint(16)).toEqual(777);
             }

@@ -64,22 +64,13 @@ fn create_project_and_run_tests() {
 
     session.expect("Project name:");
     session.send_line("foobar", "failed to enter project name");
-    session.expect("Description:");
-    session.send_line(
-        "scenario empty description",
-        "failed to enter project description",
-    );
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
-    session.expect("Install the default Git hooks?");
-    session.send_line("", "failed to keep default no-hooks choice");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
-    session.expect("License:");
-    session.send_line("", "failed to accept default license");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
     session.expect("Project name: foobar");
-    session.expect("Description: scenario empty description");
+    session.expect("Description: A TON blockchain project");
     session.expect("Template: empty");
     session.expect("License: MIT");
     session.expect("acton build");

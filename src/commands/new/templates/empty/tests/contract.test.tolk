@@ -1,6 +1,6 @@
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 
 import "@contracts/types"
 import "@wrappers/Empty"
@@ -18,7 +18,10 @@ get fun `test owner can transfer ownership`() {
         notDeployer.address,
         { value: ton("0.05") },
     );
-    expect(res).toHaveSuccessfulTx<ChangeOwner>({ from: deployer.address, to: contract.address });
+    expect(res).toHaveSuccessfulTx<ChangeOwner>({
+        from: deployer.address,
+        to: contract.address,
+    });
 
     expect(contract.owner()).toEqual(notDeployer.address);
 }
@@ -55,16 +58,21 @@ get fun `test unknown message fails with named error`() {
     });
 
     val res2 = contract.sendAny(deployer.address, createEmptyCell(), { value: ton("0.05") });
-    expect(res2).toHaveSuccessfulTx({ from: deployer.address, to: contract.address });
+    expect(res2).toHaveSuccessfulTx({
+        from: deployer.address,
+        to: contract.address,
+    });
 }
 
 fun setupTest(): (Empty, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("not_deployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
     val contract = Empty.fromStorage(Storage { owner: deployer.address });
     val res = contract.deploy(deployer.address, { value: ton("0.05") });
-    expect(res).toHaveSuccessfulDeploy({ to: contract.address });
+    expect(res).toHaveSuccessfulDeploy({
+        to: contract.address,
+    });
 
     return (contract, deployer, notDeployer);
 }

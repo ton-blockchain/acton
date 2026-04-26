@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -53,11 +54,11 @@ get fun `test dr stdlib config storage prices multi entry roundtrip`() {
         masterchainCellPrice: 808
     });
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setStoragePrices(prices);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val roundtrip = net.getConfig().getStoragePrices();
+    val roundtrip = testing.getConfig().getStoragePrices();
     expect(roundtrip).toHaveLength(3);
     expect(roundtrip).toContainKey(0);
     expect(roundtrip).toContainKey(tsA);
@@ -123,11 +124,11 @@ get fun `test dr stdlib config storage prices second write replacement`() {
         masterchainCellPrice: 119
     });
 
-    var config = net.getConfig();
+    var config = testing.getConfig();
     config.setStoragePrices(first);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    var second = createEmptyMap<uint32, StoragePrices>();
+    var second = map<uint32, StoragePrices> [];
     second.set(0, StoragePrices {
         initialUnixTime: 0,
         bitPrice: 901,
@@ -143,11 +144,11 @@ get fun `test dr stdlib config storage prices second write replacement`() {
         masterchainCellPrice: 1004
     });
 
-    var rewritten = net.getConfig();
+    var rewritten = testing.getConfig();
     rewritten.setStoragePrices(second);
-    expect(net.setConfig(rewritten)).toBeTrue();
+    expect(testing.setConfig(rewritten)).toBeTrue();
 
-    val afterSecondWrite = net.getConfig().getStoragePrices();
+    val afterSecondWrite = testing.getConfig().getStoragePrices();
     expect(afterSecondWrite).toHaveLength(2);
     expect(afterSecondWrite).toContainKey(0);
     expect(afterSecondWrite).toContainKey(newTs);

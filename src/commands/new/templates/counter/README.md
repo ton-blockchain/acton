@@ -1,16 +1,19 @@
 # Counter Template
 
 This project was generated from Acton's `counter` template. It includes a small
-counter contract, wrapper helpers, tests, and a ready-to-run deployment script.
+counter contract, generated wrapper helpers, tests, and a ready-to-run
+deployment script.
 
 ## What Is Included
 
 - `contracts/Counter.tolk` implements the counter contract.
-- `contracts/types.tolk` defines storage, message types, and starter errors.
-- `wrappers/Counter.tolk` is the wrapper used by tests and scripts.
-- `tests/counter.test.tolk` covers increment, reset, and invalid-message flows.
-- `scripts/deploy.tolk` deploys the contract with initial counter state and
-  reads the counter back after deployment.
+- `contracts/types.tolk` defines storage and message types.
+- `wrappers/Counter.gen.tolk` is the generated wrapper used by tests and
+  scripts.
+- `tests/counter.test.tolk` covers owner checks, increment, decrement, reset,
+  underflow, and invalid-message flows.
+- `scripts/deploy.tolk` deploys the contract with the deployer wallet as owner,
+  then reads the owner and counter value back after deployment.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
   GitHub Actions.
 
@@ -36,7 +39,7 @@ acton run deploy-emulation
 
 1. Extend `contracts/types.tolk` with your storage, messages, and errors.
 2. Update `contracts/Counter.tolk` with your contract logic.
-3. Adjust `wrappers/Counter.tolk` to match the new ABI, or regenerate it
+3. Adjust `wrappers/Counter.gen.tolk` to match the new ABI, or regenerate it
    with `acton wrapper Counter`.
 4. Extend `tests/counter.test.tolk` with the scenarios you care about.
 5. Update `scripts/deploy.tolk` with the storage and deployment flow you want.
@@ -68,8 +71,10 @@ acton run deploy-emulation
 acton run deploy-testnet
 ```
 
-If you need higher Toncenter limits for blockchain queries, set
-`TONCENTER_API_KEY` in `.env`.
+If you need higher Toncenter limits for blockchain queries, put
+`TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` into the generated
+`.env` file, depending on the network you use. Acton loads that file
+automatically, so it is usually the easiest place to keep these keys.
 
 ## CI
 

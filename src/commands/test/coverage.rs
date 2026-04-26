@@ -7,12 +7,12 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolkc::{
+use tolk_compiler::{
     TolkSourceMap,
     source_map::{DebugMark, SrcRange},
 };
+use tvm_logs::parser::VmStackValue;
 use tycho_types::boc::Boc;
-use vmlogs::parser::VmStackValue;
 
 #[derive(Debug, Clone)]
 pub(super) struct Coverage {
@@ -190,7 +190,7 @@ fn collect_executed_lines_per_files(
         source_map, logs, ..
     } in data
     {
-        let vm_lines = vmlogs::parser::parse_lines(logs);
+        let vm_lines = tvm_logs::parser::parse_lines(logs);
         let Ok(mut replayer) = TolkReplayer::new(source_map, &vm_lines) else {
             continue;
         };
@@ -286,7 +286,7 @@ fn current_coverage_loc(
 }
 
 fn coverage_location_for_range(
-    source_map: &tolkc::SourceMap,
+    source_map: &tolk_compiler::SourceMap,
     range: &SrcRange,
 ) -> Option<(String, i64)> {
     let file = source_map
@@ -396,8 +396,8 @@ fn build_executable_lines_per_file(
 
     for mark_id in 0..source_map.debug_marks_count() {
         let Some(range) = (match source_map.get_debug_mark(mark_id) {
-            DebugMark::Loc { range, .. } => Some(range),
-            DebugMark::EnterFun {
+            DebugMark::Loc { range, .. }
+            | DebugMark::EnterFun {
                 range,
                 is_inlined: true,
                 ..
@@ -540,19 +540,111 @@ const fn zero_based_line(line: usize) -> i64 {
     line.saturating_sub(1) as i64
 }
 
-pub(super) fn total_line_coverage_percentage(coverage: &Coverage) -> f64 {
-    let total_executable_lines: usize = coverage
-        .files
-        .iter()
-        .map(|f| f.executable_lines_count)
-        .sum();
-    let total_covered_lines: usize = coverage.files.iter().map(|f| f.covered_lines_count).sum();
+#[derive(Debug, Clone, Copy, Default)]
+struct CoverageStats {
+    lines_found: usize,
+    lines_hit: usize,
+    branches_found: usize,
+    branches_hit: usize,
+}
 
-    if total_executable_lines == 0 {
-        0.0
-    } else {
-        total_covered_lines as f64 / total_executable_lines as f64 * 100.0
+impl CoverageStats {
+    fn line_percentage(self) -> f64 {
+        coverage_percentage_or_zero(self.lines_hit, self.lines_found)
     }
+
+    fn branch_percentage(self) -> Option<f64> {
+        coverage_percentage(self.branches_hit, self.branches_found)
+    }
+
+    fn combined_score(self) -> f64 {
+        coverage_percentage_or_zero(
+            self.lines_hit + self.branches_hit,
+            self.lines_found + self.branches_found,
+        )
+    }
+}
+
+fn coverage_percentage(covered: usize, total: usize) -> Option<f64> {
+    (total > 0).then(|| covered as f64 / total as f64 * 100.0)
+}
+
+fn coverage_percentage_or_zero(covered: usize, total: usize) -> f64 {
+    coverage_percentage(covered, total).unwrap_or(0.0)
+}
+
+fn branch_coverage_totals(hits: &BranchHits) -> (usize, usize) {
+    let mut branches_found = 0usize;
+    let mut branches_hit = 0usize;
+
+    if hits.has_condition_branch() {
+        branches_found += 2;
+        branches_hit +=
+            usize::from(hits.condition_true > 0) + usize::from(hits.condition_false > 0);
+    }
+
+    if hits.has_guard_branch() {
+        branches_found += 2;
+        branches_hit += usize::from(hits.guard_throw > 0) + usize::from(hits.guard_continue > 0);
+    }
+
+    (branches_found, branches_hit)
+}
+
+fn file_coverage_stats(file_coverage: &FileCoverage) -> CoverageStats {
+    let mut stats = CoverageStats {
+        lines_found: file_coverage.executable_lines_count,
+        lines_hit: file_coverage.covered_lines_count,
+        ..CoverageStats::default()
+    };
+
+    for branch_site in file_coverage.branch_sites.values() {
+        let (branches_found, branches_hit) = branch_coverage_totals(&branch_site.hits);
+        stats.branches_found += branches_found;
+        stats.branches_hit += branches_hit;
+    }
+
+    stats
+}
+
+fn total_coverage_stats(coverage: &Coverage) -> CoverageStats {
+    let mut stats = CoverageStats::default();
+
+    for file_coverage in &coverage.files {
+        let file_stats = file_coverage_stats(file_coverage);
+        stats.lines_found += file_stats.lines_found;
+        stats.lines_hit += file_stats.lines_hit;
+        stats.branches_found += file_stats.branches_found;
+        stats.branches_hit += file_stats.branches_hit;
+    }
+
+    stats
+}
+
+const fn coverage_color(percentage: f64) -> Color {
+    match percentage as u32 {
+        0..=50 => Color::DarkRed,
+        51..=80 => Color::DarkYellow,
+        _ => Color::DarkGreen,
+    }
+}
+
+fn score_color(score: f64) -> Color {
+    if score >= 85.0 {
+        Color::DarkGreen
+    } else if score >= 60.0 {
+        Color::DarkYellow
+    } else {
+        Color::DarkRed
+    }
+}
+
+pub(super) fn total_line_coverage_percentage(coverage: &Coverage) -> f64 {
+    total_coverage_stats(coverage).line_percentage()
+}
+
+pub(super) fn total_coverage_score_percentage(coverage: &Coverage) -> f64 {
+    total_coverage_stats(coverage).combined_score()
 }
 
 pub(super) fn print_coverage_summary(coverage: &Coverage) {
@@ -565,83 +657,114 @@ pub(super) fn print_coverage_summary(coverage: &Coverage) {
 
     let mut table = Table::new();
     table
-        .load_preset("  ─  ──      ─     ")
+        .load_preset("  ─  ──      ─     ──      ─       ──     ")
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["File", "Covered Lines", "Total Lines", "% Lines"]);
+        .set_header(vec![
+            "File",
+            "Covered Lines",
+            "Total Lines",
+            "% Lines",
+            "Covered Branches",
+            "Total Branches",
+            "% Branches",
+            "Score",
+        ]);
 
-    let mut total_executable_lines = 0usize;
-    let mut total_covered_lines = 0usize;
+    let total_stats = total_coverage_stats(coverage);
 
-    for file_coverage in &coverage.files {
-        total_executable_lines += file_coverage.executable_lines_count;
-        total_covered_lines += file_coverage.covered_lines_count;
-    }
-
-    if total_executable_lines > 0 {
-        let total_percentage = total_line_coverage_percentage(coverage);
-        let (total_covered_color, total_percentage_color) = match total_percentage as u32 {
-            0..=50 => (Color::DarkRed, Color::DarkRed),
-            51..=80 => (Color::DarkYellow, Color::DarkYellow),
-            _ => (Color::DarkGreen, Color::DarkGreen),
-        };
+    if total_stats.lines_found > 0 {
+        let total_line_percentage = total_stats.line_percentage();
+        let total_branch_percentage = total_stats.branch_percentage();
+        let total_score = total_stats.combined_score();
+        let total_line_color = coverage_color(total_line_percentage);
+        let total_branch_color = total_branch_percentage.map_or(Color::Grey, coverage_color);
+        let total_score_color = score_color(total_score);
 
         table.add_row(vec![
             TableCell::new("All files")
                 .set_alignment(CellAlignment::Left)
-                .fg(total_percentage_color),
-            TableCell::new(total_covered_lines.to_string())
+                .fg(total_score_color),
+            TableCell::new(total_stats.lines_hit.to_string())
                 .set_alignment(CellAlignment::Right)
-                .fg(total_covered_color),
-            TableCell::new(total_executable_lines.to_string()).set_alignment(CellAlignment::Right),
-            TableCell::new(format!("{total_percentage:.1}%"))
+                .fg(total_line_color),
+            TableCell::new(total_stats.lines_found.to_string()).set_alignment(CellAlignment::Right),
+            TableCell::new(format!("{total_line_percentage:.1}%"))
                 .set_alignment(CellAlignment::Right)
-                .fg(total_percentage_color),
+                .fg(total_line_color),
+            TableCell::new(total_stats.branches_hit.to_string())
+                .set_alignment(CellAlignment::Right)
+                .fg(total_branch_color),
+            TableCell::new(total_stats.branches_found.to_string())
+                .set_alignment(CellAlignment::Right),
+            TableCell::new(
+                total_branch_percentage
+                    .map_or_else(|| "n/a".to_string(), |value| format!("{value:.1}%")),
+            )
+            .set_alignment(CellAlignment::Right)
+            .fg(total_branch_color),
+            TableCell::new(format!("{total_score:.1}%"))
+                .set_alignment(CellAlignment::Right)
+                .fg(total_score_color),
         ]);
     }
 
-    let mut files_with_percentage: Vec<(f64, &FileCoverage)> = coverage
+    let mut files_with_stats: Vec<(CoverageStats, &FileCoverage)> = coverage
         .files
         .iter()
-        .map(|file_coverage| {
-            let percentage = if file_coverage.executable_lines_count > 0 {
-                file_coverage.covered_lines_count as f64
-                    / file_coverage.executable_lines_count as f64
-                    * 100.0
-            } else {
-                0.0
-            };
-            (percentage, file_coverage)
-        })
+        .map(|file_coverage| (file_coverage_stats(file_coverage), file_coverage))
         .collect();
 
-    files_with_percentage.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+    files_with_stats.sort_by(|(left_stats, left_file), (right_stats, right_file)| {
+        left_stats
+            .combined_score()
+            .total_cmp(&right_stats.combined_score())
+            .then_with(|| {
+                right_file
+                    .executable_lines_count
+                    .cmp(&left_file.executable_lines_count)
+            })
+            .then_with(|| left_file.file.cmp(&right_file.file))
+    });
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-    for (percentage, file_coverage) in files_with_percentage {
+    for (stats, file_coverage) in files_with_stats {
         let relative_path = Path::new(&file_coverage.file)
             .strip_prefix(&cwd)
             .unwrap_or_else(|_| Path::new(&file_coverage.file))
             .display()
             .to_string();
 
-        let (covered_color, percentage_color) = match percentage as u32 {
-            0..=50 => (Color::DarkRed, Color::DarkRed),
-            51..=80 => (Color::DarkYellow, Color::DarkYellow),
-            _ => (Color::DarkGreen, Color::DarkGreen),
-        };
+        let line_percentage = stats.line_percentage();
+        let branch_percentage = stats.branch_percentage();
+        let combined_score = stats.combined_score();
+        let line_color = coverage_color(line_percentage);
+        let branch_color = branch_percentage.map_or(Color::Grey, coverage_color);
+        let combined_score_color = score_color(combined_score);
 
         table.add_row(vec![
             TableCell::new(relative_path)
                 .set_alignment(CellAlignment::Left)
-                .fg(percentage_color),
+                .fg(combined_score_color),
             TableCell::new(file_coverage.covered_lines_count.to_string())
                 .set_alignment(CellAlignment::Right)
-                .fg(covered_color),
+                .fg(line_color),
             TableCell::new(file_coverage.executable_lines_count.to_string())
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format!("{percentage:.1}%"))
+            TableCell::new(format!("{line_percentage:.1}%"))
                 .set_alignment(CellAlignment::Right)
-                .fg(percentage_color),
+                .fg(line_color),
+            TableCell::new(stats.branches_hit.to_string())
+                .set_alignment(CellAlignment::Right)
+                .fg(branch_color),
+            TableCell::new(stats.branches_found.to_string()).set_alignment(CellAlignment::Right),
+            TableCell::new(
+                branch_percentage.map_or_else(|| "n/a".to_string(), |value| format!("{value:.1}%")),
+            )
+            .set_alignment(CellAlignment::Right)
+            .fg(branch_color),
+            TableCell::new(format!("{combined_score:.1}%"))
+                .set_alignment(CellAlignment::Right)
+                .fg(combined_score_color),
         ]);
     }
 
@@ -686,6 +809,8 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
             }
 
             let mut branch_idx = 0usize;
+            let mut branches_found = 0u64;
+            let mut branches_hit = 0u64;
             for (line, mut sites) in branch_sites_by_line {
                 sites.sort_by(compare_branch_sites);
                 let line = line + 1;
@@ -700,6 +825,9 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
                             "BRDA:{line},{branch_idx},1,{}\n",
                             info.condition_false
                         ));
+                        branches_found += 2;
+                        branches_hit += u64::from(info.condition_true > 0)
+                            + u64::from(info.condition_false > 0);
                         branch_idx += 1;
                     }
                     if info.has_guard_branch() {
@@ -711,10 +839,17 @@ pub(super) fn generate_lcov_report(coverage: &Coverage) -> String {
                             "BRDA:{line},{branch_idx},1,{}\n",
                             info.guard_continue
                         ));
+                        branches_found += 2;
+                        branches_hit +=
+                            u64::from(info.guard_throw > 0) + u64::from(info.guard_continue > 0);
                         branch_idx += 1;
                     }
                 }
             }
+
+            // BRF: branches found, BRH: branches hit
+            lcov_content.push_str(&format!("BRF:{branches_found}\n"));
+            lcov_content.push_str(&format!("BRH:{branches_hit}\n"));
         }
 
         lcov_content.push_str("end_of_record\n");

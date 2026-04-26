@@ -14,12 +14,12 @@ use super::types_render::{
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI;
-use tolkc::debug_marks_dict::DebugMarksDict;
-use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
-use tolkc::types_kernel::Ty;
-use vmlogs::parser::{VmLine, VmStackValue};
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::debug_marks_dict::DebugMarksDict;
+use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
+use tolk_compiler::types_kernel::Ty;
+use tvm_logs::parser::{VmLine, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,9 +47,12 @@ pub enum ExceptionBreakMode {
     All,
 }
 
+const IGNORED_UNCAUGHT_EXCEPTION_ERRNO: &str = "65536"; // invalid message
+
 #[derive(Debug, Clone)]
 pub struct ExceptionInfo {
     pub errno: String,
+    pub symbolic_name: Option<String>,
     pub is_uncaught: bool,
 }
 
@@ -97,7 +100,8 @@ struct LocalVarInScope {
     name: String,
     ty_idx: usize,
     ir_slots: Vec<usize>,
-    is_lazy: bool,
+    // None = not lazy; Some((ir_slot, slice)) = lazy, with the original CellSlice for field preview
+    lazy_info: Option<(usize, VmStackValue)>,
 }
 
 #[derive(Debug, Clone)]
@@ -452,7 +456,7 @@ pub enum Tick {
         ty_idx: usize,
         ir_slots: Vec<usize>,
         is_parameter: bool,
-        is_lazy: bool,
+        ir_lazy_slice: Option<usize>,
     },
     SmartCast {
         var_name: String,
@@ -593,6 +597,8 @@ impl TolkReplayer {
             }
         }
 
+        Self::fixup_fift_procinline_mark_ordering(&mut lookup, &source_map);
+
         TolkReplayer {
             source_map,
             marks_lookup: lookup,
@@ -613,6 +619,65 @@ impl TolkReplayer {
             last_stop_depth: usize::MAX,
             breakpoint_skip_line: 0,
             pending_ticks: VecDeque::new(),
+        }
+    }
+
+    /// THIS HACK SHOULD BE DELETED LATER
+    /// It's for `@inline` functions with multiple returns: Tolk compiler does not inline them at AST->IR stage.
+    /// Instead, it defers inlining to Fift with PROCINLINE. Fift does bytecode-level inlining.
+    /// PROCINLINE embeds bytecode into the caller, merging debug marks. Debug marks are stored
+    /// in a Dict<`mark_id`> which iterates by ascending `mark_id`. Since PROCINLINE
+    /// functions are compiled before their callers, they get lower `mark_ids`, causing
+    /// the replayer to enter the callee before the caller.
+    ///
+    /// This fixup detects such situations (multiple non-inlined `ENTER_FUN` at the same
+    /// offset) and reorders marks so the caller's group (highest `mark_ids`) comes first.
+    ///
+    /// Better solution (in the future):
+    /// 1) either assign higher `MARK_ID` inside fift-inlined functions
+    /// 2) or do bytecode-inlining inside Tolk compiler, not by Fift
+    ///
+    /// Both solutions will eliminate the need of this hack.
+    fn fixup_fift_procinline_mark_ordering(lookup: &mut MarksLookup, source_map: &SourceMap) {
+        for marks in lookup.values_mut() {
+            if marks.len() < 2 {
+                continue;
+            }
+
+            let noinline_enter_count = marks
+                .iter()
+                .filter(|&&mid| {
+                    mid < source_map.debug_marks_count()
+                        && matches!(
+                            source_map.get_debug_mark(mid),
+                            DebugMark::EnterFun {
+                                is_inlined: false,
+                                is_builtin: false,
+                                ..
+                            }
+                        )
+                })
+                .count();
+            if noinline_enter_count < 2 {
+                continue;
+            }
+
+            // Split marks into contiguous groups (detected by gaps in the sequence).
+            // Each group belongs to one function. Sort groups so the one with the
+            // highest starting mark_id (the caller) comes first.
+            let mut groups: Vec<Vec<usize>> = Vec::new();
+            for &mid in marks.iter() {
+                if groups.is_empty() || mid != *groups.last().unwrap().last().unwrap() + 1 {
+                    groups.push(vec![mid]);
+                } else {
+                    groups.last_mut().unwrap().push(mid);
+                }
+            }
+
+            if groups.len() >= 2 {
+                groups.sort_by(|a, b| b[0].cmp(&a[0]));
+                *marks = groups.into_iter().flatten().collect();
+            }
         }
     }
 
@@ -656,6 +721,14 @@ impl TolkReplayer {
     #[must_use]
     pub const fn last_exception(&self) -> Option<&ExceptionInfo> {
         self.last_exception.as_ref()
+    }
+
+    fn resolve_exception_symbolic_name(&self, errno: &str) -> Option<String> {
+        let code = errno.parse::<i32>().ok()?;
+        self.compiler_abi
+            .as_deref()
+            .and_then(|abi| abi.thrown_errors.iter().find(|err| err.err_code == code))
+            .and_then(|err| (!err.name.is_empty()).then(|| err.name.clone()))
     }
 
     #[must_use]
@@ -969,7 +1042,7 @@ impl TolkReplayer {
                 ty_idx,
                 ir_slots,
                 is_parameter,
-                is_lazy,
+                ir_lazy_slice,
                 ..
             } => {
                 self.pending_ticks.push_back(Tick::LocalVar {
@@ -977,7 +1050,7 @@ impl TolkReplayer {
                     ty_idx: *ty_idx,
                     ir_slots: ir_slots.clone(),
                     is_parameter: *is_parameter,
-                    is_lazy: (*is_lazy).unwrap_or(false),
+                    ir_lazy_slice: *ir_lazy_slice,
                 });
             }
             DebugMark::SmartCast {
@@ -1153,18 +1226,26 @@ impl TolkReplayer {
                 self.after_exception_ifret = true;
                 if self.exception_break_mode != ExceptionBreakMode::Never {
                     self.last_exception = Some(ExceptionInfo {
+                        symbolic_name: self.resolve_exception_symbolic_name(&errno),
                         errno,
                         is_uncaught: false,
                     });
                 }
                 return self.exception_break_mode == ExceptionBreakMode::All;
             }
-            Tick::TvmExceptionHandler { .. } => {
+            Tick::TvmExceptionHandler { errno } => {
                 // "default exception handler, terminating vm with exit code N" from VM log.
                 // This always follows TvmException when the exception is NOT caught by try/catch.
                 if let Some(ref mut exc) = self.last_exception {
                     // last_exception may be None if mode=All (we already stopped, and step() cleared it)
                     exc.is_uncaught = true;
+                }
+                // The executor can report 65536 for "invalid message" for example for Jettons.
+                // This is unnecessary noise for the user so we just skip it completely
+                // and do not pause on it in the source-level uncaught-exception flow.
+                if errno == IGNORED_UNCAUGHT_EXCEPTION_ERRNO {
+                    self.last_exception = None;
+                    return false;
                 }
                 return self.exception_break_mode == ExceptionBreakMode::Uncaught;
             }
@@ -1172,16 +1253,39 @@ impl TolkReplayer {
                 var_name,
                 ty_idx,
                 ir_slots,
-                is_lazy,
+                ir_lazy_slice,
                 ..
             } => {
+                let lazy_info: Option<(usize, VmStackValue)> = ir_lazy_slice.and_then(|ir| {
+                    // check if another lazy variable already captured this slice
+                    // (e.g. `self` in inlined methods shares ir_slice with the outer lazy var)
+                    for frame in self.call_stack.iter().rev() {
+                        for v in frame.all_visible_vars() {
+                            if let Some((captured_ir, ref slice)) = v.lazy_info
+                                && captured_ir == ir
+                            {
+                                return Some((ir, slice.clone()));
+                            }
+                        }
+                        if !frame.is_inlined {
+                            break;
+                        }
+                    }
+                    // first encounter: take from last_seen
+                    let slice = self
+                        .exec_stack
+                        .last()
+                        .and_then(|e| e.last_seen_values.get(&ir))?
+                        .clone();
+                    Some((ir, slice))
+                });
                 if let Some(frame) = self.call_stack.last_mut() {
                     // .expect("no last frame");
                     let new_var = LocalVarInScope {
                         name: var_name.clone(),
                         ty_idx,
                         ir_slots: ir_slots.clone(),
-                        is_lazy,
+                        lazy_info,
                     };
                     let vars = frame.current_vars_mut();
                     if let Some(existing) = vars.iter_mut().find(|v| v.name == var_name) {
@@ -1320,7 +1424,7 @@ impl TolkReplayer {
                 })
                 .collect();
 
-            let debug_val = if var.is_lazy {
+            let debug_val = if let Some((_, ref slice)) = var.lazy_info {
                 match self.source_map.resolve_ty(var.ty_idx) {
                     Some(ty) => debug_format_lazy(
                         &self.source_map,
@@ -1328,6 +1432,7 @@ impl TolkReplayer {
                         &var.ir_slots,
                         ty,
                         last_seen,
+                        slice,
                     ),
                     None => RenderedValue::leaf("var.ty_idx not found"),
                 }
@@ -1343,13 +1448,19 @@ impl TolkReplayer {
             });
         }
 
-        // TODO: unify with `in.data`? Currently `in` uses only runtime data from c7, while `in.data` takes value from the stack
         if is_top_frame
             && frame.f_name == "onInternalMessage"
             && let Some(snapshot) = self.runtime_source.runtime_debug_snapshot()
             && let Some(c7) = snapshot.c7.as_ref()
-            && let Some(value) = render_runtime_in_message(c7)
+            && let Some(mut value) = render_runtime_in_message(c7)
         {
+            // `in.body` comes from the stack; other `in` fields come from c7.
+            if let RenderedValue::Struct { fields, .. } = &mut value
+                && let Some(idx) = result.iter().position(|local| local.var_name == "in.body")
+            {
+                let body = result.remove(idx).value;
+                fields.push(("body".to_owned(), body));
+            }
             result.insert(
                 0,
                 LocalVarRendered {
@@ -1488,5 +1599,10 @@ impl TolkReplayer {
     #[must_use]
     pub fn type_name(&self, ty_idx: usize) -> Option<String> {
         self.source_map.resolve_ty(ty_idx).map(ToString::to_string)
+    }
+
+    #[must_use]
+    pub const fn source_map(&self) -> &SourceMap {
+        &self.source_map
     }
 }

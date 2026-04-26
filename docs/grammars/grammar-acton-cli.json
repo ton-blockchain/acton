@@ -449,7 +449,7 @@
           "name": "keyword.control.acton-cli"
         },
         {
-          "match": "\\b(?:new|test|build|script|run|wallet|compile|check|verify|wrapper|doc|fmt|doctor|library|retrace|litenode|init)\\b",
+          "match": "\\b(?:new|test|build|script|run|wallet|compile|check|verify|wrapper|doc|fmt|doctor|library|retrace|localnet|init)\\b",
           "name": "keyword.control.acton-cli"
         },
         {

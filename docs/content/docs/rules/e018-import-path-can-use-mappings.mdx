@@ -1,0 +1,32 @@
+---
+title: "E018: import-path-can-use-mappings"
+description: "Warns when a relative import path can be replaced with a configured `@mapping/...` path."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E018`
+- `Rule`: `import-path-can-use-mappings`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Warns when a relative import path can be replaced with a configured `@mapping/...` path.
+
+### Why is this bad?
+Relative imports are harder to maintain in larger projects and become fragile when files move.
+
+### Example
+```tolk twoslash
+import "../libs/math.tolk";
+//      ^^^^^^^^^^^^^^^^^ E018: import path can use mappings
+```
+
+Use instead:
+```tolk
+import "@libs/math";
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/import_path_can_use_mappings.rs#L25" />

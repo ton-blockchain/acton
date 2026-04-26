@@ -58,11 +58,6 @@ disassembly output.
 Fetch contract code from the blockchain by address and disassemble it.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.RE
-.sp
 \fB\-\-net\fR \fInetwork\fR
 .RS 4
 Network to use for \fB\-\-address\fR and library lookups.
@@ -77,8 +72,11 @@ If omitted, Acton tries mainnet first and then falls back to testnet.
 .sp
 \fB\-\-follow\-libraries\fR
 .RS 4
-If the code references a library, fetch and disassemble the actual library code
-instead of showing only the library hash reference.
+If the input disassembles to exactly one top\-level exotic library\-reference
+cell, fetch and disassemble the actual library code instead of showing only the
+library hash reference.
+.sp
+This is not a general recursive library\-follow mode.
 .RE
 .SS "Display Options"
 .sp
@@ -121,16 +119,24 @@ When \fB\-\-address\fR is used, Acton fetches code from the selected network.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-api\-key\fR helps avoid TonCenter rate limits
-.RE
-.sp
-.RS 4
-\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR resolves library references when possible
+\h'-04'\(bu\h'+03'with \fB\-\-address\fR, \fB\-\-follow\-libraries\fR reuses the network that returned the
+contract code
 .RE
 .sp
 When \fB\-\-follow\-libraries\fR is used with a local file or \fB\-\-string\fR, Acton uses
 the explicit \fB\-\-net\fR if provided; otherwise library fetches default to
 testnet.
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
+names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so
+\fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "INPUT PRECEDENCE"
 .sp
 .RS 4
@@ -142,12 +148,18 @@ testnet.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR only replaces the input when the fetched code is a
-single library reference and the library lookup succeeds
+\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR only replaces the input when the initial disassembly is
+exactly one top\-level exotic library\-reference cell and the lookup succeeds
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'ordinary code, mixed instruction streams, or nested library references are a
+no\-op for \fB\-\-follow\-libraries\fR
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'if library lookup fails, Acton warns and disassembles the original code
+instead; this still exits successfully
 .RE
 .SH "SOURCE MAPS"
 If you compiled a contract with \fBacton compile \-\-source\-map\fR, you can pass that
@@ -229,11 +241,11 @@ acton disasm contract.boc \-\-output build/disasm/contract.tasm
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Resolve library references for a local BoC using a configured custom network:
+\h'-04' 7.\h'+01'Resolve a top\-level library\-reference cell using a configured custom network:
 .sp
 .RS 4
 .nf
-acton disasm contract.boc \-\-follow\-libraries \-\-net custom:staging
+acton disasm library\-ref.boc \-\-follow\-libraries \-\-net custom:staging
 .fi
 .RE
 .RE

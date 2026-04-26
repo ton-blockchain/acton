@@ -6,6 +6,7 @@ use std::fs;
 const DA_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/tlb/maybe"
 import "../../lib/types/message"
@@ -37,8 +38,8 @@ fn transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode() {
         "da-stdlib-transaction-load-in-msg-inline-opcode",
         r#"
 get fun `test da stdlib transaction load in msg inline opcode`() {
-    val sender = net.treasury("da_sender_inline");
-    val destination = net.randomAddress("da_destination_inline");
+    val sender = testing.treasury("da_sender_inline");
+    val destination = randomAddress("da_destination_inline");
 
     val txs = net.send(
         sender.address,
@@ -60,8 +61,11 @@ get fun `test da stdlib transaction load in msg inline opcode`() {
     val inBody = inMsg.loadBody();
 
     expect(inBody).toEqual(DaInlinePayload { queryId: 11, amount: 22 });
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(destination);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(destination);
+    }
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
     expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);
@@ -86,8 +90,8 @@ fn transaction_load_in_msg_in_fixture_project_matches_inbound_opcode() {
         imports = DA_TRANSACTION_IMPORTS,
         body = r#"
 get fun `test da stdlib transaction load in msg fixture opcode`() {
-    val sender = net.treasury("da_sender_fixture");
-    val destination = net.randomAddress("da_destination_fixture");
+    val sender = testing.treasury("da_sender_fixture");
+    val destination = randomAddress("da_destination_fixture");
     val payload = DaInlinePayload { queryId: 77, amount: 99 };
 
     val txs = net.send(
@@ -105,8 +109,11 @@ get fun `test da stdlib transaction load in msg fixture opcode`() {
 
     val inMsg = tx.loadInMsg<DaInlinePayload>();
     expect(inMsg.loadBody()).toEqual(payload);
-    expect(inMsg.info.src).toEqual(sender.address as any_address);
-    expect(inMsg.info.dest).toEqual(destination);
+    expect(inMsg.info is TlbInternalMessage).toBeTrue();
+    if (inMsg.info is TlbInternalMessage) {
+        expect(inMsg.info.src).toEqual(sender.address);
+        expect(inMsg.info.dest).toEqual(destination);
+    }
 
     val genericInMsg = tx.messages.load().inMsg.unwrap().load();
     expect(genericInMsg.loadOpcode()).toEqual(reflect.serializationPrefixOf<DaInlinePayload>().0);

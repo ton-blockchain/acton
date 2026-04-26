@@ -11,14 +11,15 @@ the target directory name.
 {{/option}}
 
 {{#option "`--description` _description_" }}
-Project description written to `Acton.toml`. If not provided, interactive mode
-prompts for it and defaults to `A TON blockchain project`.
+Project description written to `Acton.toml`. If not provided, Acton uses
+`A TON blockchain project` by default. In interactive mode you can override it
+after opting into advanced options.
 {{/option}}
 
 {{#option "`--template` _template_" }}
 Project template to use.
 
-Possible values: `empty`, `counter`, `jetton`
+Possible values: `empty`, `counter`, `jetton`, `nft`
 
 If not provided, interactive mode prompts for the template.
 {{/option}}
@@ -27,7 +28,8 @@ If not provided, interactive mode prompts for the template.
 License identifier to place into `Acton.toml` and use for the generated
 `LICENSE` file when Acton has a built-in template for that license.
 
-If not provided, interactive mode prompts for it.
+If not provided, Acton uses `MIT` by default. In interactive mode you can
+override it after opting into advanced options.
 {{/option}}
 
 {{#option "`--app`" }}
@@ -44,18 +46,18 @@ layout disabled unless `--app` is passed explicitly.
 {{#option "`--hooks`" }}
 Create and install the default project-local Git hooks.
 
-If `git` is available and `--hooks` is not provided, interactive mode prompts
-for this choice. Non-interactive mode leaves hooks disabled unless `--hooks`
-is passed explicitly.
+If `git` is available and `--hooks` is not provided, interactive mode offers
+this choice after you opt into advanced options. Non-interactive mode leaves
+hooks disabled unless `--hooks` is passed explicitly.
 {{/option}}
 
 {{#option "`--agents`" }}
 Include an `AGENTS.md` file with coding-agent guidance from the selected
 template.
 
-If `--agents` is not provided, interactive mode prompts for this choice.
-Non-interactive mode leaves `AGENTS.md` disabled unless `--agents` is passed
-explicitly.
+If `--agents` is not provided, interactive mode offers this choice after you
+opt into advanced options. Non-interactive mode leaves `AGENTS.md` disabled
+unless `--agents` is passed explicitly.
 {{/option}}
 
 {{/options}}

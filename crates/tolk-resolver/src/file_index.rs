@@ -603,10 +603,10 @@ impl FileIndex {
                         span: import.span(),
                     });
                 }
-                tolk_syntax::TopLevel::TolkRequiredVersion(_) => continue,
-                tolk_syntax::TopLevel::Contract(_) => continue,
-                tolk_syntax::TopLevel::EmptyStmt(_) => continue,
-                tolk_syntax::TopLevel::Unmapped(_) => continue,
+                tolk_syntax::TopLevel::TolkRequiredVersion(_)
+                | tolk_syntax::TopLevel::Contract(_)
+                | tolk_syntax::TopLevel::EmptyStmt(_)
+                | tolk_syntax::TopLevel::Unmapped(_) => continue,
             }
 
             local_id += 1;

@@ -13,9 +13,10 @@ use tolk_syntax::{HasName, Ident, LambdaParameter, Parameter, TryFromNode, VarDe
 /// Unused variables and parameters clutter the code and can be a sign of a bug.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main() {
 ///     val x = 1;
+///     //  ^ E002: variable is unused
 ///     println("hello");
 /// }
 /// ```

@@ -188,6 +188,9 @@ Parse generics
 global a: Container<slice>;
 global b: Container < Container < slice > >;
 global c: Container<Container<slice>>;
+global d: Container<
+    slice,
+>;
 
 ------------------------------------------------------------------------
 
@@ -215,4 +218,10 @@ global c: Container<Container<slice>>;
         (type_instantiatedTs
           (type_identifier)
           (instantiationT_list
-            (type_identifier)))))))
+            (type_identifier))))))
+  (global_var_declaration
+    (identifier)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_identifier)))))

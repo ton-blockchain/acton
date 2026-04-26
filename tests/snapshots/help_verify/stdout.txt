@@ -36,22 +36,25 @@ OPTIONS
        --compiler-version version
            Tolk compiler version to request on the verifier side.
 
-           Currently defaults to 1.1.0.
+           Currently defaults to 1.2.0.
 
        --dry-run
            Run verification without submitting the final blockchain
            transaction.
-
-       --api-key key
-           TonCenter API key for blockchain queries.
-
-           Also read from TONCENTER_API_KEY.
 
    Network Options
        --net network
            Network to verify against.
 
            Defaults to testnet.
+
+TONCENTER API KEYS
+       Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY, depending on --net.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
    Display Options
        --color when
@@ -84,6 +87,12 @@ PROCESS
        4. collecting the required signatures
 
        5. optionally sending the final verification transaction
+
+       Acton prepares the local compilation artifacts and uploads them to the
+       verification service. The final deployed-code match is established by
+       the verifier flow itself; acton verify does not first perform a separate
+       local on-chain code-hash comparison against the target address before
+       upload.
 
 PREREQUISITES
        o  a .tolk contract source in the current project
@@ -130,10 +139,61 @@ COST AND BACKEND NOTES
        o  on successful verification, Acton prints a verifier link for the
           contract
 
+ENVIRONMENT OVERRIDES
+       The verification flow also supports backend/debug environment overrides:
+
+       o  ACTON_VERIFY_BACKEND overrides only the initial /source backend used
+          for source upload
+
+       o  ACTON_VERIFY_BACKENDS replaces the later signer /sign backend list
+
+       o  ACTON_VERIFY_DEBUG enables verbose verification diagnostics by
+          presence alone
+
+       Backend override values are trimmed and normalized, including removal of
+       a trailing /.
+
+       With ACTON_VERIFY_DEBUG, Acton prints:
+
+       o  compiler version
+
+       o  collected source files
+
+       o  active source-backend override
+
+       o  active signer-backend override list
+
+       Example: debug source upload against a custom backend:
+
+           ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 /
+           ACTON_VERIFY_DEBUG=1 /
+           acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+
+       Example: separate source upload from signer backends:
+
+           ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 /
+           ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 /
+           acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+
 DRY RUN
        --dry-run still compiles the contract, uploads sources to the verifier
        backend, and collects the required signatures. It skips only the final
        blockchain transaction.
+
+RETRIES AND FAILURE HINTS
+       o  source upload is attempted up to 8 times total (initial try plus up
+          to 7 retries) for transient transport failures and backend 5xx
+          responses
+
+       o  retry backoff grows from 1 second to 7 seconds between attempts
+
+       o  backend error responses are printed with the response body when
+          available
+
+       o  5xx failures suggest retrying later and using ACTON_VERIFY_DEBUG=1
+
+       o  backend problems can also be narrowed down by pointing
+          ACTON_VERIFY_BACKEND at a specific endpoint
 
 EXIT STATUS
        o  0: Verification completed successfully, including successful dry runs
@@ -163,12 +223,12 @@ EXAMPLES
 
        5. Verify with an explicit compiler version:
 
-              acton verify Counter --address EQDt7LL... --compiler-version 1.1.0
+              acton verify Counter --address EQDt7LL... --compiler-version 1.2.0
 
 SEE ALSO
        o  Contract verification guide
-          <https://ton-blockchain.github.io/acton/docs/contract-verification>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/contract-verification>
 
        o  Wallet setup guide
-          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>
 

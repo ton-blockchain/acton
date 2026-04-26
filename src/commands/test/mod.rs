@@ -1,8 +1,10 @@
 use crate::commands::build::build_cmd;
-use crate::commands::common::error_fmt;
+use crate::commands::common::{
+    error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
+};
 use crate::commands::test::coverage::{
     collect_coverage, generate_lcov_file, generate_lcov_report, generate_text_file,
-    print_coverage_summary, total_line_coverage_percentage,
+    print_coverage_summary, total_coverage_score_percentage,
 };
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
@@ -15,7 +17,7 @@ use crate::commands::test::reporting::{
 };
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
-    EmulationsState, Env, IoContext, KnownAddresses,
+    DebugStopRequested, EmulationsState, Env, IoContext, KnownAddresses, is_debug_stop_requested,
 };
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
@@ -47,9 +49,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -58,8 +60,8 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvmffi::serde::serialize_tuple;
-use tvmffi::stack::Tuple;
+use tvm_ffi::serde::serialize_tuple;
+use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, HashBytes};
 use tycho_types::models::{ShardAccount, StdAddr};
@@ -159,7 +161,8 @@ impl<'a> TestRunner<'a> {
                     continue;
                 };
 
-                let Some(cached) = cache.get(&contract_info.src, config.debug, 2, "1.3") else {
+                let Some(cached) = cache.get(&contract_info.src, config.debug, false, 2, "1.3")
+                else {
                     warn!("No build cache for contract {}", &contract_info.src);
                     continue;
                 };
@@ -232,18 +235,21 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn minimal_log_verbosity(&self) -> ExecutorVerbosity {
+    fn effective_log_verbosity(&self) -> ExecutorVerbosity {
+        let mut verbosity = executor_verbosity_for_cli_level(self.config.verbosity);
+
         if self.config.debug || self.config.backtrace == Some(BacktraceMode::Full) {
             // for these modes we need all logs for work
-            return ExecutorVerbosity::FullLocationStackVerbose;
+            verbosity =
+                max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStackVerbose);
         }
 
         if self.config.coverage {
             // for coverage, we need at least locations to map to actual source code
-            return ExecutorVerbosity::FullLocationStackVerbose;
+            verbosity = max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStack);
         }
 
-        ExecutorVerbosity::Full
+        verbosity
     }
 
     fn execute_test(
@@ -290,7 +296,7 @@ impl<'a> TestRunner<'a> {
         source_map: Arc<TolkSourceMap>,
         stack: &Tuple,
     ) -> anyhow::Result<TestResult> {
-        let verbosity = self.minimal_log_verbosity();
+        let verbosity = self.effective_log_verbosity();
 
         let now = std::time::SystemTime::now();
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -318,7 +324,6 @@ impl<'a> TestRunner<'a> {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
                 net.clone(),
                 self.config.fork_block_number,
-                self.config.api_key.clone(),
                 self.remote_cache.clone(),
             )),
             None => AccountsState::Local(LocalAccountsState::new()),
@@ -344,9 +349,9 @@ impl<'a> TestRunner<'a> {
                 open_wallets: Default::default(), // in tests, we never use real wallets
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
-                api_key: self.config.api_key.clone(),
                 fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
+                test_code: Some(code_cell.clone()),
             },
             io: IoContext {
                 stdout_buffer: String::new(),
@@ -392,7 +397,9 @@ impl<'a> TestRunner<'a> {
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);
 
-                ctx.debug.process_incoming_requests(true)?;
+                if ctx.debug.process_incoming_requests(true)? {
+                    return Err(DebugStopRequested.into());
+                }
 
                 let get_result = executor.finish(&params.code)?;
 
@@ -443,7 +450,7 @@ impl<'a> TestRunner<'a> {
             };
 
         let mut captured_stdout = captured_stdout;
-        Self::append_debug_output(&mut captured_stdout, &result);
+        Self::append_debug_output(&mut captured_stdout, &result, verbosity);
 
         let executed_get_methods = if self.config.coverage {
             // save results for coverage only in coverage mode since cloning is expensive due to logs
@@ -467,7 +474,15 @@ impl<'a> TestRunner<'a> {
         })
     }
 
-    fn append_debug_output(stdout: &mut String, get_result: &GetMethodResult) {
+    fn append_debug_output(
+        stdout: &mut String,
+        get_result: &GetMethodResult,
+        verbosity: ExecutorVerbosity,
+    ) {
+        if matches!(verbosity, ExecutorVerbosity::Off) {
+            return;
+        }
+
         let GetMethodResult::Success(result) = get_result else {
             return;
         };
@@ -639,7 +654,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         total_skipped += stats.skipped;
         total_todo += stats.todo;
     } else {
-        for file in &test_files {
+        for (index, file) in test_files.iter().enumerate() {
             let result = run_tests_for_file(&mut runner, file);
             match result {
                 Ok(stats) => {
@@ -647,6 +662,16 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     total_failed += stats.failed;
                     total_skipped += stats.skipped;
                     total_todo += stats.todo;
+
+                    if stats.stopped {
+                        break;
+                    }
+
+                    if index + 1 < test_files.len()
+                        && config.report_formats.contains(&ReportFormat::Console)
+                    {
+                        println!();
+                    }
                 }
                 Err(err) => {
                     eprintln!("{err}");
@@ -733,11 +758,11 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     "coverage minimum percent must be between 0 and 100, got {minimum_percent}"
                 );
             }
-            let actual_percent = total_line_coverage_percentage(&coverage);
+            let actual_percent = total_coverage_score_percentage(&coverage);
             if actual_percent < minimum_percent {
                 coverage_threshold_failed = true;
                 println!(
-                    "\n{}: total line coverage {:.2}% is below the required minimum of {:.2}%.",
+                    "\n{}: coverage score {:.2}% is below the required minimum of {:.2}%.",
                     "Error".red(),
                     actual_percent,
                     minimum_percent
@@ -943,14 +968,16 @@ struct TestStats {
     failed: usize,
     skipped: usize,
     todo: usize,
+    stopped: bool,
 }
 
 impl TestStats {
-    fn add_assign(&mut self, other: &TestStats) {
+    const fn add_assign(&mut self, other: &TestStats) {
         self.passed += other.passed;
         self.failed += other.failed;
         self.skipped += other.skipped;
         self.todo += other.todo;
+        self.stopped |= other.stopped;
     }
 }
 
@@ -977,7 +1004,7 @@ enum ReporterEvent {
 
 #[derive(Debug)]
 enum ParallelTestRunMessage {
-    ReporterEvent(ReporterEvent),
+    ReporterEvent(Box<ReporterEvent>),
     Outcome(anyhow::Result<TestFileRunOutcome>),
 }
 
@@ -986,14 +1013,14 @@ struct StreamingReporter {
 }
 
 impl StreamingReporter {
-    fn new(sender: Sender<ParallelTestRunMessage>) -> Self {
+    const fn new(sender: Sender<ParallelTestRunMessage>) -> Self {
         Self { sender }
     }
 
     fn send_event(&self, event: ReporterEvent) {
         let _ = self
             .sender
-            .send(ParallelTestRunMessage::ReporterEvent(event));
+            .send(ParallelTestRunMessage::ReporterEvent(Box::new(event)));
     }
 }
 
@@ -1033,7 +1060,7 @@ impl reporting::TestReporter for StreamingReporter {
     }
 }
 
-fn should_run_test_files_in_parallel(config: &TestConfig, test_file_count: usize) -> bool {
+const fn should_run_test_files_in_parallel(config: &TestConfig, test_file_count: usize) -> bool {
     test_file_count > 1 && !config.debug && !config.fail_fast
 }
 
@@ -1044,7 +1071,8 @@ fn run_test_files_in_parallel(
 ) -> anyhow::Result<TestStats> {
     let (sender, receiver) = unbounded();
 
-    for file_path in test_files.iter().cloned() {
+    for file_path in test_files {
+        let file_path = file_path.clone();
         let sender = sender.clone();
         let acton_config = runner.acton_config.clone();
         let config = runner.config.clone();
@@ -1083,7 +1111,7 @@ fn run_test_files_in_parallel(
     for message in receiver {
         match message {
             ParallelTestRunMessage::ReporterEvent(event) => {
-                dispatch_reporter_event(runner.reporter_manager, event)?;
+                dispatch_reporter_event(runner.reporter_manager, *event)?;
             }
             ParallelTestRunMessage::Outcome(result) => match result {
                 Ok(outcome) => {
@@ -1157,12 +1185,12 @@ fn compile_test_file(
     file: &str,
     need_debug_info: bool,
     acton_config: &ActonConfig,
-) -> anyhow::Result<tolkc::CompilerResult> {
-    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.3");
+) -> anyhow::Result<tolk_compiler::CompilerResult> {
+    let cache_entry = file_cache.get(file, need_debug_info, false, 0, "1.3");
     if let Some(cache_entry) = cache_entry {
-        return Ok(tolkc::CompilerResult::Success(
-            tolkc::compiler::CompilerResultSuccess {
-                fift_code: cache_entry.fift_code,
+        return Ok(tolk_compiler::CompilerResult::Success(
+            tolk_compiler::compiler::CompilerResultSuccess {
+                fift_code: cache_entry.fift_code.unwrap_or_default(),
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
                 debug_mark_base64: cache_entry.debug_mark_base64,
@@ -1173,13 +1201,13 @@ fn compile_test_file(
     }
 
     let mappings = acton_config.mappings();
-    let compiler = tolkc::Compiler::new(0)
+    let compiler = tolk_compiler::Compiler::new(0)
         .with_mappings(&mappings)
         .with_allow_no_entrypoint(true);
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
-        tolkc::CompilerResult::Success(result) => {
-            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.3");
+        tolk_compiler::CompilerResult::Success(result) => {
+            let cache_result = file_cache.put(file, result, need_debug_info, false, 0, "1.3");
             match cache_result {
                 Ok(()) => {}
                 Err(err) => {
@@ -1187,7 +1215,7 @@ fn compile_test_file(
                 }
             }
         }
-        tolkc::CompilerResult::Error(_) => {
+        tolk_compiler::CompilerResult::Error(_) => {
             // handled in caller
         }
     }
@@ -1232,8 +1260,8 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     );
 
     let result = match compilation_result {
-        tolkc::CompilerResult::Success(result) => result,
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Success(result) => result,
+        tolk_compiler::CompilerResult::Error(error) => {
             let trimmed_message = error.message.trim();
             anyhow::bail!(trimmed_message.to_string())
         }
@@ -1266,7 +1294,7 @@ fn run_file_tests(
     tests: Vec<TestDescriptor>,
     code: &Cell,
     abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
+    compiler_abi: Option<Arc<tolk_compiler::abi::ContractABI>>,
     source_map: Arc<TolkSourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
@@ -1295,8 +1323,8 @@ fn run_file_tests(
     let mut failed = 0;
     let mut skipped = 0;
     let mut todo = 0;
+    let mut stopped = false;
     let mappings = runner.acton_config.mappings();
-
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
         let mut test_report = TestReport {
@@ -1331,7 +1359,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
-            test_report.details = test.todo_description.clone();
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
@@ -1339,6 +1367,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
+            test_report.details = test.status_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
@@ -1367,6 +1396,15 @@ fn run_file_tests(
         );
         let result = match result {
             Ok(result) => result,
+            Err(err) if is_debug_stop_requested(&err) => {
+                test_report.status = TestStatus::Skipped;
+                test_report.details = Some("Debug session stopped".to_string());
+                test_report.duration = start_time.elapsed();
+                runner.reporter_manager.on_test_finished(&test_report)?;
+                skipped += 1;
+                stopped = true;
+                break;
+            }
             Err(err) => {
                 test_report.status = TestStatus::Failed;
                 test_report.message = Some(format!("Cannot execute test '{}': {err}", test.name));
@@ -1410,7 +1448,7 @@ fn run_file_tests(
         let gas_used = outcome.gas_used;
         let vm_log_diff = match &get_result {
             GetMethodResult::Success(result) => {
-                let logs = vmlogs::convert_to_diff_logs(&result.vm_log);
+                let logs = tvm_logs::convert_to_diff_logs(&result.vm_log);
                 (!logs.trim().is_empty()).then_some(logs)
             }
             GetMethodResult::Error(_) => None,
@@ -1460,7 +1498,6 @@ fn run_file_tests(
                 backtrace: runner.config.backtrace,
                 fork_net: None,
                 network: None,
-                api_key: None,
             };
 
             if let Some(failure) = &assert_failure {
@@ -1557,6 +1594,7 @@ fn run_file_tests(
         failed,
         skipped,
         todo,
+        stopped,
     })
 }
 
@@ -1598,7 +1636,7 @@ pub struct TestDescriptor {
     fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
-    pub todo_description: Option<String>,
+    pub status_description: Option<String>,
     pub declared_parameter_count: usize,
     parameters: Vec<FuzzParameter>,
     pub pos: Pos,
@@ -1631,7 +1669,7 @@ fn find_all_test(
                     fuzz: test_annotations.fuzz,
                     expected_exit_code: test_annotations.expected_exit_code,
                     gas_limit: test_annotations.gas_limit,
-                    todo_description: test_annotations.todo_description,
+                    status_description: test_annotations.status_description,
                     declared_parameter_count,
                     parameters: Vec::new(),
                     pos: Pos {

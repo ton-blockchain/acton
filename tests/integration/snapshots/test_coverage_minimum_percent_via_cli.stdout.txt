@@ -14,12 +14,12 @@
 
  COVERAGE  
 
-────────────────────────────────────────────────────────
- File             Covered Lines   Total Lines   % Lines 
-────────────────────────────────────────────────────────
- All files                    2             3     66.7% 
- code/math.tolk               2             3     66.7% 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ File             Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                    2             3     66.7%                  1                2        50.0%   60.0% 
+ code/math.tolk               2             3     66.7%                  1                2        50.0%   60.0% 
 
 Text coverage file saved in threshold.txt
 
-Error: total line coverage 66.67% is below the required minimum of 100.00%.
+Error: coverage score 60.00% is below the required minimum of 65.00%.

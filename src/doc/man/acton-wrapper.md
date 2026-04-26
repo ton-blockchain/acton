@@ -1,14 +1,14 @@
 # acton-wrapper(1)
 
-## NAME
+## Name
 
 acton-wrapper --- Generate Tolk or TypeScript wrappers for a contract
 
-## SYNOPSIS
+## Synopsis
 
 `acton wrapper` [_options_] _contract-name_
 
-## DESCRIPTION
+## Description
 
 Generate a wrapper for the contract identified by `_contract-name_` from
 `Acton.toml`.
@@ -23,7 +23,7 @@ frontend and tooling integrations.
 `acton wrapper` compiles the selected contract directly. A prior `acton build`
 run is not required.
 
-## OPTIONS
+## Options
 
 ### Wrapper Options
 
@@ -90,7 +90,7 @@ Conflicts with test stub generation.
 
 {{> options-project-resolved }}
 
-## ABI REQUIREMENTS
+## ABI Requirements
 
 Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 
@@ -101,7 +101,7 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 If `incomingMessages` is missing, message-sending helpers are not generated. If
 `storage` is missing, storage helpers fall back to an untyped initializer.
 
-## TYPESCRIPT GENERATION
+## TypeScript Generation
 
 `acton wrapper --ts` shells out to `npx gen-typescript-from-tolk-dev`.
 
@@ -110,7 +110,7 @@ If `incomingMessages` is missing, message-sending helpers are not generated. If
 - `--ts` cannot be combined with `--test`, `--test-output`, or
   `--test-output-dir`
 
-## CONFIGURATION
+## Configuration
 
 Project-wide defaults can be configured in `Acton.toml`:
 
@@ -121,18 +121,18 @@ generate-test = true
 test-output-dir = "tests"
 
 [wrappers.typescript]
-output-dir = "wrappers"
+output-dir = "wrappers-ts"
 ```
 
 CLI flags override config values for the current invocation.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Wrapper generation completed successfully.
 - `1`: The contract could not be found or compiled, ABI data was missing, the
   TypeScript generator could not run, or an output file could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Generate the default Tolk wrapper:
 
@@ -157,17 +157,17 @@ CLI flags override config values for the current invocation.
    ```bash
    acton wrapper Counter --output-dir tests/generated
    acton wrapper Counter --test --test-output-dir tests/generated
-   acton wrapper Counter --ts --output-dir wrappers
+   acton wrapper Counter --ts --output-dir wrappers-ts
    ```
 
 5. Generate a frontend-oriented TypeScript wrapper layout:
 
    ```bash
-   acton wrapper Counter --ts --output-dir app/src/wrappers
+   acton wrapper Counter --ts --output-dir app/src/wrappers-ts
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help build`
 - `acton help test`
-- [Generating wrappers guide](https://ton-blockchain.github.io/acton/docs/test-runner/generating-wrappers)
+- [Generating wrappers guide](https://ton-blockchain.github.io/acton/docs/testing/generating-wrappers)

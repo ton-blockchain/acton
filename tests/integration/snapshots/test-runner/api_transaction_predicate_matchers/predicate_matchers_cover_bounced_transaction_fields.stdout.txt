@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate bounced transaction fields [TIME]
+    └─ Test output:
+       bounced.flag=true
+       bounced.opcode=0xae110002
+       bounced.from=[WALLET_ADDRESS_BASE] (sender)
+       bounced.to=[WALLET_ADDRESS_BASE] (harness)
+       bounced.exitCode=777
+
+ ✓ 1 passed in 1 file

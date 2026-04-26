@@ -2,9 +2,9 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 const CRYPTO_IMPORTS: &str = r#"
-import "../../lib/crypto/crypto"
+import "../../lib/crypto"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
 "#;
 
 fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -26,7 +26,7 @@ fn crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time() {
         "az-stdlib-fast-random-without-seed-fixed-time",
         r"
 get fun `test az stdlib fast random without seed fixed time`() {
-    vm.setTime(1700004321);
+    testing.setNow(1700004321);
 
     val randomA = crypto.getFastRandomBytes(64);
     val randomB = crypto.getFastRandomBytes(64);

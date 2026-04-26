@@ -12,12 +12,12 @@ struct (0x43480001) ChExternalPayload {
     amount: uint32
 }
 
-fun chNoInit(): Maybe<Either<StateInit, Cell<StateInit>>> {
-    return Maybe<Either<StateInit, Cell<StateInit>>>.none();
+fun chNoInit(): TlbMaybe<TlbEither<StateInit, Cell<StateInit>>> {
+    return TlbMaybe.none();
 }
 
-fun chExtInfo(): ExtMsgInfoRelaxed {
-    return ExtMsgInfoRelaxed {
+fun chExtInfo(): TlbExtMsgInfoRelaxed {
+    return TlbExtMsgInfoRelaxed {
         src: address("0:00000000000000000000000000000000000000000000000000000000000000CC"),
         dest: createAddressNone(),
         createdLt: 0,
@@ -51,10 +51,10 @@ get fun `test ch stdlib ext message load body left`() {
         amount: 900,
     };
 
-    val msg = ExtMessageRelaxed<ChExternalPayload> {
+    val msg = TlbExtMessageRelaxed<ChExternalPayload> {
         info: chExtInfo(),
         init: chNoInit(),
-        body: Either<ChExternalPayload, Cell<ChExternalPayload>>.left(payload),
+        body: TlbEither<ChExternalPayload, Cell<ChExternalPayload>>.left(payload),
     };
 
     expect(msg.loadBody()).toEqual(payload);
@@ -76,10 +76,10 @@ get fun `test ch stdlib ext message load body right`() {
     };
     val payloadCell = payload.toCell() as Cell<ChExternalPayload>;
 
-    val msg = ExtMessageRelaxed<ChExternalPayload> {
+    val msg = TlbExtMessageRelaxed<ChExternalPayload> {
         info: chExtInfo(),
         init: chNoInit(),
-        body: Either<ChExternalPayload, Cell<ChExternalPayload>>.right(payloadCell),
+        body: TlbEither<ChExternalPayload, Cell<ChExternalPayload>>.right(payloadCell),
     };
 
     expect(msg.loadBody()).toEqual(payload);

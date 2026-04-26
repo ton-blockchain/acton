@@ -17,10 +17,11 @@ use tree_sitter::Node;
 /// If `self` is never used, the method can be static which makes the API clearer.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// struct Foo {}
 ///
 /// fun Foo.bar(self, a: int): int {
+/// //          ^^^^ E009: method can be static
 ///     return a + 1;
 /// }
 /// ```

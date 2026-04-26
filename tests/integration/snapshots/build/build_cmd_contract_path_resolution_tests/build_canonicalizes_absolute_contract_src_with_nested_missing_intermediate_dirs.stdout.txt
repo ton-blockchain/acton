@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling absolute_nested_missing_target
+    Finished in [TIME]
+    Finished in [TIME]

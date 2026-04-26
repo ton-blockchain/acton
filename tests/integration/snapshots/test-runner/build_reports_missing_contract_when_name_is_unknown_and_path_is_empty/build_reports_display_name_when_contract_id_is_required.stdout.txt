@@ -1,0 +1,29 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling Visible Simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_display_name_contract_input.test.tolk (1 test)
+  ✗ ax build display-name hint [TIME]
+    └─ Error: Contract Visible Simple not found in Acton.toml
+
+It looks like you passed the contract display-name instead of the contract ID.
+
+In Acton.toml this contract is configured as:
+[contracts.simple_id]
+           ^^^^^^^^^ contract ID to pass to Acton
+display-name = "Visible Simple"
+                ^^^^^^^^^^^^^^ display-name shown in logs/UI
+
+Pass simple_id instead of Visible Simple.
+
+Available contract IDs:
+ simple_id
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

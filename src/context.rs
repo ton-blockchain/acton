@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolkc::TolkSourceMap;
-use tolkc::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
@@ -21,10 +21,25 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::SourceLocation;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{ContData, Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
+
+#[derive(Debug)]
+pub struct DebugStopRequested;
+
+impl std::fmt::Display for DebugStopRequested {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Debug session stopped")
+    }
+}
+
+impl std::error::Error for DebugStopRequested {}
+
+pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
+    err.downcast_ref::<DebugStopRequested>().is_some()
+}
 
 #[derive(Debug, Clone)]
 pub struct AssertBinFailure {
@@ -54,31 +69,76 @@ pub struct FailAssertFailure {
 }
 
 #[derive(Debug, Clone)]
+pub struct AssertDecimalFailure {
+    pub left: String,
+    pub right: String,
+    pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+}
+
+#[derive(Debug, Clone)]
 pub struct GetMethodAssertFailure {
     pub get_method_presentation: String,
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
     pub source_map: Arc<TolkSourceMap>,
+    pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
 
+/// A display-only search param: either a concrete value or a `<function>` marker.
+#[derive(Debug, Clone)]
+pub enum DisplayParam<T> {
+    Value(T),
+    Function,
+}
+
 #[derive(Debug, Clone)]
 pub struct TransactionNotFoundParams {
-    pub to: Option<IntAddr>,
-    pub from: Option<IntAddr>,
-    pub value: Option<BigInt>,
-    pub exit_code: Option<u32>,
-    pub success: Option<bool>,
-    pub aborted: Option<bool>,
-    pub deploy: Option<bool>,
-    pub bounce: Option<bool>,
-    pub bounced: Option<bool>,
-    pub opcode: Option<u32>,
-    pub action_exit_code: Option<i32>,
-    pub compute_phase_skipped: Option<bool>,
-    pub body: Option<Cell>,
+    pub to: Option<DisplayParam<IntAddr>>,
+    pub from: Option<DisplayParam<IntAddr>>,
+    pub value: Option<DisplayParam<BigInt>>,
+    pub exit_code: Option<DisplayParam<u32>>,
+    pub success: Option<DisplayParam<bool>>,
+    pub aborted: Option<DisplayParam<bool>>,
+    pub deploy: Option<DisplayParam<bool>>,
+    pub bounce: Option<DisplayParam<bool>>,
+    pub bounced: Option<DisplayParam<bool>>,
+    pub opcode: Option<DisplayParam<u32>>,
+    pub action_exit_code: Option<DisplayParam<i32>>,
+    pub compute_phase_skipped: Option<DisplayParam<bool>>,
+    pub body: Option<DisplayParam<Cell>>,
+}
+
+/// A search field parsed from `SearchParams`.
+/// Tag 0 = absent, tag 1 = user-provided predicate, tag 2 = plain value converted to predicate.
+#[derive(Debug, Clone)]
+pub struct SearchField {
+    /// 1 = user predicate (display as `<predicate>`), 2 = value-based (display as `<value>`)
+    pub tag: u8,
+    pub predicate: ContData,
+}
+
+/// Parsed search params from `SearchParams` union fields.
+/// Each field is either a predicate (with tag for display) or absent (None).
+#[derive(Debug, Clone, Default)]
+pub struct ParsedSearchParams {
+    pub to: Option<SearchField>,
+    pub from: Option<SearchField>,
+    pub value: Option<SearchField>,
+    pub exit_code: Option<SearchField>,
+    pub success: Option<SearchField>,
+    pub aborted: Option<SearchField>,
+    pub deploy: Option<SearchField>,
+    pub bounce: Option<SearchField>,
+    pub bounced: Option<SearchField>,
+    pub opcode: Option<SearchField>,
+    pub action_exit_code: Option<SearchField>,
+    pub compute_phase_skipped: Option<SearchField>,
+    pub body: Option<SearchField>,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +159,7 @@ pub struct WalletNotFoundFailure {
 #[derive(Debug, Clone)]
 pub enum AssertFailure {
     Bin(AssertBinFailure),
+    Decimal(AssertDecimalFailure),
     Fail(FailAssertFailure),
     Assume(FailAssertFailure),
     GetMethod(GetMethodAssertFailure),
@@ -112,11 +173,12 @@ impl AssertFailure {
     pub fn message(&self) -> Option<String> {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
+            AssertFailure::Decimal(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
-            AssertFailure::GetMethod(_) => None, // Formatted in FormatterContext
-            AssertFailure::TransactionNotFound(arg) => arg.message.clone(),
-            AssertFailure::TransactionIsFound(arg) => arg.message.clone(),
-            AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
+            AssertFailure::GetMethod(_) | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
+            AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
+                arg.message.clone()
+            }
         }
     }
 
@@ -124,10 +186,12 @@ impl AssertFailure {
     pub fn location(&self) -> Option<SourceLocation> {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
+            AssertFailure::Decimal(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.location.clone(),
             AssertFailure::GetMethod(arg) => arg.location.clone(),
-            AssertFailure::TransactionNotFound(arg) => arg.location.clone(),
-            AssertFailure::TransactionIsFound(arg) => arg.location.clone(),
+            AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
+                arg.location.clone()
+            }
             AssertFailure::WalletNotFound(arg) => arg.location.clone(),
         }
     }
@@ -227,8 +291,15 @@ pub struct Emulations {
     pub name: String,
     pub messages: Vec<Vec<SendMessageResultSuccess>>,
     pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
+    pub trace_position_by_tx_lt: FxHashMap<u64, TracePosition>,
     pub trace_names: FxHashMap<u64, String>,
     pub get_methods: Vec<GetMethodResultSuccess>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TracePosition {
+    pub trace_index: usize,
+    pub tx_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -288,7 +359,13 @@ impl EmulationsState {
         let emulations = self.emulations_mut(env_name);
         emulations.messages.push(successful_messages);
         emulations.failed_messages.push(failed_messages);
-        emulations.messages.len() - 1
+        let trace_index = emulations.messages.len() - 1;
+        let tx_lts = emulations.messages[trace_index]
+            .iter()
+            .map(|result| result.transaction.lt)
+            .collect::<Vec<_>>();
+        index_trace_transactions(emulations, trace_index, &tx_lts);
+        trace_index
     }
 
     pub fn append_message_to_trace(
@@ -305,12 +382,23 @@ impl EmulationsState {
         {
             emulations.messages.push(successful_messages);
             emulations.failed_messages.push(failed_messages);
-            return emulations.messages.len() - 1;
+            let trace_index = emulations.messages.len() - 1;
+            let tx_lts = emulations.messages[trace_index]
+                .iter()
+                .map(|result| result.transaction.lt)
+                .collect::<Vec<_>>();
+            index_trace_transactions(emulations, trace_index, &tx_lts);
+            return trace_index;
         }
 
         emulations.messages[trace_index].extend(successful_messages);
         emulations.failed_messages[trace_index].extend(failed_messages);
         recompute_trace_child_transactions(&mut emulations.messages[trace_index]);
+        let tx_lts = emulations.messages[trace_index]
+            .iter()
+            .map(|result| result.transaction.lt)
+            .collect::<Vec<_>>();
+        index_trace_transactions(emulations, trace_index, &tx_lts);
         trace_index
     }
 
@@ -321,6 +409,7 @@ impl EmulationsState {
                 name: env_name.to_owned(),
                 messages: vec![],
                 failed_messages: vec![],
+                trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })
@@ -334,13 +423,31 @@ impl EmulationsState {
         };
 
         let trace_root_lt = emulations
-            .messages
-            .iter()
-            .find(|trace| trace.iter().any(|tx| tx.transaction.lt == lt))
+            .trace_position_by_tx_lt
+            .get(&lt)
+            .and_then(|position| emulations.messages.get(position.trace_index))
             .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
             .unwrap_or(lt);
 
         emulations.trace_names.insert(trace_root_lt, trace_name);
+    }
+
+    #[must_use]
+    pub fn find_trace_segment_by_tx_lt_range(
+        &self,
+        env_name: &str,
+        first_tx_lt: u64,
+        last_tx_lt: u64,
+    ) -> Option<&[SendMessageResultSuccess]> {
+        let emulations = self.results.get(env_name)?;
+        let first = emulations.trace_position_by_tx_lt.get(&first_tx_lt)?;
+        let last = emulations.trace_position_by_tx_lt.get(&last_tx_lt)?;
+        if first.trace_index != last.trace_index || first.tx_index > last.tx_index {
+            return None;
+        }
+
+        let trace = emulations.messages.get(first.trace_index)?;
+        trace.get(first.tx_index..=last.tx_index)
     }
 
     #[must_use]
@@ -384,6 +491,7 @@ impl EmulationsState {
                 name: env_name.to_owned(),
                 messages: vec![],
                 failed_messages: vec![],
+                trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })
@@ -434,6 +542,18 @@ fn recompute_trace_child_transactions(trace: &mut [SendMessageResultSuccess]) {
         result.child_transactions = children_by_parent
             .remove(&result.transaction.lt)
             .unwrap_or_default();
+    }
+}
+
+fn index_trace_transactions(emulations: &mut Emulations, trace_index: usize, tx_lts: &[u64]) {
+    for (tx_index, tx_lt) in tx_lts.iter().copied().enumerate() {
+        emulations.trace_position_by_tx_lt.insert(
+            tx_lt,
+            TracePosition {
+                trace_index,
+                tx_index,
+            },
+        );
     }
 }
 
@@ -593,8 +713,9 @@ pub struct Env<'a> {
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
     pub running_id: Arc<str>,
+    /// The compiled code of the currently running test contract (for c3 in `run_continuation`).
+    pub test_code: Option<Cell>,
 }
 
 pub struct Context<'a> {
@@ -732,7 +853,7 @@ impl<'a> DebugCtx<'a> {
         }
     }
 
-    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
+    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<bool> {
         self.session().process_incoming_requests(terminate_at_end)
     }
 
@@ -761,10 +882,6 @@ impl<'a> DebugCtx<'a> {
     #[must_use]
     pub fn performing_step(&mut self) -> Option<StepMode> {
         self.session().performing_step()
-    }
-
-    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
-        self.session().advance_parent_after_child_return()
     }
 }
 

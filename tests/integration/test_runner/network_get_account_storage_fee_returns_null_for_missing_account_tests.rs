@@ -5,11 +5,13 @@ use std::fs;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
 const NETWORK_IMPORTS_WITH_TRANSACTION: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 import "../../lib/types/transaction"
 "#;
@@ -42,10 +44,10 @@ fn network_get_account_storage_fee_returns_null_for_missing_account() {
         "bk-stdlib-network-get-account-storage-fee-missing-account",
         r#"
 get fun `test bk stdlib network get account storage fee missing account`() {
-    val missing = net.randomAddress("bk_missing_storage_fee_account");
-    expect(net.getAccountState(missing) == null).toBeTrue();
-    expect(net.getAccountStorageFee(missing, 86400) == null).toBeTrue();
-    expect(net.getAccountStorageFee(missing, 0) == null).toBeTrue();
+    val missing = randomAddress("bk_missing_storage_fee_account");
+    expect(testing.getAccountState(missing) == null).toBeTrue();
+    expect(testing.getAccountStorageFee(missing, 86400) == null).toBeTrue();
+    expect(testing.getAccountStorageFee(missing, 0) == null).toBeTrue();
 }
 "#,
         "integration/snapshots/test-runner/network_get_account_storage_fee_returns_null_for_missing_account/network_get_account_storage_fee_returns_null_for_missing_account.stdout.txt",
@@ -57,16 +59,17 @@ fn network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixt
     let fixture = FixtureProject::load("basic");
     let source = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 
 get fun `test bk stdlib network get account storage fee existing account`() {
     val seconds = 86400;
-    val treasury = net.treasury("bk_storage_fee_sender");
+    val treasury = testing.treasury("bk_storage_fee_sender");
 
-    val storageFee = net.getAccountStorageFee(treasury.address, seconds);
+    val storageFee = testing.getAccountStorageFee(treasury.address, seconds);
     expect(storageFee != null).toBeTrue();
 
-    val zeroFee = net.getAccountStorageFee(treasury.address, 0);
+    val zeroFee = testing.getAccountStorageFee(treasury.address, 0);
     expect(zeroFee != null).toBeTrue();
     expect(zeroFee!).toEqual(0);
     expect(storageFee! >= zeroFee!).toBeTrue();
@@ -100,20 +103,20 @@ fn account_state_variants_uninit_and_active_are_parsed_from_accounts() {
         "bk-stdlib-account-state-uninit-and-active-variants",
         r#"
 get fun `test bk stdlib account state uninit and active variants`() {
-    val uninitAddr = net.randomAddress("bk_state_variant_uninit_addr");
-    net.topUp(uninitAddr, ton("1"));
+    val uninitAddr = randomAddress("bk_state_variant_uninit_addr");
+    testing.topUp(uninitAddr, ton("1"));
 
-    val uninitAcc = net.getAccount(uninitAddr);
-    expect(uninitAcc is AccountInfo).toBeTrue();
-    if (uninitAcc is AccountInfo) {
-        expect(uninitAcc.storage.state is AccountStateUninit).toBeTrue();
+    val uninitAcc = testing.getShardAccount(uninitAddr)!.account.load();
+    expect(uninitAcc is TlbAccountInfo).toBeTrue();
+    if (uninitAcc is TlbAccountInfo) {
+        expect(uninitAcc.storage.state is TlbAccountStateUninit).toBeTrue();
     }
 
-    val treasury = net.treasury("bk_state_variant_active_treasury");
-    val activeAcc = net.getAccount(treasury.address);
-    expect(activeAcc is AccountInfo).toBeTrue();
-    if (activeAcc is AccountInfo) {
-        expect(activeAcc.storage.state is AccountStateActive).toBeTrue();
+    val treasury = testing.treasury("bk_state_variant_active_treasury");
+    val activeAcc = testing.getShardAccount(treasury.address)!.account.load();
+    expect(activeAcc is TlbAccountInfo).toBeTrue();
+    if (activeAcc is TlbAccountInfo) {
+        expect(activeAcc.storage.state is TlbAccountStateActive).toBeTrue();
     }
 }
 "#,
@@ -129,11 +132,11 @@ fn account_state_frozen_local_roundtrip_cell_works() {
         r"
 get fun `test bk stdlib account state frozen local roundtrip`() {
     val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
-    val frozen = AccountStateFrozen { stateHash: frozenHash };
-    val parsed = AccountState.fromCell(frozen.toCell());
+    val frozen = TlbAccountStateFrozen { stateHash: frozenHash };
+    val parsed = TlbAccountState.fromCell(frozen.toCell());
 
-    expect(parsed is AccountStateFrozen).toBeTrue();
-    if (parsed is AccountStateFrozen) {
+    expect(parsed is TlbAccountStateFrozen).toBeTrue();
+    if (parsed is TlbAccountStateFrozen) {
         expect(parsed.stateHash).toEqual(frozenHash);
     }
 }
@@ -149,32 +152,41 @@ fn account_state_frozen_roundtrip_via_set_account_bug() {
         "bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug",
         r#"
 get fun `test bk stdlib account state frozen roundtrip via set account bug`() {
-    val baseAddr = net.randomAddress("bk_state_variant_frozen_base_addr");
-    net.topUp(baseAddr, ton("1"));
+    val baseAddr = randomAddress("bk_state_variant_frozen_base_addr");
+    testing.topUp(baseAddr, ton("1"));
 
-    val baseAcc = net.getAccount(baseAddr);
-    expect(baseAcc is AccountInfo).toBeTrue();
+    val baseShard = testing.getShardAccount(baseAddr);
+    expect(baseShard).toBeNotNull();
+    val baseAcc = baseShard!.account.load();
+    expect(baseAcc is TlbAccountInfo).toBeTrue();
 
-    val frozenAddr = net.randomAddress("bk_state_variant_frozen_target_addr");
+    val frozenAddr = randomAddress("bk_state_variant_frozen_target_addr");
     val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
 
-    if (baseAcc is AccountInfo) {
-        val frozenAcc = AccountInfo {
+    if (baseAcc is TlbAccountInfo) {
+        val frozenAcc = TlbAccountInfo {
             addr: frozenAddr,
             storageStat: baseAcc.storageStat,
             storage: {
                 lastTransLt: baseAcc.storage.lastTransLt,
                 balance: baseAcc.storage.balance,
-                state: AccountStateFrozen { stateHash: frozenHash },
+                state: TlbAccountStateFrozen { stateHash: frozenHash },
             },
         };
-        net.setAccount(frozenAddr, frozenAcc);
+        testing.setShardAccount(
+            frozenAddr,
+            TlbShardAccount {
+                account: (frozenAcc as TlbAccount).toCell(),
+                lastTransHash: baseShard!.lastTransHash,
+                lastTransLt: baseShard!.lastTransLt,
+            },
+        );
     }
 
-    val frozenAccAfter = net.getAccount(frozenAddr);
-    expect(frozenAccAfter is AccountInfo).toBeTrue();
-    if (frozenAccAfter is AccountInfo) {
-        expect(frozenAccAfter.storage.state is AccountStateFrozen).toBeTrue();
+    val frozenAccAfter = testing.getShardAccount(frozenAddr)!.account.load();
+    expect(frozenAccAfter is TlbAccountInfo).toBeTrue();
+    if (frozenAccAfter is TlbAccountInfo) {
+        expect(frozenAccAfter.storage.state is TlbAccountStateFrozen).toBeTrue();
     }
 }
 "#,

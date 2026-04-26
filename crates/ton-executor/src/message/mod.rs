@@ -94,12 +94,14 @@ impl Executor {
     ///
     /// # Arguments
     ///
-    /// * `verbosity` – The verbosity level for the emulator logs.
+    /// * `verbosity` – The verbosity level for the emulator logs. Use
+    ///   [`ExecutorVerbosity::Off`] to disable VM logs completely in the native emulator.
     /// * `config_b64` – Optional Base64 encoded blockchain configuration. If `None`,
     ///   the default configuration is used.
     ///
     /// Note: verbosity level influences the overall performance of the emulator.
-    /// The more verbose the logs, the slower the emulation.
+    /// The more verbose the logs, the slower the emulation. `ExecutorVerbosity::Off`
+    /// avoids VM log construction overhead entirely.
     pub fn new(verbosity: ExecutorVerbosity, config_b64: Option<&str>) -> anyhow::Result<Executor> {
         let config_b64 = config_b64.unwrap_or(DEFAULT_CONFIG);
         let config_cstr = CString::new(config_b64).context("config contains null bytes")?;

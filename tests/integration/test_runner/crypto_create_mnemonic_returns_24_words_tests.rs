@@ -2,7 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 const CRYPTO_IMPORTS: &str = r#"
-import "../../lib/crypto/crypto"
+import "../../lib/crypto"
 import "../../lib/testing/expect"
 "#;
 

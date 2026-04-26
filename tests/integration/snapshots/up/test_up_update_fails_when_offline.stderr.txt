@@ -1,0 +1,1 @@
+Error: Failed to look up the latest release on GitHub. Check your network connection and try again.

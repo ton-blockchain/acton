@@ -3,6 +3,7 @@ import {
   DocsBody,
   DocsDescription,
   DocsPage,
+  PageLastUpdate,
   DocsTitle,
 } from 'fumadocs-ui/layouts/docs/page';
 import {notFound} from 'next/navigation';
@@ -21,7 +22,7 @@ export default async function Page(props: PageProps) {
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
-  const MDX = page.data.body;
+  const { body: MDX, lastModified } = page.data;
 
   const llmText = getLLMText(page);
 
@@ -33,7 +34,7 @@ export default async function Page(props: PageProps) {
         <LLMCopyButton content={llmText}/>
         <ViewOptions
           markdownUrl={`${page.url}.mdx`}
-          githubUrl={`https://github.com/ton-blockchain/emulator-rs/blob/main/docs/content/docs/${page.path}`}
+          githubUrl={`https://github.com/ton-blockchain/acton/blob/master/docs/content/docs/${page.path}`}
         />
       </div>
       <DocsBody>
@@ -44,6 +45,11 @@ export default async function Page(props: PageProps) {
           })}
         />
       </DocsBody>
+      {lastModified && (
+        <div className="mt-4 border-t pt-4">
+          <PageLastUpdate date={lastModified} />
+        </div>
+      )}
     </DocsPage>
   );
 }

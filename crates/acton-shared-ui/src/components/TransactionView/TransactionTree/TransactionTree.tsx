@@ -13,7 +13,13 @@ import {
 import type {BackendContractInfo} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {fmt} from "@/index"
-import {getTransactionOpcode} from "@/utils/transaction"
+import {
+  getTransactionActionPhase,
+  getTransactionComputePhase,
+  getTransactionOpcode,
+  getTransactionSourceLabel,
+  resolveTransactionOpcodeName,
+} from "@/utils/transaction"
 
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 
@@ -235,13 +241,15 @@ export function TransactionTree({
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     triggerRectReference.current = rect
 
-    const description = tx.transaction.description
-    const computePhase = description.type === "generic" ? description.computePhase : undefined
+    const computePhase = getTransactionComputePhase(tx.transaction)
+    const sourceLabel = getTransactionSourceLabel(tx.transaction)
 
     const tooltipData: EdgeTransactionTooltipData = {
-      fromAddress: tx.transaction.inMessage?.info.src
-        ? formatAddress(tx.transaction.inMessage.info.src as Address, new Map())
-        : "unknown",
+      fromAddress:
+        sourceLabel ??
+        (tx.transaction.inMessage?.info.src
+          ? formatAddress(tx.transaction.inMessage.info.src as Address, new Map())
+          : "unknown"),
       computePhase: {
         success: computePhase?.type === "vm" ? computePhase.success : true,
         exitCode: computePhase?.type === "vm" ? computePhase.exitCode : undefined,
@@ -301,14 +309,13 @@ export function TransactionTree({
     })
   }
 
-  const treeData: RawNodeDatum = useMemo(() => {
+  const treeData: RawNodeDatum = useMemo<RawNodeDatum>(() => {
     const convertTransactionToNode = (tx: TransactionInfo): RawNodeDatum => {
       const thisAddress = tx.address
       const addressName = formatAddress(thisAddress, contracts)
 
-      const description = tx.transaction.description
-      const computePhase = description.type === "generic" ? description.computePhase : undefined
-      const actionPhase = description.type === "generic" ? description.actionPhase : undefined
+      const computePhase = getTransactionComputePhase(tx.transaction)
+      const actionPhase = getTransactionActionPhase(tx.transaction)
 
       const inMessage = tx.transaction.inMessage
       const withInitCode = inMessage?.init?.code !== undefined
@@ -322,15 +329,8 @@ export function TransactionTree({
       const value = inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined
 
       const opcode = getTransactionOpcode(tx.transaction)
-
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-      let typeAbi = targetContract?.abi?.messages.find(it => it.opcode === opcode)
-      if (typeAbi === undefined) {
-        for (const contract of allContracts) {
-          typeAbi = contract.abi?.messages.find(it => it.opcode === opcode)
-        }
-      }
-      const opcodeName = typeAbi?.name
+      const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
       const opcodeHex = opcodeName ?? (opcode === undefined ? "empty" : `0x${opcode.toString(16)}`)
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
@@ -358,7 +358,7 @@ export function TransactionTree({
       return {
         name: addressName,
         attributes: {
-          from: inMessage?.info.src?.toString() ?? "unknown",
+          from: getTransactionSourceLabel(tx.transaction) ?? inMessage?.info.src?.toString() ?? "unknown",
           to: inMessage?.info.dest?.toString() ?? "unknown",
           lt,
           success: isSuccess ? "✓" : "✗",
@@ -376,29 +376,70 @@ export function TransactionTree({
     }
 
     if (rootTransactions.length > 0) {
+      const sharedInternalSource = getSharedInternalSource(rootTransactions)
+
+      if (
+        rootTransactions.length === 1 &&
+        rootTransactions[0]?.transaction.inMessage?.info.type === "external-in"
+      ) {
+        return {
+          name: "",
+          attributes: {
+            isRoot: "hidden",
+            contractLetter: "",
+          },
+          children: [convertTransactionToNode(rootTransactions[0])],
+        } satisfies RawNodeDatum
+      }
+
+      if (sharedInternalSource) {
+        const sourceContract = contracts.get(sharedInternalSource.toString())
+
+        return {
+          name: formatAddress(sharedInternalSource, contracts),
+          attributes: {
+            isRoot: "source",
+            contractLetter: sourceContract?.letter ?? "BL",
+          },
+          children: rootTransactions.map(it => convertTransactionToNode(it)),
+        } satisfies RawNodeDatum
+      }
+
       return {
         name: "",
         attributes: {
           isRoot: "true",
+          contractLetter: "",
         },
         children: rootTransactions.map(it => convertTransactionToNode(it)),
-      }
+      } satisfies RawNodeDatum
     }
 
     return {
       name: "No transactions",
       attributes: {
         isRoot: "false",
+        contractLetter: "",
       },
       children: [],
-    }
+    } satisfies RawNodeDatum
   }, [rootTransactions, contracts, selectedTransaction, allContracts])
 
   const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
-    if (nodeDatum.attributes?.isRoot === "true") {
+    if (nodeDatum.attributes?.isRoot === "hidden") {
+      return <g />
+    }
+
+    if (nodeDatum.attributes?.isRoot === "source") {
       return (
-        <g>
-          <circle r={15} fill={"var(--bg-color)"} stroke="var(--text-primary)" strokeWidth={1.5} />
+        <g className={styles.rootNode}>
+          <circle
+            r={15}
+            fill={"var(--bg-color)"}
+            stroke="var(--text-primary)"
+            strokeWidth={1.5}
+            className={styles.rootCircle}
+          />
           <text
             fill="var(--text-primary)"
             strokeWidth="0"
@@ -407,6 +448,33 @@ export function TransactionTree({
             fontSize="14"
             fontWeight="bold"
             textAnchor="middle"
+            className={styles.nodeText}
+          >
+            {(nodeDatum.attributes?.contractLetter as string) || "BL"}
+          </text>
+        </g>
+      )
+    }
+
+    if (nodeDatum.attributes?.isRoot === "true") {
+      return (
+        <g className={styles.rootNode}>
+          <circle
+            r={15}
+            fill={"var(--bg-color)"}
+            stroke="var(--text-primary)"
+            strokeWidth={1.5}
+            className={styles.rootCircle}
+          />
+          <text
+            fill="var(--text-primary)"
+            strokeWidth="0"
+            x="0"
+            y="5"
+            fontSize="14"
+            fontWeight="bold"
+            textAnchor="middle"
+            className={styles.nodeText}
           >
             BL
           </text>
@@ -446,7 +514,7 @@ export function TransactionTree({
               xmlns="http://www.w3.org/2000/svg"
               className={styles.iconSvg}
             >
-              <title>Internal Out</title>
+              <title>External Out</title>
               <path
                 d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
                 fill="var(--text-muted)"
@@ -515,7 +583,7 @@ export function TransactionTree({
               ? "var(--text-primary)"
               : nodeDatum.attributes?.success === "✓"
                 ? "var(--bg-color)"
-                : "var(--color-failed)"
+                : "var(--transaction-tree-failed-node-fill)"
           }
           stroke={"var(--text-primary)"}
           strokeWidth={1.5}
@@ -689,4 +757,25 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
   }
 
   return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
+}
+
+function getSharedInternalSource(rootTransactions: readonly TransactionInfo[]): Address | undefined {
+  if (rootTransactions.length === 0) {
+    return undefined
+  }
+
+  const firstInMessage = rootTransactions[0]?.transaction.inMessage
+  if (firstInMessage?.info.type !== "internal") {
+    return undefined
+  }
+
+  const source = firstInMessage.info.src
+  const sourceAddress = source.toString()
+
+  const allShareSameInternalSource = rootTransactions.every(tx => {
+    const inMessage = tx.transaction.inMessage
+    return inMessage?.info.type === "internal" && inMessage.info.src.toString() === sourceAddress
+  })
+
+  return allShareSameInternalSource ? source : undefined
 }

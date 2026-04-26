@@ -173,12 +173,12 @@ fn fail_fast_stops_after_first_failure_with_todo_and_skip() {
             r#"
             import "../../lib/testing/expect"
 
-            @test("todo")
+            @test.todo
             get fun `test todo before failure`() {
                 expect(1).toEqual(2); // Must not run
             }
 
-            @test("skip")
+            @test.skip
             get fun `test skip before failure`() {
                 expect(1).toEqual(2); // Must not run
             }

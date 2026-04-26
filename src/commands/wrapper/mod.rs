@@ -9,11 +9,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use tolkc::CompilerResult;
-use tolkc::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
+use tolk_compiler::CompilerResult;
+use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
 use ton_abi::ContractAbi as LegacyContractAbi;
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
+const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
+const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
 struct WrapperModel {
     project_root: PathBuf,
@@ -28,7 +30,7 @@ struct WrapperModel {
     wrapper_path: PathBuf,
     test_path: PathBuf,
     mappings: Option<BTreeMap<String, String>>,
-    format_options: tolkfmt::FormatOptions,
+    format_options: tolk_fmt::FormatOptions,
 }
 
 #[derive(Serialize)]
@@ -54,7 +56,7 @@ fn build_model(
         let separate_import_groups = fmt_settings
             .and_then(|s| s.separate_import_groups)
             .unwrap_or(false);
-        tolkfmt::FormatOptions {
+        tolk_fmt::FormatOptions {
             width,
             separate_import_groups,
         }
@@ -65,7 +67,7 @@ fn build_model(
         .get_contract(contract_id)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(config, contract_id)))?;
 
-    let contract_path = project_root.join(&contract_config.src);
+    let contract_path = contract_config.absolute_source_path(&project_root);
 
     if !contract_path.exists() {
         anyhow::bail!(
@@ -82,7 +84,7 @@ fn build_model(
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
     let mappings = config.mappings();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let (abi, code_boc64) = match compiler.compile(&contract_path, false) {
         CompilerResult::Success(result) => (
             result.abi.ok_or_else(|| {
@@ -168,7 +170,7 @@ fn format_generated_tolk(
     output_path: &Path,
     artifact_label: &str,
 ) -> String {
-    match tolkfmt::format_source(&raw, model.format_options) {
+    match tolk_fmt::format_source(&raw, model.format_options) {
         Ok(formatted) => formatted,
         Err(err) => {
             eprintln!(
@@ -310,7 +312,9 @@ fn resolve_wrapper_path(
                 .join(&file_name);
         }
 
-        return project_root.join("wrappers").join(&file_name);
+        return project_root
+            .join(DEFAULT_TYPESCRIPT_WRAPPER_DIR)
+            .join(&file_name);
     }
 
     if let Some(configured_tolk_output_dir) = non_empty_path(configured_tolk_output_dir) {
@@ -323,7 +327,7 @@ fn resolve_wrapper_path(
             .join(&file_name);
     }
 
-    project_root.join("wrappers").join(&file_name)
+    project_root.join(DEFAULT_TOLK_WRAPPER_DIR).join(&file_name)
 }
 
 fn resolve_test_path(
@@ -352,7 +356,11 @@ fn resolve_test_path(
 }
 
 fn wrapper_file_name(contract_name: &str, generate_typescript: bool) -> String {
-    let extension = if generate_typescript { "ts" } else { "tolk" };
+    let extension = if generate_typescript {
+        "gen.ts"
+    } else {
+        "gen.tolk"
+    };
     format!("{contract_name}.{extension}")
 }
 
@@ -464,12 +472,9 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     let mut code = String::new();
 
-    code.push_str("import \"@stdlib/gas-payments\"\n");
-    code.push_str(&import_stdlib("build/build"));
+    code.push_str(&import_stdlib("build"));
     code.push_str(&import_stdlib("emulation/network"));
     code.push_str(&import_stdlib("testing/assert"));
-    code.push_str(&import_stdlib("testing/expect"));
-    code.push_str(&import_stdlib("types/message"));
 
     if let Some(storage_path) = &model.storage_path {
         let storage_import = get_import_path(proot, root, storage_path, mappings);
@@ -488,6 +493,15 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     code.push('\n');
 
+    if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path) {
+        let import_path = get_import_path(proot, root, storage_path, mappings);
+        let display = import_path.display().to_string();
+        let display = display.trim_start_matches("./").trim_end_matches(".tolk");
+        code.push_str(&format!(
+            "/// Storage `{}` is defined in `{display}`\n",
+            storage.name
+        ));
+    }
     code.push_str(&format!("struct {contract} {{\n"));
     code.push_str("    address: address\n");
     code.push_str("    stateInit: ContractState? = null\n");
@@ -534,7 +548,7 @@ fn generate_from_storage(
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null) {{\n",
+        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null): {contract_name} {{\n",
     ));
     code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
@@ -542,9 +556,9 @@ fn generate_from_storage(
     ));
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = toShard == null\n");
-    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
-    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
+    code.push_str(
+        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+    );
     code.push_str(&format!(
         "    return {contract_name} {{ address, stateInit }}\n",
     ));
@@ -558,7 +572,7 @@ fn generate_from_address(contract_name: &str) -> String {
 
     code.push_str("/// Creates a contract wrapper instance from the address\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromAddress(address: address) {{\n"
+        "fun {contract_name}.fromAddress(address: address): {contract_name} {{\n"
     ));
     code.push_str(&format!("    return {contract_name} {{ address }}\n",));
     code.push_str("}\n");
@@ -571,7 +585,7 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null) {{\n"
+        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null): {contract_name} {{\n"
     ));
     code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
@@ -579,9 +593,9 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     ));
     code.push_str("        data: createEmptyCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = toShard == null\n");
-    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
-    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
+    code.push_str(
+        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+    );
     code.push_str(&format!(
         "    return {contract_name} {{ address, stateInit }}\n"
     ));
@@ -732,31 +746,22 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self): {return_type} {{\n"
         ));
-        code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
-        ));
     } else {
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self, {params}): {return_type} {{\n"
         ));
+    }
 
-        if args.is_empty() {
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
-            ));
-        } else if args.len() == 1 {
-            let arg_name = &args[0];
+    if args.is_empty() {
+        code.push_str(&format!(
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
+        ));
+    } else {
+        let args = args.join(", ");
 
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", {arg_name})\n"
-            ));
-        } else {
-            let args = args.join(", ");
-
-            code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}] as tuple)\n"
-            ));
-        }
+        code.push_str(&format!(
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}])\n"
+        ));
     }
 
     code.push_str("}\n");
@@ -787,8 +792,8 @@ fn generate_test(model: &WrapperModel) -> String {
 
     code.push_str("import \"@stdlib/gas-payments\"\n");
     code.push_str(&import_stdlib("emulation/network"));
+    code.push_str(&import_stdlib("emulation/testing"));
     code.push_str(&import_stdlib("testing/expect"));
-    code.push_str(&import_stdlib("testing/transaction_expect"));
 
     for messages_path in &model.message_paths {
         let types_import = get_import_path(proot, root, messages_path, mappings);
@@ -912,14 +917,16 @@ fn generate_setup_test(
         "/// Initializes the test environment, creating a fresh instance of the contract.\n",
     );
     code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).\n");
-    code.push_str("fun setupTest() {\n");
+    code.push_str(&format!(
+        "fun setupTest(): ({contract_name}, Treasury, Treasury) {{\n"
+    ));
 
     code.push_str("    // Create a treasury account for deployment (typically the owner)\n");
-    code.push_str("    val deployer = net.treasury(\"deployer\");\n");
+    code.push_str("    val deployer = testing.treasury(\"deployer\");\n");
     code.push_str(
         "    // Create another treasury account for testing interactions from other users\n",
     );
-    code.push_str("    val not_deployer = net.treasury(\"not_deployer\");\n");
+    code.push_str("    val not_deployer = testing.treasury(\"not_deployer\");\n");
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 

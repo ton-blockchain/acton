@@ -9,7 +9,7 @@
 
  > tests/aj_vm_helpers.test.tolk (1 test)
   ✗ aj stdlib vm convert address invalid [TIME]
-    └─ Error: invalid address format
+    └─ Error: Cannot parse address: not-an-address: invalid address format
 
  ✗ 1 failed in 1 file
 

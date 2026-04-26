@@ -2,6 +2,7 @@ use acton::commands;
 use acton::commands::build::build_cmd;
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
+use acton::commands::create_app::create_app_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
@@ -14,6 +15,7 @@ use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
+use acton::commands::meta::{BuiltinSchema, print_schema_cmd};
 use acton::commands::new::{ProjectTemplate, new_cmd};
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::rpc::{RpcCommand, rpc_cmd};
@@ -28,7 +30,7 @@ use acton::paths;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
-    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
+    ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
     WalletsFile, global_wallets_path, init_manifest_path_with_source,
     init_project_root_with_source, project_root as configured_project_root,
 };
@@ -50,8 +52,8 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
-use tasm::printer::FormatOptions;
-use tolkc::TolkSourceMap;
+use tasm_core::printer::FormatOptions;
+use tolk_compiler::TolkSourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -102,8 +104,11 @@ enum Commands {
         after_help = detailed_help_pointer("new")
     )]
     New {
-        #[arg(help = "Directory to create the project in (use '.' for the current directory)")]
-        path: String,
+        #[arg(
+            help = "Directory to create the project in (use '.' for the current directory)",
+            required_unless_present = "templates"
+        )]
+        path: Option<String>,
         #[arg(long, help = "Project name")]
         name: Option<String>,
         #[arg(long, help = "Project description")]
@@ -121,6 +126,31 @@ enum Commands {
         hooks: bool,
         #[arg(long, help = "Include an AGENTS.md file with coding-agent guidance")]
         agents: bool,
+        #[arg(
+            long,
+            hide = true,
+            help = "Print machine-readable template metadata as JSON",
+            conflicts_with_all = [
+                "path",
+                "name",
+                "description",
+                "template",
+                "license",
+                "app",
+                "hooks",
+                "agents"
+            ]
+        )]
+        templates: bool,
+    },
+    #[command(
+        about = "Create a TypeScript app scaffold",
+        long_about = "Create a TypeScript app scaffold in the specified directory. Defaults to ./app.",
+        after_help = detailed_help_pointer("create-app")
+    )]
+    CreateApp {
+        #[arg(help = "Directory to create the app in (default: app)")]
+        path: Option<PathBuf>,
     },
     #[command(
         about = "Print this message or the help of a given top-level command",
@@ -196,6 +226,13 @@ enum Commands {
             help_heading = "Execution"
         )]
         fuzz_seed: Option<u64>,
+        #[arg(
+            long,
+            action = clap::ArgAction::Count,
+            help = "Increase executor log verbosity (currently supports only level 1)",
+            help_heading = "Execution"
+        )]
+        verbose: u8,
 
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
@@ -224,7 +261,7 @@ enum Commands {
             long,
             value_name = "PERCENT",
             value_parser = parse_coverage_percent,
-            help = "Fail if total line coverage is below this percentage",
+            help = "Fail if the final coverage score is below this percentage",
             help_heading = "Coverage"
         )]
         coverage_minimum_percent: Option<f64>,
@@ -312,12 +349,6 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
-        #[arg(
-            long,
-            help = "TonCenter API key for blockchain queries",
-            help_heading = "Remote"
-        )]
-        api_key: Option<String>,
 
         // Tracing
         #[arg(
@@ -437,11 +468,11 @@ enum Commands {
         ui_port: u16,
     },
     #[command(
-        about = "Generate wrapper and optionally stub test file for a contract",
+        about = "Generate wrappers and optionally a stub test file for a contract",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrapper", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(
             long,
@@ -501,6 +532,14 @@ enum Commands {
         #[arg(help = "Arguments to pass to the script")]
         args: Vec<String>,
 
+        #[arg(
+            long,
+            action = clap::ArgAction::Count,
+            help = "Increase executor log verbosity (currently supports only level 1)",
+            help_heading = "Script"
+        )]
+        verbose: u8,
+
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
@@ -536,12 +575,6 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
-        #[arg(
-            long,
-            help = "TonCenter API key for blockchain queries",
-            help_heading = "Remote"
-        )]
-        api_key: Option<String>,
 
         // Broadcasting
         #[arg(
@@ -631,6 +664,11 @@ enum Commands {
         source_map: Option<String>,
         #[arg(long, help = "Output ABI to file")]
         abi: Option<String>,
+        #[arg(
+            long,
+            help = "Allow compiling files without `main()` or `onInternalMessage()` entrypoints"
+        )]
+        allow_no_entrypoint: bool,
         #[arg(long, help = "Clear compilation cache before running")]
         clear_cache: bool,
     },
@@ -662,8 +700,6 @@ enum Commands {
             help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
         )]
         address: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Network for `--address` and library lookups")]
         net: Option<String>,
         #[arg(
@@ -693,8 +729,6 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
     },
     #[command(
         about = "Check Tolk files in the project for errors",
@@ -748,13 +782,7 @@ enum Commands {
         hash: String,
         #[arg(long, help = "Network to use")]
         net: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
-        #[arg(
-            short,
-            long,
-            help = "Show full cell hex instead of hashes in out actions"
-        )]
+        #[arg(long, help = "Show full cell hex instead of hashes in out actions")]
         verbose: bool,
         #[arg(long, help = "Directory to save VM and executor logs")]
         logs_dir: Option<String>,
@@ -782,12 +810,12 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
-        about = "Manage lightweight TON node",
-        after_help = detailed_help_pointer("litenode")
+        about = "Manage local TON network",
+        after_help = detailed_help_pointer("localnet")
     )]
-    Litenode {
+    Localnet {
         #[command(subcommand)]
-        command: LitenodeCommand,
+        command: LocalnetCommand,
     },
     #[command(
         about = "Format Tolk source files",
@@ -843,8 +871,12 @@ enum Commands {
             conflicts_with_all = ["list", "check"]
         )]
         stable: bool,
-        #[arg(short, long, help = "Skip confirmation prompts")]
-        yes: bool,
+        #[arg(
+            long,
+            help = "Install the selected release even if Acton is already up to date",
+            conflicts_with_all = ["list", "check"]
+        )]
+        force: bool,
         #[arg(long, help = "List available versions", conflicts_with = "check")]
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
@@ -884,8 +916,13 @@ enum Commands {
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
-        #[clap(value_enum)]
-        shell: clap_complete::Shell,
+        #[arg(value_parser = ["bash", "elvish", "fish", "powershell", "zsh", "nushell"])]
+        shell: String,
+    },
+    #[command(hide = true)]
+    Meta {
+        #[command(subcommand)]
+        command: MetaCommand,
     },
     #[command(
         about = "Internal command to generate MDX documentation from standard library",
@@ -910,50 +947,48 @@ enum Commands {
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LitenodeCommand {
-    #[command(about = "Start the lightweight TON node")]
+pub enum LocalnetCommand {
+    #[command(about = "Start the local TON network")]
     Start {
-        #[arg(long, help = "LiteNode server port (default: [litenode].port or 5411)")]
+        #[arg(long, help = "Localnet server port (default: [localnet].port or 5411)")]
         port: Option<u16>,
         #[arg(
             long,
-            help = "Fork from network for remote account resolution (default: [litenode].fork-net)"
+            help = "Fork from network for remote account resolution (default: [localnet].fork-net)"
         )]
         fork_net: Option<String>,
         #[arg(
             long,
-            help = "Block sequence number to fork from (default: [litenode].fork-block-number)",
+            help = "Block sequence number to fork from (default: [localnet].fork-block-number)",
             value_name = "SEQNO"
         )]
         fork_block_number: Option<u64>,
         #[arg(
             long,
             value_delimiter = ',',
-            help = "Wallet names to auto-fund and deploy on startup (default: [litenode].accounts)",
+            help = "Wallet names to auto-fund and deploy on startup (default: [localnet].accounts)",
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Path to SQLite database for persistent storage")]
         db_path: Option<String>,
         #[arg(
             long,
             value_name = "RPS",
             value_parser = clap::value_parser!(u32).range(1..),
-            help = "Maximum API requests per second to simulate provider rate limits (default: [litenode].rate-limit)"
+            help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
         #[arg(
             long,
-            help = "Load LiteNode state from JSON snapshot before startup",
+            help = "Load Localnet state from JSON snapshot before startup",
             conflicts_with = "db_path", // for now
             value_name = "PATH"
         )]
         load_state: Option<String>,
         #[arg(
             long,
-            help = "Dump LiteNode state to JSON snapshot on shutdown",
+            help = "Dump Localnet state to JSON snapshot on shutdown",
             value_name = "PATH"
         )]
         dump_state: Option<String>,
@@ -967,7 +1002,7 @@ pub enum LitenodeCommand {
         #[arg(
             long,
             short,
-            help = "LiteNode server port (default: [litenode].port or 5411)"
+            help = "Localnet server port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
     },
@@ -988,8 +1023,6 @@ pub enum LibraryCommand {
         duration: Option<String>,
         #[arg(long, help = "Wallet to use for publishing (prompts if not provided)", add = ArgValueCompleter::new(complete_wallets))]
         wallet: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
         net: String,
         #[arg(long, help = "Amount of TON to send for publication")]
@@ -1007,8 +1040,6 @@ pub enum LibraryCommand {
         hash: String,
         #[arg(long, help = "Disassemble fetched library code")]
         disasm: bool,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(
             long,
             short,
@@ -1024,8 +1055,6 @@ pub enum LibraryCommand {
     Info {
         #[arg(help = "Library name to show info for")]
         name: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
     },
     #[command(about = "Top up a library's account for storage")]
     Topup {
@@ -1038,8 +1067,6 @@ pub enum LibraryCommand {
         duration: Option<String>,
         #[arg(long, help = "Wallet to use for topping up (prompts if not provided)")]
         wallet: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
-        api_key: Option<String>,
         #[arg(
             long,
             help = "Amount of TON to send (overrides duration-based calculation)"
@@ -1070,6 +1097,15 @@ pub enum DocCommand {
         description: bool,
         #[arg(long, help = "Output instruction entry as JSON")]
         json: bool,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum MetaCommand {
+    #[command(about = "Print a built-in JSON schema")]
+    GetSchema {
+        #[arg(value_enum, default_value = "acton-toml", help = "Schema to print")]
+        schema: BuiltinSchema,
     },
 }
 
@@ -1148,7 +1184,7 @@ fn complete_wallets(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
 
 fn complete_commands(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
     let current = current.to_string_lossy();
-    Cli::command()
+    base_cli_command()
         .get_subcommands()
         .filter(|cmd| !cmd.is_hide_set())
         .map(|cmd| cmd.get_name().to_string())
@@ -1207,7 +1243,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("init", "")];
+    let core_commands = vec![("new", "[PATH]"), ("create-app", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -1220,7 +1256,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("litenode", "<COMMAND>"),
+        ("localnet", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -1247,7 +1283,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         (&cyan, tooling_commands),
         (&white, support_commands),
     ];
-    let mut command_metadata = Cli::command();
+    let mut command_metadata = base_cli_command();
     command_metadata.build();
 
     let command_descriptions = command_metadata
@@ -1284,11 +1320,15 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .filter(|arg| !arg.is_positional())
         .filter(|arg| arg.is_global_set() || matches!(arg.get_long(), Some("help" | "version")))
         .filter_map(|arg| {
-            let name = match (arg.get_short(), arg.get_long()) {
-                (Some(short), Some(long)) => format!("-{short}, --{long}"),
-                (Some(short), None) => format!("-{short}"),
-                (None, Some(long)) => format!("--{long}"),
-                (None, None) => return None,
+            let name = if matches!(arg.get_long(), Some("version")) {
+                "-v, --version".to_owned()
+            } else {
+                match (arg.get_short(), arg.get_long()) {
+                    (Some(short), Some(long)) => format!("-{short}, --{long}"),
+                    (Some(short), None) => format!("-{short}"),
+                    (None, Some(long)) => format!("--{long}"),
+                    (None, None) => return None,
+                }
             };
 
             let hint = arg
@@ -1376,8 +1416,19 @@ fn root_help(show_global_options: bool) -> StyledStr {
     writer
 }
 
+fn base_cli_command() -> clap::Command {
+    Cli::command().disable_version_flag(true).arg(
+        clap::Arg::new("version")
+            .short('v')
+            .short_alias('V')
+            .long("version")
+            .action(clap::ArgAction::Version)
+            .help("Print version"),
+    )
+}
+
 fn cli_command(show_global_options: bool) -> clap::Command {
-    Cli::command().override_help(root_help(show_global_options))
+    base_cli_command().override_help(root_help(show_global_options))
 }
 
 fn completion_command() -> clap::Command {
@@ -1402,7 +1453,7 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
                 return Ok(());
             }
 
-            let mut cli = Cli::command();
+            let mut cli = base_cli_command();
             cli.build();
             if let Some(subcommand) = cli.find_subcommand_mut(command) {
                 subcommand.print_long_help()?;
@@ -1425,7 +1476,7 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
             }
             message.push_str("\n\nhelp: view all commands with `acton --help`");
 
-            Cli::command()
+            base_cli_command()
                 .error(clap::error::ErrorKind::InvalidSubcommand, message)
                 .exit();
         }
@@ -1486,8 +1537,9 @@ fn resolve_manifest_path(
     let source = match resolved_project_root.source {
         ResolutionSource::ProjectRootFlag => ResolutionSource::ProjectRootFlag,
         ResolutionSource::AutoDetected => ResolutionSource::AutoDetected,
-        ResolutionSource::FallbackCwd => ResolutionSource::FallbackCwd,
-        ResolutionSource::ManifestPathFlag => ResolutionSource::FallbackCwd,
+        ResolutionSource::FallbackCwd | ResolutionSource::ManifestPathFlag => {
+            ResolutionSource::FallbackCwd
+        }
     };
 
     Ok(ResolvedManifestPath {
@@ -1578,8 +1630,10 @@ fn main() {
         command,
         Commands::Init
             | Commands::New { .. }
+            | Commands::CreateApp { .. }
             | Commands::Help { .. }
             | Commands::Rpc { .. }
+            | Commands::Meta { .. }
             | Commands::Lint { .. }
     ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
     {
@@ -1589,7 +1643,7 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Ls { .. } | Commands::Help { .. } | Commands::Lint { .. }
+        Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
     ) && let Err(err) = setup_logging()
     {
         eprintln!(
@@ -1600,6 +1654,7 @@ fn main() {
 
     let result = match command {
         Commands::Init => init_cmd(),
+        Commands::CreateApp { path } => create_app_cmd(path.as_deref()),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::Rpc { command } => {
@@ -1621,8 +1676,9 @@ fn main() {
             app,
             hooks,
             agents,
+            templates,
         } => new_cmd(
-            &path,
+            path.as_deref(),
             name,
             description,
             template,
@@ -1630,12 +1686,14 @@ fn main() {
             app,
             hooks,
             agents,
+            templates,
         ),
         Commands::Test {
             path,
             filter,
             reporter,
             show_bodies,
+            verbose,
             debug,
             debug_port,
             backtrace,
@@ -1654,7 +1712,6 @@ fn main() {
             baseline_snapshot,
             fail_on_diff,
             fork_net,
-            api_key,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -1673,11 +1730,15 @@ fn main() {
             fork_block_number,
             ui,
             ui_port,
-        } => match fork_net.as_deref().map(Network::from_str).transpose() {
-            Ok(fork_net) => {
+        } => match (
+            fork_net.as_deref().map(Network::from_str).transpose(),
+            commands::common::validate_cli_verbosity(verbose),
+        ) {
+            (Ok(fork_net), Ok(verbose)) => {
                 let config = create_test_config(
                     filter,
                     show_bodies,
+                    verbose,
                     debug,
                     debug_port,
                     backtrace,
@@ -1697,7 +1758,6 @@ fn main() {
                     baseline_snapshot,
                     fail_on_diff,
                     fork_net,
-                    api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     fork_block_number,
                     save_test_trace.or_else(|| {
                         if ui {
@@ -1730,21 +1790,18 @@ fn main() {
                     test_cmd(path, &config)
                 }
             }
-            Err(err) => Err(err),
+            (Err(err), _) | (_, Err(err)) => Err(err),
         },
         Commands::Run { script, args } => run_cmd(&script, &args),
         Commands::Retrace {
             hash,
             net,
-            api_key,
             verbose,
             logs_dir,
             contract,
             debug,
             debug_port,
-        } => retrace_cmd(
-            hash, net, api_key, verbose, logs_dir, contract, debug, debug_port,
-        ),
+        } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -1765,30 +1822,33 @@ fn main() {
         Commands::Script {
             path,
             args,
+            verbose,
             debug,
             backtrace,
             debug_port,
             clear_cache,
             fork_net,
-            api_key,
             fork_block_number,
             net,
             explorer,
             show_bodies,
-        } => script_cmd(
-            &path,
-            args,
-            debug,
-            backtrace,
-            debug_port,
-            clear_cache,
-            fork_net,
-            api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-            fork_block_number,
-            net,
-            explorer,
-            show_bodies,
-        ),
+        } => match commands::common::validate_cli_verbosity(verbose) {
+            Ok(verbose) => script_cmd(
+                &path,
+                args,
+                verbose,
+                debug,
+                backtrace,
+                debug_port,
+                clear_cache,
+                fork_net,
+                fork_block_number,
+                net,
+                explorer,
+                show_bodies,
+            ),
+            Err(err) => Err(err),
+        },
         Commands::Build {
             contract_id,
             clear_cache,
@@ -1814,6 +1874,7 @@ fn main() {
             fift,
             source_map,
             abi,
+            allow_no_entrypoint,
             clear_cache,
         } => {
             let result = compile_cmd(
@@ -1824,6 +1885,7 @@ fn main() {
                 fift,
                 source_map,
                 abi,
+                allow_no_entrypoint,
                 clear_cache,
             );
             if json {
@@ -1849,7 +1911,6 @@ fn main() {
             show_offsets,
             source_map,
             address,
-            api_key,
             net,
             follow_libraries,
         } => match read_source_map(source_map) {
@@ -1863,7 +1924,6 @@ fn main() {
                     source_map,
                 },
                 address,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 net,
                 follow_libraries,
             ),
@@ -1876,23 +1936,13 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
-            api_key,
-        } => verify_cmd(
-            contract_id,
-            address,
-            net,
-            wallet,
-            compiler_version,
-            dry_run,
-            api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-        ),
+        } => verify_cmd(contract_id, address, net, wallet, compiler_version, dry_run),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
                 contract_id,
                 code,
                 duration,
                 wallet,
-                api_key,
                 net,
                 amount,
                 yes,
@@ -1903,7 +1953,6 @@ fn main() {
                 code,
                 duration,
                 wallet,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 net,
                 amount,
                 yes,
@@ -1913,43 +1962,25 @@ fn main() {
             LibraryCommand::Fetch {
                 hash,
                 disasm,
-                api_key,
                 output,
                 net,
                 json,
             } => {
-                let result = fetch_cmd(
-                    hash,
-                    disasm,
-                    api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                    output,
-                    net,
-                    json,
-                );
+                let result = fetch_cmd(hash, disasm, output, net, json);
                 if json {
                     report_error_as_json(result);
                     return;
                 }
                 result
             }
-            LibraryCommand::Info { name, api_key } => {
-                info_cmd(name, api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()))
-            }
+            LibraryCommand::Info { name } => info_cmd(name),
             LibraryCommand::Topup {
                 name,
                 duration,
                 wallet,
-                api_key,
                 amount,
                 yes,
-            } => commands::library::topup_cmd(
-                name,
-                duration,
-                wallet,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                amount,
-                yes,
-            ),
+            } => commands::library::topup_cmd(name, duration, wallet, amount, yes),
         },
         Commands::Check {
             fix,
@@ -1973,11 +2004,11 @@ fn main() {
             version,
             trunk,
             stable,
-            yes,
+            force,
             list,
             check,
         } => {
-            let result = up_cmd(version, trunk, stable, yes, list, check);
+            let result = up_cmd(version, trunk, stable, force, list, check);
             if check {
                 report_error_as_json(result);
                 return;
@@ -2003,9 +2034,28 @@ fn main() {
         Commands::Hooks { command } => hooks_cmd(command),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
+            if shell == "nushell" {
+                clap_complete::generate(
+                    clap_complete_nushell::Nushell,
+                    &mut base_cli_command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            } else {
+                let shell = clap_complete::Shell::from_str(&shell)
+                    .expect("validated completion shell should parse");
+                clap_complete::generate(
+                    shell,
+                    &mut base_cli_command(),
+                    "acton",
+                    &mut std::io::stdout(),
+                );
+            }
             Ok(())
         }
+        Commands::Meta { command } => match command {
+            MetaCommand::GetSchema { schema } => print_schema_cmd(schema),
+        },
         Commands::Docgen { output, check } => docgen_cmd(output, check),
         Commands::Ls {
             port,
@@ -2020,19 +2070,18 @@ fn main() {
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
-        Commands::Litenode { command } => match command {
-            LitenodeCommand::Start {
+        Commands::Localnet { command } => match command {
+            LocalnetCommand::Start {
                 port,
                 fork_net,
                 fork_block_number,
                 accounts,
-                api_key,
                 db_path,
                 rate_limit,
                 load_state,
                 dump_state,
             } => {
-                let resolved_litenode = resolve_litenode_settings(
+                let resolved_localnet = resolve_localnet_settings(
                     port,
                     fork_net,
                     fork_block_number,
@@ -2044,32 +2093,31 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::litenode::litenode_start_cmd(
-                        resolved_litenode.port,
+                    commands::localnet::localnet_start_cmd(
+                        resolved_localnet.port,
                         db_path,
-                        resolved_litenode.fork_net,
-                        resolved_litenode.fork_block_number,
-                        resolved_litenode.accounts,
-                        resolved_litenode.rate_limit,
+                        resolved_localnet.fork_net,
+                        resolved_localnet.fork_block_number,
+                        resolved_localnet.accounts,
+                        resolved_localnet.rate_limit,
                         load_state,
                         dump_state,
-                        api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     )
                     .await
                 })
             }
-            LitenodeCommand::Airdrop {
+            LocalnetCommand::Airdrop {
                 address,
                 amount,
                 port,
             } => {
-                let port = resolve_litenode_port(port);
+                let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::litenode::litenode_airdrop_cmd(&address, amount, port).await
+                    commands::localnet::localnet_airdrop_cmd(&address, amount, port).await
                 })
             }
         },
@@ -2102,7 +2150,7 @@ fn lint_command_error(args: &[String]) -> anyhow::Error {
     anyhow::anyhow!("`acton lint` is not supported. Use `acton check{suffix}` instead.")
 }
 
-struct ResolvedLitenodeSettings {
+struct ResolvedLocalnetSettings {
     port: u16,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
@@ -2110,19 +2158,19 @@ struct ResolvedLitenodeSettings {
     rate_limit: Option<u32>,
 }
 
-fn resolve_litenode_port(cli_port: Option<u16>) -> u16 {
-    resolve_litenode_settings(cli_port, None, None, None, None).port
+fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
+    resolve_localnet_settings(cli_port, None, None, None, None).port
 }
 
-fn resolve_litenode_settings(
+fn resolve_localnet_settings(
     cli_port: Option<u16>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
-) -> ResolvedLitenodeSettings {
-    let config = load_litenode_settings_from_config();
-    ResolvedLitenodeSettings {
+) -> ResolvedLocalnetSettings {
+    let config = load_localnet_settings_from_config();
+    ResolvedLocalnetSettings {
         port: cli_port.or(config.port).unwrap_or(5411),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
@@ -2131,10 +2179,10 @@ fn resolve_litenode_settings(
     }
 }
 
-fn load_litenode_settings_from_config() -> LitenodeSettings {
+fn load_localnet_settings_from_config() -> LocalnetSettings {
     ActonConfig::load()
         .ok()
-        .and_then(|config| config.litenode)
+        .and_then(|config| config.localnet)
         .unwrap_or_default()
 }
 
@@ -2246,6 +2294,7 @@ fn setup_logging() -> anyhow::Result<()> {
 fn create_test_config(
     filter: Option<String>,
     show_bodies: bool,
+    verbosity: u8,
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
@@ -2265,7 +2314,6 @@ fn create_test_config(
     baseline_snapshot: Option<String>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
-    api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,
     mutate: bool,
@@ -2327,7 +2375,6 @@ fn create_test_config(
             snapshot,
             baseline_snapshot,
             fork_net,
-            api_key,
             fork_block_number,
             save_test_trace,
             mutate,
@@ -2344,6 +2391,7 @@ fn create_test_config(
             ui,
             Some(ui_port),
         );
+        config.verbosity = verbosity;
         config.mutation_ids = mutation_ids;
         if mutation_rules_file.is_some() {
             config.mutation_rules_file = mutation_rules_file;
@@ -2355,6 +2403,7 @@ fn create_test_config(
 
     TestConfig {
         show_bodies,
+        verbosity,
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
@@ -2374,7 +2423,6 @@ fn create_test_config(
         snapshot,
         baseline_snapshot,
         fail_on_diff,
-        api_key,
         fork_block_number,
         save_test_trace,
         mutate,

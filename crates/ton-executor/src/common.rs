@@ -4,9 +4,11 @@ use serde::{Serialize, Serializer};
 use std::ffi::CStr;
 
 /// Verbosity level for the executor logs.
-#[repr(C)]
+#[repr(i32)]
 #[derive(Debug, Clone, Copy, Default)]
 pub enum ExecutorVerbosity {
+    /// Disable VM logging completely without building log messages in the native emulator.
+    Off = -1,
     /// Minimal logging.
     #[default]
     Short = 0,
@@ -27,7 +29,7 @@ impl Serialize for ExecutorVerbosity {
     where
         S: Serializer,
     {
-        serializer.serialize_i8(*self as i8)
+        serializer.serialize_i32(*self as i32)
     }
 }
 

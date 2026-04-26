@@ -387,3 +387,44 @@ fun helperValue(): int {
         "tests/integration/snapshots/build/build_cmd_cache_reuse_tests/import_change_invalidation_scope.compilation-order.txt",
     );
 }
+
+#[test]
+fn build_output_fift_recompiles_when_plain_cache_entry_lacks_fift() {
+    let project = ProjectBuilder::new("build-cache-reuse-fift-after-plain")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    let with_fift = project
+        .acton()
+        .build()
+        .with_output_fift("custom-fift")
+        .run()
+        .success()
+        .get_normalized_stdout();
+    let with_fift_compiled = extract_compiled_contracts(&with_fift);
+
+    assert_compilation_matches_snapshot(
+        &with_fift_compiled,
+        "tests/integration/snapshots/build/build_cmd_cache_reuse_tests/fift_after_plain_cache_miss.compilation-order.txt",
+    );
+    assert!(
+        project.path().join("custom-fift/simple.fif").exists(),
+        "build with --output-fift should write requested Fift artifact after cache miss"
+    );
+
+    let second_with_fift = project
+        .acton()
+        .build()
+        .with_output_fift("custom-fift")
+        .run()
+        .success()
+        .get_normalized_stdout();
+    let second_with_fift_compiled = extract_compiled_contracts(&second_with_fift);
+
+    assert_compilation_matches_snapshot(
+        &second_with_fift_compiled,
+        "tests/integration/snapshots/build/build_cmd_cache_reuse_tests/fift_after_plain_second_run_cache_hit.compilation-order.txt",
+    );
+}

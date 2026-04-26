@@ -1,0 +1,157 @@
+name: Check installer file
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: false
+        type: string
+
+concurrency:
+  group: check-installer-file-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+
+permissions: { }
+
+jobs:
+  create-temporary-release:
+    name: Create temporary installer release
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: write
+
+    outputs:
+      release_tag: ${{ steps.release-metadata.outputs.release_tag }}
+
+    steps:
+      - id: release-metadata
+        name: Prepare temporary release metadata
+        # language=Bash
+        run: |
+          release_tag="temp-installer-check"
+
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Delete previous temporary GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: ${{ steps.release-metadata.outputs.release_tag }}
+        # language=Bash
+        run: |
+          gh release delete "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+
+          gh api "repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true
+
+      - name: Download global dist artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-build-global
+          path: release-assets
+
+      - name: Check installer artifact exists
+        working-directory: release-assets
+        # language=Bash
+        run: |
+          test -f acton-installer.sh
+
+      - name: Download Linux release archive artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-x86_64-unknown-linux-gnu
+          path: release-assets
+
+      - name: Download macOS release archive artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: artifacts-aarch64-apple-darwin
+          path: release-assets
+
+      - name: Check release archives exist
+        working-directory: release-assets
+        shell: bash
+        # language=Bash
+        run: |
+          test -f acton-x86_64-unknown-linux-gnu.tar.gz
+          test -f acton-x86_64-unknown-linux-gnu.tar.gz.sha256
+          test -f acton-aarch64-apple-darwin.tar.gz
+          test -f acton-aarch64-apple-darwin.tar.gz.sha256
+
+      - name: Create temporary GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: ${{ steps.release-metadata.outputs.release_tag }}
+        # language=Bash
+        run: |
+          cat > "${RUNNER_TEMP}/temporary-installer-check-notes.txt" <<EOF
+          **DO NOT USE THIS RELEASE.**
+          Temporary release for installer validation in workflow run ${GITHUB_RUN_ID}.
+          **DO NOT USE THIS RELEASE.**
+          EOF
+
+          gh release create "${RELEASE_TAG}" \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            --title "Temporary installer check ${RELEASE_TAG}" \
+            --notes-file "${RUNNER_TEMP}/temporary-installer-check-notes.txt" \
+            --prerelease \
+            release-assets/*
+
+  check-installer:
+    name: Check installer (${{ matrix.target_name }})
+    needs: create-temporary-release
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubicloud-standard-2-ubuntu-2204
+            target_name: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target_name: aarch64-apple-darwin
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Acton from temporary release
+        working-directory: ${{ runner.temp }}
+        env:
+          ACTON_DOWNLOAD_URL: ${{ format('https://github.com/{0}/releases/download/{1}', env.PUBLIC_ACTON_REPOSITORY, needs.create-temporary-release.outputs.release_tag) }}
+        # language=Bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            "${ACTON_DOWNLOAD_URL}/acton-installer.sh" | sh
+
+      - name: Run installer smoke checks
+        uses: ./.github/actions/check-release-artifact
+
+  cleanup-temporary-release:
+    name: Delete temporary installer release
+    needs:
+      - create-temporary-release
+      - check-installer
+    if: ${{ always() }}
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete temporary GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: ${{ needs.create-temporary-release.outputs.release_tag }}
+        # language=Bash
+        run: |
+          gh release delete "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+
+          gh api "repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true

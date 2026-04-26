@@ -101,9 +101,9 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         let content = fs::read_to_string(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
 
-        match tolkfmt::format_source(
+        match tolk_fmt::format_source(
             &content,
-            tolkfmt::FormatOptions {
+            tolk_fmt::FormatOptions {
                 width,
                 separate_import_groups,
             },

@@ -21,11 +21,12 @@ fn run_get_method_by_id_fails_for_undeployed_contract() {
             "run_get_method_by_id_undeployed",
             r#"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/io"
 
             get fun `test bg run get method by id undeployed`() {
                 val undeployed = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
-                val value: int = net.runGetMethodById(undeployed, 0x10000);
+                val value: int = net.runGetMethod(undeployed, 0x10000);
                 println(value);
             }
         "#,
@@ -46,8 +47,9 @@ fn run_get_method_by_id_fails_for_invalid_method_id_on_deployed_contract() {
     fs::write(
         fixture.path().join(test_path),
         r#"
-        import "../../lib/build/build"
+        import "../../lib/build"
         import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
         import "../../lib/io"
         import "../../lib/testing/expect"
         import "../contracts/counter_messages"
@@ -68,7 +70,7 @@ fn run_get_method_by_id_fails_for_invalid_method_id_on_deployed_contract() {
 
         fun setupCounter() {
             val counter = Counter.fromStorage({ id: 0, counter: 0 });
-            val deployer = net.treasury("deployer");
+            val deployer = testing.treasury("deployer");
 
             val deploy = createMessage({
                 bounce: false,
@@ -78,13 +80,13 @@ fn run_get_method_by_id_fails_for_invalid_method_id_on_deployed_contract() {
                 },
             });
             net.send(deployer.address, deploy);
-            expect(net.isDeployed(counter.address)).toBeTrue();
+            expect(testing.isDeployed(counter.address)).toBeTrue();
             return counter
         }
 
         get fun `test bg run get method by id invalid id`() {
             val counter = setupCounter();
-            val value: int = net.runGetMethodById(counter.address, 777777);
+            val value: int = net.runGetMethod(counter.address, 777777);
             println(value);
         }
     "#,

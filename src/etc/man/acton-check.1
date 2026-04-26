@@ -78,7 +78,25 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .SH "BEHAVIOR"
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-list\-lint\-rules\fR is a hidden machine\-readable helper that prints JSON
+entries with rule \fBname\fR and markdown \fBdescription\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'for a human\-readable catalog with rule codes, lifecycle status, and quick\-fix
+availability, use the web rules index
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-fix\fR applies edits only in \fBplain\fR output mode
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fix\fR rewrites files only for fixes marked as automatically applicable
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when a diagnostic offers multiple fixes, \fB\-\-fix\fR applies only the first one
 .RE
 .sp
 .RS 4
@@ -104,6 +122,17 @@ script roots that define \fBmain()\fR
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'project\-wide discovery skips built\-in directories such as \fB\&.git\fR, \fB\&.github\fR,
+\fB\&.idea\fR, \fB\&.acton\fR, \fBnode_modules\fR, \fBtarget\fR, \fBtolk\-stdlib\fR, \fB\&.codex\fR, and
+\fB\&.claude\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'contracts with non\-\fB\&.tolk\fR sources such as precompiled \fB\&.boc\fR entries are not
+lint roots
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'single\-file mode relaxes \fBE014 (acton\-import\-in\-contract)\fR
 .RE
 .sp
@@ -118,12 +147,54 @@ could be mistaken for a contract name
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'inline suppressions use \fB// check\-disable\-next\-line E001,S001\fR
+\h'-04'\(bu\h'+03'inline suppressions use rule names, for example
+\fB// check\-disable\-next\-line unused\-variable, write\-only\-variable\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'suppressions apply only to the immediately following line and match
+diagnostic names, including \fBcompiler\-error\fR and \fBparse\-error\fR; diagnostic
+codes such as \fBC001\fR are not matched
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-fix\fR applies only linter\-provided fixes; diagnostics without a safe fix
 remain in the report
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-enable\-only\fR is applied after config is loaded: selected rules keep their
+configured severity, selected rules that were \fBallow\fR are re\-enabled at the
+default severity, and every unselected rule is forced to \fBallow\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-enable\-only\fR selectors must resolve to exactly one rule; in practice, use
+full rule codes such as \fBE003\fR for stability
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'excluded files still participate in import/type resolution, but lint
+diagnostics for excluded non\-root files are filtered out
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'explicit targets still run even if they match \fB[lint].exclude\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'in project\-wide runs, excluded contract roots are skipped entirely, so their
+compiler errors and lint diagnostics are not reported
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compiler errors are still shown for roots that are actually checked,
+including explicit targets
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fix\fR can still exit with status \fB1\fR when unfixed diagnostics or warning
+threshold violations remain after rewriting
 .RE
 .SH "EXIT STATUS"
 .sp
@@ -189,7 +260,17 @@ acton check \-\-enable\-only E001,S001
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Emit GitHub Actions annotations in CI:
+\h'-04' 6.\h'+01'List rule metadata as JSON:
+.sp
+.RS 4
+.nf
+acton check \-\-list\-lint\-rules
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Emit GitHub Actions annotations in CI:
 .sp
 .RS 4
 .nf
@@ -199,7 +280,7 @@ acton check \-\-output\-format github
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Apply local autofixes where available:
+\h'-04' 8.\h'+01'Apply local autofixes where available:
 .sp
 .RS 4
 .nf
@@ -214,9 +295,9 @@ acton check \-\-fix
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fILinting guide\fR <https://ton\-blockchain.github.io/acton/docs/linting>
+\h'-04'\(bu\h'+03'\fILinting guide\fR <https://ton\-blockchain.github.io/acton/docs/linting/overview>
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fILinter rules\fR <https://ton\-blockchain.github.io/acton/docs/linting/rules>
+\h'-04'\(bu\h'+03'\fILinter rules\fR <https://ton\-blockchain.github.io/acton/docs/rules/overview>
 .RE

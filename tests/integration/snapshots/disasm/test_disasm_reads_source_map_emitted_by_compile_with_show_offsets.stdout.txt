@@ -33,13 +33,10 @@ off │ instruction
     │             // 13 |         }
     │             //    |         ^
 128 │             NIP
-    │             // contracts/types[LINE]
-    │             // 7 |     return Storage.fromCell(contract.getData());
-    │             //   |                             ^^^^^^^^^^^^^^^^^^
-136 │             PUSHCTR c4
     │             // contracts/counter[LINE]
     │             // 10 |             var storage = lazy Storage.load();
     │             //    |                           ^^^^^^^^^^^^^^^^^^^
+136 │             PUSHCTR c4
 152 │             CTOS
     │             // contracts/counter[LINE]
     │             // 10 |             var storage = lazy Storage.load();
@@ -90,13 +87,10 @@ off │ instruction
     │             // 18 |         }
     │             //    |         ^
 408 │             DROP
-    │             // contracts/types[LINE]
-    │             // 7 |     return Storage.fromCell(contract.getData());
-    │             //   |                             ^^^^^^^^^^^^^^^^^^
-416 │             PUSHCTR c4
     │             // contracts/counter[LINE]
     │             // 15 |             var storage = lazy Storage.load();
     │             //    |                           ^^^^^^^^^^^^^^^^^^^
+416 │             PUSHCTR c4
 432 │             CTOS
     │             // contracts/counter[LINE]
     │             // 16 |             storage.counter = 0;
@@ -134,13 +128,10 @@ off │ instruction
 600 │         THROWANYIFNOT
     │     }
     │     72514 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-20  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 33 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+20  │         PUSHCTR c4
 36  │         CTOS
     │         // contracts/counter[LINE]
     │         // 34 |     return (storage.counter, storage.counter * 2);
@@ -155,13 +146,10 @@ off │ instruction
 100 │         LSHIFT 1
     │     }
     │     89315 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-19  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 59 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
 35  │         CTOS
     │         // contracts/counter[LINE]
     │         // 60 |     return storage.counter + x * 2;
@@ -180,13 +168,10 @@ off │ instruction
 115 │         ADD
     │     }
     │     97029 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-16  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 51 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+16  │         PUSHCTR c4
 32  │         CTOS
     │         // contracts/counter[LINE]
     │         // 52 |     if (storage.counter > 100) {
@@ -231,13 +216,10 @@ off │ instruction
 168 │         PUSHINT_4 0
     │     }
     │     97645 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-16  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 69 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+16  │         PUSHCTR c4
 32  │         CTOS
     │         // contracts/counter[LINE]
     │         // 70 |     return Pair {
@@ -266,13 +248,10 @@ off │ instruction
 112 │         LSHIFT 1
     │     }
     │     106187 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-19  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 46 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
 35  │         CTOS
     │         // contracts/counter[LINE]
     │         // 47 |     return storage;
@@ -281,13 +260,10 @@ off │ instruction
 59  │         PLDU 32
     │     }
     │     108248 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-19  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 38 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+19  │         PUSHCTR c4
 35  │         CTOS
     │         // contracts/counter[LINE]
     │         // 39 |     if (storage.counter > 100) {
@@ -331,13 +307,10 @@ off │ instruction
 155 │         PUSHNULL
     │     }
     │     117456 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-18  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 28 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+18  │         PUSHCTR c4
 34  │         CTOS
     │         // contracts/counter[LINE]
     │         // 29 |     return storage.counter;
@@ -347,13 +320,10 @@ off │ instruction
 66  │         PLDU 32
     │     }
     │     122613 => {
-    │         // contracts/types[LINE]
-    │         // 7 |     return Storage.fromCell(contract.getData());
-    │         //   |                             ^^^^^^^^^^^^^^^^^^
-18  │         PUSHCTR c4
     │         // contracts/counter[LINE]
     │         // 64 |     val storage = lazy Storage.load();
     │         //    |                   ^^^^^^^^^^^^^^^^^^^
+18  │         PUSHCTR c4
 34  │         CTOS
     │         // contracts/counter[LINE]
     │         // 65 |     return storage.counter + x * 2 + y;

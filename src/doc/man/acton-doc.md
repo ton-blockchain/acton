@@ -1,21 +1,21 @@
 # acton-doc(1)
 
-## NAME
+## Name
 
 acton-doc --- Look up built-in reference documentation from the CLI
 
-## SYNOPSIS
+## Synopsis
 
 `acton doc` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Look up built-in reference documentation from the terminal.
 
 At the moment, `acton doc` provides TVM instruction lookup through the `tvm`
 subcommand.
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton doc tvm
 
@@ -66,7 +66,7 @@ With `--find`, each argument is treated as a search query.
 - at least one query is required
 - queries with no matches return an error instead of an empty result set
 
-## TOPICS
+## Topics
 
 Currently available documentation namespaces:
 
@@ -75,20 +75,20 @@ Currently available documentation namespaces:
 Additional namespaces may be added in future releases; `acton doc tvm` is the
 current built-in reference surface.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The requested documentation was printed successfully.
 - `1`: The namespace was unknown, arguments were invalid, or rendering failed.
 
-## DISPLAY OPTIONS
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-pass-through }}
 
-## EXAMPLES
+## Examples
 
 1. Exact lookup:
 
@@ -117,6 +117,6 @@ current built-in reference surface.
    acton doc tvm SENRAWMSG --find
    ```
 
-## SEE ALSO
+## See Also
 
 - [CLI docs lookup guide](https://ton-blockchain.github.io/acton/docs/commands/doc)

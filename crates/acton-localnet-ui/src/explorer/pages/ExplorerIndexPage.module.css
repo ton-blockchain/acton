@@ -1,0 +1,222 @@
+.inputPage {
+  padding: var(--spacing-lg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--tonscan-bg);
+  color: var(--text-primary);
+}
+
+.centeredInputContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0 var(--spacing-lg) var(--spacing-2xl);
+  margin-top: -100px;
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.logoTitle {
+  font-size: 2.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.inputCard {
+  width: 100%;
+  max-width: 720px;
+  position: relative;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 0 var(--spacing-sm);
+  transition:
+    background-color var(--transition-duration-fast) ease,
+    border-color var(--transition-duration-fast) ease,
+    box-shadow var(--transition-duration-fast) ease,
+    transform var(--transition-duration-fast) ease;
+  position: relative;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.inputWrapper.focused {
+  border-color: var(--tonscan-accent);
+  background-color: color-mix(in srgb, var(--tonscan-card-bg) 92%, white);
+  box-shadow:
+    0 0 0 3px rgba(0, 136, 204, 0.16),
+    0 20px 44px rgba(15, 23, 42, 0.1);
+}
+
+.inputWrapper.inputError {
+  border-color: var(--color-failed);
+}
+
+.inputWrapper.inputError.focused {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.searchIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background-color: var(--tonscan-row-hover);
+  flex-shrink: 0;
+}
+
+.input {
+  flex-grow: 1;
+  border: none;
+  background-color: transparent;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  outline: none;
+  min-width: 0;
+  padding: 1rem var(--spacing-sm);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.errorMessage {
+  color: var(--color-failed);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-sm);
+  margin-left: var(--spacing-mds);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.errorIcon {
+  flex-shrink: 0;
+}
+
+.historyDropdown {
+  list-style: none;
+  padding: var(--spacing-xs);
+  margin: var(--spacing-sm) 0 0 0;
+  position: absolute;
+  width: 99%;
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  transition: background-color var(--transition-duration-fast);
+  width: 100%;
+  border-radius: 14px;
+}
+
+.historyItemButton {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  min-width: 0;
+  padding: 0.875rem var(--spacing-md);
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  border-radius: 14px;
+}
+
+.historyItem:hover:hover {
+  background-color: var(--hover-bg);
+}
+
+.historyItem:not(:last-child) {
+  margin-bottom: 2px;
+}
+
+.historyItemIcon {
+  margin-right: var(--spacing-mds);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.historyAddr {
+  flex-grow: 1;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyItemDeleteButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  margin: 0 var(--spacing-sm) 0 0;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
+  opacity: 0.72;
+}
+
+.historyItemDeleteButton:hover {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: var(--color-failed);
+  opacity: 1;
+}
+
+.footer {
+  padding: var(--spacing-2xl) 0;
+  display: flex;
+  justify-content: center;
+}
+
+.createBy {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .logoTitle {
+    font-size: var(--font-size-xl);
+  }
+
+  .centeredInputContainer {
+    margin-top: 0;
+  }
+}

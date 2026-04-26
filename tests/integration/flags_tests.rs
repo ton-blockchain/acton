@@ -25,8 +25,9 @@ val x=1;
 
 const PROFILED_TEST: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
@@ -36,7 +37,7 @@ get fun `test-profiled-transaction`() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMessage = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -59,8 +60,9 @@ get fun `test-profiled-transaction`() {
 
 const PROFILED_TEST_WITH_DRIFT: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/types/big_array"
 
 get fun `test-profiled-transaction`() {
@@ -70,7 +72,7 @@ get fun `test-profiled-transaction`() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMessage = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -100,7 +102,7 @@ get fun `test-profiled-transaction`() {
 "#;
 
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/testing/expect"
 
 get fun `test build path from project root`() {
@@ -160,14 +162,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .test_file(
             "print_bodies",
             r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/io"
 import "../../lib/testing/expect"
 import "../contracts/test_body_messages"
 
 get fun `test show bodies prints decoded transaction body`() {
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val init = ContractState {
         code: build("test_body_sink"),
         data: createEmptyCell(),
@@ -1369,6 +1372,8 @@ fn test_up_rejects_conflicting_flag_combinations() {
         (&["--trunk", "--check"], &["--trunk", "--check"]),
         (&["--stable", "--list"], &["--stable", "--list"]),
         (&["--stable", "--check"], &["--stable", "--check"]),
+        (&["--force", "--list"], &["--force", "--list"]),
+        (&["--force", "--check"], &["--force", "--check"]),
         (&["--list", "--check"], &["--list", "--check"]),
     ];
 

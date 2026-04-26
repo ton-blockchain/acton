@@ -14,8 +14,9 @@ This command is intended for existing repositories or ad\-hoc directories where
 you want to add \fBActon.toml\fR, standard Acton ignore rules, the bundled
 standard library, and symlinks to global wallet and library overlays.
 .sp
-If \fBActon.toml\fR already exists, \fBacton init\fR does not replace it. Instead it
-patches in default mappings when they are missing.
+If \fBActon.toml\fR already exists, \fBacton init\fR patches in default mappings when
+they are missing instead of creating a fresh scaffold. That patch path rewrites
+the parsed manifest, so TOML comments and unknown keys are not preserved.
 .sp
 If \fBActon.toml\fR does not exist, the command scans \fB\&.tolk\fR files in the current
 directory tree and auto\-registers files that define \fBonInternalMessage\fR as
@@ -24,7 +25,8 @@ contract entry files.
 \fBacton init\fR is safe to run repeatedly.
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'it never replaces an existing \fBActon.toml\fR
+\h'-04'\(bu\h'+03'it does not delete and recreate an existing \fBActon.toml\fR, but it may rewrite
+the file when backfilling default mappings
 .RE
 .sp
 .RS 4
@@ -106,7 +108,8 @@ project config and may include:
 .RE
 .sp
 When \fBActon.toml\fR already exists, \fBacton init\fR only backfills missing default
-\fB[import\-mappings]\fR entries.
+\fB[import\-mappings]\fR entries. This patch path reloads the file into Acton\[cq]s typed
+config and writes it back out, so comments and unknown keys are dropped.
 .sp
 When patching \fB\&.gitignore\fR, Acton adds groups for:
 .sp
@@ -140,17 +143,34 @@ and \fB\&.acton\fR
 .RS 4
 \h'-04'\(bu\h'+03'treats files with an \fBonInternalMessage\fR function as contract entry files
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'derives the contract key from the file stem with \fB\-\fR normalized to \fB_\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'derives the default display name from the file stem by splitting on \fB_\fR and
+\fB\-\fR, then capitalizing each word
+.RE
 .SH "STANDARD LIBRARY"
 \fBacton init\fR ensures that the bundled Tolk standard library is installed into
 \fB\&.acton/tolk\-stdlib\fR\&.
+.sp
+If global wallet or library overlay files already exist, \fBacton init\fR also
+tries to create local symlinks for them. Existing local files and non\-dangling
+symlinks are left in place; Acton only creates the link when the local path
+does not already resolve. If the local path is a dangling symlink, Acton still
+attempts link creation because the path looks missing, but that attempt
+currently warns instead of repairing the dangling link.
 .sp
 If symlinks for global wallets or libraries cannot be created, Acton prints a
 warning and still completes initialization. This is relevant on systems where
 symlink creation is restricted.
 .SH "SIDE EFFECTS"
 \fBacton init\fR writes or patches local project files and may create local
-symlinks to global overlay files. It does not modify Git config and does not
-remove existing user content from \fBActon.toml\fR or \fB\&.gitignore\fR\&.
+symlinks to global overlay files. It does not modify Git config. When it
+patches an existing \fBActon.toml\fR, it rewrites the parsed manifest and may drop
+TOML comments or unknown keys; \fB\&.gitignore\fR patching remains append\-only.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -158,8 +178,9 @@ remove existing user content from \fBActon.toml\fR or \fB\&.gitignore\fR\&.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB1\fR: Manifest parsing, contract discovery, stdlib installation, or filesystem
-updates failed.
+\h'-04'\(bu\h'+03'\fB1\fR: Manifest parsing, stdlib installation, writing or patching project
+files, or another hard filesystem operation failed. Contract discovery skips
+unreadable/unparseable \fB\&.tolk\fR files, and overlay symlink failures only warn.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -203,5 +224,5 @@ acton init
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fIProject initialization guide\fR <https://ton\-blockchain.github.io/acton/docs/project\-init>
+\h'-04'\(bu\h'+03'\fIProject initialization guide\fR <https://ton\-blockchain.github.io/acton/docs/tutorial/project\-init>
 .RE

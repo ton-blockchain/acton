@@ -1,0 +1,11 @@
+{
+  "title": "Building",
+  "icon": "Wrench",
+  "pages": [
+    "overview",
+    "contracts",
+    "wrappers",
+    "reference"
+  ]
+}
+

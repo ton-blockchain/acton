@@ -1,14 +1,14 @@
 # acton-up(1)
 
-## NAME
+## Name
 
 acton-up --- Update the Acton binary from published releases
 
-## SYNOPSIS
+## Synopsis
 
 `acton up` [_options_] [_version_]
 
-## DESCRIPTION
+## Description
 
 Download and install a published Acton release for the current target triple.
 
@@ -19,7 +19,7 @@ The updater fetches release metadata from GitHub, downloads the matching
 archive and SHA256 checksum, verifies the checksum, and replaces the current
 binary.
 
-## OPTIONS
+## Options
 
 ### Update Options
 
@@ -37,8 +37,8 @@ Install the most recent trunk release.
 Install the latest stable release.
 {{/option}}
 
-{{#option "`-y`, `--yes`" }}
-Skip confirmation prompts.
+{{#option "`--force`" }}
+Install the selected release even if Acton is already up to date.
 {{/option}}
 
 {{#option "`--list`" }}
@@ -55,7 +55,7 @@ List available release tags and exit.
 
 {{> options-project-pass-through }}
 
-## RELEASE SOURCES
+## Release Sources
 
 Acton queries GitHub release metadata and assets from:
 
@@ -64,7 +64,7 @@ Acton queries GitHub release metadata and assets from:
 
 If `GITHUB_TOKEN` is set, Acton uses it for authenticated GitHub API requests.
 
-## INSTALLATION FLOW
+## Installation Flow
 
 When installing a release, Acton:
 
@@ -76,24 +76,12 @@ When installing a release, Acton:
 
 `acton up --list` is read-only and skips download or replacement.
 
-## HOME BREW INSTALLATIONS
+## Interactivity
 
-If the current binary path looks like a Homebrew installation, Acton warns and
-recommends using:
-
-```bash
-brew upgrade acton
-```
-
-Without `--yes`, Acton asks whether to continue with the built-in updater.
-
-## INTERACTIVITY
-
-- `--yes` suppresses confirmation prompts for non-interactive use
-- Homebrew-style installs prompt before replacement unless `--yes` is passed
+- `--force` bypasses the usual up-to-date short-circuit for the selected release
 - up-to-date checks and `--list` can succeed without making local changes
 
-## CHANNEL SELECTION
+## Channel Selection
 
 - `acton up` on a stable build updates to the latest stable release
 - `acton up` on a trunk build stays on trunk
@@ -102,14 +90,14 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
 - `acton up <version>` installs the explicit version even if it is older or
   newer than the current one
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The requested release information was listed, Acton was already up to
   date, or the selected version was installed successfully.
-- `1`: Release lookup failed, checksum verification failed, archive replacement
-  failed, or the update was cancelled or could not be confirmed.
+- `1`: Release lookup failed, checksum verification failed, or archive
+  replacement failed.
 
-## EXAMPLES
+## Examples
 
 1. Update to the latest stable release:
 
@@ -135,12 +123,18 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
    acton up --list
    ```
 
-5. Update non-interactively in CI or bootstrap scripts:
+5. Reinstall the currently selected channel version:
 
    ```bash
-   acton up --stable -y
+   acton up --force
    ```
 
-## SEE ALSO
+6. Update to the latest stable release explicitly:
+
+   ```bash
+   acton up --stable
+   ```
+
+## See Also
 
 - [Installation guide](https://ton-blockchain.github.io/acton/docs/installation)

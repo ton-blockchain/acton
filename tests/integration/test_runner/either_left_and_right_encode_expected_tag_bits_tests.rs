@@ -32,8 +32,8 @@ fn either_left_and_right_encode_expected_tag_bits() {
         "ab-stdlib-either-tags",
         r"
         get fun `test ab stdlib either tags`() {
-            val left = Either<uint32, uint32>.left(17);
-            val right = Either<uint32, uint32>.right(99);
+            val left = TlbEither<uint32, uint32>.left(17);
+            val right = TlbEither<uint32, uint32>.right(99);
 
             var leftSlice = left.toCell().beginParse();
             expect(leftSlice.loadUint(1)).toEqual(0);
@@ -53,16 +53,16 @@ fn either_match_routes_left_and_right_variants() {
     run_either_case(
         "ab-stdlib-either-match",
         r"
-        fun branchScore(choice: Either<uint32, uint32>): int {
+        fun branchScore(choice: TlbEither<uint32, uint32>): int {
             return match (choice) {
-                EitherLeft => 1000 + choice.value,
-                EitherRight => 2000 + choice.value,
+                TlbEitherLeft => 1000 + choice.value,
+                TlbEitherRight => 2000 + choice.value,
             };
         }
 
         get fun `test ab stdlib either match routes variants`() {
-            val left = Either<uint32, uint32>.left(11);
-            val right = Either<uint32, uint32>.right(11);
+            val left = TlbEither<uint32, uint32>.left(11);
+            val right = TlbEither<uint32, uint32>.right(11);
 
             expect(branchScore(left)).toEqual(1011);
             expect(branchScore(right)).toEqual(2011);

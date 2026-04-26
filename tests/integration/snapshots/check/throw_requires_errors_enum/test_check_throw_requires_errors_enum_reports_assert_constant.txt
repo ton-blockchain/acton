@@ -1,0 +1,11 @@
+warning[E034]: throw code should use `Errors.<Name>`
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 assert (in.body.isEmpty()) throw ERR_INVALID_MESSAGE;
+  |                                                  ^^^^^^^^^^^^^^^^^^^ use `Errors.<Name>` instead of constant `ERR_INVALID_MESSAGE`
+  |
+  = declare symbolic [EXIT_STATUS]s in `enum Errors` and reference them as `Errors.<Name>` in `throw` expressions
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E034

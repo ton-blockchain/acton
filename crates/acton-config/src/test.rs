@@ -130,6 +130,7 @@ impl std::fmt::Display for MutationDiffMode {
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
     pub show_bodies: bool,
+    pub verbosity: u8,
     pub debug: bool,
     pub debug_port: u16,
     pub backtrace: Option<BacktraceMode>,
@@ -149,7 +150,6 @@ pub struct TestConfig {
     pub baseline_snapshot: Option<String>,
     pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,
     pub save_test_trace: Option<String>,
     pub mutate: bool,

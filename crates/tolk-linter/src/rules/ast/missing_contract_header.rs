@@ -14,8 +14,9 @@ use tolk_syntax::{CONTRACT_ENTRYPOINTS, HasName, TopLevel};
 /// Without it, wrapper generation and other tooling cannot recover the contract shape reliably.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun onInternalMessage(in: InMessage) {
+/// //  ^^^^^^^^^^^^^^^^^ E031: contract defines entrypoints but is missing a `contract` header
 ///     // ...
 /// }
 /// ```

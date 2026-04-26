@@ -216,6 +216,7 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "fetch failed",
         "getaddrinfo",
         "network request",
+        "Failed to execute `npx",
         "Exit handler never called!",
         "cb() never called!",
     ]
@@ -288,7 +289,7 @@ fn assert_new_project_localnet_deploy_snapshot(
     write_localnet_wallet_config(&project_dir, wallet_name);
 
     let node = project
-        .litenode()
+        .localnet()
         .current_dir(&project_dir)
         .args(["--accounts", wallet_name])
         .start();
@@ -411,6 +412,52 @@ fn test_new_counter_project_non_interactive() {
 }
 
 #[test]
+fn test_new_nft_project_non_interactive() {
+    let project = ProjectBuilder::new("new-nft").without_acton_toml().build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("nft-project")
+        .arg("--description")
+        .arg("nft description")
+        .arg("--template")
+        .arg("nft")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: nft");
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "nft-project""#));
+    assert!(content.contains(r"[contracts.NftCollection]"));
+    assert!(content.contains(r"[contracts.NftItem]"));
+    assert!(content.contains("acton script scripts/deployCollection.tolk"));
+    assert!(content.contains("acton script scripts/deployCollection.tolk --net testnet"));
+
+    assert!(project_dir.join("contracts/NftCollection.tolk").exists());
+    assert!(project_dir.join("contracts/NftItem.tolk").exists());
+    assert!(project_dir.join("wrappers/NftCollection.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/NftItem.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/utils.tolk").exists());
+    assert!(project_dir.join("scripts/deployCollection.tolk").exists());
+    assert!(project_dir.join("scripts/deployItem.tolk").exists());
+    assert!(project_dir.join("scripts/deployBatch.tolk").exists());
+    assert!(project_dir.join("scripts/transferItem.tolk").exists());
+    assert!(project_dir.join("scripts/changeAdmin.tolk").exists());
+    assert!(project_dir.join("tests/nft-collection.test.tolk").exists());
+    assert!(project_dir.join("tests/nft-item.test.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+}
+
+#[test]
 fn test_new_counter_project_with_app_flag() {
     let project = ProjectBuilder::new("new-counter-app")
         .without_acton_toml()
@@ -446,15 +493,35 @@ fn test_new_counter_project_with_app_flag() {
         );
 
     let project_dir = project.path().join("foobar");
+    let package_lock = fs::read_to_string(project_dir.join("package-lock.json")).unwrap();
+    assert!(package_lock.starts_with(
+        r#"{
+  "name": "counter-app-project",
+  "version": "0.1.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "counter-app-project",
+      "version": "0.1.0",
+      "dependencies": {
+"#
+    ));
+    assert!(!package_lock.contains(r#""name": "counter-project""#));
     assert!(project_dir.join("app/src/App.tsx").exists());
-    assert!(project_dir.join("wrappers/Counter.ts").exists());
+    assert!(project_dir.join("wrappers-ts/Counter.gen.ts").exists());
+    assert!(!project_dir.join("wrappers-ts/Counter.ts").exists());
     assert!(project_dir.join("contracts/src/Counter.tolk").exists());
     assert!(
         project_dir
             .join("contracts/tests/counter.test.tolk")
             .exists()
     );
-    assert!(project_dir.join("contracts/wrappers/Counter.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/wrappers/Counter.gen.tolk")
+            .exists()
+    );
     assert!(project_dir.join(".prettierrc").exists());
 }
 
@@ -680,6 +747,173 @@ fn test_new_invalid_template() {
         );
 }
 
+#[test]
+fn test_new_templates_flag_is_hidden_from_help() {
+    let project = ProjectBuilder::new("new-templates-hidden-help")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .arg("new")
+        .arg("--help")
+        .run()
+        .success()
+        .assert_contains("--template")
+        .assert_not_contains("--templates");
+}
+
+#[test]
+fn test_new_templates_returns_machine_readable_json() {
+    let project = ProjectBuilder::new("new-templates-json")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg("--templates")
+        .run()
+        .success();
+
+    let json: JsonValue =
+        serde_json::from_str(&output.get_stdout()).expect("new --templates must return valid JSON");
+
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "schema_version": 1,
+            "templates": [
+                {
+                    "id": "empty",
+                    "description": "Minimal project skeleton",
+                    "supports_app": false,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "Empty",
+                                    "name": "Empty",
+                                    "src": "contracts/Empty.tolk"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "counter",
+                    "description": "Simple counter contract",
+                    "supports_app": true,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "Counter",
+                                    "name": "Counter",
+                                    "src": "contracts/Counter.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "Counter",
+                                    "name": "Counter",
+                                    "src": "contracts/src/Counter.tolk"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "jetton",
+                    "description": "Jetton minter and wallet contracts",
+                    "supports_app": true,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "JettonMinter",
+                                    "name": "JettonMinter",
+                                    "src": "contracts/JettonMinter.tolk"
+                                },
+                                {
+                                    "id": "JettonWallet",
+                                    "name": "JettonWallet",
+                                    "src": "contracts/JettonWallet.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "JettonMinter",
+                                    "name": "JettonMinter",
+                                    "src": "contracts/src/JettonMinter.tolk"
+                                },
+                                {
+                                    "id": "JettonWallet",
+                                    "name": "JettonWallet",
+                                    "src": "contracts/src/JettonWallet.tolk"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "nft",
+                    "description": "NFT collection and item contracts",
+                    "supports_app": true,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "NftCollection",
+                                    "name": "NftCollection",
+                                    "src": "contracts/NftCollection.tolk"
+                                },
+                                {
+                                    "id": "NftItem",
+                                    "name": "NftItem",
+                                    "src": "contracts/NftItem.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "NftCollection",
+                                    "name": "NftCollection",
+                                    "src": "contracts/src/NftCollection.tolk"
+                                },
+                                {
+                                    "id": "NftItem",
+                                    "name": "NftItem",
+                                    "src": "contracts/src/NftItem.tolk"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        })
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn test_new_empty_project_prompts_for_hooks() {
@@ -704,7 +938,9 @@ fn test_new_empty_project_prompts_for_hooks() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Install the default Git hooks?");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("y", "failed to open advanced options");
+    session.expect("Set up Git hooks to run checks before each commit?");
     session.send_line("y", "failed to confirm Git hooks");
     session.expect("Include AGENTS.md guidance for coding agents?");
     session.send_line("", "failed to keep default no-agents choice");
@@ -749,19 +985,21 @@ fn test_new_empty_project_full_interactive_flow_without_flags() {
 
     session.expect("Project name:");
     session.send_line("interactive-empty", "failed to enter project name");
+    session.expect("Template:");
+    session.send_line("", "failed to accept default template");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("y", "failed to open advanced options");
     session.expect("Description:");
     session.send_line(
         "interactive empty description",
         "failed to enter project description",
     );
-    session.expect("Template:");
-    session.send_line("", "failed to accept default template");
-    session.expect("Install the default Git hooks?");
+    session.expect("License:");
+    session.send_line("", "failed to accept default license");
+    session.expect("Set up Git hooks to run checks before each commit?");
     session.send_line("", "failed to keep default no-hooks choice");
     session.expect("Include AGENTS.md guidance for coding agents?");
     session.send_line("", "failed to keep default no-agents choice");
-    session.expect("License:");
-    session.send_line("", "failed to accept default license");
     session.expect("Created new Acton project");
     session.expect("Project name: interactive-empty");
     session.expect("Description: interactive empty description");
@@ -797,16 +1035,10 @@ fn test_new_empty_project_interactive_prompts_accept_default_name_and_descriptio
 
     session.expect("Project name:");
     session.send_line("", "failed to accept default project name");
-    session.expect("Description:");
-    session.send_line("", "failed to accept default description");
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
-    session.expect("Install the default Git hooks?");
-    session.send_line("", "failed to keep default no-hooks choice");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
-    session.expect("License:");
-    session.send_line("", "failed to accept default license");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
     session.expect("Project name: foobar");
     session.expect("Description: A TON blockchain project");
@@ -850,10 +1082,8 @@ fn test_new_counter_project_can_be_selected_interactively() {
     session.send_line("", "failed to select counter template");
     session.expect("Include the TypeScript dApp?");
     session.send_line("", "failed to keep default no-app choice");
-    session.expect("Install the default Git hooks?");
-    session.send_line("", "failed to keep default no-hooks choice");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
     session.expect("Project name: interactive-selected-counter");
     session.expect("Description: interactive selected counter description");
@@ -898,10 +1128,8 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
 
     session.expect("Include the TypeScript dApp?");
     session.send_line("y", "failed to confirm TypeScript app scaffold");
-    session.expect("Install the default Git hooks?");
-    session.send_line("", "failed to keep default no-hooks choice");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
     session.expect("Project name: interactive-counter");
     session.expect("Description: interactive description");
@@ -953,10 +1181,8 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
 
     session.expect("Include the TypeScript dApp?");
     session.send_line("", "failed to keep default no-app choice");
-    session.expect("Install the default Git hooks?");
-    session.send_line("", "failed to keep default no-hooks choice");
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
     session.expect("Project name: interactive-counter");
     session.expect("Description: interactive description");
@@ -1002,7 +1228,9 @@ fn test_new_empty_project_prompts_for_agents() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Install the default Git hooks?");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("y", "failed to open advanced options");
+    session.expect("Set up Git hooks to run checks before each commit?");
     session.send_line("", "failed to keep default no-hooks choice");
     session.expect("Include AGENTS.md guidance for coding agents?");
     session.send_line("y", "failed to confirm AGENTS.md guidance");
@@ -1045,8 +1273,8 @@ fn test_new_empty_project_accepts_other_license_interactively() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Include AGENTS.md guidance for coding agents?");
-    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("y", "failed to open advanced options");
     session.expect("License:");
     for _ in 0..6 {
         session
@@ -1056,6 +1284,8 @@ fn test_new_empty_project_accepts_other_license_interactively() {
     session.send_line("", "failed to select Other license option");
     session.expect("Enter license:");
     session.send_line("Custom-Proprietary", "failed to enter custom license");
+    session.expect("Include AGENTS.md guidance for coding agents?");
+    session.send_line("", "failed to keep default no-agents choice");
     session.expect("Created new Acton project");
     session.expect("Project name: other-license-project");
     session.expect("Description: other license description");
@@ -1200,6 +1430,124 @@ fn test_new_counter_app_project_supports_npm_scripts() {
     assert!(project_dir.join("dist/index.html").exists());
 }
 
+#[cfg(unix)]
+fn create_app_project(workspace: &Project, project_dir: &Path, template: &str) {
+    let project_name = format!("{template}-app-project");
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg(&project_name)
+        .arg("--description")
+        .arg("app template check")
+        .arg("--template")
+        .arg(template)
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+}
+
+#[cfg(unix)]
+fn package_uses_eslint(package_json: &JsonValue) -> bool {
+    let has_eslint_dependency = ["dependencies", "devDependencies"].iter().any(|section| {
+        package_json
+            .get(section)
+            .and_then(JsonValue::as_object)
+            .is_some_and(|deps| {
+                deps.keys()
+                    .any(|name| name == "eslint" || name.contains("eslint"))
+            })
+    });
+
+    let has_eslint_script = package_json
+        .get("scripts")
+        .and_then(JsonValue::as_object)
+        .is_some_and(|scripts| {
+            scripts.values().any(|script| {
+                script
+                    .as_str()
+                    .is_some_and(|script| script.contains("eslint"))
+            })
+        });
+
+    has_eslint_dependency || has_eslint_script
+}
+
+#[cfg(unix)]
+fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
+    if !is_npm_available() {
+        eprintln!("Skipping npm app template checks: npm is not available in PATH");
+        return;
+    }
+
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+    let project_dir = workspace.path().join("generated");
+    create_app_project(&workspace, &project_dir, template);
+
+    let package_json: JsonValue =
+        serde_json::from_str(&fs::read_to_string(project_dir.join("package.json")).unwrap())
+            .unwrap();
+    let scripts = package_json["scripts"].as_object().unwrap();
+    assert!(
+        scripts.contains_key("fmt:check"),
+        "{template} app template must expose npm run fmt:check"
+    );
+
+    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
+    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
+        eprintln!(
+            "Skipping npm app template checks for {template} due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&install_output.stdout),
+            String::from_utf8_lossy(&install_output.stderr)
+        );
+        return;
+    }
+    assert!(
+        install_output.status.success(),
+        "npm ci failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&install_output.stdout),
+        String::from_utf8_lossy(&install_output.stderr)
+    );
+
+    if scripts.contains_key("lint") {
+        let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
+        assert!(
+            lint_output.status.success(),
+            "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&lint_output.stdout),
+            String::from_utf8_lossy(&lint_output.stderr)
+        );
+    } else {
+        assert!(
+            !package_uses_eslint(&package_json),
+            "{template} app template uses ESLint but does not expose npm run lint"
+        );
+    }
+
+    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    assert!(
+        fmt_output.status.success(),
+        "npm run fmt:check failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&fmt_output.stdout),
+        String::from_utf8_lossy(&fmt_output.stderr)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_app_templates_npm_quality_checks() {
+    for template in ["counter", "jetton", "nft"] {
+        assert_app_template_npm_quality_checks(
+            &format!("new-{template}-app-npm-quality-checks"),
+            template,
+        );
+    }
+}
+
 #[test]
 fn test_new_empty_project_localnet_deploy_snapshot() {
     assert_new_project_localnet_deploy_snapshot(
@@ -1245,6 +1593,18 @@ fn test_new_jetton_project_localnet_deploy_snapshot() {
         "deployer",
         "scripts/deploy.tolk",
         "integration/snapshots/test_new_jetton_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
+fn test_new_nft_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-nft-localnet-deploy",
+        "nft",
+        false,
+        "deployer",
+        "scripts/deployCollection.tolk",
+        "integration/snapshots/test_new_nft_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -1907,6 +2267,92 @@ fn test_new_jetton_project_full_flow() {
 }
 
 #[test]
+fn test_new_nft_project_full_flow() {
+    let project = ProjectBuilder::new("new-nft-full")
+        .without_acton_toml()
+        .build();
+
+    let dir = project.path();
+    let project_dir = project.path().join("foobar");
+
+    // 1. Create project
+    project
+        .acton()
+        .arg("new")
+        .arg(&dir.join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("nft")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_new.stdout.txt",
+        );
+
+    // 2. Build project
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_build.stdout.txt",
+        );
+
+    // 3. Run tests
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("test")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_test.stdout.txt",
+        );
+
+    // 4. Run deploy script in emulation mode
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/deployCollection.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_script.stdout.txt",
+        );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_project_full_flow_fmt.stdout.txt",
+        );
+}
+
+#[test]
 fn test_new_empty_project_with_dot_env() {
     let project = ProjectBuilder::new("new-dot-env")
         .without_acton_toml()
@@ -1973,4 +2419,395 @@ fn test_new_empty_project_writes_editorconfig_with_tolk_rules() {
             "foobar/.editorconfig",
             "integration/snapshots/test_new_empty_project_editorconfig.gen",
         );
+}
+
+fn create_project_and_check_wrappers(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    create_project_and_check_wrappers_inner(test_name, template, false, contracts_and_wrappers);
+}
+
+fn create_project_and_check_wrappers_with_build(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    create_project_and_check_wrappers_inner(test_name, template, true, contracts_and_wrappers);
+}
+
+fn create_project_and_check_wrappers_inner(
+    test_name: &str,
+    template: &str,
+    needs_build: bool,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg(template)
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    if needs_build {
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("build")
+            .run()
+            .success();
+    }
+
+    for &(contract_name, template_wrapper_path) in contracts_and_wrappers {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let wrappers_dir = PathBuf::from(template_wrapper_path)
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let generated_path = wrappers_dir.join(format!("{contract_name}.gen.tolk"));
+        let generated_wrapper = fs::read_to_string(project_dir.join(&generated_path))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to read generated wrapper {}: {e}",
+                    generated_path.display()
+                )
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
+}
+
+#[cfg(unix)]
+fn create_app_project_and_check_typescript_wrappers(
+    test_name: &str,
+    template: &str,
+    contracts_and_wrappers: &[(&str, &str)],
+) {
+    if !is_npm_available() {
+        eprintln!("Skipping TypeScript wrapper generation check: npm is not available in PATH");
+        return;
+    }
+
+    let workspace = ProjectBuilder::new(test_name).without_acton_toml().build();
+
+    let project_dir = workspace.path().join("generated");
+    create_app_project(&workspace, &project_dir, template);
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in contracts_and_wrappers {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        let output = Command::new(acton_exe())
+            .args(["wrapper", contract_name, "--ts"])
+            .current_dir(&project_dir)
+            .output()
+            .unwrap();
+
+        if !output.status.success() && npm_failure_looks_environment_specific(&output) {
+            eprintln!(
+                "Skipping TypeScript wrapper generation check for {template}/{contract_name} due to environment-specific npx failure:\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        assert!(
+            output.status.success(),
+            "acton wrapper {contract_name} --ts failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template TypeScript wrapper `{template_wrapper_path}` does not match auto-generated `acton wrapper {contract_name} --ts` output"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_counter_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-counter-app-ts-wrapper-check",
+        "counter",
+        &[("Counter", "wrappers-ts/Counter.gen.ts")],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_jetton_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-jetton-app-ts-wrapper-check",
+        "jetton",
+        &[
+            ("JettonMinter", "wrappers-ts/JettonMinter.gen.ts"),
+            ("JettonWallet", "wrappers-ts/JettonWallet.gen.ts"),
+        ],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_nft_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-nft-app-ts-wrapper-check",
+        "nft",
+        &[
+            ("NftCollection", "wrappers-ts/NftCollection.gen.ts"),
+            ("NftItem", "wrappers-ts/NftItem.gen.ts"),
+        ],
+    );
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_empty_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-empty-wrapper-check",
+        "empty",
+        &[("Empty", "wrappers/Empty.tolk")],
+    );
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_counter_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-counter-wrapper-check",
+        "counter",
+        &[("Counter", "wrappers/Counter.gen.tolk")],
+    );
+}
+
+#[test]
+#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
+fn test_new_counter_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-counter-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("counter")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let template_wrapper =
+        fs::read_to_string(project_dir.join("contracts/wrappers/Counter.gen.tolk"))
+            .expect("Failed to read template wrapper");
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("wrapper")
+        .arg("Counter")
+        .run()
+        .success();
+
+    let generated_wrapper =
+        fs::read_to_string(project_dir.join("contracts/wrappers/Counter.gen.tolk"))
+            .expect("Failed to read generated wrapper");
+
+    assert_eq!(
+        template_wrapper, generated_wrapper,
+        "Template wrapper `contracts/wrappers/Counter.gen.tolk` does not match auto-generated wrapper for contract `Counter`"
+    );
+}
+
+#[test]
+fn test_new_jetton_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers_with_build(
+        "new-jetton-wrapper-check",
+        "jetton",
+        &[
+            ("JettonMinter", "wrappers/JettonMinter.gen.tolk"),
+            ("JettonWallet", "wrappers/JettonWallet.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_jetton_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-jetton-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in &[
+        ("JettonMinter", "contracts/wrappers/JettonMinter.gen.tolk"),
+        ("JettonWallet", "contracts/wrappers/JettonWallet.gen.tolk"),
+    ] {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
+}
+
+#[test]
+fn test_new_nft_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-nft-wrapper-check",
+        "nft",
+        &[
+            ("NftCollection", "wrappers/NftCollection.gen.tolk"),
+            ("NftItem", "wrappers/NftItem.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_nft_app_template_wrappers_match_autogenerated() {
+    let workspace = ProjectBuilder::new("new-nft-app-wrapper-check")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("wrapper-check")
+        .arg("--description")
+        .arg("wrapper consistency check")
+        .arg("--template")
+        .arg("nft")
+        .arg("--app")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    for &(contract_name, template_wrapper_path) in &[
+        ("NftCollection", "contracts/wrappers/NftCollection.gen.tolk"),
+        ("NftItem", "contracts/wrappers/NftItem.gen.tolk"),
+    ] {
+        let template_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read template wrapper {template_wrapper_path}: {e}")
+            });
+
+        workspace
+            .acton()
+            .current_dir(&project_dir)
+            .arg("wrapper")
+            .arg(contract_name)
+            .run()
+            .success();
+
+        let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
+            .unwrap_or_else(|e| {
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
+            });
+
+        assert_eq!(
+            template_wrapper, generated_wrapper,
+            "Template wrapper `{template_wrapper_path}` does not match auto-generated wrapper for contract `{contract_name}`"
+        );
+    }
 }

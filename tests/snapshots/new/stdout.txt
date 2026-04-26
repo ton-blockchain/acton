@@ -1,9 +1,9 @@
 Create a new project in a specified directory. This will create a new directory with a basic project template.
 
-Usage: acton new [OPTIONS] <PATH>
+Usage: acton new [OPTIONS] [PATH]
 
 Arguments:
-  <PATH>
+  [PATH]
           Directory to create the project in (use '.' for the current directory)
 
 Options:
@@ -28,7 +28,7 @@ Options:
       --template <TEMPLATE>
           Project template
           
-          [possible values: empty, counter, jetton]
+          [possible values: empty, counter, jetton, nft]
 
       --license <LICENSE>
           License

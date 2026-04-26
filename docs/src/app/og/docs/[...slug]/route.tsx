@@ -1,7 +1,7 @@
 import { getPageImage, source } from '@/lib/source';
 import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
-import {generate} from "@/lib/mono";
+import { generate, getImageResponseOptions } from '@/lib/mono';
 
 export const revalidate = false;
 
@@ -13,15 +13,14 @@ export async function GET(
   const page = source.getPage(slug.slice(0, -1));
   if (!page) notFound();
 
+  const options = await getImageResponseOptions();
+
   return new ImageResponse(
-    generate({
+    await generate({
       title: page.data.title,
       description: page.data.description,
     }),
-    {
-      width: 1200,
-      height: 630,
-    },
+    options,
   );
 }
 

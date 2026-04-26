@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 const CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
 "#;
 
@@ -26,7 +27,7 @@ fn config_get_msg_forward_prices_returns_per_chain_values_after_both_writes() {
         "dn-stdlib-config-msg-forward-prices-dual-write",
         r"
 get fun `test dn stdlib config msg forward prices dual write`() {
-    var config = net.getConfig();
+    var config = testing.getConfig();
     var basechain = config.getMsgForwardPrices(BASECHAIN);
     var masterchain = config.getMsgForwardPrices(MASTERCHAIN);
 
@@ -63,9 +64,9 @@ get fun `test dn stdlib config msg forward prices dual write`() {
 
     config.setMsgForwardPrices(basechain, BASECHAIN);
     config.setMsgForwardPrices(masterchain, MASTERCHAIN);
-    expect(net.setConfig(config)).toBeTrue();
+    expect(testing.setConfig(config)).toBeTrue();
 
-    val persisted = net.getConfig();
+    val persisted = testing.getConfig();
     val baseAfter = persisted.getMsgForwardPrices(BASECHAIN);
     val masterAfter = persisted.getMsgForwardPrices(MASTERCHAIN);
 

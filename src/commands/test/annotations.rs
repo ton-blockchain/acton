@@ -1,5 +1,7 @@
 use crate::commands::test::{FuzzConfig, TestAnnotation};
-use tolk_syntax::{AstNode, Expr, GetMethod, HasAnnotations, HasName, ObjectLit};
+use tolk_syntax::{
+    Annotation, AnnotationArgs, AstNode, Expr, GetMethod, HasAnnotations, HasName, ObjectLit,
+};
 
 #[derive(Debug, Default)]
 pub(super) struct TestAnnotations {
@@ -7,7 +9,25 @@ pub(super) struct TestAnnotations {
     pub fuzz: Option<FuzzConfig>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
-    pub todo_description: Option<String>,
+    pub status_description: Option<String>,
+}
+
+impl TestAnnotations {
+    fn merge_from(&mut self, other: Self) {
+        self.annotations.extend(other.annotations);
+        if other.fuzz.is_some() {
+            self.fuzz = other.fuzz;
+        }
+        if other.expected_exit_code.is_some() {
+            self.expected_exit_code = other.expected_exit_code;
+        }
+        if other.gas_limit.is_some() {
+            self.gas_limit = other.gas_limit;
+        }
+        if other.status_description.is_some() {
+            self.status_description = other.status_description;
+        }
+    }
 }
 
 pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> TestAnnotations {
@@ -16,135 +36,119 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
         return TestAnnotations::default();
     };
 
-    let mut annotations = Vec::new();
-    let mut fuzz = None;
-    let mut expected_exit_code = None;
-    let mut gas_limit = None;
-    let mut todo_description = None;
+    let mut parsed = TestAnnotations::default();
 
     for annotation in annotations_node.annotations() {
         let Some(name) = annotation.name() else {
             continue;
         };
 
-        if !name.text_matches(content, "test") {
-            continue;
-        }
-
-        let Some(args) = annotation.args() else {
+        let annotation_name = name.text(content);
+        let annotation_values = if annotation_name.starts_with("test.") {
+            parse_dotted_test_annotation(content, annotation_name, annotation)
+        } else {
             continue;
         };
 
-        for arg in args.args() {
-            match arg {
-                Expr::StringLit(arg) => match arg.content(content) {
-                    "skip" => {
-                        annotations.push(TestAnnotation::Skip);
-                    }
-                    "todo" => {
-                        annotations.push(TestAnnotation::Todo);
-                    }
-                    _ => {}
-                },
-                Expr::ObjectLit(arg) => {
-                    let values = parse_annotation_object(content, arg);
-
-                    annotations.extend(values.annotations);
-                    if values.fuzz.is_some() {
-                        fuzz = values.fuzz;
-                    }
-                    if values.expected_exit_code.is_some() {
-                        expected_exit_code = values.expected_exit_code;
-                    }
-                    if values.gas_limit.is_some() {
-                        gas_limit = values.gas_limit;
-                    }
-                    if values.todo_description.is_some() {
-                        todo_description = values.todo_description;
-                    }
-                }
-                _ => {}
-            }
-        }
+        parsed.merge_from(annotation_values);
     }
-    TestAnnotations {
-        annotations,
-        fuzz,
-        expected_exit_code,
-        gas_limit,
-        todo_description,
+
+    parsed
+}
+
+fn parse_dotted_test_annotation(
+    content: &str,
+    annotation_name: &str,
+    annotation: Annotation<'_>,
+) -> TestAnnotations {
+    let Some(kind) = annotation_name.strip_prefix("test.") else {
+        return TestAnnotations::default();
+    };
+
+    match kind {
+        "skip" => parse_dotted_skip(content, annotation.args()),
+        "todo" => parse_dotted_todo(content, annotation.args()),
+        "fail_with" => parse_dotted_fail_with(content, annotation.args()),
+        "gas_limit" => parse_dotted_gas_limit(content, annotation.args()),
+        "fuzz" => parse_dotted_fuzz(content, annotation.args()),
+        _ => TestAnnotations::default(),
     }
 }
 
-fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotations {
-    let mut annotations = Vec::new();
-    let mut fuzz = None;
-    let mut expected_exit_code = None;
-    let mut gas_limit = None;
-    let mut todo_description = None;
+fn first_annotation_arg(args: Option<AnnotationArgs<'_>>) -> Option<Expr<'_>> {
+    args.and_then(|args| args.args().next())
+}
 
-    for key_value in object.arguments() {
-        let Some(name_node) = key_value.name() else {
-            continue;
-        };
+fn parse_dotted_skip(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+    let mut parsed = TestAnnotations::default();
 
-        let field_name = name_node.text(content);
-
-        match field_name {
-            "skip" => {
-                let is_true = key_value.value().is_none_or(|value| match value {
-                    Expr::BoolLit(b) => b.value(),
-                    _ => false,
-                });
-
-                if is_true {
-                    annotations.push(TestAnnotation::Skip);
-                }
-                continue;
-            }
-            "todo" => {
-                if let Some(value) = key_value.value() {
-                    match value {
-                        Expr::StringLit(s) => {
-                            annotations.push(TestAnnotation::Todo);
-                            todo_description = Some(s.content(content).to_string());
-                        }
-                        Expr::BoolLit(b) if b.value() => {
-                            annotations.push(TestAnnotation::Todo);
-                            todo_description = Some("TODO".to_string());
-                        }
-                        _ => {}
-                    }
-                }
-                continue;
-            }
-            "fail_with" => {
-                if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Some(code) = n.parse_i32(content)
-                {
-                    expected_exit_code = Some(code);
-                }
-            }
-            "fuzz" => {
-                fuzz = parse_fuzz_value(content, key_value.value());
-            }
-            "gas_limit" => {
-                if let Some(Expr::NumberLit(n)) = key_value.value()
-                    && let Some(limit) = n.parse_u64(content)
-                {
-                    gas_limit = Some(limit);
-                }
-            }
-            _ => {}
+    match first_annotation_arg(args) {
+        None => parsed.annotations.push(TestAnnotation::Skip),
+        Some(Expr::StringLit(value)) => {
+            parsed.annotations.push(TestAnnotation::Skip);
+            parsed.status_description = Some(value.content(content).to_string());
         }
+        Some(Expr::BoolLit(value)) if value.value() => {
+            parsed.annotations.push(TestAnnotation::Skip);
+        }
+        _ => {}
     }
 
+    parsed
+}
+
+fn parse_dotted_todo(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+    let mut parsed = TestAnnotations::default();
+
+    match first_annotation_arg(args) {
+        None => parsed.annotations.push(TestAnnotation::Todo),
+        Some(Expr::StringLit(value)) => {
+            parsed.annotations.push(TestAnnotation::Todo);
+            parsed.status_description = Some(value.content(content).to_string());
+        }
+        Some(Expr::BoolLit(value)) if value.value() => {
+            parsed.annotations.push(TestAnnotation::Todo);
+            parsed.status_description = Some("TODO".to_string());
+        }
+        _ => {}
+    }
+
+    parsed
+}
+
+fn parse_dotted_fail_with(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+    let mut parsed = TestAnnotations::default();
+
+    if let Some(Expr::NumberLit(value)) = first_annotation_arg(args)
+        && let Some(code) = value.parse_i32(content)
+    {
+        parsed.expected_exit_code = Some(code);
+    }
+
+    parsed
+}
+
+fn parse_dotted_gas_limit(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+    let mut parsed = TestAnnotations::default();
+
+    if let Some(Expr::NumberLit(value)) = first_annotation_arg(args)
+        && let Some(limit) = value.parse_u64(content)
+    {
+        parsed.gas_limit = Some(limit);
+    }
+
+    parsed
+}
+
+fn parse_dotted_fuzz(content: &str, args: Option<AnnotationArgs<'_>>) -> TestAnnotations {
+    let fuzz = first_annotation_arg(args).map_or_else(
+        || Some(FuzzConfig::default()),
+        |value| parse_fuzz_value(content, Some(value)),
+    );
+
     TestAnnotations {
-        annotations,
         fuzz,
-        expected_exit_code,
-        gas_limit,
-        todo_description,
+        ..TestAnnotations::default()
     }
 }
 

@@ -10,21 +10,21 @@ impl Git {
         Self
     }
 
-    pub(crate) fn current_branch(&self) -> Result<String> {
+    pub(crate) fn current_branch(self) -> Result<String> {
         self.output(&["rev-parse", "--abbrev-ref", "HEAD"])
     }
 
-    pub(crate) fn head_commit(&self) -> Result<String> {
+    pub(crate) fn head_commit(self) -> Result<String> {
         self.output(&["rev-parse", "HEAD"])
     }
 
-    pub(crate) fn has_uncommitted_changes(&self) -> Result<bool> {
+    pub(crate) fn has_uncommitted_changes(self) -> Result<bool> {
         Ok(!self
             .output(&["status", "--porcelain", "--untracked-files=no"])?
             .is_empty())
     }
 
-    pub(crate) fn commit_count_between(&self, left: &str, right: &str) -> Result<(usize, usize)> {
+    pub(crate) fn commit_count_between(self, left: &str, right: &str) -> Result<(usize, usize)> {
         let counts = self.output(&[
             "rev-list",
             "--left-right",
@@ -51,7 +51,7 @@ impl Git {
         Ok((left, right))
     }
 
-    pub(crate) fn remote_tag_exists(&self, remote: &str, name: &str) -> Result<bool> {
+    pub(crate) fn remote_tag_exists(self, remote: &str, name: &str) -> Result<bool> {
         let tag_ref = format!("refs/tags/{name}");
 
         Ok(!self
@@ -59,15 +59,15 @@ impl Git {
             .is_empty())
     }
 
-    pub(crate) fn local_tag_exists(&self, name: &str) -> Result<bool> {
+    pub(crate) fn local_tag_exists(self, name: &str) -> Result<bool> {
         Ok(!self.output(&["tag", "--list", name])?.is_empty())
     }
 
-    pub(crate) fn fetch_branch(&self, remote: &str, branch: &str) -> Result<()> {
+    pub(crate) fn fetch_branch(self, remote: &str, branch: &str) -> Result<()> {
         self.output(&["fetch", remote, branch]).map(|_| ())
     }
 
-    pub(crate) fn add_files(&self, paths: &[&str]) -> Result<()> {
+    pub(crate) fn add_files(self, paths: &[&str]) -> Result<()> {
         let mut args = Vec::with_capacity(paths.len() + 2);
         args.push("add");
         args.push("--");
@@ -76,7 +76,7 @@ impl Git {
         self.output(&args).map(|_| ())
     }
 
-    pub(crate) fn commit(&self, message: &str, args: &[&str]) -> Result<()> {
+    pub(crate) fn commit(self, message: &str, args: &[&str]) -> Result<()> {
         let mut command_args = Vec::with_capacity(3 + args.len());
         command_args.push("commit");
         command_args.extend_from_slice(args);
@@ -86,19 +86,19 @@ impl Git {
         self.output(&command_args).map(|_| ())
     }
 
-    pub(crate) fn show_commit_numstat(&self, rev: &str) -> Result<String> {
+    pub(crate) fn show_commit_numstat(self, rev: &str) -> Result<String> {
         self.output(&["show", "--numstat", rev])
     }
 
-    pub(crate) fn tag(&self, name: &str) -> Result<()> {
+    pub(crate) fn tag(self, name: &str) -> Result<()> {
         self.output(&["tag", name]).map(|_| ())
     }
 
-    pub(crate) fn delete_tag(&self, name: &str) -> Result<()> {
+    pub(crate) fn delete_tag(self, name: &str) -> Result<()> {
         self.output(&["tag", "--delete", name]).map(|_| ())
     }
 
-    pub(crate) fn push_refs(&self, remote: &str, refs: &[&str]) -> Result<()> {
+    pub(crate) fn push_refs(self, remote: &str, refs: &[&str]) -> Result<()> {
         let mut args = Vec::with_capacity(2 + refs.len());
         args.push("push");
         args.push(remote);
@@ -107,11 +107,11 @@ impl Git {
         self.output(&args).map(|_| ())
     }
 
-    pub(crate) fn delete_remote_tag(&self, remote: &str, name: &str) -> Result<()> {
+    pub(crate) fn delete_remote_tag(self, remote: &str, name: &str) -> Result<()> {
         self.output(&["push", remote, "--delete", name]).map(|_| ())
     }
 
-    fn output(&self, args: &[&str]) -> Result<String> {
+    fn output(self, args: &[&str]) -> Result<String> {
         let output = Command::new("git")
             .args(args)
             .output()

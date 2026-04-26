@@ -13,7 +13,7 @@ fn check_project_wide_includes_scripts_with_main_using_relaxed_file_rules() {
                 import "../.acton/tlb/maybe.tolk";
 
                 fun main() {
-                    val maybeValue = Maybe<int>.none();
+                    val maybeValue = TlbMaybe<int>.none();
                     maybeValue.unwrapOr(0);
                     val unused = 1;
                 }

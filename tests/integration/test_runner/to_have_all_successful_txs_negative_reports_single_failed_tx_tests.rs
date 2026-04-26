@@ -4,10 +4,10 @@ use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const TX_EXPECT_IMPORTS: &str = r#"
-import "../../lib/build/build"
+import "../../lib/build"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/testing/expect"
-import "../../lib/testing/transaction_expect"
 "#;
 
 const FAILING_CONTRACT: &str = r"
@@ -46,7 +46,7 @@ get fun `test ce all successful negative single failing tx`() {
         stateInit: init,
     };
 
-    val sender = net.treasury("sender");
+    val sender = testing.treasury("sender");
     val msg = createMessage({
         bounce: false,
         value: ton("1"),
@@ -77,7 +77,7 @@ get fun `test ce all successful negative fixture single failing tx`() {{
     }};
     val counterAddress = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val deployMsg = createMessage({{
         bounce: false,
         value: ton("1"),
@@ -113,4 +113,27 @@ get fun `test ce all successful negative fixture single failing tx`() {{
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/to_have_all_successful_txs_negative_reports_single_failed_tx/to_have_all_successful_txs_negative_reports_single_failed_tx_in_fixture.stdout.txt",
         );
+}
+
+#[test]
+fn to_have_all_successful_txs_treats_compute_skipped_transaction_as_failure() {
+    run_project_builder_failure(
+        "ce-stdlib-all-successful-compute-skipped",
+        r#"
+get fun `test ce all successful compute skipped tx`() {
+    val sender = testing.treasury("sender");
+    val missingAddress = address("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot");
+
+    val results = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: missingAddress,
+        body: beginCell().storeUint(1, 32).endCell(),
+    }));
+
+    expect(results).toHaveAllSuccessfulTxs();
+}
+"#,
+        "integration/snapshots/test-runner/to_have_all_successful_txs_negative_reports_single_failed_tx/to_have_all_successful_txs_treats_compute_skipped_transaction_as_failure.stdout.txt",
+    );
 }

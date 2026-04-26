@@ -8,7 +8,8 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const VM_IMPORTS: &str = r#"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
+import "../../lib/emulation/testing"
+import "../../lib/impl"
 "#;
 
 fn run_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -32,14 +33,14 @@ fn set_config_param_keeps_neighbor_slots_consistent() {
         "cl-stdlib-set-config-param-neighbor-slots",
         r"
 get fun `test cl stdlib set config param neighbor slots`() {
-    val c7Before = vm.getC7();
+    val c7Before = testing.getC7OutsideContract();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeNow = paramsBefore.get(3) as int;
 
-    vm.setConfigParam(401234567, 4);
-    vm.setConfigParam(501234567, 5);
+    impl.setConfigParam(401234567, 4);
+    impl.setConfigParam(501234567, 5);
 
-    val c7After = vm.getC7();
+    val c7After = testing.getC7OutsideContract();
     val paramsAfter = c7After.get(0) as tuple;
 
     expect(paramsAfter.get(3) as int).toEqual(beforeNow);
@@ -57,14 +58,14 @@ fn set_config_param_slot_three_updates_blockchain_now_and_c7() {
         "cl-stdlib-set-config-param-slot-three",
         r"
 get fun `test cl stdlib set config param slot three`() {
-    val c7Before = vm.getC7();
+    val c7Before = testing.getC7OutsideContract();
     val paramsBefore = c7Before.get(0) as tuple;
     val beforeBlockLogicalTime = paramsBefore.get(4) as int;
     val beforeLogicalTime = paramsBefore.get(5) as int;
 
-    vm.setConfigParam(1700002222, 3);
+    impl.setConfigParam(1700002222, 3);
 
-    val c7After = vm.getC7();
+    val c7After = testing.getC7OutsideContract();
     val paramsAfter = c7After.get(0) as tuple;
 
     expect(blockchain.now()).toEqual(1700002222);
@@ -83,9 +84,9 @@ fn get_config_param_tuple_read_is_not_usable_bug() {
         "cl-stdlib-get-config-param-tuple-read-bug",
         r#"
 get fun `test cl stdlib get config param tuple read bug`() {
-    vm.setConfigParam(tuple [ton("9"), null], 7);
+    impl.setConfigParam(tuple [ton("9"), null], 7);
 
-    val originalBalance = vm.getConfigParam<tuple>(7);
+    val originalBalance = (testing.getC7OutsideContract().get(0) as tuple).get(7) as tuple;
     expect(originalBalance.get(0) as int).toEqual(ton("9"));
 }
 "#,

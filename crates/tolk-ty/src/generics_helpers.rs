@@ -318,8 +318,8 @@ impl GenericSubstitutionsDeducing {
                                         (
                                             TyData::Struct { def: p_def, .. },
                                             TyData::Struct { def: a_def, .. },
-                                        ) => p_def == a_def,
-                                        (
+                                        )
+                                        | (
                                             TyData::TypeAlias { def: p_def, .. },
                                             TyData::TypeAlias { def: a_def, .. },
                                         ) => p_def == a_def,

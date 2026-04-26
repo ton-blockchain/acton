@@ -1,6 +1,6 @@
 use crate::{BaseTypeInfo, TypeAbi, TypeInfo};
 use num_bigint::BigInt;
-use tolkc::abi::Ty;
+use tolk_compiler::abi::Ty;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
 use tycho_types::models::{AnyAddr, ExtAddr, IntAddr};
 

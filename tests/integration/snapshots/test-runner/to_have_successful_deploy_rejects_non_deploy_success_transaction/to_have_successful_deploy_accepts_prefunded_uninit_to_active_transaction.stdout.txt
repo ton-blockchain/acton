@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/deploy_expect.test.tolk (1 test)
+  ✓ cg to have successful deploy accepts prefunded uninit to active [TIME]
+
+ ✓ 1 passed in 1 file

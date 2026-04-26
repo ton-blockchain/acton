@@ -1360,6 +1360,26 @@ mod tests {
     }
 
     #[test]
+    fn test_import_preserves_non_tolk_suffix_when_appending_extension() {
+        ResolveTestBuilder::new()
+            .file("other.test.tolk", "fun other_fun() {}")
+            .file(
+                "main.tolk",
+                r#"
+                import "other.test"
+
+                fun main() {
+                    <caret>other_fun();
+                }
+                "#,
+            )
+            .target("main.tolk")
+            .check_definition(expect![[r"
+                other_fun -> Global(other_fun at other.test.tolk:4-13)
+            "]]);
+    }
+
+    #[test]
     fn test_mapped_import() {
         ResolveTestBuilder::new()
             .mapping("@core", "libs")
@@ -1569,7 +1589,7 @@ mod tests {
 
             let target_abs_path = target_abs_path.expect("Target file not found in project files");
 
-            let stdlib_path = PathBuf::from("../../crates/tolkc/assets/tolk-stdlib");
+            let stdlib_path = PathBuf::from("../../crates/tolk-compiler/assets/tolk-stdlib");
             let file_db = FileDb::new(stdlib_path.clone(), None);
 
             let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(stdlib_path);
@@ -1696,5 +1716,46 @@ mod tests {
 
             expect.assert_eq(&actual);
         }
+    }
+
+    #[test]
+    fn reachable_files_stops_on_cyclic_imports() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_root = temp_dir.path();
+
+        let a_path = project_root.join("a.tolk");
+        let b_path = project_root.join("b.tolk");
+
+        std::fs::write(
+            &a_path,
+            r#"
+            import "b.tolk"
+
+            fun a() {}
+            "#,
+        )
+        .unwrap();
+        std::fs::write(
+            &b_path,
+            r#"
+            import "a.tolk"
+
+            fun b() {}
+            "#,
+        )
+        .unwrap();
+
+        let file_db = FileDb::new(project_root.join("__stdlib__"), None);
+        let a_path = file_db.canonicalize(&a_path).unwrap();
+        let b_path = file_db.canonicalize(&b_path).unwrap();
+
+        let index = crate::project_index::ProjectIndex::builder(&file_db, a_path.clone())
+            .build()
+            .unwrap();
+
+        let a_id = index.get_file_by_path(&a_path).unwrap();
+        let b_id = index.get_file_by_path(&b_path).unwrap();
+
+        assert_eq!(index.reachable_files(a_id), vec![a_id, b_id]);
     }
 }

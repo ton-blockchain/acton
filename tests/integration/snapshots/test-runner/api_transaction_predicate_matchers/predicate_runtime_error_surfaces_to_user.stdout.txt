@@ -1,0 +1,20 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✗ predicate runtime error [TIME]
+    └─ Error: Contract missing_contract not found in Acton.toml
+Available contracts:
+ harness
+    └─ Test output:
+       throw.to=[WALLET_ADDRESS_BASE] (harness)
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

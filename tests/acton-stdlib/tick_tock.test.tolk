@@ -1,5 +1,6 @@
-import "@local-acton/build/build"
+import "@local-acton/build"
 import "@local-acton/emulation/network"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
 import "@local-acton/types/big_array"
 import "contracts/tick_tock_types"
@@ -18,7 +19,7 @@ fun TickTockContract.deploy(): TickTockContract {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     net.send(
         deployer.address,
         createMessage({
@@ -42,7 +43,7 @@ fun TickTockContract.getTockCount(self): int {
 get fun `test run tick`() {
     val contract = TickTockContract.deploy();
 
-    val res = net.runTickTock(contract.address, false);
+    val res = testing.runTickTock(contract.address, false);
     expect(res.size()).toBeGreater(0);
 
     expect(contract.getTickCount()).toEqual(1);
@@ -52,7 +53,7 @@ get fun `test run tick`() {
 get fun `test run tock`() {
     val contract = TickTockContract.deploy();
 
-    val res = net.runTickTock(contract.address, true);
+    val res = testing.runTickTock(contract.address, true);
     expect(res.size()).toBeGreater(0);
 
     expect(contract.getTickCount()).toEqual(0);

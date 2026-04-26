@@ -21,8 +21,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             Stmt::Break(break_stmt) => self.process_break_stmt(break_stmt, flow),
             Stmt::Continue(continue_stmt) => self.process_continue_stmt(continue_stmt, flow),
             Stmt::Match(match_stmt) => self.process_match_stmt(match_stmt, flow),
-            Stmt::EmptyStmt(_) => flow,
-            Stmt::Unmapped(_) => flow,
+            Stmt::EmptyStmt(_) | Stmt::Unmapped(_) => flow,
         }
     }
 

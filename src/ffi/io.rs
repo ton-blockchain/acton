@@ -1,14 +1,18 @@
-use crate::context::Context;
+use crate::commands::common::error_fmt;
+use crate::context::{Context, to_cell};
+use crate::ffi::emulation::normalize_address_input;
 use crate::formatter::FormatterContext;
-use anyhow::bail;
+use anyhow::{Context as AnyhowContext, bail};
+use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::io::{IsTerminal, stdin};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tvmffi::from_stack::FromStack;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::from_stack::FromStack;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 extension!(println in (Context) with (arg6: TupleItem, type6: String, arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String) using println_impl);
 #[allow(clippy::too_many_arguments)]
@@ -281,36 +285,123 @@ fn format_args(
     Ok((out, consumed))
 }
 
-extension!(prompt in (Context) with (placeholder: String, message: String) using prompt_impl);
+extension!(prompt in (Context) with (default: String, placeholder: String, message: String) using prompt_impl);
 fn prompt_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
+    default: String,
     placeholder: String,
     message: String,
 ) -> anyhow::Result<()> {
     let text = if stdin().is_terminal() {
-        Text::new(&message)
-            .with_placeholder(&placeholder)
-            .prompt()
-            .unwrap_or_default()
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+        text.prompt().unwrap_or_else(|_| default.clone())
     } else {
-        String::new()
+        default
     };
 
     stack.push_string(&text);
     Ok(())
 }
 
-extension!(select in (Context) with (variants: Vec<String>, message: String) using select_impl);
+fn parse_prompt_int(input: &str) -> anyhow::Result<BigInt> {
+    input
+        .trim()
+        .parse::<BigInt>()
+        .with_context(|| format!("Failed to parse integer from '{input}'"))
+}
+
+extension!(prompt_int in (Context) with (default: String, placeholder: String, message: String) using prompt_int_impl);
+fn prompt_int_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    default: String,
+    placeholder: String,
+    message: String,
+) -> anyhow::Result<()> {
+    let input = if stdin().is_terminal() {
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+
+        text.with_validator(|input: &str| {
+            if parse_prompt_int(input).is_ok() {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    "Enter a valid integer".to_owned(),
+                )))
+            }
+        })
+        .prompt()
+        .unwrap_or_else(|_| default.clone())
+    } else {
+        default
+    };
+
+    stack.push(TupleItem::Int(parse_prompt_int(&input)?));
+    Ok(())
+}
+
+fn parse_prompt_address(input: &str) -> anyhow::Result<StdAddr> {
+    let (addr, _) = StdAddr::from_str_ext(normalize_address_input(input), StdAddrFormat::any())
+        .with_context(|| format!("Cannot parse address: {input}"))?;
+    Ok(addr)
+}
+
+extension!(prompt_address in (Context) with (default: String, placeholder: String, message: String) using prompt_address_impl);
+fn prompt_address_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    default: String,
+    placeholder: String,
+    message: String,
+) -> anyhow::Result<()> {
+    let input = if stdin().is_terminal() {
+        let mut text = Text::new(&message).with_placeholder(&placeholder);
+        if !default.is_empty() {
+            text = text.with_default(&default);
+        }
+
+        text.with_validator(|input: &str| {
+            if parse_prompt_address(input).is_ok() {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(ErrorMessage::Custom(
+                    "Enter a valid TON address".to_owned(),
+                )))
+            }
+        })
+        .prompt()
+        .unwrap_or_else(|_| default.clone())
+    } else {
+        default
+    };
+
+    let addr = parse_prompt_address(&input)?;
+    stack.push(TupleItem::Slice(to_cell(&addr)));
+    Ok(())
+}
+
+extension!(select in (Context) with (default_index: BigInt, variants: Vec<String>, message: String) using select_impl);
 fn select_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
+    default_index: BigInt,
     variants: Vec<String>,
     message: String,
 ) -> anyhow::Result<()> {
     let result = if stdin().is_terminal() {
+        let cursor = default_index
+            .to_usize()
+            .unwrap_or(0)
+            .min(variants.len().saturating_sub(1));
         Select::new(&message, variants)
-            .with_starting_cursor(0)
+            .with_starting_cursor(cursor)
             .prompt()
             .unwrap_or_default()
     } else {
@@ -343,13 +434,61 @@ fn confirm_impl(
     Ok(())
 }
 
+extension!(prompt_wallet in (Context) with (message: String) using prompt_wallet_impl);
+fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> anyhow::Result<()> {
+    // In emulate mode `scripts.wallet(name)` accepts any name, so there is nothing real to choose
+    // from. Return a stable placeholder so scripts that call `promptWallet` keep working when
+    // run without `--net` (e.g. plain `acton script`).
+    if !ctx.is_broadcasting {
+        stack.push_string("emulated-wallet");
+        return Ok(());
+    }
+
+    let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
+
+    if wallet_names.is_empty() {
+        ctx.asserts.fail(error_fmt::no_wallets_found());
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
+    if wallet_names.len() == 1 {
+        stack.push_string(&wallet_names[0]);
+        return Ok(());
+    }
+
+    if !stdin().is_terminal() {
+        ctx.asserts.fail(
+            "Cannot prompt for wallet selection in a non-interactive environment. \
+             Please specify the wallet explicitly."
+                .to_string(),
+        );
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
+    let Ok(result) = Select::new(&message, wallet_names)
+        .with_starting_cursor(0)
+        .prompt()
+    else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    stack.push_string(&result);
+    Ok(())
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         1 => println : 12,
         2 => eprintln : 1,
         200 => format : 11,
-        205 => prompt : 2,
-        206 => select : 2,
+        205 => prompt : 3,
+        206 => select : 3,
         207 => confirm : 3,
+        208 => prompt_wallet : 1,
+        209 => prompt_int : 3,
+        210 => prompt_address : 3,
     });
 }

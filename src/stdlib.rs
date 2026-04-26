@@ -60,7 +60,7 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
         }
 
         LIB_DIR.extract(&acton_dir)?;
-        tolkc::compiler::TOLK_STDLIB_DIR.extract(&tolk_stdlib_dir)?;
+        tolk_compiler::compiler::TOLK_STDLIB_DIR.extract(&tolk_stdlib_dir)?;
         fs::write(version_path, &current_version)?;
     }
 

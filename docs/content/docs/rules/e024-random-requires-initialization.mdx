@@ -1,0 +1,49 @@
+---
+title: "E024: random-requires-initialization"
+description: "Requires random generator initialization before random value generation calls."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E024`
+- `Rule`: `random-requires-initialization`
+- `Status`: Preview since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Requires random generator initialization before random value generation calls.
+
+### Why is this bad?
+Calling `random.uint256(...)` or `random.range(...)` before
+`random.initialize(...)` / `random.initializeBy(...)` can lead to predictable
+or invalid randomness behavior.
+
+### Example
+```tolk twoslash
+fun main() {
+    val x = random.uint256();
+    //      ^^^^^^^^^^^^^^^^ E024: random generator must be initialized before `random.uint256`/`random.range` call
+}
+```
+
+Use instead:
+```tolk
+fun main() {
+    random.initializeBy(123);
+    val x = random.uint256();
+}
+```
+
+### Behavior notes
+
+This check is control-flow aware. It does not just scan text for "init before use".
+It builds a control-flow graph (CFG) and verifies that for each
+`random.uint256(...)` / `random.range(...)` call, initialization is guaranteed
+on all reachable execution paths before that call.
+
+It also follows function calls, so helper functions that initialize random
+are taken into account.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/dfa/random_requires_initialization/mod.rs#L43" />

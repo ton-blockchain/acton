@@ -48,7 +48,8 @@ pub struct RunGetMethodArgs {
     pub code: String,
     /// Base64 encoded contract data `BoC`.
     pub data: String,
-    /// Verbosity level for the emulator logs.
+    /// Verbosity level for the emulator logs. Use [`ExecutorVerbosity::Off`] to disable
+    /// VM logs completely in the native emulator.
     pub verbosity: ExecutorVerbosity,
     /// Base64 encoded libraries `BoC`.
     pub libs: String,

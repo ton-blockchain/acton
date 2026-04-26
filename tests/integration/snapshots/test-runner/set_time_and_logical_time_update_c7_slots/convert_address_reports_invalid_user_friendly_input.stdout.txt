@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/aj_vm_helpers.test.tolk (1 test)
+  ✗ aj stdlib vm convert address invalid user friendly [TIME]
+    └─ Error: Cannot parse address: [WALLET_ADDRESS_BASE]: invalid address format
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

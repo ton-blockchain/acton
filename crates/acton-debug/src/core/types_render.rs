@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
-use tolkc::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
-use tolkc::source_map::{Declaration, SourceMap};
-use tolkc::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
+use tolk_compiler::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
+use tolk_compiler::source_map::{AbiStruct, Declaration, SourceMap};
+use tolk_compiler::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
-use tvmffi::from_stack::FromStack;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::from_stack::FromStack;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
 use tycho_types::dict;
@@ -16,7 +17,6 @@ use tycho_types::models::{
     LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
     ReserveCurrencyFlags, SendMsgFlags, StateInit, StdAddr,
 };
-use vmlogs::parser::{CellLike, CellSlice, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // RenderedValue — structured intermediate format for rendered values
@@ -32,11 +32,13 @@ pub enum RenderedValue {
         type_name: String,
         value: String,
         fields: Vec<(String, RenderedValue)>, // "bits" and "refs" fields
+        raw: Option<CellLike>,
     },
     CellOf {
         type_name: String,
         value: String,
         fields: Vec<(String, RenderedValue)>, // "decoded" field with actual value
+        raw: Option<CellLike>,
     },
     EnumValue {
         type_name: String,
@@ -71,7 +73,10 @@ pub enum RenderedValue {
         inner: Box<RenderedValue>,
     },
     OptimizedOut,
-    NotYetLoaded,
+    LazyNotYetLoaded {
+        preview: Box<RenderedValue>,
+    },
+    LazyCantParseSlice,
     LazyUnresolved {
         type_name: String,
     },
@@ -100,11 +105,14 @@ impl RenderedValue {
             RenderedValue::Leaf { value, type_field } => (value.clone(), type_field.clone()),
             RenderedValue::CellLike {
                 type_name, value, ..
-            } => (value.clone(), Some(type_name.clone())),
-            RenderedValue::CellOf {
+            }
+            | RenderedValue::CellOf {
                 type_name, value, ..
-            } => (value.clone(), Some(type_name.clone())),
-            RenderedValue::EnumValue {
+            }
+            | RenderedValue::EnumValue {
+                type_name, value, ..
+            }
+            | RenderedValue::Address {
                 type_name, value, ..
             } => (value.clone(), Some(type_name.clone())),
             RenderedValue::UnionCase {
@@ -113,13 +121,8 @@ impl RenderedValue {
                 ..
             } => (variant_name.clone(), Some(type_name.clone())),
             RenderedValue::Struct { type_name, .. } => (String::new(), Some(type_name.clone())),
-            RenderedValue::Address {
-                type_name, value, ..
-            } => (value.clone(), Some(type_name.clone())),
-            RenderedValue::Tensor { type_name, items } => {
-                (format!("{} items", items.len()), Some(type_name.clone()))
-            }
-            RenderedValue::ArrayOf { type_name, items } => {
+            RenderedValue::Tensor { type_name, items }
+            | RenderedValue::ArrayOf { type_name, items } => {
                 (format!("{} items", items.len()), Some(type_name.clone()))
             }
             RenderedValue::LastSeen { inner } => {
@@ -132,42 +135,101 @@ impl RenderedValue {
                 (value, type_field)
             }
             RenderedValue::OptimizedOut => ("<optimized out>".to_string(), None),
-            RenderedValue::NotYetLoaded => ("<not loaded>".to_string(), None),
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                let (value, type_field) = preview.dap_parts();
+                let value = if value.is_empty() {
+                    "<not loaded>".to_string()
+                } else {
+                    format!("{value} (not loaded)")
+                };
+                (value, type_field)
+            }
+            RenderedValue::LazyCantParseSlice => ("<not loaded>".to_string(), None),
             RenderedValue::LazyUnresolved { type_name } => {
                 ("(lazy, unresolved)".to_string(), Some(type_name.clone()))
             }
         }
     }
 
-    fn legacy_dap_value(&self) -> String {
+    fn legacy_dap_value(&self, name: Option<&str>) -> String {
         match self {
-            RenderedValue::Leaf { value, .. } => value.clone(),
-            RenderedValue::CellLike { value, .. } => value.clone(),
+            RenderedValue::Leaf {
+                value,
+                type_field: Some(type_field),
+            } if type_field == "coins"
+                && name.is_some_and(|name| identifier_has_word(name, "ton")) =>
+            {
+                format_coins_for_debug(value).unwrap_or_else(|| value.clone())
+            }
+            RenderedValue::Leaf { value, .. }
+            | RenderedValue::CellLike { value, .. }
+            | RenderedValue::EnumValue { value, .. } => value.clone(),
             RenderedValue::CellOf {
                 type_name, value, ..
             } => format!("{type_name} {value}"),
-            RenderedValue::EnumValue { value, .. } => value.clone(),
             RenderedValue::UnionCase { variant_name, .. } => variant_name.clone(),
             RenderedValue::Struct { type_name, .. } => type_name.clone(),
             RenderedValue::Address { legacy_value, .. } => legacy_value.clone(),
-            RenderedValue::Tensor { items, .. } => format!("{} items", items.len()),
-            RenderedValue::ArrayOf { items, .. } => format!("{} items", items.len()),
+            RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
+                format!("{} items", items.len())
+            }
             RenderedValue::LastSeen { inner } => {
-                format!("{} (last seen)", inner.legacy_dap_value())
+                format!("{} (last seen)", inner.legacy_dap_value(name))
             }
             RenderedValue::OptimizedOut => "<optimized out>".to_string(),
-            RenderedValue::NotYetLoaded => "<not loaded>".to_string(),
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                format!("{} (not loaded)", preview.legacy_dap_value(name))
+            }
+            RenderedValue::LazyCantParseSlice => "<not loaded>".to_string(),
             RenderedValue::LazyUnresolved { type_name } => {
                 format!("{type_name} (lazy, unresolved)")
             }
         }
     }
 
-    pub fn dap_parts_for_client(&self) -> (String, Option<String>) {
+    pub fn dap_parts_for_client(&self, name: Option<&str>) -> (String, Option<String>) {
         if dap_legacy_value_enabled() {
-            (self.legacy_dap_value(), None)
+            // TODO: remove legacy path
+            (self.legacy_dap_value(name), None)
+        } else if let Some(name) = name {
+            self.dap_parts_for_name(name)
         } else {
             self.dap_parts()
+        }
+    }
+
+    fn dap_parts_for_name(&self, name: &str) -> (String, Option<String>) {
+        match self {
+            RenderedValue::Leaf {
+                value,
+                type_field: Some(type_field),
+            } if type_field == "coins" => {
+                let value = if identifier_has_word(name, "ton") {
+                    format_coins_for_debug(value).unwrap_or_else(|| value.clone())
+                } else {
+                    value.clone()
+                };
+                (value, Some(type_field.clone()))
+            }
+            RenderedValue::LastSeen { inner } => {
+                let (value, type_field) = inner.dap_parts_for_name(name);
+                let value = if value.is_empty() {
+                    "(last seen)".to_string()
+                } else {
+                    format!("{value} (last seen)")
+                };
+                (value, type_field)
+            }
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                let (value, type_field) = preview.dap_parts_for_name(name);
+                let value = if value.is_empty() {
+                    "<not loaded>".to_string()
+                } else {
+                    format!("{value} (not loaded)")
+                };
+                (value, type_field)
+            }
+            _ => self.dap_parts(),
         }
     }
 
@@ -177,16 +239,26 @@ impl RenderedValue {
 
     pub fn has_children(&self) -> bool {
         match self {
-            RenderedValue::Struct { fields, .. } => !fields.is_empty(),
-            RenderedValue::Address { fields, .. } => !fields.is_empty(),
-            RenderedValue::CellLike { fields, .. } => !fields.is_empty(),
-            RenderedValue::CellOf { fields, .. } => !fields.is_empty(),
-            RenderedValue::EnumValue { fields, .. } => !fields.is_empty(),
-            RenderedValue::UnionCase { fields, .. } => !fields.is_empty(),
-            RenderedValue::Tensor { items, .. } => !items.is_empty(),
-            RenderedValue::ArrayOf { items, .. } => !items.is_empty(),
+            RenderedValue::Struct { fields, .. }
+            | RenderedValue::Address { fields, .. }
+            | RenderedValue::CellLike { fields, .. }
+            | RenderedValue::CellOf { fields, .. }
+            | RenderedValue::EnumValue { fields, .. }
+            | RenderedValue::UnionCase { fields, .. } => !fields.is_empty(),
+            RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
+                !items.is_empty()
+            }
             RenderedValue::LastSeen { inner } => inner.has_children(),
             _ => false,
+        }
+    }
+
+    pub(crate) fn raw_cell_like(&self) -> Option<&CellLike> {
+        match self {
+            RenderedValue::CellLike { raw: Some(raw), .. }
+            | RenderedValue::CellOf { raw: Some(raw), .. } => Some(raw),
+            RenderedValue::LastSeen { inner } => inner.raw_cell_like(),
+            _ => None,
         }
     }
 }
@@ -201,6 +273,68 @@ fn dap_legacy_value_enabled() -> bool {
             .ok()
             .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"))
     })
+}
+
+fn format_coins_for_debug(tokens: &str) -> Option<String> {
+    let tokens: u128 = tokens.parse().ok()?;
+    let whole = tokens / 1_000_000_000;
+    let frac = tokens % 1_000_000_000;
+    if frac == 0 {
+        return Some(format!("{whole} TON"));
+    }
+
+    let frac = format!("{frac:09}");
+    let frac = frac.trim_end_matches('0');
+    Some(format!("{whole}.{frac} TON"))
+}
+
+fn identifier_has_word(name: &str, needle: &str) -> bool {
+    let mut start = None;
+    let mut prev = None;
+    let mut chars = name.char_indices().peekable();
+
+    while let Some((idx, ch)) = chars.next() {
+        if !ch.is_ascii_alphanumeric() {
+            if let Some(start_idx) = start.take()
+                && name[start_idx..idx].eq_ignore_ascii_case(needle)
+            {
+                return true;
+            }
+            prev = None;
+            continue;
+        }
+
+        let next = chars.peek().map(|(_, next)| *next);
+        if let Some(prev_ch) = prev
+            && let Some(start_idx) = start
+            && identifier_word_boundary(prev_ch, ch, next)
+        {
+            if name[start_idx..idx].eq_ignore_ascii_case(needle) {
+                return true;
+            }
+            start = Some(idx);
+        } else if start.is_none() {
+            start = Some(idx);
+        }
+
+        prev = Some(ch);
+    }
+
+    start.is_some_and(|start_idx| name[start_idx..].eq_ignore_ascii_case(needle))
+}
+
+fn identifier_word_boundary(prev: char, current: char, next: Option<char>) -> bool {
+    if prev.is_ascii_digit() != current.is_ascii_digit() {
+        return true;
+    }
+
+    if prev.is_ascii_lowercase() && current.is_ascii_uppercase() {
+        return true;
+    }
+
+    prev.is_ascii_uppercase()
+        && current.is_ascii_uppercase()
+        && next.is_some_and(|next| next.is_ascii_lowercase())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -227,12 +361,13 @@ impl MapScalarType {
 impl fmt::Display for RenderedValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RenderedValue::Leaf { value, .. } => write!(f, "{value}"),
-            RenderedValue::CellLike { value, .. } => write!(f, "{value}"),
+            RenderedValue::Leaf { value, .. }
+            | RenderedValue::CellLike { value, .. }
+            | RenderedValue::EnumValue { value, .. }
+            | RenderedValue::Address { value, .. } => write!(f, "{value}"),
             RenderedValue::CellOf {
                 type_name, value, ..
             } => write!(f, "{type_name} {value}"),
-            RenderedValue::EnumValue { value, .. } => write!(f, "{value}"),
             RenderedValue::UnionCase {
                 variant_name,
                 fields,
@@ -244,7 +379,6 @@ impl fmt::Display for RenderedValue {
             RenderedValue::Struct { type_name, fields } if fields.is_empty() => {
                 write!(f, "{type_name} {{}}")
             }
-            RenderedValue::Address { value, .. } => write!(f, "{value}"),
             RenderedValue::Struct { type_name, fields } => {
                 write!(f, "{type_name} {{ ")?;
                 for (i, (name, val)) in fields.iter().enumerate() {
@@ -277,7 +411,8 @@ impl fmt::Display for RenderedValue {
             }
             RenderedValue::LastSeen { inner } => write!(f, "{inner} (last seen)"),
             RenderedValue::OptimizedOut => write!(f, "<optimized out>"),
-            RenderedValue::NotYetLoaded => write!(f, "<not loaded>"),
+            RenderedValue::LazyNotYetLoaded { preview } => write!(f, "{preview} (not loaded)"),
+            RenderedValue::LazyCantParseSlice => write!(f, "<not loaded>"),
             RenderedValue::LazyUnresolved { type_name } => {
                 write!(f, "{type_name} (lazy, unresolved)")
             }
@@ -498,12 +633,35 @@ fn render_cell_hash(cell: &Cell) -> String {
     format!("0x{}", cell.repr_hash().to_string().to_ascii_lowercase())
 }
 
-fn render_cell_meta_fields(
+fn render_cell_hash_prefix(hash: &str) -> String {
+    const PREFIX_LEN: usize = 10;
+    if hash.len() <= PREFIX_LEN {
+        hash.to_owned()
+    } else {
+        format!("{}...", &hash[..PREFIX_LEN])
+    }
+}
+
+fn render_cell_summary(bits: Option<usize>, refs: Option<usize>, hash: Option<&str>) -> String {
+    let bits = bits.map_or_else(
+        || "<unknown> bits".to_owned(),
+        |bits| format!("{bits} bits"),
+    );
+    let refs = refs.map_or_else(
+        || "<unknown> refs".to_owned(),
+        |refs| format!("{refs} refs"),
+    );
+    let hash = hash.map_or_else(|| "<unknown hash>".to_owned(), render_cell_hash_prefix);
+    format!("{bits}, {refs}, hash: {hash}")
+}
+
+fn render_cell_fields(
     bits: Option<usize>,
     refs: Option<usize>,
     hash: Option<String>,
+    raw_value: Option<String>,
 ) -> Vec<(String, RenderedValue)> {
-    vec![
+    let mut fields = vec![
         (
             "bits".to_owned(),
             RenderedValue::leaf(
@@ -520,7 +678,11 @@ fn render_cell_meta_fields(
             "hash".to_owned(),
             RenderedValue::leaf(hash.unwrap_or_else(|| "<unknown>".to_owned())),
         ),
-    ]
+    ];
+    if let Some(raw_value) = raw_value {
+        fields.push(("raw".to_owned(), RenderedValue::leaf(raw_value)));
+    }
+    fields
 }
 
 fn cell_like_meta(cell: &CellLike) -> (Option<usize>, Option<usize>, Option<String>) {
@@ -582,17 +744,30 @@ fn slice_meta(cs: &CellSlice) -> (Option<usize>, Option<usize>, Option<String>) 
     (bits, refs, hash)
 }
 
+fn slice_as_cell_like(cs: &CellSlice) -> Option<CellLike> {
+    exact_slice_cell(cs).map(|cell| CellLike::Cell(Boc::encode_hex(&cell)))
+}
+
 fn render_openable_cell_like(
     ty: &Ty,
     value: impl Into<String>,
     bits: Option<usize>,
     refs: Option<usize>,
     hash: Option<String>,
+    raw: Option<CellLike>,
 ) -> RenderedValue {
+    let raw_value = value.into();
+    let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
+
     RenderedValue::CellLike {
         type_name: ty.to_string(),
-        value: value.into(),
-        fields: render_cell_meta_fields(bits, refs, hash),
+        value: if summarize_value {
+            render_cell_summary(bits, refs, hash.as_deref())
+        } else {
+            raw_value.clone()
+        },
+        fields: render_cell_fields(bits, refs, hash, summarize_value.then_some(raw_value)),
+        raw,
     }
 }
 
@@ -606,16 +781,37 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
         VmStackValue::Unknown => RenderedValue::leaf("???"),
         VmStackValue::Cell(cell) => {
             let (bits, refs, hash) = cell_like_meta(cell);
-            render_openable_cell_like(&Ty::Cell, render_cell_like(cell), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Cell,
+                render_cell_like(cell),
+                bits,
+                refs,
+                hash,
+                Some(cell.clone()),
+            )
         }
         VmStackValue::Builder(builder_hex) => {
             let cell_like = CellLike::Builder(builder_hex.clone());
             let (bits, refs, hash) = cell_like_meta(&cell_like);
-            render_openable_cell_like(&Ty::Builder, render_builder(builder_hex), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Builder,
+                render_builder(builder_hex),
+                bits,
+                refs,
+                hash,
+                Some(cell_like),
+            )
         }
         VmStackValue::CellSlice(slice) => {
             let (bits, refs, hash) = slice_meta(slice);
-            render_openable_cell_like(&Ty::Slice, render_slice(slice), bits, refs, hash)
+            render_openable_cell_like(
+                &Ty::Slice,
+                render_slice(slice),
+                bits,
+                refs,
+                hash,
+                slice_as_cell_like(slice),
+            )
         }
         VmStackValue::Tuple(items) => RenderedValue::ArrayOf {
             type_name: "tuple".to_owned(),
@@ -691,12 +887,11 @@ fn parse_map_key_type(ty: &Ty) -> Option<MapScalarType> {
 
 fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
     match ty {
-        Ty::Nullable { .. } | Ty::MapKV { .. } => None,
         Ty::Cell | Ty::CellOf { .. } => Some(MapScalarType::Cell),
         Ty::String => Some(MapScalarType::String),
         Ty::Bool => Some(MapScalarType::Bool),
         Ty::Address | Ty::AddressAny => Some(MapScalarType::Address),
-        Ty::Coins => Some(MapScalarType::VarInt {
+        Ty::Coins | Ty::VaruintN { n: 16 } => Some(MapScalarType::VarInt {
             len_bits: 4,
             signed: false,
         }),
@@ -723,10 +918,6 @@ fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
         Ty::VarintN { n: 32 } => Some(MapScalarType::VarInt {
             len_bits: 5,
             signed: true,
-        }),
-        Ty::VaruintN { n: 16 } => Some(MapScalarType::VarInt {
-            len_bits: 4,
-            signed: false,
         }),
         Ty::VaruintN { n: 32 } => Some(MapScalarType::VarInt {
             len_bits: 5,
@@ -822,23 +1013,35 @@ fn render_typed_cell_with_compiler_abi(
     inner: &Ty,
     cell: &CellLike,
 ) -> RenderedValue {
-    let value = render_cell_like(cell);
-    let (bits, refs, hash) = cell_like_meta(cell);
-    let mut fields = render_cell_meta_fields(bits, refs, hash);
-
-    if let Some(cell) = decode_cell_like(cell)
+    let decoded = if let Some(cell) = decode_cell_like(cell)
         && let Some(abi) = abi
     {
         let mut parser = cell.as_slice_allow_exotic();
-        if let Some(data) = decode_abi_data_with_compiler_abi(abi, &mut parser, inner) {
-            fields.insert(0, ("decoded".to_owned(), render_abi_data(data, inner)));
-        }
+        decode_abi_data_with_compiler_abi(abi, &mut parser, inner).map(|data| (inner, data))
+    } else {
+        None
+    };
+    render_typed_cell_with_decoded_data(ty, cell, decoded)
+}
+
+fn render_typed_cell_with_decoded_data(
+    ty: &Ty,
+    cell: &CellLike,
+    decoded: Option<(&Ty, ParsedAbiData)>,
+) -> RenderedValue {
+    let value = render_cell_like(cell);
+    let (bits, refs, hash) = cell_like_meta(cell);
+    let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(value));
+
+    if let Some((inner, data)) = decoded {
+        fields.insert(0, ("decoded".to_owned(), render_abi_data(data, inner)));
     }
 
     RenderedValue::CellOf {
         type_name: ty.to_string(),
-        value,
+        value: render_cell_summary(bits, refs, hash.as_deref()),
         fields,
+        raw: Some(cell.clone()),
     }
 }
 
@@ -846,23 +1049,116 @@ pub(crate) fn render_runtime_storage_with_compiler_abi(
     value: &VmStackValue,
     abi: &ContractABI,
 ) -> Option<RenderedValue> {
-    let storage_ty = abi
-        .storage
-        .storage_at_deployment_ty
-        .as_ref()
-        .or(abi.storage.storage_ty.as_ref())?;
     let VmStackValue::Cell(cell) = value else {
         return None;
     };
-    let cell_ty = Ty::CellOf {
-        inner: Box::new(storage_ty.clone()),
+
+    let decoded_cell = decode_cell_like(cell)?;
+
+    // Try deployment storage first and then default one
+    for storage_ty in abi
+        .storage
+        .storage_at_deployment_ty
+        .as_ref()
+        .into_iter()
+        .chain(abi.storage.storage_ty.as_ref())
+    {
+        let mut parser = decoded_cell.as_slice_allow_exotic();
+        if let Some(data) = decode_abi_data_with_compiler_abi(abi, &mut parser, storage_ty) {
+            let cell_ty = Ty::CellOf {
+                inner: Box::new(storage_ty.clone()),
+            };
+
+            return Some(render_typed_cell_with_decoded_data(
+                &cell_ty,
+                cell,
+                Some((storage_ty, data)),
+            ));
+        }
+    }
+
+    None
+}
+
+fn decode_abi_data_with_compiler_abi_result(
+    abi: &ContractABI,
+    parser: &mut TyCellSlice<'_>,
+    ty: &Ty,
+) -> Result<ParsedAbiData, String> {
+    let data = compiler_abi_serde::decode(parser, abi, ty).map_err(|err| err.to_string())?;
+    if parser.size_bits() != 0 || parser.size_refs() != 0 {
+        return Err(format!(
+            "remaining bits/refs after decode: {} bits, {} refs",
+            parser.size_bits(),
+            parser.size_refs()
+        ));
+    }
+    Ok(data)
+}
+
+pub(crate) fn render_cell_like_as_type(
+    symbols: &SourceMap,
+    value: &RenderedValue,
+    ty: &Ty,
+) -> Result<RenderedValue, String> {
+    let cell_like = value.raw_cell_like().ok_or_else(|| {
+        format!(
+            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
+            debugger_value_kind(value)
+        )
+    })?;
+    let CellLike::Cell(_) = cell_like else {
+        return Err(format!(
+            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
+            debugger_value_kind(value)
+        ));
     };
-    Some(render_typed_cell_with_compiler_abi(
-        Some(abi),
-        &cell_ty,
-        storage_ty,
-        cell,
+
+    let Ty::CellOf { inner } = ty else {
+        return Err(format!(
+            "Debugger evaluate only supports casts to Cell<T>, got `{ty}`"
+        ));
+    };
+
+    let abi = build_compiler_abi(symbols)
+        .ok_or_else(|| "Failed to build debug ABI from SourceMap declarations".to_owned())?;
+    let decoded_cell = decode_cell_like(cell_like).ok_or_else(|| {
+        format!(
+            "Failed to materialize {} as a TVM cell while decoding `{ty}`",
+            debugger_value_kind(value)
+        )
+    })?;
+    let mut parser = decoded_cell.as_slice_allow_exotic();
+    let data = decode_abi_data_with_compiler_abi_result(&abi, &mut parser, inner.as_ref())?;
+
+    Ok(render_typed_cell_with_decoded_data(
+        ty,
+        cell_like,
+        Some((inner.as_ref(), data)),
     ))
+}
+
+fn debugger_value_kind(value: &RenderedValue) -> String {
+    match value {
+        RenderedValue::Leaf {
+            value,
+            type_field: Some(type_field),
+        } => format!("`{type_field}` (`{value}`)"),
+        RenderedValue::Leaf { value, .. } => format!("`{value}`"),
+        RenderedValue::CellLike { type_name, .. }
+        | RenderedValue::CellOf { type_name, .. }
+        | RenderedValue::EnumValue { type_name, .. }
+        | RenderedValue::UnionCase { type_name, .. }
+        | RenderedValue::Struct { type_name, .. }
+        | RenderedValue::Address { type_name, .. }
+        | RenderedValue::Tensor { type_name, .. }
+        | RenderedValue::ArrayOf { type_name, .. }
+        | RenderedValue::LazyUnresolved { type_name } => format!("`{type_name}`"),
+        RenderedValue::LastSeen { inner } => debugger_value_kind(inner),
+        RenderedValue::OptimizedOut => "<optimized out>".to_owned(),
+        RenderedValue::LazyNotYetLoaded { preview } => debugger_value_kind(preview),
+        RenderedValue::LazyCantParseSlice => "<not loaded>".to_owned(),
+    }
 }
 
 fn render_abi_data(data: ParsedAbiData, ty: &Ty) -> RenderedValue {
@@ -1253,7 +1549,14 @@ fn debug_format(
         Ty::Cell => match r.read_slot() {
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 let (bits, refs, hash) = cell_like_meta(cell);
-                render_openable_cell_like(ty, render_cell_like(cell), bits, refs, hash)
+                render_openable_cell_like(
+                    ty,
+                    render_cell_like(cell),
+                    bits,
+                    refs,
+                    hash,
+                    Some(cell.clone()),
+                )
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM cell"),
@@ -1287,7 +1590,7 @@ fn debug_format(
             SlotValue::Live(VmStackValue::Builder(b)) => {
                 let cell = CellLike::Builder(b.clone());
                 let (bits, refs, hash) = cell_like_meta(&cell);
-                render_openable_cell_like(ty, render_builder(b), bits, refs, hash)
+                render_openable_cell_like(ty, render_builder(b), bits, refs, hash, Some(cell))
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM builder"),
@@ -1296,7 +1599,14 @@ fn debug_format(
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => {
                 let (bits, refs, hash) = slice_meta(cs);
-                render_openable_cell_like(ty, render_slice(cs), bits, refs, hash)
+                render_openable_cell_like(
+                    ty,
+                    render_slice(cs),
+                    bits,
+                    refs,
+                    hash,
+                    slice_as_cell_like(cs),
+                )
             }
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM slice"),
@@ -1346,7 +1656,7 @@ fn debug_format(
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => match try_parse_address(cs) {
                 Some(raw) => match raw.parse::<StdAddr>() {
-                    Ok(addr) => render_std_address(ty.to_string(), render_slice(cs), &addr),
+                    Ok(addr) => render_std_address(ty.to_string(), addr.to_string(), &addr),
                     Err(_) => typed_leaf_for_ty(ty, raw),
                 },
                 None => typed_leaf_for_ty(ty, render_slice(cs)),
@@ -1550,7 +1860,7 @@ fn debug_format(
                                 StackReader::new(&union_slots[variant_start..stack_width - 1]);
                             Some(debug_format(symbols, &mut sub, &variant.variant_ty, false))
                         };
-                        render_union_case(ty, format!("#{}", variant.variant_ty), value)
+                        render_union_case(ty, variant.variant_ty.to_string(), value)
                     } else {
                         // corrupted stack, type_id on a stack mismatches all variants
                         typed_leaf_for_ty(ty, "union with unknown variant")
@@ -1585,6 +1895,68 @@ pub(crate) fn debug_print_from_stack(
     debug_format(symbols, &mut r, ty, false)
 }
 
+fn render_lazy_struct_fields(
+    symbols: &SourceMap,
+    struct_ref: &AbiStruct,
+    type_args: Option<&[Ty]>,
+    slot_values: &[SlotValue],
+    ir_slots: &[usize],
+    last_seen: &HashMap<usize, VmStackValue>,
+    lazy_cell_abi: Option<(&Cell, &ContractABI)>,
+) -> Vec<(String, RenderedValue)> {
+    let mut lazy_s = lazy_cell_abi.as_ref().map(|(cell, _)| {
+        let mut s = cell.as_slice_allow_exotic();
+        if let Some(ref prefix) = struct_ref.prefix {
+            let _ = s.skip_first(prefix.prefix_len as u16, 0);
+        }
+        s
+    });
+    let abi = lazy_cell_abi.as_ref().map(|(_, a)| *a);
+
+    let mut fields = Vec::new();
+    let mut offset = 0;
+    for f in &struct_ref.fields {
+        let f_ty = match type_args {
+            Some(type_args) => instantiate_generics(
+                &f.ty,
+                struct_ref.type_params.as_deref().unwrap_or(&[]),
+                type_args,
+            ),
+            None => f.ty.clone(),
+        };
+        let f_width = calc_width_on_stack(symbols, &f_ty);
+        let field_ir_slots = &ir_slots[offset..offset + f_width];
+        let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
+
+        let preview = match (lazy_s.as_mut(), abi) {
+            (Some(lazy_s), Some(abi)) => {
+                if let Ok(parsed) = compiler_abi_serde::decode(lazy_s, abi, &f_ty) {
+                    Some(render_abi_data(parsed, &f_ty))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let field_val = if field_ever_seen {
+            let field_slot_values = &slot_values[offset..offset + f_width];
+            let mut r = StackReader::new(field_slot_values);
+            debug_format(symbols, &mut r, &f_ty, false)
+        } else {
+            match preview {
+                None => RenderedValue::LazyCantParseSlice,
+                Some(preview) => RenderedValue::LazyNotYetLoaded {
+                    preview: Box::new(preview),
+                },
+            }
+        };
+        fields.push((f.name.clone(), field_val));
+        offset += f_width;
+    }
+    fields
+}
+
 // ---------------------------------------------------------------------------
 // debug_format_lazy — renders a lazy variable, showing <not loaded> for
 // fields whose ir_slots have never been observed on the stack.
@@ -1598,6 +1970,7 @@ pub(crate) fn debug_format_lazy(
     ir_slots: &[usize],
     ty: &Ty,
     last_seen: &HashMap<usize, VmStackValue>,
+    lazy_original_slice: &VmStackValue,
 ) -> RenderedValue {
     match ty {
         Ty::Union { .. } => {
@@ -1624,7 +1997,14 @@ pub(crate) fn debug_format_lazy(
                     type_name: alias_name.clone(),
                 };
             }
-            debug_format_lazy(symbols, slot_values, ir_slots, &resolved, last_seen)
+            debug_format_lazy(
+                symbols,
+                slot_values,
+                ir_slots,
+                &resolved,
+                last_seen,
+                lazy_original_slice,
+            )
         }
 
         Ty::StructRef {
@@ -1632,31 +2012,36 @@ pub(crate) fn debug_format_lazy(
             type_args,
         } => {
             let struct_ref = symbols.get_struct(struct_name);
-            let mut fields: Vec<(String, RenderedValue)> = Vec::new();
-            let mut offset = 0;
-            for f in &struct_ref.fields {
-                let f_ty = match type_args {
-                    Some(type_args) => instantiate_generics(
-                        &f.ty,
-                        struct_ref.type_params.as_deref().unwrap_or(&[]),
-                        type_args,
-                    ),
-                    None => f.ty.clone(),
-                };
-                let f_width = calc_width_on_stack(symbols, &f_ty);
-                let field_ir_slots = &ir_slots[offset..offset + f_width];
-                let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
+            let slice_as_cell = match lazy_original_slice {
+                VmStackValue::CellSlice(cs) => exact_slice_cell(cs),
+                _ => None,
+            };
 
-                let field_val = if field_ever_seen {
-                    let field_slot_values = &slot_values[offset..offset + f_width];
-                    let mut r = StackReader::new(field_slot_values);
-                    debug_format(symbols, &mut r, &f_ty, false)
-                } else {
-                    RenderedValue::NotYetLoaded
-                };
-                fields.push((f.name.clone(), field_val));
-                offset += f_width;
-            }
+            let ty_args = type_args.as_deref();
+            let fields = match &slice_as_cell {
+                Some(cell) => {
+                    let tmp_abi = build_compiler_abi(symbols).expect("always not None");
+                    render_lazy_struct_fields(
+                        symbols,
+                        struct_ref,
+                        ty_args,
+                        slot_values,
+                        ir_slots,
+                        last_seen,
+                        Some((cell, &tmp_abi)),
+                    )
+                }
+                None => render_lazy_struct_fields(
+                    symbols,
+                    struct_ref,
+                    ty_args,
+                    slot_values,
+                    ir_slots,
+                    last_seen,
+                    None,
+                ),
+            };
+
             RenderedValue::Struct {
                 type_name: format!("{struct_name} (lazy)"),
                 fields,
@@ -1680,9 +2065,8 @@ pub(crate) fn render_runtime_out_actions(
     let root = decode_cell_like(cell)?;
     let actions = decode_out_actions(&root)?;
 
-    let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
-    let mut fields = render_cell_meta_fields(bits, refs, hash);
+    let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(render_cell_like(cell)));
     fields.insert(
         0,
         (
@@ -1699,8 +2083,9 @@ pub(crate) fn render_runtime_out_actions(
 
     Some(RenderedValue::CellOf {
         type_name: "Cell<array<OutAction>>".to_owned(),
-        value,
+        value: render_cell_summary(bits, refs, hash.as_deref()),
         fields,
+        raw: Some(cell.clone()),
     })
 }
 
@@ -1860,13 +2245,15 @@ fn render_message_body(
 
     let cell_like = CellLike::Cell(Boc::encode_hex(&cell));
     let (bits, refs, hash) = cell_like_meta(&cell_like);
-    let mut fields = render_cell_meta_fields(bits, refs, hash);
+    let mut fields =
+        render_cell_fields(bits, refs, hash.clone(), Some(render_cell_like(&cell_like)));
     fields.insert(0, ("decoded".to_owned(), body_decoded.clone()));
 
     RenderedValue::CellOf {
         type_name: format!("Cell<{body_type_name}>"),
-        value: render_cell_like(&cell_like),
+        value: render_cell_summary(bits, refs, hash.as_deref()),
         fields,
+        raw: Some(cell_like),
     }
 }
 
@@ -1993,7 +2380,7 @@ fn render_relaxed_msg_info(info: &RelaxedMsgInfo) -> RenderedValue {
                 ),
                 (
                     "fwd_fee".to_owned(),
-                    RenderedValue::typed_leaf(format_tokens(info.fwd_fee.into_inner()), "coins"),
+                    RenderedValue::typed_leaf(info.fwd_fee.into_inner().to_string(), "coins"),
                 ),
                 (
                     "created_lt".to_owned(),
@@ -2329,7 +2716,7 @@ fn render_runtime_in_msg_sender_address_field(value: &VmStackValue) -> RenderedV
     match value {
         VmStackValue::CellSlice(cs) => match try_parse_address(cs) {
             Some(raw) => match raw.parse::<StdAddr>() {
-                Ok(addr) => render_std_address("address".to_owned(), render_slice(cs), &addr),
+                Ok(addr) => render_std_address("address".to_owned(), addr.to_string(), &addr),
                 Err(_) => RenderedValue::typed_leaf(raw, "address"),
             },
             None => RenderedValue::typed_leaf(render_slice(cs), "address"),
@@ -2340,10 +2727,7 @@ fn render_runtime_in_msg_sender_address_field(value: &VmStackValue) -> RenderedV
 
 fn render_runtime_coins_field(value: &VmStackValue) -> RenderedValue {
     match value {
-        VmStackValue::Integer(value) => match value.parse::<u128>() {
-            Ok(tokens) => RenderedValue::typed_leaf(format_tokens(tokens), "coins"),
-            Err(_) => RenderedValue::typed_leaf(value.clone(), "coins"),
-        },
+        VmStackValue::Integer(value) => RenderedValue::typed_leaf(value.clone(), "coins"),
         _ => RenderedValue::typed_leaf(render_runtime_vm_value(value).dap_value(), "coins"),
     }
 }
@@ -2363,7 +2747,14 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
                 v: Box::new(Ty::VaruintN { n: 32 }),
             };
             let (bits, refs, hash) = cell_like_meta(cell);
-            render_openable_cell_like(&ty, render_cell_like(cell), bits, refs, hash)
+            render_openable_cell_like(
+                &ty,
+                render_cell_like(cell),
+                bits,
+                refs,
+                hash,
+                Some(cell.clone()),
+            )
         }
         VmStackValue::Null => RenderedValue::typed_leaf("()", "map<int32, varuint32>"),
         _ => RenderedValue::typed_leaf(
@@ -2441,8 +2832,10 @@ fn source_map_declaration_to_abi(decl: &Declaration) -> Option<ABIDeclaration> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tolkc::abi::{ABIDeclaration, ABIOpcode, ABIOutgoingMessage};
-    use tolkc::types_kernel::UnionVariant;
+    use tolk_compiler::abi::{
+        ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField,
+    };
+    use tolk_compiler::types_kernel::UnionVariant;
     use ton_abi::abi_serde::{DataField, DataObject};
     use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
@@ -2538,24 +2931,37 @@ mod tests {
             bits,
             refs,
             hash,
+            Some(CellLike::Cell(Boc::encode_hex(&cell))),
         );
 
         let RenderedValue::CellLike {
             type_name,
             value,
             fields,
+            ..
         } = rendered
         else {
             panic!("expected CellLike");
         };
         assert_eq!(type_name, "cell");
-        assert_eq!(value, format!("cell{{{}}}", Boc::encode_hex(&cell)));
+        assert_eq!(
+            value,
+            format!(
+                "16 bits, 1 refs, hash: {}",
+                render_cell_hash_prefix(&render_cell_hash(&cell))
+            )
+        );
         assert_eq!(fields[0].0, "bits");
         assert_eq!(fields[0].1.dap_parts().0, "16");
         assert_eq!(fields[1].0, "refs");
         assert_eq!(fields[1].1.dap_parts().0, "1");
         assert_eq!(fields[2].0, "hash");
         assert_eq!(fields[2].1.dap_parts().0, render_cell_hash(&cell));
+        assert_eq!(fields[3].0, "raw");
+        assert_eq!(
+            fields[3].1.dap_parts().0,
+            format!("cell{{{}}}", Boc::encode_hex(&cell))
+        );
     }
 
     #[test]
@@ -2595,7 +3001,7 @@ mod tests {
         assert_eq!(fields[0].1.dap_parts().0, addr.to_string());
         assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("address"));
         assert_eq!(fields[1].0, "valueCoins");
-        assert_eq!(fields[1].1.dap_parts().0, "1.000000000 TON");
+        assert_eq!(fields[1].1.dap_parts().0, "1000000000");
         assert_eq!(fields[1].1.dap_parts().1.as_deref(), Some("coins"));
         assert_eq!(fields[2].0, "valueExtra");
         assert_eq!(
@@ -2603,7 +3009,7 @@ mod tests {
             Some("map<int32, varuint32>")
         );
         assert_eq!(fields[3].0, "originalForwardFee");
-        assert_eq!(fields[3].1.dap_parts().0, "0.123456789 TON");
+        assert_eq!(fields[3].1.dap_parts().0, "123456789");
         assert_eq!(fields[3].1.dap_parts().1.as_deref(), Some("coins"));
         assert_eq!(fields[4].0, "createdLt");
         assert_eq!(fields[4].1.dap_parts().0, "42");
@@ -2611,6 +3017,195 @@ mod tests {
         assert_eq!(fields[5].0, "createdAt");
         assert_eq!(fields[5].1.dap_parts().0, "1710000000");
         assert_eq!(fields[5].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_runtime_storage_chooses_storage_type_that_decodes_cell() {
+        let abi = ContractABI {
+            declarations: vec![
+                ABIDeclaration::Struct {
+                    name: "Storage".to_owned(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![ABIStructField {
+                        name: "count".to_owned(),
+                        ty: Ty::UintN { n: 32 },
+                        default_value: None,
+                        description: String::new(),
+                    }],
+                    custom_pack_unpack: None,
+                },
+                ABIDeclaration::Struct {
+                    name: "DeploymentStorage".to_owned(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![ABIStructField {
+                        name: "ready".to_owned(),
+                        ty: Ty::Bool,
+                        default_value: None,
+                        description: String::new(),
+                    }],
+                    custom_pack_unpack: None,
+                },
+            ],
+            storage: ABIStorage {
+                storage_ty: Some(Ty::StructRef {
+                    struct_name: "Storage".to_owned(),
+                    type_args: None,
+                }),
+                storage_at_deployment_ty: Some(Ty::StructRef {
+                    struct_name: "DeploymentStorage".to_owned(),
+                    type_args: None,
+                }),
+            },
+            ..Default::default()
+        };
+        let mut builder = CellBuilder::new();
+        builder.store_uint(7, 32).unwrap();
+        let cell = builder.build().unwrap();
+
+        let rendered = render_runtime_storage_with_compiler_abi(
+            &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &abi,
+        )
+        .expect("expected decoded c4");
+
+        let RenderedValue::CellOf {
+            type_name,
+            value,
+            fields,
+            ..
+        } = rendered
+        else {
+            panic!("expected CellOf");
+        };
+        assert_eq!(type_name, "Cell<Storage>");
+        assert_eq!(
+            value,
+            format!(
+                "32 bits, 0 refs, hash: {}",
+                render_cell_hash_prefix(&render_cell_hash(&cell))
+            )
+        );
+        assert_eq!(fields[0].0, "decoded");
+        assert_eq!(fields[4].0, "raw");
+        assert_eq!(
+            fields[4].1.dap_parts().0,
+            format!("cell{{{}}}", Boc::encode_hex(&cell))
+        );
+
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded storage");
+        };
+        assert_eq!(type_name, "Storage");
+        assert_eq!(decoded_fields[0].0, "count");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "7");
+        assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn named_dap_parts_format_coins_only_for_ton_word() {
+        let rendered = RenderedValue::typed_leaf("1022000000", "coins");
+
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("tonAmount")).0,
+            "1.022 TON"
+        );
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("forward_ton_amount")).0,
+            "1.022 TON"
+        );
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("jettonAmount")).0,
+            "1022000000"
+        );
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("amount")).0,
+            "1022000000"
+        );
+    }
+
+    #[test]
+    fn named_dap_parts_preserve_last_seen_suffix_for_formatted_coins() {
+        let rendered = RenderedValue::LastSeen {
+            inner: Box::new(RenderedValue::typed_leaf("1022000000", "coins")),
+        };
+
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("forwardTonAmount")).0,
+            "1.022 TON (last seen)"
+        );
+        assert_eq!(
+            rendered.dap_parts_for_client(Some("jettonAmount")).0,
+            "1022000000 (last seen)"
+        );
+    }
+
+    #[test]
+    fn legacy_named_dap_value_formats_coins_only_for_ton_word() {
+        let rendered = RenderedValue::typed_leaf("1022000000", "coins");
+
+        assert_eq!(rendered.legacy_dap_value(Some("tonAmount")), "1.022 TON");
+        assert_eq!(
+            rendered.legacy_dap_value(Some("forward_ton_amount")),
+            "1.022 TON"
+        );
+        assert_eq!(
+            rendered.legacy_dap_value(Some("jettonAmount")),
+            "1022000000"
+        );
+        assert_eq!(rendered.legacy_dap_value(None), "1022000000");
+    }
+
+    #[test]
+    fn legacy_named_dap_value_preserves_last_seen_suffix_for_formatted_coins() {
+        let rendered = RenderedValue::LastSeen {
+            inner: Box::new(RenderedValue::typed_leaf("1022000000", "coins")),
+        };
+
+        assert_eq!(
+            rendered.legacy_dap_value(Some("forwardTonAmount")),
+            "1.022 TON (last seen)"
+        );
+        assert_eq!(
+            rendered.legacy_dap_value(Some("jettonAmount")),
+            "1022000000 (last seen)"
+        );
+    }
+
+    #[test]
+    fn render_address_from_slice_keeps_legacy_value_as_address() {
+        let addr = StdAddr::new(0, HashBytes([0x22; 32]));
+        let mut builder = CellBuilder::new();
+        IntAddr::Std(addr.clone())
+            .store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let addr_cell = builder.build().unwrap();
+        let stack_values = [VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(&addr_cell),
+            bits: None,
+            refs: None,
+        })];
+        let slots = [SlotValue::Live(&stack_values[0])];
+
+        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &Ty::Address);
+
+        let RenderedValue::Address {
+            legacy_value,
+            value,
+            type_name,
+            ..
+        } = rendered
+        else {
+            panic!("expected address");
+        };
+        assert_eq!(type_name, "address");
+        assert_eq!(value, addr.to_string());
+        assert_eq!(legacy_value, addr.to_string());
     }
 
     #[test]
@@ -2693,6 +3288,7 @@ mod tests {
         ];
 
         let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
+        let (dap_value, dap_type) = rendered.dap_parts();
 
         let RenderedValue::UnionCase {
             type_name,
@@ -2702,8 +3298,10 @@ mod tests {
         else {
             panic!("expected UnionCase");
         };
-        assert_eq!(type_name, "cell, int");
-        assert_eq!(variant_name, "#cell");
+        assert_eq!(type_name, "cell | int");
+        assert_eq!(variant_name, "cell");
+        assert_eq!(dap_value, "cell");
+        assert_eq!(dap_type.as_deref(), Some("cell | int"));
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
         let RenderedValue::CellLike { fields, .. } = &fields[0].1 else {
@@ -2753,7 +3351,7 @@ mod tests {
         else {
             panic!("expected UnionCase");
         };
-        assert_eq!(variant_name, "#null");
+        assert_eq!(variant_name, "null");
         assert!(fields.is_empty());
     }
 
@@ -2786,7 +3384,7 @@ mod tests {
         let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
 
         assert_eq!(rendered.dap_parts().0, "union with unresolved layout");
-        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int, cell"));
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int | cell"));
     }
 
     #[test]
@@ -2801,17 +3399,24 @@ mod tests {
             Some(16),
             Some(0),
             Some(hash.clone()),
+            None,
         );
 
-        let RenderedValue::CellLike { fields, .. } = rendered else {
+        let RenderedValue::CellLike { value, fields, .. } = rendered else {
             panic!("expected CellLike");
         };
+        assert_eq!(
+            value,
+            format!("16 bits, 0 refs, hash: {}", render_cell_hash_prefix(&hash))
+        );
         assert_eq!(fields[0].0, "bits");
         assert_eq!(fields[0].1.dap_parts().0, "16");
         assert_eq!(fields[1].0, "refs");
         assert_eq!(fields[1].1.dap_parts().0, "0");
         assert_eq!(fields[2].0, "hash");
         assert_eq!(fields[2].1.dap_parts().0, hash);
+        assert_eq!(fields[3].0, "raw");
+        assert_eq!(fields[3].1.dap_parts().0, "slice{abcd}");
     }
 
     #[test]
@@ -2825,18 +3430,33 @@ mod tests {
         let cell_like = CellLike::Builder(builder_hex.clone());
         let (bits, refs, hash) = cell_like_meta(&cell_like);
 
-        let rendered =
-            render_openable_cell_like(&Ty::Builder, render_builder(&builder_hex), bits, refs, hash);
+        let rendered = render_openable_cell_like(
+            &Ty::Builder,
+            render_builder(&builder_hex),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
 
-        let RenderedValue::CellLike { fields, .. } = rendered else {
+        let RenderedValue::CellLike { value, fields, .. } = rendered else {
             panic!("expected CellLike");
         };
+        assert_eq!(
+            value,
+            format!(
+                "16 bits, 1 refs, hash: {}",
+                render_cell_hash_prefix(&render_cell_hash(&cell))
+            )
+        );
         assert_eq!(fields[0].0, "bits");
         assert_eq!(fields[0].1.dap_parts().0, "16");
         assert_eq!(fields[1].0, "refs");
         assert_eq!(fields[1].1.dap_parts().0, "1");
         assert_eq!(fields[2].0, "hash");
         assert_eq!(fields[2].1.dap_parts().0, render_cell_hash(&cell));
+        assert_eq!(fields[3].0, "raw");
+        assert_eq!(fields[3].1.dap_parts().0, render_builder(&builder_hex));
     }
 
     #[test]

@@ -165,7 +165,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .contract_with_deps(
             "app",
             r#"
-import "../gen/library_code.tolk"
+import "../gen/library.code.tolk"
 
 fun onInternalMessage(in: InMessage) {
     val code = libraryCompiledCode();

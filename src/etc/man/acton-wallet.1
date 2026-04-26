@@ -16,6 +16,44 @@ bodies, request faucet funds, and remove stored wallet entries.
 .sp
 Wallets created by this workflow are intended for development and testing. The
 default network context is testnet.
+.SH "COMMON LIFECYCLE"
+The wallet workflow is not limited to \fBwallet new\fR\&.
+.sp
+Typical follow\-up commands are:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet import\fR to reuse an existing mnemonic
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet list \-\-balance\fR to inspect configured wallets and balances
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet airdrop \-\-net localnet\fR to fund a wallet from a localnet
+faucet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet sign\fR to sign an external message body without writing a whole
+script
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet export\-mnemonic\fR for interactive export
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton wallet remove \-y\fR to remove a wallet non\-interactively
+.RE
+.SH "TONCENTER API KEYS"
+Testnet balance\-backed wallet flows read \fBTONCENTER_TESTNET_API_KEY\fR,
+including \fBwallet list \-\-balance\fR and the interactive post\-airdrop balance
+confirmation after \fBwallet new\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep this key there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "SUBCOMMANDS"
 .SS "acton wallet new"
 Generate a new wallet.
@@ -125,11 +163,6 @@ List configured wallets.
 Fetch and print wallet balances.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for balance lookups.
-.RE
-.sp
 \fB\-\-json\fR
 .RS 4
 Emit JSON output.
@@ -202,7 +235,7 @@ Do not wait for testnet funds to appear after a successful testnet airdrop.
 Emit JSON output.
 .RE
 .sp
-With \fB\-\-net localnet\fR, Acton uses the local LiteNode faucet instead of the
+With \fB\-\-net localnet\fR, Acton uses the localnet faucet instead of the
 testnet PoW flow.
 .SS "acton wallet remove"
 Remove a wallet from configuration.
@@ -293,7 +326,8 @@ to appear on testnet and lets you skip that wait by pressing \fBEnter\fR, unless
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBwallet list \-\-balance\fR resolves balances through TonCenter and also respects
-the \fBTONCENTER_API_KEY\fR environment variable
+\fBTONCENTER_TESTNET_API_KEY\fR; the same environment variable is used when
+\fBwallet new\fR waits for testnet funds after an interactive auto\-airdrop
 .RE
 .sp
 .RS 4
@@ -318,7 +352,7 @@ submits a claim
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBlocalnet\fR sends a fixed faucet transfer through LiteNode
+\h'-04'\(bu\h'+03'\fBlocalnet\fR sends a fixed faucet transfer through Localnet
 .RE
 .sp
 After a successful interactive testnet \fBwallet airdrop\fR, Acton briefly waits
@@ -469,7 +503,7 @@ cat body.boc.base64 | acton wallet sign deployer
 .SH "SEE ALSO"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBacton help litenode\fR
+\h'-04'\(bu\h'+03'\fBacton help localnet\fR
 .RE
 .sp
 .RS 4
@@ -477,5 +511,5 @@ cat body.boc.base64 | acton wallet sign deployer
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fIWallet setup guide\fR <https://ton\-blockchain.github.io/acton/docs/setup\-wallets>
+\h'-04'\(bu\h'+03'\fIWallet setup guide\fR <https://ton\-blockchain.github.io/acton/docs/tutorial/setup\-wallets>
 .RE

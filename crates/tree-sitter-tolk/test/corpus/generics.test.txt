@@ -62,6 +62,9 @@ fun main() {
         int,
         slice,
     >.parse();
+    Slice<
+        int,
+    >.parse();
 }
 ------------------------------------------------------------------------
 
@@ -93,6 +96,15 @@ fun main() {
               expr: (identifier)
               instantiationTs: (instantiationT_list
                 types: (type_identifier)
+                types: (type_identifier)))
+            field: (identifier))
+          arguments: (argument_list)))
+      (expression_statement
+        (function_call
+          callee: (dot_access
+            obj: (generic_instantiation
+              expr: (identifier)
+              instantiationTs: (instantiationT_list
                 types: (type_identifier)))
             field: (identifier))
           arguments: (argument_list))))))

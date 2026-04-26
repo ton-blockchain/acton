@@ -34,9 +34,9 @@ Install the most recent trunk release.
 Install the latest stable release.
 .RE
 .sp
-\fB\-y\fR, \fB\-\-yes\fR
+\fB\-\-force\fR
 .RS 4
-Skip confirmation prompts.
+Install the selected release even if Acton is already up to date.
 .RE
 .sp
 \fB\-\-list\fR
@@ -104,25 +104,10 @@ When installing a release, Acton:
 .RE
 .sp
 \fBacton up \-\-list\fR is read\-only and skips download or replacement.
-.SH "HOME BREW INSTALLATIONS"
-If the current binary path looks like a Homebrew installation, Acton warns and
-recommends using:
-.sp
-.RS 4
-.nf
-brew upgrade acton
-.fi
-.RE
-.sp
-Without \fB\-\-yes\fR, Acton asks whether to continue with the built\-in updater.
 .SH "INTERACTIVITY"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-yes\fR suppresses confirmation prompts for non\-interactive use
-.RE
-.sp
-.RS 4
-\h'-04'\(bu\h'+03'Homebrew\-style installs prompt before replacement unless \fB\-\-yes\fR is passed
+\h'-04'\(bu\h'+03'\fB\-\-force\fR bypasses the usual up\-to\-date short\-circuit for the selected release
 .RE
 .sp
 .RS 4
@@ -158,8 +143,8 @@ date, or the selected version was installed successfully.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, archive replacement
-failed, or the update was cancelled or could not be confirmed.
+\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, or archive
+replacement failed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -204,11 +189,21 @@ acton up \-\-list
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Update non\-interactively in CI or bootstrap scripts:
+\h'-04' 5.\h'+01'Reinstall the currently selected channel version:
 .sp
 .RS 4
 .nf
-acton up \-\-stable \-y
+acton up \-\-force
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Update to the latest stable release explicitly:
+.sp
+.RS 4
+.nf
+acton up \-\-stable
 .fi
 .RE
 .RE

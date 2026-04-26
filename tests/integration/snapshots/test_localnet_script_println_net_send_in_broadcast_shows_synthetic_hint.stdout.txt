@@ -1,0 +1,3 @@
+Broadcast send (synthetic result)
+└── [EXT_IN_OPCODE] -> EQBRPs..l6nHTG A 
+    └── submitted to network; call res.waitForFirstTransaction() to confirm inclusion

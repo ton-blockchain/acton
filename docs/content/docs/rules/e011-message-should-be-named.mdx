@@ -1,0 +1,35 @@
+---
+title: "E011: message-should-be-named"
+description: "Checks for messages created with `createMessage(...)` but named as generic `msg`."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E011`
+- `Rule`: `message-should-be-named`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Checks for messages created with `createMessage(...)` but named as generic `msg`.
+
+### Why is this bad?
+Messages are first-class entities in Tolk and should have meaningful names.
+Generic names like `msg` make code harder to read and reason about.
+
+### Example
+```tolk twoslash
+val msg = createMessage({ ... });
+//  ^^^ E011: message should be properly named
+msg.send(SEND_MODE_REGULAR);
+```
+
+Use instead:
+```tolk
+val deployMessage = createMessage({ ... });
+deployMessage.send(SEND_MODE_REGULAR);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/message_entity_naming.rs#L31" />

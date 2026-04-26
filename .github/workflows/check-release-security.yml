@@ -1,0 +1,30 @@
+name: Check Release Security
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: check-release-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  rust-deps:
+    uses: ./.github/workflows/check-rust-deps.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  ui-deps:
+    uses: ./.github/workflows/check-ui-deps.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  grammar-deps:
+    uses: ./.github/workflows/check-grammar-deps.yml
+    secrets: inherit
+    permissions:
+      contents: read

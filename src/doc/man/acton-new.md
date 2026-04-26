@@ -1,14 +1,14 @@
 # acton-new(1)
 
-## NAME
+## Name
 
 acton-new --- Create a new Acton project
 
-## SYNOPSIS
+## Synopsis
 
 `acton new` [_options_] _path_
 
-## DESCRIPTION
+## Description
 
 Create a new Acton project in the given directory.
 
@@ -28,7 +28,7 @@ changes, not only files created by the scaffold.
 
 The command does not create an initial commit.
 
-## OPTIONS
+## Options
 
 ### New Options
 
@@ -42,7 +42,7 @@ The command does not create an initial commit.
 
 {{> options-project }}
 
-## TEMPLATES
+## Templates
 
 ### empty
 
@@ -78,24 +78,42 @@ Jetton minter and wallet template with:
 - CI workflow
 - optional `AGENTS.md`
 
-## INTERACTIVE MODE
+### nft
+
+NFT collection and item template with:
+
+- collection and item contracts
+- wrappers and tests
+- deployment scripts
+- CI workflow
+- optional `AGENTS.md`
+
+## Interactive Mode
 
 When enough information is missing and standard input/output are connected to a
-terminal, `acton new` prompts for:
+terminal, `acton new` uses a short default flow:
 
 - project name
-- description
 - template
-- license
 - whether to include the TypeScript app layout when the template supports it
+- whether to configure advanced options
+
+If you opt into advanced options, Acton can then prompt for:
+
+- description
+- license
 - whether to install the default Git hooks when `git` is available
 - whether to include `AGENTS.md`
+
+If you skip advanced options, Acton keeps the default description `A TON
+blockchain project`, the default license `MIT`, and leaves optional features
+disabled unless their flags are passed explicitly.
 
 In non-interactive mode, optional features stay disabled unless their flags are
 passed explicitly. For CI or scripts, pass `--name`, `--description`,
 `--template`, and `--license` if you want to avoid prompts entirely.
 
-## FILES
+## Files
 
 The generated project always includes:
 
@@ -110,19 +128,22 @@ Depending on the selected template and options, Acton may also generate:
 - contract sources
 - tests
 - wrappers
+- wrappers that usually include helper shapes such as `fromStorage(...)`,
+  `deploy(...)`, `send{Name}(...)`, `sendAny(...)`, and typed get-method calls
 - deployment scripts
+- `[scripts]` aliases such as `deploy-emulation` and `deploy-testnet` in `Acton.toml`
 - frontend files for `--app`
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
 
-## COUNTER APP LAYOUT
+## Counter App Layout
 
 When `acton new --template counter --app` is used, the project includes:
 
 - `contracts/src` for contract sources and shared Tolk types
 - `contracts/tests` for tests and generated Tolk wrappers
 - `contracts/scripts` for deployment and utility scripts
-- `wrappers/` for the generated TypeScript wrapper used by the app
+- `wrappers-ts/` for the generated TypeScript wrapper used by the app
 - `app/` for the React + Vite frontend
 - top-level `package.json` and `package-lock.json` for the frontend toolchain
 
@@ -132,7 +153,19 @@ Before running frontend commands, install the app dependencies:
 npm ci
 ```
 
-## SIDE EFFECTS
+The generated app scaffold is a real frontend workspace, not just static demo
+files. After `npm ci`, use the usual frontend lifecycle commands from the
+generated `package.json` alongside normal Acton contract commands.
+
+Typical commands in that generated app workspace:
+
+- `npm run dev` to start the Vite development server
+- `npm run build` to build both contracts and the frontend bundle
+- `npm run preview` to preview the production bundle locally
+- `npm run typecheck` for TypeScript checking
+- `npm test` to run the bundled `acton test` command
+
+## Side Effects
 
 `acton new` writes only inside the chosen target directory. When `_path_` is
 `.`, that means the current directory itself, and existing files with the same
@@ -145,13 +178,13 @@ contents.
 
 The command does not create a commit and does not modify parent directories.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The project scaffold was created successfully.
 - `1`: Project creation failed because the target path already existed, a
   prompt could not be completed, or a filesystem/setup step failed.
 
-## EXAMPLES
+## Examples
 
 1. Create a new project in `my-project`:
 
@@ -183,8 +216,8 @@ The command does not create a commit and does not modify parent directories.
    acton new . --template empty --name "My Project" --description "A TON blockchain project" --license MIT
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help init`
-- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/project-init)
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/tutorial/project-init)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

@@ -19,14 +19,14 @@ members = ["crates/*", "xtask"]
 exclude = [
   "crates/acton-test-ui",
   "crates/acton-shared-ui",
-  "crates/acton-litenode-ui",
+  "crates/acton-localnet-ui",
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.1"
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.93.0"
+rust-version = "1.94.1"
 homepage = "https://ton-blockchain.github.io/acton"
 documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
 repository = "https://github.com/ton-blockchain/acton"
@@ -38,7 +38,7 @@ acton-config = { path = "crates/acton-config" }
 acton-debug = { path = "crates/acton-debug" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
-tolkc = { path = "crates/tolkc" }
+tolk-compiler = { path = "crates/tolk-compiler" }
 ton-abi = { path = "crates/ton-abi" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
@@ -55,22 +55,23 @@ tolk-analysis = { path = "crates/tolk-analysis" }
 tolk-linter = { path = "crates/tolk-linter" }
 tolk-macros = { path = "crates/tolk-macros" }
 tolk-dataflow = { path = "crates/tolk-dataflow" }
-tvmffi = { path = "crates/tvmffi" }
-vmlogs = { path = "crates/vmlogs" }
-tasm = { path = "crates/tasm" }
+tvm-ffi = { path = "crates/tvm-ffi" }
+tvm-logs = { path = "crates/tvm-logs" }
+tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
-retrace = { path = "crates/retrace" }
+ton-retrace = { path = "crates/ton-retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
-tolkfmt = { path = "crates/tolkfmt" }
+tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
-ton-litenode = { path = "crates/ton-litenode" }
+ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
 ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
 tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
+toncenter-keys = { path = "crates/toncenter-keys" }
 tree-sitter-toml-ng = "0.7.0"
 handlebars = { version = "6.4.0", features = ["dir_source"] }
 pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
@@ -131,7 +132,8 @@ tempfile = "3.10.1" # testing
 dotenvy = "0.15.7"
 pathdiff = "0.2.3"
 strsim = "0.11.1"
-clap_complete = { version = "4.5.61", features = ["unstable-dynamic"] }
+clap_complete = { version = "4.6.1", features = ["unstable-dynamic"] }
+clap_complete_nushell = "4.6.0"
 human-panic = "2.0.5" # better panic handling
 crash-handler = "0.7.0" # low-level fatal signal/exception handling
 ctrlc = "3.4.5" # graceful Ctrl+C handling
@@ -197,7 +199,7 @@ cc = "1.2"
 acton-config = { workspace = true }
 acton-debug = { workspace = true }
 acton-mdman = { workspace = true }
-tolkc = { workspace = true }
+tolk-compiler = { workspace = true }
 ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
@@ -208,14 +210,14 @@ tolk-linter = { workspace = true }
 ton-ls = { workspace = true }
 tower-lsp = { workspace = true }
 dashmap = { workspace = true }
-tvmffi = { workspace = true }
-vmlogs = { workspace = true }
-tasm = { workspace = true }
+tvm-ffi = { workspace = true }
+tvm-logs = { workspace = true }
+tasm-core = { workspace = true }
 ton-api = { workspace = true }
-retrace = { workspace = true }
+ton-retrace = { workspace = true }
 ton-source-map = { workspace = true }
-tolkfmt = { workspace = true }
-ton-litenode = { workspace = true }
+tolk-fmt = { workspace = true }
+ton-localnet = { workspace = true }
 
 # remote crates
 # base TON libraries
@@ -267,6 +269,7 @@ dotenvy = { workspace = true }
 pathdiff = { workspace = true }
 strsim = { workspace = true }
 clap_complete = { workspace = true }
+clap_complete_nushell = { workspace = true }
 human-panic = { workspace = true } # better panic handling
 crash-handler = { workspace = true } # low-level fatal signal/exception handling
 ctrlc = { workspace = true } # graceful Ctrl+C handling
@@ -304,11 +307,13 @@ snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }
 strip-ansi-escapes = "0.2.1"
 fs_extra = "1.3.0"
 base64 = { workspace = true }
+expect-test = { workspace = true }
 expectrl = "0.5.2"
 dap-client = { workspace = true }
 function_name = { workspace = true }
 owo-colors = { workspace = true } # overall coloring
 dap = { workspace = true }
+toncenter-keys = { workspace = true }
 
 [build-dependencies]
 chrono = { workspace = true }
@@ -334,6 +339,10 @@ unused_qualifications = "warn"
 #pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 perf = { level = "warn", priority = -1 }
+
+manual_let_else = "warn"
+trivially_copy_pass_by_ref = "warn"
+match_same_arms = "warn"
 
 use_self = "allow"
 redundant_pub_crate = "allow"

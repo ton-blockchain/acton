@@ -1,0 +1,9 @@
+  Installing standard library [ACTON_VERSION]
+script.opcode=0x7e8764ef
+script.bounce=true
+script.value=100000000
+script.from=[WALLET_ADDRESS_BASE] (deployer)
+script.to=[WALLET_ADDRESS_BASE] (counter)
+script.bodyHash=0x2348c89c02099054ce85ac7acf97bbcf659bc1148c5b4b9b87e20651a6b1d068
+script.negated.to=[WALLET_ADDRESS_BASE] (counter)
+SCRIPT_PREDICATES_OK

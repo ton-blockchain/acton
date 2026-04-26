@@ -132,10 +132,10 @@ fn env_or_uses_defaults_for_invalid_int_address_and_cell_values() {
                 expect(env<address>("T_BAD_ADDRESS")).toBeNull();
                 expect(env<cell>("T_BAD_CELL")).toBeNull();
 
-                expect(envOr<int>("T_BAD_INT", 42)).toEqual(42);
-                expect(envOr<address>("T_BAD_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
+                expect(env<int>("T_BAD_INT") ?? 42).toEqual(42);
+                expect(env<address>("T_BAD_ADDRESS") ?? fallbackAddress).toEqual(fallbackAddress);
 
-                val resolvedCell = envOr<cell>("T_BAD_CELL", fallbackCell);
+                val resolvedCell = env<cell>("T_BAD_CELL") ?? fallbackCell;
                 var slice = resolvedCell.beginParse();
                 expect(slice.loadUint(32)).toEqual(777);
             }

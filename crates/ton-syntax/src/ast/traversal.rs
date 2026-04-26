@@ -15,12 +15,7 @@ impl<'tree> Iterator for PreorderTraverse<'tree> {
     type Item = Node<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let c = match self.cursor.as_mut() {
-            None => {
-                return None;
-            }
-            Some(c) => c,
-        };
+        let c = self.cursor.as_mut()?;
 
         // We will always return the node we were on at the start;
         // the node we traverse to will either be returned on the next iteration,

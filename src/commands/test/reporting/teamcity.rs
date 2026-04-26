@@ -42,7 +42,6 @@ impl TeamCityReporter {
             backtrace: test.backtrace,
             fork_net: None,
             network: None,
-            api_key: None,
         })
     }
 
@@ -102,6 +101,11 @@ impl TeamCityReporter {
                         message = "Assertion failed".to_string();
                     }
                 },
+                AssertFailure::Decimal(failure) => {
+                    message = "Decimal equality failed".to_string();
+                    expected = Some(failure.right.clone());
+                    actual = Some(failure.left.clone());
+                }
                 AssertFailure::Fail(_) => {
                     message = "Test assertion failed".to_string();
                 }
@@ -253,9 +257,16 @@ impl TestReporter for TeamCityReporter {
                 }
             }
             TestStatus::Skipped | TestStatus::Todo => {
-                self.emit_message(format!(
-                    "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' flowId='{flow_id}']"
-                ))?;
+                if let Some(details) = test.details.as_deref() {
+                    self.emit_message(format!(
+                        "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' flowId='{flow_id}' message='{}']",
+                        self.escape_name(details),
+                    ))?;
+                } else {
+                    self.emit_message(format!(
+                        "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}' flowId='{flow_id}']"
+                    ))?;
+                }
             }
             TestStatus::Passed => {}
         }

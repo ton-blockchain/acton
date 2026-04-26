@@ -25,6 +25,15 @@ Path to the script file to execute.
 .RS 4
 Arguments passed through to the script.
 .RE
+.sp
+\fB\-\-verbose\fR
+.RS 4
+Enable executor debug logs at verbosity level \fB1\fR\&.
+.sp
+Currently only level \fB1\fR is supported. Pass \fB\-\-verbose\fR at most once.
+Use this for low\-level executor output such as \fBdebug.dumpStack()\fR\&. For richer
+debug output, use \fB\-\-backtrace full\fR or \fB\-\-debug\fR\&.
+.RE
 .SS "Debugging Options"
 .sp
 \fB\-\-debug\fR
@@ -61,11 +70,6 @@ network.
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
 .RS 4
 Historical block sequence number to fork from.
-.RE
-.sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
 .RE
 .SS "Broadcasting Options"
 .sp
@@ -149,6 +153,9 @@ acton script scripts/query.tolk \-\- \-\-net\-like\-value
 \fBacton script\fR always compiles and executes the selected script. With
 \fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution
 stays local even when \fB\-\-fork\-net\fR is used.
+.sp
+Executor debug logs are hidden by default. Re\-run with \fB\-\-verbose\fR when you need
+level\-1 executor output such as \fBdebug.dumpStack()\fR\&.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -190,7 +197,17 @@ acton script scripts/deploy.tolk
 .RE
 .sp
 .RS 4
-\h'-04' 2.\h'+01'Broadcast to testnet:
+\h'-04' 2.\h'+01'Show executor debug logs from \fBdebug.*\fR helpers:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-verbose
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Broadcast to testnet:
 .sp
 .RS 4
 .nf
@@ -200,24 +217,35 @@ acton script scripts/deploy.tolk \-\-net testnet
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Query mainnet state without broadcasting:
+\h'-04' 4.\h'+01'Query mainnet state without broadcasting:
 .sp
 .RS 4
 .nf
-acton script query.tolk \-\-fork\-net mainnet \-\-api\-key YOUR_API_KEY
+TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainnet
 .fi
 .RE
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Broadcast a deploy flow and print explorer links:
+\h'-04' 5.\h'+01'Broadcast a deploy flow and print explorer links:
 .sp
 .RS 4
 .nf
-acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonviewer
+acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
 .fi
 .RE
 .RE
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
+names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so
+\fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "SEE ALSO"
 .sp
 .RS 4
@@ -225,9 +253,9 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonviewer
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fIScripting guide\fR <https://ton\-blockchain.github.io/acton/docs/scripting>
+\h'-04'\(bu\h'+03'\fIScripting guide\fR <https://ton\-blockchain.github.io/acton/docs/scripting/overview>
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fIWallet setup\fR <https://ton\-blockchain.github.io/acton/docs/setup\-wallets>
+\h'-04'\(bu\h'+03'\fIWallet setup\fR <https://ton\-blockchain.github.io/acton/docs/tutorial/setup\-wallets>
 .RE

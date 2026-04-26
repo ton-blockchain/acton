@@ -14,6 +14,7 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
+use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 #[allow(dead_code)]
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
@@ -1783,7 +1784,7 @@ fn test_wallet_list_balance_json_uses_env_api_key() {
         .arg("--balance")
         .arg("--json")
         .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "env-api-key")
         .run()
         .success();
 
@@ -1812,8 +1813,8 @@ fn test_wallet_list_balance_json_uses_env_api_key() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_wallet_list_balance_cli_api_key_overrides_env() {
-    let project = ProjectBuilder::new("wallet-list-balance-flag-api-key").build();
+fn test_wallet_list_balance_uses_testnet_env_over_mainnet_env() {
+    let project = ProjectBuilder::new("wallet-list-balance-network-scoped-api-key").build();
 
     project
         .acton()
@@ -1848,10 +1849,9 @@ fn test_wallet_list_balance_cli_api_key_overrides_env() {
         .acton()
         .wallet_list()
         .arg("--balance")
-        .arg("--api-key")
-        .arg("flag-api-key")
         .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
-        .env("TONCENTER_API_KEY", "env-api-key")
+        .env(TONCENTER_MAINNET_API_KEY_ENV, "mainnet-api-key")
+        .env(TONCENTER_TESTNET_API_KEY_ENV, "testnet-api-key")
         .run()
         .success();
 
@@ -1865,7 +1865,7 @@ fn test_wallet_list_balance_cli_api_key_overrides_env() {
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
         .map(|(_, value)| value.as_str());
-    assert_eq!(header, Some("flag-api-key"));
+    assert_eq!(header, Some("testnet-api-key"));
 }
 
 #[test]

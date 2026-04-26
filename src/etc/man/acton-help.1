@@ -20,6 +20,21 @@ With a command name, Acton first tries to render a generated command manual
 from the bundled \fBtxt\fR and \fBman\fR artifacts. If no generated manual exists,
 Acton falls back to clap long help for that subcommand.
 .sp
+As a practical rule:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use \fBacton \-\-help\fR for the root overview
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use \fBacton help <command>\fR for the long top\-level manual
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use nested clap help such as \fBacton wallet list \-\-help\fR when you need the
+exact nested subcommand usage
+.RE
+.sp
 Nested command paths such as \fBwallet list\fR are not currently accepted by
 \fBacton help\fR\&. In practice, top\-level manuals such as \fBacton help wallet\fR and
 \fBacton help library\fR already include the nested subcommands under that command.
@@ -169,5 +184,5 @@ acton help build | rg "EXIT STATUS|EXAMPLES"
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fICommands overview\fR <https://ton\-blockchain.github.io/acton/docs/commands>
+\h'-04'\(bu\h'+03'\fICommands overview\fR <https://ton\-blockchain.github.io/acton/docs/commands/overview>
 .RE

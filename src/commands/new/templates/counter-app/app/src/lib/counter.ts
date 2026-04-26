@@ -2,7 +2,7 @@ import { Address, beginCell, storeStateInit, toNano } from '@ton/core';
 import { TonClient } from '@ton/ton';
 import type { SendTransactionParameters } from '@ton/appkit-react';
 
-import { Counter } from '../../../wrappers/Counter';
+import { Counter } from '../../../wrappers-ts/Counter.gen';
 import {
   IS_TESTNET,
   TONCENTER_API_KEY,
@@ -27,11 +27,13 @@ export interface CounterPreview {
   address: string;
   contract: Counter;
   id: bigint;
+  owner: string;
 }
 
 export interface CounterSnapshot {
   address: string;
   isDeployed: boolean;
+  owner: string | null;
   value: bigint | null;
 }
 
@@ -108,14 +110,19 @@ export function normalizeCounterAddress(address: string): string {
   return formatAddress(Address.parse(address));
 }
 
-export function getCounterPreview(counterIdValue: string): CounterPreview {
+export function getCounterPreview(
+  counterIdValue: string,
+  ownerAddressValue: string,
+): CounterPreview {
   const id = parseUint32(counterIdValue, 'Counter ID');
-  const contract = Counter.fromStorage({ id, counter: 0n });
+  const owner = Address.parse(ownerAddressValue);
+  const contract = Counter.fromStorage({ id, owner, counter: 0n });
 
   return {
     address: formatAddress(contract.address),
     contract,
     id,
+    owner: formatAddress(owner),
   };
 }
 
@@ -134,16 +141,19 @@ export async function readCounter(
     return {
       address: normalizedAddress,
       isDeployed: false,
+      owner: null,
       value: null,
     };
   }
 
   const contract = tonClient.open(Counter.fromAddress(address));
+  const owner = await contract.getOwner();
   const value = await contract.getCurrentCounter();
 
   return {
     address: normalizedAddress,
     isDeployed: true,
+    owner: formatAddress(owner),
     value,
   };
 }
@@ -151,12 +161,13 @@ export async function readCounter(
 export function buildDeployTransaction(
   counterIdValue: string,
   deployAmountValue: string,
+  ownerAddressValue: string,
 ): {
   address: string;
   request: SendTransactionParameters;
   preview: CounterPreview;
 } {
-  const preview = getCounterPreview(counterIdValue);
+  const preview = getCounterPreview(counterIdValue, ownerAddressValue);
   const amount = parseTonAmount(deployAmountValue, 'Deploy value');
 
   return {
@@ -217,7 +228,7 @@ export function getErrorMessage(error: unknown): string {
       status === 429 ||
       errorWithStatus.message?.includes('status code 429')
     ) {
-      return 'Toncenter rate limit reached (HTTP 429). This app reads chain data through Toncenter, so wait a bit and try again, or add VITE_TONCENTER_API_KEY for higher limits.';
+      return 'Toncenter rate limit reached (HTTP 429). This app reads chain data through Toncenter, so wait a bit and try again, or add TONCENTER_TESTNET_API_KEY / TONCENTER_MAINNET_API_KEY for higher limits.';
     }
   }
 

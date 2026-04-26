@@ -1,0 +1,6 @@
+{
+  "success": true,
+  "current_version": "[ACTON_VERSION]",
+  "latest_version": "[ACTON_VERSION]",
+  "update_available": false
+}

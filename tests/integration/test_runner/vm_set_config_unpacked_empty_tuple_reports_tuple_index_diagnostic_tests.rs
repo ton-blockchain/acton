@@ -10,8 +10,9 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const DL_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
-import "../../lib/vm/vm"
 "#;
 
 fn run_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -36,10 +37,10 @@ fn vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic() {
         "dl-stdlib-vm-set-config-unpacked-empty-tuple-diagnostic",
         r"
 get fun `test dl vm set config unpacked empty tuple diagnostic`() {
-    vm.setConfigUnpacked([]);
+    impl.setConfigParam([], 14);
 
-    var config = net.getConfig();
-    val applied = net.setConfig(config);
+    var config = testing.getConfig();
+    val applied = testing.setConfig(config);
     expect(applied).toBeTrue();
 }
 ",
@@ -56,10 +57,10 @@ fn vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fi
 get fun `test dl vm set config unpacked single item tuple diagnostic`() {{
     var malformed = [];
     malformed.push(1);
-    vm.setConfigUnpacked(malformed);
+    impl.setConfigParam(malformed, 14);
 
-    var config = net.getConfig();
-    val applied = net.setConfig(config);
+    var config = testing.getConfig();
+    val applied = testing.setConfig(config);
     expect(applied).toBeTrue();
 }}
 "

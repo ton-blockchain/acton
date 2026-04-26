@@ -16,6 +16,25 @@ DESCRIPTION
        exporting ABI or Fift output without running the full project build
        pipeline.
 
+       Unlike acton build, this command works on one explicit source file. It
+       does not traverse the [contracts] graph, does not generate dependency
+       helper files, and does not write project build JSON artifacts.
+
+       By default the compiler still expects a contract or script entrypoint.
+       Use --allow-no-entrypoint when compiling library or helper files that
+       intentionally define neither main() nor onInternalMessage().
+
+       Acton.toml is optional here. If it loads successfully, Acton uses it for
+       project context such as import mappings. Cache placement still follows
+       the resolved project root and the usual build/cache layout. If the
+       manifest is missing or invalid, Acton warns and continues compiling the
+       file without those manifest-derived project settings.
+
+       --manifest-path and --project-root choose which project context to use,
+       but they do not rebase unrelated CLI paths. The input file and output
+       paths stay relative to the current working directory unless you pass
+       absolute paths.
+
 OPTIONS
    Compile Options
        path
@@ -39,6 +58,10 @@ OPTIONS
 
        --abi path
            Write the emitted contract ABI to a file.
+
+       --allow-no-entrypoint
+           Allow compiling files that do not define main() or
+           onInternalMessage().
 
        --clear-cache
            Clear the compilation cache before compiling.
@@ -71,7 +94,9 @@ OUTPUT
        can be combined with either stdout mode.
 
        --boc is special: Acton writes the binary BoC file and returns
-       successfully without printing the usual stdout payload.
+       successfully without printing the usual stdout payload. If --boc is
+       combined with other file-output flags, those other files may still be
+       written first.
 
        Depending on the selected options, Acton can also write:
 
@@ -83,17 +108,32 @@ OUTPUT
 
        o  an ABI file via --abi
 
+       acton compile does not write:
+
+       o  build/<contract>.json project build artifacts
+
+       o  gen/*.code.tolk dependency helper files
+
+       o  outputs derived from [build] defaults in Acton.toml
+
        --source-map enables debug-oriented compilation output. If the compiler
        does not emit a contract ABI for the input file, --abi does not create
        an ABI artifact.
 
 CACHE
-       Acton uses a compilation cache to speed up repeated runs.
+       Acton uses the same compilation cache as acton build and acton test to
+       speed up repeated runs.
 
        o  Use --clear-cache to force recompilation.
 
        o  Cache entries are invalidated automatically when source inputs
           change.
+
+       o  Cache entries are mode-specific: --source-map and --fift may require
+          a different cache entry than a plain compile of the same file.
+
+       o  Standalone files that are not registered as project contracts still
+          benefit from file-import-aware cache invalidation.
 
 EXIT STATUS
        o  0: Compilation completed successfully, including runs that emitted
@@ -129,5 +169,5 @@ SEE ALSO
        o  acton help disasm
 
        o  Build system configuration reference
-          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+          <https://ton-blockchain.github.io/acton/docs/building/reference>
 

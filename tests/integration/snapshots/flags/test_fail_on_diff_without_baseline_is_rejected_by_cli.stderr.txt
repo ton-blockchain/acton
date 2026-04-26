@@ -1,6 +1,6 @@
 error: the following required arguments were not provided:
   --baseline-snapshot <BASELINE_SNAPSHOT>
 
-Usage: acton test --baseline-snapshot <BASELINE_SNAPSHOT> --fail-on-diff [PATH]
+Usage: acton[EXE] test --baseline-snapshot <BASELINE_SNAPSHOT> --fail-on-diff [PATH]
 
 For more information, try '--help'.

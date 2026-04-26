@@ -40,6 +40,50 @@
   box-sizing: border-box;
 }
 
+.heightDetailValue {
+  padding: var(--spacing-sm) var(--spacing-mds);
+  color: var(--text-primary);
+  word-break: break-all;
+  font-size: 0.8125rem;
+  flex-grow: 1;
+  box-sizing: border-box;
+}
+
+.triggerRoute {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.triggerKind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 8px;
+  border-radius: var(--border-radius-full);
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 80%, var(--color-todo-bg));
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.messageEndpointBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 8px;
+  border-radius: var(--border-radius-full);
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 84%, var(--text-muted));
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
 .timestampValue {
   font-size: 0.8125rem;
 }
@@ -171,6 +215,12 @@
   letter-spacing: 0.4px;
 }
 
+.parsedBodyTitle .actionsToggleButton {
+  color: inherit;
+  padding: 0;
+  font: inherit;
+}
+
 .parsedBodyTree {
   width: 100%;
   overflow-x: auto;
@@ -182,6 +232,14 @@
 .parsedBodyContent {
   width: max-content;
   min-width: 100%;
+}
+
+.stateInitSection,
+.stateInitField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .parsedContainer {
@@ -214,7 +272,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   min-width: 0;
   padding-left: var(--spacing-mds);
@@ -256,7 +314,7 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--border-color);

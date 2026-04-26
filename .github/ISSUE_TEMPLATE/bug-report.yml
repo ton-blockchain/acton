@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: Acton Version
-      description: Paste the output of `acton -V`.
+      description: Paste the output of `acton -v`.
       placeholder: 0.0.11 (abc1234 2026-03-14)
     validations:
       required: true

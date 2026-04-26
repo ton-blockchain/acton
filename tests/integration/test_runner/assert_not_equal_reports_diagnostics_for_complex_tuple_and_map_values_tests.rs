@@ -23,7 +23,7 @@ get fun `test ej stdlib assert not equal complex tuple diagnostic`() {{
 }}
 
 get fun `test ej stdlib assert not equal complex map diagnostic`() {{
-    var balances = createEmptyMap<int32, int32>();
+    var balances = map<int32, int32> [];
     balances.set(7, 70);
     balances.set(11, 110);
 

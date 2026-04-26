@@ -1,6 +1,6 @@
   Installing standard library [ACTON_VERSION]
 Script finished with [EXIT_STATUS] 100
-Re-run with --backtrace full to get more information
+  Re-run with --backtrace full to get more information
 Failed to send message to real network: wallet deployer rejected the external message before contract execution; likely causes:
 - not enough balance to cover the transfer and fees
 - wallet deployment StateInit was invalid or rejected

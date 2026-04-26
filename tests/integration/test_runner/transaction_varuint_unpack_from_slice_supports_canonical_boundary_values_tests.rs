@@ -6,11 +6,11 @@ import "../../lib/testing/expect"
 import "../../lib/types/transaction"
 
 struct EoVarUint7Box {
-    value: VarUint7
+    value: TlbVarUint7
 }
 
 struct EoVarUint3Box {
-    value: VarUint3
+    value: TlbVarUint3
 }
 
 fun canonicalVarUint7Box(value: int): Cell<EoVarUint7Box> {
@@ -93,7 +93,7 @@ get fun `test eo varuint7 pack roundtrip boundary bug`() {
     val directCell = directBuilder.endCell();
     var directSlice = directCell.beginParse();
 
-    val directDecoded = VarUint7.unpackFromSlice(mutate directSlice);
+    val directDecoded = TlbVarUint7.unpackFromSlice(mutate directSlice);
     expect(directDecoded).toEqual(source.value);
 
     val decoded = EoVarUint7Box.fromCell(source.toCell());
@@ -117,7 +117,7 @@ get fun `test eo varuint3 pack roundtrip boundary bug`() {
     val directCell = directBuilder.endCell();
     var directSlice = directCell.beginParse();
 
-    val directDecoded = VarUint3.unpackFromSlice(mutate directSlice);
+    val directDecoded = TlbVarUint3.unpackFromSlice(mutate directSlice);
     expect(directDecoded).toEqual(source.value);
 
     val decoded = EoVarUint3Box.fromCell(source.toCell());

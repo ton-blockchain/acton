@@ -658,8 +658,11 @@ const TOLK_GRAMMAR = {
         ),
 
     tensor_type: $ =>
-        prec.dynamic(103, choice(seq("(", ")"), seq("(", commaSep2($._type_hint), ")"))),
-    tuple_type: $ => prec(103, seq("[", commaSep1($._type_hint), "]")),
+        prec.dynamic(
+            103,
+            choice(seq("(", ")"), seq("(", commaSep2($._type_hint), optional(","), ")")),
+        ),
+    tuple_type: $ => prec(103, seq("[", commaSep1($._type_hint), optional(","), "]")),
     parenthesized_type: $ => prec(103, seq("(", field("inner", $._type_hint), ")")),
 
     fun_callable_type: $ =>

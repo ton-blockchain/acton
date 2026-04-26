@@ -258,8 +258,60 @@ fun f(a: Container<int>, b: Message<Container<never>>) {}
             (type_instantiatedTs
               (type_identifier)
               (instantiationT_list
-                (type_identifier)))))))
+              (type_identifier)))))))
     (block_statement)))
+
+========================================================================
+Function with multiline tensor return type
+========================================================================
+
+fun foo(): (
+    SendResultList,
+    address,
+    int,
+    uint256,
+    coins,
+) {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (tensor_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    body: (block_statement)))
+
+========================================================================
+Function with multiline tuple return type
+========================================================================
+
+fun bar(): [
+    SendResultList,
+    address,
+    int,
+    uint256,
+    coins,
+] {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (tuple_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    body: (block_statement)))
 
 ========================================================================
 Default parameters

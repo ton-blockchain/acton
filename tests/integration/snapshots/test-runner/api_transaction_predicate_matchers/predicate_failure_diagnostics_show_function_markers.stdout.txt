@@ -1,0 +1,26 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✗ predicate diagnostics show function markers [TIME]
+    └─ Error: expect(actual).toHaveTx(expected)
+        N/A -> sender A
+        └── Ping 0.5 TON -> harness B                                                   gas=690
+        
+        Cannot find transaction from <any> to <any>
+        with:
+          value=<function>
+          body=<function>
+      └─ at tests/predicate_matchers.test[LINE]
+    └─ Test output:
+       diag.value=500000000
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

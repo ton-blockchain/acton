@@ -116,7 +116,10 @@ export const tolkGrammar = {
   ],
   repository: {
     structBody: {
-      begin: String.raw`\bstruct\b[^{]*\{`,
+      begin: String.raw`\b(struct)\b[^{]*\{`,
+      beginCaptures: {
+        "1": {name: "storage.modifier"},
+      },
       end: String.raw`\}`,
       patterns: [
         {

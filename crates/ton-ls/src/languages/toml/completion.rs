@@ -742,7 +742,7 @@ type = "contract"
     fn top_level_object_key_inserts_table_header() {
         let insertion = key_value_insertion(
             &CompletionProperty {
-                name: "litenode".to_string(),
+                name: "localnet".to_string(),
                 required: false,
                 doc: SchemaDoc {
                     schema_type: Some("object".to_string()),
@@ -753,7 +753,7 @@ type = "contract"
             false,
         );
 
-        assert_eq!(insertion.value, "[litenode]\n$0");
+        assert_eq!(insertion.value, "[localnet]\n$0");
         assert_eq!(insertion.format, InsertTextFormat::SNIPPET);
     }
 
@@ -761,7 +761,7 @@ type = "contract"
     fn top_level_object_completion_item_uses_table_header_without_equals() {
         let item = property_completion_item(
             CompletionProperty {
-                name: "litenode".to_string(),
+                name: "localnet".to_string(),
                 required: false,
                 doc: SchemaDoc {
                     schema_type: Some("object".to_string()),
@@ -772,14 +772,14 @@ type = "contract"
             false,
         );
 
-        assert_eq!(item.insert_text.as_deref(), Some("[litenode]\n$0"));
+        assert_eq!(item.insert_text.as_deref(), Some("[localnet]\n$0"));
     }
 
     #[test]
     fn table_header_completion_item_inserts_only_name() {
         let item = property_completion_item(
             CompletionProperty {
-                name: "litenode".to_string(),
+                name: "localnet".to_string(),
                 required: false,
                 doc: SchemaDoc {
                     schema_type: Some("object".to_string()),
@@ -790,7 +790,7 @@ type = "contract"
             true,
         );
 
-        assert_eq!(item.insert_text.as_deref(), Some("litenode"));
+        assert_eq!(item.insert_text.as_deref(), Some("localnet"));
     }
 
     #[test]

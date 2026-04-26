@@ -18,8 +18,9 @@ use tolk_ty::InferenceResult;
 /// Named constants make intent explicit and reduce mistakes.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// reserveToncoinsOnBalance(ton("0.1"), 3);
+/// //                                   ^ E020: reserve mode should use RESERVE_MODE_* constants
 /// ```
 ///
 /// Use instead:

@@ -38,14 +38,14 @@ OPTIONS
            defaults to the target directory name.
 
        --description description
-           Project description written to Acton.toml. If not provided,
-           interactive mode prompts for it and defaults to A TON blockchain
-           project.
+           Project description written to Acton.toml. If not provided, Acton
+           uses A TON blockchain project by default. In interactive mode you
+           can override it after opting into advanced options.
 
        --template template
            Project template to use.
 
-           Possible values: empty, counter, jetton
+           Possible values: empty, counter, jetton, nft
 
            If not provided, interactive mode prompts for the template.
 
@@ -54,7 +54,8 @@ OPTIONS
            generated LICENSE file when Acton has a built-in template for that
            license.
 
-           If not provided, interactive mode prompts for it.
+           If not provided, Acton uses MIT by default. In interactive mode you
+           can override it after opting into advanced options.
 
        --app
            Include the template’s TypeScript app scaffold when available.
@@ -72,16 +73,17 @@ OPTIONS
            Create and install the default project-local Git hooks.
 
            If git is available and --hooks is not provided, interactive mode
-           prompts for this choice. Non-interactive mode leaves hooks disabled
-           unless --hooks is passed explicitly.
+           offers this choice after you opt into advanced options.
+           Non-interactive mode leaves hooks disabled unless --hooks is passed
+           explicitly.
 
        --agents
            Include an AGENTS.md file with coding-agent guidance from the
            selected template.
 
-           If --agents is not provided, interactive mode prompts for this
-           choice. Non-interactive mode leaves AGENTS.md disabled unless
-           --agents is passed explicitly.
+           If --agents is not provided, interactive mode offers this choice
+           after you opt into advanced options. Non-interactive mode leaves
+           AGENTS.md disabled unless --agents is passed explicitly.
 
    Display Options
        --color when
@@ -149,24 +151,45 @@ TEMPLATES
 
        o  optional AGENTS.md
 
+   nft
+       NFT collection and item template with:
+
+       o  collection and item contracts
+
+       o  wrappers and tests
+
+       o  deployment scripts
+
+       o  CI workflow
+
+       o  optional AGENTS.md
+
 INTERACTIVE MODE
        When enough information is missing and standard input/output are
-       connected to a terminal, acton new prompts for:
+       connected to a terminal, acton new uses a short default flow:
 
        o  project name
 
-       o  description
-
        o  template
-
-       o  license
 
        o  whether to include the TypeScript app layout when the template
           supports it
 
+       o  whether to configure advanced options
+
+       If you opt into advanced options, Acton can then prompt for:
+
+       o  description
+
+       o  license
+
        o  whether to install the default Git hooks when git is available
 
        o  whether to include AGENTS.md
+
+       If you skip advanced options, Acton keeps the default description A TON
+       blockchain project, the default license MIT, and leaves optional
+       features disabled unless their flags are passed explicitly.
 
        In non-interactive mode, optional features stay disabled unless their
        flags are passed explicitly. For CI or scripts, pass --name,
@@ -194,7 +217,14 @@ FILES
 
        o  wrappers
 
+       o  wrappers that usually include helper shapes such as fromStorage(...),
+          deploy(...), send{Name}(...), sendAny(...), and typed get-method
+          calls
+
        o  deployment scripts
+
+       o  [scripts] aliases such as deploy-emulation and deploy-testnet in
+          Acton.toml
 
        o  frontend files for --app
 
@@ -211,7 +241,7 @@ COUNTER APP LAYOUT
 
        o  contracts/scripts for deployment and utility scripts
 
-       o  wrappers/ for the generated TypeScript wrapper used by the app
+       o  wrappers-ts/ for the generated TypeScript wrapper used by the app
 
        o  app/ for the React + Vite frontend
 
@@ -221,6 +251,22 @@ COUNTER APP LAYOUT
        Before running frontend commands, install the app dependencies:
 
            npm ci
+
+       The generated app scaffold is a real frontend workspace, not just static
+       demo files. After npm ci, use the usual frontend lifecycle commands from
+       the generated package.json alongside normal Acton contract commands.
+
+       Typical commands in that generated app workspace:
+
+       o  npm run dev to start the Vite development server
+
+       o  npm run build to build both contracts and the frontend bundle
+
+       o  npm run preview to preview the production bundle locally
+
+       o  npm run typecheck for TypeScript checking
+
+       o  npm test to run the bundled acton test command
 
 SIDE EFFECTS
        acton new writes only inside the chosen target directory. When _path_ is
@@ -266,8 +312,8 @@ SEE ALSO
        o  acton help init
 
        o  Project initialization guide
-          <https://ton-blockchain.github.io/acton/docs/project-init>
+          <https://ton-blockchain.github.io/acton/docs/tutorial/project-init>
 
        o  Build system configuration reference
-          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+          <https://ton-blockchain.github.io/acton/docs/building/reference>
 

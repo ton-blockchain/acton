@@ -1,9 +1,9 @@
 import "../contracts/messages"
 
-import "../../../../lib/build/build"
+import "../../../../lib/build"
 import "../../../../lib/emulation/network"
+import "../../../../lib/emulation/testing"
 import "../../../../lib/testing/expect"
-import "../../../../lib/testing/transaction_expect"
 
 struct Counter {
     address: address
@@ -22,7 +22,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({});
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),

@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate mixed scalar and predicate fields [TIME]
+    └─ Test output:
+       mixed.from=[WALLET_ADDRESS_BASE] (sender)
+       mixed.success=true
+       mixed.negated.from=[WALLET_ADDRESS_BASE] (sender)
+
+ ✓ 1 passed in 1 file

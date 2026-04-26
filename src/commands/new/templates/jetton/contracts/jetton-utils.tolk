@@ -1,3 +1,4 @@
+import "sharding"
 import "storage"
 
 fun calcDeployedJettonWallet(
@@ -11,7 +12,11 @@ fun calcDeployedJettonWallet(
         minterAddress,
     };
 
-    return { stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() } };
+    return {
+        workchain: MY_WORKCHAIN,
+        stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() },
+        toShard: { fixedPrefixLength: SHARD_DEPTH, closeTo: ownerAddress },
+    };
 }
 
 fun calcAddressOfJettonWallet(

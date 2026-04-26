@@ -14,8 +14,9 @@ use tolk_resolver::resolve_index::Resolved;
 /// Unused imports clutter the code and increase compilation time.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// import "other.tolk";
+/// //      ^^^^^^^^^^ E006: unused import
 ///
 /// fun main() {
 ///     println("hello");

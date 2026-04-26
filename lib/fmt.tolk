@@ -1,4 +1,4 @@
-/// Module for string formatting.
+/// Module for string parsing and formatting.
 ///
 /// This module provides a universal `format` function for creating formatted strings.
 /// It accepts up to 5 typed arguments.
@@ -36,10 +36,13 @@
 ///
 /// // Multiple arguments
 /// val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1_000_000_000);
+/// 
+/// // Parse an integer from a string
+/// val num = parseInt("42");
 /// ```
 
 import "@stdlib/reflection"
-import "ffi/ffi"
+import "ffi"
 
 /// Formats a string with up to 5 arguments.
 ///
@@ -81,5 +84,72 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
     );
 }
 
-fun ffi.format(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple, type4: string, arg4: tuple, type5: string, arg5: tuple): string
+/// Parse a decimal string into an int value.
+///
+/// Leading and trailing whitespace is ignored before parsing.
+/// After trimming, accepts optional leading `-` sign followed by decimal digits.
+/// Invalid input (non-numeric characters, empty string, whitespace-only string)
+/// fails with an error.
+///
+/// Example:
+/// ```tolk
+/// val n = parseInt("12345");
+/// val negative = parseInt("-42");
+/// val withWhitespace = parseInt(" 42 ");
+/// ```
+fun parseInt(x: string): int {
+    val n = ffi.parseInt(x);
+    assert (n != null) throw 5; // 5 = "integer out of range"
+    return n;
+}
+
+/// Convert a string representation of address to an internal [address] value.
+///
+/// Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+/// (base64/base64url with flags). Inputs copied from CLI output like
+/// `<address> (<name>)` are also accepted; the symbolic suffix is ignored.
+/// The returned value is normalized as an internal address; rendered formatting may
+/// differ from input flags, while representing the same account.
+/// Invalid input fails with an error like `Failed to convert address from <input>`.
+///
+/// Example:
+/// ```tolk
+/// val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+/// ```
+fun parseAddress(addr: string): address {
+    val cell = ffi.convertAddress(addr);
+    return cell.beginParse() as address;
+}
+
+/// Decode a root cell from hex-encoded BOC bytes.
+///
+/// `cellHex` must be a valid BOC serialized as hex.
+/// Invalid or malformed input (including non-BOC payloads) fails with an error like
+/// `Failed to decode cell hex <input>`.
+fun parseCellFromHex(cellHex: string): cell {
+    return ffi.cellFromHex(cellHex);
+}
+
+fun ffi.format(
+    fmt: string,
+    type1: string,
+    arg1: tuple,
+    type2: string,
+    arg2: tuple,
+    type3: string,
+    arg3: tuple,
+    type4: string,
+    arg4: tuple,
+    type5: string,
+    arg5: tuple,
+): string
     asm "200 EXTCALL"
+
+fun ffi.convertAddress(addr: string): cell
+    asm "19 EXTCALL"
+
+fun ffi.cellFromHex(cellHex: string): cell
+    asm "20 EXTCALL"
+
+fun ffi.parseInt(x: string): int?
+    asm "47 EXTCALL"

@@ -1,7 +1,7 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton_api::{GetMethodResult, Network, TonApiClient};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellSlice, CellSliceParts, HashBytes, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -34,7 +34,6 @@ pub fn verify_cmd(
     wallet_name: Option<String>,
     compiler_version: Option<String>,
     dry_run: bool,
-    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
@@ -42,8 +41,7 @@ pub fn verify_cmd(
     let contract = config
         .get_contract(&contract_key)
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
-    let contract_path = dunce::canonicalize(contract.src.clone())
-        .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
+    let contract_path = contract.absolute_source_path(configured_project_root());
 
     let network = Network::from_str(&network)?;
     if !matches!(network, Network::Mainnet | Network::Testnet) {
@@ -67,15 +65,15 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings());
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
     let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
     let code_boc64 = match compilation_result {
-        tolkc::CompilerResult::Success(result) => {
+        tolk_compiler::CompilerResult::Success(result) => {
             println!("  {} Compiled successfully", "✓".green().bold());
             result.code_boc64
         }
-        tolkc::CompilerResult::Error(error) => {
+        tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!(
                 "{}\nFix compilation error first to verify contract",
                 error.message
@@ -397,12 +395,12 @@ pub fn verify_cmd(
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let is_testnet = network == Network::Testnet;
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
     let quorum = usize::from(get_verifier_quorum(
         &api_client,
         &registry_address,
@@ -493,11 +491,11 @@ pub fn verify_cmd(
     let cell_data = &msg_cell.data;
     let body_cell = Boc::decode(cell_data)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
 
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
-    wait_for_rate_limit(&api_key);
+    wait_for_rate_limit(api_client.has_api_key());
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -738,6 +736,7 @@ fn remove_random<T>(els: &mut Vec<T>) -> T {
 fn build_verify_http_client() -> anyhow::Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
         .pool_max_idle_per_host(0)
+        .user_agent(crate::build_info::user_agent())
         .build()
         .context("Failed to build verifier HTTP client")
 }
@@ -850,8 +849,8 @@ fn truncate_for_display(text: &str, max_chars: usize) -> String {
     out
 }
 
-fn wait_for_rate_limit(api_key: &Option<String>) {
-    if api_key.is_none() {
+fn wait_for_rate_limit(has_api_key: bool) {
+    if !has_api_key {
         // rate limit
         println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -960,7 +959,7 @@ fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Resu
     }
 
     let tuple = result.parse_stack_tuple().with_context(|| {
-        format!("Failed to parse stack from '{method_name}' with tvmffi JSON stack parser")
+        format!("Failed to parse stack from '{method_name}' with tvm-ffi JSON stack parser")
     })?;
     let Some(item) = tuple.first() else {
         anyhow::bail!("Stack from '{method_name}' is empty");

@@ -1,7 +1,7 @@
-import "@local-acton/build/build"
+import "@local-acton/build"
 import "@local-acton/emulation/network"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
-import "@local-acton/testing/transaction_expect"
 import "contracts/types"
 
 struct Counter {
@@ -31,7 +31,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
 fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
-    val deployer = net.treasury("deployer");
+    val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
         value: ton("1.0"),
@@ -114,9 +114,6 @@ get fun `test run get method with single int argument`() {
     val res = counter.sendIncrease(deployer.address, 100);
     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
 
-    val result: int = net.runGetMethod(counter.address, "double", 999);
-    expect(result).toEqual(2098);
-
     val result2: int = net.runGetMethod(counter.address, "double", [999]);
     expect(result2).toEqual(2098);
 }
@@ -140,10 +137,12 @@ get fun `test run get method with objectt argument`() {
     val result: Pair = net.runGetMethod(
         counter.address,
         "doubleObject",
-        Pair {
-            x: 100,
-            y: 200,
-        },
+        [
+            Pair {
+                x: 100,
+                y: 200,
+            },
+        ],
     );
     expect(result).toEqual(Pair {
         x: 200,
@@ -157,6 +156,6 @@ get fun `test run get method with int return type by id`() {
     val res = counter.sendIncrease(deployer.address, 100);
     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
 
-    val result: tuple = net.runGetMethodById(counter.address, 0x1cad0);
+    val result: tuple = net.runGetMethod(counter.address, 0x1cad0);
     expect(result).toEqual(100);
 }

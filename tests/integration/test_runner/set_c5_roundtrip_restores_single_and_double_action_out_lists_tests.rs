@@ -3,9 +3,14 @@ use crate::support::project::ProjectBuilder;
 
 const CN_VM_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/impl"
 import "../../lib/testing/expect"
 import "../../lib/types/out_actions"
-import "../../lib/vm/vm"
+import "../../lib/ffi"
+
+fun overwriteC5(cell: cell): void
+    asm "c5 POPCTR"
 "#;
 
 fn run_success(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -27,14 +32,14 @@ fn set_c5_roundtrip_restores_single_and_double_action_out_lists() {
         "cn-stdlib-set-c5-roundtrip-non-empty-transitions",
         r#"
 get fun `test cn set c5 roundtrip non empty transitions`() {
-    val dest = net.randomAddress("cn_set_c5_roundtrip_dest");
+    val dest = randomAddress("cn_set_c5_roundtrip_dest");
     createMessage({
         bounce: false,
         value: ton("1"),
         dest,
         body: beginCell().storeUint(0xC0FFEE01, 32).endCell().beginParse(),
     }).send(SEND_MODE_REGULAR);
-    val singleActionC5 = vm.getC5();
+    val singleActionC5 = impl.getC5();
 
     createMessage({
         bounce: false,
@@ -42,9 +47,9 @@ get fun `test cn set c5 roundtrip non empty transitions`() {
         dest,
         body: beginCell().storeUint(0xC0FFEE02, 32).endCell().beginParse(),
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
-    val doubleActionC5 = vm.getC5();
+    val doubleActionC5 = impl.getC5();
 
-    val doubleActions = vm.outActions();
+    val doubleActions = testing.outActions();
     expect(doubleActions.size()).toEqual(2);
     expect(doubleActions.at(0).kind()).toEqual("send-message");
     expect(doubleActions.at(1).kind()).toEqual("send-message");
@@ -55,16 +60,16 @@ get fun `test cn set c5 roundtrip non empty transitions`() {
     expect(firstDouble!.mode).toEqual(SEND_MODE_PAY_FEES_SEPARATELY);
     expect(secondDouble!.mode).toEqual(SEND_MODE_REGULAR);
 
-    vm.setC5(singleActionC5);
-    val singleActions = vm.outActions();
+    overwriteC5(singleActionC5);
+    val singleActions = testing.outActions();
     expect(singleActions.size()).toEqual(1);
     expect(singleActions.at(0).kind()).toEqual("send-message");
     val single = singleActions.getSendMessageAt(0);
     expect(single).toBeNotNull();
     expect(single!.mode).toEqual(SEND_MODE_REGULAR);
 
-    vm.setC5(doubleActionC5);
-    val restoredDoubleActions = vm.outActions();
+    overwriteC5(doubleActionC5);
+    val restoredDoubleActions = testing.outActions();
     expect(restoredDoubleActions.size()).toEqual(2);
     val restoredFirst = restoredDoubleActions.getSendMessageAt(0);
     val restoredSecond = restoredDoubleActions.getSendMessageAt(1);
@@ -84,10 +89,10 @@ fn set_c5_to_empty_cell_breaks_vm_out_actions_bug() {
         "cn-stdlib-set-c5-empty-cell-out-actions-bug",
         r"
 get fun `test cn set c5 empty cell out actions bug`() {
-    val emptyC5 = vm.getC5();
-    vm.setC5(emptyC5);
+    val emptyC5 = impl.getC5();
+    overwriteC5(emptyC5);
 
-    val parsed = vm.outActions();
+    val parsed = testing.outActions();
     expect(parsed.size()).toEqual(0);
 }
 ",
@@ -101,7 +106,7 @@ fn parse_out_actions_direct_empty_cell_returns_empty_list() {
         "cn-stdlib-parse-out-actions-direct-empty-cell",
         r"
 get fun `test cn parse out actions direct empty cell`() {
-    val parsed = vm.parseOutActions(createEmptyCell());
+    val parsed = impl.parseOutActions(createEmptyCell());
     expect(parsed.size()).toEqual(0);
 }
 ",

@@ -1,6 +1,6 @@
 error: the following required arguments were not provided:
   <HASH>
 
-Usage: acton retrace <HASH>
+Usage: acton[EXE] retrace <HASH>
 
 For more information, try '--help'.

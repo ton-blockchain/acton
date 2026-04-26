@@ -1,0 +1,90 @@
+---
+title: "API Compatibility"
+description: "Coverage matrix for TonCenter v2/v3 endpoints in Acton local development node"
+---
+
+This page tracks TonCenter v2 and v3 API coverage in Acton local development node.
+
+## TonCenter v2 Coverage Matrix
+
+| Method | Endpoint                                | Available in local node | OpenAPI summary                  |
+|--------|-----------------------------------------|-------------------------|----------------------------------|
+| `GET`  | `/api/v2/detectAddress`                 | ✅                       | Detect address                   |
+| `GET`  | `/api/v2/detectHash`                    | ✅                       | Detect hash                      |
+| `GET`  | `/api/v2/packAddress`                   | ✅                       | Pack address                     |
+| `GET`  | `/api/v2/unpackAddress`                 | ✅                       | Unpack address                   |
+| `GET`  | `/api/v2/getAddressInformation`         | ✅                       | Get Address Information          |
+| `GET`  | `/api/v2/getExtendedAddressInformation` | ✅                       | Get Extended Address Information |
+| `GET`  | `/api/v2/getWalletInformation`          | ❌                       | Get Wallet Information           |
+| `GET`  | `/api/v2/getAddressBalance`             | ✅                       | Get Address Balance              |
+| `GET`  | `/api/v2/getAddressState`               | ✅                       | Get Address State                |
+| `GET`  | `/api/v2/getTokenData`                  | ❌                       | Get Token Data                   |
+| `GET`  | `/api/v2/getMasterchainInfo`            | ✅                       | Get Masterchain Info             |
+| `GET`  | `/api/v2/getMasterchainBlockSignatures` | ❌                       | Get Masterchain Block Signatures |
+| `GET`  | `/api/v2/getShardBlockProof`            | ❌                       | Get Shard Block Proof            |
+| `GET`  | `/api/v2/getConsensusBlock`             | ✅                       | Get Consensus Block              |
+| `GET`  | `/api/v2/lookupBlock`                   | ✅                       | Lookup Block                     |
+| `GET`  | `/api/v2/getShards`                     | ✅                       | Get Shards                       |
+| `GET`  | `/api/v2/getBlockHeader`                | ✅                       | Get Block Header                 |
+| `GET`  | `/api/v2/getOutMsgQueueSize`            | ✅                       | Get Out Msg Queue Size           |
+| `GET`  | `/api/v2/getBlockTransactions`          | ✅                       | Get Block Transactions           |
+| `GET`  | `/api/v2/getBlockTransactionsExt`       | ✅                       | Get Block Transactions Extended  |
+| `GET`  | `/api/v2/getTransactions`               | ✅                       | Get Transactions                 |
+| `GET`  | `/api/v2/getTransactionsStd`            | ✅                       | Get Transactions Std             |
+| `GET`  | `/api/v2/tryLocateTx`                   | ✅                       | Try Locate Transaction           |
+| `GET`  | `/api/v2/tryLocateResultTx`             | ✅                       | Try Locate Result Transaction    |
+| `GET`  | `/api/v2/tryLocateSourceTx`             | ✅                       | Try Locate Source Transaction    |
+| `GET`  | `/api/v2/getConfigParam`                | ✅                       | Get Config Parameter             |
+| `GET`  | `/api/v2/getConfigAll`                  | ✅                       | Get All Config                   |
+| `GET`  | `/api/v2/getLibraries`                  | ✅                       | Get Libraries                    |
+
+## TonCenter v3 Coverage Matrix
+
+Acton local development node currently supports 11 TonCenter v3 endpoints:
+
+| Method | Endpoint                        | Available in local node | Purpose                                                              |
+|--------|---------------------------------|-------------------------|----------------------------------------------------------------------|
+| `GET`  | `/api/v3/traces`                | ✅                       | Returns transaction trace tree for a transaction hash.               |
+| `GET`  | `/api/v3/accountStates`         | ✅                       | Returns account states with `interfaces` and token metadata.         |
+| `GET`  | `/api/v3/addressInformation`    | ✅                       | Returns account state in `V2AddressInformation` shape.               |
+| `GET`  | `/api/v3/transactions`          | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
+| `GET`  | `/api/v3/transactionsByMessage` | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
+| `GET`  | `/api/v3/pendingTransactions`   | ✅                       | Returns pending transactions filtered by account and trace id.       |
+| `POST` | `/api/v3/message`               | ✅                       | Sends an external message in BOC and returns message hash fields.    |
+| `POST` | `/api/v3/runGetMethod`          | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
+| `GET`  | `/api/v3/jetton/masters`        | ✅                       | Returns jetton master metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/jetton/wallets`        | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/nft/items`             | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
+
+`/api/v3/transactions`, `/api/v3/transactionsByMessage`, and `/api/v3/pendingTransactions` currently support only single-value query filters for `account`, `exclude_account`, and `trace_id` in local development node (no repeated multi-value form yet).
+
+No other v3 endpoints are exposed by the local development node at the moment.
+
+## Emulate API Coverage Matrix
+
+| Method | Endpoint                       | Available in local node | Purpose                                                                      |
+|--------|--------------------------------|-------------------------|------------------------------------------------------------------------------|
+| `POST` | `/api/emulate/v1/emulateTrace` | ✅                       | Emulates external message execution trace against current state (no commit). |
+
+## Admin API
+
+| Method | Endpoint               | Request                                                                                  | What it does                                                                                      |
+|--------|------------------------|------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `POST` | `/admin/faucet`        | JSON body: `{"address":"<ADDR>","amount":<NANOTONS>}`                                    | Credits address with local funds and mines the transfer transaction.                              |
+| `GET`  | `/admin/address-name`  | Query: `?address=<ADDR>`                                                                 | Returns current alias for an address (or `null` if not set).                                      |
+| `POST` | `/admin/address-name`  | JSON body: `{"address":"<ADDR>","name":"<ALIAS>"}`                                       | Sets or updates local alias for an address.                                                       |
+| `GET`  | `/admin/compiler-abi`  | Query: `?code_hash=<HEX_OR_BASE64_HASH>`                                                 | Returns the registered compiler ABI for a code hash, or `null` when no ABI is registered.         |
+| `POST` | `/admin/compiler-abis` | JSON body: `{"entries":[{"code_hash":"<HEX_OR_BASE64_HASH>","compiler_abi":{...}},...]}` | Registers one or more compiler ABIs for later explorer/API lookups.                               |
+| `GET`  | `/admin/state-source`  | No params                                                                                | Returns current state source used for account resolution (`Local` or `Remote`).                   |
+| `POST` | `/admin/state-source`  | JSON enum payload (`"Local"` or `{"Remote": {...}}`)                                     | Switches account state source at runtime.                                                         |
+
+<Callout type="warn">
+  Admin routes are intended for local development tooling and should not be exposed publicly.
+  The local node does not implement authentication for these routes. Loopback-only CORS helps
+  browser usage, but it is not an access-control mechanism.
+</Callout>
+
+<Callout type="info">
+  Rate limiting applies only to `/api` routes. `/admin` routes remain available even when
+  `--rate-limit` or `[localnet].rate-limit` is enabled.
+</Callout>

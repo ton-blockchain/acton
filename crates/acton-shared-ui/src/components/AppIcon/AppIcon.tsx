@@ -6,216 +6,22 @@ interface AppIconProps {
 }
 
 export const AppIcon: React.FC<AppIconProps> = ({theme, size = 28}) => {
-  if (theme === "dark") {
-    return (
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 16 16"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        role="img"
-        aria-label="Acton Tests app icon"
-      >
-        <g clipPath="url(#clip0_18_3209)">
-          <path
-            d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
-            fill="url(#paint0_linear_18_3209)"
-          />
-          <path
-            d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
-            fill="url(#paint1_linear_18_3209)"
-          />
-          <mask
-            id="mask0_18_3209"
-            style={{maskType: "luminance"}}
-            maskUnits="userSpaceOnUse"
-            x="0"
-            y="0"
-            width="16"
-            height="16"
-          >
-            <path d="M16 0H0V16H16V0Z" fill="black" />
-            <path
-              d="M8 12.25C10.2091 12.25 12 10.4591 12 8.25C12 6.04086 10.2091 4.25 8 4.25C5.79086 4.25 4 6.04086 4 8.25C4 10.4591 5.79086 12.25 8 12.25Z"
-              fill="white"
-            />
-            <path
-              d="M9.625 10.5C9.625 11.125 9.125 11.625 8.5 11.625H6.75C5.625 11.625 4.75 10.75 4.75 9.625C4.75 8.5 5.625 7.625 6.75 7.625H9.625V10.5ZM9.625 6.375H6.75C5 6.375 3.5 7.875 3.5 9.625C3.5 11.375 5 12.875 6.75 12.875H8.5C9.625 12.875 10.625 11.875 10.625 10.75V6.375H9.625Z"
-              fill="black"
-            />
-          </mask>
-          <g mask="url(#mask0_18_3209)">
-            <path d="M16 0H0V16H16V0Z" fill="white" />
-          </g>
-        </g>
-        <defs>
-          <linearGradient
-            id="paint0_linear_18_3209"
-            x1="1"
-            y1="1"
-            x2="15"
-            y2="15"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop stopColor="#222329" />
-            <stop offset="1" stopColor="#0B0B0F" />
-          </linearGradient>
-          <linearGradient
-            id="paint1_linear_18_3209"
-            x1="1"
-            y1="1"
-            x2="1"
-            y2="15"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop stopOpacity="0.14" />
-            <stop offset="0.45" stopOpacity="0.04" />
-            <stop offset="1" stopOpacity="0" />
-          </linearGradient>
-          <clipPath id="clip0_18_3209">
-            <rect width="16" height="16" fill="white" />
-          </clipPath>
-        </defs>
-      </svg>
-    )
-  }
+  const fillColor = theme === "dark" ? "#ecebeb" : "#4DB8FF"
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox="0 0 237 237"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Acton Tests app icon"
+      aria-label="TON logo"
     >
-      <g clipPath="url(#clip0_22_3097)">
-        <path
-          d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
-          fill="url(#paint0_linear_22_3097)"
-        />
-        <path
-          d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
-          fill="url(#paint1_radial_22_3097)"
-        />
-        <path
-          d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
-          fill="url(#paint2_radial_22_3097)"
-        />
-        <mask
-          id="mask0_22_3097"
-          style={{maskType: "luminance"}}
-          maskUnits="userSpaceOnUse"
-          x="0"
-          y="0"
-          width="16"
-          height="16"
-        >
-          <path d="M16 0H0V16H16V0Z" fill="black" />
-          <path
-            d="M8 12.25C10.2091 12.25 12 10.4591 12 8.25C12 6.04086 10.2091 4.25 8 4.25C5.79086 4.25 4 6.04086 4 8.25C4 10.4591 5.79086 12.25 8 12.25Z"
-            fill="white"
-          />
-          <path
-            d="M9.625 10.5C9.625 11.125 9.125 11.625 8.5 11.625H6.75C5.625 11.625 4.75 10.75 4.75 9.625C4.75 8.5 5.625 7.625 6.75 7.625H9.625V10.5ZM9.625 6.375H6.75C5 6.375 3.5 7.875 3.5 9.625C3.5 11.375 5 12.875 6.75 12.875H8.5C9.625 12.875 10.625 11.875 10.625 10.75V6.375H9.625Z"
-            fill="black"
-          />
-        </mask>
-        <g mask="url(#mask0_22_3097)">
-          <path d="M16 0H0V16H16V0Z" fill="url(#paint3_linear_22_3097)" />
-        </g>
-        <mask
-          id="mask1_22_3097"
-          style={{maskType: "luminance"}}
-          maskUnits="userSpaceOnUse"
-          x="0"
-          y="0"
-          width="16"
-          height="16"
-        >
-          <path d="M16 0H0V16H16V0Z" fill="black" />
-          <path
-            d="M8 12.25C10.2091 12.25 12 10.4591 12 8.25C12 6.04086 10.2091 4.25 8 4.25C5.79086 4.25 4 6.04086 4 8.25C4 10.4591 5.79086 12.25 8 12.25Z"
-            fill="white"
-          />
-          <path
-            d="M9.625 10.5C9.625 11.125 9.125 11.625 8.5 11.625H6.75C5.625 11.625 4.75 10.75 4.75 9.625C4.75 8.5 5.625 7.625 6.75 7.625H9.625V10.5ZM9.625 6.375H6.75C5 6.375 3.5 7.875 3.5 9.625C3.5 11.375 5 12.875 6.75 12.875H8.5C9.625 12.875 10.625 11.875 10.625 10.75V6.375H9.625Z"
-            fill="black"
-          />
-        </mask>
-        <g mask="url(#mask1_22_3097)">
-          <path d="M16 0H0V16H16V0Z" fill="url(#paint4_radial_22_3097)" />
-        </g>
-        <path
-          d="M8 12.25C10.2091 12.25 12 10.4591 12 8.25C12 6.04086 10.2091 4.25 8 4.25C5.79086 4.25 4 6.04086 4 8.25C4 10.4591 5.79086 12.25 8 12.25Z"
-          stroke="white"
-          strokeOpacity="0.18"
-        />
-      </g>
-      <defs>
-        <linearGradient
-          id="paint0_linear_22_3097"
-          x1="1"
-          y1="1"
-          x2="15"
-          y2="15"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="white" />
-          <stop offset="1" stopColor="#E9EAEE" />
-        </linearGradient>
-        <radialGradient
-          id="paint1_radial_22_3097"
-          cx="0"
-          cy="0"
-          r="1"
-          gradientUnits="userSpaceOnUse"
-          gradientTransform="translate(5.75 4.5) rotate(45) scale(13.75)"
-        >
-          <stop stopColor="white" stopOpacity="0.85" />
-          <stop offset="0.55" stopColor="white" stopOpacity="0.25" />
-          <stop offset="1" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient
-          id="paint2_radial_22_3097"
-          cx="0"
-          cy="0"
-          r="1"
-          gradientUnits="userSpaceOnUse"
-          gradientTransform="translate(8 8) rotate(90) scale(10.625)"
-        >
-          <stop stopOpacity="0" />
-          <stop offset="1" stopOpacity="0.06" />
-        </radialGradient>
-        <linearGradient
-          id="paint3_linear_22_3097"
-          x1="5.75"
-          y1="4.25"
-          x2="10.75"
-          y2="12.25"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#2B2C31" />
-          <stop offset="1" stopColor="#0B0B0F" />
-        </linearGradient>
-        <radialGradient
-          id="paint4_radial_22_3097"
-          cx="0"
-          cy="0"
-          r="1"
-          gradientUnits="userSpaceOnUse"
-          gradientTransform="translate(6.75 6) rotate(45) scale(7.5)"
-        >
-          <stop stopColor="white" stopOpacity="0.22" />
-          <stop offset="0.55" stopColor="white" stopOpacity="0.06" />
-          <stop offset="1" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-        <clipPath id="clip0_22_3097">
-          <rect width="16" height="16" fill="white" />
-        </clipPath>
-      </defs>
+      <path
+        d="M118.204 0.000292436C183.486 0.000292436 236.408 52.9224 236.408 118.205C236.408 183.487 183.486 236.408 118.204 236.408C52.9216 236.408 0.000184007 183.487 0 118.205C0 52.9225 52.9215 0.000452012 118.204 0.000292436ZM74.1011 62.1965C57.6799 62.1965 47.268 79.912 55.5308 94.2347L109.964 188.582C113.619 194.922 122.781 194.922 126.436 188.582L180.88 94.2347C189.132 79.9343 178.72 62.1966 162.31 62.1965H74.1011ZM162.288 78.8412C166.031 78.8412 168.234 82.8121 166.45 85.9075L137.856 137.091L137.851 137.099L126.506 159.046V78.8412H162.288ZM109.872 78.8517V159.024L98.5376 137.088L98.5334 137.08L69.9294 85.9215L69.8468 85.7725C68.2134 82.6997 70.405 78.8517 74.0899 78.8517H109.872Z"
+        fill={fillColor}
+      />
     </svg>
   )
 }

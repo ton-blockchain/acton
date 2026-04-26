@@ -28,8 +28,8 @@ OPTIONS
        --stable
            Install the latest stable release.
 
-       -y, --yes
-           Skip confirmation prompts.
+       --force
+           Install the selected release even if Acton is already up to date.
 
        --list
            List available release tags and exit.
@@ -79,19 +79,9 @@ INSTALLATION FLOW
 
        acton up --list is read-only and skips download or replacement.
 
-HOME BREW INSTALLATIONS
-       If the current binary path looks like a Homebrew installation, Acton
-       warns and recommends using:
-
-           brew upgrade acton
-
-       Without --yes, Acton asks whether to continue with the built-in updater.
-
 INTERACTIVITY
-       o  --yes suppresses confirmation prompts for non-interactive use
-
-       o  Homebrew-style installs prompt before replacement unless --yes is
-          passed
+       o  --force bypasses the usual up-to-date short-circuit for the selected
+          release
 
        o  up-to-date checks and --list can succeed without making local changes
 
@@ -111,9 +101,8 @@ EXIT STATUS
        o  0: The requested release information was listed, Acton was already up
           to date, or the selected version was installed successfully.
 
-       o  1: Release lookup failed, checksum verification failed, archive
-          replacement failed, or the update was cancelled or could not be
-          confirmed.
+       o  1: Release lookup failed, checksum verification failed, or archive
+          replacement failed.
 
 EXAMPLES
        1. Update to the latest stable release:
@@ -132,9 +121,13 @@ EXAMPLES
 
               acton up --list
 
-       5. Update non-interactively in CI or bootstrap scripts:
+       5. Reinstall the currently selected channel version:
 
-              acton up --stable -y
+              acton up --force
+
+       6. Update to the latest stable release explicitly:
+
+              acton up --stable
 
 SEE ALSO
        o  Installation guide

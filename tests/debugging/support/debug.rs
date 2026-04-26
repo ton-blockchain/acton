@@ -13,7 +13,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tempfile::TempDir;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 
 pub(crate) fn render_variable_value(var: &dap::types::Variable) -> String {
     match (var.value.as_str(), var.type_field.as_deref()) {
@@ -163,8 +163,16 @@ impl DebugSession {
         let source_content = fs::read_to_string(&code).expect("Failed to read code file");
 
         let stack = self.stack.clone();
+        let project_root = self.project_ref.path.clone();
         let handle = thread::spawn(move || {
-            run_script_file(&code, &source_content, port, debug_listener, stack)
+            run_script_file(
+                &code,
+                &source_content,
+                &project_root,
+                port,
+                debug_listener,
+                stack,
+            )
         });
 
         let address = format!("127.0.0.1:{port}");

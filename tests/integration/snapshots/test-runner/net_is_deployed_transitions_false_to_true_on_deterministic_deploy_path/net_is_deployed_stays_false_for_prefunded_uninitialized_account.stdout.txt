@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling probe
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/is_deployed_prefunded_uninit.test.tolk (1 test)
+  ✓ cp net is deployed prefunded uninit [TIME]
+
+ ✓ 1 passed in 1 file

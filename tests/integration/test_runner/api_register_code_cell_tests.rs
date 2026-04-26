@@ -19,12 +19,13 @@ fn register_code_cell_labels_auto_deploy_transactions() {
         .test_file(
             "register_code",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/io"
 
             get fun `test register code cell label`() {
-                val deployer = net.treasury("q_deployer");
+                val deployer = testing.treasury("q_deployer");
                 val code = build("simple");
                 net.registerCodeCell(code, "q_simple_alias");
 
@@ -64,12 +65,13 @@ fn register_code_cell_last_registration_wins_for_same_hash() {
         .test_file(
             "register_code",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/io"
 
             get fun `test register code cell last wins`() {
-                val deployer = net.treasury("q_deployer");
+                val deployer = testing.treasury("q_deployer");
                 val code = build("simple");
 
                 net.registerCodeCell(code, "q_alias_old");
@@ -112,12 +114,13 @@ fn register_code_cell_does_not_rename_other_contract_hashes() {
         .test_file(
             "register_code",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/io"
 
             get fun `test register code cell is hash specific`() {
-                val deployer = net.treasury("q_deployer");
+                val deployer = testing.treasury("q_deployer");
                 net.registerCodeCell(build("simple"), "q_simple_alias");
 
                 val simpleInit = ContractState {
@@ -168,12 +171,13 @@ fn register_address_name_has_priority_over_registered_code_name() {
         .test_file(
             "register_code",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
             import "../../lib/io"
 
             get fun `test register address priority over code name`() {
-                val deployer = net.treasury("q_deployer");
+                val deployer = testing.treasury("q_deployer");
                 val code = build("simple");
                 net.registerCodeCell(code, "q_code_alias");
 
@@ -217,12 +221,25 @@ fn register_code_cell_from_get_deployed_code_applies_to_future_transactions() {
         .test_file(
             "register_code",
             r#"
-            import "../../lib/build/build"
+            import "../../lib/build"
             import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
             import "../../lib/io"
+            import "../../lib/types/transaction"
+
+            fun deployedCodeOrNull(addr: address): cell? {
+                val state = testing.getAccountState(addr);
+                if (state == null) {
+                    return null;
+                }
+                if (state.storage.state is TlbAccountStateActive) {
+                    return state.storage.state.stateInit.code;
+                }
+                return null;
+            }
 
             get fun `test register code cell from get deployed code`() {
-                val deployer = net.treasury("q_deployer");
+                val deployer = testing.treasury("q_deployer");
                 val init = ContractState {
                     code: build("simple"),
                     data: createEmptyCell(),
@@ -240,7 +257,7 @@ fn register_code_cell_from_get_deployed_code_applies_to_future_transactions() {
                 });
                 net.send(deployer.address, deployMsg);
 
-                val code = net.getDeployedCode(target);
+                val code = deployedCodeOrNull(target);
                 if (code == null) {
                     throw 555;
                 }

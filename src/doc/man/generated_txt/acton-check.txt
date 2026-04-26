@@ -59,7 +59,19 @@ OPTIONS
            This conflicts with --manifest-path.
 
 BEHAVIOR
+       o  --list-lint-rules is a hidden machine-readable helper that prints
+          JSON entries with rule name and markdown description
+
+       o  for a human-readable catalog with rule codes, lifecycle status, and
+          quick-fix availability, use the web rules index
+
        o  --fix applies edits only in plain output mode
+
+       o  --fix rewrites files only for fixes marked as automatically
+          applicable
+
+       o  when a diagnostic offers multiple fixes, --fix applies only the first
+          one
 
        o  non-plain output formats report diagnostics without rewriting source
           files
@@ -74,6 +86,13 @@ BEHAVIOR
        o  project-wide mode includes workspace *.test.tolk files and standalone
           script roots that define main()
 
+       o  project-wide discovery skips built-in directories such as .git,
+          .github, .idea, .acton, node_modules, target, tolk-stdlib, .codex,
+          and .claude
+
+       o  contracts with non-.tolk sources such as precompiled .boc entries are
+          not lint roots
+
        o  single-file mode relaxes E014 (acton-import-in-contract)
 
        o  targets ending with .tolk are treated as file paths; other targets
@@ -82,10 +101,37 @@ BEHAVIOR
        o  use an explicit .tolk path such as ./contracts/Counter.tolk when a
           name could be mistaken for a contract name
 
-       o  inline suppressions use // check-disable-next-line E001,S001
+       o  inline suppressions use rule names, for example //
+          check-disable-next-line unused-variable, write-only-variable
+
+       o  suppressions apply only to the immediately following line and match
+          diagnostic names, including compiler-error and parse-error;
+          diagnostic codes such as C001 are not matched
 
        o  --fix applies only linter-provided fixes; diagnostics without a safe
           fix remain in the report
+
+       o  --enable-only is applied after config is loaded: selected rules keep
+          their configured severity, selected rules that were allow are
+          re-enabled at the default severity, and every unselected rule is
+          forced to allow
+
+       o  --enable-only selectors must resolve to exactly one rule; in
+          practice, use full rule codes such as E003 for stability
+
+       o  excluded files still participate in import/type resolution, but lint
+          diagnostics for excluded non-root files are filtered out
+
+       o  explicit targets still run even if they match [lint].exclude
+
+       o  in project-wide runs, excluded contract roots are skipped entirely,
+          so their compiler errors and lint diagnostics are not reported
+
+       o  compiler errors are still shown for roots that are actually checked,
+          including explicit targets
+
+       o  --fix can still exit with status 1 when unfixed diagnostics or
+          warning threshold violations remain after rewriting
 
 EXIT STATUS
        o  0: No lint errors were reported, warning thresholds were respected,
@@ -115,19 +161,24 @@ EXAMPLES
 
               acton check --enable-only E001,S001
 
-       6. Emit GitHub Actions annotations in CI:
+       6. List rule metadata as JSON:
+
+              acton check --list-lint-rules
+
+       7. Emit GitHub Actions annotations in CI:
 
               acton check --output-format github
 
-       7. Apply local autofixes where available:
+       8. Apply local autofixes where available:
 
               acton check --fix
 
 SEE ALSO
        o  acton help fmt
 
-       o  Linting guide <https://ton-blockchain.github.io/acton/docs/linting>
+       o  Linting guide
+          <https://ton-blockchain.github.io/acton/docs/linting/overview>
 
        o  Linter rules
-          <https://ton-blockchain.github.io/acton/docs/linting/rules>
+          <https://ton-blockchain.github.io/acton/docs/rules/overview>
 

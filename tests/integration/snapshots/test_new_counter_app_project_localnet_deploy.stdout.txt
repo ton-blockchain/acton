@@ -2,4 +2,5 @@ Awaiting transaction... [Attempt 1/20]
 Transaction successfully applied!
 You can view it at [EXPLORER_TX_URL]
 Deployed counter to [WALLET_ADDRESS_BASE]
+Counter owner is [WALLET_ADDRESS_BASE]
 Counter value is 0

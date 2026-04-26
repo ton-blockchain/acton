@@ -48,7 +48,7 @@ OPTIONS
 
        --gen-dir dir
            Directory for generated dependency helper files such as
-           gen/<dependency>_code.tolk.
+           gen/<dependency>.code.tolk.
 
            Defaults to [build].gen-dir when configured, otherwise gen/.
 
@@ -97,7 +97,9 @@ CONFIGURATION
            gen-dir = "gen"
            output-fift = "build/fift"
 
-       CLI flags override config values for the current invocation.
+       CLI flags override config values for the current invocation. For
+       dependency helpers, a per-dependency depends[].path still overrides the
+       resolved gen-dir for that helper file.
 
 OUTPUTS
        Depending on command flags and project configuration, acton build may
@@ -107,7 +109,9 @@ OUTPUTS
 
        o  the configured contract output .boc file
 
-       o  <gen-dir>/<dependency>_code.tolk helper files for dependencies
+       o  <gen-dir>/<dependency>.code.tolk helper files for dependencies by
+          default (or a dependency-specific custom path when depends[].path is
+          configured)
 
        o  <output-fift>/<contract-name>.fif for compiled .tolk contracts
 
@@ -115,6 +119,29 @@ OUTPUTS
 
        Existing output files at those paths are replaced with freshly generated
        artifacts.
+
+BEST-EFFORT BEHAVIOR
+       Dependency-graph failures such as missing contracts or circular
+       dependencies stop the command before the main compile loop starts, so
+       those failures do not produce partial build outputs.
+
+       After dependency resolution succeeds, acton build becomes best-effort:
+
+       o  compile failures for one contract are recorded while other eligible
+          contracts continue building
+
+       o  artifact-writing failures are also collected instead of aborting
+          immediately
+
+       o  artifacts that were written successfully before a later failure
+          remain on disk
+
+       If an earlier dependency failed, its generated helper file is not
+       produced. A later parent contract may then fail because its generated
+       import is missing.
+
+       When you build a specific _contract-name_, Acton limits the build set to
+       that contract and its transitive dependencies.
 
 SIDE EFFECTS
        acton build writes artifacts, cache entries, and optional graph output
@@ -157,7 +184,7 @@ SEE ALSO
        o  acton help wrapper
 
        o  Build system configuration reference
-          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+          <https://ton-blockchain.github.io/acton/docs/building/reference>
 
        o  Acton.toml reference
           <https://ton-blockchain.github.io/acton/docs/acton-toml>

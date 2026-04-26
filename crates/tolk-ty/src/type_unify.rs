@@ -46,9 +46,7 @@ impl TypeInferringUnifyStrategy {
             }
         }
 
-        let current = if let Some(res) = self.unified_result {
-            res
-        } else {
+        let Some(current) = self.unified_result else {
             self.unified_result = Some(next);
             return;
         };

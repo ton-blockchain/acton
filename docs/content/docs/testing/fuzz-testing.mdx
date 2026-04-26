@@ -1,0 +1,152 @@
+---
+title: "Fuzz Testing"
+description: "Run parameterized tests with generated inputs, assumptions, and bounds"
+---
+
+Fuzz testing means running the same parameterized test many times with
+automatically generated argument values.
+
+In Acton, a fuzz test is just a test function with parameters, for example
+`(value: int, flag: bool)`. The runner generates different values for those
+parameters and re-runs the test until all configured runs pass or one run
+fails.
+
+Acton does not fuzz parameterized tests unless you mark them with one of the
+supported dotted annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or
+`@test.fuzz({ ... })`.
+
+## What Happens During a Fuzz Test
+
+For each fuzz test, Acton:
+
+1. looks at the test parameters and their types
+2. generates one set of input values
+3. runs the test with those values
+4. repeats the process until it reaches the configured run count or finds a failure
+
+If one generated case fails, the fuzz test stops and Acton reports that failing
+input.
+
+## Opt In Per Test
+
+Use `@test.fuzz` to enable fuzzing with defaults,
+`@test.fuzz(<runs>)` to override the number of runs for a single test,
+or `@test.fuzz({ ... })` to override individual fuzz settings.
+
+```tolk
+import "@acton/testing/expect"
+import "@acton/testing/fuzz"
+
+@test.fuzz
+get fun `test counter never goes negative`(value: int) {
+    val bounded = fuzz.bound(value, 0, 1000);
+    expect(bounded >= 0).toBeTrue();
+}
+
+@test.fuzz(64)
+get fun `test bool roundtrip`(flag: bool) {
+    expect(flag).toEqual(flag);
+}
+
+@test.fuzz({ runs: 64, max_test_rejects: 1024, seed: 42 })
+get fun `test only even values`(value: int) {
+    fuzz.assume(value % 2 == 0);
+    expect(value % 2).toEqual(0);
+}
+```
+
+Rules:
+
+- Parameterized tests require an explicit fuzz annotation.
+- Tests without parameters cannot use `fuzz`.
+- `@test.fuzz` uses defaults from `[test.fuzz]` in `Acton.toml`.
+- `@test.fuzz(N)` overrides `runs` for that test.
+- `@test.fuzz({ ... })` can override `runs`, `max_test_rejects`, and `seed` for that test.
+- Legacy `@test({ fuzz: ... })` is ignored by the runner.
+- `runs` means how many generated cases Acton should execute for that test.
+
+## Supported Parameter Types
+
+Acton currently fuzzes these parameter types:
+
+- signed and unsigned integers, including `coins`
+- `bool`
+- `string`
+- `address` and `any_address`
+- nullable versions of supported types
+
+Types such as `bits`, `bytes`, `cell`, structs, containers, and tuple-like values are not supported yet.
+
+## Assumptions and Bounds
+
+Import `@acton/testing/fuzz` to access fuzz-specific helpers.
+
+Use `fuzz.assume(...)` when the property you want to test only applies to part
+of the generated input space.
+
+If the condition is false, the current generated case is discarded and Acton
+tries another one. That rejected case does not count toward `runs`.
+
+Outside fuzz tests, the same call fails the test.
+
+```tolk
+import "@acton/testing/expect"
+import "@acton/testing/fuzz"
+
+@test.fuzz
+get fun `test only positive values`(value: int) {
+    fuzz.assume(value > 0, "this check only applies to positive values");
+    expect(value > 0).toBeTrue();
+}
+```
+
+`fuzz.bound(...)` maps integer-like values into an inclusive range with wrap
+behavior. This is useful when your test accepts only a smaller range than the
+full range of the generated type.
+
+```tolk
+import "@acton/testing/expect"
+import "@acton/testing/fuzz"
+
+@test.fuzz
+get fun `test transfer amounts`(rawAmount: int, rawRecipient: address?) {
+    val amount = fuzz.bound(rawAmount, 1, 1_000_000);
+    fuzz.assume(rawRecipient != null, "recipient must be present");
+
+    expect(amount >= 1).toBeTrue();
+    expect(amount <= 1_000_000).toBeTrue();
+}
+```
+
+## Configure Defaults
+
+Store project-wide defaults in `Acton.toml`:
+
+```toml title="Acton.toml"
+[test.fuzz]
+runs = 512
+max-test-rejects = 4096
+seed = 42
+```
+
+- `runs` is the number of generated cases that must actually execute.
+- `max-test-rejects` is the maximum number of cases that may be rejected by
+  `fuzz.assume(...)` before the test fails.
+- `seed` makes generated values reproducible across runs.
+- `acton test --fuzz-seed <SEED>` overrides `[test.fuzz].seed` for one run.
+- `@test.fuzz({ max_test_rejects: ... })` overrides the reject limit for one test.
+- `@test.fuzz({ seed: ... })` overrides the seed for one test.
+- When `seed` is omitted, Acton picks a new seed for each `acton test` run and shows it in console output.
+- When `max-test-rejects` is omitted, Acton uses `runs * 256`.
+
+## Failure Reporting
+
+Acton stops at the first failing generated case and reports:
+
+- the total configured run count
+- the seed used for that fuzz test
+- the first failing run number
+- the generated input values for that failing case
+
+When too many inputs are rejected by `fuzz.assume(...)`, Acton fails the test
+with an error saying that the rejection limit was reached.

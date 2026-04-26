@@ -2279,15 +2279,15 @@ impl<'idx> UseDefCollector<'idx> {
                 }
             }
             Expr::Match(match_expr) => self.collect_match(match_expr, reads, writes),
-            Expr::Lambda(_) => {
-                // Lambda body is not executed eagerly and should not influence enclosing CFG node.
-            }
-            Expr::NumberLit(_)
+            Expr::Lambda(_)
+            | Expr::NumberLit(_)
             | Expr::StringLit(_)
             | Expr::BoolLit(_)
             | Expr::NullLit(_)
             | Expr::Underscore(_)
-            | Expr::Unmapped(_) => {}
+            | Expr::Unmapped(_) => {
+                // Lambda body is not executed eagerly and should not influence enclosing CFG node.
+            }
         }
     }
 
@@ -2386,11 +2386,10 @@ impl<'idx> UseDefCollector<'idx> {
 
         for arm in match_expr.arms() {
             match arm.pattern() {
-                MatchPattern::Type(_) => {}
                 MatchPattern::Expr(expr) => {
                     self.collect_expr(expr, AccessMode::Read, reads, writes);
                 }
-                MatchPattern::Else => {}
+                MatchPattern::Type(_) | MatchPattern::Else => {}
             }
 
             if let Some(body) = arm.body() {

@@ -21,152 +21,154 @@
 /// }
 /// ```
 
+import "../impl"
 import "../tlb/either"
 import "../tlb/maybe"
 
-/// Represents a generic relaxed message. Unlike [MessageRelaxed], this message does not
+/// Represents a generic relaxed message. Unlike [TlbMessageRelaxed], this message does not
 /// load the body of the message. Instead body is represented as a slice and can be parsed
 /// later manually (for example to load the opcode).
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode();
 ///     println(opcode);
 /// }
 /// ```
-struct MessageRelaxedGeneric {
-    info: IntMsgInfoRelaxed
-    init: Maybe<Either<StateInit, Cell<StateInit>>>
+struct TlbMessageRelaxedGeneric {
+    info: TlbIntMsgInfoRelaxed
+    init: TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>
     body: RemainingBitsAndRefs
 }
 
 /// Loads the opcode of the message.
 ///
 /// Returns `null` for malformed or too-short body data:
-/// - body marks `EitherRight` but does not contain a body reference;
+/// - body does not contain the `TlbEither` branch bit;
+/// - body marks `TlbEitherRight` but does not contain a body reference;
 /// - decoded body has fewer than 32 bits for the first opcode;
-/// - [skipBounce] is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
-///   for the second opcode.
+/// - [skipBounce] is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
+///   and fewer than 32 bits remain for the second opcode.
 ///
-/// If [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped.
+/// If [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped.
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadGenericMessage();
 ///     val opcode = message.loadOpcode(true);
 ///     println(opcode);
 /// }
 /// ```
-fun MessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
-    return implMsg.loadOpcode(self.body, skipBounce);
+fun TlbMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
+    return impl.loadOpcode(self.body, skipBounce);
 }
 
-/// Represents a generic external message. Unlike [ExtMessageRelaxed], this message does not
+/// Represents a generic external message. Unlike [TlbExtMessageRelaxed], this message does not
 /// load the body of the message. Instead body is represented as a slice and can be parsed
 /// later manually (for example to load the opcode).
-struct ExtMessageRelaxedGeneric {
-    info: ExtMsgInfoRelaxed
-    init: Maybe<Either<StateInit, Cell<StateInit>>>
+struct TlbExtMessageRelaxedGeneric {
+    info: TlbExtMsgInfoRelaxed
+    init: TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>
     body: RemainingBitsAndRefs
 }
 
 /// Loads the opcode of the message.
 ///
-/// Same behavior as [MessageRelaxedGeneric.loadOpcode]:
+/// Same behavior as [TlbMessageRelaxedGeneric.loadOpcode]:
 /// - returns the first 32-bit opcode by default;
-/// - if [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped;
+/// - if [skipBounce] is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped;
 /// - returns `null` for malformed or too-short body data.
-fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
-    return implMsg.loadOpcode(self.body, skipBounce);
+fun TlbExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
+    return impl.loadOpcode(self.body, skipBounce);
 }
 
-/// Represents a generic message. Unlike [MessageRelaxedGeneric], this message loads
+/// Represents a generic message. Unlike [TlbMessageRelaxedGeneric], this message loads
 /// the body of the message with passed type.
 ///
 /// If actual message body has a different type, loading will fail with exit code 63.
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();
 ///     println(body.increaseBy);
 /// }
 /// ```
 @overflow1023_policy("suppress")
-struct MessageRelaxed<X> {
-    info: IntMsgInfoRelaxed
-    init: Maybe<Either<StateInit, Cell<StateInit>>>
-    body: Either<X, Cell<X>>
+struct TlbMessageRelaxed<X> {
+    info: TlbIntMsgInfoRelaxed
+    init: TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>
+    body: TlbEither<X, Cell<X>>
 }
 
 /// Loads the body of the message.
 ///
 /// Decoding branch behavior:
-/// - `EitherLeft`: body is already in this cell and is returned directly.
-/// - `EitherRight`: body is loaded from referenced cell.
+/// - `TlbEitherLeft`: body is already in this cell and is returned directly.
+/// - `TlbEitherRight`: body is loaded from referenced cell.
 ///
 /// Note that if message type mismatch, loading will fail with exit code 63.
 ///
 /// Example:
 /// ```tolk
-/// val outActions = vm.outActions();
+/// val outActions = testing.outActions();
 /// val action = outActions.at(0);
-/// if (action is OutActionSendMessage) {
+/// if (action is TlbOutActionSendMessage) {
 ///     val message = action.loadMessage<IncreaseCounter>();
 ///     val body = message.loadBody();
 ///     println(body.increaseBy);
 /// }
 /// ```
-fun MessageRelaxed<X>.loadBody(self): X {
-    if (self.body is EitherLeft<X>) {
+fun TlbMessageRelaxed<X>.loadBody(self): X {
+    if (self.body is TlbEitherLeft<X>) {
         return self.body.value;
     }
     return self.body.value.load({ assertEndAfterReading: false });
 }
 
-/// Represents a generic external message. Unlike [ExtMessageRelaxedGeneric], this message
+/// Represents a generic external message. Unlike [TlbExtMessageRelaxedGeneric], this message
 /// loads the body of the message with passed type.
 ///
 /// If actual message body has a different type, loading will fail with exit code 63.
 @overflow1023_policy("suppress")
-struct ExtMessageRelaxed<X> {
-    info: ExtMsgInfoRelaxed
-    init: Maybe<Either<StateInit, Cell<StateInit>>>
-    body: Either<X, Cell<X>>
+struct TlbExtMessageRelaxed<X> {
+    info: TlbExtMsgInfoRelaxed
+    init: TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>
+    body: TlbEither<X, Cell<X>>
 }
 
 /// Loads the body of the message.
 ///
 /// Decoding branch behavior:
-/// - `EitherLeft`: body is already in this cell and is returned directly.
-/// - `EitherRight`: body is loaded from referenced cell.
+/// - `TlbEitherLeft`: body is already in this cell and is returned directly.
+/// - `TlbEitherRight`: body is loaded from referenced cell.
 ///
 /// Note that if message type mismatch, loading will fail with exit code 63.
-fun ExtMessageRelaxed<X>.loadBody(self): X {
-    if (self.body is EitherLeft<X>) {
+fun TlbExtMessageRelaxed<X>.loadBody(self): X {
+    if (self.body is TlbEitherLeft<X>) {
         return self.body.value;
     }
     return self.body.value.load({ assertEndAfterReading: false });
 }
 
 /// Represents common message info for internal relaxed message.
-struct (0b0) IntMsgInfoRelaxed {
+struct (0b0) TlbIntMsgInfoRelaxed {
     ihrDisabled: bool
     bounce: bool
     bounced: bool
     src: any_address
     dest: address
-    value: CurrencyCollection
+    value: TlbCurrencyCollection
     extraFlags: varuint16
     fwdFee: coins
     createdLt: uint64
@@ -174,7 +176,7 @@ struct (0b0) IntMsgInfoRelaxed {
 }
 
 /// Represents common message info for external relaxed message.
-struct (0b11) ExtMsgInfoRelaxed {
+struct (0b11) TlbExtMsgInfoRelaxed {
     src: address
     dest: any_address
     createdLt: uint64
@@ -182,7 +184,7 @@ struct (0b11) ExtMsgInfoRelaxed {
 }
 
 /// Represents a currency collection as TON amount + extra currencies.
-struct CurrencyCollection {
+struct TlbCurrencyCollection {
     /// Amount in nanoton.
     grams: coins
     /// Extra currencies.
@@ -195,13 +197,13 @@ struct CurrencyCollection {
 ///                value:CurrencyCollection extra_flags:(VarUInteger 16) fwd_fee:Grams
 ///                created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 /// ```
-struct (0b0) InternalMessage {
+struct (0b0) TlbInternalMessage {
     ihrDisabled: bool
     bounce: bool
     bounced: bool
     src: address
     dest: address
-    value: CurrencyCollection
+    value: TlbCurrencyCollection
     extraFlags: varuint16
     forwardFee: coins
     createdLt: uint64
@@ -212,7 +214,7 @@ struct (0b0) InternalMessage {
 /// ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
 ///                    import_fee:Grams = CommonMsgInfo;
 /// ```
-struct (0b10) ExternalInMessageInfo {
+struct (0b10) TlbExternalInMessageInfo {
     src: any_address
     dest: address
     importFee: coins
@@ -222,7 +224,7 @@ struct (0b10) ExternalInMessageInfo {
 /// ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
 ///                     created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 /// ```
-struct (0b11) ExternalOutMessageInfo {
+struct (0b11) TlbExternalOutMessageInfo {
     src: address
     dest: any_address
     createdLt: uint64
@@ -232,38 +234,42 @@ struct (0b11) ExternalOutMessageInfo {
 /// Tagged union for the TL-B `CommonMsgInfo` constructors.
 ///
 /// Runtime variant is selected by the leading tag:
-/// - `0b0`: [InternalMessage]
-/// - `0b10`: [ExternalInMessageInfo]
-/// - `0b11`: [ExternalOutMessageInfo]
-type CommonMessageInfo = InternalMessage | ExternalInMessageInfo | ExternalOutMessageInfo
+/// - `0b0`: [TlbInternalMessage]
+/// - `0b10`: [TlbExternalInMessageInfo]
+/// - `0b11`: [TlbExternalOutMessageInfo]
+type TlbCommonMessageInfo =
+    | TlbInternalMessage
+    | TlbExternalInMessageInfo
+    | TlbExternalOutMessageInfo
 
 /// Generic message structure with configurable body and info types.
 ///
-/// `TInfo` defaults to [CommonMessageInfo], so when `Message` is loaded with default generic
+/// `TInfo` defaults to [TlbCommonMessageInfo], so when [TlbMessage] is loaded with default generic
 /// arguments, `info` is decoded as one of the `CommonMsgInfo` tagged variants above.
 @overflow1023_policy("suppress")
-struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
+struct TlbMessage<TBody = RemainingBitsAndRefs, TInfo = TlbCommonMessageInfo> {
     info: TInfo
-    init: Maybe<Either<StateInit, Cell<StateInit>>>
-    body: Either<TBody, Cell<TBody>>
+    init: TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>
+    body: TlbEither<TBody, Cell<TBody>>
 }
 
 /// Loads `Message.body`.
 ///
 /// Decoding branch behavior:
-/// - `EitherLeft`: body is already in this cell and is returned directly.
-/// - `EitherRight`: body is loaded from referenced cell.
-fun Message<TBody, TInfo>.loadBody(self): TBody {
+/// - `TlbEitherLeft`: body is already in this cell and is returned directly.
+/// - `TlbEitherRight`: body is loaded from referenced cell.
+fun TlbMessage<TBody, TInfo>.loadBody(self): TBody {
     return match (self.body) {
-        EitherLeft => self.body.value,
-        EitherRight => self.body.value.load({ assertEndAfterReading: false }),
+        TlbEitherLeft => self.body.value,
+        TlbEitherRight => self.body.value.load({ assertEndAfterReading: false }),
     };
 }
 
-struct implMsg
-
-fun implMsg.loadOpcode(body: slice, skipBounce: bool): int? {
+fun impl.loadOpcode(body: slice, skipBounce: bool): int? {
     var slice = body;
+    if (slice.remainingBitsCount() < 1) {
+        return null;
+    }
     if (slice.loadBool()) {
         // actual body in the ref
         if (slice.remainingRefsCount() == 0) {
@@ -278,7 +284,7 @@ fun implMsg.loadOpcode(body: slice, skipBounce: bool): int? {
     }
 
     val opcode = slice.loadUint(32);
-    if (skipBounce && opcode == 0xFFFFFFFF) {
+    if (skipBounce && (opcode == 0xFFFFFFFF || opcode == 0xFFFFFFFE)) {
         if (slice.remainingBitsCount() < 32) {
             return null;
         }

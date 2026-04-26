@@ -13,9 +13,10 @@ use tolk_syntax::{Expr, Paren};
 /// instead of `=` or `+=`.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main(a: int, b: int) {
 ///     a != b;
+/// //  ^^^^^^^ E032: unused expression has no effect
 /// }
 /// ```
 ///

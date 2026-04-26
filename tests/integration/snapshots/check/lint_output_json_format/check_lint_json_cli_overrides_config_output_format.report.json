@@ -14,7 +14,10 @@
               "character": 20,
               "line": 2
             }
-          }
+          },
+          "tags": [
+            "unnecessary"
+          ]
         }
       ],
       "code": "E002",

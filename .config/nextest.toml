@@ -10,9 +10,9 @@ status-level = "pass"
 max-threads = 1
 
 [[profile.default.overrides]]
-filter = 'package(retrace)'
+filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'
 
 [[profile.ci.overrides]]
-filter = 'package(retrace)'
+filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'

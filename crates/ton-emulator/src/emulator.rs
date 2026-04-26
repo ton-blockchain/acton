@@ -96,7 +96,8 @@ impl Emulator {
     ///
     /// # Arguments
     ///
-    /// * `verbosity` - The level of logging detail for the executor.
+    /// * `verbosity` - The level of logging detail for the executor. Use
+    ///   [`ExecutorVerbosity::Off`] to disable VM logs completely in the native emulator.
     /// * `config_b64` - Optional Base64-encoded global configuration `BoC`.
     pub fn new(verbosity: ExecutorVerbosity, config_b64: Option<&str>) -> anyhow::Result<Emulator> {
         let executor = Executor::new(verbosity, config_b64)?;

@@ -1,14 +1,14 @@
 # acton-compile(1)
 
-## NAME
+## Name
 
 acton-compile --- Compile a Tolk file into TVM code and related artifacts
 
-## SYNOPSIS
+## Synopsis
 
 `acton compile` [_options_] _path_
 
-## DESCRIPTION
+## Description
 
 Compile a single `.tolk` source file with the Tolk compiler and print the
 resulting code information or write artifacts to files.
@@ -17,7 +17,25 @@ This command is useful for inspecting compiler output, producing standalone BoC
 files, generating source maps for debugging, and exporting ABI or Fift output
 without running the full project build pipeline.
 
-## OPTIONS
+Unlike `acton build`, this command works on one explicit source file. It does
+not traverse the `[contracts]` graph, does not generate dependency helper
+files, and does not write project build JSON artifacts.
+
+By default the compiler still expects a contract or script entrypoint. Use
+`--allow-no-entrypoint` when compiling library or helper files that
+intentionally define neither `main()` nor `onInternalMessage()`.
+
+`Acton.toml` is optional here. If it loads successfully, Acton uses it for
+project context such as import mappings. Cache placement still follows the
+resolved project root and the usual `build/cache` layout. If the manifest is
+missing or invalid, Acton warns and continues compiling the file without those
+manifest-derived project settings.
+
+`--manifest-path` and `--project-root` choose which project context to use, but
+they do not rebase unrelated CLI paths. The input file and output paths stay
+relative to the current working directory unless you pass absolute paths.
+
+## Options
 
 ### Compile Options
 
@@ -51,6 +69,10 @@ Write a source map file and enable debug-oriented compilation output.
 Write the emitted contract ABI to a file.
 {{/option}}
 
+{{#option "`--allow-no-entrypoint`" }}
+Allow compiling files that do not define `main()` or `onInternalMessage()`.
+{{/option}}
+
 {{#option "`--clear-cache`" }}
 Clear the compilation cache before compiling.
 {{/option}}
@@ -65,7 +87,7 @@ Clear the compilation cache before compiling.
 
 {{> options-project-resolved }}
 
-## OUTPUT
+## Output
 
 Without file-output flags, `acton compile` prints compilation information to
 standard output.
@@ -75,7 +97,8 @@ still enabled. File-output flags such as `--fift`, `--source-map`, and `--abi`
 can be combined with either stdout mode.
 
 `--boc` is special: Acton writes the binary BoC file and returns successfully
-without printing the usual stdout payload.
+without printing the usual stdout payload. If `--boc` is combined with other
+file-output flags, those other files may still be written first.
 
 Depending on the selected options, Acton can also write:
 
@@ -84,24 +107,35 @@ Depending on the selected options, Acton can also write:
 - a source map via `--source-map`
 - an ABI file via `--abi`
 
+`acton compile` does **not** write:
+
+- `build/<contract>.json` project build artifacts
+- `gen/*.code.tolk` dependency helper files
+- outputs derived from `[build]` defaults in `Acton.toml`
+
 `--source-map` enables debug-oriented compilation output. If the compiler does
 not emit a contract ABI for the input file, `--abi` does not create an ABI
 artifact.
 
-## CACHE
+## Cache
 
-Acton uses a compilation cache to speed up repeated runs.
+Acton uses the same compilation cache as `acton build` and `acton test` to
+speed up repeated runs.
 
 - Use `--clear-cache` to force recompilation.
 - Cache entries are invalidated automatically when source inputs change.
+- Cache entries are mode-specific: `--source-map` and `--fift` may require a
+  different cache entry than a plain compile of the same file.
+- Standalone files that are not registered as project contracts still benefit
+  from file-import-aware cache invalidation.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Compilation completed successfully, including runs that emitted warnings.
 - `1`: Compilation failed, cache setup failed, input validation failed, or an
   output artifact could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Compile a Tolk file and print the result:
 
@@ -133,8 +167,8 @@ Acton uses a compilation cache to speed up repeated runs.
    acton compile contracts/main.tolk --boc build/main.boc --source-map build/main.map.json
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help build`
 - `acton help disasm`
-- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference)
+- [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

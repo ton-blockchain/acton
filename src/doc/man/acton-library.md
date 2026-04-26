@@ -1,21 +1,21 @@
 # acton-library(1)
 
-## NAME
+## Name
 
 acton-library --- Manage on-chain TON libraries
 
-## SYNOPSIS
+## Synopsis
 
 `acton library` [_options_] _command_
 
-## DESCRIPTION
+## Description
 
 Publish, fetch, inspect, and top up on-chain TON libraries.
 
 Library metadata can also be stored locally in `libraries.toml` or globally in
 `global.libraries.toml` for later inspection and maintenance.
 
-## LIFECYCLE
+## Lifecycle
 
 A typical library workflow is:
 
@@ -25,7 +25,7 @@ A typical library workflow is:
 4. `fetch` the code again for inspection or backup
 5. `topup` the library account when more storage time is needed
 
-## SUBCOMMANDS
+## Subcommands
 
 ### acton library publish
 
@@ -61,10 +61,6 @@ Wallet to use for the publication transaction.
 Network to use.
 
 Defaults to `testnet`.
-{{/option}}
-
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
 {{/option}}
 
 {{#option "`--amount` _ton_" }}
@@ -120,10 +116,6 @@ Network to use.
 Defaults to `testnet`.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
-{{/option}}
-
 {{#option "`--json`" }}
 Emit JSON output for raw library fetches.
 
@@ -148,10 +140,6 @@ Show information about a deployed library.
 Library name to inspect.
 
 If omitted, Acton can prompt from the available library metadata.
-{{/option}}
-
-{{#option "`--api-key` _key_" }}
-TonCenter API key for balance checks.
 {{/option}}
 
 {{/options}}
@@ -189,10 +177,6 @@ Overrides duration-based estimation.
 Wallet to use for the top-up transaction.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain interactions.
-{{/option}}
-
 {{#option "`-y`, `--yes`" }}
 Skip confirmation prompts.
 {{/option}}
@@ -202,15 +186,28 @@ Skip confirmation prompts.
 After a successful top-up, Acton updates `last_topup_timestamp` in the stored
 library metadata.
 
-## DISPLAY OPTIONS
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
+names are uppercased and non-alphanumeric characters are replaced with `_`, so
+`custom:mock-remote` becomes `MOCK_REMOTE_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
+
+## Display Options
 
 {{> options-display }}
 
-## PROJECT OPTIONS
+## Project Options
 
 {{> options-project-resolved }}
 
-## RESOLUTION RULES
+## Resolution Rules
 
 - library metadata is merged from `global.libraries.toml` first and then local
   `libraries.toml`
@@ -220,14 +217,14 @@ library metadata.
 - if neither `--local` nor `--global` is passed to `publish`, Acton prompts for
   the destination file
 
-## AMOUNT ESTIMATION
+## Amount Estimation
 
 For `publish` and `topup`, `--duration` is used to estimate the required TON
 amount from the library size and storage duration.
 
 If `--amount` is passed, it overrides that estimate completely.
 
-## METADATA FILES
+## Metadata Files
 
 Saved library metadata typically includes:
 
@@ -241,7 +238,7 @@ Saved library metadata typically includes:
 - last top-up timestamp
 - code size in bits and cells
 
-## FETCH OUTPUT
+## Fetch Output
 
 - without `--output`, fetched code is printed to stdout
 - with `--output path.boc`, Acton writes binary BoC
@@ -251,14 +248,14 @@ Saved library metadata typically includes:
 - if both `--json` and `--disasm` are passed, disassembly text takes
   precedence over JSON on successful runs
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: The selected library subcommand completed successfully.
 - `1`: Contract or wallet resolution failed, chain access failed, metadata
   could not be written, or publish/top-up transaction preparation or submission
   failed.
 
-## EXAMPLES
+## Examples
 
 1. Publish a contract as a library:
 
@@ -290,6 +287,6 @@ Saved library metadata typically includes:
    acton library fetch <HASH> --output build/math-lib.boc
    ```
 
-## SEE ALSO
+## See Also
 
-- [Libraries guide](https://ton-blockchain.github.io/acton/docs/advanced/libraries)
+- [Libraries guide](https://ton-blockchain.github.io/acton/docs/libraries)

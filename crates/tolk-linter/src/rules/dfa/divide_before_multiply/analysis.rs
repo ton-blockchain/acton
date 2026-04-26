@@ -15,13 +15,13 @@ pub struct DivisionTaintState {
     pub taint_origins: FxHashMap<LocalDefId, DivisionOrigin>,
 }
 
-const fn local_sort_key(local: &LocalDefId) -> (u32, u32) {
+const fn local_sort_key(local: LocalDefId) -> (u32, u32) {
     (local.file_id, local.local)
 }
 
 fn sorted_locals(locals: &FxHashSet<LocalDefId>) -> Vec<LocalDefId> {
     let mut values = locals.iter().copied().collect::<Vec<_>>();
-    values.sort_by_key(local_sort_key);
+    values.sort_by_key(|local| local_sort_key(*local));
     values
 }
 

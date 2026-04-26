@@ -1,6 +1,6 @@
   Installing standard library [ACTON_VERSION]
 Exiting with code 65535
 Script finished with [EXIT_STATUS] 65535
-Re-run with --backtrace full to get more information
-Description: Invalid message
-Phase: Compute phase
+  Description: Invalid message
+  Phase: Compute phase
+  Re-run with --backtrace full to get more information

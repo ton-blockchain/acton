@@ -8,7 +8,7 @@ display-name = "MyContract"
 src = "contracts/MyContract.tolk"
 depends = []
 
-See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for more information
+See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
      Running tests
 
  TEST  [ROOT]
@@ -16,8 +16,8 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
  > tests/assert_equal_decimal_rounding.test.tolk (1 test)
   ✗ eg assert equal decimal no round half up [TIME]
     └─ Error: expect(actual).toEqualDecimal(expected)
-       Actual:   1.49
-       Expected: 1.5
+        Actual:   1.49
+        Expected: 1.5
 
  ✗ 1 failed in 1 file
 

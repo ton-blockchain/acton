@@ -7,7 +7,7 @@ Acton scripts can interact with the real TON blockchain, enabling contract deplo
 
 ## Prerequisites
 
-Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/setup-wallets/) guide to configure your wallet with a mnemonic.
+Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/tutorial/setup-wallets) guide to configure your wallet with a mnemonic.
 
 ## The `--net` Flag
 
@@ -56,13 +56,14 @@ Here's a complete example of deploying a counter contract to the blockchain:
 ```tolk title="deploy.tolk"
 import "@acton/io"
 import "@acton/emulation/network"
-import "@acton/build/build"
+import "@acton/emulation/scripts"
+import "@acton/build"
 
 import "@contracts/types"
 import "@wrappers/Counter"
 
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     val counter = Counter.fromStorage({
         id: 8,
         counter: 0,
@@ -78,11 +79,11 @@ fun main() {
 }
 ```
 
-The `counter_wrapper.tolk` file provides a convenient wrapper around the counter contract:
+The `wrappers/Counter.tolk` file provides a convenient wrapper around the counter contract:
 
-```tolk collapse={2-3, 10-17, 30-42} title="counter_wrapper.tolk"
+```tolk collapse={2-3, 10-17, 30-42} title="wrappers/Counter.tolk"
 // todo update snippet to actual wrapper
-import "@acton/build/build"
+import "@acton/build"
 import "@acton/emulation/network"
 
 import "@contracts/types"
@@ -148,17 +149,19 @@ flow.
 
 ## Using Wallets in Scripts
 
-The `net.wallet()` function returns a wallet struct with an `address` field:
+The `scripts.wallet()` function returns a wallet struct with an `address` field:
 
 ```tolk
+import "@acton/emulation/scripts"
+
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
     println("Wallet address: {}", deployer.address);
 }
 ```
 
 **Behavior:**
-- Without `--net`: Creates a local test wallet (similar to `net.treasury()`)
+- Without `--net`: Creates a local test wallet (similar to `testing.treasury()`)
 - With `--net`: Uses the real wallet configured in `wallets.toml` or global wallets
 
 This dual behavior allows you to test scripts locally before running them on the real blockchain.
@@ -168,8 +171,10 @@ This dual behavior allows you to test scripts locally before running them on the
 Use `net.send()` to send messages from a wallet address:
 
 ```tolk
+import "@acton/emulation/scripts"
+
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
 
     val msg = createMessage({
         bounce: true,
@@ -194,8 +199,10 @@ Be extremely careful with `--net`. While local tests allow arbitrary big values,
 When broadcasting transactions to the real network, you may want to wait for them to be processed. The `SendResultList.wait()` method polls the network until the transaction is confirmed:
 
 ```tolk
+import "@acton/emulation/scripts"
+
 fun main() {
-    val deployer = net.wallet("deployer");
+    val deployer = scripts.wallet("deployer");
 
     // Deploy counter
     val counter = Counter.fromStorage({
@@ -275,8 +282,8 @@ acton script query.tolk --fork-net testnet
 # Query a contract on mainnet
 acton script query.tolk --fork-net mainnet
 
-# With API key to avoid rate limiting
-acton script query.tolk --fork-net testnet --api-key YOUR_API_KEY
+# With a TonCenter API key to avoid rate limiting
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
 When `--fork-net` is enabled, Acton automatically fetches account state from
@@ -292,7 +299,7 @@ transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper
 getters against the same chain without passing `--fork-net`.
 
 <Callout type="info">
-Learn more about fork testing in the [Fork Testing](/docs/test-runner/fork-testing/) article.
+Learn more about fork testing in the [Fork Testing](/docs/testing/fork-testing) article.
 </Callout>
 
 ### Combining with `--net`
@@ -340,6 +347,6 @@ It's crucial to understand the difference:
 
 ## Next Steps
 
-- Check the [script command reference](/docs/script/) for all available options
-- Learn more about [wallet configuration](/docs/setup-wallets/)
-- Explore [verifying your deployed contracts](/docs/verify/)
+- Check the [script command reference](/docs/commands/script) for all available options
+- Learn more about [wallet configuration](/docs/tutorial/setup-wallets)
+- Explore [verifying your deployed contracts](/docs/verify)

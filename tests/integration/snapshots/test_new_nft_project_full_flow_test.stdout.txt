@@ -1,0 +1,29 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]/foobar
+
+ > tests/nft-collection.test.tolk (8 tests)
+  ✓ nft: report royalty params [TIME]
+  ✓ nft: should not allow any other opcode not from owner [TIME]
+  ✓ nft: should deploy nft [TIME]
+  ✓ nft: should not deploy nft with invalid item index [TIME]
+  ✓ nft: should increment item index if last [TIME]
+  ✓ nft: should not increment item index if not last [TIME]
+  ✓ nft: should deploy some nfts via batch deploy [TIME]
+  ✓ nft: should change owner [TIME]
+ > tests/nft-item.test.tolk (11 tests)
+  ✓ nft: should transfer ownership [TIME]
+  ✓ nft: should transfer ownership and return excesses [TIME]
+  ✓ nft: should not transfer ownership not from owner [TIME]
+  ✓ nft: should transfer ownership with notification [TIME]
+  ✓ nft: should get static data [TIME]
+  ✓ nft: should fail when receiver in different workchain [TIME]
+  ✓ nft: should fail when op not on list [TIME]
+  ✓ nft: should fail when response address in different workchain [TIME]
+  ✓ nft: should transfer ownership with forward payload in slice [TIME]
+  ✓ nft: should fail with incomplete transfer body [TIME]
+  ✓ nft: bench should deploy 100 nfts via batch deploy [TIME]
+
+ ✓ 19 passed in 2 files

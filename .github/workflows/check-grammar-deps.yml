@@ -1,7 +1,14 @@
 name: Check Grammar Dependencies
 
 on:
+  workflow_call:
   pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-grammar-deps.yml"
+      - "crates/tree-sitter-**/**"
+  push:
     branches:
       - master
     paths:

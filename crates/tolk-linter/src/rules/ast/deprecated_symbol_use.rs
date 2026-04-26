@@ -1,4 +1,4 @@
-use crate::rules::diagnostic::{Annotation, Diagnostic};
+use crate::rules::diagnostic::{Annotation, Diagnostic, DiagnosticTag};
 use crate::rules::violation::Violation;
 use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
@@ -16,14 +16,15 @@ use tree_sitter::Node;
 /// may be removed in future versions.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// @deprecated
 /// fun oldFunction() {
 ///     // some deprecated logic
 /// }
 ///
 /// fun main() {
-///     oldFunction(); // <- error: usage of deprecated symbol
+///     oldFunction();
+/// //  ^^^^^^^^^^^ E004: usage of deprecated symbol
 /// }
 /// ```
 #[derive(ViolationMetadata)]
@@ -61,7 +62,7 @@ pub fn check_resolved_reference(
                 symbol.name
             )),
             is_primary: true,
-            tags: vec![],
+            tags: vec![DiagnosticTag::Deprecated],
         }])
         .with_help("deprecated symbols may be removed in future versions");
     checker.emit_diagnostic(diagnostic);

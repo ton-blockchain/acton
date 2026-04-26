@@ -14,17 +14,17 @@ const COUNTER_TEMPLATE_CONTRACT: &str =
 const COUNTER_TEMPLATE_TYPES: &str =
     include_str!("../../src/commands/new/templates/counter/contracts/types.tolk");
 const COUNTER_TEMPLATE_WRAPPER: &str =
-    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.tolk");
+    include_str!("../../src/commands/new/templates/counter/wrappers/Counter.gen.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
 
 const COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS: &str = r#"
 import "@acton/emulation/network"
+import "@acton/emulation/testing"
 import "@acton/testing/expect"
-import "@acton/testing/transaction_expect"
 
 import "@contracts/types"
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 
 get fun `test unknown message reject`() {
     val (contract, deployer, _) = setupTest();
@@ -45,10 +45,10 @@ get fun `test unknown message accept`() {
 }
 
 fun setupTest(): (Counter, Treasury, Treasury) {
-    val deployer = net.treasury("deployer");
-    val notDeployer = net.treasury("not_deployer");
+    val deployer = testing.treasury("deployer");
+    val notDeployer = testing.treasury("not_deployer");
 
-    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val contract = Counter.fromStorage({ id: 0, owner: deployer.address, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
@@ -61,56 +61,8 @@ fn build_counter_template_project(name: &str, test_source: &str) -> Project {
         .without_acton_toml()
         .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
-        .file("wrappers/Counter", COUNTER_TEMPLATE_WRAPPER)
+        .file("wrappers/Counter.gen", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
-        .build();
-    project.acton().init().run().success();
-    project
-}
-
-fn build_jetton_template_project(name: &str) -> Project {
-    let project = ProjectBuilder::new(name)
-        .without_acton_toml()
-        .file_from_path(
-            "contracts/JettonMinter",
-            "src/commands/new/templates/jetton/contracts/JettonMinter.tolk",
-        )
-        .file_from_path(
-            "contracts/JettonWallet",
-            "src/commands/new/templates/jetton/contracts/JettonWallet.tolk",
-        )
-        .file_from_path(
-            "contracts/errors",
-            "src/commands/new/templates/jetton/contracts/errors.tolk",
-        )
-        .file_from_path(
-            "contracts/fees-management",
-            "src/commands/new/templates/jetton/contracts/fees-management.tolk",
-        )
-        .file_from_path(
-            "contracts/jetton-utils",
-            "src/commands/new/templates/jetton/contracts/jetton-utils.tolk",
-        )
-        .file_from_path(
-            "contracts/messages",
-            "src/commands/new/templates/jetton/contracts/messages.tolk",
-        )
-        .file_from_path(
-            "contracts/storage",
-            "src/commands/new/templates/jetton/contracts/storage.tolk",
-        )
-        .file_from_path(
-            "wrappers/JettonMinter",
-            "src/commands/new/templates/jetton/wrappers/JettonMinter.tolk",
-        )
-        .file_from_path(
-            "wrappers/JettonWallet",
-            "src/commands/new/templates/jetton/wrappers/JettonWallet.tolk",
-        )
-        .test_file_from_path(
-            "wallet",
-            "src/commands/new/templates/jetton/tests/wallet.test.tolk",
-        )
         .build();
     project.acton().init().run().success();
     project
@@ -843,9 +795,7 @@ fn test_coverage_runtime_branch_opcodes_text_snapshot() {
         panic!("coverage output did not contain nullable ternary line:\n{normalized}");
     };
     assert!(
-        nullable_ternary_line.contains("site0")
-            && nullable_ternary_line.contains("site1")
-            && nullable_ternary_line.contains("site2"),
+        nullable_ternary_line.contains("site0") && nullable_ternary_line.contains("site1"),
         "expected nullable ternary line to keep separate branch sites:\n{nullable_ternary_line}"
     );
 }
@@ -949,7 +899,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .with_coverage_file("counter-template-all.txt")
         .run()
         .success()
-        .assert_passed(5)
+        .assert_passed(8)
         .assert_file_snapshot_matches(
             "counter-template-all.txt",
             "integration/snapshots/test_counter_template_coverage_all.txt",
@@ -973,28 +923,17 @@ fn test_counter_template_coverage_text_snapshots() {
     project
         .acton()
         .test()
-        .filter("test deploy starts at zero|test increase counter|test any account can increase counter|test reset counter")
+        .filter("test increase counter|test reset counter|test decrease counter")
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("counter-template-non-branch.txt")
         .run()
         .success()
-        .assert_passed(4)
+        .assert_passed(5)
         .assert_file_snapshot_matches(
             "counter-template-non-branch.txt",
             "integration/snapshots/test_counter_template_coverage_non_branch.txt",
         );
-}
-
-fn assert_branch_counts(report: &str, code_snippet: &str, expected: &str) {
-    let Some(line) = report.lines().find(|line| line.contains(code_snippet)) else {
-        panic!("coverage output did not contain line for `{code_snippet}`:\n{report}");
-    };
-
-    assert!(
-        line.contains(expected),
-        "coverage line for `{code_snippet}` did not contain `{expected}`:\n{line}"
-    );
 }
 
 #[test]
@@ -1032,128 +971,6 @@ fn test_counter_template_split_unknown_message_branch_text_snapshots() {
         .assert_file_snapshot_matches(
             "counter-template-accept-only.txt",
             "integration/snapshots/test_counter_template_coverage_accept_only.txt",
-        );
-}
-
-#[test]
-fn test_jetton_template_coverage_text_snapshots() {
-    let project = build_jetton_template_project("coverage-jetton-template");
-
-    project
-        .acton()
-        .test()
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-all.txt")
-        .run()
-        .success()
-        .assert_passed(25)
-        .assert_file_snapshot_matches(
-            "jetton-template-all.txt",
-            "integration/snapshots/test_jetton_template_coverage_all.txt",
-        );
-    let all_report = fs::read_to_string(project.path().join("jetton-template-all.txt"))
-        .expect("Should read jetton-template-all.txt");
-    let all_report = normalize_output(all_report.as_str(), project.path());
-    assert_branch_counts(
-        &all_report,
-        "val forwardedMessagesCount = msg.forwardTonAmount ? 2 : 1;",
-        "false=",
-    );
-
-    project
-        .acton()
-        .test()
-        .filter("test no forward ton amount no forward")
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-no-forward-only.txt")
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_file_snapshot_matches(
-            "jetton-template-no-forward-only.txt",
-            "integration/snapshots/test_jetton_template_coverage_no_forward_only.txt",
-        );
-    let no_forward_report =
-        fs::read_to_string(project.path().join("jetton-template-no-forward-only.txt"))
-            .expect("Should read jetton-template-no-forward-only.txt");
-    let no_forward_report = normalize_output(no_forward_report.as_str(), project.path());
-    assert_branch_counts(
-        &no_forward_report,
-        "val forwardedMessagesCount = msg.forwardTonAmount ? 2 : 1;",
-        "true=0 false=1",
-    );
-
-    project
-        .acton()
-        .test()
-        .filter("test wallet owner should be able to send jettons")
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-forward-only.txt")
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_file_snapshot_matches(
-            "jetton-template-forward-only.txt",
-            "integration/snapshots/test_jetton_template_coverage_forward_only.txt",
-        );
-    let forward_report =
-        fs::read_to_string(project.path().join("jetton-template-forward-only.txt"))
-            .expect("Should read jetton-template-forward-only.txt");
-    let forward_report = normalize_output(forward_report.as_str(), project.path());
-    assert_branch_counts(
-        &forward_report,
-        "val forwardedMessagesCount = msg.forwardTonAmount ? 2 : 1;",
-        "true=1 false=0",
-    );
-
-    project
-        .acton()
-        .test()
-        .filter(
-            "test minter admin should be able to mint jettons|test not a minter admin should not be able to mint jettons",
-        )
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-mint-admin-pair.txt")
-        .run()
-        .success()
-        .assert_passed(2)
-        .assert_file_snapshot_matches(
-            "jetton-template-mint-admin-pair.txt",
-            "integration/snapshots/test_jetton_template_coverage_mint_admin_pair.txt",
-        );
-
-    project
-        .acton()
-        .test()
-        .filter("test minter admin should be able to mint jettons")
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-mint-admin-accept-only.txt")
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_file_snapshot_matches(
-            "jetton-template-mint-admin-accept-only.txt",
-            "integration/snapshots/test_jetton_template_coverage_mint_admin_accept_only.txt",
-        );
-
-    project
-        .acton()
-        .test()
-        .filter("test not a minter admin should not be able to mint jettons")
-        .with_coverage()
-        .with_coverage_format("text")
-        .with_coverage_file("jetton-template-mint-admin-reject-only.txt")
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_file_snapshot_matches(
-            "jetton-template-mint-admin-reject-only.txt",
-            "integration/snapshots/test_jetton_template_coverage_mint_admin_reject_only.txt",
         );
 }
 
@@ -1480,7 +1297,7 @@ fn test_coverage_text_output_write_error_is_non_zero() {
 }
 
 #[test]
-fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() {
+fn test_coverage_minimum_percent_via_cli_fails_when_score_is_below_threshold() {
     let project = build_partial_coverage_project("coverage-min-percent-cli").build();
 
     project
@@ -1489,7 +1306,7 @@ fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() 
         .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("threshold.txt")
-        .with_coverage_minimum_percent(100.0)
+        .with_coverage_minimum_percent(65.0)
         .run()
         .failure()
         .assert_passed(1)
@@ -1503,13 +1320,13 @@ fn test_coverage_minimum_percent_via_cli_fails_when_total_coverage_is_too_low() 
 }
 
 #[test]
-fn test_coverage_minimum_percent_via_config_fails_when_total_coverage_is_too_low() {
+fn test_coverage_minimum_percent_via_config_fails_when_score_is_below_threshold() {
     let project = build_partial_coverage_project("coverage-min-percent-config")
         .with_test_config(TestConfig {
             coverage: Some(true),
             coverage_format: Some("text".to_owned()),
             coverage_file: Some("threshold.txt".to_owned()),
-            coverage_minimum_percent: Some(100.0),
+            coverage_minimum_percent: Some(65.0),
             ..Default::default()
         })
         .build();

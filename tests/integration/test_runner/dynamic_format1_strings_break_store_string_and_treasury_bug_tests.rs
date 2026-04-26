@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
 import "../../lib/fmt"
 import "../../lib/io"
 "#;
@@ -53,13 +54,13 @@ fn format1_result_can_be_used_as_treasury_name() {
         "bz-dynamic-format1-treasury-name-regression",
         r#"
 get fun `test bz static treasury name works`() {
-    val treasury = net.treasury("bz_static_treasury");
+    val treasury = testing.treasury("bz_static_treasury");
     println(treasury.address);
 }
 
 get fun `test bz format1 treasury name not a cell`() {
     val treasuryName = format("bz_dynamic_{}", 1);
-    val treasury = net.treasury(treasuryName);
+    val treasury = testing.treasury(treasuryName);
     println(treasury.address);
 }
 "#,

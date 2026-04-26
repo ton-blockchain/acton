@@ -23,8 +23,8 @@ published Docker image.
     documented baseline is Ubuntu 20.04 or newer. `trunk` builds and
     WSL installs are beta / best-effort surfaces today. Native Windows is not
     supported. If you use Windows, install Acton inside WSL with Ubuntu 20.04
-    or newer and follow the Linux steps there. See
-    [Support policy](/docs/miscellaneous/support-policy) for the full matrix.
+    or newer and follow the Linux steps there. See [platform tiers](#platform-tiers)
+    for the full matrix.
 </Callout>
 
 <Callout>
@@ -184,7 +184,7 @@ other Acton subcommand such as `test`, `check`, or `fmt --check`.
 
 ## CI/CD
 
-See the [CI integration guide](/docs/ci-setup/) for GitHub Actions and GitLab CI examples.
+See the [CI integration guide](/docs/ci-setup) for GitHub Actions and GitLab CI examples.
 
 ## Updating
 
@@ -216,7 +216,7 @@ acton up 0.1.5
 
 ### Switch to trunk
 
-If you want to try the latest features before they are officially released, you can install the trunk version:
+If you want to try the latest features **before they are officially released**, you can install the trunk version:
 
 ```bash
 acton up --trunk
@@ -235,3 +235,23 @@ If you also want to remove global wallets and libraries, remove the global confi
 ```bash
 rm -rf ~/.config/acton
 ```
+
+## Support policy
+
+Acton is currently released as a public beta.
+
+### Platform tiers
+
+| Platform / environment                         | Tier        |
+| ---------------------------------------------- | ----------- |
+| macOS ARM64 (`aarch64-apple-darwin`)           | First-class |
+| macOS x86\_64 (`x86_64-apple-darwin`)          | First-class |
+| Linux x86\_64 GNU (`x86_64-unknown-linux-gnu`) | First-class |
+| Linux ARM64 GNU (`aarch64-unknown-linux-gnu`)  | First-class |
+| Native Windows                                 | Unsupported |
+| Windows via WSL                                | Beta        |
+| Other source-built targets                     | Beta        |
+
+<Callout type="warn">
+  Other source-built targets are outside the official binary matrix; validation is limited and regressions may occur.
+</Callout>

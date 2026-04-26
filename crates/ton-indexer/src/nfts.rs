@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, Load};
 use tycho_types::dict::Dict;
 use tycho_types::models::IntAddr;
@@ -55,7 +55,6 @@ pub fn get_nft_item_data(address: String, code: Cell, data: Cell) -> Option<NftI
 
 fn parse_optional_address(item: &TupleItem) -> Option<String> {
     match item {
-        TupleItem::Null => None,
         TupleItem::Slice(cell) | TupleItem::Cell(cell) => {
             let mut slice = cell.as_slice_allow_exotic();
             IntAddr::load_from(&mut slice)
@@ -68,14 +67,12 @@ fn parse_optional_address(item: &TupleItem) -> Option<String> {
 
 #[must_use]
 pub fn parse_nft_content(content_cell: Cell) -> Value {
-    let mut parser = match content_cell.as_slice() {
-        Ok(p) => p,
-        Err(_) => return json!({}),
+    let Ok(mut parser) = content_cell.as_slice() else {
+        return json!({});
     };
 
-    let prefix = match parser.load_uint(8) {
-        Ok(p) => p,
-        Err(_) => return json!({}),
+    let Ok(prefix) = parser.load_uint(8) else {
+        return json!({});
     };
 
     if prefix == 0x01 {

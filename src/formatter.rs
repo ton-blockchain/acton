@@ -2,8 +2,8 @@ use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
 use crate::context;
 use crate::context::{
-    AssertFailure, BuildCache, EmulationsState, GetMethodAssertFailure, KnownAddresses,
-    TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
+    KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::retrace::{
     self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
@@ -18,13 +18,13 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
-use tolkc::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
+use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::SourceLocation;
-use tvmffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
 use tycho_types::dict;
@@ -64,6 +64,12 @@ enum FormattedExtraInfo {
     Annotation(String),
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct AbiExitCodeInfo {
+    pub symbolic_name: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum MapScalarType {
     Int { bits: u16, signed: bool },
@@ -101,7 +107,6 @@ pub struct FormatterContext<'a> {
     pub available_wallets: Vec<String>,
     pub backtrace: Option<BacktraceMode>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<Cow<'a, str>>,
     pub network: Option<Network>,
 }
 
@@ -121,7 +126,6 @@ impl<'a> FormatterContext<'a> {
             backtrace: None,
             fork_net: None,
             network: None,
-            api_key: None,
         }
     }
 
@@ -141,8 +145,99 @@ impl<'a> FormatterContext<'a> {
             backtrace: ctx.build.backtrace,
             fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
-            api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
+    }
+
+    fn compiler_abi_symbol_description(
+        compiler_abi: &CompilerContractABI,
+        symbol: &str,
+    ) -> Option<String> {
+        if let Some((enum_name, member_name)) = symbol.rsplit_once('.')
+            && let Some(description) = compiler_abi
+                .declarations
+                .iter()
+                .find_map(|declaration| match declaration {
+                    tolk_compiler::abi::ABIDeclaration::Enum { name, members, .. }
+                        if name == enum_name =>
+                    {
+                        members
+                            .iter()
+                            .find(|member| member.name == member_name)
+                            .map(|member| member.description.as_str())
+                    }
+                    _ => None,
+                })
+                .filter(|description| !description.is_empty())
+        {
+            return Some(description.to_owned());
+        }
+
+        compiler_abi
+            .constants
+            .iter()
+            .find(|constant| constant.name == symbol && !constant.description.is_empty())
+            .map(|constant| constant.description.clone())
+    }
+
+    fn compiler_abi_symbol_name(compiler_abi: &CompilerContractABI, code: i32) -> Option<String> {
+        compiler_abi
+            .thrown_errors
+            .iter()
+            .find(|error| error.err_code == code && !error.name.is_empty())
+            .map(|thrown| thrown.name.clone())
+    }
+
+    #[must_use]
+    pub(crate) fn find_custom_exit_code_info(
+        code: i32,
+        abi: Option<&ContractAbi>,
+        compiler_abi: Option<&CompilerContractABI>,
+    ) -> Option<AbiExitCodeInfo> {
+        if let Some(compiler_abi) = compiler_abi
+            && let Some(symbolic_name) = Self::compiler_abi_symbol_name(compiler_abi, code)
+        {
+            let description = Self::compiler_abi_symbol_description(compiler_abi, &symbolic_name)
+                .unwrap_or_else(|| symbolic_name.clone());
+            return Some(AbiExitCodeInfo {
+                symbolic_name,
+                description,
+            });
+        }
+
+        let exit_code = abi?.exit_codes.iter().find(|item| item.value == code)?;
+        let symbolic_name = exit_code.constant_name.clone();
+        let description = compiler_abi
+            .and_then(|abi| Self::compiler_abi_symbol_description(abi, &symbolic_name))
+            .unwrap_or_else(|| symbolic_name.clone());
+
+        Some(AbiExitCodeInfo {
+            symbolic_name,
+            description,
+        })
+    }
+
+    fn find_tx_custom_exit_code_info(
+        &self,
+        tx: &Transaction,
+        code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        let code_cell = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
+        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
+        Self::find_custom_exit_code_info(code, build.abi.as_deref(), build.compiler_abi.as_deref())
+    }
+
+    fn find_code_custom_exit_code_info(
+        &self,
+        code_boc64: &str,
+        exit_code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        let code_cell = Boc::decode_base64(code_boc64).ok();
+        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
+        Self::find_custom_exit_code_info(
+            exit_code,
+            build.abi.as_deref(),
+            build.compiler_abi.as_deref(),
+        )
     }
 
     #[must_use]
@@ -162,7 +257,7 @@ keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
 [wallets.deployer.expected]
 address-testnet = \"<<ADDRESS>>\"
 
-See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information
+See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more information
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),
@@ -324,7 +419,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         if message.is_empty() {
             lines.push(format!(
                 "└── submitted to network; call {} to confirm inclusion",
-                "res.wait()".yellow()
+                "res.waitForFirstTransaction()".yellow()
             ));
             return lines.join("\n");
         }
@@ -332,7 +427,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         lines.push(format!("└── {message}"));
         lines.push(format!(
             "    └── submitted to network; call {} to confirm inclusion",
-            "res.wait()".yellow()
+            "res.waitForFirstTransaction()".yellow()
         ));
         lines.join("\n")
     }
@@ -356,10 +451,10 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                     Some(TupleItem::Tuple(externals)),
                 ) = (
                     tuple.first(),
-                    tuple.get(1),
-                    tuple.get(3),
+                    tuple.get(2),
                     tuple.get(4),
-                    tuple.get(6), // externals
+                    tuple.get(5),
+                    tuple.get(7), // externals
                 )
                 else {
                     return None;
@@ -375,8 +470,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                             _ => None,
                         })
                         .collect(),
-                    parent_lt: match tuple.get(2) {
-                        Some(TupleItem::Null) => None,
+                    parent_lt: match tuple.get(3) {
                         Some(TupleItem::Int(int)) => int.to_i64(),
                         _ => None,
                     },
@@ -401,10 +495,9 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
     }
 
     fn flatten_big_array_items(items: &[TupleItem]) -> Option<Vec<TupleItem>> {
-        let (top_level, size) = match items {
-            // [topLevel: array<array<T>>, size: int]
-            [TupleItem::Tuple(top_level), TupleItem::Int(size)] => (top_level, size),
-            _ => return None,
+        // [topLevel: array<array<T>>, size: int]
+        let [TupleItem::Tuple(top_level), TupleItem::Int(size)] = items else {
+            return None;
         };
 
         let size = size.to_usize()?;
@@ -1407,6 +1500,11 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                 "Compute phase failed: {}",
                 info.description.to_string().yellow()
             )));
+        } else if let Some(info) = self.find_tx_custom_exit_code_info(tx, compute.exit_code) {
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
+                "Compute phase failed: {}",
+                info.description.yellow()
+            )));
         }
 
         if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt)
@@ -1432,10 +1530,10 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
             ));
             extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "To manually register library use {} somewhere in {}-like function",
-                "vm.registerLibrary(code)".yellow(),
+                "testing.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
             )));
-            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/libraries".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
@@ -2025,12 +2123,12 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                     "null".to_owned()
                 }
             }
-            TupleItem::Nan => "NaN".to_owned(),
-            TupleItem::Cell(cell) => {
-                let s = Boc::encode_hex(cell);
+            TupleItem::Cont(cont) => {
+                let s = Boc::encode_hex(&cont.code);
                 if colorize { s.dimmed().to_string() } else { s }
             }
-            TupleItem::Builder(cell) => {
+            TupleItem::Nan => "NaN".to_owned(),
+            TupleItem::Cell(cell) | TupleItem::Builder(cell) => {
                 let s = Boc::encode_hex(cell);
                 if colorize { s.dimmed().to_string() } else { s }
             }
@@ -2757,107 +2855,89 @@ impl FormatterContext<'_> {
         abi: Arc<ContractAbi>,
     ) -> Vec<String> {
         let mut params = vec![];
-        if let Some(opcode) = assert_failure.params.opcode {
-            let opcode_type = abi.find_type_by_opcode(opcode);
-            params.push(format!(
-                "  opcode={} {}",
-                format!("0x{opcode:x}").green(),
-                opcode_type
-                    .map(|typ| typ.name)
-                    .unwrap_or_else(|| if opcode == 0 {
-                        "empty".to_owned()
-                    } else {
-                        "unknown".to_owned()
-                    })
-                    .purple()
-                    .bold()
-            ));
-        }
-        if let Some(bounced) = assert_failure.params.bounced {
-            params.push(format!(
-                "  bounced={}",
-                if bounced {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+        use crate::context::DisplayParam;
+
+        let fmt_bool = |v: bool| {
+            if v {
+                "true".green().to_string()
+            } else {
+                "false".red().to_string()
+            }
+        };
+        let fmt_int = |v: &dyn std::fmt::Display, zero_ok: bool| {
+            let s = v.to_string();
+            if zero_ok && s == "0" {
+                "0".green().to_string()
+            } else {
+                s.red().to_string()
+            }
+        };
+
+        macro_rules! push_param {
+            (bool $name:literal, $field:expr) => {
+                match &$field {
+                    Some(DisplayParam::Value(v)) => {
+                        params.push(format!("  {}={}", $name, fmt_bool(*v)))
+                    }
+                    Some(DisplayParam::Function) => {
+                        params.push(format!("  {}={}", $name, "<function>".cyan()))
+                    }
+                    None => {}
                 }
-            ));
-        }
-        if let Some(bounce) = assert_failure.params.bounce {
-            params.push(format!(
-                "  bounce={}",
-                if bounce {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+            };
+            (int $name:literal, $field:expr) => {
+                match &$field {
+                    Some(DisplayParam::Value(v)) => {
+                        params.push(format!("  {}={}", $name, fmt_int(v, true)))
+                    }
+                    Some(DisplayParam::Function) => {
+                        params.push(format!("  {}={}", $name, "<function>".cyan()))
+                    }
+                    None => {}
                 }
-            ));
+            };
         }
-        if let Some(value) = &assert_failure.params.value {
-            params.push(format!("  value={value}",));
-        }
-        if let Some(deploy) = assert_failure.params.deploy {
-            params.push(format!(
-                "  deploy={}",
-                if deploy {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
+
+        if let Some(ref dp) = assert_failure.params.opcode {
+            match dp {
+                DisplayParam::Value(opcode) => {
+                    let opcode_type = abi.find_type_by_opcode(*opcode);
+                    params.push(format!(
+                        "  opcode={} {}",
+                        format!("0x{opcode:x}").green(),
+                        opcode_type
+                            .map(|typ| typ.name)
+                            .unwrap_or_else(|| if *opcode == 0 {
+                                "empty".to_owned()
+                            } else {
+                                "unknown".to_owned()
+                            })
+                            .purple()
+                            .bold()
+                    ));
                 }
-            ));
+                DisplayParam::Function => params.push(format!("  opcode={}", "<function>".cyan())),
+            }
         }
-        if let Some(success) = assert_failure.params.success {
-            params.push(format!(
-                "  success={}",
-                if success {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
+        push_param!(bool "bounced", assert_failure.params.bounced);
+        push_param!(bool "bounce", assert_failure.params.bounce);
+        match &assert_failure.params.value {
+            Some(DisplayParam::Value(v)) => params.push(format!("  value={v}")),
+            Some(DisplayParam::Function) => params.push(format!("  value={}", "<function>".cyan())),
+            None => {}
         }
-        if let Some(aborted) = assert_failure.params.aborted {
-            params.push(format!(
-                "  aborted={}",
-                if aborted {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
-        }
-        if let Some(exit_code) = assert_failure.params.exit_code {
-            params.push(format!(
-                "  exit_code={}",
-                if exit_code == 0 {
-                    "0".green().to_string()
-                } else {
-                    exit_code.to_string().red().to_string()
-                }
-            ));
-        }
-        if let Some(action_exit_code) = assert_failure.params.action_exit_code {
-            params.push(format!(
-                "  action_exit_code={}",
-                if action_exit_code == 0 {
-                    "0".green().to_string()
-                } else {
-                    action_exit_code.to_string().red().to_string()
-                }
-            ));
-        }
-        if let Some(compute_phase_skipped) = assert_failure.params.compute_phase_skipped {
-            params.push(format!(
-                "  compute_phase_skipped={}",
-                if compute_phase_skipped {
-                    "true".green().to_string()
-                } else {
-                    "false".red().to_string()
-                }
-            ));
-        }
-        if let Some(body) = &assert_failure.params.body {
-            params.push(format!("  body={}", Boc::encode_hex(body)));
+        push_param!(bool "deploy", assert_failure.params.deploy);
+        push_param!(bool "success", assert_failure.params.success);
+        push_param!(bool "aborted", assert_failure.params.aborted);
+        push_param!(int "exit_code", assert_failure.params.exit_code);
+        push_param!(int "action_exit_code", assert_failure.params.action_exit_code);
+        push_param!(bool "compute_phase_skipped", assert_failure.params.compute_phase_skipped);
+        match &assert_failure.params.body {
+            Some(DisplayParam::Value(body)) => {
+                params.push(format!("  body={}", Boc::encode_hex(body)));
+            }
+            Some(DisplayParam::Function) => params.push(format!("  body={}", "<function>".cyan())),
+            None => {}
         }
         params
     }
@@ -2966,6 +3046,19 @@ impl FormatterContext<'_> {
         if let Some(info) = exit_codes::find(failure.vm_exit_code) {
             writeln!(details, "Description: {}", info.description).ok();
             writeln!(details, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = Self::find_custom_exit_code_info(
+            failure.vm_exit_code,
+            failure
+                .abi
+                .as_deref()
+                .or_else(|| Some(self.contract_abi.as_ref())),
+            failure.compiler_abi.as_deref(),
+        ) {
+            writeln!(details, "Description: {}", info.description).ok();
+            if info.symbolic_name != info.description {
+                writeln!(details, "Error: {}", info.symbolic_name).ok();
+            }
+            writeln!(details, "Phase: Compute phase").ok();
         } else if let Some(info) = &replayed_exception {
             let description = if info.description.is_empty() {
                 format!("uncaught exception {}", info.errno)
@@ -2993,9 +3086,8 @@ impl FormatterContext<'_> {
         let account = accounts.get(addr);
         let state = account?.account.load().ok()?.0?.state;
         match state {
-            AccountState::Uninit => None,
             AccountState::Active(state) => state.code,
-            AccountState::Frozen(_) => None,
+            AccountState::Uninit | AccountState::Frozen(_) => None,
         }
     }
 
@@ -3005,16 +3097,14 @@ impl FormatterContext<'_> {
         failure: &TransactionGenericAssertFailure,
         abi: Arc<ContractAbi>,
     ) -> FailedTransactionContext {
-        let from_address = failure
-            .params
-            .from
-            .as_ref()
-            .map(|addr| self.address_to_string(addr));
-        let to_address = failure
-            .params
-            .to
-            .as_ref()
-            .map(|addr| self.address_to_string(addr));
+        let from_address = failure.params.from.as_ref().map(|dp| match dp {
+            DisplayParam::Value(addr) => self.address_to_string(addr),
+            DisplayParam::Function => "<function>".to_string(),
+        });
+        let to_address = failure.params.to.as_ref().map(|dp| match dp {
+            DisplayParam::Value(addr) => self.address_to_string(addr),
+            DisplayParam::Function => "<function>".to_string(),
+        });
         let params = self
             .format_search_transaction_parameters(failure, abi)
             .into_iter()
@@ -3061,7 +3151,7 @@ impl FormatterContext<'_> {
                     vm_log_diff: self
                         .emulations
                         .find_tx_logs(tx.lt)
-                        .map(vmlogs::convert_to_diff_logs)
+                        .map(tvm_logs::convert_to_diff_logs)
                         .unwrap_or_default(),
                     executor_logs: self
                         .emulations
@@ -3113,18 +3203,48 @@ impl FormatterContext<'_> {
             AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
                 let left = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
                 let right = self.format_tuple_value(&bin_failure.right, &bin_failure.right_type, 0);
-                writeln!(result, "Actual:   {left}").ok();
-                writeln!(result, "Expected: {right}").ok();
+                writeln!(result, "        Actual:   {left}").ok();
+                writeln!(result, "        Expected: {right}").ok();
+            }
+            AssertFailure::Decimal(decimal_failure) => {
+                writeln!(result, "        Actual:   {}", decimal_failure.left).ok();
+                writeln!(result, "        Expected: {}", decimal_failure.right).ok();
             }
             AssertFailure::TransactionNotFound(tx_failure) => {
                 let params = self.format_search_transaction_parameters(tx_failure, abi);
                 let tx_tree = self.format(&tx_failure.txs);
                 writeln!(result, "{tx_tree}").ok();
+                let from_addr = tx_failure.params.from.as_ref().and_then(|dp| match dp {
+                    DisplayParam::Value(a) => Some(a.clone()),
+                    DisplayParam::Function => None,
+                });
+                let to_addr = tx_failure.params.to.as_ref().and_then(|dp| match dp {
+                    DisplayParam::Value(a) => Some(a.clone()),
+                    DisplayParam::Function => None,
+                });
+                let from_str = if tx_failure
+                    .params
+                    .from
+                    .as_ref()
+                    .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                {
+                    "<function>".cyan().to_string()
+                } else {
+                    self.format_address(&tx_failure.txs, &from_addr)
+                };
+                let to_str = if tx_failure
+                    .params
+                    .to
+                    .as_ref()
+                    .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                {
+                    "<function>".cyan().to_string()
+                } else {
+                    self.format_address(&tx_failure.txs, &to_addr)
+                };
                 writeln!(
                     result,
-                    "Cannot find transaction from {} to {}",
-                    self.format_address(&tx_failure.txs, &tx_failure.params.from),
-                    self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                    "Cannot find transaction from {from_str} to {to_str}"
                 )
                 .ok();
                 writeln!(result, "with:").ok();
@@ -3140,11 +3260,35 @@ impl FormatterContext<'_> {
                 {
                     String::new()
                 } else {
-                    format!(
-                        " from {} to {}",
-                        self.format_address(&tx_failure.txs, &tx_failure.params.from),
-                        self.format_address(&tx_failure.txs, &tx_failure.params.to)
-                    )
+                    let from_addr = tx_failure.params.from.as_ref().and_then(|dp| match dp {
+                        DisplayParam::Value(a) => Some(a.clone()),
+                        DisplayParam::Function => None,
+                    });
+                    let to_addr = tx_failure.params.to.as_ref().and_then(|dp| match dp {
+                        DisplayParam::Value(a) => Some(a.clone()),
+                        DisplayParam::Function => None,
+                    });
+                    let from_s = if tx_failure
+                        .params
+                        .from
+                        .as_ref()
+                        .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                    {
+                        "<function>".cyan().to_string()
+                    } else {
+                        self.format_address(&tx_failure.txs, &from_addr)
+                    };
+                    let to_s = if tx_failure
+                        .params
+                        .to
+                        .as_ref()
+                        .is_some_and(|dp| matches!(dp, DisplayParam::Function))
+                    {
+                        "<function>".cyan().to_string()
+                    } else {
+                        self.format_address(&tx_failure.txs, &to_addr)
+                    };
+                    format!(" from {from_s} to {to_s}")
                 };
                 writeln!(result, "Unexpected transaction{from_to}").ok();
                 if !params.is_empty() {
@@ -3234,6 +3378,21 @@ impl FormatterContext<'_> {
         if let Some(info) = exit_codes::find(exit_code) {
             writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
+        } else if let Some(info) = self
+            .find_code_custom_exit_code_info(result.code.as_ref(), exit_code)
+            .or_else(|| {
+                Self::find_custom_exit_code_info(
+                    exit_code,
+                    Some(test.abi.as_ref()),
+                    test.compiler_abi.as_deref(),
+                )
+            })
+        {
+            writeln!(output, "Description: {}", info.description).ok();
+            if info.symbolic_name != info.description {
+                writeln!(output, "Error: {}", info.symbolic_name).ok();
+            }
+            writeln!(output, "Phase: Compute phase").ok();
         } else if let Some(info) = &exit_code_info {
             let description = if info.description.is_empty() {
                 format!("uncaught exception {}", info.errno)

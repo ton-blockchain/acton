@@ -3,7 +3,8 @@ import { createMDX } from "fumadocs-mdx/next";
 
 const withMDX = createMDX();
 
-const isProd = process.env.NODE_ENV === "production";
+const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true" ||
+  process.env.GITHUB_PAGES === "true";
 const repoName = "acton";
 const docsRoot = fileURLToPath(new URL(".", import.meta.url));
 
@@ -11,13 +12,17 @@ const docsRoot = fileURLToPath(new URL(".", import.meta.url));
 const config = {
   reactStrictMode: true,
   output: "export",
-  trailingSlash: true,
+  serverExternalPackages: ["typescript", "twoslash"],
   images: { unoptimized: true },
   turbopack: {
     root: docsRoot,
   },
-  basePath: isProd ? `/${repoName}` : "",
-  assetPrefix: isProd ? `https://ton-blockchain.github.io/${repoName}/` : "",
+  ...(isGitHubPagesBuild
+    ? {
+        basePath: `/${repoName}`,
+        assetPrefix: `https://ton-blockchain.github.io/${repoName}/`,
+      }
+    : {}),
 };
 
 export default withMDX(config);

@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate deploy and direct find transaction [TIME]
+    └─ Test output:
+       deploy.deploy=true
+       deploy.to=[WALLET_ADDRESS_BASE] (harness)
+       deploy.success=true
+       deploy.negated=true
+
+ ✓ 1 passed in 1 file

@@ -1,5 +1,5 @@
 error: unexpected value 'false' for '--agents' found; no more were expected
 
-Usage: acton new <PATH|--name <NAME>|--description <DESCRIPTION>|--template <TEMPLATE>|--license <LICENSE>|--app|--hooks|--agents>
+Usage: acton new <PATH|--name <NAME>|--description <DESCRIPTION>|--template <TEMPLATE>|--license <LICENSE>|--app|--hooks|--agents|--templates>
 
 For more information, try '--help'.

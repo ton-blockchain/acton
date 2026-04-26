@@ -1103,12 +1103,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                         let index_str = self.text_of(&idx);
                         if let Ok(index_at) = index_str.parse::<usize>() {
                             match self.intrn().data(obj_ty) {
-                                TyData::Tensor(items) => {
-                                    if let Some(ty) = items.get(index_at) {
-                                        return *ty;
-                                    }
-                                }
-                                TyData::Tuple(items) => {
+                                TyData::Tensor(items) | TyData::Tuple(items) => {
                                     if let Some(ty) = items.get(index_at) {
                                         return *ty;
                                     }
@@ -1651,24 +1646,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             && let Ok(index_at) = field_name.parse::<usize>()
         {
             match self.intrn().data(unwrapped_obj_type).clone() {
-                TyData::Tensor(items) => {
-                    if index_at >= items.len() {
-                        let unknown_ty = self.const_intrn().ty_unknown;
-                        self.ctx.set_node_type(&v, unknown_ty);
-                        self.ctx.set_node_type(&field, unknown_ty);
-                        return ExprFlow::create(flow, as_cond);
-                    }
-
-                    let mut inferred_type = items[index_at];
-                    if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
-                        inferred_type =
-                            flow.smart_cast_or_original(s_expr, inferred_type, self.intrn());
-                    }
-                    self.ctx.set_node_type(&v, inferred_type);
-                    self.ctx.set_node_type(&field, inferred_type);
-                    return ExprFlow::create(flow, as_cond);
-                }
-                TyData::Tuple(items) => {
+                TyData::Tensor(items) | TyData::Tuple(items) => {
                     if index_at >= items.len() {
                         let unknown_ty = self.const_intrn().ty_unknown;
                         self.ctx.set_node_type(&v, unknown_ty);
@@ -1927,23 +1905,23 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             // something strange if we cannot resolve reference
             return ExprFlow::create(flow, as_cond);
         };
-        let (parameters, type_parameters) = match &declaration.kind {
-            SymbolKind::Function {
-                parameters,
-                type_parameters,
-                ..
-            } => (parameters, type_parameters),
-            SymbolKind::Method {
-                parameters,
-                type_parameters,
-                ..
-            } => (parameters, type_parameters),
-            SymbolKind::GetMethod {
-                parameters,
-                type_parameters,
-                ..
-            } => (parameters, type_parameters),
-            _ => return ExprFlow::create(flow, as_cond),
+        let (SymbolKind::Function {
+            parameters,
+            type_parameters,
+            ..
+        }
+        | SymbolKind::Method {
+            parameters,
+            type_parameters,
+            ..
+        }
+        | SymbolKind::GetMethod {
+            parameters,
+            type_parameters,
+            ..
+        }) = &declaration.kind
+        else {
+            return ExprFlow::create(flow, as_cond);
         };
 
         if let Some(instantiation_types) = instantiation_types {
@@ -2397,7 +2375,9 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             .and_then(|h| self.return_type_or_none(h));
 
         let mut params_types = Vec::new();
-        let mut body_start = FlowContext::new();
+        // Closures capture outer locals by value at the moment the lambda is created, so the
+        // lambda body should see the current outer flow facts as its starting point.
+        let mut body_start = flow.clone();
 
         for (i, param) in v.parameters().enumerate() {
             let param_ty = if let Some(ty_node) = param.typ() {
@@ -2849,11 +2829,11 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 let type_parameters = match &symbol.kind {
                     SymbolKind::Function {
                         type_parameters, ..
-                    } => Some(type_parameters),
-                    SymbolKind::Method {
+                    }
+                    | SymbolKind::Method {
                         type_parameters, ..
-                    } => Some(type_parameters),
-                    SymbolKind::GetMethod {
+                    }
+                    | SymbolKind::GetMethod {
                         type_parameters, ..
                     } => Some(type_parameters),
                     _ => None,

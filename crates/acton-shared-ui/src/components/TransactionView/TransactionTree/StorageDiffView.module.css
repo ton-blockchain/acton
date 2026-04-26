@@ -16,8 +16,16 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--spacing-sm);
-  grid-auto-rows: minmax(30px, auto);
+  grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
+  padding-left: var(--spacing-mds);
+  border-left: 1px solid var(--border-color);
+}
+
+.storageNestedMap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   padding-left: var(--spacing-mds);
   border-left: 1px solid var(--border-color);
 }
@@ -33,6 +41,40 @@
 .storageEntryValue {
   min-width: 0;
   align-self: center;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.storageMapEntry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.storageMapSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storageMapSectionLabel {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.storageMapKey {
+  color: inherit;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.storageMapValue {
+  min-width: 0;
   font-size: var(--font-size-xs);
   line-height: 1.4;
 }

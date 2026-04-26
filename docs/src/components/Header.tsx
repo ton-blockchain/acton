@@ -20,7 +20,7 @@ function HeaderContent() {
         </div>
         <div className="flex items-center gap-3 md:gap-4">
           <Link
-            href="/docs/welcome/"
+            href="/docs/welcome"
             className={linkClassName}
           >
             <BookOpen className="h-4 w-4" />

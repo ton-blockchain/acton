@@ -16,9 +16,10 @@ use tolk_syntax::{VarDeclLhs, match_parents};
 /// Using `val` instead of `var` makes the code clearer by signaling that the variable's value will not change.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// fun main() {
 ///     var x = 1;
+/// //  ^^^ E003: variable can be immutable
 ///     println(x);
 /// }
 /// ```

@@ -14,14 +14,14 @@ use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tolkc::abi::ContractABI;
-use tolkc::compiler::CompilerResultSuccess;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::compiler::CompilerResultSuccess;
 use ton_abi;
 use xxhash_rust::xxh3::Xxh3;
 
 use crate::paths;
 
-const CACHE_SCHEMA_VERSION: u32 = 7;
+const CACHE_SCHEMA_VERSION: u32 = 8;
 const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
 const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
 const DEBUG_CACHE_SUBDIR: &str = "debug";
@@ -31,8 +31,8 @@ pub struct CacheEntry {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub debug_mark_base64: Option<String>,
-    pub fift_code: String,
-    pub new_source_map: Option<tolkc::SourceMap>,
+    pub fift_code: Option<String>,
+    pub new_source_map: Option<tolk_compiler::SourceMap>,
     pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,
@@ -102,11 +102,8 @@ impl FileBuildCache {
         })
     }
 
-    pub fn dummy() -> Result<Self> {
+    pub fn temporary_for_project(project_root: PathBuf, config: ActonConfig) -> Result<Self> {
         let tmp_dir = tempfile::TempDir::new()?;
-        let config = ActonConfig::load().unwrap_or_default();
-
-        let project_root = configured_project_root().to_path_buf();
         let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
@@ -206,10 +203,17 @@ impl FileBuildCache {
         &mut self,
         file_path: &str,
         with_debug_info: bool,
+        with_fift: bool,
         optimization_level: usize,
         tolk_version: &str,
     ) -> Option<CacheEntry> {
-        let key = self.compute_key(file_path, with_debug_info, optimization_level, tolk_version);
+        let key = self.compute_key(
+            file_path,
+            with_debug_info,
+            with_fift,
+            optimization_level,
+            tolk_version,
+        );
         let entry = self.load_entry_for_key(&key, with_debug_info)?;
         let expected_dependencies_hash = entry.dependencies_hash.clone();
 
@@ -230,6 +234,7 @@ impl FileBuildCache {
         file_path: &str,
         result: &CompilerResultSuccess,
         with_debug_info: bool,
+        with_fift: bool,
         optimization_level: usize,
         tolk_version: &str,
     ) -> Result<()> {
@@ -242,7 +247,7 @@ impl FileBuildCache {
             code_boc64: result.code_boc64.clone(),
             code_hash_hex: result.code_hash_hex.clone(),
             debug_mark_base64: result.debug_mark_base64.clone(),
-            fift_code: result.fift_code.clone(),
+            fift_code: with_fift.then(|| result.fift_code.clone()),
             new_source_map: result.new_source_map.clone(),
             abi: result.abi.clone(),
             dependencies_hash,
@@ -253,7 +258,13 @@ impl FileBuildCache {
             schema_version: CACHE_SCHEMA_VERSION,
         };
 
-        let key = self.compute_key(file_path, with_debug_info, optimization_level, tolk_version);
+        let key = self.compute_key(
+            file_path,
+            with_debug_info,
+            with_fift,
+            optimization_level,
+            tolk_version,
+        );
         let cache_file = self.cache_file_path(&key, with_debug_info);
         let cache_parent = cache_file
             .parent()
@@ -275,6 +286,7 @@ impl FileBuildCache {
         &self,
         file_path: &str,
         with_debug_info: bool,
+        with_fift: bool,
         optimization_level: usize,
         tolk_version: &str,
     ) -> String {
@@ -284,6 +296,9 @@ impl FileBuildCache {
         hasher.update(CACHE_SCHEMA_VERSION.to_le_bytes());
         if with_debug_info {
             hasher.update(b"debug_info = true");
+        }
+        if with_fift {
+            hasher.update(b"fift = true");
         }
         hasher.update(optimization_level.to_le_bytes());
         hasher.update(tolk_version.as_bytes());
@@ -388,7 +403,12 @@ impl FileBuildCache {
                         .get(dep_name)
                         .ok_or_else(|| anyhow!("Contract '{dep_name}' not found in Acton.toml"))?;
 
-                    dep_sources.push(contract_config.src.clone());
+                    dep_sources.push(
+                        contract_config
+                            .absolute_source_path(&self.project_root)
+                            .to_string_lossy()
+                            .to_string(),
+                    );
                 }
             }
             dep_sources
@@ -479,9 +499,8 @@ impl FileBuildCache {
         };
 
         for (name, contract) in contracts {
-            let abs_path = Path::new(&contract.src)
-                .absolutize_from(project_root)
-                .unwrap_or_else(|_| Path::new(&contract.src).into())
+            let abs_path = contract
+                .absolute_source_path(project_root)
                 .to_string_lossy()
                 .to_string();
             index.insert(abs_path, name.clone());
@@ -547,7 +566,7 @@ mod tests {
             .write_all(b"fun helper() { return 1; }")
             .unwrap();
 
-        let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1");
+        let cached = cache.get(main_path.to_str().unwrap(), false, false, 2, "1.1");
         assert!(
             cached.is_none(),
             "Cache should be invalidated when dependency changes"
@@ -559,7 +578,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
-        let cached = cache.get(main_path.to_str().unwrap(), true, 2, "1.1");
+        let cached = cache.get(main_path.to_str().unwrap(), true, false, 2, "1.1");
         assert!(
             cached.is_none(),
             "Cache should be none since debug info mismatch"
@@ -571,7 +590,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
-        let cached = cache.get(main_path.to_str().unwrap(), false, 0, "1.1");
+        let cached = cache.get(main_path.to_str().unwrap(), false, false, 0, "1.1");
         assert!(
             cached.is_none(),
             "Cache should be none since optimization level mismatch"
@@ -583,7 +602,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
-        let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.2");
+        let cached = cache.get(main_path.to_str().unwrap(), false, false, 2, "1.2");
         assert!(
             cached.is_none(),
             "Cache should be none since Tolk version mismatch"
@@ -594,12 +613,12 @@ mod tests {
     fn test_corrupted_cache_entry_returns_none() {
         let temp_dir = tempdir().unwrap();
         let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
-        let key = cache.compute_key(main_path.to_str().unwrap(), false, 2, "1.1");
+        let key = cache.compute_key(main_path.to_str().unwrap(), false, false, 2, "1.1");
         let cache_file = cache.cache_file_path(&key, false);
 
         fs::write(cache_file, "corrupted cache data").unwrap();
 
-        let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1");
+        let cached = cache.get(main_path.to_str().unwrap(), false, false, 2, "1.1");
         assert!(cached.is_none(), "Corrupted cache entry should be ignored");
     }
 
@@ -663,10 +682,10 @@ mod tests {
         };
 
         cache
-            .put(main_path.to_str().unwrap(), &result, true, 2, "1.1")
+            .put(main_path.to_str().unwrap(), &result, true, true, 2, "1.1")
             .expect("Failed to write debug cache entry");
 
-        let key = cache.compute_key(main_path.to_str().unwrap(), true, 2, "1.1");
+        let key = cache.compute_key(main_path.to_str().unwrap(), true, true, 2, "1.1");
         assert!(
             cache.cache_file_path(&key, true).exists(),
             "Debug cache entry should be stored in debug subdirectory"
@@ -677,10 +696,56 @@ mod tests {
         );
         assert!(
             cache
-                .get(main_path.to_str().unwrap(), true, 2, "1.1")
+                .get(main_path.to_str().unwrap(), true, true, 2, "1.1")
                 .is_some(),
             "Debug cache entry should be readable back"
         );
+    }
+
+    #[test]
+    fn test_fift_cache_key_is_separate_and_only_stored_when_requested() {
+        let temp_dir = tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+        let mut cache = FileBuildCache::new(Some(cache_dir)).expect("Failed to create cache");
+
+        let main_path = temp_dir.path().join("main.tolk");
+        File::create(&main_path)
+            .unwrap()
+            .write_all(b"fun main() { }")
+            .unwrap();
+
+        let result = CompilerResultSuccess {
+            fift_code: "test_fift_code".to_string(),
+            code_boc64: "test_boc".to_string(),
+            code_hash_hex: "test_hash".to_string(),
+            debug_mark_base64: None,
+            new_source_map: None,
+            abi: None,
+        };
+
+        cache
+            .put(main_path.to_str().unwrap(), &result, false, false, 2, "1.1")
+            .expect("Failed to write non-fift cache entry");
+
+        let no_fift = cache
+            .get(main_path.to_str().unwrap(), false, false, 2, "1.1")
+            .expect("non-fift cache entry should exist");
+        assert_eq!(no_fift.fift_code, None);
+
+        let with_fift_before = cache.get(main_path.to_str().unwrap(), false, true, 2, "1.1");
+        assert!(
+            with_fift_before.is_none(),
+            "fift-enabled lookup should miss when only non-fift cache entry exists"
+        );
+
+        cache
+            .put(main_path.to_str().unwrap(), &result, false, true, 2, "1.1")
+            .expect("Failed to write fift cache entry");
+
+        let with_fift = cache
+            .get(main_path.to_str().unwrap(), false, true, 2, "1.1")
+            .expect("fift cache entry should exist");
+        assert_eq!(with_fift.fift_code.as_deref(), Some("test_fift_code"));
     }
 
     fn prepare_cache(temp_dir: &TempDir) -> Result<(FileBuildCache, PathBuf, PathBuf)> {
@@ -703,9 +768,9 @@ mod tests {
             abi: None,
         };
 
-        cache.put(main_path.to_str().unwrap(), &result, false, 2, "1.1")?;
+        cache.put(main_path.to_str().unwrap(), &result, false, false, 2, "1.1")?;
 
-        let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1");
+        let cached = cache.get(main_path.to_str().unwrap(), false, false, 2, "1.1");
         assert!(cached.is_some());
         let cached = cached.unwrap();
         assert_eq!(cached.code_boc64, "test_boc");
@@ -713,6 +778,7 @@ mod tests {
             cached.debug_mark_base64.as_deref(),
             Some("test_debug_marks")
         );
+        assert_eq!(cached.fift_code, None);
         Ok((cache, lib_path, main_path))
     }
 }

@@ -7,7 +7,7 @@ Error: Failed to prepare project for mutation testing: Error: In dependency:
 In main:
 
 [ROOT]/contracts/main[LINE]: error: Failed to import: [NOT_FOUND]
-   2 | import "../gen/dependency_code.tolk"
+   2 | import "../gen/dependency.code.tolk"
      |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Build failed with 2 errors

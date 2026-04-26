@@ -33,12 +33,7 @@ Network to retrace from.
 Without this flag, Acton tries mainnet first and then falls back to testnet.
 .RE
 .sp
-\fB\-\-api\-key\fR \fIkey\fR
-.RS 4
-TonCenter API key for blockchain queries.
-.RE
-.sp
-\fB\-v\fR, \fB\-\-verbose\fR
+\fB\-\-verbose\fR
 .RS 4
 Show full cell hex in outgoing actions instead of only hashes.
 .RE
@@ -102,11 +97,16 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RS 4
 \h'-04'\(bu\h'+03'\fBlocalnet\fR and \fBcustom:<name>\fR are not supported by the retrace backend
 .RE
+.SH "TONCENTER API KEYS"
+Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
+\fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
 .sp
-.RS 4
-\h'-04'\(bu\h'+03'If no \fB\-\-api\-key\fR is provided, Acton throttles requests to reduce rate\-limit
-failures
-.RE
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
+.sp
+If no matching key is configured, Acton throttles requests to reduce
+rate\-limit failures.
 .sp
 For library fallback lookups, retrace also supports \fBDTON_API_KEY\fR from the
 environment.
@@ -122,8 +122,23 @@ When \fB\-\-contract\fR is set:
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'Acton refreshes the bundled stdlib under \fB\&.acton/\fR before preparing the
+source\-level retrace
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'Acton recompiles the contract for the current invocation with debug info and
 source maps
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'no prior \fBacton build \-\-debug\fR step is required, but the current local
+sources and import mappings must compile cleanly
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the recompilation must return both source maps and debug marks; missing either
+is a hard error
 .RE
 .sp
 .RS 4
@@ -153,6 +168,28 @@ Protocol.
 .sp
 \fB\-\-debug\-port\fR follows the same convention as other Acton debug commands:
 without \fB\-\-debug\fR it does not start a debug server.
+.sp
+Current replay\-debug limits:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the retrace adapter exposes one DAP thread only
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'replay sessions do not expose the live \fBRegisters\fR scope available in local
+debug sessions
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the supported request set is intentionally narrow: source breakpoints,
+continue/step, stack/scopes/variables, exception info, evaluate, and
+disconnect
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'unsupported client\-specific extension requests are ignored rather than
+emulated
+.RE
 .SH "VS CODE SETUP"
 Typical setup:
 .sp
@@ -265,11 +302,11 @@ acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41
 .RE
 .sp
 .RS 4
-\h'-04' 2.\h'+01'Force mainnet and use an API key:
+\h'-04' 2.\h'+01'Force mainnet and use an API key from the environment:
 .sp
 .RS 4
 .nf
-acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-net mainnet \-\-api\-key YOUR_API_KEY
+TONCENTER_MAINNET_API_KEY=your\-key acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \-\-net mainnet
 .fi
 .RE
 .RE

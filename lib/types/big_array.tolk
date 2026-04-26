@@ -70,9 +70,7 @@ fun BigArray<T>.last(self): T {
 fun BigArray<T>.push(mutate self, value: T): void {
     var [topLevel, itemsCount] = self.arr;
 
-    if (itemsCount >= 65025) {
-        throw VmExitCode.IntegerOutOfRange;
-    }
+    assert (itemsCount < 65025) throw VmExitCode.IntegerOutOfRange;
 
     val binIdx = itemsCount / 255;
     while (topLevel.size() <= binIdx) {
@@ -128,4 +126,38 @@ fun BigArray<T>.get(self, index: int): T {
     val bin = topLevel.get(binIdx);
     val idxInBin = index % 255;
     return bin.get(idxInBin);
+}
+
+/// Calls [f] for every element in the [BigArray].
+fun BigArray<T>.each(self, f: (T -> void)): void {
+    var i = 0;
+    repeat (self.size()) {
+        f(self.get(i));
+        i += 1;
+    }
+}
+
+/// Returns a new [BigArray] with [f] applied to every element.
+fun BigArray<T>.map<U>(self, f: (T -> U)): BigArray<U> {
+    var res = BigArray<U>.createEmpty();
+    var i = 0;
+    repeat (self.size()) {
+        res.push(f(self.get(i)));
+        i += 1;
+    }
+    return res;
+}
+
+/// Returns a new [BigArray] containing only elements for which [f] returns `true`.
+fun BigArray<T>.filter(self, f: (T -> bool)): BigArray<T> {
+    var res = BigArray<T>.createEmpty();
+    var i = 0;
+    repeat (self.size()) {
+        val item = self.get(i);
+        if (f(item)) {
+            res.push(item);
+        }
+        i += 1;
+    }
+    return res;
 }

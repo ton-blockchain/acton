@@ -1,9 +1,0 @@
-{
-  "pages": [
-    "getting-started",
-    "forking-from-network",
-    "startup-accounts",
-    "persistence-and-snapshots",
-    "api-compatibility"
-  ]
-}

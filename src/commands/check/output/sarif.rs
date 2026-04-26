@@ -351,7 +351,7 @@ fn annotation_to_location(
             artifact_location: Some(artifact_location.clone()),
             context_region: None,
             properties: None,
-            region: span_to_region(source, &annotation.span),
+            region: span_to_region(source, annotation.span),
         }),
         properties: property_bag(
             annotation_tags(annotation),
@@ -376,8 +376,7 @@ fn diagnostic_fixes(
                 continue;
             };
 
-            let Some(region) = span_to_region(file_info.source().source.as_ref(), &edit.span)
-            else {
+            let Some(region) = span_to_region(file_info.source().source.as_ref(), edit.span) else {
                 continue;
             };
 
@@ -544,7 +543,7 @@ fn artifact_location(path: &Path, project_root: &Path) -> sarif::ArtifactLocatio
     }
 }
 
-fn span_to_region(source: &str, span: &Span) -> Option<sarif::Region> {
+fn span_to_region(source: &str, span: Span) -> Option<sarif::Region> {
     let (start_line, start_col) = pos::byte_to_line_col(source, span.start as usize)?;
     let (end_line, end_col) = pos::byte_to_line_col(source, span.end as usize)?;
 

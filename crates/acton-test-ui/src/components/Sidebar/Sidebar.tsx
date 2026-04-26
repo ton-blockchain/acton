@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>
-            <AppIcon theme={theme ?? "light"} />
+            <AppIcon theme={theme ?? "light"} size={24} />
             Test UI
           </div>
           <div className={styles.headerButtons}>

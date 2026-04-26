@@ -165,9 +165,14 @@
   display: flex;
   padding: 8px 16px;
   gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .traceTab {
+  flex: 0 0 auto;
   padding: 4px var(--spacing-sm);
   border: none;
   background-color: var(--bg-color);
@@ -300,6 +305,11 @@
   gap: var(--spacing-xss);
 }
 
+.infoValueGroup {
+  display: flex;
+  flex-direction: column;
+}
+
 .infoLabel {
   font-size: var(--font-size-xss);
   color: var(--text-muted);
@@ -316,6 +326,14 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.statusDescription {
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .traceFeesSection {
@@ -547,7 +565,6 @@
 }
 
 .errorMessageBlock {
-  border-left: 4px solid var(--border-color);
   background-color: var(--bg-secondary-color);
   color: var(--text-primary);
 }
@@ -586,7 +603,7 @@
 .errorHeader {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
 }
 
 .errorRoute {

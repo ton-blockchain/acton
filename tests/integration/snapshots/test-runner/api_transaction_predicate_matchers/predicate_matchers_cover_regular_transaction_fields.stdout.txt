@@ -1,0 +1,26 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✓ predicate regular transaction fields [TIME]
+    └─ Test output:
+       deploy=false
+       bounced=false
+       opcode=0xae110001
+       bounce=true
+       value=500000000
+       from=[WALLET_ADDRESS_BASE] (sender)
+       to=[WALLET_ADDRESS_BASE] (harness)
+       bodyHash=0xf395e703ae4efb6f2454bfd77da3a05fc99d8d96115b738c8043bb2f9784f0f4
+       computePhaseSkipped=false
+       aborted=false
+       exitCode=0
+       success=true
+
+ ✓ 1 passed in 1 file

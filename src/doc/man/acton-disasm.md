@@ -1,14 +1,14 @@
 # acton-disasm(1)
 
-## NAME
+## Name
 
 acton-disasm --- Disassemble TVM bytecode into human-readable TASM
 
-## SYNOPSIS
+## Synopsis
 
 `acton disasm` [_options_] [_boc-file_]
 
-## DESCRIPTION
+## Description
 
 Disassemble compiled TVM bytecode from a file, a literal BoC string, or a live
 contract address.
@@ -17,7 +17,7 @@ This command is useful for debugging compiler output, inspecting deployed code,
 following library references, and correlating bytecode with Tolk source via
 source maps.
 
-## OPTIONS
+## Options
 
 ### Disassembly Options
 
@@ -57,10 +57,6 @@ disassembly output.
 Fetch contract code from the blockchain by address and disassemble it.
 {{/option}}
 
-{{#option "`--api-key` _key_" }}
-TonCenter API key for blockchain queries.
-{{/option}}
-
 {{#option "`--net` _network_" }}
 Network to use for `--address` and library lookups.
 
@@ -73,8 +69,11 @@ If omitted, Acton tries mainnet first and then falls back to testnet.
 {{/option}}
 
 {{#option "`--follow-libraries`" }}
-If the code references a library, fetch and disassemble the actual library code
-instead of showing only the library hash reference.
+If the input disassembles to exactly one top-level exotic library-reference
+cell, fetch and disassemble the actual library code instead of showing only the
+library hash reference.
+
+This is not a general recursive library-follow mode.
 {{/option}}
 
 {{/options}}
@@ -87,29 +86,45 @@ instead of showing only the library hash reference.
 
 {{> options-project-resolved }}
 
-## BLOCKCHAIN LOOKUPS
+## Blockchain Lookups
 
 When `--address` is used, Acton fetches code from the selected network.
 
 - `--net` accepts `mainnet`, `testnet`, `localnet`, and `custom:<name>`
 - `localnet` and `custom:<name>` use URLs from `Acton.toml`
 - Without `--net`, Acton tries mainnet first and then testnet
-- `--api-key` helps avoid TonCenter rate limits
-- `--follow-libraries` resolves library references when possible
+- with `--address`, `--follow-libraries` reuses the network that returned the
+  contract code
 
 When `--follow-libraries` is used with a local file or `--string`, Acton uses
 the explicit `--net` if provided; otherwise library fetches default to
 testnet.
 
-## INPUT PRECEDENCE
+## TonCenter API Keys
+
+Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
+`TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
+names are uppercased and non-alphanumeric characters are replaced with `_`, so
+`custom:mock-remote` becomes `MOCK_REMOTE_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
+
+## Input Precedence
 
 - `BOC_FILE` and `--string` are mutually exclusive
 - `--address` is used only when neither a file nor `--string` is provided
-- `--follow-libraries` only replaces the input when the fetched code is a
-  single library reference and the library lookup succeeds
+- `--follow-libraries` only replaces the input when the initial disassembly is
+  exactly one top-level exotic library-reference cell and the lookup succeeds
+- ordinary code, mixed instruction streams, or nested library references are a
+  no-op for `--follow-libraries`
 - if library lookup fails, Acton warns and disassembles the original code
+  instead; this still exits successfully
 
-## SOURCE MAPS
+## Source Maps
 
 If you compiled a contract with `acton compile --source-map`, you can pass that
 source map JSON here to annotate the disassembly with original Tolk locations.
@@ -117,14 +132,14 @@ source map JSON here to annotate the disassembly with original Tolk locations.
 `--source-map` only affects annotations in the output. It does not change which
 BoC is disassembled.
 
-## EXIT STATUS
+## Exit Status
 
 - `0`: Disassembly completed successfully, including runs with unresolved
   library references that were left as warnings.
 - `1`: BoC input was invalid, a blockchain fetch failed, source-map loading
   failed, or the output file could not be written.
 
-## EXAMPLES
+## Examples
 
 1. Disassemble a local BoC file:
 
@@ -162,13 +177,13 @@ BoC is disassembled.
    acton disasm contract.boc --output build/disasm/contract.tasm
    ```
 
-7. Resolve library references for a local BoC using a configured custom network:
+7. Resolve a top-level library-reference cell using a configured custom network:
 
    ```bash
-   acton disasm contract.boc --follow-libraries --net custom:staging
+   acton disasm library-ref.boc --follow-libraries --net custom:staging
    ```
 
-## SEE ALSO
+## See Also
 
 - `acton help compile`
 - [Disassembly command guide](https://ton-blockchain.github.io/acton/docs/commands/disasm)

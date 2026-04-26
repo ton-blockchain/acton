@@ -14,14 +14,16 @@ use tolk_syntax::{If, IfAlt, NodeTraversalExt, Ternary};
 /// copy-paste mistake.
 ///
 /// ### Example
-/// ```tolk
+/// ```tolk twoslash
 /// if (flag) {
 ///     checkAccess();
 /// } else {
 ///     checkAccess();
+/// //  ^^^^^^^^^^^^^ E027: conditional branches are identical
 /// }
 ///
 /// val result = flag ? value + 1 : value + 1;
+/// //                              ^^^^^^^^^ E027: conditional branches are identical
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]

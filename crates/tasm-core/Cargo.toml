@@ -1,0 +1,28 @@
+[package]
+name = "tasm-core"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+tycho-types = { workspace = true }
+smallvec = { workspace = true }
+anyhow = { workspace = true }
+tolk-compiler = { workspace = true }
+ton-source-map = { workspace = true }
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

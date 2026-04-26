@@ -1,0 +1,11 @@
+warning[E033]: low-level `dict` type should be replaced with typed `map<K, V>`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun main(data: dict) {}
+  |                            ^^^^ prefer `map<K, V>` over low-level `dict`
+  |
+  = Use `map<K, V>` when key and value types are known; keep `dict` only for low-level TVM interop boundaries.
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E033
