@@ -106,11 +106,7 @@ impl RuntimeStack {
     }
 
     #[must_use]
-    pub fn parsed_values(&self) -> Vec<VmStackValue> {
-        self.values().to_vec()
-    }
-
-    fn values(&self) -> &[VmStackValue] {
+    pub fn values(&self) -> &[VmStackValue] {
         match self {
             Self::Empty => &[],
             Self::Raw { raw, parsed } => parsed.get_or_init(|| VmStack::new(raw).parsed()),

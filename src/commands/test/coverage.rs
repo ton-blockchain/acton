@@ -324,8 +324,7 @@ fn process_branch_instruction(
         return;
     };
 
-    let stack_values = stack.parsed_values();
-    let Some(condition_is_true) = stack_condition_is_true(instr_name, &stack_values) else {
+    let Some(condition_is_true) = stack_condition_is_true(instr_name, stack.values()) else {
         return;
     };
 
