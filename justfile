@@ -22,7 +22,6 @@ test-integration:
 test-workspace:
     cargo nextest run --workspace {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
     cargo test --workspace --doc
-    cargo run -- test
 
 _tree-sitter-test grammar:
     cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
@@ -87,6 +86,7 @@ check-security:
     cd crates/ton-ls/editors/code && yarn npm audit --all --recursive --severity=moderate
 
 check-tolk:
+    cargo run -- test
     cargo run -- fmt --check
     cargo run -- check
 
