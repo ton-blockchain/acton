@@ -10,13 +10,16 @@
  TEST  [ROOT]
 
  > tests/formatter_action.test.tolk (1 test)
-  ✓ formatter action phase failure println with hint [TIME]
+  ✓ formatter action phase failure println verbose [TIME]
     └─ Test output:
        N/A -> sender A
        └── empty 0.2 TON -> fm_action_fail B                                           gas=2347 aborted action_result_code=37
            ├── account created
            ├── Action phase failed
            ├── Description: Not enough Toncoin
-           └── Re-run with --backtrace full to get actions location
+           ├── Re-run with --backtrace full to get actions location
+           └── Executed actions:
+               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL                                  balance: 0.0990612 TON
+               └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3E690D84D58C05F1B39E195AB1CB99C00  balance: 0 TON
 
  ✓ 1 passed in 1 file

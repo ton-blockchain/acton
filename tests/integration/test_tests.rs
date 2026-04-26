@@ -1395,7 +1395,31 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
 
 #[test]
 fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
-    let project = ProjectBuilder::new("test-get")
+    let project = action_exit_code_37_project("test-get").build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_action_exit_code_37.stdout.txt");
+}
+
+#[test]
+fn test_test_success_search_param_for_tx_with_action_exit_code_37_verbose() {
+    let project = action_exit_code_37_project("test-get-action-exit-code-37-verbose").build();
+
+    project
+        .acton()
+        .test()
+        .verbose()
+        .run()
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_action_exit_code_37_verbose.stdout.txt");
+}
+
+fn action_exit_code_37_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
         .contract(
             "simple",
             r#"
@@ -1434,14 +1458,6 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
             }
         "#,
         )
-        .build();
-
-    project
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_action_exit_code_37.stdout.txt");
 }
 
 #[test]

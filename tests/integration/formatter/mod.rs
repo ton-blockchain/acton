@@ -1126,6 +1126,19 @@ fn run_success_case(project: ProjectBuilder, snapshot_path: &str) {
         .assert_snapshot_matches(snapshot_path);
 }
 
+fn run_success_case_verbose(project: ProjectBuilder, snapshot_path: &str) {
+    project
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .verbose()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 fn linear_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
     let source = format!("{LINEAR_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
@@ -1911,6 +1924,35 @@ get fun `test formatter action phase failure println with hint`() {
 }
 
 #[test]
+fn formatter_action_phase_failure_println_verbose_renders_actions_retrace() {
+    run_success_case_verbose(
+        action_formatter_project(
+            "formatter-action-failure-println-verbose",
+            r#"
+get fun `test formatter action phase failure println verbose`() {
+    val sender = testing.treasury("sender");
+    val (init, actionAddress) = fmActionInit();
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: {
+                stateInit: init,
+            },
+        }),
+    );
+
+    expect(txs).toHaveLength(1);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_action_phase_failure_println_verbose.stdout.txt",
+    );
+}
+
+#[test]
 fn formatter_action_phase_failure_println_with_backtrace_full_renders_action_locations() {
     let source = format!(
         "{}\n{}\n",
@@ -2019,6 +2061,71 @@ get fun `test formatter flags after gas variants`() {
 "#,
         ),
         "integration/snapshots/formatter/formatter_flags_after_gas_println_variants.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_flags_after_gas_println_verbose_renders_multiple_flag_variants() {
+    run_success_case_verbose(
+        flags_formatter_project(
+            "formatter-flags-after-gas-variants-verbose",
+            r#"
+get fun `test formatter flags after gas variants verbose`() {
+    val (sender, flagsAddress) = deployFmFlagsHarness();
+
+    val okRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: flagsAddress,
+            body: FmFlagsOk { queryId: 1 },
+        }),
+    );
+
+    val throwRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: flagsAddress,
+            body: FmFlagsThrow { queryId: 2 },
+        }),
+    );
+
+    val actionFailRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: flagsAddress,
+            body: FmFlagsActionFail { queryId: 3 },
+        }),
+    );
+
+    val skippedRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: unknownFmFlagsAddress(),
+            body: FmFlagsOk { queryId: 4 },
+        }),
+    );
+
+    expect(okRes).toHaveLength(1);
+    expect(throwRes).toHaveLength(1);
+    expect(actionFailRes).toHaveLength(1);
+    expect(skippedRes).toHaveLength(1);
+
+    println(okRes);
+    println(throwRes);
+    println(actionFailRes);
+    println(skippedRes);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_flags_after_gas_println_variants_verbose.stdout.txt",
     );
 }
 

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/formatter_flags.test.tolk (1 test)
-  ✓ formatter flags after gas variants [TIME]
+  ✓ formatter flags after gas variants verbose [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmFlagsOk 0.2 TON -> fm_flags B                                             gas=516
@@ -24,7 +24,9 @@
            queryId: 3
            ├── Action phase failed
            ├── Description: Not enough Toncoin
-           └── Re-run with --backtrace full to get actions location
+           ├── Re-run with --backtrace full to get actions location
+           └── Executed actions:
+               └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
        
        N/A -> sender A
        └── FmFlagsOk 0.2 TON -> EQAAAA..ALrXfh B                                       compute phase skipped aborted

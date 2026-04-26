@@ -15,7 +15,9 @@
             ├── account created
             ├── Action phase failed
             ├── Description: Not enough Toncoin
-            └── Re-run with --backtrace full to get actions location
+            ├── Re-run with --backtrace full to get actions location
+            └── Executed actions:
+                └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
         
         Cannot find transaction from <any> to <any>
         with:

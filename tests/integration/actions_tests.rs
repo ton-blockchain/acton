@@ -95,47 +95,7 @@ fn test_action_fail() {
 
 #[test]
 fn test_invalid_action_fail() {
-    let project = ProjectBuilder::new("action-fail")
-        .contract(
-            "simple",
-            r"
-                fun onInternalMessage(in: InMessage) {
-                    sendRawMessage(beginCell().endCell(), 0);
-                }
-            ",
-        )
-        .test_file(
-            "test",
-            r#"
-            import "../../lib/testing/expect"
-            import "../../lib/build"
-            import "../../lib/io"
-            import "../../lib/emulation/network"
-            import "../../lib/emulation/testing"
-
-            get fun `test action fail`() {
-                val deployer = testing.treasury("deployer");
-
-                 val addr = AutoDeployAddress {
-                     stateInit: ContractState {
-                         code: build("simple"),
-                         data: createEmptyCell(),
-                     },
-                 };
-
-                // Trigger internal message that will cause action fail
-                val triggerMsg = createMessage({
-                    bounce: false,
-                    value: ton("0.2"),
-                    dest: addr,
-                });
-
-                val res = net.send(deployer.address, triggerMsg);
-                println(res);
-            }
-        "#,
-        )
-        .build();
+    let project = invalid_action_fail_project("action-fail").build();
 
     project
         .acton()
@@ -150,7 +110,39 @@ fn test_invalid_action_fail() {
 
 #[test]
 fn test_invalid_action_fail_without_backtrace() {
-    let project = ProjectBuilder::new("action-fail")
+    let project = invalid_action_fail_project("action-fail").build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("action fail")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_invalid_action_fail_without_backtrace.stdout.txt",
+        );
+}
+
+#[test]
+fn test_invalid_action_fail_without_backtrace_verbose() {
+    let project = invalid_action_fail_project("action-fail-verbose").build();
+
+    project
+        .acton()
+        .test()
+        .verbose()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("action fail")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_invalid_action_fail_without_backtrace_verbose.stdout.txt",
+        );
+}
+
+fn invalid_action_fail_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
         .contract(
             "simple",
             r"
@@ -190,16 +182,4 @@ fn test_invalid_action_fail_without_backtrace() {
             }
         "#,
         )
-        .build();
-
-    project
-        .acton()
-        .test()
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_contains("action fail")
-        .assert_snapshot_matches(
-            "integration/snapshots/test_invalid_action_fail_without_backtrace.stdout.txt",
-        );
 }
