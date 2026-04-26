@@ -20,7 +20,7 @@ Survived Mutants
 ────────────────────────────────────────────────────────────
 
   ✗ Mutation #2
-  Rule:  Replace + with - [flip_plus]
+  Rule:  Replace + with - [replace_plus_with_minus]
   Level: major
   Group: arithmetic
   at contracts/main[LINE]

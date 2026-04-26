@@ -410,7 +410,7 @@ diff = "branch"
 diff-ref = "origin/main"
 mutation-levels = ["critical", "major"]
 minimum-percent = 85
-disable-rules = ["flip_plus"]
+disable-rules = ["replace_plus_with_minus"]
 ```
 
 CLI flags override config values for the current invocation.

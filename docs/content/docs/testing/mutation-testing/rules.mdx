@@ -32,73 +32,73 @@ are often indicators of missing tests for security-critical behavior.
 | `remove_accept_external_message`          | Remove `acceptExternalMessage()` calls        | This external accept path is not covered by tests. Without this call, external message handling semantics may break.      |
 | `remove_commit_contract_data_and_actions` | Remove `commitContractDataAndActions()` calls | This commit path is not covered by tests. Without this call, state persistence and replay-protection semantics may break. |
 | `remove_set_code_postponed`               | Remove `contract.setCodePostponed()` calls    | This upgrade path is not covered by tests. Without this call, code-upgrade semantics may break.                           |
-| `if_condition_true`                       | Replace if condition with `true`              | The conditional logic is not fully covered.                                                                               |
-| `if_condition_false`                      | Replace if condition with `false`             | The conditional logic is not fully covered.                                                                               |
-| `while_condition_false`                   | Replace while condition with `false`          | The loop execution path is not fully covered.                                                                             |
+| `replace_if_condition_with_true`          | Replace if condition with `true`              | The conditional logic is not fully covered.                                                                               |
+| `replace_if_condition_with_false`         | Replace if condition with `false`             | The conditional logic is not fully covered.                                                                               |
+| `replace_while_condition_with_false`      | Replace while condition with `false`          | The loop execution path is not fully covered.                                                                             |
 | `remove_logical_not`                      | Remove logical NOT (`!`)                      | The logical negation is not fully covered.                                                                                |
 
 ## Arithmetic Rules
 
 These rules mutate arithmetic operations to ensure calculations are verified by tests.
 
-| Rule                  | Description              |
-|-----------------------|--------------------------|
-| `flip_plus`           | Replace `+` with `-`     |
-| `flip_minus`          | Replace `-` with `+`     |
-| `flip_mul_div`        | Replace `*` with `/`     |
-| `flip_div_mul`        | Replace `/` with `*`     |
-| `flip_mul_assign`     | Replace `*=` with `/=`   |
-| `flip_div_assign`     | Replace `/=` with `*=`   |
-| `flip_mul_assign_mod` | Replace `*=` with `%=`   |
-| `flip_mod_assign`     | Replace `%=` with `*=`   |
-| `flip_plus_assign`    | Replace `+=` with `-=`   |
-| `flip_minus_assign`   | Replace `-=` with `+=`   |
-| `remove_unary_minus`  | Remove unary minus (`-`) |
+| Rule                                         | Description              |
+|----------------------------------------------|--------------------------|
+| `replace_plus_with_minus`                    | Replace `+` with `-`     |
+| `replace_minus_with_plus`                    | Replace `-` with `+`     |
+| `replace_multiply_with_divide`               | Replace `*` with `/`     |
+| `replace_divide_with_multiply`               | Replace `/` with `*`     |
+| `replace_multiply_assign_with_divide_assign` | Replace `*=` with `/=`   |
+| `replace_divide_assign_with_multiply_assign` | Replace `/=` with `*=`   |
+| `replace_multiply_assign_with_modulo_assign` | Replace `*=` with `%=`   |
+| `replace_modulo_assign_with_multiply_assign` | Replace `%=` with `*=`   |
+| `replace_plus_assign_with_minus_assign`      | Replace `+=` with `-=`   |
+| `replace_minus_assign_with_plus_assign`      | Replace `-=` with `+=`   |
+| `remove_unary_minus`                         | Remove unary minus (`-`) |
 
 ## Comparison Rules
 
 These rules mutate comparison operators to check if boundary conditions are tested.
 
-| Rule         | Description            |
-|--------------|------------------------|
-| `flip_eq_ne` | Replace `==` with `!=` |
-| `flip_ne_eq` | Replace `!=` with `==` |
-| `flip_lt_le` | Replace `<` with `<=`  |
-| `flip_gt_ge` | Replace `>` with `>=`  |
-| `flip_le_lt` | Replace `<=` with `<`  |
-| `flip_ge_gt` | Replace `>=` with `>`  |
+| Rule                                         | Description            |
+|----------------------------------------------|------------------------|
+| `replace_equal_with_not_equal`               | Replace `==` with `!=` |
+| `replace_not_equal_with_equal`               | Replace `!=` with `==` |
+| `replace_less_than_with_less_or_equal`       | Replace `<` with `<=`  |
+| `replace_greater_than_with_greater_or_equal` | Replace `>` with `>=`  |
+| `replace_less_or_equal_with_less_than`       | Replace `<=` with `<`  |
+| `replace_greater_or_equal_with_greater_than` | Replace `>=` with `>`  |
 
 ## Boolean & Logical Rules
 
 These rules invert boolean values and logical operators.
 
-| Rule                | Description                 |
-|---------------------|-----------------------------|
-| `invert_bool_true`  | Replace `true` with `false` |
-| `invert_bool_false` | Replace `false` with `true` |
-| `flip_logical_and`  | Replace `&&` with `\|\|`    |
-| `flip_logical_or`   | Replace `\|\|` with `&&`    |
+| Rule                                  | Description                 |
+|---------------------------------------|-----------------------------|
+| `replace_true_with_false`             | Replace `true` with `false` |
+| `replace_false_with_true`             | Replace `false` with `true` |
+| `replace_logical_and_with_logical_or` | Replace `&&` with `\|\|`    |
+| `replace_logical_or_with_logical_and` | Replace `\|\|` with `&&`    |
 
 ## Bitwise Rules
 
 These rules mutate bitwise operators, compound bitwise assignments, and shifts.
 
-| Rule                          | Description              |
-|-------------------------------|--------------------------|
-| `flip_bitwise_and`            | Replace `&` with `\|`    |
-| `flip_bitwise_or`             | Replace `\|` with `&`    |
-| `flip_bitwise_and_xor`        | Replace `&` with `^`     |
-| `flip_bitwise_or_xor`         | Replace `\|` with `^`    |
-| `flip_bitwise_xor`            | Replace `^` with `&`     |
-| `flip_bitwise_xor_or`         | Replace `^` with `\|`    |
-| `flip_bitwise_and_assign_or`  | Replace `&=` with `\|=`  |
-| `flip_bitwise_and_assign_xor` | Replace `&=` with `^=`   |
-| `flip_bitwise_or_assign_and`  | Replace `\|=` with `&=`  |
-| `flip_bitwise_or_assign_xor`  | Replace `\|=` with `^=`  |
-| `flip_bitwise_xor_assign_and` | Replace `^=` with `&=`   |
-| `flip_bitwise_xor_assign_or`  | Replace `^=` with `\|=`  |
-| `flip_lshift_assign`          | Replace `<<=` with `>>=` |
-| `flip_rshift_assign`          | Replace `>>=` with `<<=` |
-| `flip_lshift`                 | Replace `<<` with `>>`   |
-| `flip_rshift`                 | Replace `>>` with `<<`   |
-| `remove_bitwise_not`          | Remove bitwise NOT (`~`) |
+| Rule                                                 | Description              |
+|------------------------------------------------------|--------------------------|
+| `replace_bitwise_and_with_bitwise_or`                | Replace `&` with `\|`    |
+| `replace_bitwise_or_with_bitwise_and`                | Replace `\|` with `&`    |
+| `replace_bitwise_and_with_bitwise_xor`               | Replace `&` with `^`     |
+| `replace_bitwise_or_with_bitwise_xor`                | Replace `\|` with `^`    |
+| `replace_bitwise_xor_with_bitwise_and`               | Replace `^` with `&`     |
+| `replace_bitwise_xor_with_bitwise_or`                | Replace `^` with `\|`    |
+| `replace_bitwise_and_assign_with_bitwise_or_assign`  | Replace `&=` with `\|=`  |
+| `replace_bitwise_and_assign_with_bitwise_xor_assign` | Replace `&=` with `^=`   |
+| `replace_bitwise_or_assign_with_bitwise_and_assign`  | Replace `\|=` with `&=`  |
+| `replace_bitwise_or_assign_with_bitwise_xor_assign`  | Replace `\|=` with `^=`  |
+| `replace_bitwise_xor_assign_with_bitwise_and_assign` | Replace `^=` with `&=`   |
+| `replace_bitwise_xor_assign_with_bitwise_or_assign`  | Replace `^=` with `\|=`  |
+| `replace_left_shift_assign_with_right_shift_assign`  | Replace `<<=` with `>>=` |
+| `replace_right_shift_assign_with_left_shift_assign`  | Replace `>>=` with `<<=` |
+| `replace_left_shift_with_right_shift`                | Replace `<<` with `>>`   |
+| `replace_right_shift_with_left_shift`                | Replace `>>` with `<<`   |
+| `remove_bitwise_not`                                 | Remove bitwise NOT (`~`) |

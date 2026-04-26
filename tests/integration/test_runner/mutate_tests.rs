@@ -79,7 +79,7 @@ get fun addOne(x: int): int {
 
 const CUSTOM_MUTATION_RULES_JSON: &str = r#"[
   {
-    "name": "flip_plus_custom",
+    "name": "replace_plus_with_multiply_custom",
     "description": "Replace + with *",
     "explanation": "Custom arithmetic mutation loaded from JSON.",
     "level": "major",
@@ -98,8 +98,8 @@ const CUSTOM_MUTATION_RULES_JSON: &str = r#"[
 
 const CUSTOM_MUTATION_RULES_OVERRIDE_JSON: &str = r#"[
   {
-    "name": "flip_plus",
-    "description": "Replace + with *",
+    "name": "replace_plus_with_minus",
+    "description": "Replace + with -",
     "explanation": "Custom override mutation loaded from JSON.",
     "level": "major",
     "group": "arithmetic",
@@ -110,7 +110,7 @@ const CUSTOM_MUTATION_RULES_OVERRIDE_JSON: &str = r#"[
     },
     "edit": {
       "type": "replace",
-      "replacement": "*"
+      "replacement": "-"
     }
   }
 ]"#;
@@ -323,7 +323,7 @@ fn mutate_disable_rules_filter_mutants() {
         .arg("--mutation-disable-rules")
         .arg("remove_assert")
         .arg("--mutation-disable-rules")
-        .arg("flip_plus")
+        .arg("replace_plus_with_minus")
         .run()
         .success()
         .assert_snapshot_matches(
@@ -660,7 +660,7 @@ fn mutate_custom_rules_file_via_cli() {
         .arg("--mutation-disable-rules")
         .arg("remove_assert")
         .arg("--mutation-disable-rules")
-        .arg("flip_plus")
+        .arg("replace_plus_with_minus")
         .run()
         .success()
         .assert_snapshot_matches(
@@ -711,7 +711,7 @@ src = "contracts/simple.tolk"
 
 [test.mutation]
 rules-file = "mutation-rules.json"
-disable-rules = ["remove_assert", "flip_plus"]
+disable-rules = ["remove_assert", "replace_plus_with_minus"]
 "#,
         )
         .build()
@@ -747,7 +747,7 @@ src = "contracts/simple.tolk"
 
 [test.mutation]
 rules-file = "missing-rules.json"
-disable-rules = ["remove_assert", "flip_plus"]
+disable-rules = ["remove_assert", "replace_plus_with_minus"]
 "#,
         )
         .build()
@@ -1429,7 +1429,7 @@ display-name = "simple"
 src = "contracts/simple.tolk"
 
 [test.mutation]
-disable-rules = ["remove_assert", "flip_plus", "flip_gt_ge"]
+disable-rules = ["remove_assert", "replace_plus_with_minus", "replace_greater_than_with_greater_or_equal"]
 "#,
         )
         .build()

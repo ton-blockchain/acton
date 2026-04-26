@@ -34,7 +34,7 @@ Survived Mutants
   Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
 
   ✗ Mutation #2
-  Rule:  Replace + with - [flip_plus]
+  Rule:  Replace + with - [replace_plus_with_minus]
   Level: major
   Group: arithmetic
   at contracts/simple[LINE]

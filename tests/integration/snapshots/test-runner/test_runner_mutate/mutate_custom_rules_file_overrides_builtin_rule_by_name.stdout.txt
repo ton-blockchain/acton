@@ -6,7 +6,7 @@ Source:   contracts/simple.tolk
 Files:    1
 Mutants:  2
 
-  ◉ Mutation 1/2 contracts/simple[LINE] Replace + with * SURVIVED
+  ◉ Mutation 1/2 contracts/simple[LINE] Replace + with - SURVIVED
   ◉ Mutation 2/2 contracts/simple[LINE] Replace > with >= SURVIVED
 
     Total mutants        2
@@ -20,20 +20,20 @@ Survived Mutants
 ────────────────────────────────────────────────────────────
 
   ✗ Mutation #1
-  Rule:  Replace + with * [flip_plus]
+  Rule:  Replace + with - [replace_plus_with_minus]
   Level: major
   Group: arithmetic
   at contracts/simple[LINE]
      7 │ 
      8 │ get fun addOne(x: int): int {
      9 │     return x + 1;
-       │              *
+       │              -
     10 │ }
 
   Why it's bad: Custom override mutation loaded from JSON.
 
   ✗ Mutation #2
-  Rule:  Replace > with >= [flip_gt_ge]
+  Rule:  Replace > with >= [replace_greater_than_with_greater_or_equal]
   Level: major
   Group: comparison
   at contracts/simple[LINE]

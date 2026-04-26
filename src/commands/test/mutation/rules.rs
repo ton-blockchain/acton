@@ -94,7 +94,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             },
         ),
         MutationRule::replace(
-            "flip_plus",
+            "replace_plus_with_minus",
             "Replace + with -",
             "This arithmetic operation is not fully covered by tests. Changing + to - did not cause any tests to fail.",
             MutationLevel::Major,
@@ -106,7 +106,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "-",
         ),
         MutationRule::replace(
-            "flip_minus",
+            "replace_minus_with_plus",
             "Replace - with +",
             "This arithmetic operation is not fully covered by tests. Changing - to + did not cause any tests to fail.",
             MutationLevel::Major,
@@ -118,7 +118,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "+",
         ),
         MutationRule::replace(
-            "flip_mul_div",
+            "replace_multiply_with_divide",
             "Replace * with /",
             "This arithmetic operation is not fully covered by tests. Changing * to / did not cause any tests to fail.",
             MutationLevel::Minor,
@@ -130,7 +130,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "/",
         ),
         MutationRule::replace(
-            "flip_div_mul",
+            "replace_divide_with_multiply",
             "Replace / with *",
             "This arithmetic operation is not fully covered by tests. Changing / to * did not cause any tests to fail.",
             MutationLevel::Minor,
@@ -142,7 +142,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "*",
         ),
         MutationRule::replace(
-            "flip_eq_ne",
+            "replace_equal_with_not_equal",
             "Replace == with !=",
             "This comparison is not fully covered by tests. Inverting the equality check did not cause any tests to fail.",
             MutationLevel::Major,
@@ -154,7 +154,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "!=",
         ),
         MutationRule::replace(
-            "flip_ne_eq",
+            "replace_not_equal_with_equal",
             "Replace != with ==",
             "This comparison is not fully covered by tests. Inverting the inequality check did not cause any tests to fail.",
             MutationLevel::Major,
@@ -166,7 +166,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "==",
         ),
         MutationRule::replace(
-            "flip_lt_le",
+            "replace_less_than_with_less_or_equal",
             "Replace < with <=",
             "This comparison boundary is not strictly checked. Changing < to <= did not affect test results.",
             MutationLevel::Major,
@@ -178,7 +178,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "<=",
         ),
         MutationRule::replace(
-            "flip_gt_ge",
+            "replace_greater_than_with_greater_or_equal",
             "Replace > with >=",
             "This comparison boundary is not strictly checked. Changing > to >= did not affect test results.",
             MutationLevel::Major,
@@ -190,7 +190,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             ">=",
         ),
         MutationRule::replace(
-            "flip_le_lt",
+            "replace_less_or_equal_with_less_than",
             "Replace <= with <",
             "This comparison boundary is not strictly checked. Changing <= to < did not affect test results.",
             MutationLevel::Major,
@@ -202,7 +202,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "<",
         ),
         MutationRule::replace(
-            "flip_ge_gt",
+            "replace_greater_or_equal_with_greater_than",
             "Replace >= with >",
             "This comparison boundary is not strictly checked. Changing >= to > did not affect test results.",
             MutationLevel::Major,
@@ -214,7 +214,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             ">",
         ),
         MutationRule::replace(
-            "invert_bool_true",
+            "replace_true_with_false",
             "Replace true with false",
             "This boolean logic is not fully covered. Replacing 'true' with 'false' did not fail any tests.",
             MutationLevel::Major,
@@ -226,7 +226,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "false",
         ),
         MutationRule::replace(
-            "invert_bool_false",
+            "replace_false_with_true",
             "Replace false with true",
             "This boolean logic is not fully covered. Replacing 'false' with 'true' did not fail any tests.",
             MutationLevel::Major,
@@ -238,7 +238,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "true",
         ),
         MutationRule::replace(
-            "flip_plus_assign",
+            "replace_plus_assign_with_minus_assign",
             "Replace += with -=",
             "This compound assignment is not fully covered. Changing += to -= did not affect test results.",
             MutationLevel::Minor,
@@ -250,7 +250,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "-=",
         ),
         MutationRule::replace(
-            "flip_minus_assign",
+            "replace_minus_assign_with_plus_assign",
             "Replace -= with +=",
             "This compound assignment is not fully covered. Changing -= to += did not affect test results.",
             MutationLevel::Minor,
@@ -262,7 +262,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "+=",
         ),
         MutationRule::replace(
-            "flip_logical_and",
+            "replace_logical_and_with_logical_or",
             "Replace && with ||",
             "This logical operation is not fully covered. Changing && to || did not affect test results.",
             MutationLevel::Major,
@@ -274,7 +274,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "||",
         ),
         MutationRule::replace(
-            "flip_logical_or",
+            "replace_logical_or_with_logical_and",
             "Replace || with &&",
             "This logical operation is not fully covered. Changing || to && did not affect test results.",
             MutationLevel::Major,
@@ -286,7 +286,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "&&",
         ),
         MutationRule::replace(
-            "flip_bitwise_and",
+            "replace_bitwise_and_with_bitwise_or",
             "Replace & with |",
             "This bitwise operation is not fully covered. Changing & to | did not affect test results.",
             MutationLevel::Minor,
@@ -298,7 +298,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "|",
         ),
         MutationRule::replace(
-            "flip_bitwise_or",
+            "replace_bitwise_or_with_bitwise_and",
             "Replace | with &",
             "This bitwise operation is not fully covered. Changing | to & did not affect test results.",
             MutationLevel::Minor,
@@ -310,7 +310,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "&",
         ),
         MutationRule::replace(
-            "flip_bitwise_and_xor",
+            "replace_bitwise_and_with_bitwise_xor",
             "Replace & with ^",
             "This bitwise operation is not fully covered. Changing & to ^ did not affect test results.",
             MutationLevel::Minor,
@@ -322,7 +322,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "^",
         ),
         MutationRule::replace(
-            "flip_bitwise_or_xor",
+            "replace_bitwise_or_with_bitwise_xor",
             "Replace | with ^",
             "This bitwise operation is not fully covered. Changing | to ^ did not affect test results.",
             MutationLevel::Minor,
@@ -334,7 +334,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "^",
         ),
         MutationRule::replace(
-            "flip_bitwise_xor",
+            "replace_bitwise_xor_with_bitwise_and",
             "Replace ^ with &",
             "This bitwise operation is not fully covered. Changing ^ to & did not affect test results.",
             MutationLevel::Minor,
@@ -346,7 +346,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "&",
         ),
         MutationRule::replace(
-            "flip_bitwise_xor_or",
+            "replace_bitwise_xor_with_bitwise_or",
             "Replace ^ with |",
             "This bitwise operation is not fully covered. Changing ^ to | did not affect test results.",
             MutationLevel::Minor,
@@ -358,7 +358,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "|",
         ),
         MutationRule::replace(
-            "flip_bitwise_and_assign_or",
+            "replace_bitwise_and_assign_with_bitwise_or_assign",
             "Replace &= with |=",
             "This compound bitwise assignment is not fully covered. Changing &= to |= did not affect test results.",
             MutationLevel::Minor,
@@ -370,7 +370,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "|=",
         ),
         MutationRule::replace(
-            "flip_bitwise_and_assign_xor",
+            "replace_bitwise_and_assign_with_bitwise_xor_assign",
             "Replace &= with ^=",
             "This compound bitwise assignment is not fully covered. Changing &= to ^= did not affect test results.",
             MutationLevel::Minor,
@@ -382,7 +382,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "^=",
         ),
         MutationRule::replace(
-            "flip_bitwise_or_assign_and",
+            "replace_bitwise_or_assign_with_bitwise_and_assign",
             "Replace |= with &=",
             "This compound bitwise assignment is not fully covered. Changing |= to &= did not affect test results.",
             MutationLevel::Minor,
@@ -394,7 +394,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "&=",
         ),
         MutationRule::replace(
-            "flip_bitwise_or_assign_xor",
+            "replace_bitwise_or_assign_with_bitwise_xor_assign",
             "Replace |= with ^=",
             "This compound bitwise assignment is not fully covered. Changing |= to ^= did not affect test results.",
             MutationLevel::Minor,
@@ -406,7 +406,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "^=",
         ),
         MutationRule::replace(
-            "flip_bitwise_xor_assign_and",
+            "replace_bitwise_xor_assign_with_bitwise_and_assign",
             "Replace ^= with &=",
             "This compound bitwise assignment is not fully covered. Changing ^= to &= did not affect test results.",
             MutationLevel::Minor,
@@ -418,7 +418,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "&=",
         ),
         MutationRule::replace(
-            "flip_bitwise_xor_assign_or",
+            "replace_bitwise_xor_assign_with_bitwise_or_assign",
             "Replace ^= with |=",
             "This compound bitwise assignment is not fully covered. Changing ^= to |= did not affect test results.",
             MutationLevel::Minor,
@@ -430,7 +430,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "|=",
         ),
         MutationRule::replace(
-            "flip_lshift_assign",
+            "replace_left_shift_assign_with_right_shift_assign",
             "Replace <<= with >>=",
             "This compound shift assignment is not fully covered. Changing <<= to >>= did not affect test results.",
             MutationLevel::Minor,
@@ -442,7 +442,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             ">>=",
         ),
         MutationRule::replace(
-            "flip_rshift_assign",
+            "replace_right_shift_assign_with_left_shift_assign",
             "Replace >>= with <<=",
             "This compound shift assignment is not fully covered. Changing >>= to <<= did not affect test results.",
             MutationLevel::Minor,
@@ -454,7 +454,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "<<=",
         ),
         MutationRule::replace(
-            "flip_lshift",
+            "replace_left_shift_with_right_shift",
             "Replace << with >>",
             "This bitwise shift is not fully covered. Changing << to >> did not affect test results.",
             MutationLevel::Minor,
@@ -466,7 +466,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             ">>",
         ),
         MutationRule::replace(
-            "flip_rshift",
+            "replace_right_shift_with_left_shift",
             "Replace >> with <<",
             "This bitwise shift is not fully covered. Changing >> to << did not affect test results.",
             MutationLevel::Minor,
@@ -502,7 +502,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "",
         ),
         MutationRule::replace(
-            "flip_mul_assign",
+            "replace_multiply_assign_with_divide_assign",
             "Replace *= with /=",
             "This compound assignment is not fully covered. Changing *= to /= did not affect test results.",
             MutationLevel::Minor,
@@ -514,7 +514,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "/=",
         ),
         MutationRule::replace(
-            "flip_div_assign",
+            "replace_divide_assign_with_multiply_assign",
             "Replace /= with *=",
             "This compound assignment is not fully covered. Changing /= to *= did not affect test results.",
             MutationLevel::Minor,
@@ -526,7 +526,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "*=",
         ),
         MutationRule::replace(
-            "flip_mul_assign_mod",
+            "replace_multiply_assign_with_modulo_assign",
             "Replace *= with %=",
             "This compound assignment is not fully covered. Changing *= to %= did not affect test results.",
             MutationLevel::Minor,
@@ -538,7 +538,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "%=",
         ),
         MutationRule::replace(
-            "flip_mod_assign",
+            "replace_modulo_assign_with_multiply_assign",
             "Replace %= with *=",
             "This compound assignment is not fully covered. Changing %= to *= did not affect test results.",
             MutationLevel::Minor,
@@ -562,7 +562,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "",
         ),
         MutationRule::replace(
-            "if_condition_true",
+            "replace_if_condition_with_true",
             "Replace if condition with true",
             "The conditional logic is not fully covered. Forcing the condition to true did not affect test results.",
             MutationLevel::Critical,
@@ -574,7 +574,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "true",
         ),
         MutationRule::replace(
-            "if_condition_false",
+            "replace_if_condition_with_false",
             "Replace if condition with false",
             "The conditional logic is not fully covered. Forcing the condition to false did not affect test results.",
             MutationLevel::Critical,
@@ -586,7 +586,7 @@ pub(super) fn rules() -> Vec<MutationRule> {
             "false",
         ),
         MutationRule::replace(
-            "while_condition_false",
+            "replace_while_condition_with_false",
             "Replace while condition with false",
             "The loop execution path is not fully covered. Forcing the loop condition to false did not affect test results.",
             MutationLevel::Critical,
@@ -950,227 +950,259 @@ fun f() {
     }
 
     #[test]
-    fn flip_plus_changes_source() {
+    fn replace_plus_with_minus_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a + b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a - b; }"#;
-        assert_rule_mutates_to("flip_plus", before, after);
+        assert_rule_mutates_to("replace_plus_with_minus", before, after);
     }
 
     #[test]
-    fn flip_minus_changes_source() {
+    fn replace_minus_with_plus_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a - b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a + b; }"#;
-        assert_rule_mutates_to("flip_minus", before, after);
+        assert_rule_mutates_to("replace_minus_with_plus", before, after);
     }
 
     #[test]
-    fn flip_mul_div_changes_source() {
+    fn replace_multiply_with_divide_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a * b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a / b; }"#;
-        assert_rule_mutates_to("flip_mul_div", before, after);
+        assert_rule_mutates_to("replace_multiply_with_divide", before, after);
     }
 
     #[test]
-    fn flip_div_mul_changes_source() {
+    fn replace_divide_with_multiply_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a / b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a * b; }"#;
-        assert_rule_mutates_to("flip_div_mul", before, after);
+        assert_rule_mutates_to("replace_divide_with_multiply", before, after);
     }
 
     #[test]
-    fn flip_eq_ne_changes_source() {
+    fn replace_equal_with_not_equal_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a == b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a != b; }"#;
-        assert_rule_mutates_to("flip_eq_ne", before, after);
+        assert_rule_mutates_to("replace_equal_with_not_equal", before, after);
     }
 
     #[test]
-    fn flip_ne_eq_changes_source() {
+    fn replace_not_equal_with_equal_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a != b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a == b; }"#;
-        assert_rule_mutates_to("flip_ne_eq", before, after);
+        assert_rule_mutates_to("replace_not_equal_with_equal", before, after);
     }
 
     #[test]
-    fn flip_lt_le_changes_source() {
+    fn replace_less_than_with_less_or_equal_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a < b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
-        assert_rule_mutates_to("flip_lt_le", before, after);
+        assert_rule_mutates_to("replace_less_than_with_less_or_equal", before, after);
     }
 
     #[test]
-    fn flip_gt_ge_changes_source() {
+    fn replace_greater_than_with_greater_or_equal_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a > b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
-        assert_rule_mutates_to("flip_gt_ge", before, after);
+        assert_rule_mutates_to("replace_greater_than_with_greater_or_equal", before, after);
     }
 
     #[test]
-    fn flip_le_lt_changes_source() {
+    fn replace_less_or_equal_with_less_than_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a < b; }"#;
-        assert_rule_mutates_to("flip_le_lt", before, after);
+        assert_rule_mutates_to("replace_less_or_equal_with_less_than", before, after);
     }
 
     #[test]
-    fn flip_ge_gt_changes_source() {
+    fn replace_greater_or_equal_with_greater_than_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a > b; }"#;
-        assert_rule_mutates_to("flip_ge_gt", before, after);
+        assert_rule_mutates_to("replace_greater_or_equal_with_greater_than", before, after);
     }
 
     #[test]
-    fn invert_bool_true_changes_source() {
+    fn replace_true_with_false_changes_source() {
         let before = r#"fun f() { val result = true; }"#;
         let after = r#"fun f() { val result = false; }"#;
-        assert_rule_mutates_to("invert_bool_true", before, after);
+        assert_rule_mutates_to("replace_true_with_false", before, after);
     }
 
     #[test]
-    fn invert_bool_false_changes_source() {
+    fn replace_false_with_true_changes_source() {
         let before = r#"fun f() { val result = false; }"#;
         let after = r#"fun f() { val result = true; }"#;
-        assert_rule_mutates_to("invert_bool_false", before, after);
+        assert_rule_mutates_to("replace_false_with_true", before, after);
     }
 
     #[test]
-    fn flip_plus_assign_changes_source() {
+    fn replace_plus_assign_with_minus_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
-        assert_rule_mutates_to("flip_plus_assign", before, after);
+        assert_rule_mutates_to("replace_plus_assign_with_minus_assign", before, after);
     }
 
     #[test]
-    fn flip_minus_assign_changes_source() {
+    fn replace_minus_assign_with_plus_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
-        assert_rule_mutates_to("flip_minus_assign", before, after);
+        assert_rule_mutates_to("replace_minus_assign_with_plus_assign", before, after);
     }
 
     #[test]
-    fn flip_logical_and_changes_source() {
+    fn replace_logical_and_with_logical_or_changes_source() {
         let before = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
         let after = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
-        assert_rule_mutates_to("flip_logical_and", before, after);
+        assert_rule_mutates_to("replace_logical_and_with_logical_or", before, after);
     }
 
     #[test]
-    fn flip_logical_or_changes_source() {
+    fn replace_logical_or_with_logical_and_changes_source() {
         let before = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
         let after = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
-        assert_rule_mutates_to("flip_logical_or", before, after);
+        assert_rule_mutates_to("replace_logical_or_with_logical_and", before, after);
     }
 
     #[test]
-    fn flip_bitwise_and_changes_source() {
+    fn replace_bitwise_and_with_bitwise_or_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
-        assert_rule_mutates_to("flip_bitwise_and", before, after);
+        assert_rule_mutates_to("replace_bitwise_and_with_bitwise_or", before, after);
     }
 
     #[test]
-    fn flip_bitwise_or_changes_source() {
+    fn replace_bitwise_or_with_bitwise_and_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
-        assert_rule_mutates_to("flip_bitwise_or", before, after);
+        assert_rule_mutates_to("replace_bitwise_or_with_bitwise_and", before, after);
     }
 
     #[test]
-    fn flip_bitwise_and_xor_changes_source() {
+    fn replace_bitwise_and_with_bitwise_xor_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
-        assert_rule_mutates_to("flip_bitwise_and_xor", before, after);
+        assert_rule_mutates_to("replace_bitwise_and_with_bitwise_xor", before, after);
     }
 
     #[test]
-    fn flip_bitwise_or_xor_changes_source() {
+    fn replace_bitwise_or_with_bitwise_xor_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
-        assert_rule_mutates_to("flip_bitwise_or_xor", before, after);
+        assert_rule_mutates_to("replace_bitwise_or_with_bitwise_xor", before, after);
     }
 
     #[test]
-    fn flip_bitwise_xor_changes_source() {
+    fn replace_bitwise_xor_with_bitwise_and_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
-        assert_rule_mutates_to("flip_bitwise_xor", before, after);
+        assert_rule_mutates_to("replace_bitwise_xor_with_bitwise_and", before, after);
     }
 
     #[test]
-    fn flip_bitwise_xor_or_changes_source() {
+    fn replace_bitwise_xor_with_bitwise_or_changes_source() {
         let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
         let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
-        assert_rule_mutates_to("flip_bitwise_xor_or", before, after);
+        assert_rule_mutates_to("replace_bitwise_xor_with_bitwise_or", before, after);
     }
 
     #[test]
-    fn flip_bitwise_and_assign_or_changes_source() {
+    fn replace_bitwise_and_assign_with_bitwise_or_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_and_assign_or", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_and_assign_with_bitwise_or_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_bitwise_and_assign_xor_changes_source() {
+    fn replace_bitwise_and_assign_with_bitwise_xor_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_and_assign_xor", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_and_assign_with_bitwise_xor_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_bitwise_or_assign_and_changes_source() {
+    fn replace_bitwise_or_assign_with_bitwise_and_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_or_assign_and", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_or_assign_with_bitwise_and_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_bitwise_or_assign_xor_changes_source() {
+    fn replace_bitwise_or_assign_with_bitwise_xor_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_or_assign_xor", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_or_assign_with_bitwise_xor_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_bitwise_xor_assign_and_changes_source() {
+    fn replace_bitwise_xor_assign_with_bitwise_and_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_xor_assign_and", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_xor_assign_with_bitwise_and_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_bitwise_xor_assign_or_changes_source() {
+    fn replace_bitwise_xor_assign_with_bitwise_or_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
-        assert_rule_mutates_to("flip_bitwise_xor_assign_or", before, after);
+        assert_rule_mutates_to(
+            "replace_bitwise_xor_assign_with_bitwise_or_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_lshift_assign_changes_source() {
+    fn replace_left_shift_assign_with_right_shift_assign_changes_source() {
         let before = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
         let after = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
-        assert_rule_mutates_to("flip_lshift_assign", before, after);
+        assert_rule_mutates_to(
+            "replace_left_shift_assign_with_right_shift_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_rshift_assign_changes_source() {
+    fn replace_right_shift_assign_with_left_shift_assign_changes_source() {
         let before = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
         let after = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
-        assert_rule_mutates_to("flip_rshift_assign", before, after);
+        assert_rule_mutates_to(
+            "replace_right_shift_assign_with_left_shift_assign",
+            before,
+            after,
+        );
     }
 
     #[test]
-    fn flip_lshift_changes_source() {
+    fn replace_left_shift_with_right_shift_changes_source() {
         let before = r#"fun f(value: int) { val result = value << 1; }"#;
         let after = r#"fun f(value: int) { val result = value >> 1; }"#;
-        assert_rule_mutates_to("flip_lshift", before, after);
+        assert_rule_mutates_to("replace_left_shift_with_right_shift", before, after);
     }
 
     #[test]
-    fn flip_rshift_changes_source() {
+    fn replace_right_shift_with_left_shift_changes_source() {
         let before = r#"fun f(value: int) { val result = value >> 1; }"#;
         let after = r#"fun f(value: int) { val result = value << 1; }"#;
-        assert_rule_mutates_to("flip_rshift", before, after);
+        assert_rule_mutates_to("replace_right_shift_with_left_shift", before, after);
     }
 
     #[test]
@@ -1188,31 +1220,31 @@ fun f() {
     }
 
     #[test]
-    fn flip_mul_assign_changes_source() {
+    fn replace_multiply_assign_with_divide_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
-        assert_rule_mutates_to("flip_mul_assign", before, after);
+        assert_rule_mutates_to("replace_multiply_assign_with_divide_assign", before, after);
     }
 
     #[test]
-    fn flip_div_assign_changes_source() {
+    fn replace_divide_assign_with_multiply_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
-        assert_rule_mutates_to("flip_div_assign", before, after);
+        assert_rule_mutates_to("replace_divide_assign_with_multiply_assign", before, after);
     }
 
     #[test]
-    fn flip_mul_assign_mod_changes_source() {
+    fn replace_multiply_assign_with_modulo_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
-        assert_rule_mutates_to("flip_mul_assign_mod", before, after);
+        assert_rule_mutates_to("replace_multiply_assign_with_modulo_assign", before, after);
     }
 
     #[test]
-    fn flip_mod_assign_changes_source() {
+    fn replace_modulo_assign_with_multiply_assign_changes_source() {
         let before = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
         let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
-        assert_rule_mutates_to("flip_mod_assign", before, after);
+        assert_rule_mutates_to("replace_modulo_assign_with_multiply_assign", before, after);
     }
 
     #[test]
@@ -1223,24 +1255,24 @@ fun f() {
     }
 
     #[test]
-    fn if_condition_true_changes_source() {
+    fn replace_if_condition_with_true_changes_source() {
         let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
         let after = r#"fun f(flag: bool) { if (true) { throw 1; } }"#;
-        assert_rule_mutates_to("if_condition_true", before, after);
+        assert_rule_mutates_to("replace_if_condition_with_true", before, after);
     }
 
     #[test]
-    fn if_condition_false_changes_source() {
+    fn replace_if_condition_with_false_changes_source() {
         let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
         let after = r#"fun f(flag: bool) { if (false) { throw 1; } }"#;
-        assert_rule_mutates_to("if_condition_false", before, after);
+        assert_rule_mutates_to("replace_if_condition_with_false", before, after);
     }
 
     #[test]
-    fn while_condition_false_changes_source() {
+    fn replace_while_condition_with_false_changes_source() {
         let before = r#"fun f(flag: bool) { var keep = flag; while (keep) { keep = false; } }"#;
         let after = r#"fun f(flag: bool) { var keep = flag; while (false) { keep = false; } }"#;
-        assert_rule_mutates_to("while_condition_false", before, after);
+        assert_rule_mutates_to("replace_while_condition_with_false", before, after);
     }
 
     #[test]

@@ -20,7 +20,7 @@ Survived Mutants
 ────────────────────────────────────────────────────────────
 
   ✗ Mutation #1
-  Rule:  Replace > with >= [flip_gt_ge]
+  Rule:  Replace > with >= [replace_greater_than_with_greater_or_equal]
   Level: major
   Group: comparison
   at contracts/simple[LINE]
@@ -34,7 +34,7 @@ Survived Mutants
   Why it's bad: This comparison boundary is not strictly checked. Changing > to >= did not affect test results.
 
   ✗ Mutation #2
-  Rule:  Replace + with * [flip_plus_custom]
+  Rule:  Replace + with * [replace_plus_with_multiply_custom]
   Level: major
   Group: arithmetic
   at contracts/simple[LINE]
