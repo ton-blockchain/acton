@@ -13,7 +13,7 @@ use super::types_render::{
 };
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tolk_compiler::TolkSourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::debug_marks_dict::DebugMarksDict;
@@ -90,17 +90,31 @@ pub enum RuntimeEvent {
 pub enum RuntimeStack {
     #[default]
     Empty,
-    Raw(Arc<str>),
+    Raw {
+        raw: Arc<str>,
+        parsed: Arc<OnceLock<Vec<VmStackValue>>>,
+    },
     Values(Vec<VmStackValue>),
 }
 
 impl RuntimeStack {
+    fn raw(raw: Arc<str>) -> Self {
+        Self::Raw {
+            raw,
+            parsed: Arc::new(OnceLock::new()),
+        }
+    }
+
     #[must_use]
     pub fn parsed_values(&self) -> Vec<VmStackValue> {
+        self.values().to_vec()
+    }
+
+    fn values(&self) -> &[VmStackValue] {
         match self {
-            Self::Empty => Vec::new(),
-            Self::Raw(raw) => VmStack::new(raw).parsed(),
-            Self::Values(values) => values.clone(),
+            Self::Empty => &[],
+            Self::Raw { raw, parsed } => parsed.get_or_init(|| VmStack::new(raw).parsed()),
+            Self::Values(values) => values,
         }
     }
 }
@@ -241,38 +255,6 @@ struct VmCodePosition {
     offset: i32,
 }
 
-#[derive(Debug, Default)]
-struct LazyVmStack {
-    raw: Option<Arc<str>>,
-    values: Vec<VmStackValue>,
-}
-
-impl LazyVmStack {
-    fn set(&mut self, stack: RuntimeStack) {
-        match stack {
-            RuntimeStack::Empty => {
-                self.raw = None;
-                self.values.clear();
-            }
-            RuntimeStack::Raw(raw) => {
-                self.raw = Some(raw);
-                self.values.clear();
-            }
-            RuntimeStack::Values(values) => {
-                self.raw = None;
-                self.values = values;
-            }
-        }
-    }
-
-    fn values(&mut self) -> &[VmStackValue] {
-        if let Some(raw) = self.raw.take() {
-            self.values = VmStack::new(&raw).parsed();
-        }
-        &self.values
-    }
-}
-
 pub struct VmLogRuntimeEventSource {
     vm_lines: Vec<OwnedVmLine>,
     cur_vm_line_idx: usize,
@@ -305,7 +287,7 @@ impl RuntimeEventSource for VmLogRuntimeEventSource {
             match &self.vm_lines[idx] {
                 OwnedVmLine::Stack { raw_stack } => {
                     return Some(RuntimeEvent::Stack {
-                        stack: RuntimeStack::Raw(Arc::clone(raw_stack)),
+                        stack: RuntimeStack::raw(Arc::clone(raw_stack)),
                     });
                 }
                 OwnedVmLine::Loc { cell_hash, offset } => {
@@ -570,7 +552,7 @@ pub struct TolkReplayer {
 
     // raw TVM stack (updated from runtime stack events);
     // global (not per-context) because TvmStackValues tick arrives before PushFrame
-    tvm_stack_values: LazyVmStack,
+    tvm_stack_values: RuntimeStack,
 
     // in coverage mode we don't want to materialize stack on ticks
     coverage_mode: bool,
@@ -668,7 +650,7 @@ impl TolkReplayer {
             exec_stack: vec![NoinlineExecState::new()],
             global_var_values: HashMap::new(),
             compiler_abi: None,
-            tvm_stack_values: LazyVmStack::default(),
+            tvm_stack_values: RuntimeStack::default(),
             coverage_mode: false,
             breakpoints: HashSet::new(),
             exception_break_mode: ExceptionBreakMode::Never,
@@ -1274,7 +1256,7 @@ impl TolkReplayer {
             }
             Tick::TvmStackValues { stack } => {
                 self.clear_caught_exception();
-                self.tvm_stack_values.set(stack);
+                self.tvm_stack_values = stack;
 
                 if let Some(exec) = self.exec_stack.last_mut() {
                     exec.accumulated_needs_reset = true;
