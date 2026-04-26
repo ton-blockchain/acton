@@ -116,7 +116,7 @@ log = "0.4.29" # overall logging
 fern = "0.7.1" # overall logging
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5" # test discovery
-sha2 = "0.10" # for cache
+sha2 = { version = "0.10", features = ["asm"] } # for cache; hardware SHA-256 backends
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] } # fast file content hash for cache
 fs2 = "0.4" # build cache locking
 quick-junit = "0.5.2" # junit format for tests
