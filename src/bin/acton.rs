@@ -47,8 +47,8 @@ use clap_complete::engine::{
 };
 use commands::common::error_fmt;
 use dotenvy::dotenv;
+use file_rotate::{ContentLimit, FileRotate, compression::Compression, suffix::AppendCount};
 use human_panic::{Metadata, setup_panic};
-use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
@@ -2222,6 +2222,10 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
 }
 
 const ACTON_LOG_DIR_ENV: &str = "ACTON_LOG_DIR";
+const ACTON_LOG_MAX_BYTES_ENV: &str = "ACTON_LOG_MAX_BYTES";
+const ACTON_LOG_MAX_FILES_ENV: &str = "ACTON_LOG_MAX_FILES";
+const DEFAULT_DEBUG_LOG_MAX_BYTES: u64 = 10 * 1024 * 1024;
+const DEFAULT_DEBUG_LOG_MAX_FILES: usize = 5;
 
 fn env_path(var: &str) -> Option<PathBuf> {
     let value = env::var_os(var)?;
@@ -2265,13 +2269,30 @@ fn resolve_acton_log_dir() -> PathBuf {
     resolve_acton_log_dir_with_env(env_path)
 }
 
+fn log_rotation_config() -> (u64, usize) {
+    let max_bytes = env::var(ACTON_LOG_MAX_BYTES_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_DEBUG_LOG_MAX_BYTES);
+    let max_files = env::var(ACTON_LOG_MAX_FILES_ENV)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_DEBUG_LOG_MAX_FILES);
+    (max_bytes, max_files)
+}
+
 fn setup_logging() -> anyhow::Result<()> {
     let log_dir = resolve_acton_log_dir();
     fs::create_dir_all(&log_dir)?;
-    let log_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_dir.join("debug.log"))?;
+    let (max_bytes, max_files) = log_rotation_config();
+    let log_file = FileRotate::new(
+        log_dir.join("debug.log"),
+        AppendCount::new(max_files),
+        ContentLimit::BytesSurpassed(max_bytes as usize),
+        Compression::None,
+        None,
+    );
 
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -2283,7 +2304,7 @@ fn setup_logging() -> anyhow::Result<()> {
             ));
         })
         .level(log::LevelFilter::Debug)
-        .chain(log_file)
+        .chain(Box::new(log_file) as Box<dyn std::io::Write + Send>)
         // .chain(std::io::stdout())
         .apply()?;
 

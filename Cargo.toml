@@ -114,6 +114,7 @@ crossbeam-channel = "0.5.15" # dap communication
 dap = "0.4.1-alpha1"
 log = "0.4.29" # overall logging
 fern = "0.7.1" # overall logging
+file-rotate = "0.8.0" # size-based debug log rotation
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5" # test discovery
 sha2 = { version = "0.10", features = ["asm"] } # for cache; hardware SHA-256 backends
@@ -250,6 +251,7 @@ inquire = { workspace = true } # for interactive cli
 crossbeam-channel = { workspace = true }
 log = { workspace = true } # overall logging
 fern = { workspace = true } # overall logging
+file-rotate = { workspace = true } # size-based debug log rotation
 chrono = { workspace = true }
 walkdir = { workspace = true } # test discovery
 sha2 = { workspace = true } # for cache

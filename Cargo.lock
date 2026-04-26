@@ -41,6 +41,7 @@ dependencies = [
  "expect-test",
  "expectrl",
  "fern",
+ "file-rotate",
  "flate2",
  "fs2",
  "fs_extra",
@@ -1744,6 +1745,16 @@ dependencies = [
  "ton-syntax",
  "tree-sitter",
  "tree-sitter-fift",
+]
+
+[[package]]
+name = "file-rotate"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e8e2fa049328a1f3295991407a88585805d126dfaadf74b9fe8c194c730aafc"
+dependencies = [
+ "chrono",
+ "flate2",
 ]
 
 [[package]]

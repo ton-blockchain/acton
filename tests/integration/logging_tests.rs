@@ -36,6 +36,35 @@ fn test_debug_log_uses_custom_dir_from_env() {
 }
 
 #[test]
+fn test_debug_log_rotates_when_size_limit_is_exceeded() {
+    let project = ProjectBuilder::new("logging-rotates-by-size")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let custom_logs = project.path().join("custom-logs");
+    std::fs::create_dir_all(&custom_logs).expect("failed to create custom log dir");
+    std::fs::write(custom_logs.join("debug.log"), "oversized log")
+        .expect("failed to create oversized debug log");
+    let custom_logs_str = custom_logs
+        .to_str()
+        .expect("custom logs path must be valid UTF-8");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", custom_logs_str)
+        .env("ACTON_LOG_MAX_BYTES", "1")
+        .env("ACTON_LOG_MAX_FILES", "2")
+        .build()
+        .run()
+        .success();
+
+    assert!(
+        custom_logs.join("debug.log.1").exists(),
+        "oversized debug.log should rotate to debug.log.1"
+    );
+}
+
+#[test]
 fn test_logging_setup_failure_is_non_fatal() {
     let project = ProjectBuilder::new("logging-setup-failure-is-non-fatal")
         .contract("simple", SIMPLE_CONTRACT)
