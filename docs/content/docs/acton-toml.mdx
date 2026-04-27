@@ -368,7 +368,7 @@ override these defaults for the current run.
 Configures the Tolk linter (`acton check`).
 
 Use `[lint]` for linter-wide settings and `[lint.rules]` for rule severities.
-For practical workflows and CI usage, see [Linting](/docs/linting/overview).
+For practical workflows and CI usage, see [Linting](/docs/lint).
 
 ### General Settings
 
@@ -395,7 +395,7 @@ Project-wide discovery still skips built-in directories such as `.git`,
 artifacts are never lint roots.
 CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
 Use `acton check --output-file <PATH>` to write non-plain output into a file.
-For one-off line-level suppressions in source code, use `// check-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
+For one-off line-level suppressions in source code, use `// check-disable-next-line ...` comments (see [project lint policy configuration](/docs/lint#set-project-lint-policy)).
 Suppressions use rule names (for example `unused-variable`) and do not affect compiler/parser diagnostics (`C001`).
 
 ### Global Configuration

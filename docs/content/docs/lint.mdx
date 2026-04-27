@@ -1,0 +1,160 @@
+---
+title: "Linting"
+description: "Learn how to lint Tolk smart contracts, catch common issues, and enforce best practices with Acton"
+icon: "FileCheck"
+---
+
+Run `acton check` to catch compiler errors and lint diagnostics in Tolk contracts, tests, and standalone scripts. Command supports automatic fixes and various output formats for use on CI platforms, such as GitHub and GitLab.
+
+## Lint the whole project
+
+Run:
+
+```bash
+acton check
+```
+
+This checks all lint roots discovered from the project:
+
+- Contracts declared in `Acton.toml`;
+- Workspace `*.test.tolk` files;
+- Standalone script roots that define `main()`.
+
+Use this command before commits and before CI runs.
+
+## Lint one contract or one file
+
+Use a contract name from `Acton.toml`:
+
+```bash
+acton check Counter
+```
+
+Use a file path to check one source file:
+
+```bash
+acton check ./contracts/Counter.tolk
+```
+
+Prefer an explicit path such as `./contracts/Counter.tolk` when a file name could be mistaken for a contract name from `Acton.toml`.
+
+## Apply automatic fixes
+
+Apply safe fixes in place:
+
+```bash
+acton check --fix
+```
+
+`--fix` works only with the default plain terminal output. It applies only fixes that the linter marks as automatically applicable, and the command can still exit with a non-zero status if unfixed diagnostics remain.
+
+## Focus on specific rules
+
+Explain a diagnostic code:
+
+```bash
+acton check --explain E002
+```
+
+Run only selected rules during one pass:
+
+```bash
+acton check --enable-only E003,E028
+```
+
+Use full rule codes for predictable matching.
+
+## Set project lint policy
+
+Store the default lint policy in `Acton.toml`:
+
+```toml title="Acton.toml"
+[lint]
+max-warnings = 0
+exclude = ["contracts/generated/*.tolk"]
+output-format = "sarif"
+
+[lint.rules]
+unused-variable = "deny"
+mutable-variable-can-be-immutable = "warn"
+
+[lint.rules.Counter]
+unused-variable = "allow"
+```
+
+Use:
+
+- `[lint]` for global behavior such as warning thresholds, excluded paths, and default output format;
+- `[lint.rules]` for project-wide rule levels;
+- `[lint.rules.<ContractName>]` for per-contract overrides.
+
+Supported rule levels are:
+
+- `allow` to disable the rule;
+- `warn` to report the rule as a warning;
+- `deny` to report the rule as an error.
+
+Keep these `exclude` rules in mind:
+
+- In project-wide runs, excluded contracts are skipped as lint roots.
+- If an explicit target is passed, that contract or file is still checked.
+- Excluded dependency files can still be parsed for imports and types, but their lint diagnostics are hidden.
+- Excluded roots do not report compiler errors or lint diagnostics in project-wide runs.
+- Exclude matching works against both project-root-relative and absolute paths.
+
+When only one line needs an exception, suppress the next line instead of weakening the whole project policy:
+
+```tolk
+// check-disable-next-line unused-variable
+val legacy = oldLogic();
+```
+
+Another common pattern is suppressing more than one diagnostic:
+
+```tolk
+// check-disable-next-line unused-variable, write-only-variable
+var tmp = 10;
+tmp = 20;
+```
+
+Use rule names such as `unused-variable`, or diagnostic names such as `compiler-error` and `parse-error`, not diagnostic codes such as `E002` or `C001`, in suppression comments.
+
+For suppressions:
+
+- The comment applies only to the immediately following line.
+- The comment must use `//` and sit directly above the target line.
+- `all` suppresses all diagnostics for the next line.
+- Unknown rule names in the suppression list are ignored.
+
+## Use linting in CI
+
+Fail the job on any warning:
+
+```toml title="Acton.toml"
+[lint]
+max-warnings = 0
+```
+
+Then run:
+
+```bash
+acton check # plain stdout output
+```
+
+For machine-readable reports, choose a non-plain output format:
+
+```bash
+acton check --output-format json
+acton check --output-format sarif --output-file build/reports/lint.sarif
+acton check --output-format github
+acton check --output-format gitlab --output-file gl-code-quality-report.json
+```
+
+Non-plain formats report diagnostics but do not rewrite source files, even when `--fix` is passed.
+
+Refer to the [CI integration](/docs/ci-setup) page for more information on output formats and overall CI setup.
+
+## See also
+
+- [`acton check` reference](/docs/commands/check)
+- [Lint rules reference](/docs/rules/overview)
