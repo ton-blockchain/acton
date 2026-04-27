@@ -114,12 +114,11 @@ For a contract-only repository, create `.github/workflows/ci.yml`:
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
+      # Keep the primary protected branch:
       - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -165,9 +164,10 @@ name: Coverage
 
 on:
   pull_request:
-  push:
     branches:
+      # Keep the primary protected branch:
       - main
+      - master
 
 jobs:
   coverage:
@@ -202,12 +202,11 @@ If the repository also contains a frontend created with `acton new --app` or a c
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
+      # Keep the primary protected branch:
       - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -238,6 +237,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Acton build
+        run: acton build
+
       - name: Frontend build
         run: npm run build
 
@@ -247,7 +249,7 @@ jobs:
       - name: Acton format
         run: acton fmt --check
 
-      - name: Prettier
+      - name: Prettier # or other formatting tool such as Biome
         run: npm run fmt:check
 ```
 
