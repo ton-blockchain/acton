@@ -1602,6 +1602,31 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         );
     }
 
+    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    assert!(
+        build_output.status.success(),
+        "npm run build failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build_output.stdout),
+        String::from_utf8_lossy(&build_output.stderr)
+    );
+
+    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+    assert!(
+        test_output.status.success(),
+        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&test_output.stdout),
+        String::from_utf8_lossy(&test_output.stderr)
+    );
+
+    let typecheck_output =
+        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+    assert!(
+        typecheck_output.status.success(),
+        "npm run typecheck failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&typecheck_output.stdout),
+        String::from_utf8_lossy(&typecheck_output.stderr)
+    );
+
     let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
@@ -1863,7 +1888,8 @@ fn test_new_project_leaves_partial_scaffold_when_git_add_fails() {
     assert!(project_dir.join("contracts").exists());
     assert!(project_dir.join("tests").exists());
     assert!(project_dir.join(".gitignore").exists());
-    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".env.example").exists());
+    assert!(!project_dir.join(".env").exists());
     assert!(project_dir.join(".editorconfig").exists());
     assert!(project_dir.join(".git").exists());
 }
@@ -1906,7 +1932,8 @@ fn test_new_project_fails_when_git_init_fails() {
     assert!(project_dir.join("contracts").exists());
     assert!(project_dir.join("tests").exists());
     assert!(project_dir.join(".gitignore").exists());
-    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".env.example").exists());
+    assert!(!project_dir.join(".env").exists());
     assert!(project_dir.join(".editorconfig").exists());
     assert!(!project_dir.join(".git").exists());
 }
@@ -2427,7 +2454,7 @@ fn test_new_nft_project_full_flow() {
 }
 
 #[test]
-fn test_new_empty_project_with_dot_env() {
+fn test_new_empty_project_with_env_example() {
     let project = ProjectBuilder::new("new-dot-env")
         .without_acton_toml()
         .build();
@@ -2465,7 +2492,8 @@ fn test_new_empty_project_with_dot_env() {
     assert!(project.path().join("foobar/tests").exists());
     assert!(project.path().join("foobar/LICENSE").exists());
     assert!(project.path().join("foobar/.gitignore").exists());
-    assert!(project.path().join("foobar/.env").exists());
+    assert!(project.path().join("foobar/.env.example").exists());
+    assert!(!project.path().join("foobar/.env").exists());
     assert!(project.path().join("foobar/.editorconfig").exists());
 }
 

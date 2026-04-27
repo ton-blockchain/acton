@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { TonConnectUIProvider, THEME } from '@tonconnect/ui-react';
 import { App } from './App';
 
+import './polyfills';
+
 const manifestUrl =
   'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
 
@@ -31,7 +33,10 @@ const lightColors = {
   connectButton: { background: '#0098EA', foreground: '#FFFFFF' },
 };
 
-document.documentElement.setAttribute('data-theme', savedTheme === 'light' ? 'light' : 'dark');
+document.documentElement.setAttribute(
+  'data-theme',
+  savedTheme === 'light' ? 'light' : 'dark',
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

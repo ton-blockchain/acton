@@ -67,10 +67,9 @@ acton run deploy-emulation
 acton run deploy-testnet
 ```
 
-If you hit rate limits while talking to Toncenter, put
-`TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` into the generated
-`.env` file, depending on the network you use. Acton loads that file
-automatically, so it is usually the easiest place to keep these keys.
+If you hit rate limits while talking to Toncenter, copy `.env.example` to
+`.env` and put `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` there,
+depending on the network you use. Acton loads `.env` automatically.
 
 ## CI
 

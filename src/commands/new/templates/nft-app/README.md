@@ -52,7 +52,7 @@ npm run dev
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
 - The app reads blockchain data through Toncenter. Set
-  `TONCENTER_TESTNET_API_KEY` and/or `TONCENTER_MAINNET_API_KEY` in `.env` if
-  you need higher rate limits. The same generated `.env` is used by Acton CLI
-  flows and by the Vite frontend; `vite.config.ts` allows the `TONCENTER_`
-  prefix via `envPrefix`.
+  `TONCENTER_TESTNET_API_KEY` and/or `TONCENTER_MAINNET_API_KEY` in a local
+  `.env` copied from `.env.example` if you need higher rate limits. Acton CLI
+  flows and the Vite frontend both read that `.env`; `vite.config.ts` allows
+  the `TONCENTER_` prefix via `envPrefix`.
