@@ -42,8 +42,7 @@ npm run dev
 - `acton wrapper Counter --ts` regenerates `wrappers-ts/Counter.gen.ts`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
-- The app uses the same Vite + npm setup and shadcn/Tailwind UI layer as the
-  Jetton and NFT app templates.
+- The app uses Vite, npm, shadcn-style UI primitives, and Tailwind CSS.
 - Copy `.env.example` to a local `.env` for Toncenter keys. Both Acton CLI and
   the Vite app read `TONCENTER_MAINNET_API_KEY` and
   `TONCENTER_TESTNET_API_KEY`; Vite allows the `TONCENTER_` prefix via
