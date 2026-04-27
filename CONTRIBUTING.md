@@ -274,6 +274,10 @@ Notes:
 
 - `just test` uses `cargo nextest run` for Rust test targets and
   `cargo test --workspace --doc` for doctests.
+- Do not use `#[ignore]` for flaky tests. Add the exact test name to the
+  flaky override in `.config/nextest.toml` instead. Flaky tests still run by
+  default; if a test fails once and then passes on retry, nextest reports it as
+  `FLAKY` and the run still passes. If all attempts fail, the run fails.
 - `ton-retrace` tests stay inside the shared workspace run, but the repo's nextest
   config assigns `package(ton-retrace)` to the `retrace-serial` group, so those
   tests still run one at a time.

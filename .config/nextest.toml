@@ -1,17 +1,29 @@
 [profile.default]
 fail-fast = false
+final-status-level = "flaky"
 
 [profile.ci]
 fail-fast = false
 status-level = "pass"
+final-status-level = "flaky"
 
 [test-groups.retrace-serial]
 # Retrace hits rate-limited remote APIs, so keep its tests mutually exclusive.
 max-threads = 1
 
 [[profile.default.overrides]]
+filter = 'package(ton-retrace) & (test(=tests::test_retrace_lib_load) | test(=tests::test_retrace_v12))'
+retries = 2
+flaky-result = "pass"
+
+[[profile.default.overrides]]
 filter = 'package(ton-retrace)'
 test-group = 'retrace-serial'
+
+[[profile.ci.overrides]]
+filter = 'package(ton-retrace) & (test(=tests::test_retrace_lib_load) | test(=tests::test_retrace_v12))'
+retries = 2
+flaky-result = "pass"
 
 [[profile.ci.overrides]]
 filter = 'package(ton-retrace)'
