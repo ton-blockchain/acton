@@ -116,9 +116,8 @@ fn write_linter_index(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result
     mdx_content.push_str(
         "Lifecycle states currently used in the catalog are mainly `Stable` and `Preview`. The generator also supports future `Deprecated` and `Removed` statuses when rules eventually transition.\n\n",
     );
-    mdx_content.push_str(
-        "For setup, configuration, and CI usage, start with [Linting](/docs/lint).\n\n",
-    );
+    mdx_content
+        .push_str("For setup, configuration, and CI usage, start with [Linting](/docs/lint).\n\n");
 
     mdx_content.push_str("| Code | Rule | Status | Quick fix | What it does |\n");
     mdx_content.push_str("|:-----|:-----|:-------|:----------|:-------------|\n");
