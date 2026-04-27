@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './polyfills';
-import './app.css';
+import './styles.css';
 
 async function bootstrap() {
   const [{ default: App }, { AppProviders }] = await Promise.all([
