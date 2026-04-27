@@ -9,10 +9,10 @@ script that deploys the minter and mints the initial supply.
 - `contracts/JettonMinter.tolk` implements the jetton minter.
 - `contracts/JettonWallet.tolk` implements user jetton wallets.
 - `contracts/errors.tolk` defines starter errors for the template.
-- `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
+- `wrappers/JettonMinter.gen.tolk` and `wrappers/JettonWallet.gen.tolk`
   are the wrappers used by tests and scripts.
-- `tests/wallet.test.tolk` covers minting, admin updates, content updates, and
-  transfers.
+- `tests/*.test.tolk` covers state init, gas, bounce handling, wallet behavior,
+  admin and governance flows, and protocol validation.
 - `scripts/deploy.tolk` builds on-chain metadata, deploys the minter, and mints
   the configured supply, then reads total supply back from the network.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
@@ -40,10 +40,10 @@ acton run deploy-emulation
 
 1. Update the contracts under `contracts/` for your token policy and business
    rules.
-2. Adjust `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
+2. Adjust `wrappers/JettonMinter.gen.tolk` and `wrappers/JettonWallet.gen.tolk`
    to match the new ABI, or regenerate them with `acton wrapper JettonMinter`
    and `acton wrapper JettonWallet`.
-3. Extend `tests/wallet.test.tolk` with the scenarios you care about.
+3. Extend the focused test suites under `tests/` with the scenarios you care about.
 4. Update metadata defaults and deployment behavior in `scripts/deploy.tolk`.
 
 ## Deploy To Testnet

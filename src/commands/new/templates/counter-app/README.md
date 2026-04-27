@@ -45,8 +45,8 @@ npm run dev
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
 - The app uses the same Vite + npm setup and shadcn/Tailwind UI layer as the
-  Jetton template.
-- `.env.example` shows the available env vars. Copy it to `.env` (gitignored)
-  and fill in your keys. Both Acton CLI and the Vite app read
-  `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY`; Vite allows the
-  `TONCENTER_` prefix via `envPrefix` in `vite.config.ts`.
+  Jetton and NFT app templates.
+- The generated `.env` file is gitignored and can hold local Toncenter keys.
+  Both Acton CLI and the Vite app read `TONCENTER_MAINNET_API_KEY` and
+  `TONCENTER_TESTNET_API_KEY`; Vite allows the `TONCENTER_` prefix via
+  `envPrefix` in `vite.config.ts`.

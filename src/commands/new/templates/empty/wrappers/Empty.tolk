@@ -5,29 +5,41 @@
 
 import "@acton/build"
 import "@acton/emulation/network"
+import "@acton/testing/assert"
 import "@contracts/types"
 
+/// Storage `Storage` is defined in `@contracts/types`
 struct Empty {
     address: address
-    init: ContractState
+    stateInit: ContractState? = null
 }
 
-fun Empty.fromStorage(storage: Storage): Empty {
-    val init = ContractState {
+/// Creates a contract wrapper instance from the storage data
+fun Empty.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): Empty {
+    val stateInit = ContractState {
         code: build("Empty"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
-    return Empty { address, init };
+    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    return Empty { address, stateInit };
 }
 
+/// Creates a contract wrapper instance from the address
+fun Empty.fromAddress(address: address): Empty {
+    return Empty { address };
+}
+
+/// Deploys the contract to the blockchain
 fun Empty.deploy(self, from: address, config: SendParams = {}): SendResultList {
-    val deployMsg = createMessage({
+    if (self.stateInit == null) {
+        Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
+    }
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.init },
+        dest: { stateInit: self.stateInit },
     });
-    return net.send(from, deployMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Empty.sendChangeOwner(
@@ -36,23 +48,24 @@ fun Empty.sendChangeOwner(
     newOwner: address,
     config: SendParams = {},
 ): SendResultList {
-    val changeOwnerMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body: ChangeOwner { newOwner },
     });
-    return net.send(from, changeOwnerMsg);
+    return net.send(from, genericMsg);
 }
 
+/// Send message to the contract with a custom body cell
 fun Empty.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
-    val anyMsg = createMessage({
+    val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body,
     });
-    return net.send(from, anyMsg);
+    return net.send(from, genericMsg);
 }
 
 fun Empty.owner(self): address {
