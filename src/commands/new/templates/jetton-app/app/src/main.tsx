@@ -1,9 +1,8 @@
+import './polyfills';
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TonConnectUIProvider, THEME } from '@tonconnect/ui-react';
-import { App } from './App';
-
-import './polyfills';
 
 const manifestUrl =
   'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
@@ -38,17 +37,23 @@ document.documentElement.setAttribute(
   savedTheme === 'light' ? 'light' : 'dark',
 );
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <TonConnectUIProvider
-      manifestUrl={manifestUrl}
-      uiPreferences={{
-        theme: initialTheme,
-        colorsSet: { [THEME.DARK]: darkColors, [THEME.LIGHT]: lightColors },
-      }}
-      analytics={{ mode: 'off' }}
-    >
-      <App />
-    </TonConnectUIProvider>
-  </StrictMode>,
-);
+async function bootstrap() {
+  const { App } = await import('./App');
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <TonConnectUIProvider
+        manifestUrl={manifestUrl}
+        uiPreferences={{
+          theme: initialTheme,
+          colorsSet: { [THEME.DARK]: darkColors, [THEME.LIGHT]: lightColors },
+        }}
+        analytics={{ mode: 'off' }}
+      >
+        <App />
+      </TonConnectUIProvider>
+    </StrictMode>,
+  );
+}
+
+void bootstrap();

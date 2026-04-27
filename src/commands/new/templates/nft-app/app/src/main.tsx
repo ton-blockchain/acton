@@ -1,7 +1,8 @@
+import './polyfills';
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import './polyfills';
 import './styles.css';
 
 async function bootstrap() {
