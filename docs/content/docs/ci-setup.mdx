@@ -283,7 +283,7 @@ Validation jobs do not need to set up wallets. For noninteractive deployment job
 ```toml title="wallets.toml"
 [wallets.deployer]
 kind = "v5r1"
-keys = { mnemonic-env = "<MNEMONIC_WORDS_PHRASE>" }
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
 ```
 
 Then expose the secret in CI:
