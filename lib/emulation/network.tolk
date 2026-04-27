@@ -323,13 +323,13 @@ struct SearchParams {
     /// Predicate example:
     /// ```
     /// expect(txs).toHaveTx({
-    ///     state_init: fun(rawStateInit) {
-    ///         val actual = (rawStateInit as Cell<StateInit?>).load();
+    ///     state_init: fun(rawStateInit: Cell<StateInit?>): bool {
+    ///         val actual = rawStateInit.load();
     ///         // ...
     ///     },
     /// });
     /// ```
-    state_init: (cell -> bool) | cell | null = null
+    state_init: (Cell<StateInit?> -> bool) | Cell<StateInit?> | null = null
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
