@@ -1,7 +1,151 @@
 ---
 title: "Deployment"
-description: "How to deploy Tolk smart contracts with Acton"
+description: "Learn how to deploy Tolk smart contracts locally, on testnet, and on mainnet with Acton"
 icon: "Rocket"
 ---
 
-Stub.
+There is no dedicated `acton deploy` command. Instead, contracts are deployed using [Tolk scripts](/docs/commands/script). Use the same deployment script locally first, then broadcast it to testnet, and finally to mainnet.
+
+## Prerequisites
+
+- A built Acton project with a contract wrapper and deployment script.
+- A configured deployer wallet in `wallets.toml` or `global.wallets.toml` for testnet and mainnet deployments.
+- Testnet TON for testnet deployment.
+- Mainnet TON for mainnet deployment.
+
+<Callout type="warn" title="Real funds move on public networks">
+  Local runs stay in the emulator. Testnet and mainnet runs send real external messages from the configured wallet. Validate the deployment script locally before broadcasting it, and treat mainnet deployment as irreversible.
+</Callout>
+
+## Configure the deployer wallet
+
+Public-network deployments use the wallet returned by `scripts.wallet("deployer")`. Add that wallet to `wallets.toml` or `global.wallets.toml`:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "word1 word2 word3 ... word24" }
+```
+
+For wallet setup details, see the [wallet management](/docs/wallets) page.
+
+## Use a deployment script
+
+Acton deploys contracts through [Tolk scripts](/docs/commands/script), not through a dedicated `acton deploy` command. This keeps deployment logic in Tolk, where contract initialization can stay close to the contract code.
+
+A deployment script usually does three things:
+
+- loads the deployer wallet
+- builds the contract state
+- sends the deployment transaction
+
+The following example deploys a `Counter` contract:
+
+```tolk title="scripts/deploy.tolk"
+import "@acton/io"
+import "@acton/emulation/network"
+import "@acton/emulation/scripts"
+import "@acton/build"
+
+import "@wrappers/Counter"
+import "@contracts/types"
+
+fun main() {
+    val deployer = scripts.wallet("deployer");
+
+    val counter = Counter.fromStorage({
+        id: 123,
+        counter: 0,
+    });
+
+    println("Deploying counter to {}", counter.address);
+
+    val result = counter.deploy(deployer.address, { value: ton("0.05") });
+
+    if (!result.wait()) {
+        return;
+    }
+
+    println("Deployment complete: {}", counter.address);
+    println("On-chain counter is {}", counter.currentCounter());
+}
+```
+
+The same pattern works for more complex contracts. Prepare dictionaries, cells, metadata, and contract code inside the script before calling `deploy`.
+
+```tolk
+import "@acton/emulation/scripts"
+
+fun main() {
+    val deployer = scripts.wallet("deployer");
+
+    val content = buildOnchainMetadata({
+        name: "MyJetton",
+        symbol: "JET",
+        description: "A jetton on TON",
+        image: "https://example.com/icon.png",
+    });
+
+    val minter = JettonMinter.fromStorage({
+        totalSupply: 1_000_000_000,
+        adminAddress: deployer.address,
+        content: content,
+        jettonWalletCode: build("JettonWallet"),
+    });
+
+    minter.deploy(deployer.address, { value: ton("0.05") }).wait();
+
+    println("Jetton deployed at {}", minter.address);
+}
+```
+
+## Deploy locally
+
+Run the deployment script without `--net` to execute it in the local emulator:
+
+```bash
+acton script scripts/deploy.tolk
+```
+
+In local mode, `scripts.wallet("deployer")` creates a virtual wallet automatically. This is the fastest way to verify that the contract address, initial state, deployment value, and post-deploy getter calls behave as expected.
+
+Read-only wrapper calls such as `counter.currentCounter()` keep working after deployment. In local mode, they read emulator state.
+
+## Deploy to testnet
+
+Broadcast the same script to testnet with `--net testnet`:
+
+```bash
+acton script scripts/deploy.tolk --net testnet
+```
+
+In broadcast mode, `scripts.wallet("deployer")` resolves the named wallet from local or global wallet configuration. Read-only wrapper calls still work after deployment, but they read from the selected network instead of the emulator.
+
+<Callout title="Funding testnet deployments">
+  Fund the deployer wallet before broadcasting. Use `acton wallet airdrop` or a public TON testnet faucet.
+</Callout>
+
+For higher request limits, set `TONCENTER_TESTNET_API_KEY`:
+
+```bash
+TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net testnet
+```
+
+## Deploy to mainnet
+
+Broadcast to mainnet only after the same script succeeds locally and on testnet:
+
+```bash
+acton script scripts/deploy.tolk --net mainnet
+```
+
+<Callout type="warn" title="Mainnet deployment">
+  Mainnet deployment transfers real value and publishes the contract state permanently. Confirm the deployer wallet, deployment value, and initialization data before sending the transaction.
+</Callout>
+
+For higher request limits, set `TONCENTER_MAINNET_API_KEY`:
+
+```bash
+TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
+```
