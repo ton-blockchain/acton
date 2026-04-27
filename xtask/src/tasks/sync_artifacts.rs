@@ -7,11 +7,13 @@ use crate::modules::github::Github;
 use anyhow::{Context, Result, bail};
 use flate2::bufread::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::Deserialize;
 use tar::Archive;
 use tempfile::Builder as TempfileBuilder;
 
 const RELEASE_OBJS_RELEASE_TAG: &str = "release-objs";
 const TON_OBJS_DIR: &str = "objs";
+const TON_ARTIFACTS_LOCK_NAME: &str = "ton-artifacts.lock";
 
 const ARTIFACTS_MANIFEST_ASSET_NAME: &str = "artifacts_manifest.toml";
 const TON_OBJS_ARTIFACTS_MANIFEST_PATH: &str = "crates/ton-objs/artifacts_manifest.toml";
@@ -43,7 +45,9 @@ pub(crate) fn run() -> Result<()> {
         manifest_contents,
     )?;
     println!("Synchronized `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`");
-    refresh_local_artifacts_from_release(github, objs_dir)?;
+    let rust_target = current_release_target()?;
+    refresh_local_artifacts_from_release(github, objs_dir, &rust_target)?;
+    warn_if_lock_does_not_match_manifest(objs_dir, &rust_target);
 
     Ok(())
 }
@@ -65,9 +69,12 @@ fn release_archive_name(rust_target: &str) -> String {
     format!("ton-objs-{rust_target}.tar.gz")
 }
 
-fn refresh_local_artifacts_from_release(github: Github, objs_dir: &Path) -> Result<()> {
-    let rust_target = current_release_target()?;
-    let archive_name = release_archive_name(&rust_target);
+fn refresh_local_artifacts_from_release(
+    github: Github,
+    objs_dir: &Path,
+    rust_target: &str,
+) -> Result<()> {
+    let archive_name = release_archive_name(rust_target);
 
     refresh_local_objs_from_release(github, &archive_name, objs_dir)?;
     download_local_stdlib_archive_from_release(
@@ -83,6 +90,122 @@ fn refresh_local_artifacts_from_release(github: Github, objs_dir: &Path) -> Resu
     );
 
     Ok(())
+}
+
+#[derive(Deserialize)]
+struct TonArtifactsChecksums {
+    rust_target: String,
+    sha256_libemulator: String,
+    sha256_libtolk: String,
+}
+
+fn warn_if_lock_does_not_match_manifest(objs_dir: &Path, rust_target: &str) {
+    if let Err(error) = ensure_lock_matches_manifest(objs_dir, rust_target) {
+        eprintln!(
+            "Warning: `{}` does not match `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`: {error}",
+            objs_dir.join(TON_ARTIFACTS_LOCK_NAME).display()
+        );
+    }
+}
+
+fn ensure_lock_matches_manifest(objs_dir: &Path, rust_target: &str) -> Result<()> {
+    let lock_path = objs_dir.join(TON_ARTIFACTS_LOCK_NAME);
+    let lock_contents = fs::read_to_string(&lock_path)
+        .with_context(|| format!("failed to read `{}`", lock_path.display()))?;
+    let manifest_contents = fs::read_to_string(TON_OBJS_ARTIFACTS_MANIFEST_PATH)
+        .with_context(|| format!("failed to read `{TON_OBJS_ARTIFACTS_MANIFEST_PATH}`"))?;
+
+    ensure_lock_matches_manifest_contents(
+        &lock_contents,
+        &lock_path,
+        &manifest_contents,
+        rust_target,
+    )
+}
+
+fn ensure_lock_matches_manifest_contents(
+    lock_contents: &str,
+    lock_path: &Path,
+    manifest_contents: &str,
+    rust_target: &str,
+) -> Result<()> {
+    let lock_checksums: TonArtifactsChecksums = serde_json::from_str(lock_contents)
+        .with_context(|| format!("failed to parse `{}`", lock_path.display()))?;
+    let manifest_checksums = parse_manifest_checksums(manifest_contents, rust_target)?;
+
+    let mut mismatches = Vec::new();
+    push_mismatch(
+        &mut mismatches,
+        "rust_target",
+        &manifest_checksums.rust_target,
+        &lock_checksums.rust_target,
+    );
+    push_mismatch(
+        &mut mismatches,
+        "sha256_libemulator",
+        &manifest_checksums.sha256_libemulator,
+        &lock_checksums.sha256_libemulator,
+    );
+    push_mismatch(
+        &mut mismatches,
+        "sha256_libtolk",
+        &manifest_checksums.sha256_libtolk,
+        &lock_checksums.sha256_libtolk,
+    );
+
+    if !mismatches.is_empty() {
+        bail!("{}", mismatches.join("; "));
+    }
+
+    Ok(())
+}
+
+fn push_mismatch(mismatches: &mut Vec<String>, field_name: &str, expected: &str, actual: &str) {
+    if expected != actual {
+        mismatches.push(format!(
+            "`{field_name}` expected `{expected}`, got `{actual}`"
+        ));
+    }
+}
+
+fn parse_manifest_checksums(
+    manifest_contents: &str,
+    rust_target: &str,
+) -> Result<TonArtifactsChecksums> {
+    let document = manifest_contents
+        .parse::<toml_edit::DocumentMut>()
+        .context("failed to parse downloaded artifacts manifest")?;
+
+    let mut item = document.as_item();
+    for key in ["target", rust_target, "sha256"] {
+        item = item.get(key).with_context(|| {
+            format!("missing table `target.{rust_target}.sha256` in downloaded artifacts manifest")
+        })?;
+    }
+
+    Ok(TonArtifactsChecksums {
+        rust_target: rust_target.to_owned(),
+        sha256_libemulator: read_manifest_sha256(item, "libemulator", rust_target)?,
+        sha256_libtolk: read_manifest_sha256(item, "libtolk", rust_target)?,
+    })
+}
+
+fn read_manifest_sha256(
+    sha256_item: &toml_edit::Item,
+    field_name: &str,
+    rust_target: &str,
+) -> Result<String> {
+    sha256_item
+        .get(field_name)
+        .and_then(toml_edit::Item::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .with_context(|| {
+            format!(
+                "missing string `target.{rust_target}.sha256.{field_name}` in downloaded artifacts manifest"
+            )
+        })
 }
 
 fn refresh_local_objs_from_release(
