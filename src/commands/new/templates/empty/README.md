@@ -8,7 +8,7 @@ tests, and a deployment script you can extend.
 
 - `contracts/Empty.tolk` implements a small ownable contract.
 - `contracts/types.tolk` defines storage, messages, and starter error codes.
-- `wrappers/Empty.tolk` is the wrapper used by tests and scripts.
+- `wrappers/Empty.gen.tolk` is the generated wrapper used by tests and scripts.
 - `tests/contract.test.tolk` covers deployment and ownership transfer.
 - `scripts/deploy.tolk` deploys the contract with `deployer` as the initial
   owner and reads the owner back after deployment.
@@ -37,7 +37,7 @@ acton run deploy-emulation
 
 1. Extend `contracts/types.tolk` with your storage and messages.
 2. Update `contracts/Empty.tolk` with your contract logic.
-3. Adjust `wrappers/Empty.tolk` to match the new ABI, or regenerate it
+3. Adjust `wrappers/Empty.gen.tolk` to match the new ABI, or regenerate it
    with `acton wrapper Empty`.
 4. Extend `tests/contract.test.tolk` with the scenarios you care about.
 5. Update `scripts/deploy.tolk` with the storage and deployment flow you want.
@@ -67,10 +67,9 @@ acton run deploy-emulation
 acton run deploy-testnet
 ```
 
-If you hit rate limits while talking to Toncenter, put
-`TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` into the generated
-`.env` file, depending on the network you use. Acton loads that file
-automatically, so it is usually the easiest place to keep these keys.
+If you hit rate limits while talking to Toncenter, copy `.env.example` to
+`.env` and put `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` there,
+depending on the network you use. Acton loads `.env` automatically.
 
 ## CI
 

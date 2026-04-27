@@ -526,6 +526,80 @@ fn test_new_counter_project_with_app_flag() {
 }
 
 #[test]
+fn test_new_jetton_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-jetton-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("Jetton App Project")
+        .arg("--description")
+        .arg("jetton description")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.agents.md.gen",
+        );
+}
+
+#[test]
+fn test_new_nft_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-nft-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("NFT App Project")
+        .arg("--description")
+        .arg("nft description")
+        .arg("--template")
+        .arg("nft")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_nft_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_nft_app_project_with_agents_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_nft_app_project_with_agents_flag.agents.md.gen",
+        );
+}
+
+#[test]
 fn test_new_empty_project_with_hooks_flag() {
     let project = ProjectBuilder::new("new-empty-hooks")
         .without_acton_toml()
@@ -1528,6 +1602,31 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         );
     }
 
+    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    assert!(
+        build_output.status.success(),
+        "npm run build failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build_output.stdout),
+        String::from_utf8_lossy(&build_output.stderr)
+    );
+
+    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+    assert!(
+        test_output.status.success(),
+        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&test_output.stdout),
+        String::from_utf8_lossy(&test_output.stderr)
+    );
+
+    let typecheck_output =
+        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+    assert!(
+        typecheck_output.status.success(),
+        "npm run typecheck failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&typecheck_output.stdout),
+        String::from_utf8_lossy(&typecheck_output.stderr)
+    );
+
     let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
@@ -1789,7 +1888,8 @@ fn test_new_project_leaves_partial_scaffold_when_git_add_fails() {
     assert!(project_dir.join("contracts").exists());
     assert!(project_dir.join("tests").exists());
     assert!(project_dir.join(".gitignore").exists());
-    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".env.example").exists());
+    assert!(!project_dir.join(".env").exists());
     assert!(project_dir.join(".editorconfig").exists());
     assert!(project_dir.join(".git").exists());
 }
@@ -1832,7 +1932,8 @@ fn test_new_project_fails_when_git_init_fails() {
     assert!(project_dir.join("contracts").exists());
     assert!(project_dir.join("tests").exists());
     assert!(project_dir.join(".gitignore").exists());
-    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".env.example").exists());
+    assert!(!project_dir.join(".env").exists());
     assert!(project_dir.join(".editorconfig").exists());
     assert!(!project_dir.join(".git").exists());
 }
@@ -2353,7 +2454,7 @@ fn test_new_nft_project_full_flow() {
 }
 
 #[test]
-fn test_new_empty_project_with_dot_env() {
+fn test_new_empty_project_with_env_example() {
     let project = ProjectBuilder::new("new-dot-env")
         .without_acton_toml()
         .build();
@@ -2391,7 +2492,8 @@ fn test_new_empty_project_with_dot_env() {
     assert!(project.path().join("foobar/tests").exists());
     assert!(project.path().join("foobar/LICENSE").exists());
     assert!(project.path().join("foobar/.gitignore").exists());
-    assert!(project.path().join("foobar/.env").exists());
+    assert!(project.path().join("foobar/.env.example").exists());
+    assert!(!project.path().join("foobar/.env").exists());
     assert!(project.path().join("foobar/.editorconfig").exists());
 }
 
@@ -2606,17 +2708,15 @@ fn test_new_nft_app_template_typescript_wrappers_match_autogenerated() {
 }
 
 #[test]
-#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
 fn test_new_empty_template_wrappers_match_autogenerated() {
     create_project_and_check_wrappers(
         "new-empty-wrapper-check",
         "empty",
-        &[("Empty", "wrappers/Empty.tolk")],
+        &[("Empty", "wrappers/Empty.gen.tolk")],
     );
 }
 
 #[test]
-#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
 fn test_new_counter_template_wrappers_match_autogenerated() {
     create_project_and_check_wrappers(
         "new-counter-wrapper-check",
@@ -2626,7 +2726,6 @@ fn test_new_counter_template_wrappers_match_autogenerated() {
 }
 
 #[test]
-#[ignore] // template wrappers are out of sync with acton wrapper — fix tracked separately
 fn test_new_counter_app_template_wrappers_match_autogenerated() {
     let workspace = ProjectBuilder::new("new-counter-app-wrapper-check")
         .without_acton_toml()

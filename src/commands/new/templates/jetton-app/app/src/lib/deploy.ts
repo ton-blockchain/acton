@@ -7,7 +7,11 @@ import {
   ChangeMinterAdmin,
   ChangeMinterMetadata,
 } from '@wrappers/JettonMinter.gen';
-import { JettonWallet, AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
+import {
+  JettonWallet,
+  AskToBurn,
+  AskToTransfer,
+} from '@wrappers/JettonWallet.gen';
 import { buildOnchainMetadata, type JettonMetadata } from './jettonContent';
 
 export function parseUnits(amount: string, decimals: number): bigint {
@@ -51,7 +55,13 @@ export function buildMintBody(params: {
   totalTonAmount: bigint;
   queryId?: bigint;
 }): Cell {
-  const { toAddress, jettonAmount, forwardTonAmount, totalTonAmount, queryId = 0n } = params;
+  const {
+    toAddress,
+    jettonAmount,
+    forwardTonAmount,
+    totalTonAmount,
+    queryId = 0n,
+  } = params;
 
   return MintNewJettons.toCell(
     MintNewJettons.create({
@@ -73,7 +83,9 @@ export function buildMintBody(params: {
 }
 
 export function buildChangeAdminBody(newAdmin: Address, queryId = 0n): Cell {
-  return ChangeMinterAdmin.toCell(ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }));
+  return ChangeMinterAdmin.toCell(
+    ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }),
+  );
 }
 
 export async function buildChangeContentBody(
@@ -86,7 +98,11 @@ export async function buildChangeContentBody(
   );
 }
 
-export function buildBurnBody(amount: bigint, responseAddress: Address, queryId = 0n): Cell {
+export function buildBurnBody(
+  amount: bigint,
+  responseAddress: Address,
+  queryId = 0n,
+): Cell {
   return AskToBurn.toCell(
     AskToBurn.create({
       queryId,
@@ -115,7 +131,11 @@ export function buildTransferBody(params: {
   } = params;
 
   const payloadSlice = forwardPayload
-    ? beginCell().storeUint(1, 1).storeRef(forwardPayload).endCell().beginParse()
+    ? beginCell()
+        .storeUint(1, 1)
+        .storeRef(forwardPayload)
+        .endCell()
+        .beginParse()
     : beginCell().storeUint(0, 1).asSlice();
 
   return AskToTransfer.toCell(

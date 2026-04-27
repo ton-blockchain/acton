@@ -40,8 +40,8 @@
   --color-chart-1: var(--chart-1);
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, Tahoma, Verdana,
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial,
+    Tahoma, Verdana, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
 
   --animate-in: enter 0.2s ease-out;

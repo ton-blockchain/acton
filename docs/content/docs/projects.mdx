@@ -151,9 +151,9 @@ A simple example demonstrating state management in Tolk. It includes:
 - Unit tests.
 - A deployment script.
 
-The `counter` template also supports `--app`, which adds a React + Vite app,
-top-level `package.json` and `package-lock.json`, and a generated TypeScript
-wrapper in `wrappers-ts/Counter.ts`.
+The `counter`, `jetton`, and `nft` templates also support `--app`, which adds a
+React + Vite app, top-level `package.json` and `package-lock.json`, and
+generated TypeScript wrappers under `wrappers-ts/`.
 
 ### `jetton`
 A comprehensive example of a [Jetton](https://docs.ton.org/standard/tokens/jettons/overview) (Token) implementation. This is a great reference for building complex multi-contract applications. It includes:
@@ -190,7 +190,7 @@ A typical contract-only template project starts with the following structure:
     <File name="Contract.tolk" />
   </Folder>
   <File name="Acton.toml" />
-  <File name=".env" />
+  <File name=".env.example" />
   <File name=".editorconfig" />
   <File name="README.md" />
   <File name="LICENSE" />
@@ -205,7 +205,7 @@ A typical contract-only template project starts with the following structure:
 - **`tests/`**: Contains your unit and integration tests.
 - **`wrappers/`**: Contains contract wrappers that provide an interface for testing and scripting.
 - **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
-- **`.env`**: Local environment variables template (includes commented `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY` hints).
+- **`.env.example`**: Local environment variables example. Copy it to `.env` for private Toncenter API keys.
 - **`.editorconfig`**: Shared formatting defaults for the generated project.
 - **`README.md`**: Template-specific onboarding notes and common commands for the generated project.
 
@@ -218,10 +218,11 @@ Acton can add more files after project creation or when you opt in:
 - **`AGENTS.md`**: Added when you pass `--agents` or confirm the coding-agent prompt.
 - **`.github/workflows/ci.yml`**: Included by the built-in templates for CI checks.
 
-### Counter Template With `--app`
+### App Layout With `--app`
 
-If you initialize the `counter` template with `--app`, the project layout
-changes to keep contracts and frontend separate:
+If you initialize a supported template with `--app`, the project layout changes
+to keep contracts and frontend separate. The exact contract and wrapper names
+depend on the selected template:
 
 <Files>
   <Folder name=".acton" defaultOpen>
@@ -230,14 +231,14 @@ changes to keep contracts and frontend separate:
   </Folder>
   <Folder name="contracts" defaultOpen>
     <Folder name="src" defaultOpen>
-      <File name="counter.tolk" />
+      <File name="Counter.tolk" />
       <File name="types.tolk" />
     </Folder>
     <Folder name="tests" defaultOpen>
       <File name="counter.test.tolk" />
     </Folder>
     <Folder name="wrappers" defaultOpen>
-      <File name="Counter.tolk" />
+      <File name="Counter.gen.tolk" />
     </Folder>
     <Folder name="scripts" defaultOpen>
       <File name="deploy.tolk" />
@@ -247,13 +248,13 @@ changes to keep contracts and frontend separate:
     <File name="src/App.tsx" />
     <File name="..." />
   </Folder>
-  <Folder name="wrappers" defaultOpen>
-    <File name="Counter.ts" />
+  <Folder name="wrappers-ts" defaultOpen>
+    <File name="Counter.gen.ts" />
   </Folder>
   <File name="package.json" />
   <File name="package-lock.json" />
   <File name="Acton.toml" />
-  <File name=".env" />
+  <File name=".env.example" />
   <File name=".editorconfig" />
   <File name="README.md" />
   <File name="LICENSE" />
@@ -264,7 +265,7 @@ changes to keep contracts and frontend separate:
 - **`contracts/tests/`**: Tolk tests.
 - **`contracts/wrappers/`**: Generated Tolk wrappers used by tests and scripts.
 - **`contracts/scripts/`**: Contract deployment and maintenance scripts.
-- **`wrappers/`**: Generated TypeScript wrappers consumed by the frontend.
+- **`wrappers-ts/`**: Generated TypeScript wrappers consumed by the frontend.
 - **`app/`**: React + Vite application.
 - **`package.json` / `package-lock.json`**: Frontend scripts and pinned npm dependencies.
 - **`README.md`**: Setup notes for the split contract + app layout.
@@ -292,7 +293,7 @@ display-name = "Counter"
 src = "contracts/Counter.tolk"
 ```
 
-For the `counter --app` layout, the contract source moves under `contracts/src`:
+For the `--app` layout, contract sources move under `contracts/src`:
 
 ```toml
 [contracts.Counter]
@@ -313,8 +314,8 @@ acton build
 acton test
 ```
 
-If you created the `counter --app` layout, install frontend dependencies and
-start the app toolchain too:
+If you created a project with `--app`, install frontend dependencies and start
+the app toolchain too:
 
 ```bash
 npm ci

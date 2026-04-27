@@ -3,7 +3,7 @@ import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 
 import "@contracts/types"
-import "@wrappers/Empty"
+import "@wrappers/Empty.gen"
 
 fun main() {
     val deployer = scripts.wallet("deployer");

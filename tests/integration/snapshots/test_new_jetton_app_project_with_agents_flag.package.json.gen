@@ -1,7 +1,7 @@
 {
-  "name": "interactive-counter",
-  "private": true,
+  "name": "jetton-app-project",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "acton build && vite build",
