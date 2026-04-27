@@ -1,7 +1,99 @@
 ---
 title: "Formatting"
-description: "How to format Tolk smart contracts"
+description: "How to format Tolk smart contracts with Acton"
 icon: "AArrowUp"
 ---
 
-Stub.
+Format Tolk contracts with `acton fmt` to keep code style consistent across a project.
+
+## Format every Tolk file in the project
+
+Run `acton fmt` from the project root:
+
+```bash
+acton fmt
+```
+
+If no paths are provided, Acton scans the resolved project root recursively and formats every `.tolk` file it finds.
+
+## Format only selected files or directories
+
+Pass one or more paths to limit the scope:
+
+```bash
+acton fmt contracts scripts/deploy.tolk
+```
+
+Use this form when only part of the repository changed, or when a pre-commit hook should format staged contract files only.
+
+## Check formatting without rewriting files
+
+Use `--check` to validate formatting in CI or before opening a pull request:
+
+```bash
+acton fmt --check
+```
+
+In this mode, Acton does not rewrite files. It prints a diff for each file that does not match the formatter output and exits with a non-zero status.
+
+Formatting is clean when the command exits with status `0` and prints no diffs.
+
+## Run the formatter from another directory
+
+Point Acton to the project explicitly when the current shell is outside the project root:
+
+```bash
+acton fmt --manifest-path ../my-project/Acton.toml
+```
+
+Or set the project root directly:
+
+```bash
+acton fmt --project-root ../my-project
+```
+
+<Callout type="warn">
+  Use either `--manifest-path` or `--project-root`, not both.
+</Callout>
+
+## Adjust formatter defaults
+
+Store formatter defaults in the `[fmt]` section of `Acton.toml`:
+
+```toml title="Acton.toml"
+[fmt]
+width = 100
+ignore = ["contracts/generated/*.tolk"]
+separate-import-groups = true
+```
+
+Use these fields for common formatting rules:
+
+- `width` sets the maximum formatted line width
+- `ignore` excludes files or directories during recursive traversal
+- `separate-import-groups` inserts blank lines between import groups
+
+Acton sorts imports automatically. The formatter groups imports in a fixed order, so manual sorting is usually unnecessary.
+
+<Callout title="Explicit file paths override ignores">
+  A file passed explicitly to `acton fmt` is still formatted even if it matches `[fmt].ignore`. Ignore patterns apply during directory traversal.
+</Callout>
+
+## Troubleshooting
+
+### `acton fmt` reports syntax errors
+
+Fix the parse error first, then run the formatter again. Acton formats only valid Tolk source files.
+
+### A file was skipped unexpectedly
+
+Check whether the file path matches `[fmt].ignore` or one of Acton's built-in excluded directories such as `node_modules`, `.git`, `target`, or `.acton`.
+
+### CI fails on formatting
+
+Run `acton fmt` locally, commit the rewritten `.tolk` files, and rerun the pipeline. For CI examples, see [CI setup](/docs/ci-setup).
+
+## See also
+
+- [`acton fmt` command reference](/docs/commands/fmt)
+- [`Acton.toml` reference](/docs/acton-toml)
