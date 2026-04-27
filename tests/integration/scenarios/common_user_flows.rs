@@ -90,7 +90,7 @@ fn create_project_and_run_tests() {
         .assert_file_exists("foobar/contracts/Empty.tolk")
         .assert_file_exists("foobar/contracts/types.tolk")
         .assert_file_exists("foobar/tests/contract.test.tolk")
-        .assert_file_exists("foobar/wrappers/Empty.tolk")
+        .assert_file_exists("foobar/wrappers/Empty.gen.tolk")
         .assert_file_exists("foobar/scripts/deploy.tolk")
         .assert_file_exists("foobar/README.md")
         .assert_file_exists("foobar/.github/workflows/ci.yml");
