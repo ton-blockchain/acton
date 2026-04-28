@@ -1,0 +1,17 @@
+Print a TonCenter v3 transaction trace as an Acton transaction tree
+
+Usage: acton[EXE] rpc trace [OPTIONS] <HASH>
+
+Arguments:
+  <HASH>  Root transaction hash to query through TonCenter v3 /traces
+
+Options:
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --net <NET>             Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
+      --manifest-path <PATH>  Path to Acton.toml
+      --summary               Print only the trace summary
+      --project-root <PATH>   Path to project root
+      --tree                  Print the trace summary and transaction tree (default)
+      --verbose               Print the summary, tree, and stable per-transaction fields
+      --show-bodies           Print decoded message bodies in the transaction tree
+  -h, --help                  Print help

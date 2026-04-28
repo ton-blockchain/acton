@@ -33,7 +33,8 @@ pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetTracesQuery>,
 ) -> impl IntoResponse {
-    let tx_hash = match payload.hash.as_deref().map(parse_hash_any).transpose() {
+    let tx_hash_raw = payload.tx_hash.as_deref().or(payload.hash.as_deref());
+    let tx_hash = match tx_hash_raw.map(parse_hash_any).transpose() {
         Ok(hash) => hash,
         Err(e) => return v3_bad_request(e.to_string()),
     };
@@ -47,7 +48,7 @@ pub async fn get_traces(
     } else if let Some(tx_hash) = tx_hash {
         handle_v3_result(node.get_traces(tx_hash), v3::map_traces).await
     } else {
-        v3_bad_request("Either `msg_hash` or `hash` is required")
+        v3_bad_request("Either `msg_hash` or `tx_hash` is required")
     }
 }
 

@@ -17,6 +17,9 @@ DESCRIPTION
 
        o  inspect balance, last transaction metadata, and state hashes
 
+       o  print a transaction trace from TonCenter v3 as an Acton transaction
+          tree
+
        o  match deployed code against a local Acton project by code_hash
 
        o  decode account storage through local ABI metadata when a match is
@@ -82,6 +85,56 @@ SUBCOMMANDS
       Output
           acton rpc latest-block prints only the latest masterchain block seqno
           as a decimal number.
+
+   acton rpc trace
+       Fetch a TonCenter v3 trace by root transaction hash and print it in a
+       stable Acton text format.
+
+      Synopsis
+          acton rpc trace [options] hash
+
+      Options
+          hash
+              Root transaction hash to query through TonCenter v3 /traces.
+
+          --net network
+              Network to query.
+
+              Defaults to testnet.
+
+              Supported values include mainnet, testnet, localnet, and
+              custom:<name>.
+
+          --summary
+              Print only the trace summary.
+
+          --tree
+              Print the trace summary and transaction tree. This is the default
+              mode.
+
+          --verbose
+              Print the summary, tree, and stable per-transaction fields.
+
+          --show-bodies
+              Print decoded message bodies in the transaction tree.
+
+      Output
+          acton rpc trace prints a short summary first:
+
+          o  query hash
+
+          o  trace id
+
+          o  root transaction hash
+
+          o  whether the trace is complete
+
+          o  total transaction and message counts
+
+          Tree and verbose modes then reuse the same transaction tree formatter
+          as Acton tests. When current account code matches a local contract in
+          the project, Acton prints local contract names through the local ABI.
+          Add --show-bodies to print decoded inbound message bodies.
 
 DISPLAY OPTIONS
        --color when
@@ -169,6 +222,10 @@ EXAMPLES
        5. Print the latest mainnet masterchain block number:
 
               acton rpc latest-block --net mainnet
+
+       6. Print a transaction trace from localnet:
+
+              acton rpc trace <tx-hash> --net localnet
 
 SEE ALSO
        o  acton help disasm

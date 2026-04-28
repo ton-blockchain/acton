@@ -191,6 +191,16 @@ fn test_acton_rpc_info_help() {
 }
 
 #[test]
+fn test_acton_rpc_trace_help() {
+    snapbox::cmd::Command::acton_ui()
+        .args(["rpc", "trace", "--help"])
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/rpc_trace/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
 fn test_acton_retrace_help() {
     snapbox::cmd::Command::acton_ui()
         .args(["retrace", "--help"])

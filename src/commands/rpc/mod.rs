@@ -1,22 +1,38 @@
 use crate::commands::common::error_fmt;
+use crate::context::{BuildCache, KnownAddresses};
+use crate::ffi::emulation::{
+    synthesize_tx_cell_from_v3, tx_cell_to_send_result_tuple_with_relations,
+};
 use crate::file_build_cache::FileBuildCache;
+use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
 use num_bigint::{BigInt, Sign};
+use rustc_hash::FxHashMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::TolkSourceMap;
+use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
 use ton_abi::abi_serde::Data as CompilerAbiData;
 use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
-use ton_api::{Network, TonApiClient};
+use ton_api::{
+    AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
+    V3TransactionSummary,
+};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
+use tycho_types::cell::{Cell, CellSlice, HashBytes, Lazy};
 use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
+    Account, AccountState as TychoAccountState, Base64StdAddrFlags, CurrencyCollection,
+    DisplayBase64StdAddr, IntAddr, OptionalAccount, ShardAccount, StateInit, StdAddr,
+    StdAddrFormat, StorageInfo,
 };
 
 #[derive(Subcommand, Clone)]
@@ -39,12 +55,55 @@ pub enum RpcCommand {
         )]
         net: Option<String>,
     },
+    #[command(about = "Print a TonCenter v3 transaction trace as an Acton transaction tree")]
+    Trace {
+        #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
+        hash: String,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            conflicts_with_all = ["tree", "verbose"],
+            help = "Print only the trace summary"
+        )]
+        summary: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "verbose"],
+            help = "Print the trace summary and transaction tree (default)"
+        )]
+        tree: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "tree"],
+            help = "Print the summary, tree, and stable per-transaction fields"
+        )]
+        verbose: bool,
+        #[arg(long, help = "Print decoded message bodies in the transaction tree")]
+        show_bodies: bool,
+    },
 }
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
         RpcCommand::LatestBlock { net } => rpc_latest_block_cmd(net),
+        RpcCommand::Trace {
+            hash,
+            net,
+            summary,
+            tree,
+            verbose,
+            show_bodies,
+        } => rpc_trace_cmd(
+            &hash,
+            net,
+            trace_output_mode(summary, tree, verbose),
+            show_bodies,
+        ),
     }
 }
 
@@ -162,6 +221,634 @@ fn rpc_latest_block_cmd(net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TraceOutputMode {
+    Summary,
+    Tree,
+    Verbose,
+}
+
+const fn trace_output_mode(summary: bool, _tree: bool, verbose: bool) -> TraceOutputMode {
+    if summary {
+        TraceOutputMode::Summary
+    } else if verbose {
+        TraceOutputMode::Verbose
+    } else {
+        TraceOutputMode::Tree
+    }
+}
+
+fn rpc_trace_cmd(
+    hash: &str,
+    net: Option<String>,
+    mode: TraceOutputMode,
+    show_bodies: bool,
+) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let mut traces = client
+        .get_traces_by_tx_hash(hash, 1)
+        .with_context(|| format!("Failed to fetch trace {hash} from {network}"))?;
+    let trace = traces
+        .pop()
+        .ok_or_else(|| anyhow!("No trace found for transaction hash {hash} on {network}"))?;
+
+    let trace_txs = (mode != TraceOutputMode::Summary)
+        .then(|| build_rpc_trace_transactions(&trace))
+        .transpose()?;
+
+    print_rpc_trace_summary(hash, &trace);
+    if mode == TraceOutputMode::Summary {
+        return Ok(());
+    }
+
+    let trace_txs = trace_txs.expect("trace transactions are built above for non-summary modes");
+    let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
+
+    print_section("Trace Tree");
+    let send_results = trace_txs
+        .iter()
+        .map(|tx| {
+            tx_cell_to_send_result_tuple_with_relations(
+                tx.tx_cell.clone(),
+                &tx.transaction,
+                &tx.child_lts,
+                tx.parent_lt,
+            )
+        })
+        .collect::<Vec<_>>();
+    let send_result_list = TupleItem::TypedTuple {
+        type_name: "SendResultList".to_owned(),
+        inner: Tuple(send_results),
+    };
+    let formatted_tree = formatter.format(&send_result_list);
+    println!("{}", formatted_tree.trim_end());
+
+    if mode == TraceOutputMode::Verbose {
+        print_section("Trace Details");
+        print_rpc_trace_details(&trace_txs, Some(&formatter), &network);
+    }
+
+    Ok(())
+}
+
+struct RpcTraceTransaction {
+    hash: String,
+    summary: V3TransactionSummary,
+    tx_cell: Cell,
+    transaction: tycho_types::models::Transaction,
+    parent_lt: Option<u64>,
+    child_lts: Vec<u64>,
+}
+
+fn build_rpc_trace_transactions(trace: &V3Trace) -> anyhow::Result<Vec<RpcTraceTransaction>> {
+    let mut transactions = Vec::with_capacity(trace.transactions_order.len());
+    for tx_hash in &trace.transactions_order {
+        let summary = trace
+            .transactions
+            .get(tx_hash)
+            .ok_or_else(|| anyhow!("Trace references missing transaction {tx_hash}"))?;
+        if summary.in_msg.is_none() {
+            anyhow::bail!(
+                "Trace transaction {tx_hash} has no in_msg in TonCenter v3 /traces response"
+            );
+        }
+        let (tx_cell, transaction) = synthesize_tx_cell_from_v3(summary)
+            .with_context(|| format!("Failed to synthesize transaction {tx_hash}"))?;
+        transactions.push(RpcTraceTransaction {
+            hash: tx_hash.clone(),
+            summary: summary.clone(),
+            tx_cell,
+            transaction,
+            parent_lt: None,
+            child_lts: Vec::new(),
+        });
+    }
+
+    let in_msg_by_hash = transactions
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, tx)| {
+            message_hash(tx.summary.in_msg.as_ref()).map(|hash| (hash.to_owned(), idx))
+        })
+        .collect::<HashMap<_, _>>();
+
+    let mut edges = Vec::new();
+    for (parent_idx, tx) in transactions.iter().enumerate() {
+        for out_msg in &tx.summary.out_msgs {
+            let Some(hash) = message_hash(Some(out_msg)) else {
+                continue;
+            };
+            let Some(child_idx) = in_msg_by_hash.get(hash).copied() else {
+                continue;
+            };
+            if child_idx != parent_idx {
+                edges.push((parent_idx, child_idx));
+            }
+        }
+    }
+
+    for (parent_idx, child_idx) in edges {
+        let parent_lt = transactions[parent_idx].transaction.lt;
+        let child_lt = transactions[child_idx].transaction.lt;
+        if transactions[child_idx].parent_lt.is_none() {
+            transactions[child_idx].parent_lt = Some(parent_lt);
+        }
+        if !transactions[parent_idx].child_lts.contains(&child_lt) {
+            transactions[parent_idx].child_lts.push(child_lt);
+        }
+    }
+
+    for tx in &mut transactions {
+        tx.child_lts.sort_unstable();
+    }
+
+    Ok(transactions)
+}
+
+fn message_hash(message: Option<&V3MessageSummary>) -> Option<&str> {
+    message?.hash.as_deref().filter(|hash| !hash.is_empty())
+}
+
+fn rpc_trace_formatter(
+    trace_txs: &[RpcTraceTransaction],
+    client: &TonApiClient,
+    network: &Network,
+    config: &ActonConfig,
+    show_bodies: bool,
+) -> anyhow::Result<FormatterContext<'static>> {
+    let build_cache = load_local_build_cache(config)?;
+    let accounts = if build_cache.built.is_empty() {
+        FxHashMap::default()
+    } else {
+        match fetch_trace_accounts(trace_txs, client) {
+            Ok(accounts) => accounts,
+            Err(err) => {
+                warn!("Skipping rpc trace local ABI matching: {err:#}");
+                FxHashMap::default()
+            }
+        }
+    };
+
+    let mut formatter = FormatterContext::empty();
+    formatter.accounts = Cow::Owned(accounts);
+    formatter.build_cache = Cow::Owned(build_cache);
+    formatter.known_addresses = Cow::Owned(KnownAddresses::new());
+    formatter.show_bodies = show_bodies;
+    formatter.network = Some(network.clone());
+    Ok(formatter)
+}
+
+fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
+    print_section("Trace Summary");
+    print_kv("Query Hash", query_hash);
+    print_kv("Trace ID", trace.trace_id.as_str());
+    print_kv(
+        "Root Tx Hash",
+        trace
+            .transactions_order
+            .first()
+            .map(String::as_str)
+            .unwrap_or("<none>"),
+    );
+    print_kv("Trace Complete", (!trace.is_incomplete).to_string());
+    print_kv("Total Txs", trace.transactions_order.len().to_string());
+    print_kv("Total Messages", trace_message_count(trace).to_string());
+}
+
+fn trace_message_count(trace: &V3Trace) -> usize {
+    let mut unique = BTreeSet::new();
+
+    for tx_hash in &trace.transactions_order {
+        let Some(tx) = trace.transactions.get(tx_hash) else {
+            continue;
+        };
+        count_trace_message(tx_hash, "in", tx.in_msg.as_ref(), &mut unique);
+        for (idx, msg) in tx.out_msgs.iter().enumerate() {
+            let synthetic_id = format!("out:{idx}");
+            count_trace_message(tx_hash, &synthetic_id, Some(msg), &mut unique);
+        }
+    }
+
+    unique.len()
+}
+
+fn count_trace_message(
+    tx_hash: &str,
+    synthetic_id: &str,
+    message: Option<&V3MessageSummary>,
+    unique: &mut BTreeSet<String>,
+) {
+    let Some(message) = message else {
+        return;
+    };
+    if let Some(hash) = message_hash(Some(message)) {
+        unique.insert(hash.to_owned());
+    } else {
+        unique.insert(format!("{tx_hash}:{synthetic_id}"));
+    }
+}
+
+fn print_rpc_trace_details(
+    trace_txs: &[RpcTraceTransaction],
+    formatter: Option<&FormatterContext<'_>>,
+    network: &Network,
+) {
+    for (idx, tx) in trace_txs.iter().enumerate() {
+        let prefix = format!("tx[{}]", idx + 1);
+        println!("  {prefix}:");
+        println!("    hash: {}", tx.hash);
+        println!("    lt: {}", tx.transaction.lt);
+        println!(
+            "    account: {}",
+            format_trace_address(&tx.summary.account, network)
+        );
+        println!("    parent_lt: {}", format_optional_u64(tx.parent_lt));
+        println!("    child_lts: {}", format_child_lts(&tx.child_lts));
+
+        if let Some(message) = &tx.summary.in_msg {
+            println!(
+                "    from: {}",
+                format_optional_address(&message.source, network)
+            );
+            println!(
+                "    to: {}",
+                format_optional_address(&message.destination, network)
+            );
+            println!("    value: {}", format_message_value(message));
+            println!("    opcode: {}", format_message_opcode(message, formatter));
+            println!("    bounced: {}", message.bounced.unwrap_or(false));
+            println!(
+                "    branch: {}",
+                trace_branch_kind(&tx.summary, message, formatter)
+            );
+        } else {
+            println!("    from: <none>");
+            println!("    to: <none>");
+            println!("    value: <none>");
+            println!("    opcode: <none>");
+            println!("    bounced: false");
+            println!("    branch: system");
+        }
+
+        println!("    success: {}", trace_tx_success(&tx.summary));
+        println!("    exit_code: {}", format_compute_exit_code(&tx.summary));
+        println!(
+            "    action_result_code: {}",
+            format_action_result_code(&tx.summary)
+        );
+    }
+}
+
+fn format_optional_u64(value: Option<u64>) -> String {
+    value.map_or_else(|| "null".to_owned(), |value| value.to_string())
+}
+
+fn format_child_lts(child_lts: &[u64]) -> String {
+    if child_lts.is_empty() {
+        return "[]".to_owned();
+    }
+    format!(
+        "[{}]",
+        child_lts
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn trace_tx_success(tx: &V3TransactionSummary) -> bool {
+    let Some(description) = &tx.description else {
+        return false;
+    };
+    if description.aborted.unwrap_or(false) {
+        return false;
+    }
+    if let Some(compute) = &description.compute_ph
+        && (!compute.success.unwrap_or(false) || compute.exit_code.unwrap_or(0) != 0)
+    {
+        return false;
+    }
+    if let Some(action) = &description.action
+        && (!action.success.unwrap_or(false) || action.result_code.unwrap_or(0) != 0)
+    {
+        return false;
+    }
+    true
+}
+
+fn format_compute_exit_code(tx: &V3TransactionSummary) -> String {
+    tx.description
+        .as_ref()
+        .and_then(|description| description.compute_ph.as_ref())
+        .and_then(|compute| compute.exit_code)
+        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+}
+
+fn format_action_result_code(tx: &V3TransactionSummary) -> String {
+    tx.description
+        .as_ref()
+        .and_then(|description| description.action.as_ref())
+        .and_then(|action| action.result_code)
+        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+}
+
+fn trace_branch_kind(
+    tx: &V3TransactionSummary,
+    message: &V3MessageSummary,
+    formatter: Option<&FormatterContext<'_>>,
+) -> &'static str {
+    if message.bounced.unwrap_or(false) {
+        return "bounce";
+    }
+    if matches!(
+        tx.orig_status.as_deref(),
+        Some("nonexist" | "uninit" | "uninitialized")
+    ) && tx.end_status.as_deref() == Some("active")
+    {
+        return "deploy";
+    }
+    if format_message_opcode(message, formatter)
+        .to_ascii_lowercase()
+        .contains("notification")
+    {
+        return "notification";
+    }
+    "message"
+}
+
+fn format_message_opcode(
+    message: &V3MessageSummary,
+    formatter: Option<&FormatterContext<'_>>,
+) -> String {
+    let opcode = extract_message_opcode(message);
+    let opcode_text = if opcode == 0 {
+        "0x00000000".to_owned()
+    } else {
+        format!("0x{opcode:08x}")
+    };
+    let name = local_message_name(message, opcode, formatter)
+        .or_else(|| (opcode == 0).then(|| "empty".to_owned()));
+    match name {
+        Some(name) => format!("{opcode_text} ({name})"),
+        None => opcode_text,
+    }
+}
+
+fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
+    let Some(body_boc64) = message
+        .message_content
+        .as_ref()
+        .and_then(|content| content.body.as_deref())
+        .filter(|body| !body.is_empty())
+    else {
+        return 0;
+    };
+    let Ok(body) = Boc::decode_base64(body_boc64) else {
+        return 0;
+    };
+    let mut parser = body.as_slice_allow_exotic();
+    let mut opcode = parser.load_u32().unwrap_or(0);
+    if message.bounced.unwrap_or(false) {
+        opcode = parser.load_u32().unwrap_or(0);
+    }
+    opcode
+}
+
+fn local_message_name(
+    message: &V3MessageSummary,
+    _opcode: u32,
+    formatter: Option<&FormatterContext<'_>>,
+) -> Option<String> {
+    let formatter = formatter?;
+    let dst = message.destination.as_deref()?;
+    let (dst, _) = StdAddr::from_str_ext(dst, StdAddrFormat::any()).ok()?;
+    let code = FormatterContext::account_code(&formatter.accounts, &dst);
+    let (_, build) = formatter.build_cache.result_for_code(&code)?;
+    let compiler_abi = build.compiler_abi.as_ref()?;
+    let body = decode_message_body(message)?;
+    let candidates = if message.source.is_none() {
+        MessageBodyCandidates::External
+    } else {
+        MessageBodyCandidates::Internal {
+            bounced: message.bounced.unwrap_or(false),
+        }
+    };
+    local_message_name_from_body(body.as_slice_allow_exotic(), compiler_abi, candidates)
+        .filter(|name| !name.is_empty())
+}
+
+enum MessageBodyCandidates {
+    Internal { bounced: bool },
+    External,
+}
+
+fn decode_message_body(message: &V3MessageSummary) -> Option<Cell> {
+    let body_boc64 = message
+        .message_content
+        .as_ref()
+        .and_then(|content| content.body.as_deref())
+        .filter(|body| !body.is_empty())?;
+    Boc::decode_base64(body_boc64).ok()
+}
+
+fn local_message_name_from_body(
+    body: CellSlice<'_>,
+    abi: &CompilerContractABI,
+    candidates: MessageBodyCandidates,
+) -> Option<String> {
+    match candidates {
+        MessageBodyCandidates::Internal { bounced } => {
+            let prefix_to_skip = if bounced { 32 } else { 0 };
+            decoded_message_body_name(
+                body,
+                abi,
+                abi.incoming_messages.iter().map(|message| &message.body_ty),
+                prefix_to_skip,
+            )
+        }
+        MessageBodyCandidates::External => decoded_message_body_name(
+            body,
+            abi,
+            abi.incoming_external.iter().map(|message| &message.body_ty),
+            0,
+        ),
+    }
+}
+
+fn decoded_message_body_name<'msg, I>(
+    body: CellSlice<'_>,
+    abi: &CompilerContractABI,
+    candidates: I,
+    prefix_to_skip: u16,
+) -> Option<String>
+where
+    I: IntoIterator<Item = &'msg CompilerAbiType>,
+{
+    for body_ty in candidates {
+        let mut parser = body;
+        if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
+            continue;
+        }
+
+        if compiler_abi_serde::decode(&mut parser, abi, body_ty).is_err() {
+            continue;
+        }
+        if parser.size_bits() != 0 || parser.size_refs() != 0 {
+            continue;
+        }
+
+        return Some(compiler_body_type_name(body_ty));
+    }
+
+    None
+}
+
+fn compiler_body_type_name(body_ty: &CompilerAbiType) -> String {
+    match body_ty {
+        CompilerAbiType::StructRef { struct_name, .. } => struct_name.clone(),
+        CompilerAbiType::AliasRef { alias_name, .. } => alias_name.clone(),
+        CompilerAbiType::EnumRef { enum_name } => enum_name.clone(),
+        _ => body_ty.render_type(),
+    }
+}
+
+fn format_message_value(message: &V3MessageSummary) -> String {
+    let Some(value) = message.value.as_deref() else {
+        return "<none>".to_owned();
+    };
+    match BigInt::from_str(value) {
+        Ok(value) => format_nanotons(&value),
+        Err(_) => value.to_owned(),
+    }
+}
+
+fn format_optional_address(address: &Option<String>, network: &Network) -> String {
+    address.as_deref().map_or_else(
+        || "<none>".to_owned(),
+        |address| format_trace_address(address, network),
+    )
+}
+
+fn format_trace_address(address: &str, network: &Network) -> String {
+    StdAddr::from_str_ext(address, StdAddrFormat::any()).map_or_else(
+        |_| address.to_owned(),
+        |(address, _)| format_std_address(&address, network),
+    )
+}
+
+fn fetch_trace_accounts(
+    trace_txs: &[RpcTraceTransaction],
+    client: &TonApiClient,
+) -> anyhow::Result<FxHashMap<StdAddr, ShardAccount>> {
+    let mut addresses = BTreeMap::new();
+    for tx in trace_txs {
+        collect_trace_address(&tx.summary.account, &mut addresses);
+        if let Some(in_msg) = &tx.summary.in_msg {
+            collect_optional_trace_address(&in_msg.source, &mut addresses);
+            collect_optional_trace_address(&in_msg.destination, &mut addresses);
+        }
+        for out_msg in &tx.summary.out_msgs {
+            collect_optional_trace_address(&out_msg.source, &mut addresses);
+            collect_optional_trace_address(&out_msg.destination, &mut addresses);
+        }
+    }
+
+    let address_strings = addresses.keys().cloned().collect::<Vec<_>>();
+    let address_refs = address_strings
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let states = client
+        .get_account_states(&address_refs)
+        .context("Failed to fetch trace account states")?;
+
+    let mut accounts = FxHashMap::default();
+    for state in states {
+        if let Some((address, account)) = shard_account_from_ton_api_state(&state)? {
+            accounts.insert(address, account);
+        }
+    }
+    Ok(accounts)
+}
+
+fn collect_optional_trace_address(address: &Option<String>, addresses: &mut BTreeMap<String, ()>) {
+    if let Some(address) = address {
+        collect_trace_address(address, addresses);
+    }
+}
+
+fn collect_trace_address(address: &str, addresses: &mut BTreeMap<String, ()>) {
+    let Ok((address, _)) = StdAddr::from_str_ext(address, StdAddrFormat::any()) else {
+        return;
+    };
+    addresses.insert(address.to_string(), ());
+}
+
+fn shard_account_from_ton_api_state(
+    state: &TonApiAccountState,
+) -> anyhow::Result<Option<(StdAddr, ShardAccount)>> {
+    let (address, _) =
+        StdAddr::from_str_ext(&state.address, StdAddrFormat::any()).map_err(|_| {
+            anyhow!(
+                "Invalid account address in accountStates: {}",
+                state.address
+            )
+        })?;
+    if state.status != "active" || state.code_boc.is_none() {
+        return Ok(None);
+    }
+
+    let code = state
+        .code_boc
+        .as_ref()
+        .map(Boc::decode_base64)
+        .transpose()
+        .context("Failed to decode account code BoC")?;
+    let balance = state
+        .balance
+        .as_deref()
+        .and_then(|balance| balance.parse::<u128>().ok())
+        .unwrap_or(0);
+    let account = Account {
+        balance: CurrencyCollection::new(balance),
+        address: IntAddr::Std(address.clone()),
+        last_trans_lt: 0,
+        state: TychoAccountState::Active(StateInit {
+            code,
+            data: None,
+            ..Default::default()
+        }),
+        storage_stat: StorageInfo::default(),
+    };
+    let shard_account = ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(account)))
+            .context("Failed to build account state for trace formatting")?,
+        last_trans_hash: HashBytes::ZERO,
+        last_trans_lt: 0,
+    };
+    Ok(Some((address, shard_account)))
+}
+
+fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
+    let mut build_cache = BuildCache::new();
+    for candidate in load_local_contract_candidates(config)? {
+        build_cache.memoize(
+            &candidate.contract_name,
+            &candidate.contract_path,
+            &candidate.code_boc64,
+            candidate.code_hash,
+            Arc::new(TolkSourceMap::without_debug_info()),
+            candidate.abi,
+            candidate.compiler_abi,
+        );
+    }
+    Ok(build_cache)
+}
+
 fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
     net.as_deref()
         .map(Network::from_str)
@@ -195,26 +882,7 @@ fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
 ) -> anyhow::Result<Option<LocalContractMatch>> {
-    let manifest_path = acton_config::config::manifest_path();
-    if !manifest_path.exists() {
-        return Ok(None);
-    }
-
-    let Some(contracts) = config.contracts() else {
-        return Ok(None);
-    };
-    let mut file_cache = FileBuildCache::new(None).ok();
-
-    for (contract_id, contract) in contracts {
-        let candidate =
-            match load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())
-            {
-                Ok(candidate) => candidate,
-                Err(err) => {
-                    warn!("Skipping rpc ABI match candidate `{contract_id}`: {err:#}");
-                    continue;
-                }
-            };
+    for candidate in load_local_contract_candidates(config)? {
         if &candidate.code_hash == code_hash {
             return Ok(Some(LocalContractMatch {
                 contract_id: candidate.contract_id,
@@ -228,9 +896,41 @@ fn find_local_contract_match(
     Ok(None)
 }
 
+fn load_local_contract_candidates(
+    config: &ActonConfig,
+) -> anyhow::Result<Vec<LocalContractCandidate>> {
+    let manifest_path = acton_config::config::manifest_path();
+    if !manifest_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let Some(contracts) = config.contracts() else {
+        return Ok(Vec::new());
+    };
+    let mut file_cache = FileBuildCache::new(None).ok();
+    let mut candidates = Vec::new();
+
+    for (contract_id, contract) in contracts {
+        let candidate =
+            match load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())
+            {
+                Ok(candidate) => candidate,
+                Err(err) => {
+                    warn!("Skipping rpc ABI match candidate `{contract_id}`: {err:#}");
+                    continue;
+                }
+            };
+        candidates.push(candidate);
+    }
+
+    Ok(candidates)
+}
+
 struct LocalContractCandidate {
+    contract_path: PathBuf,
     contract_id: String,
     contract_name: String,
+    code_boc64: String,
     code_hash: HashBytes,
     abi: Option<Arc<ContractAbi>>,
     compiler_abi: Option<Arc<CompilerContractABI>>,
@@ -248,9 +948,12 @@ fn load_local_contract_candidate(
             .with_context(|| format!("Failed to read {}", contract_path.display()))?;
         let code = Boc::decode(boc)
             .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
+        let code_boc64 = Boc::encode_base64(&code);
         return Ok(LocalContractCandidate {
+            contract_path,
             contract_id: contract_id.to_owned(),
             contract_name: contract.display_name(contract_id).to_owned(),
+            code_boc64,
             code_hash: *code.repr_hash(),
             abi: None,
             compiler_abi: None,
@@ -283,12 +986,14 @@ fn load_local_contract_candidate(
         .with_context(|| format!("Failed to decode code for {}", contract_path.display()))?;
     let content = fs::read_to_string(&contract_path)
         .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-    let path = contract_path.to_string_lossy();
+    let path = contract_path.to_string_lossy().to_string();
     let abi = Arc::new(contract_abi(content.into(), &path, &config.mappings()));
 
     Ok(LocalContractCandidate {
+        contract_path,
         contract_id: contract_id.to_owned(),
         contract_name: contract.display_name(contract_id).to_owned(),
+        code_boc64,
         code_hash: *code.repr_hash(),
         abi: Some(abi),
         compiler_abi,

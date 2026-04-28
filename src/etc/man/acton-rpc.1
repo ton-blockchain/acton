@@ -25,6 +25,10 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'print a transaction trace from TonCenter v3 as an Acton transaction tree
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'match deployed code against a local Acton project by \fBcode_hash\fR
 .RE
 .sp
@@ -99,6 +103,74 @@ Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
 .SS "Output"
 \fBacton rpc latest\-block\fR prints only the latest masterchain block \fBseqno\fR as a
 decimal number.
+.SS "acton rpc trace"
+Fetch a TonCenter v3 trace by root transaction hash and print it in a stable
+Acton text format.
+.SS "Synopsis"
+\fBacton rpc trace\fR [\fIoptions\fR] \fIhash\fR
+.SS "Options"
+.sp
+\fIhash\fR
+.RS 4
+Root transaction hash to query through TonCenter v3 \fB/traces\fR\&.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to query.
+.sp
+Defaults to \fBtestnet\fR\&.
+.sp
+Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
+\fBcustom:<name>\fR\&.
+.RE
+.sp
+\fB\-\-summary\fR
+.RS 4
+Print only the trace summary.
+.RE
+.sp
+\fB\-\-tree\fR
+.RS 4
+Print the trace summary and transaction tree. This is the default mode.
+.RE
+.sp
+\fB\-\-verbose\fR
+.RS 4
+Print the summary, tree, and stable per\-transaction fields.
+.RE
+.sp
+\fB\-\-show\-bodies\fR
+.RS 4
+Print decoded message bodies in the transaction tree.
+.RE
+.SS "Output"
+\fBacton rpc trace\fR prints a short summary first:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'query hash
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'trace id
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'root transaction hash
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'whether the trace is complete
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'total transaction and message counts
+.RE
+.sp
+Tree and verbose modes then reuse the same transaction tree formatter as Acton
+tests. When current account code matches a local contract in the project,
+Acton prints local contract names through the local ABI. Add \fB\-\-show\-bodies\fR
+to print decoded inbound message bodies.
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -232,6 +304,16 @@ acton \-\-manifest\-path ../incident/Acton.toml rpc info EQC... \-\-net custom:s
 .RS 4
 .nf
 acton rpc latest\-block \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Print a transaction trace from localnet:
+.sp
+.RS 4
+.nf
+acton rpc trace <tx\-hash> \-\-net localnet
 .fi
 .RE
 .RE

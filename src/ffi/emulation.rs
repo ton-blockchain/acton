@@ -508,10 +508,26 @@ fn collect_external_out_message_cells(parsed_tx: &Transaction) -> Vec<Cell> {
 /// Fields that cannot be reconstructed from a single on-chain transaction
 /// (`childTxs`, `parentLt`, `outActions`) are left empty/null. Externals are
 /// derived by filtering the transaction's own outgoing messages.
-fn tx_cell_to_send_result_tuple(tx_cell: Cell, parsed_tx: &Transaction) -> TupleItem {
+pub(crate) fn tx_cell_to_send_result_tuple(tx_cell: Cell, parsed_tx: &Transaction) -> TupleItem {
+    tx_cell_to_send_result_tuple_with_relations(tx_cell, parsed_tx, &[], None)
+}
+
+pub(crate) fn tx_cell_to_send_result_tuple_with_relations(
+    tx_cell: Cell,
+    parsed_tx: &Transaction,
+    child_transactions: &[u64],
+    parent_transaction: Option<u64>,
+) -> TupleItem {
     let externals = collect_external_out_message_cells(parsed_tx);
 
-    build_send_result_tuple(tx_cell, parsed_tx, &[], None, Cell::default(), &externals)
+    build_send_result_tuple(
+        tx_cell,
+        parsed_tx,
+        child_transactions,
+        parent_transaction,
+        Cell::default(),
+        &externals,
+    )
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -3433,7 +3449,7 @@ fn poll_send_results_by_trace(
 /// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original
 /// cell had a non-addr_none src, a non-zero import_fee, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
-fn synthesize_tx_cell_from_v3(
+pub(crate) fn synthesize_tx_cell_from_v3(
     summary: &V3TransactionSummary,
 ) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)
