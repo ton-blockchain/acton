@@ -1047,15 +1047,27 @@ impl TonApiClient {
         msg_hash: &str,
         limit: u32,
     ) -> anyhow::Result<Vec<V3Trace>> {
+        self.get_traces_by_hash_param("msg_hash", msg_hash, limit)
+    }
+
+    /// Fetch a trace by its root transaction hash using toncenter v3.
+    pub fn get_traces_by_tx_hash(&self, tx_hash: &str, limit: u32) -> anyhow::Result<Vec<V3Trace>> {
+        self.get_traces_by_hash_param("tx_hash", tx_hash, limit)
+    }
+
+    fn get_traces_by_hash_param(
+        &self,
+        hash_param: &str,
+        hash: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<V3Trace>> {
         let url = format!(
             "{}/traces",
             self.network.toncenter_v3_url(&self.custom_networks)?
         );
 
-        let params: Vec<(&str, String)> = vec![
-            ("msg_hash", msg_hash.to_owned()),
-            ("limit", limit.to_string()),
-        ];
+        let params: Vec<(&str, String)> =
+            vec![(hash_param, hash.to_owned()), ("limit", limit.to_string())];
 
         let response = self.send_with_retry(
             || self.build_request(&url).query(&params),

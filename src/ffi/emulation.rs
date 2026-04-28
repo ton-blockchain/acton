@@ -18,7 +18,7 @@ use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use path_absolutize::Absolutize;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -28,7 +28,9 @@ use tolk_compiler::TolkSourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
-use ton_api::{Network, TonApiClient, V3MessageSummary, V3TransactionSummary, V3TxDescription};
+use ton_api::{
+    Network, TonApiClient, V3MessageSummary, V3Trace, V3TransactionSummary, V3TxDescription,
+};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
@@ -505,13 +507,117 @@ fn collect_external_out_message_cells(parsed_tx: &Transaction) -> Vec<Cell> {
 
 /// Build `SendResult` from an already-parsed transaction (e.g. fetched from toncenter).
 ///
-/// Fields that cannot be reconstructed from a single on-chain transaction
-/// (`childTxs`, `parentLt`, `outActions`) are left empty/null. Externals are
-/// derived by filtering the transaction's own outgoing messages.
-fn tx_cell_to_send_result_tuple(tx_cell: Cell, parsed_tx: &Transaction) -> TupleItem {
+/// Externals are derived by filtering the transaction's own outgoing messages.
+fn tx_cell_to_send_result_tuple(
+    tx_cell: Cell,
+    parsed_tx: &Transaction,
+    child_transactions: &[u64],
+    parent_transaction: Option<u64>,
+) -> TupleItem {
     let externals = collect_external_out_message_cells(parsed_tx);
 
-    build_send_result_tuple(tx_cell, parsed_tx, &[], None, Cell::default(), &externals)
+    build_send_result_tuple(
+        tx_cell,
+        parsed_tx,
+        child_transactions,
+        parent_transaction,
+        Cell::default(),
+        &externals,
+    )
+}
+
+pub(crate) struct V3TraceTransaction {
+    pub(crate) hash: String,
+    pub(crate) summary: V3TransactionSummary,
+    pub(crate) tx_cell: Cell,
+    pub(crate) transaction: Transaction,
+    pub(crate) parent_lt: Option<u64>,
+    pub(crate) child_lts: Vec<u64>,
+}
+
+impl V3TraceTransaction {
+    pub(crate) fn to_send_result_tuple(&self) -> TupleItem {
+        tx_cell_to_send_result_tuple(
+            self.tx_cell.clone(),
+            &self.transaction,
+            &self.child_lts,
+            self.parent_lt,
+        )
+    }
+}
+
+pub(crate) enum V3TraceTransactions {
+    Ready(Vec<V3TraceTransaction>),
+    Pending { tx_hash: String },
+}
+
+pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
+    let mut transactions = Vec::with_capacity(trace.transactions_order.len());
+    for tx_hash in &trace.transactions_order {
+        let Some(summary) = trace.transactions.get(tx_hash) else {
+            return Ok(V3TraceTransactions::Pending {
+                tx_hash: tx_hash.clone(),
+            });
+        };
+        let (tx_cell, transaction) = synthesize_tx_cell_from_v3(summary)
+            .with_context(|| format!("Failed to synthesize Transaction cell for tx {tx_hash}"))?;
+        transactions.push(V3TraceTransaction {
+            hash: tx_hash.clone(),
+            summary: summary.clone(),
+            tx_cell,
+            transaction,
+            parent_lt: None,
+            child_lts: Vec::new(),
+        });
+    }
+
+    let in_msg_by_hash = transactions
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, tx)| {
+            tx.summary
+                .in_msg
+                .as_ref()
+                .and_then(v3_message_hash)
+                .map(|hash| (hash.to_owned(), idx))
+        })
+        .collect::<HashMap<_, _>>();
+
+    let mut edges = Vec::new();
+    for (parent_idx, tx) in transactions.iter().enumerate() {
+        for out_msg in &tx.summary.out_msgs {
+            let Some(hash) = v3_message_hash(out_msg) else {
+                continue;
+            };
+            let Some(child_idx) = in_msg_by_hash.get(hash).copied() else {
+                continue;
+            };
+            if child_idx != parent_idx {
+                edges.push((parent_idx, child_idx));
+            }
+        }
+    }
+
+    for (parent_idx, child_idx) in edges {
+        let parent_lt = transactions[parent_idx].transaction.lt;
+        let child_lt = transactions[child_idx].transaction.lt;
+        if transactions[child_idx].parent_lt.is_none() {
+            transactions[child_idx].parent_lt = Some(parent_lt);
+        }
+        if !transactions[parent_idx].child_lts.contains(&child_lt) {
+            transactions[parent_idx].child_lts.push(child_lt);
+        }
+    }
+
+    for tx in &mut transactions {
+        tx.child_lts.sort_unstable();
+    }
+
+    Ok(V3TraceTransactions::Ready(transactions))
+}
+
+pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
+    message.hash.as_deref().filter(|hash| !hash.is_empty())
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -2524,7 +2630,7 @@ fn poll_send_result_v2(
         if actual_hash != *target_hash {
             continue;
         }
-        let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx);
+        let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx, &[], None);
         let tx_hash_hex = base64::engine::general_purpose::STANDARD
             .decode(&tx.transaction_id.hash)
             .map_or_else(|_| tx.transaction_id.hash.clone(), hex::encode);
@@ -3411,18 +3517,39 @@ fn poll_send_results_by_trace(
         return Ok(TracePollOutcome::NotYet);
     }
 
-    let mut results = Vec::with_capacity(trace.transactions_order.len());
-    for tx_hash in &trace.transactions_order {
-        let Some(summary) = trace.transactions.get(tx_hash) else {
+    let transactions = match build_v3_trace_transactions(&trace)? {
+        V3TraceTransactions::Ready(transactions) => transactions,
+        V3TraceTransactions::Pending { .. } => {
             // Indexer returned an id it cannot resolve — trace is still being assembled.
             return Ok(TracePollOutcome::NotYet);
-        };
-        let (tx_cell, parsed_tx) = synthesize_tx_cell_from_v3(summary)
-            .with_context(|| format!("Failed to synthesize Transaction cell for tx {tx_hash}"))?;
-        results.push(tx_cell_to_send_result_tuple(tx_cell, &parsed_tx));
+        }
+    };
+    if has_unmatched_internal_out_messages(&transactions) {
+        return Ok(TracePollOutcome::NotYet);
     }
+    let results = transactions
+        .iter()
+        .map(V3TraceTransaction::to_send_result_tuple)
+        .collect::<Vec<_>>();
 
     Ok(TracePollOutcome::Settled(results))
+}
+
+fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> bool {
+    let in_msg_hashes = transactions
+        .iter()
+        .filter_map(|tx| tx.summary.in_msg.as_ref().and_then(v3_message_hash))
+        .collect::<HashSet<_>>();
+
+    let is_std_address =
+        |address: &str| StdAddr::from_str_ext(address, StdAddrFormat::any()).is_ok();
+    transactions.iter().any(|tx| {
+        tx.summary.out_msgs.iter().any(|message| {
+            message.source.as_deref().is_some_and(is_std_address)
+                && message.destination.as_deref().is_some_and(is_std_address)
+                && v3_message_hash(message).is_some_and(|hash| !in_msg_hashes.contains(hash))
+        })
+    })
 }
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
@@ -3433,7 +3560,7 @@ fn poll_send_results_by_trace(
 /// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original
 /// cell had a non-addr_none src, a non-zero import_fee, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
-fn synthesize_tx_cell_from_v3(
+pub(crate) fn synthesize_tx_cell_from_v3(
     summary: &V3TransactionSummary,
 ) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)

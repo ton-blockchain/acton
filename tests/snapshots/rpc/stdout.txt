@@ -5,6 +5,7 @@ Usage: acton[EXE] rpc [OPTIONS] <COMMAND>
 Commands:
   info          Show remote account information and decode storage when ABI is known
   latest-block  Print the latest masterchain block number for a network
+  trace         Render a TonCenter v3 trace as a decoded transaction tree
 
 Options:
       --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]

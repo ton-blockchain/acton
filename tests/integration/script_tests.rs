@@ -135,6 +135,10 @@ fun main() {
         return;
     }
 
+    println("TRACE_OUTPUT_BEGIN");
+    println(trace);
+    println("TRACE_OUTPUT_END");
+
     val receiverCount: int = net.runGetMethod(receiverAddress, "received");
     println("TRACE_READY=true");
     println("RECEIVER_COUNT={}", receiverCount);
