@@ -26,6 +26,20 @@ acton fmt contracts scripts/deploy.tolk
 
 Use this form when only part of the repository changed, or when a pre-commit hook should format staged contract files only.
 
+## Run the formatter from another directory
+
+Point Acton to the project explicitly when the current shell is outside the project root:
+
+```bash
+actom fmt ../my-project
+```
+
+Use `--manifest-path` to also point to the `Acton.toml` manifest in a different project root:
+
+```bash
+actom fmt --manifest-path <PATH_TO_MANIFEST> ../my-project
+```
+
 ## Check formatting without rewriting files
 
 Use `--check` to validate formatting in CI or before opening a pull request:
@@ -37,24 +51,6 @@ acton fmt --check
 In this mode, Acton does not rewrite files. It prints a diff for each file that does not match the formatter output and exits with a non-zero status.
 
 Formatting is clean when the command exits with status `0` and prints no diffs.
-
-## Run the formatter from another directory
-
-Point Acton to the project explicitly when the current shell is outside the project root:
-
-```bash
-acton fmt --manifest-path ../my-project/Acton.toml
-```
-
-Or set the project root directly:
-
-```bash
-acton fmt --project-root ../my-project
-```
-
-<Callout type="warn">
-  Use either `--manifest-path` or `--project-root`, not both.
-</Callout>
 
 ## Adjust formatter defaults
 
@@ -81,7 +77,7 @@ Acton sorts imports automatically. The formatter groups imports in a fixed order
 
 ## Troubleshooting
 
-### `acton fmt` reports syntax errors
+### The formatter reports syntax errors
 
 Fix the parse error first, then run the formatter again. Acton formats only valid Tolk source files.
 
