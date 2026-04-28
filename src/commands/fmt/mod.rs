@@ -49,6 +49,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
 
     let mut files_to_format = Vec::new();
 
+    let has_explicit_paths = !paths.is_empty();
     let search_paths = if paths.is_empty() {
         vec![project_root.to_path_buf()]
     } else {
@@ -59,6 +60,11 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         if path.is_file() {
             if path.extension().is_some_and(|ext| ext == "tolk") {
                 files_to_format.push(path);
+            } else if has_explicit_paths {
+                anyhow::bail!(
+                    "Cannot format {}: expected a .tolk file",
+                    path.display().to_string().yellow()
+                );
             }
         } else if path.is_dir() {
             let iter = WalkDir::new(&path)

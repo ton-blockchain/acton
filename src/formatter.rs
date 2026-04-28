@@ -18,7 +18,9 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
-use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
+use tolk_compiler::abi::{
+    ABIDeclaration, ContractABI as CompilerContractABI, Ty as CompilerAbiType,
+};
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
@@ -60,6 +62,12 @@ struct TransactionNode {
 struct DecodedMessageBody {
     name: String,
     data: ParsedAbiData,
+}
+
+#[derive(Clone, Copy)]
+enum MessageBodyDirection {
+    Incoming,
+    Outgoing,
 }
 
 enum FormattedExtraInfo {
@@ -160,14 +168,10 @@ impl<'a> FormatterContext<'a> {
                 .declarations
                 .iter()
                 .find_map(|declaration| match declaration {
-                    tolk_compiler::abi::ABIDeclaration::Enum { name, members, .. }
-                        if name == enum_name =>
-                    {
-                        members
-                            .iter()
-                            .find(|member| member.name == member_name)
-                            .map(|member| member.description.as_str())
-                    }
+                    ABIDeclaration::Enum { name, members, .. } if name == enum_name => members
+                        .iter()
+                        .find(|member| member.name == member_name)
+                        .map(|member| member.description.as_str()),
                     _ => None,
                 })
                 .filter(|description| !description.is_empty())
@@ -755,8 +759,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                         "external".dimmed()
                     );
                 }
-                tx_builder += "└── ".dimmed().to_string().as_str();
+            } else {
+                tx_builder += &format!(
+                    "{} {} {}\n",
+                    "N/A".dimmed(),
+                    "->".dimmed(),
+                    "system".dimmed()
+                );
             }
+            tx_builder += "└── ".dimmed().to_string().as_str();
         }
 
         tx_builder += &main_part;
@@ -817,7 +828,13 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             );
         }
 
-        String::new()
+        let account = IntAddr::Std(StdAddr::new(0, tx.account));
+        format!(
+            "{} {} {}",
+            "system".blue(),
+            "->".dimmed(),
+            self.format_address_with_letter(&account, contract_letters, true)
+        )
     }
 
     fn format_single_message(
@@ -881,31 +898,65 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             return None;
         }
 
+        let body = self.resolve_transaction_inbound_message_body(tx)?;
+        Some(self.format_decoded_message_body(&body))
+    }
+
+    pub(crate) fn transaction_inbound_message_name(&self, tx: &Transaction) -> Option<String> {
+        self.resolve_transaction_inbound_message_body(tx)
+            .map(|body| body.name)
+    }
+
+    fn resolve_transaction_inbound_message_body(
+        &self,
+        tx: &Transaction,
+    ) -> Option<DecodedMessageBody> {
         if let Some(in_msg) = tx.in_msg.as_ref()
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
             && let Some(body) = self.resolve_incoming_message_body(&in_msg)
         {
-            return Some(self.format_decoded_message_body(&body));
+            return Some(body);
         }
 
         let in_msg = tx.load_in_msg().ok()??;
-        let body = self.resolve_external_incoming_message_body(tx, &in_msg)?;
-        Some(self.format_decoded_message_body(&body))
+        self.resolve_external_incoming_message_body(tx, &in_msg)
     }
 
     fn resolve_incoming_message_body(&self, in_msg: &RelaxedMessage) -> Option<DecodedMessageBody> {
-        let build = self.build_result_for_incoming_message(in_msg)?;
-        let compiler_abi = build.compiler_abi.as_ref()?;
         match &in_msg.info {
-            RelaxedMsgInfo::Int(info) => self.try_decode_message_body_types(
-                in_msg.body,
-                compiler_abi,
-                compiler_abi
-                    .incoming_messages
-                    .iter()
-                    .map(|message| &message.body_ty),
-                if info.bounced { 32 } else { 0 },
-            ),
+            RelaxedMsgInfo::Int(info) => {
+                let destination_build = self.build_result_for_address(Some(&info.dst));
+                let source_build = info
+                    .src
+                    .as_ref()
+                    .and_then(|src| self.build_result_for_address(Some(src)));
+                let (destination_direction, source_direction) = if info.bounced {
+                    (
+                        MessageBodyDirection::Outgoing,
+                        MessageBodyDirection::Incoming,
+                    )
+                } else {
+                    (
+                        MessageBodyDirection::Incoming,
+                        MessageBodyDirection::Outgoing,
+                    )
+                };
+
+                self.try_decode_message_with_builds(
+                    in_msg.body,
+                    self.prioritized_builds(destination_build),
+                    destination_direction,
+                    info.bounced,
+                )
+                .or_else(|| {
+                    self.try_decode_message_with_builds(
+                        in_msg.body,
+                        self.prioritized_builds(source_build),
+                        source_direction,
+                        info.bounced,
+                    )
+                })
+            }
             RelaxedMsgInfo::ExtOut(_) => None,
         }
     }
@@ -997,17 +1048,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         )
     }
 
-    fn build_result_for_incoming_message(
-        &self,
-        in_msg: &RelaxedMessage,
-    ) -> Option<context::CompilationResult> {
-        let dst = match &in_msg.info {
-            RelaxedMsgInfo::Int(info) => Some(&info.dst),
-            RelaxedMsgInfo::ExtOut(_) => return None,
-        };
-        self.build_result_for_address(dst)
-    }
-
     fn build_result_for_tx_account(&self, tx: &Transaction) -> Option<context::CompilationResult> {
         let code = self
             .accounts
@@ -1034,15 +1074,214 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             .map(|(_, result)| result)
     }
 
-    fn try_decode_message_body_types<'msg, I>(
+    fn prioritized_builds(
         &self,
-        body: CellSlice<'msg>,
+        preferred: Option<context::CompilationResult>,
+    ) -> Vec<context::CompilationResult> {
+        let mut builds = Vec::new();
+        let mut seen = HashSet::new();
+        if let Some(preferred) = preferred {
+            seen.insert(Self::build_result_key(&preferred));
+            builds.push(preferred);
+        }
+
+        let mut fallback_builds = self.build_cache.built.iter().collect::<Vec<_>>();
+        fallback_builds.sort_by(|(left_path, left), (right_path, right)| {
+            left.name
+                .cmp(&right.name)
+                .then_with(|| left_path.cmp(right_path))
+        });
+        for (_, build) in fallback_builds {
+            if seen.insert(Self::build_result_key(build)) {
+                builds.push(build.clone());
+            }
+        }
+
+        builds
+    }
+
+    fn build_result_key(build: &context::CompilationResult) -> String {
+        format!("{}:{}", build.name, build.code_hash)
+    }
+
+    fn try_decode_message_with_builds(
+        &self,
+        body: CellSlice<'_>,
+        builds: Vec<context::CompilationResult>,
+        direction: MessageBodyDirection,
+        bounced: bool,
+    ) -> Option<DecodedMessageBody> {
+        let opcode = Self::opcode_after_bounce_prefix(body, bounced);
+        for build in builds {
+            let Some(compiler_abi) = build.compiler_abi.as_ref() else {
+                continue;
+            };
+            let candidates = Self::compiler_message_candidates(compiler_abi, direction, opcode);
+            if let Some(decoded) = self.try_decode_message_body_types(
+                body,
+                compiler_abi,
+                candidates.iter(),
+                if bounced { 32 } else { 0 },
+            ) {
+                return Some(decoded);
+            }
+        }
+
+        None
+    }
+
+    fn compiler_message_candidates(
+        abi: &CompilerContractABI,
+        direction: MessageBodyDirection,
+        opcode: Option<u32>,
+    ) -> Vec<CompilerAbiType> {
+        let mut candidates = Vec::new();
+        let mut seen = HashSet::new();
+
+        match direction {
+            MessageBodyDirection::Incoming => {
+                for message in &abi.incoming_messages {
+                    Self::push_compiler_message_candidate(
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty.clone(),
+                    );
+                }
+            }
+            MessageBodyDirection::Outgoing => {
+                for message in &abi.outgoing_messages {
+                    Self::push_compiler_message_candidate(
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty.clone(),
+                    );
+                }
+            }
+        }
+
+        for (_, candidate) in Self::declaration_message_candidates(abi, opcode) {
+            Self::push_compiler_message_candidate(&mut candidates, &mut seen, candidate);
+        }
+
+        candidates
+    }
+
+    fn push_compiler_message_candidate(
+        candidates: &mut Vec<CompilerAbiType>,
+        seen: &mut HashSet<String>,
+        candidate: CompilerAbiType,
+    ) {
+        if seen.insert(Self::compiler_body_type_key(&candidate)) {
+            candidates.push(candidate);
+        }
+    }
+
+    fn declaration_message_candidates(
+        abi: &CompilerContractABI,
+        opcode: Option<u32>,
+    ) -> Vec<(u8, CompilerAbiType)> {
+        let mut candidates = Vec::new();
+        for declaration in &abi.declarations {
+            match declaration {
+                ABIDeclaration::Struct {
+                    name,
+                    type_params,
+                    prefix,
+                    ..
+                } => {
+                    if type_params
+                        .as_ref()
+                        .is_some_and(|params| !params.is_empty())
+                    {
+                        continue;
+                    }
+
+                    let matches_opcode = opcode.is_some_and(|opcode| {
+                        prefix.as_ref().is_some_and(|prefix| {
+                            prefix.prefix_len == 32
+                                && Self::parse_abi_prefix_number(&prefix.prefix_str) == Some(opcode)
+                        })
+                    });
+                    let priority = if matches_opcode {
+                        0
+                    } else if prefix.is_some() {
+                        1
+                    } else {
+                        2
+                    };
+                    candidates.push((
+                        priority,
+                        CompilerAbiType::StructRef {
+                            struct_name: name.clone(),
+                            type_args: None,
+                        },
+                    ));
+                }
+                ABIDeclaration::Alias {
+                    name, type_params, ..
+                } => {
+                    if type_params
+                        .as_ref()
+                        .is_some_and(|params| !params.is_empty())
+                    {
+                        continue;
+                    }
+
+                    candidates.push((
+                        3,
+                        CompilerAbiType::AliasRef {
+                            alias_name: name.clone(),
+                            type_args: None,
+                        },
+                    ));
+                }
+                ABIDeclaration::Enum { name, .. } => {
+                    candidates.push((
+                        4,
+                        CompilerAbiType::EnumRef {
+                            enum_name: name.clone(),
+                        },
+                    ));
+                }
+            }
+        }
+        candidates.sort_by_key(|(priority, _)| *priority);
+        candidates
+    }
+
+    fn parse_abi_prefix_number(prefix: &str) -> Option<u32> {
+        let prefix = prefix.trim();
+        if prefix.is_empty() {
+            return None;
+        }
+        let parsed = if let Some(hex) = prefix
+            .strip_prefix("0x")
+            .or_else(|| prefix.strip_prefix("0X"))
+        {
+            u64::from_str_radix(hex, 16).ok()?
+        } else {
+            prefix.parse::<u64>().ok()?
+        };
+        u32::try_from(parsed).ok()
+    }
+
+    fn opcode_after_bounce_prefix(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
+        let mut parser = body;
+        if bounced {
+            parser.load_u32().ok()?;
+        }
+        parser.load_u32().ok()
+    }
+
+    fn try_decode_message_body_types<'ty, I>(
+        &self,
+        body: CellSlice<'_>,
         abi: &CompilerContractABI,
         candidates: I,
         prefix_to_skip: u16,
     ) -> Option<DecodedMessageBody>
     where
-        I: IntoIterator<Item = &'msg CompilerAbiType>,
+        I: IntoIterator<Item = &'ty CompilerAbiType>,
     {
         for body_ty in candidates {
             let mut parser = body;
@@ -1071,6 +1310,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             CompilerAbiType::StructRef { struct_name, .. } => struct_name.clone(),
             CompilerAbiType::AliasRef { alias_name, .. } => alias_name.clone(),
             CompilerAbiType::EnumRef { enum_name } => enum_name.clone(),
+            _ => body_ty.render_type(),
+        }
+    }
+
+    fn compiler_body_type_key(body_ty: &CompilerAbiType) -> String {
+        match body_ty {
+            CompilerAbiType::StructRef { struct_name, .. } => format!("StructRef:{struct_name}"),
+            CompilerAbiType::AliasRef { alias_name, .. } => format!("AliasRef:{alias_name}"),
+            CompilerAbiType::EnumRef { enum_name } => format!("EnumRef:{enum_name}"),
             _ => body_ty.render_type(),
         }
     }

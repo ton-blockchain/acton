@@ -1174,6 +1174,42 @@ fn test_wallet_sign_rejects_invalid_payload() {
 }
 
 #[test]
+fn test_wallet_sign_requires_explicit_wallet_in_non_interactive_mode() {
+    let project = ProjectBuilder::new("wallet-sign-multiple-non-interactive").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let (body_hex, _, _) = wallet_sign_fixture();
+
+    fs::write(
+        project.path().join("wallets.toml"),
+        format!(
+            r#"[wallets.first]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
+
+[wallets.second]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{SECOND_TEST_MNEMONIC}" }}
+"#,
+        ),
+    )
+    .expect("failed to write wallets.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .wallet_sign()
+        .arg("--body")
+        .arg(&body_hex)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/wallet/test_wallet_sign_requires_explicit_wallet_in_non_interactive_mode.stderr.txt",
+        );
+}
+
+#[test]
 fn test_wallet_remove_local() {
     let project = ProjectBuilder::new("wallet-remove-local").build();
 

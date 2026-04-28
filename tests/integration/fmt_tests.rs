@@ -183,6 +183,23 @@ fn test_fmt_nonexistent_path() {
 }
 
 #[test]
+fn test_fmt_explicit_non_tolk_file_fails() {
+    let project = ProjectBuilder::new("fmt-explicit-non-tolk")
+        .raw_file("README.md", "# Notes\n")
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("README.md")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_explicit_non_tolk_file_fails.stderr.txt",
+        );
+}
+
+#[test]
 fn test_fmt_mixed_paths_partial_failure_keeps_existing_file_unchanged() {
     let project = ProjectBuilder::new("fmt-mixed-paths-partial-failure")
         .contract("simple", UNFORMATTED_TOLK)

@@ -1,9 +1,11 @@
+use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, global_libraries_path, global_wallets_path,
     project_root as configured_project_root,
 };
 use anyhow::{Context, anyhow};
 use inquire::Select;
+use std::io::{IsTerminal, stdin, stdout};
 use std::path::Path;
 use ton_executor::ExecutorVerbosity;
 
@@ -352,6 +354,17 @@ pub fn select_wallet(wallet_name: Option<String>, config: &ActonConfig) -> anyho
         match wallet_names.len() {
             0 => anyhow::bail!(error_fmt::no_wallets_found()),
             1 => wallet_names[0].clone(),
+            _ if !stdin().is_terminal() || !stdout().is_terminal() => {
+                let available_wallets = wallet_names
+                    .iter()
+                    .map(|name| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                anyhow::bail!(
+                    "Cannot prompt for wallet selection in a non-interactive environment.\n\nPass the wallet name explicitly. Available wallets: {}",
+                    available_wallets.cyan()
+                );
+            }
             _ => {
                 let wallet_name = Select::new(
                     "Multiple wallets configured. Please select which wallet to use:",

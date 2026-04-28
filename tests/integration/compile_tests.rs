@@ -335,6 +335,21 @@ fn test_compile_json_error() {
 }
 
 #[test]
+fn test_compile_json_missing_file_exits_with_failure() {
+    let project = ProjectBuilder::new("compile-json-missing-file").build();
+
+    project
+        .acton()
+        .compile("missing.tolk")
+        .with_json()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_compile_json_missing_file_exits_with_failure.stdout.txt",
+        );
+}
+
+#[test]
 fn test_compile_base64_only() {
     let project = ProjectBuilder::new("compile-base64")
         .contract("simple", SIMPLE_CONTRACT)

@@ -374,6 +374,37 @@ fn test_new_empty_project_non_interactive() {
 }
 
 #[test]
+fn test_new_project_non_interactive_requires_template() {
+    let project = ProjectBuilder::new("new-non-interactive-requires-template")
+        .without_acton_toml()
+        .build();
+
+    let target_dir = project.path().join("foobar");
+
+    let output = project
+        .acton()
+        .arg("--color")
+        .arg("always")
+        .arg("new")
+        .arg(&target_dir.display().to_string())
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.txt",
+        )
+        .assert_stderr_svg_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.svg",
+        );
+
+    assert!(
+        !target_dir.exists(),
+        "new should not create the target directory before required non-interactive arguments are valid"
+    );
+}
+
+#[test]
 fn test_new_counter_project_non_interactive() {
     let project = ProjectBuilder::new("new-counter")
         .without_acton_toml()
@@ -750,32 +781,6 @@ fn test_new_project_rejects_agents_value_syntax() {
 }
 
 #[test]
-fn test_new_empty_project_rejects_app_flag() {
-    let project = ProjectBuilder::new("new-empty-app-unsupported")
-        .without_acton_toml()
-        .build();
-
-    project
-        .acton()
-        .arg("new")
-        .arg(&project.path().join("foobar").display().to_string())
-        .arg("--name")
-        .arg("test-project")
-        .arg("--description")
-        .arg("test description")
-        .arg("--template")
-        .arg("empty")
-        .arg("--license")
-        .arg("MIT")
-        .arg("--app")
-        .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_rejects_app_flag.stderr.txt",
-        );
-}
-
-#[test]
 fn test_new_hooks_flag_requires_git() {
     let project = ProjectBuilder::new("new-hooks-requires-git")
         .without_acton_toml()
@@ -861,7 +866,7 @@ fn test_new_templates_returns_machine_readable_json() {
                 {
                     "id": "empty",
                     "description": "Minimal project skeleton",
-                    "supports_app": false,
+                    "supports_app": true,
                     "scaffolds": [
                         {
                             "kind": "standard",
@@ -871,6 +876,17 @@ fn test_new_templates_returns_machine_readable_json() {
                                     "id": "Empty",
                                     "name": "Empty",
                                     "src": "contracts/Empty.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "Empty",
+                                    "name": "Empty",
+                                    "src": "contracts/src/Empty.tolk"
                                 }
                             ]
                         }
@@ -1012,6 +1028,8 @@ fn test_new_empty_project_prompts_for_hooks() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("y", "failed to open advanced options");
     session.expect("Set up Git hooks to run checks before each commit?");
@@ -1061,6 +1079,8 @@ fn test_new_empty_project_full_interactive_flow_without_flags() {
     session.send_line("interactive-empty", "failed to enter project name");
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("y", "failed to open advanced options");
     session.expect("Description:");
@@ -1111,6 +1131,8 @@ fn test_new_empty_project_interactive_prompts_accept_default_name_and_descriptio
     session.send_line("", "failed to accept default project name");
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
@@ -1302,6 +1324,8 @@ fn test_new_empty_project_prompts_for_agents() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("y", "failed to open advanced options");
     session.expect("Set up Git hooks to run checks before each commit?");
@@ -1347,6 +1371,8 @@ fn test_new_empty_project_accepts_other_license_interactively() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("y", "failed to open advanced options");
     session.expect("License:");
