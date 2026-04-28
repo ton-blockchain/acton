@@ -15,7 +15,7 @@ use std::path::Path;
 mod licenses;
 mod template;
 use template::ProjectLayout;
-pub use template::ProjectTemplate;
+pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";

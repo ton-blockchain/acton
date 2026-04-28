@@ -8,6 +8,9 @@ use std::path::Path;
 static EMPTY_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty");
 
+static EMPTY_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty-app");
+
 static COUNTER_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/counter");
 
@@ -219,6 +222,14 @@ const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     deploy_script: "scripts/deploy.tolk",
 };
 
+const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &EMPTY_TEMPLATE_DIR,
+    app_overlay_dir: Some(&EMPTY_APP_TEMPLATE_DIR),
+    layout: ProjectLayout::App,
+    contracts: &EMPTY_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+};
+
 const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     base_dir: &COUNTER_TEMPLATE_DIR,
     app_overlay_dir: None,
@@ -305,7 +316,7 @@ impl std::fmt::Display for ProjectTemplate {
 
 const EMPTY_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     default_scaffold: EMPTY_SCAFFOLD,
-    app_scaffold: None,
+    app_scaffold: Some(EMPTY_APP_SCAFFOLD),
 };
 
 const COUNTER_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
@@ -396,6 +407,20 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
             })
             .collect(),
     }
+}
+
+/// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
+/// without any contract files, for `acton init --create-app`.
+pub fn extract_standalone_app_scaffold(
+    target_dir: &Path,
+    npm_package_name: &str,
+) -> std::io::Result<()> {
+    extract_template_dir(
+        &EMPTY_APP_TEMPLATE_DIR,
+        target_dir,
+        false,
+        Some(npm_package_name),
+    )
 }
 
 pub(super) fn create_project_from_scaffold(
