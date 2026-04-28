@@ -507,14 +507,8 @@ fn collect_external_out_message_cells(parsed_tx: &Transaction) -> Vec<Cell> {
 
 /// Build `SendResult` from an already-parsed transaction (e.g. fetched from toncenter).
 ///
-/// Fields that cannot be reconstructed from a single on-chain transaction
-/// (`childTxs`, `parentLt`, `outActions`) are left empty/null. Externals are
-/// derived by filtering the transaction's own outgoing messages.
-pub(crate) fn tx_cell_to_send_result_tuple(tx_cell: Cell, parsed_tx: &Transaction) -> TupleItem {
-    tx_cell_to_send_result_tuple_with_relations(tx_cell, parsed_tx, &[], None)
-}
-
-pub(crate) fn tx_cell_to_send_result_tuple_with_relations(
+/// Externals are derived by filtering the transaction's own outgoing messages.
+fn tx_cell_to_send_result_tuple(
     tx_cell: Cell,
     parsed_tx: &Transaction,
     child_transactions: &[u64],
@@ -543,7 +537,7 @@ pub(crate) struct V3TraceTransaction {
 
 impl V3TraceTransaction {
     pub(crate) fn to_send_result_tuple(&self) -> TupleItem {
-        tx_cell_to_send_result_tuple_with_relations(
+        tx_cell_to_send_result_tuple(
             self.tx_cell.clone(),
             &self.transaction,
             &self.child_lts,
@@ -2636,7 +2630,7 @@ fn poll_send_result_v2(
         if actual_hash != *target_hash {
             continue;
         }
-        let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx);
+        let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx, &[], None);
         let tx_hash_hex = base64::engine::general_purpose::STANDARD
             .decode(&tx.transaction_id.hash)
             .map_or_else(|_| tx.transaction_id.hash.clone(), hex::encode);

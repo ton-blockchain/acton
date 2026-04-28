@@ -15,5 +15,6 @@
        
        N/A -> sender A
        └── FmBouncePing 0.2 TON -> EQAAAA..ALrXfh B                                    compute phase skipped aborted
+           queryId: 402
 
  ✓ 1 passed in 1 file

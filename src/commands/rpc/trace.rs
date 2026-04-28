@@ -7,6 +7,7 @@ use crate::ffi::emulation::{
     V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions, v3_message_hash,
 };
 use crate::formatter::FormatterContext;
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use log::warn;
@@ -112,7 +113,7 @@ fn rpc_trace_formatter(
 }
 
 fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
-    print_section("Trace Summary");
+    println!("{}", "Trace Summary".bold().cyan());
     print_kv("Query Hash", query_hash);
     print_kv("Trace ID", trace.trace_id.as_str());
     print_kv(

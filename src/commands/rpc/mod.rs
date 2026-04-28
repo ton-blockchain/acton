@@ -42,7 +42,7 @@ pub enum RpcCommand {
         )]
         net: Option<String>,
     },
-    #[command(about = "Print a TonCenter v3 transaction trace as an Acton transaction tree")]
+    #[command(about = "Render a TonCenter v3 trace as a decoded transaction tree")]
     Trace {
         #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
         hash: String,

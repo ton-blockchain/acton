@@ -1,4 +1,4 @@
-Print a TonCenter v3 transaction trace as an Acton transaction tree
+Render a TonCenter v3 trace as a decoded transaction tree
 
 Usage: acton[EXE] rpc trace [OPTIONS] <HASH>
 

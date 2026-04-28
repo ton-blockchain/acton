@@ -20,6 +20,7 @@
            │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid)
            │   sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
            └── FmDelivered 0.1996 TON -> fm_linear_mid C                               gas=435 exit_code=63 aborted
+               queryId: 102, hop: 1
                └── Compute phase failed: Unable to load data from cell because prefix does not match
 
  ✓ 1 passed in 1 file

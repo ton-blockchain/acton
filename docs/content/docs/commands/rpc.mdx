@@ -18,7 +18,7 @@ Query blockchain account state through a configured network endpoint.
 - fetch the latest masterchain block number for a network
 - check whether an account is active, frozen, or uninitialized
 - inspect balance, last transaction metadata, and state hashes
-- print a transaction trace from TonCenter v3 as an Acton transaction tree
+- render a TonCenter v3 trace as a decoded transaction tree
 - match deployed code against a local Acton project by `code_hash`
 - decode account storage through local ABI metadata when a match is found
 
@@ -135,8 +135,8 @@ decimal number.
 
 ### acton rpc trace
 
-Fetch a TonCenter v3 trace by root transaction hash and print it in a stable
-Acton text format.
+Fetch a TonCenter v3 trace by root transaction hash and render it in a stable
+text format.
 
 #### Synopsis
 
