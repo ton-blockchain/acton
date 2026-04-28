@@ -1,0 +1,156 @@
+---
+title: "6. Harden with mutation and fuzz testing"
+description: "Use acton test --mutate to find untested mutations and @fuzzing to validate the Vote option boundary."
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+<Callout type="info" title="Optional page">
+  This page is independent of pages 6–9. Skip it now and return later if needed.
+</Callout>
+
+Coverage tells which lines ran — not whether tests would catch a bug in them. This page introduces two complementary techniques:
+
+- **Mutation testing**: deliberately breaks the contract code and checks whether tests notice
+- **Fuzz testing**: generates random inputs to probe edge cases
+
+## Mutation testing
+
+The mutation engine makes small, deliberate changes — for example, changing `option0 += 1` to `option0 -= 1` — then runs the test suite. If all tests still pass after a mutation, that mutation is a **survivor**: tests did not catch the change. Survivors point to gaps that line coverage misses.
+
+## Run the mutation engine on Voter
+
+```bash
+acton test --mutate --mutate-contract Voter
+```
+
+```acton-cli
+$ acton test --mutate --mutate-contract Voter
+   Compiling contracts
+    Finished in 620.11µs
+     Running tests (mutation mode)
+
+ Mutating: Voter (12 mutations)
+
+  ✓ Mutation 1: replaced `== storage.poll` with `!= storage.poll`  killed in 3ms
+  ✓ Mutation 2: replaced `!storage.hasVoted` with `storage.hasVoted`  killed in 4ms
+  ✓ Mutation 3: removed `storage.hasVoted = true`  killed in 3ms
+  ...
+  ✗ Mutation 7: replaced `Errors.AlreadyVoted` with `Errors.NotFromPoll`  survived
+
+ Mutation score: 11/12 (91.7%)
+ 1 survivor found.
+```
+
+One mutation survived: changing `Errors.AlreadyVoted` to `Errors.NotFromPoll` in Voter's assert. Tests checked that a duplicate vote is rejected — but none checked the specific exit code. Add one:
+
+```tolk title="tests/poll.test.tolk"
+get fun `test voter exits with AlreadyVoted on duplicate`() {
+    val (poll, _, alice, _) = setupTest();
+
+    // First vote deploys and sets hasVoted = true.
+    val res1 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(res1).toHaveAllSuccessfulTxs();
+
+    val voterAddr = poll.calcVoterAddress(alice.address);
+    val voter     = Voter.fromAddress(voterAddr);
+
+    val directMsg = createMessage({
+        bounce: false,
+        value:  ton("0.05"),
+        dest:   voter.address,
+        body:   Vote { option: 0 },
+    });
+    val res2 = net.send(alice.address, directMsg);
+    expect(res2).toHaveFailedTx({
+        from:     alice.address,
+        to:       voter.address,
+        exitCode: Errors.AlreadyVoted as int,
+    });
+}
+```
+
+Rerun to confirm the survivor is gone:
+
+```bash
+acton test --mutate --mutate-contract Voter
+```
+
+```acton-cli
+ Mutation score: 12/12 (100%)
+ No survivors.
+```
+
+## Run mutation testing on Poll
+
+```bash
+acton test --mutate --mutate-contract Poll
+```
+
+Address any survivors. Common ones:
+
+- Mutations to `if (msg.option == 0)` in both `onInternalMessage` and `onBouncedMessage`
+- Off-by-one in increment or decrement operations
+
+<Callout type="tip">
+  Use `--mutation-diff` to test only mutations in lines changed since the main branch — useful in CI to skip re-testing stable code.
+</Callout>
+
+## Add a fuzz test for the option boundary
+
+```tolk title="tests/poll.test.tolk"
+import "@acton/testing/expect"
+
+@fuzzing(min: 0, max: 255)
+get fun `fuzz vote option boundary`(option: uint8) {
+    val (poll, _, alice, _) = setupTest();
+
+    val msg = createMessage({
+        bounce: false,
+        value:  ton("0.1"),
+        dest:   poll.address,
+        body:   Vote { option },
+    });
+    val res = net.send(alice.address, msg);
+
+    if (option == 0 || option == 1) {
+        expect(res).toHaveSuccessfulTx({ from: alice.address, to: poll.address });
+    } else {
+        expect(res).toHaveFailedTx({
+            from:     alice.address,
+            to:       poll.address,
+            exitCode: Errors.InvalidOption as int,
+        });
+    }
+}
+```
+
+```bash
+acton test --fuzz-seed 42 -f "fuzz vote option"
+```
+
+```acton-cli
+$ acton test --fuzz-seed 42 -f "fuzz vote option"
+   Compiling contracts
+    Finished in 608.21µs
+     Running tests
+
+ TEST  <root>/poll
+
+ > ./tests/poll.test.tolk (1 fuzz test)
+  ✓ fuzz vote option boundary  (256 iterations, seed 42)  145ms
+
+ ✓ 1 passed in 1 file
+```
+
+The fuzz test exercises all 256 possible `uint8` values and confirms Poll accepts only `0` and `1`.
+
+<Callout type="info">
+  For CI, run with a fixed seed for deterministic output. See the [fuzz testing docs](/docs/testing/fuzz-testing) for configuration.
+</Callout>
+
+## Checkpoint
+
+The test suite now uses three complementary techniques — integration, mutation, and fuzz — with a 100% mutation score on Voter and the option boundary fully covered.
+
+**Commands introduced:** `acton test --mutate`, `acton test --mutate-contract`, `acton test --fuzz-seed`

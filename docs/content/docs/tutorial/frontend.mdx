@@ -1,0 +1,383 @@
+---
+title: "9. Build the React frontend"
+description: "Generate a TypeScript wrapper, scaffold a React app with AppKit React, and build a live poll UI with real-time vote counts."
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Prerequisites for this page
+
+- [Node.js](https://nodejs.org/en/download/) 20 or later
+- A deployed poll on [testnet](/docs/tutorial/testnet)
+
+## Generate a TypeScript wrapper
+
+```bash
+acton wrapper --ts Poll
+```
+
+This creates `wrappers-ts/Poll.gen.ts` with typed methods for every getter and every message type:
+
+```typescript title="wrappers-ts/Poll.gen.ts (excerpt)"
+import { Address, beginCell, Cell } from "@ton/ton";
+
+export function createVoteMessage(option: number): Cell {
+    return beginCell()
+        .storeUint(0x694d6f6e, 32)  // Vote opcode
+        .storeUint(option, 8)
+        .endCell();
+}
+
+export function createClosePollMessage(): Cell {
+    return beginCell()
+        .storeUint(0x14160e21, 32)  // ClosePoll opcode
+        .endCell();
+}
+```
+
+<Callout type="info">
+  Re-run `acton wrapper --ts Poll` whenever messages or getters change. Do not edit the generated file manually.
+</Callout>
+
+## Scaffold the app
+
+```bash
+acton init --create-app app/
+```
+
+```acton-cli
+$ acton init --create-app app/
+✓ Created app scaffold at app/
+  Framework: React + Vite + TypeScript
+  Styling:   Tailwind CSS
+  UI:        shadcn/ui
+  Wallet:    TON Connect UI
+```
+
+```bash
+cd app/
+npm install
+npm install @ton/appkit-react @ton/ton @ton/core
+```
+
+Copy the generated TypeScript wrapper:
+
+```bash
+cp ../wrappers-ts/Poll.gen.ts src/lib/poll.ts
+```
+
+Create `.env` from the example:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```bash title=".env"
+VITE_POLL_ADDRESS=<POLL_ADDRESS>
+VITE_TONCENTER_TESTNET_API_KEY=<TONCENTER_API_KEY>
+```
+
+`<POLL_ADDRESS>` — the testnet address from page 8.
+`<TONCENTER_API_KEY>` — obtain a free key at [toncenter.com](https://toncenter.com/).
+
+## Set up AppKit React
+
+Replace `src/main.tsx`:
+
+```tsx title="src/main.tsx"
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { AppKitProvider } from "@ton/appkit-react";
+import App from "./App";
+import "./styles.css";
+
+// Replace with your own manifest hosted at a stable URL.
+const manifestUrl =
+    "https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+        <AppKitProvider manifestUrl={manifestUrl} network="testnet">
+            <App />
+        </AppKitProvider>
+    </React.StrictMode>,
+);
+```
+
+## Create the poll API helper
+
+Create `src/lib/ton.ts`:
+
+```typescript title="src/lib/ton.ts"
+import { Address, TonClient, TupleReader } from "@ton/ton";
+
+// Collect configurable values in one place.
+const POLL_ADDRESS = import.meta.env.VITE_POLL_ADDRESS as string;
+const API_KEY      = import.meta.env.VITE_TONCENTER_TESTNET_API_KEY as string;
+
+const client = new TonClient({
+    endpoint: "https://testnet.toncenter.com/api/v2/jsonRPC",
+    apiKey:   API_KEY,
+});
+
+export async function fetchResults(): Promise<{ option0: number; option1: number }> {
+    const address = Address.parse(POLL_ADDRESS);
+    const result  = await client.runMethod(address, "results");
+    const reader  = new TupleReader(result.stack);
+    return {
+        option0: reader.readNumber(),
+        option1: reader.readNumber(),
+    };
+}
+
+export async function fetchIsClosed(): Promise<boolean> {
+    const address = Address.parse(POLL_ADDRESS);
+    const result  = await client.runMethod(address, "isClosed");
+    return result.stack.readBoolean();
+}
+
+export async function fetchOwner(): Promise<string> {
+    const address = Address.parse(POLL_ADDRESS);
+    const result  = await client.runMethod(address, "owner");
+    return result.stack.readAddress().toString();
+}
+```
+
+## Build the `PollResults` component
+
+Create `src/components/PollResults.tsx`:
+
+```tsx title="src/components/PollResults.tsx"
+import { useEffect, useState } from "react";
+import { fetchResults } from "../lib/ton";
+
+export function PollResults() {
+    const [results, setResults] = useState({ option0: 0, option1: 0 });
+
+    useEffect(() => {
+        const load = async () => setResults(await fetchResults());
+        load();
+        const interval = setInterval(load, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const total = results.option0 + results.option1 || 1;
+
+    return (
+        <div className="space-y-3 w-full max-w-sm">
+            <div>
+                <div className="flex justify-between text-sm mb-1">
+                    <span>Option A</span>
+                    <span>{results.option0} votes</span>
+                </div>
+                <div className="h-4 bg-gray-200 rounded-full">
+                    <div
+                        className="h-4 bg-blue-500 rounded-full transition-all"
+                        style={{ width: `${(results.option0 / total) * 100}%` }}
+                    />
+                </div>
+            </div>
+            <div>
+                <div className="flex justify-between text-sm mb-1">
+                    <span>Option B</span>
+                    <span>{results.option1} votes</span>
+                </div>
+                <div className="h-4 bg-gray-200 rounded-full">
+                    <div
+                        className="h-4 bg-green-500 rounded-full transition-all"
+                        style={{ width: `${(results.option1 / total) * 100}%` }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+```
+
+## Build the `VoteButtons` component
+
+Create `src/components/VoteButtons.tsx`:
+
+```tsx title="src/components/VoteButtons.tsx"
+import { useTonConnectUI } from "@tonconnect/ui-react";
+import { createVoteMessage } from "../lib/poll";
+
+// Collect configurable values in one place.
+const POLL_ADDRESS = import.meta.env.VITE_POLL_ADDRESS as string;
+
+interface VoteButtonsProps {
+    disabled?: boolean;
+}
+
+export function VoteButtons({ disabled }: VoteButtonsProps) {
+    const [tonConnectUI] = useTonConnectUI();
+
+    const vote = async (option: number) => {
+        const body = createVoteMessage(option);
+        await tonConnectUI.sendTransaction({
+            validUntil: Math.floor(Date.now() / 1000) + 60,
+            messages: [{
+                address: POLL_ADDRESS,
+                amount:  "100000000",  // 0.1 TON in nanotons
+                payload: body.toBoc().toString("base64"),
+            }],
+        });
+    };
+
+    return (
+        <div className="flex gap-3">
+            <button
+                onClick={() => vote(0)}
+                disabled={disabled}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+            >
+                Vote A
+            </button>
+            <button
+                onClick={() => vote(1)}
+                disabled={disabled}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+            >
+                Vote B
+            </button>
+        </div>
+    );
+}
+```
+
+## Build the `CloseButton` component
+
+Create `src/components/CloseButton.tsx`:
+
+```tsx title="src/components/CloseButton.tsx"
+import { useTonConnectUI, useAddress } from "@ton/appkit-react";
+import { createClosePollMessage } from "../lib/poll";
+
+// Collect configurable values in one place.
+const POLL_ADDRESS = import.meta.env.VITE_POLL_ADDRESS as string;
+
+interface CloseButtonProps {
+    ownerAddress: string;
+}
+
+export function CloseButton({ ownerAddress }: CloseButtonProps) {
+    const connectedAddress = useAddress();
+    const [tonConnectUI]   = useTonConnectUI();
+
+    if (!connectedAddress || connectedAddress !== ownerAddress) {
+        return null;
+    }
+
+    const closePoll = async () => {
+        const body = createClosePollMessage();
+        await tonConnectUI.sendTransaction({
+            validUntil: Math.floor(Date.now() / 1000) + 60,
+            messages: [{
+                address: POLL_ADDRESS,
+                amount:  "50000000",  // 0.05 TON in nanotons
+                payload: body.toBoc().toString("base64"),
+            }],
+        });
+    };
+
+    return (
+        <button
+            onClick={closePoll}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm"
+        >
+            Close poll
+        </button>
+    );
+}
+```
+
+`CloseButton` returns `null` when the connected address does not match the poll owner — non-owners never see the button.
+
+## Assemble the main `App` component
+
+Replace `src/App.tsx`:
+
+```tsx title="src/App.tsx"
+import { TonConnectButton, useAddress } from "@ton/appkit-react";
+import { useEffect, useState } from "react";
+import { PollResults } from "./components/PollResults";
+import { VoteButtons } from "./components/VoteButtons";
+import { CloseButton } from "./components/CloseButton";
+import { fetchIsClosed, fetchOwner } from "./lib/ton";
+
+export default function App() {
+    const connectedAddress = useAddress();
+    const [isClosed, setIsClosed] = useState(false);
+    const [owner, setOwner]       = useState("");
+
+    useEffect(() => {
+        fetchIsClosed().then(setIsClosed);
+        fetchOwner().then(setOwner);
+    }, []);
+
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-8">
+            <div className="flex items-center justify-between w-full max-w-sm">
+                <h1 className="text-2xl font-bold">Acton Poll</h1>
+                <TonConnectButton />
+            </div>
+
+            {isClosed && (
+                <div className="text-sm text-gray-500 border rounded px-3 py-1">
+                    This poll is closed.
+                </div>
+            )}
+
+            <PollResults />
+
+            {connectedAddress && !isClosed && <VoteButtons />}
+
+            {!isClosed && <CloseButton ownerAddress={owner} />}
+
+            {!connectedAddress && !isClosed && (
+                <p className="text-sm text-gray-500">Connect a wallet to vote.</p>
+            )}
+        </div>
+    );
+}
+```
+
+## Run the app
+
+```bash
+npm run dev
+```
+
+```acton-cli
+  VITE v5.x.x  ready in 312 ms
+  ➜  Local:   http://localhost:5173/
+```
+
+Open http://localhost:5173. The page shows:
+
+1. An **Acton Poll** header with a **Connect Wallet** button
+2. Two progress bars with current vote counts, refreshed every 5 seconds
+3. **Vote A** and **Vote B** buttons when a wallet is connected
+4. A **Close poll** button visible only to the poll owner
+
+Connect a wallet (such as Tonkeeper), click **Vote A**, and confirm the transaction. The bars update within a few seconds. A second vote from the same wallet sends the transaction, but the count reverts as the bounce propagates.
+
+## Complete
+
+The project now includes:
+
+- Smart contracts in Tolk (`Poll.tolk`, `Voter.tolk`) with bounce-based duplicate vote prevention
+- Integration tests with multi-contract traces, coverage, mutation, and fuzz testing
+- Deploy and vote scripts for localnet and testnet
+- Verified source on verifier.ton.org
+- React frontend with live results and TON Connect wallet integration
+
+## Next steps
+
+- [Testing guide](/docs/testing/overview) — fork testing against live testnet state
+- [Libraries](/docs/libraries) — share common code between contracts
+- [Jetton template](/docs/commands/new) — a production-grade example of the parent-child pattern at scale
+
+**Commands introduced:** `acton wrapper --ts`, `acton init --create-app`

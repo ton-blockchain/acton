@@ -60,6 +60,8 @@ const builtinLangs = [
   'powershell',
   'toml',
   'yaml',
+  'typescript',
+  'tsx',
 ] as const;
 
 export default defineConfig({
