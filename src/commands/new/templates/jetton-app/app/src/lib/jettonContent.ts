@@ -19,7 +19,10 @@ function makeSnakeCell(data: Buffer): Cell {
   const chunkSize = 127;
 
   if (data.length <= firstChunkSize) {
-    return beginCell().storeUint(SNAKE_DATA_PREFIX, 8).storeBuffer(data).endCell();
+    return beginCell()
+      .storeUint(SNAKE_DATA_PREFIX, 8)
+      .storeBuffer(data)
+      .endCell();
   }
 
   const chunks: Buffer[] = [];
@@ -55,8 +58,13 @@ export interface JettonMetadata {
   imageData?: string;
 }
 
-export async function buildOnchainMetadata(metadata: JettonMetadata): Promise<Cell> {
-  const dict = Dictionary.empty(Dictionary.Keys.Buffer(32), Dictionary.Values.Cell());
+export async function buildOnchainMetadata(
+  metadata: JettonMetadata,
+): Promise<Cell> {
+  const dict = Dictionary.empty(
+    Dictionary.Keys.Buffer(32),
+    Dictionary.Values.Cell(),
+  );
 
   const entries: [string, string][] = [
     ['name', metadata.name],
@@ -73,5 +81,8 @@ export async function buildOnchainMetadata(metadata: JettonMetadata): Promise<Ce
     dict.set(keyHash, valueCell);
   }
 
-  return beginCell().storeUint(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict).endCell();
+  return beginCell()
+    .storeUint(ONCHAIN_CONTENT_PREFIX, 8)
+    .storeDict(dict)
+    .endCell();
 }

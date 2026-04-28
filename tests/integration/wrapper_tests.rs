@@ -23,6 +23,13 @@ if [ "${1:-}" != "gen-typescript-from-tolk" ] && [ "${1:-}" != "gen-typescript-f
     exit 1
 fi
 
+if [ "${ACTON_TS_WRAPPER_REQUIRE_CACHE:-0}" = "1" ]; then
+    if [ -z "${npm_config_cache:-}" ] || [ ! -d "${npm_config_cache}" ]; then
+        echo "missing npm_config_cache" >&2
+        exit 1
+    fi
+fi
+
 printf '%s' "${2:-}" > "$ACTON_TS_WRAPPER_CAPTURE"
 printf '%s\n' '// generated ts wrapper' 'export const marker = "ts";'
 "#;
@@ -179,6 +186,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
         .wrapper("my_contract")
         .generate_typescript_wrapper()
         .env("PATH", &path_env)
+        .env("ACTON_TS_WRAPPER_REQUIRE_CACHE", "1")
         .env(
             "ACTON_TS_WRAPPER_CAPTURE",
             capture_path.to_str().expect("capture path"),

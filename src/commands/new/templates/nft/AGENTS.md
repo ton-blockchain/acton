@@ -6,6 +6,6 @@
 - Treat the collection and item contracts as a coupled system. Keep storage, message formats, tests, wrappers, and deployment behavior consistent across both sides.
 - Keep `tests/nft-collection.test.tolk`, `tests/nft-item.test.tolk`, `wrappers/`, and `scripts/` aligned with contract changes.
 - When ABI changes are involved, prefer regenerating wrappers with `acton wrapper NftCollection` and `acton wrapper NftItem` over hand-editing wrapper files.
-- Prefer this validation loop when feasible: `acton build`, `acton test`
+- Prefer this validation loop when feasible: `acton build`, `acton test`, `acton run deploy-emulation`.
 - Before proposing broadcast deployment changes or metadata changes, verify the full deployment script in emulation first.
 - When command syntax or flags are unclear, verify them with `acton --help` or `acton <command> --help`.

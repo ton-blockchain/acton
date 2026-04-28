@@ -99,7 +99,7 @@ when the tag already exists in `origin` and local `master` exactly matches
 - `cargo xtask dist archive` packages release archives and `.sha256` files used
   by CI and release automation
 - other `dist` subcommands currently exist but are still placeholders/TODO
-- `cargo xtask schema` regenerates `acton.schema.json`
+- `cargo xtask schema` regenerates `crates/acton-config/schemas/acton.schema.json`
 - `cargo xtask sync-artifacts` refreshes native TON artifacts and bundled stdlib assets
 - `cargo xtask github-cleanup` and `cargo xtask ubicloud-cleanup` prune caches;
   outside CI they default to dry-run safety mode

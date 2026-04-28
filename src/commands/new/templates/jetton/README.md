@@ -9,10 +9,10 @@ script that deploys the minter and mints the initial supply.
 - `contracts/JettonMinter.tolk` implements the jetton minter.
 - `contracts/JettonWallet.tolk` implements user jetton wallets.
 - `contracts/errors.tolk` defines starter errors for the template.
-- `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
+- `wrappers/JettonMinter.gen.tolk` and `wrappers/JettonWallet.gen.tolk`
   are the wrappers used by tests and scripts.
-- `tests/wallet.test.tolk` covers minting, admin updates, content updates, and
-  transfers.
+- `tests/*.test.tolk` covers state init, gas, bounce handling, wallet behavior,
+  admin and governance flows, and protocol validation.
 - `scripts/deploy.tolk` builds on-chain metadata, deploys the minter, and mints
   the configured supply, then reads total supply back from the network.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
@@ -40,16 +40,17 @@ acton run deploy-emulation
 
 1. Update the contracts under `contracts/` for your token policy and business
    rules.
-2. Adjust `wrappers/JettonMinter.tolk` and `wrappers/JettonWallet.tolk`
+2. Adjust `wrappers/JettonMinter.gen.tolk` and `wrappers/JettonWallet.gen.tolk`
    to match the new ABI, or regenerate them with `acton wrapper JettonMinter`
    and `acton wrapper JettonWallet`.
-3. Extend `tests/wallet.test.tolk` with the scenarios you care about.
+3. Extend the focused test suites under `tests/` with the scenarios you care about.
 4. Update metadata defaults and deployment behavior in `scripts/deploy.tolk`.
 
 ## Deploy To Testnet
 
 The deploy script expects a wallet named `deployer` and optionally reads these
-environment variables from `.env` or your shell:
+environment variables from a local `.env` copied from `.env.example`, or from
+your shell:
 
 - `JETTON_NAME`
 - `JETTON_DESCRIPTION`
@@ -63,7 +64,8 @@ environment variables from `.env` or your shell:
 acton wallet new --name deployer --local --airdrop
 ```
 
-2. Optionally customize jetton metadata and supply in `.env`.
+2. Optionally copy `.env.example` to `.env` and customize jetton metadata and
+   supply there.
 3. Run `acton run deploy-emulation` and confirm the generated metadata, minter
    address, and minted supply look correct.
 4. Broadcast the deployment to testnet:
@@ -83,10 +85,9 @@ acton run deploy-emulation
 acton run deploy-testnet
 ```
 
-If you need higher Toncenter limits for blockchain queries, put
-`TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` into the generated
-`.env` file, depending on the network you use. Acton loads that file
-automatically, so it is usually the easiest place to keep these keys.
+If you need higher Toncenter limits for blockchain queries, copy `.env.example`
+to `.env` and put `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY`
+there, depending on the network you use. Acton loads `.env` automatically.
 
 ## CI
 

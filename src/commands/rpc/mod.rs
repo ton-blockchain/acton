@@ -7,6 +7,7 @@ use clap::Subcommand;
 use log::warn;
 use num_bigint::{BigInt, Sign};
 use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::abi::ContractABI as CompilerContractABI;
@@ -18,6 +19,8 @@ use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{
     Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
 };
+
+mod trace;
 
 #[derive(Subcommand, Clone)]
 pub enum RpcCommand {
@@ -31,11 +34,67 @@ pub enum RpcCommand {
         )]
         net: Option<String>,
     },
+    #[command(about = "Print the latest masterchain block info returned by TonCenter")]
+    Block {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Print the latest masterchain block number for a network")]
+    BlockNumber {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Render a TonCenter v3 trace as a decoded transaction tree")]
+    Trace {
+        #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
+        hash: String,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            conflicts_with_all = ["tree", "verbose"],
+            help = "Print only the trace summary"
+        )]
+        summary: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "verbose"],
+            help = "Print the trace summary and transaction tree (default)"
+        )]
+        tree: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "tree"],
+            help = "Print the summary, tree, and stable per-transaction fields"
+        )]
+        verbose: bool,
+        #[arg(long, help = "Print decoded message bodies in the transaction tree")]
+        show_bodies: bool,
+    },
 }
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
+        RpcCommand::Block { net } => rpc_block_cmd(net),
+        RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
+        RpcCommand::Trace {
+            hash,
+            net,
+            summary,
+            tree: _,
+            verbose,
+            show_bodies,
+        } => trace::rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
 }
 
@@ -44,12 +103,7 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
         .map_err(|_| anyhow!("Invalid address"))
         .with_context(|| error_fmt::invalid_address(address))?;
 
-    let network = net
-        .as_deref()
-        .map(Network::from_str)
-        .transpose()?
-        .unwrap_or(Network::Testnet);
-
+    let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
@@ -145,6 +199,39 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn rpc_block_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let block = client
+        .get_masterchain_info()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{}", serde_json::to_string_pretty(&block)?);
+
+    Ok(())
+}
+
+fn rpc_block_number_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let seqno = client
+        .get_last_block_seqno()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{seqno}");
+
+    Ok(())
+}
+
+fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
+    net.as_deref()
+        .map(Network::from_str)
+        .transpose()
+        .map(|network| network.unwrap_or(Network::Testnet))
+}
+
 fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     let manifest_path = acton_config::config::manifest_path();
     match ActonConfig::load() {
@@ -171,26 +258,7 @@ fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
 ) -> anyhow::Result<Option<LocalContractMatch>> {
-    let manifest_path = acton_config::config::manifest_path();
-    if !manifest_path.exists() {
-        return Ok(None);
-    }
-
-    let Some(contracts) = config.contracts() else {
-        return Ok(None);
-    };
-    let mut file_cache = FileBuildCache::new(None).ok();
-
-    for (contract_id, contract) in contracts {
-        let candidate =
-            match load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())
-            {
-                Ok(candidate) => candidate,
-                Err(err) => {
-                    warn!("Skipping rpc ABI match candidate `{contract_id}`: {err:#}");
-                    continue;
-                }
-            };
+    for candidate in load_local_contract_candidates(config)? {
         if &candidate.code_hash == code_hash {
             return Ok(Some(LocalContractMatch {
                 contract_id: candidate.contract_id,
@@ -204,9 +272,41 @@ fn find_local_contract_match(
     Ok(None)
 }
 
+fn load_local_contract_candidates(
+    config: &ActonConfig,
+) -> anyhow::Result<Vec<LocalContractCandidate>> {
+    let manifest_path = acton_config::config::manifest_path();
+    if !manifest_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let Some(contracts) = config.contracts() else {
+        return Ok(Vec::new());
+    };
+    let mut file_cache = FileBuildCache::new(None).ok();
+    let mut candidates = Vec::new();
+
+    for (contract_id, contract) in contracts {
+        let candidate =
+            match load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())
+            {
+                Ok(candidate) => candidate,
+                Err(err) => {
+                    warn!("Skipping rpc ABI match candidate `{contract_id}`: {err:#}");
+                    continue;
+                }
+            };
+        candidates.push(candidate);
+    }
+
+    Ok(candidates)
+}
+
 struct LocalContractCandidate {
+    contract_path: PathBuf,
     contract_id: String,
     contract_name: String,
+    code_boc64: String,
     code_hash: HashBytes,
     abi: Option<Arc<ContractAbi>>,
     compiler_abi: Option<Arc<CompilerContractABI>>,
@@ -224,9 +324,12 @@ fn load_local_contract_candidate(
             .with_context(|| format!("Failed to read {}", contract_path.display()))?;
         let code = Boc::decode(boc)
             .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
+        let code_boc64 = Boc::encode_base64(&code);
         return Ok(LocalContractCandidate {
+            contract_path,
             contract_id: contract_id.to_owned(),
             contract_name: contract.display_name(contract_id).to_owned(),
+            code_boc64,
             code_hash: *code.repr_hash(),
             abi: None,
             compiler_abi: None,
@@ -259,12 +362,14 @@ fn load_local_contract_candidate(
         .with_context(|| format!("Failed to decode code for {}", contract_path.display()))?;
     let content = fs::read_to_string(&contract_path)
         .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-    let path = contract_path.to_string_lossy();
+    let path = contract_path.to_string_lossy().to_string();
     let abi = Arc::new(contract_abi(content.into(), &path, &config.mappings()));
 
     Ok(LocalContractCandidate {
+        contract_path,
         contract_id: contract_id.to_owned(),
         contract_name: contract.display_name(contract_id).to_owned(),
+        code_boc64,
         code_hash: *code.repr_hash(),
         abi: Some(abi),
         compiler_abi,

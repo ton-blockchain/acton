@@ -1,4 +1,4 @@
-Build the specified contract or all contracts
+Build one contract or every contract
 
 Usage: acton[EXE] build [OPTIONS] [CONTRACT_NAME]
 

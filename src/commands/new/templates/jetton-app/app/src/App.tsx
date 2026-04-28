@@ -50,7 +50,8 @@ export function App() {
           className="flex items-center justify-between px-7 h-[60px] border-b sticky top-0 z-50 max-sm:px-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-2.5 max-sm:py-3"
           style={{
             background: theme === 'light' ? '#fff' : '#08080A',
-            borderBottomColor: theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+            borderBottomColor:
+              theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
           }}
         >
           <div className="flex items-center gap-6 max-sm:gap-2.5 max-sm:w-full max-sm:justify-between">
@@ -112,7 +113,11 @@ export function App() {
                 <Moon className="size-[18px]" />
               )}
             </Button>
-            <NetworkDropdown network={network} setTestnet={setTestnet} theme={theme} />
+            <NetworkDropdown
+              network={network}
+              setTestnet={setTestnet}
+              theme={theme}
+            />
             <TonConnectButton />
           </div>
         </header>
@@ -121,7 +126,11 @@ export function App() {
           {page === 'create' ? (
             <DeployPage network={network} />
           ) : (
-            <ManagePage network={network} initialAddress={address} onAddressChange={setAddress} />
+            <ManagePage
+              network={network}
+              initialAddress={address}
+              onAddressChange={setAddress}
+            />
           )}
         </main>
       </div>
@@ -151,7 +160,10 @@ function NetworkDropdown({
         >
           <Circle
             className="size-2 fill-current"
-            style={{ color: network === 'testnet' ? 'var(--warning)' : 'var(--success)' }}
+            style={{
+              color:
+                network === 'testnet' ? 'var(--warning)' : 'var(--success)',
+            }}
           />
           {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
           <ChevronDown className="size-3 opacity-50" />
@@ -162,7 +174,10 @@ function NetworkDropdown({
           className="rounded-xl px-3.5 py-3 text-[15px] font-medium gap-2.5 cursor-pointer"
           onClick={() => setTestnet(false)}
         >
-          <Circle className="size-2 fill-current" style={{ color: 'var(--success)' }} />
+          <Circle
+            className="size-2 fill-current"
+            style={{ color: 'var(--success)' }}
+          />
           Mainnet
           {network === 'mainnet' && <Check className="size-4 ml-auto" />}
         </DropdownMenuItem>
@@ -170,7 +185,10 @@ function NetworkDropdown({
           className="rounded-xl px-3.5 py-3 text-[15px] font-medium gap-2.5 cursor-pointer"
           onClick={() => setTestnet(true)}
         >
-          <Circle className="size-2 fill-current" style={{ color: 'var(--warning)' }} />
+          <Circle
+            className="size-2 fill-current"
+            style={{ color: 'var(--warning)' }}
+          />
           Testnet
           {network === 'testnet' && <Check className="size-4 ml-auto" />}
         </DropdownMenuItem>

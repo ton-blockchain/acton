@@ -3,7 +3,7 @@ import "@acton/emulation/testing"
 import "@acton/testing/expect"
 
 import "@contracts/types"
-import "@wrappers/Empty"
+import "@wrappers/Empty.gen"
 
 get fun `test deploy exposes initial owner`() {
     val (contract, deployer, _) = setupTest();

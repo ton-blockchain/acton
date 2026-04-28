@@ -135,6 +135,10 @@ fun main() {
         return;
     }
 
+    println("TRACE_OUTPUT_BEGIN");
+    println(trace);
+    println("TRACE_OUTPUT_END");
+
     val receiverCount: int = net.runGetMethod(receiverAddress, "received");
     println("TRACE_READY=true");
     println("RECEIVER_COUNT={}", receiverCount);
@@ -724,7 +728,105 @@ fn test_script_with_args() {
 }
 
 #[test]
-fn test_script_missing_args_uses_main_definition_for_backtrace() {
+fn test_script_with_tolk_number_formats() {
+    let project = ProjectBuilder::new("script-number-formats")
+        .script_file(
+            "numbers",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: int, b: int, c: int) {
+                println("sum: {}", a + b + c);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/numbers.tolk")
+        .arg("0xFF_FF")
+        .arg("0b_1010")
+        .arg("1_000")
+        .run()
+        .success()
+        .assert_contains("sum: 66545");
+}
+
+#[test]
+fn test_script_typed_args_print_stdout_snapshot() {
+    let project = ProjectBuilder::new("script-typed-args-output")
+        .script_file(
+            "typed",
+            r#"
+            import "../../lib/io"
+
+            fun main(i: int, flag: bool, text: string, owner: address, state: cell, data: slice, maybe: int?) {
+                println("int: {}", i);
+                println("bool: {}", flag);
+                println("string: {}", text);
+                println("address: {}", owner);
+
+                var stateSlice = state.beginParse();
+                println("cell: {}", stateSlice.loadUint(32));
+                println("slice: {}", data.loadUint(32));
+                println("nullable: {}", maybe);
+            }
+        "#,
+        )
+        .build();
+
+    let mut state_builder = CellBuilder::new();
+    state_builder.store_uint(123, 32).ok();
+    let state_cell = state_builder.build().ok().unwrap_or_default();
+    let state_hex = Boc::encode_hex(state_cell);
+
+    let mut data_builder = CellBuilder::new();
+    data_builder.store_uint(456, 32).ok();
+    let data_cell = data_builder.build().ok().unwrap_or_default();
+    let data_hex = Boc::encode_hex(data_cell);
+
+    project
+        .acton()
+        .script("scripts/typed.tolk")
+        .arg("0x2a")
+        .arg("true")
+        .arg(r#""hello\n\"world\"""#)
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .arg(&state_hex)
+        .arg(&data_hex)
+        .arg("null")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_typed_args_print_stdout_snapshot.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_bool_arg_rejects_numeric_alias() {
+    let project = ProjectBuilder::new("script-bool-numeric-arg")
+        .script_file(
+            "bool",
+            r#"
+            fun main(flag: bool) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/bool.tolk")
+        .arg("0")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_missing_args_reports_count_error() {
     let project = ProjectBuilder::new("script-missing-args")
         .script_file(
             "args",
@@ -741,37 +843,187 @@ fn test_script_missing_args_uses_main_definition_for_backtrace() {
         )
         .build();
 
-    let output = project
+    project
         .acton()
         .script("scripts/args.tolk")
         .with_backtrace("full")
         .run()
-        .failure();
-
-    output
-        .assert_contains("Script finished with exit code 2")
-        .assert_contains("at scripts/args.tolk:")
-        .assert_contains("Backtrace:")
-        .assert_contains("main")
-        .assert_not_contains("unknown-file");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_missing_args_reports_count_error.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_tuple_args() {
-    let project = ProjectBuilder::new("script-tuple-args")
+fn test_script_extra_args_reports_count_error() {
+    let project = ProjectBuilder::new("script-extra-args")
         .script_file(
-            "tuple",
+            "args",
+            r#"
+            fun main(a: int, b: int) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/args.tolk")
+        .arg("10")
+        .arg("20")
+        .arg("30")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_extra_args_reports_count_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_arg_type_mismatch_reports_type_error() {
+    let project = ProjectBuilder::new("script-arg-type-mismatch")
+        .script_file(
+            "cell",
+            r#"
+            fun main(a: cell) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/cell.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_map_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-map-arg")
+        .script_file(
+            "map",
+            r#"
+            fun main(items: map<int32, int32>) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_map_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_dict_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-dict-arg")
+        .script_file(
+            "dict",
+            r#"
+            fun main(items: dict) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/dict.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_dict_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_unknown_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-array-args")
+        .script_file(
+            "array",
+            r#"
+            fun main(t: array<unknown>) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/array.tolk")
+        .arg("[10 20]")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_arg_print_stdout_snapshot() {
+    let project = ProjectBuilder::new("script-array-output")
+        .script_file(
+            "array",
             r#"
             import "../../lib/io"
 
-            fun main(t: tuple) {
-                val a = t.get(0) as int;
-                val b = t.get(1) as int;
-                println("Tuple A:");
-                println(a);
-                println("Tuple B:");
-                println(b);
+            fun main(items: array<int>) {
+                println("size: {}", items.size());
+                println("first: {}", items.get(0));
+                println("second: {}", items.get(1));
+                println("sum: {}", items.get(0) + items.get(1) + items.get(2));
             }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/array.tolk")
+        .arg("[10 20 30]")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_array_arg_print_stdout_snapshot.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_unknown_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-unknown-cell-arg")
+        .script_file(
+            "unknown",
+            r#"
+            fun main(value: unknown) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/unknown.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tuple_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-tuple-arg")
+        .script_file(
+            "tuple",
+            r#"
+            fun main(t: tuple) {}
         "#,
         )
         .build();
@@ -779,85 +1031,198 @@ fn test_script_with_tuple_args() {
     project
         .acton()
         .script("scripts/tuple.tolk")
-        .arg("[(10 20)]")
+        .arg("[10 20]")
         .run()
-        .success()
-        .assert_contains("Tuple A:")
-        .assert_contains("10")
-        .assert_contains("Tuple B:")
-        .assert_contains("20");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_tensor_args_and_struct() {
-    let project = ProjectBuilder::new("script-tensor-args")
+fn test_script_lisp_list_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-lisp-list-arg")
         .script_file(
-            "tensor",
+            "list",
             r#"
-            import "../../lib/io"
-
-            struct Abc {
-                a: int,
-                b: int,
-                c: int,
-            }
-
-            fun main(a: Abc) {
-                println("a: {}", a.a);
-                println("b: {}", a.b);
-                println("c: {}", a.c);
-            }
-
+            fun main(items: lisp_list<int>) {}
         "#,
         )
         .build();
 
     project
         .acton()
-        .script("scripts/tensor.tolk")
-        .arg("[ 10 20 30 ]")
+        .script("scripts/list.tolk")
+        .arg("[1 [2 null]]")
         .run()
-        .success()
-        .assert_contains("a: 10")
-        .assert_contains("b: 20")
-        .assert_contains("c: 30");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_args_and_struct() {
-    let project = ProjectBuilder::new("script-tensor-args")
+fn test_script_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-struct-arg")
         .script_file(
-            "tensor",
+            "item",
             r#"
-            import "../../lib/io"
-
             struct Abc {
                 a: int,
                 b: int,
                 c: int,
             }
 
-            fun main(a: Abc) {
-                println("a: {}", a.a);
-                println("b: {}", a.b);
-                println("c: {}", a.c);
-            }
-
+            fun main(a: Abc) {}
         "#,
         )
         .build();
 
     project
         .acton()
-        .script("scripts/tensor.tolk")
+        .script("scripts/item.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_struct_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_nullable_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-nullable-struct-arg")
+        .script_file(
+            "item",
+            r#"
+            struct Foo {
+                a: int32,
+            }
+
+            fun main(a: Foo?) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/item.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-array-struct-arg")
+        .script_file(
+            "item",
+            r#"
+            struct Foo {
+                a: int32,
+            }
+
+            fun main(items: array<Foo>) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/item.tolk")
+        .arg("[]")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_struct_flat_args_reports_count_error() {
+    let project = ProjectBuilder::new("script-struct-flat-args")
+        .script_file(
+            "item",
+            r#"
+            struct Abc {
+                a: int,
+                b: int,
+                c: int,
+            }
+
+            fun main(a: Abc) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/item.tolk")
         .arg("10")
         .arg("20")
         .arg("30")
         .run()
-        .success()
-        .assert_contains("a: 10")
-        .assert_contains("b: 20")
-        .assert_contains("c: 30");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_struct_flat_args_reports_count_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_alias_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-alias-arg")
+        .script_file(
+            "alias",
+            r#"
+            type ItemId = int;
+
+            fun main(id: ItemId) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/alias.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_alias_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_nested_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-nested-struct-arg")
+        .script_file(
+            "nested",
+            r#"
+            struct Inner {
+                value: int,
+            }
+
+            struct Outer {
+                inner: Inner,
+            }
+
+            fun main(arg: Outer) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/nested.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
@@ -918,7 +1283,7 @@ fn test_script_with_cell_arg() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("C{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .run()
         .success()
         .assert_contains("a: 999");
@@ -948,14 +1313,121 @@ fn test_script_with_slice_arg() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("CS{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .run()
         .success()
         .assert_contains("a: 999");
 }
 
 #[test]
-#[ignore]
+fn test_script_with_bits_arg() {
+    let project = ProjectBuilder::new("script-bits-args")
+        .script_file(
+            "bits",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: bits12) {
+                var slice = a as slice;
+                println("a: {}", slice.loadUint(12));
+            }
+
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(0xabc, 12).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/bits.tolk")
+        .arg(&cell_hex)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/test_script_with_bits_arg.stdout.txt");
+}
+
+#[test]
+fn test_script_builder_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-builder-args")
+        .script_file(
+            "builder",
+            r#"
+            fun main(a: builder) {}
+
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(999, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/builder.tolk")
+        .arg(&cell_hex)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_builder_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_any_address_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-any-address-arg")
+        .script_file(
+            "address",
+            r#"
+            fun main(a: any_address) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/address.tolk")
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_cell_arg_rejects_prefixed_hex() {
+    let project = ProjectBuilder::new("script-cell-prefixed-arg")
+        .script_file(
+            "cell",
+            r#"
+            fun main(a: cell) {}
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(999, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/cell.tolk")
+        .arg(&format!("C{{{cell_hex}}}"))
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
+        );
+}
+
+#[test]
 fn test_script_with_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(
@@ -963,7 +1435,7 @@ fn test_script_with_string_arg() {
             r#"
             import "../../lib/io"
 
-            fun main(a: slice) {
+            fun main(a: string) {
                 println("a: {}", a);
             }
 
@@ -974,22 +1446,21 @@ fn test_script_with_string_arg() {
     project
         .acton()
         .script("scripts/string.tolk")
-        .arg(r#""hello world""#)
+        .arg("hello world")
         .run()
         .success()
         .assert_contains("a: hello world");
 }
 
 #[test]
-#[ignore]
-fn test_script_with_long_string_arg() {
+fn test_script_with_escaped_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(
             "string",
             r#"
             import "../../lib/io"
 
-            fun main(a: slice) {
+            fun main(a: string) {
                 println("a: {}", a);
             }
 
@@ -997,14 +1468,37 @@ fn test_script_with_long_string_arg() {
         )
         .build();
 
-    let string = "hello world ".repeat(1000);
     project
         .acton()
         .script("scripts/string.tolk")
-        .arg(&format!("\"{string}\""))
+        .arg(r#""hello\n\"world\"\\tail""#)
         .run()
         .success()
-        .assert_contains(&format!("a: {string}"));
+        .assert_contains("a: hello\n\"world\"\\tail");
+}
+
+#[test]
+fn test_script_with_address_arg() {
+    let project = ProjectBuilder::new("script-address-args")
+        .script_file(
+            "address",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: address) {
+                println("a: {}", a);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/address.tolk")
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .run()
+        .success()
+        .assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]
@@ -1065,7 +1559,7 @@ fn test_script_to_calculate_storage_fee() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("C{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .arg(&(60 * 60 * 24 * 365).to_string())
         .run()
         .success()

@@ -15,7 +15,7 @@ use std::path::Path;
 mod licenses;
 mod template;
 use template::ProjectLayout;
-pub use template::ProjectTemplate;
+pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";
@@ -59,9 +59,10 @@ lcov.info
 gen/
 ";
 
-const BASE_DOT_ENV: &str = "
-# Acton loads this .env file automatically.
-# This is usually the easiest place to keep project-local Toncenter API keys.
+const BASE_ENV_EXAMPLE: &str = "
+# Copy this file to .env for local Toncenter API keys.
+# Acton loads .env automatically.
+# App templates also let Vite read the TONCENTER_ variables.
 # Acton uses Toncenter to access blockchain data and send messages.
 # Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
 # exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
@@ -261,7 +262,7 @@ pub fn new_cmd(
     }
 
     fs::write(".gitignore", BASE_GITIGNORE.trim_start())?;
-    fs::write(".env", BASE_DOT_ENV.trim_start())?;
+    fs::write(".env.example", BASE_ENV_EXAMPLE.trim_start())?;
     fs::write(".editorconfig", BASE_EDITORCONFIG.trim_start())?;
 
     if let Err(e) = symlink_global_wallets() {
@@ -332,9 +333,9 @@ pub fn new_cmd(
     println!("  {} test", "acton".bold());
     if scaffold.layout().includes_typescript_app() {
         println!("  {}", "# Install app dependencies".dimmed());
-        println!("  npm ci");
+        println!("  {} ci", "npm".bold());
         println!("  {}", "# Start the TypeScript app".dimmed());
-        println!("  npm run dev");
+        println!("  {} run dev", "npm".bold());
     }
 
     Ok(())

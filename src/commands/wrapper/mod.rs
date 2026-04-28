@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use tempfile::TempDir;
 use tolk_compiler::CompilerResult;
 use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
 use ton_abi::ContractAbi as LegacyContractAbi;
@@ -389,8 +390,11 @@ fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
 
 fn generate_typescript_wrapper(model: &WrapperModel) -> anyhow::Result<String> {
     let abi_json = serialize_typescript_abi(model)?;
+    let npm_cache_dir =
+        TempDir::new().context("Failed to create a temporary npm cache directory")?;
 
     let output = Command::new("npx")
+        .env("npm_config_cache", npm_cache_dir.path())
         .env("npm_config_update_notifier", "false")
         .arg("--yes")
         .arg(TYPESCRIPT_WRAPPER_PACKAGE)

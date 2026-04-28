@@ -294,8 +294,8 @@ fn to_have_and_not_have_tx_by_state_init() {
                 expect(txs).toHaveTx({{
                     from: sender.address,
                     to: target,
-                    state_init: fun(rawStateInit) {{
-                        val actual = (rawStateInit as Cell<StateInit?>).load();
+                    state_init: fun(rawStateInit: Cell<StateInit?>): bool {{
+                        val actual = rawStateInit.load();
                         return actual != null && actual!.toCell().hash() == init.toCell().hash();
                     }},
                 }});

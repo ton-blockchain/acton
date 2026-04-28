@@ -25,7 +25,11 @@ OPTIONS
            BoC value in hex or base64 format.
 
        -o, --output path
-           Write disassembled output to a file instead of standard output.
+           Write plain disassembly text to a file.
+
+           Without --json, this replaces standard output. With --json, Acton
+           still prints the JSON envelope to stdout and writes only the
+           assembly field to the file.
 
            If the parent directory does not exist, Acton creates it
            automatically. Existing files are overwritten.
@@ -35,6 +39,13 @@ OPTIONS
 
        --show-offsets
            Show instruction bit offsets in the left column.
+
+       --json
+           Print machine-readable disassembly JSON to stdout.
+
+           Successful output includes success, the plain disassembly in
+           assembly, and blocks derived from --source-map. Without
+           --source-map, blocks is empty.
 
        --source-map path
            Use a source map to show original Tolk source locations together
@@ -132,6 +143,24 @@ SOURCE MAPS
        --source-map only affects annotations in the output. It does not change
        which BoC is disassembled.
 
+JSON OUTPUT
+       With --json, Acton prints pretty-printed JSON to stdout.
+
+       o  success: true for successful disassembly
+
+       o  assembly: plain disassembly text without inline source-map comments
+
+       o  blocks: source-to-assembly mappings derived from --source-map
+
+       Each item in blocks contains a source location and assembly_ranges.
+       assembly_ranges stores inclusive zero-based start_line/end_line pairs
+       into the assembly string.
+
+       If --source-map is not provided, blocks is empty.
+
+       If --output is also provided, the output file contains the same plain
+       assembly text while stdout remains JSON.
+
 EXIT STATUS
        o  0: Disassembly completed successfully, including runs with unresolved
           library references that were left as warnings.
@@ -168,6 +197,10 @@ EXAMPLES
           network:
 
               acton disasm library-ref.boc --follow-libraries --net custom:staging
+
+       8. Print machine-readable JSON with source-map ranges:
+
+              acton disasm contract.boc --source-map contract.json --json
 
 SEE ALSO
        o  acton help compile
