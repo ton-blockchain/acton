@@ -79,7 +79,7 @@ get fun `test admin: non-admin should not be able to mint jettons`() {
     expect(mintResult).toHaveFailedTx<MintNewJettons>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     val deployerWallet = userWallet(minter, deployer.address);
@@ -111,7 +111,7 @@ get fun `test admin: change-admin flow should work and only next admin can claim
     expect(badClaim).toHaveFailedTx<ClaimMinterAdmin>({
         from: deployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     val claimResult = minter.sendClaimMinterAdmin(
@@ -147,7 +147,7 @@ get fun `test admin: non-admin cannot change admin`() {
     expect(changeResult).toHaveFailedTx<ChangeMinterAdmin>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getAdminAddress()).toEqual(deployer.address);
 }
@@ -163,7 +163,7 @@ get fun `test admin: non-admin cannot drop admin access`() {
     expect(dropResult).toHaveFailedTx<DropMinterAdmin>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 }
 
@@ -222,7 +222,7 @@ get fun `test admin: non-admin cannot change metadata uri`() {
     expect(changeResult).toHaveFailedTx<ChangeMinterMetadata>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getContent().hash()).toEqual(oldContentHash);
 }
@@ -340,7 +340,7 @@ get fun `test admin: non-admin should not be able to upgrade minter`() {
     expect(res).toHaveFailedTx<UpgradeMinterCode>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getContent().hash()).toEqual(oldContentHash);
 }
