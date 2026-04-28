@@ -70,19 +70,25 @@ acton check --output-format sarif --output-file .acton/reports/lint.sarif
 acton check --output-format json
 ```
 
-This prints a JSON object to stdout with:
+This prints the linting report as a JSON object to stdout with:
 
-- `success`
-- `diagnostics` (array)
+- `success`: `true` or `false`
+- `diagnostics`: array of diagnostics
 
 Each diagnostic includes:
 
 - `file` as an absolute file path
-- `severity`, `name`, `code`, `message`, and optional `help`
+- `severity`, `name`, `message`, and optional `code` or `help`
 - `annotations[]` with 0-based `range.start/end.{line,character}`, `is_primary`, optional `message`, and optional `tags`
 - `fixes[]` with `message`, `applicability` (`auto` or `manual`), and structured `edits[]`
 
-Use this mode for editor integrations and custom tooling.
+To print the exact [JSON Schema](https://json-schema.org/) of the report to stdout, run:
+
+```bash
+acton meta get-schema lint-report
+```
+
+Use JSON mode for editor integrations and custom tooling.
 
 ### SARIF report
 
