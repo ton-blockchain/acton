@@ -930,37 +930,30 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                     .src
                     .as_ref()
                     .and_then(|src| self.build_result_for_address(Some(src)));
-
-                if info.bounced {
-                    return self
-                        .try_decode_message_with_builds(
-                            in_msg.body,
-                            self.prioritized_builds(destination_build),
-                            MessageBodyDirection::Outgoing,
-                            true,
-                        )
-                        .or_else(|| {
-                            self.try_decode_message_with_builds(
-                                in_msg.body,
-                                self.prioritized_builds(source_build),
-                                MessageBodyDirection::Incoming,
-                                true,
-                            )
-                        });
-                }
+                let (destination_direction, source_direction) = if info.bounced {
+                    (
+                        MessageBodyDirection::Outgoing,
+                        MessageBodyDirection::Incoming,
+                    )
+                } else {
+                    (
+                        MessageBodyDirection::Incoming,
+                        MessageBodyDirection::Outgoing,
+                    )
+                };
 
                 self.try_decode_message_with_builds(
                     in_msg.body,
                     self.prioritized_builds(destination_build),
-                    MessageBodyDirection::Incoming,
-                    false,
+                    destination_direction,
+                    info.bounced,
                 )
                 .or_else(|| {
                     self.try_decode_message_with_builds(
                         in_msg.body,
                         self.prioritized_builds(source_build),
-                        MessageBodyDirection::Outgoing,
-                        false,
+                        source_direction,
+                        info.bounced,
                     )
                 })
             }
@@ -1118,11 +1111,11 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         direction: MessageBodyDirection,
         bounced: bool,
     ) -> Option<DecodedMessageBody> {
+        let opcode = Self::opcode_after_bounce_prefix(body, bounced);
         for build in builds {
             let Some(compiler_abi) = build.compiler_abi.as_ref() else {
                 continue;
             };
-            let opcode = Self::opcode_after_bounce_prefix(body, bounced);
             let candidates = Self::compiler_message_candidates(compiler_abi, direction, opcode);
             if let Some(decoded) = self.try_decode_message_body_types(
                 body,

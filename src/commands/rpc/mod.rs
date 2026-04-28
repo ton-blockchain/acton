@@ -13,7 +13,7 @@ use log::warn;
 use num_bigint::{BigInt, Sign};
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -98,16 +98,7 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             tree: _,
             verbose,
             show_bodies,
-        } => {
-            let mode = if summary {
-                TraceOutputMode::Summary
-            } else if verbose {
-                TraceOutputMode::Verbose
-            } else {
-                TraceOutputMode::Tree
-            };
-            rpc_trace_cmd(&hash, net, mode, show_bodies)
-        }
+        } => rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
 }
 
@@ -225,17 +216,11 @@ fn rpc_latest_block_cmd(net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TraceOutputMode {
-    Summary,
-    Tree,
-    Verbose,
-}
-
 fn rpc_trace_cmd(
     hash: &str,
     net: Option<String>,
-    mode: TraceOutputMode,
+    summary: bool,
+    verbose: bool,
     show_bodies: bool,
 ) -> anyhow::Result<()> {
     let network = resolve_rpc_network(net)?;
@@ -249,7 +234,7 @@ fn rpc_trace_cmd(
         .pop()
         .ok_or_else(|| anyhow!("No trace found for transaction hash {hash} on {network}"))?;
 
-    if mode == TraceOutputMode::Summary {
+    if summary {
         print_rpc_trace_summary(hash, &trace);
         return Ok(());
     }
@@ -276,7 +261,7 @@ fn rpc_trace_cmd(
     let formatted_tree = formatter.format(&send_result_list);
     println!("{}", formatted_tree.trim_end());
 
-    if mode == TraceOutputMode::Verbose {
+    if verbose {
         print_section("Trace Details");
         print_rpc_trace_details(&trace_txs, Some(&formatter), &network);
     }
@@ -337,30 +322,23 @@ fn trace_message_count(trace: &V3Trace) -> usize {
         let Some(tx) = trace.transactions.get(tx_hash) else {
             continue;
         };
-        count_trace_message(tx_hash, "in", tx.in_msg.as_ref(), &mut unique);
+
+        if let Some(hash) = tx.in_msg.as_ref().and_then(v3_message_hash) {
+            unique.insert(hash.to_owned());
+        } else if tx.in_msg.is_some() {
+            unique.insert(format!("{tx_hash}:in"));
+        }
+
         for (idx, msg) in tx.out_msgs.iter().enumerate() {
-            let synthetic_id = format!("out:{idx}");
-            count_trace_message(tx_hash, &synthetic_id, Some(msg), &mut unique);
+            if let Some(hash) = v3_message_hash(msg) {
+                unique.insert(hash.to_owned());
+            } else {
+                unique.insert(format!("{tx_hash}:out:{idx}"));
+            }
         }
     }
 
     unique.len()
-}
-
-fn count_trace_message(
-    tx_hash: &str,
-    synthetic_id: &str,
-    message: Option<&V3MessageSummary>,
-    unique: &mut BTreeSet<String>,
-) {
-    let Some(message) = message else {
-        return;
-    };
-    if let Some(hash) = v3_message_hash(Some(message)) {
-        unique.insert(hash.to_owned());
-    } else {
-        unique.insert(format!("{tx_hash}:{synthetic_id}"));
-    }
 }
 
 fn print_rpc_trace_details(
@@ -555,20 +533,25 @@ fn fetch_trace_accounts(
     trace_txs: &[V3TraceTransaction],
     client: &TonApiClient,
 ) -> anyhow::Result<FxHashMap<StdAddr, ShardAccount>> {
-    let mut addresses = BTreeMap::new();
+    let mut addresses = BTreeSet::new();
     for tx in trace_txs {
         collect_trace_address(&tx.summary.account, &mut addresses);
         if let Some(in_msg) = &tx.summary.in_msg {
-            collect_optional_trace_address(&in_msg.source, &mut addresses);
-            collect_optional_trace_address(&in_msg.destination, &mut addresses);
+            for address in [&in_msg.source, &in_msg.destination].into_iter().flatten() {
+                collect_trace_address(address, &mut addresses);
+            }
         }
         for out_msg in &tx.summary.out_msgs {
-            collect_optional_trace_address(&out_msg.source, &mut addresses);
-            collect_optional_trace_address(&out_msg.destination, &mut addresses);
+            for address in [&out_msg.source, &out_msg.destination]
+                .into_iter()
+                .flatten()
+            {
+                collect_trace_address(address, &mut addresses);
+            }
         }
     }
 
-    let address_strings = addresses.keys().cloned().collect::<Vec<_>>();
+    let address_strings = addresses.into_iter().collect::<Vec<_>>();
     let address_refs = address_strings
         .iter()
         .map(String::as_str)
@@ -586,17 +569,11 @@ fn fetch_trace_accounts(
     Ok(accounts)
 }
 
-fn collect_optional_trace_address(address: &Option<String>, addresses: &mut BTreeMap<String, ()>) {
-    if let Some(address) = address {
-        collect_trace_address(address, addresses);
-    }
-}
-
-fn collect_trace_address(address: &str, addresses: &mut BTreeMap<String, ()>) {
+fn collect_trace_address(address: &str, addresses: &mut BTreeSet<String>) {
     let Ok((address, _)) = StdAddr::from_str_ext(address, StdAddrFormat::any()) else {
         return;
     };
-    addresses.insert(address.to_string(), ());
+    addresses.insert(address.to_string());
 }
 
 fn shard_account_from_ton_api_state(

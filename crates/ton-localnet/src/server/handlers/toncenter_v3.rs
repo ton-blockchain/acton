@@ -33,8 +33,7 @@ pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetTracesQuery>,
 ) -> impl IntoResponse {
-    let tx_hash_raw = payload.tx_hash.as_deref().or(payload.hash.as_deref());
-    let tx_hash = match tx_hash_raw.map(parse_hash_any).transpose() {
+    let tx_hash = match payload.tx_hash.as_deref().map(parse_hash_any).transpose() {
         Ok(hash) => hash,
         Err(e) => return v3_bad_request(e.to_string()),
     };

@@ -581,14 +581,18 @@ pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3T
         .iter()
         .enumerate()
         .filter_map(|(idx, tx)| {
-            v3_message_hash(tx.summary.in_msg.as_ref()).map(|hash| (hash.to_owned(), idx))
+            tx.summary
+                .in_msg
+                .as_ref()
+                .and_then(v3_message_hash)
+                .map(|hash| (hash.to_owned(), idx))
         })
         .collect::<HashMap<_, _>>();
 
     let mut edges = Vec::new();
     for (parent_idx, tx) in transactions.iter().enumerate() {
         for out_msg in &tx.summary.out_msgs {
-            let Some(hash) = v3_message_hash(Some(out_msg)) else {
+            let Some(hash) = v3_message_hash(out_msg) else {
                 continue;
             };
             let Some(child_idx) = in_msg_by_hash.get(hash).copied() else {
@@ -618,8 +622,8 @@ pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3T
     Ok(V3TraceTransactions::Ready(transactions))
 }
 
-pub(crate) fn v3_message_hash(message: Option<&V3MessageSummary>) -> Option<&str> {
-    message?.hash.as_deref().filter(|hash| !hash.is_empty())
+pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
+    message.hash.as_deref().filter(|hash| !hash.is_empty())
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -3540,24 +3544,18 @@ fn poll_send_results_by_trace(
 fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> bool {
     let in_msg_hashes = transactions
         .iter()
-        .filter_map(|tx| v3_message_hash(tx.summary.in_msg.as_ref()))
+        .filter_map(|tx| tx.summary.in_msg.as_ref().and_then(v3_message_hash))
         .collect::<HashSet<_>>();
 
+    let is_std_address =
+        |address: &str| StdAddr::from_str_ext(address, StdAddrFormat::any()).is_ok();
     transactions.iter().any(|tx| {
         tx.summary.out_msgs.iter().any(|message| {
-            is_internal_v3_message(message)
-                && v3_message_hash(Some(message)).is_some_and(|hash| !in_msg_hashes.contains(hash))
+            message.source.as_deref().is_some_and(is_std_address)
+                && message.destination.as_deref().is_some_and(is_std_address)
+                && v3_message_hash(message).is_some_and(|hash| !in_msg_hashes.contains(hash))
         })
     })
-}
-
-fn is_internal_v3_message(message: &V3MessageSummary) -> bool {
-    message.source.as_deref().is_some_and(is_std_address)
-        && message.destination.as_deref().is_some_and(is_std_address)
-}
-
-fn is_std_address(address: &str) -> bool {
-    StdAddr::from_str_ext(address, StdAddrFormat::any()).is_ok()
 }
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
