@@ -1,7 +1,8 @@
 use crate::commands::common::error_fmt;
 use crate::context::{BuildCache, KnownAddresses};
 use crate::ffi::emulation::{
-    synthesize_tx_cell_from_v3, tx_cell_to_send_result_tuple_with_relations,
+    V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions,
+    tx_cell_to_send_result_tuple_with_relations, v3_message_hash,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -13,7 +14,7 @@ use log::warn;
 use num_bigint::{BigInt, Sign};
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -260,7 +261,13 @@ fn rpc_trace_cmd(
         return Ok(());
     }
 
-    let trace_txs = build_rpc_trace_transactions(&trace)?;
+    let trace_txs = match build_v3_trace_transactions(&trace)? {
+        V3TraceTransactions::Ready(transactions) => transactions,
+        V3TraceTransactions::Pending { tx_hash } => {
+            anyhow::bail!("Trace references missing transaction {tx_hash}");
+        }
+    };
+    ensure_rpc_trace_in_msgs(&trace_txs)?;
     print_rpc_trace_summary(hash, &trace);
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
@@ -291,86 +298,20 @@ fn rpc_trace_cmd(
     Ok(())
 }
 
-struct RpcTraceTransaction {
-    hash: String,
-    summary: V3TransactionSummary,
-    tx_cell: Cell,
-    transaction: Transaction,
-    parent_lt: Option<u64>,
-    child_lts: Vec<u64>,
-}
-
-fn build_rpc_trace_transactions(trace: &V3Trace) -> anyhow::Result<Vec<RpcTraceTransaction>> {
-    let mut transactions = Vec::with_capacity(trace.transactions_order.len());
-    for tx_hash in &trace.transactions_order {
-        let summary = trace
-            .transactions
-            .get(tx_hash)
-            .ok_or_else(|| anyhow!("Trace references missing transaction {tx_hash}"))?;
-        if summary.in_msg.is_none() {
+fn ensure_rpc_trace_in_msgs(trace_txs: &[V3TraceTransaction]) -> anyhow::Result<()> {
+    for tx in trace_txs {
+        if tx.summary.in_msg.is_none() {
             anyhow::bail!(
-                "Trace transaction {tx_hash} has no in_msg in TonCenter v3 /traces response"
+                "Trace transaction {} has no in_msg in TonCenter v3 /traces response",
+                tx.hash
             );
         }
-        let (tx_cell, transaction) = synthesize_tx_cell_from_v3(summary)
-            .with_context(|| format!("Failed to synthesize transaction {tx_hash}"))?;
-        transactions.push(RpcTraceTransaction {
-            hash: tx_hash.clone(),
-            summary: summary.clone(),
-            tx_cell,
-            transaction,
-            parent_lt: None,
-            child_lts: Vec::new(),
-        });
     }
-
-    let in_msg_by_hash = transactions
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, tx)| {
-            message_hash(tx.summary.in_msg.as_ref()).map(|hash| (hash.to_owned(), idx))
-        })
-        .collect::<HashMap<_, _>>();
-
-    let mut edges = Vec::new();
-    for (parent_idx, tx) in transactions.iter().enumerate() {
-        for out_msg in &tx.summary.out_msgs {
-            let Some(hash) = message_hash(Some(out_msg)) else {
-                continue;
-            };
-            let Some(child_idx) = in_msg_by_hash.get(hash).copied() else {
-                continue;
-            };
-            if child_idx != parent_idx {
-                edges.push((parent_idx, child_idx));
-            }
-        }
-    }
-
-    for (parent_idx, child_idx) in edges {
-        let parent_lt = transactions[parent_idx].transaction.lt;
-        let child_lt = transactions[child_idx].transaction.lt;
-        if transactions[child_idx].parent_lt.is_none() {
-            transactions[child_idx].parent_lt = Some(parent_lt);
-        }
-        if !transactions[parent_idx].child_lts.contains(&child_lt) {
-            transactions[parent_idx].child_lts.push(child_lt);
-        }
-    }
-
-    for tx in &mut transactions {
-        tx.child_lts.sort_unstable();
-    }
-
-    Ok(transactions)
-}
-
-fn message_hash(message: Option<&V3MessageSummary>) -> Option<&str> {
-    message?.hash.as_deref().filter(|hash| !hash.is_empty())
+    Ok(())
 }
 
 fn rpc_trace_formatter(
-    trace_txs: &[RpcTraceTransaction],
+    trace_txs: &[V3TraceTransaction],
     client: &TonApiClient,
     network: &Network,
     config: &ActonConfig,
@@ -441,7 +382,7 @@ fn count_trace_message(
     let Some(message) = message else {
         return;
     };
-    if let Some(hash) = message_hash(Some(message)) {
+    if let Some(hash) = v3_message_hash(Some(message)) {
         unique.insert(hash.to_owned());
     } else {
         unique.insert(format!("{tx_hash}:{synthetic_id}"));
@@ -449,7 +390,7 @@ fn count_trace_message(
 }
 
 fn print_rpc_trace_details(
-    trace_txs: &[RpcTraceTransaction],
+    trace_txs: &[V3TraceTransaction],
     formatter: Option<&FormatterContext<'_>>,
     network: &Network,
 ) {
@@ -650,7 +591,7 @@ fn format_trace_address(address: &str, network: &Network) -> String {
 }
 
 fn fetch_trace_accounts(
-    trace_txs: &[RpcTraceTransaction],
+    trace_txs: &[V3TraceTransaction],
     client: &TonApiClient,
 ) -> anyhow::Result<FxHashMap<StdAddr, ShardAccount>> {
     let mut addresses = BTreeMap::new();
