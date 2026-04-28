@@ -1218,13 +1218,30 @@ fn detailed_help_pointer(command: &str) -> StyledStr {
     use std::fmt::Write as _;
 
     let mut writer = StyledStr::new();
-    let styles = Styles::styled();
+    let styles = acton_help_styles();
     let literal = styles.get_literal();
     let _ = write!(
         writer,
         "Run '{literal}acton help {command}{literal:#}' for more detailed information."
     );
     writer
+}
+
+const fn acton_help_styles() -> Styles {
+    let header = Style::new().bold();
+    let usage = Style::new().bold();
+    let literal = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        .bold();
+    let placeholder = Style::new().dimmed();
+
+    Styles::styled()
+        .header(header)
+        .usage(usage)
+        .literal(literal)
+        .placeholder(placeholder)
+        .context(placeholder)
+        .context_value(placeholder)
 }
 
 fn root_help(show_global_options: bool) -> StyledStr {
@@ -1425,14 +1442,17 @@ fn root_help(show_global_options: bool) -> StyledStr {
 }
 
 fn base_cli_command() -> clap::Command {
-    Cli::command().disable_version_flag(true).arg(
-        clap::Arg::new("version")
-            .short('v')
-            .short_alias('V')
-            .long("version")
-            .action(clap::ArgAction::Version)
-            .help("Print version"),
-    )
+    Cli::command()
+        .styles(acton_help_styles())
+        .disable_version_flag(true)
+        .arg(
+            clap::Arg::new("version")
+                .short('v')
+                .short_alias('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help("Print version"),
+        )
 }
 
 fn cli_command(show_global_options: bool) -> clap::Command {
