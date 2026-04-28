@@ -164,6 +164,8 @@ fn print_retrace_result(
             "Success".green(),
             "(exit code: 0)".to_string().dimmed()
         )
+    } else if matches!(tx.compute_info, ComputeInfo::Skipped) {
+        "Compute phase skipped".bright_red().to_string()
     } else if !compute_success {
         let exit_code = match &tx.compute_info {
             ComputeInfo::Success { exit_code, .. } => *exit_code,
@@ -430,10 +432,10 @@ fn print_retrace_result(
     if let Some(opcode) = result.in_msg.opcode {
         println!("\n{}", "Message Data:".bold());
         println!("  {:<15} 0x{:08x}", "Opcode:".dimmed(), opcode);
-        println!();
     }
 
     if logs_dir.is_none() {
+        println!();
         println!("Help: Use --logs-dir <DIR> to save full VM and executor logs to files.");
     }
 }

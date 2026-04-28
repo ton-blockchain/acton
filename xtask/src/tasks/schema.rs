@@ -2,14 +2,16 @@ use std::fs;
 use std::path::PathBuf;
 
 use acton_config::config::ActonConfig;
+use acton_config::lint_output::LintJsonReport;
 use acton_config::mutation_rules::CustomMutationRulesFile;
 use anyhow::{Context, Result, bail};
 use clap::{Args, ValueEnum};
 use schemars::JsonSchema;
 use schemars::r#gen::SchemaSettings;
 
-const ACTON_TOML_OUTPUT_PATH: &str = "acton.schema.json";
-const MUTATION_RULES_OUTPUT_PATH: &str = "mutation-rules.schema.json";
+const ACTON_TOML_OUTPUT_PATH: &str = "crates/acton-config/schemas/acton.schema.json";
+const LINT_REPORT_OUTPUT_PATH: &str = "crates/acton-config/schemas/lint-report.schema.json";
+const MUTATION_RULES_OUTPUT_PATH: &str = "crates/acton-config/schemas/mutation-rules.schema.json";
 
 #[derive(Args)]
 pub(crate) struct SchemaArgs {
@@ -24,6 +26,7 @@ pub(crate) struct SchemaArgs {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub(crate) enum SchemaTarget {
     ActonToml,
+    LintReport,
     MutationRules,
 }
 
@@ -31,6 +34,7 @@ impl SchemaTarget {
     const fn default_output_path(self) -> &'static str {
         match self {
             Self::ActonToml => ACTON_TOML_OUTPUT_PATH,
+            Self::LintReport => LINT_REPORT_OUTPUT_PATH,
             Self::MutationRules => MUTATION_RULES_OUTPUT_PATH,
         }
     }
@@ -38,6 +42,7 @@ impl SchemaTarget {
     const fn label(self) -> &'static str {
         match self {
             Self::ActonToml => "Acton.toml",
+            Self::LintReport => "lint JSON report",
             Self::MutationRules => "custom mutation rules",
         }
     }
@@ -49,6 +54,7 @@ pub(crate) fn run(args: SchemaArgs) -> Result<()> {
         .unwrap_or_else(|| PathBuf::from(args.schema.default_output_path()));
     let content = match args.schema {
         SchemaTarget::ActonToml => schema_content::<ActonConfig>()?,
+        SchemaTarget::LintReport => schema_content::<LintJsonReport>()?,
         SchemaTarget::MutationRules => schema_content::<CustomMutationRulesFile>()?,
     };
 

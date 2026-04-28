@@ -27,7 +27,7 @@ Path to the script file to execute.
 {{/option}}
 
 {{#option "_args_..." }}
-Arguments passed through to the script.
+Arguments parsed against the `main()` ABI and passed to the script.
 {{/option}}
 
 {{#option "`--verbose`" }}
@@ -144,6 +144,20 @@ the script arguments:
 ```bash
 acton script scripts/query.tolk -- --net-like-value
 ```
+
+## Script Arguments
+
+Forwarded arguments are parsed against the ABI for `main()`.
+
+- the number of CLI arguments must exactly match the `main()` parameters
+- integers use Tolk integer literal syntax such as `42`, `-1`, `0xff`, and `0b1010`
+- `bool` accepts `true` and `false`
+- nullable supported types accept `null`
+- `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- arrays accept `[item1, item2]`
+
+Unsupported parameter types currently include `structs`, `tuple`, `map`,
+`dict`, `builder`, `any_address` and other complex types.
 
 ## Side Effects
 

@@ -58,7 +58,11 @@ BoC value in hex or base64 format.
 
 </CommandOptionTitle>
 
-Write disassembled output to a file instead of standard output.
+Write plain disassembly text to a file.
+
+Without `--json`, this replaces standard output. With `--json`, Acton still
+prints the JSON envelope to stdout and writes only the `assembly` field to the
+file.
 
 If the parent directory does not exist, Acton creates it automatically.
 Existing files are overwritten.
@@ -86,6 +90,22 @@ Show cell hashes alongside code blocks.
 </CommandOptionTitle>
 
 Show instruction bit offsets in the left column.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--json`
+
+</CommandOptionTitle>
+
+Print machine-readable disassembly JSON to stdout.
+
+Successful output includes `success`, the plain disassembly in `assembly`, and
+`blocks` derived from `--source-map`. Without `--source-map`, `blocks` is
+empty.
 
 </CommandOption>
 
@@ -264,6 +284,23 @@ source map JSON here to annotate the disassembly with original Tolk locations.
 `--source-map` only affects annotations in the output. It does not change which
 BoC is disassembled.
 
+## JSON Output
+
+With `--json`, Acton prints pretty-printed JSON to stdout.
+
+- `success`: `true` for successful disassembly
+- `assembly`: plain disassembly text without inline source-map comments
+- `blocks`: source-to-assembly mappings derived from `--source-map`
+
+Each item in `blocks` contains a `source` location and `assembly_ranges`.
+`assembly_ranges` stores inclusive zero-based `start_line`/`end_line` pairs
+into the `assembly` string.
+
+If `--source-map` is not provided, `blocks` is empty.
+
+If `--output` is also provided, the output file contains the same plain
+`assembly` text while stdout remains JSON.
+
 ## Exit Status
 
 - `0`: Disassembly completed successfully, including runs with unresolved
@@ -313,6 +350,12 @@ BoC is disassembled.
 
    ```bash
    acton disasm library-ref.boc --follow-libraries --net custom:staging
+   ```
+
+8. Print machine-readable JSON with source-map ranges:
+
+   ```bash
+   acton disasm contract.boc --source-map contract.json --json
    ```
 
 ## See Also

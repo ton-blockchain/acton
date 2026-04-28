@@ -71,6 +71,7 @@ check-docgen:
 
 check-schema:
     cargo run -p xtask -- schema --schema acton-toml --check
+    cargo run -p xtask -- schema --schema lint-report --check
     cargo run -p xtask -- schema --schema mutation-rules --check
 
 check-deny:

@@ -2,7 +2,7 @@ use acton::commands;
 use acton::commands::build::build_cmd;
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
-use acton::commands::create_app::create_app_cmd;
+use acton::commands::create_app::DEFAULT_APP_DIR;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
@@ -93,13 +93,28 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     #[command(
-        about = "Initialize a new project in the current directory",
-        long_about = "Initialize a new project in the current directory. This is useful for adding Acton support to an existing project.",
+        about = "Add Acton support to current directory",
+        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-app, Acton skips project initialization and only scaffolds a TypeScript app. With --stdlib-only, Acton only refreshes the bundled standard library.",
         after_help = detailed_help_pointer("init")
     )]
-    Init,
+    Init {
+        #[arg(
+            long,
+            value_name = "PATH",
+            num_args = 0..=1,
+            default_missing_value = DEFAULT_APP_DIR,
+            conflicts_with = "stdlib_only",
+            help = "Create a TypeScript app scaffold in PATH (default: app)"
+        )]
+        create_app: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Update the bundled standard library without touching Acton.toml"
+        )]
+        stdlib_only: bool,
+    },
     #[command(
-        about = "Create a new project in a specified directory",
+        about = "Create a new project from a template",
         long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template.",
         after_help = detailed_help_pointer("new")
     )]
@@ -144,16 +159,7 @@ enum Commands {
         templates: bool,
     },
     #[command(
-        about = "Create a TypeScript app scaffold",
-        long_about = "Create a TypeScript app scaffold in the specified directory. Defaults to ./app.",
-        after_help = detailed_help_pointer("create-app")
-    )]
-    CreateApp {
-        #[arg(help = "Directory to create the app in (default: app)")]
-        path: Option<PathBuf>,
-    },
-    #[command(
-        about = "Print this message or the help of a given top-level command",
+        about = "Show top-level or command-specific help",
         after_help = detailed_help_pointer("help")
     )]
     Help {
@@ -161,7 +167,7 @@ enum Commands {
         command: Option<String>,
     },
     #[command(
-        about = "Manage wallets",
+        about = "Manage project and global wallets",
         after_help = detailed_help_pointer("wallet")
     )]
     Wallet {
@@ -169,7 +175,7 @@ enum Commands {
         command: WalletCommand,
     },
     #[command(
-        about = "Manage git hooks for the current project",
+        about = "Install and manage project Git hooks",
         after_help = detailed_help_pointer("hooks")
     )]
     Hooks {
@@ -177,7 +183,7 @@ enum Commands {
         command: HooksCommand,
     },
     #[command(
-        about = "Inspect remote account and contract state",
+        about = "Inspect remote accounts and contracts",
         after_help = detailed_help_pointer("rpc")
     )]
     Rpc {
@@ -185,7 +191,7 @@ enum Commands {
         command: RpcCommand,
     },
     #[command(
-        about = "Execute tests in file or directory",
+        about = "Run tests from a file or directory",
         after_help = detailed_help_pointer("test")
     )]
     Test {
@@ -468,7 +474,7 @@ enum Commands {
         ui_port: u16,
     },
     #[command(
-        about = "Generate wrappers and optionally a stub test file for a contract",
+        about = "Generate contract wrappers and test stubs",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
@@ -522,7 +528,7 @@ enum Commands {
         ts: bool,
     },
     #[command(
-        about = "Execute a Tolk script file",
+        about = "Run a standalone Tolk script file",
         after_help = detailed_help_pointer("script")
     )]
     Script {
@@ -600,7 +606,7 @@ enum Commands {
         show_bodies: bool,
     },
     #[command(
-        about = "Build the specified contract or all contracts",
+        about = "Build one contract or every contract",
         after_help = detailed_help_pointer("build")
     )]
     Build {
@@ -632,11 +638,11 @@ enum Commands {
         info: bool,
     },
     #[command(
-        about = "Run a script defined in Acton.toml",
+        about = "Run a named script from Acton.toml",
         after_help = detailed_help_pointer("run")
     )]
     Run {
-        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
+        #[arg(help = "Name of the command script to run", add = ArgValueCompleter::new(complete_scripts))]
         script: String,
         #[arg(
             help = "Arguments to pass to the script",
@@ -646,7 +652,7 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Compile a Tolk file",
+        about = "Compile one Tolk source into TVM code",
         after_help = detailed_help_pointer("compile")
     )]
     Compile {
@@ -673,7 +679,7 @@ enum Commands {
         clear_cache: bool,
     },
     #[command(
-        about = "Disassemble TVM bitcode to human-readable TASM",
+        about = "Disassemble TVM code into TASM",
         after_help = detailed_help_pointer("disasm")
     )]
     Disasm {
@@ -693,6 +699,8 @@ enum Commands {
         show_hashes: bool,
         #[arg(long, help = "Show instruction offsets in left column")]
         show_offsets: bool,
+        #[arg(long, help = "Print machine-readable disassembly JSON to stdout")]
+        json: bool,
         #[arg(long, help = "Source map JSON from `acton compile --source-map`")]
         source_map: Option<String>,
         #[arg(
@@ -709,7 +717,7 @@ enum Commands {
         follow_libraries: bool,
     },
     #[command(
-        about = "Verify contract source code on verifier.ton.org",
+        about = "Verify contract source on TON Verifier",
         after_help = detailed_help_pointer("verify")
     )]
     Verify {
@@ -731,7 +739,7 @@ enum Commands {
         dry_run: bool,
     },
     #[command(
-        about = "Check Tolk files in the project for errors",
+        about = "Check project Tolk sources for errors",
         after_help = detailed_help_pointer("check")
     )]
     Check {
@@ -774,7 +782,7 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Retrace a transaction by its hash",
+        about = "Replay a transaction trace by hash",
         after_help = detailed_help_pointer("retrace")
     )]
     Retrace {
@@ -802,7 +810,7 @@ enum Commands {
         debug_port: Option<u16>,
     },
     #[command(
-        about = "Manage TON libraries",
+        about = "Publish and manage on-chain libraries",
         after_help = detailed_help_pointer("library")
     )]
     Library {
@@ -818,7 +826,7 @@ enum Commands {
         command: LocalnetCommand,
     },
     #[command(
-        about = "Format Tolk source files",
+        about = "Format project Tolk source files",
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
@@ -828,7 +836,7 @@ enum Commands {
         check: bool,
     },
     #[command(
-        about = "Lookup reference documentation",
+        about = "Look up TVM reference documentation",
         after_help = detailed_help_pointer("doc")
     )]
     Doc {
@@ -850,7 +858,7 @@ enum Commands {
         no_log: bool,
     },
     #[command(
-        about = "Manage Acton versions",
+        about = "Install or update Acton CLI releases",
         after_help = detailed_help_pointer("up")
     )]
     Up {
@@ -884,7 +892,7 @@ enum Commands {
     },
     #[command(
         name = "func2tolk",
-        about = "Convert FunC files to Tolk via @ton/convert-func-to-tolk",
+        about = "Convert FunC sources into Tolk code",
         after_help = detailed_help_pointer("func2tolk")
     )]
     Func2Tolk {
@@ -907,12 +915,12 @@ enum Commands {
         version: String,
     },
     #[command(
-        about = "Inspect resolved project environment",
+        about = "Inspect the resolved project setup",
         after_help = detailed_help_pointer("doctor")
     )]
     Doctor,
     #[command(
-        about = "Generate shell completions for selected shell",
+        about = "Generate shell completion scripts",
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
@@ -1210,13 +1218,30 @@ fn detailed_help_pointer(command: &str) -> StyledStr {
     use std::fmt::Write as _;
 
     let mut writer = StyledStr::new();
-    let styles = Styles::styled();
+    let styles = acton_help_styles();
     let literal = styles.get_literal();
     let _ = write!(
         writer,
         "Run '{literal}acton help {command}{literal:#}' for more detailed information."
     );
     writer
+}
+
+const fn acton_help_styles() -> Styles {
+    let header = Style::new().bold();
+    let usage = Style::new().bold();
+    let literal = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        .bold();
+    let placeholder = Style::new().dimmed();
+
+    Styles::styled()
+        .header(header)
+        .usage(usage)
+        .literal(literal)
+        .placeholder(placeholder)
+        .context(placeholder)
+        .context_value(placeholder)
 }
 
 fn root_help(show_global_options: bool) -> StyledStr {
@@ -1243,7 +1268,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("create-app", "[PATH]"), ("init", "")];
+    let core_commands = vec![("new", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -1256,7 +1281,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("localnet", "<COMMAND>"),
+        // ("localnet", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -1267,7 +1292,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("doc", "tvm <QUERY...>"),
     ];
     let support_commands = vec![
-        ("ls", ""),
+        // ("ls", ""),
         ("up", ""),
         ("help", "[COMMAND]"),
         ("hooks", "<COMMAND>"),
@@ -1417,14 +1442,17 @@ fn root_help(show_global_options: bool) -> StyledStr {
 }
 
 fn base_cli_command() -> clap::Command {
-    Cli::command().disable_version_flag(true).arg(
-        clap::Arg::new("version")
-            .short('v')
-            .short_alias('V')
-            .long("version")
-            .action(clap::ArgAction::Version)
-            .help("Print version"),
-    )
+    Cli::command()
+        .styles(acton_help_styles())
+        .disable_version_flag(true)
+        .arg(
+            clap::Arg::new("version")
+                .short('v')
+                .short_alias('V')
+                .long("version")
+                .action(clap::ArgAction::Version)
+                .help("Print version"),
+        )
 }
 
 fn cli_command(show_global_options: bool) -> clap::Command {
@@ -1628,9 +1656,8 @@ fn main() {
 
     if !matches!(
         command,
-        Commands::Init
+        Commands::Init { .. }
             | Commands::New { .. }
-            | Commands::CreateApp { .. }
             | Commands::Help { .. }
             | Commands::Rpc { .. }
             | Commands::Meta { .. }
@@ -1653,8 +1680,10 @@ fn main() {
     }
 
     let result = match command {
-        Commands::Init => init_cmd(),
-        Commands::CreateApp { path } => create_app_cmd(path.as_deref()),
+        Commands::Init {
+            create_app,
+            stdlib_only,
+        } => init_cmd(create_app.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::Rpc { command } => {
@@ -1909,26 +1938,35 @@ fn main() {
             output,
             show_hashes,
             show_offsets,
+            json,
             source_map,
             address,
             net,
             follow_libraries,
-        } => match read_source_map(source_map) {
-            Ok(source_map) => disasm_cmd(
-                boc_file,
-                string,
-                output,
-                FormatOptions {
-                    show_hashes,
-                    show_offsets,
-                    source_map,
-                },
-                address,
-                net,
-                follow_libraries,
-            ),
-            Err(err) => Err(err),
-        },
+        } => {
+            let result = match read_source_map(source_map) {
+                Ok(source_map) => disasm_cmd(
+                    boc_file,
+                    string,
+                    output,
+                    FormatOptions {
+                        show_hashes,
+                        show_offsets,
+                        source_map,
+                    },
+                    address,
+                    net,
+                    follow_libraries,
+                    json,
+                ),
+                Err(err) => Err(err),
+            };
+            if json {
+                report_error_as_json(result);
+                return;
+            }
+            result
+        }
         Commands::Verify {
             contract_id,
             address,

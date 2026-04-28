@@ -10,9 +10,10 @@ acton\-init \[em] Initialize Acton support in the current directory
 .SH "DESCRIPTION"
 Initialize Acton support in the current working directory.
 .sp
-This command is intended for existing repositories or ad\-hoc directories where
-you want to add \fBActon.toml\fR, standard Acton ignore rules, the bundled
-standard library, and symlinks to global wallet and library overlays.
+By default, this command is intended for existing repositories or ad\-hoc
+directories where you want to add \fBActon.toml\fR, standard Acton ignore rules,
+the bundled standard library, and symlinks to global wallet and library
+overlays.
 .sp
 If \fBActon.toml\fR already exists, \fBacton init\fR patches in default mappings when
 they are missing instead of creating a fresh scaffold. That patch path rewrites
@@ -21,6 +22,17 @@ the parsed manifest, so TOML comments and unknown keys are not preserved.
 If \fBActon.toml\fR does not exist, the command scans \fB\&.tolk\fR files in the current
 directory tree and auto\-registers files that define \fBonInternalMessage\fR as
 contract entry files.
+.sp
+With \fB\-\-create\-app\fR, \fBacton init\fR switches to app\-only mode. In that mode,
+Acton does not create or patch \fBActon.toml\fR, \fB\&.gitignore\fR, \fB\&.acton/\fR,
+or overlay symlinks. It only creates a Vite\-based TypeScript app scaffold in
+\fB\&./app\fR by default, or in the provided path.
+.sp
+With \fB\-\-stdlib\-only\fR, \fBacton init\fR switches to standard\-library\-only mode. In
+that mode, Acton does not read, create, or patch \fBActon.toml\fR, does not patch
+\fB\&.gitignore\fR, and does not create overlay symlinks. It re\-extracts the bundled
+standard library into \fB\&.acton/\fR even when \fBActon.toml\fR is missing or the stored
+stdlib version already matches the current Acton version.
 .SH "IDEMPOTENCY"
 \fBacton init\fR is safe to run repeatedly.
 .sp
@@ -43,6 +55,30 @@ the file when backfilling default mappings
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'it re\-attempts global wallet and library symlinks on each run
+.RE
+.sp
+The \fB\-\-create\-app\fR mode is not idempotent: it fails if the target app
+directory already exists.
+.sp
+The \fB\-\-stdlib\-only\fR mode is safe to run repeatedly, but it always re\-extracts
+the bundled standard library instead of relying on the stored version marker.
+.SH "INIT OPTIONS"
+.sp
+\fB\-\-create\-app\fR [\fIpath\fR]
+.RS 4
+Create a Vite\-based TypeScript app scaffold instead of performing project
+initialization.
+.sp
+If \fB_path_\fR is omitted, Acton uses \fBapp\fR\&. The target directory must not already
+exist.
+.RE
+.sp
+\fB\-\-stdlib\-only\fR
+.RS 4
+Update the bundled standard library without touching \fBActon.toml\fR\&.
+.sp
+This mode always re\-extracts the standard library into \fB\&.acton/\fR, even outside
+an initialized Acton project.
 .RE
 .SH "DISPLAY OPTIONS"
 .sp
@@ -70,7 +106,7 @@ This command does not require an existing project root for its primary
 workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "GENERATED AND PATCHED FILES"
-\fBacton init\fR can create or update:
+The default \fBacton init\fR flow can create or update:
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBActon.toml\fR
@@ -87,6 +123,11 @@ workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RS 4
 \h'-04'\(bu\h'+03'local symlinks for \fBglobal.wallets.toml\fR and \fBglobal.libraries.toml\fR
 .RE
+.sp
+With \fB\-\-create\-app\fR, \fBacton init\fR only creates \fBapp/\fR or the provided app
+directory.
+.sp
+With \fB\-\-stdlib\-only\fR, \fBacton init\fR only creates or updates \fB\&.acton/\fR\&.
 .sp
 When \fBActon.toml\fR is created from scratch, it starts from Acton\[cq]s default
 project config and may include:
@@ -156,6 +197,9 @@ and \fB\&.acton\fR
 \fBacton init\fR ensures that the bundled Tolk standard library is installed into
 \fB\&.acton/tolk\-stdlib\fR\&.
 .sp
+With \fB\-\-stdlib\-only\fR, Acton refreshes the bundled standard library
+unconditionally and does not require \fBActon.toml\fR to exist.
+.sp
 If global wallet or library overlay files already exist, \fBacton init\fR also
 tries to create local symlinks for them. Existing local files and non\-dangling
 symlinks are left in place; Acton only creates the link when the local path
@@ -167,10 +211,16 @@ If symlinks for global wallets or libraries cannot be created, Acton prints a
 warning and still completes initialization. This is relevant on systems where
 symlink creation is restricted.
 .SH "SIDE EFFECTS"
-\fBacton init\fR writes or patches local project files and may create local
-symlinks to global overlay files. It does not modify Git config. When it
-patches an existing \fBActon.toml\fR, it rewrites the parsed manifest and may drop
-TOML comments or unknown keys; \fB\&.gitignore\fR patching remains append\-only.
+The default \fBacton init\fR flow writes or patches local project files and may
+create local symlinks to global overlay files. It does not modify Git config.
+When it patches an existing \fBActon.toml\fR, it rewrites the parsed manifest and
+may drop TOML comments or unknown keys; \fB\&.gitignore\fR patching remains
+append\-only.
+.sp
+With \fB\-\-create\-app\fR, \fBacton init\fR writes only inside the new app directory and
+does not touch Acton project files.
+.sp
+With \fB\-\-stdlib\-only\fR, \fBacton init\fR writes only inside \fB\&.acton/\fR\&.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -181,6 +231,8 @@ TOML comments or unknown keys; \fB\&.gitignore\fR patching remains append\-only.
 \h'-04'\(bu\h'+03'\fB1\fR: Manifest parsing, stdlib installation, writing or patching project
 files, or another hard filesystem operation failed. Contract discovery skips
 unreadable/unparseable \fB\&.tolk\fR files, and overlay symlink failures only warn.
+In \fB\-\-stdlib\-only\fR mode, manifest parsing and overlay symlink operations are
+skipped.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -205,11 +257,41 @@ acton init
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Re\-run safely after adding more contracts:
+\h'-04' 3.\h'+01'Create only the default app scaffold:
+.sp
+.RS 4
+.nf
+acton init \-\-create\-app
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Create only the app scaffold in \fBfrontend/\fR:
+.sp
+.RS 4
+.nf
+acton init \-\-create\-app frontend
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Re\-run safely after adding more contracts:
 .sp
 .RS 4
 .nf
 acton init
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Refresh only the bundled standard library:
+.sp
+.RS 4
+.nf
+acton init \-\-stdlib\-only
 .fi
 .RE
 .RE

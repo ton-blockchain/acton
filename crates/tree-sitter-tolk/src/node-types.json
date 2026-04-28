@@ -28,112 +28,159 @@
   {
     "type": "annotation_arguments",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "assignment",
-          "named": true
-        },
-        {
-          "type": "binary_operator",
-          "named": true
-        },
-        {
-          "type": "boolean_literal",
-          "named": true
-        },
-        {
-          "type": "cast_as_operator",
-          "named": true
-        },
-        {
-          "type": "dot_access",
-          "named": true
-        },
-        {
-          "type": "function_call",
-          "named": true
-        },
-        {
-          "type": "generic_instantiation",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "is_type_operator",
-          "named": true
-        },
-        {
-          "type": "lambda_expression",
-          "named": true
-        },
-        {
-          "type": "lazy_expression",
-          "named": true
-        },
-        {
-          "type": "match_expression",
-          "named": true
-        },
-        {
-          "type": "not_null_operator",
-          "named": true
-        },
-        {
-          "type": "null_literal",
-          "named": true
-        },
-        {
-          "type": "number_literal",
-          "named": true
-        },
-        {
-          "type": "object_literal",
-          "named": true
-        },
-        {
-          "type": "parenthesized_expression",
-          "named": true
-        },
-        {
-          "type": "set_assignment",
-          "named": true
-        },
-        {
-          "type": "string_literal",
-          "named": true
-        },
-        {
-          "type": "tensor_expression",
-          "named": true
-        },
-        {
-          "type": "ternary_operator",
-          "named": true
-        },
-        {
-          "type": "typed_tuple",
-          "named": true
-        },
-        {
-          "type": "unary_operator",
-          "named": true
-        },
-        {
-          "type": "underscore",
-          "named": true
-        },
-        {
-          "type": "var_declaration_lhs",
-          "named": true
-        }
-      ]
+    "fields": {
+      "type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "fun_callable_type",
+            "named": true
+          },
+          {
+            "type": "null_literal",
+            "named": true
+          },
+          {
+            "type": "nullable_type",
+            "named": true
+          },
+          {
+            "type": "parenthesized_type",
+            "named": true
+          },
+          {
+            "type": "tensor_type",
+            "named": true
+          },
+          {
+            "type": "tuple_type",
+            "named": true
+          },
+          {
+            "type": "type_identifier",
+            "named": true
+          },
+          {
+            "type": "type_instantiatedTs",
+            "named": true
+          },
+          {
+            "type": "union_type",
+            "named": true
+          }
+        ]
+      },
+      "values": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "assignment",
+            "named": true
+          },
+          {
+            "type": "binary_operator",
+            "named": true
+          },
+          {
+            "type": "boolean_literal",
+            "named": true
+          },
+          {
+            "type": "cast_as_operator",
+            "named": true
+          },
+          {
+            "type": "dot_access",
+            "named": true
+          },
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "generic_instantiation",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "is_type_operator",
+            "named": true
+          },
+          {
+            "type": "lambda_expression",
+            "named": true
+          },
+          {
+            "type": "lazy_expression",
+            "named": true
+          },
+          {
+            "type": "match_expression",
+            "named": true
+          },
+          {
+            "type": "not_null_operator",
+            "named": true
+          },
+          {
+            "type": "null_literal",
+            "named": true
+          },
+          {
+            "type": "number_literal",
+            "named": true
+          },
+          {
+            "type": "object_literal",
+            "named": true
+          },
+          {
+            "type": "parenthesized_expression",
+            "named": true
+          },
+          {
+            "type": "set_assignment",
+            "named": true
+          },
+          {
+            "type": "string_literal",
+            "named": true
+          },
+          {
+            "type": "tensor_expression",
+            "named": true
+          },
+          {
+            "type": "ternary_operator",
+            "named": true
+          },
+          {
+            "type": "typed_tuple",
+            "named": true
+          },
+          {
+            "type": "unary_operator",
+            "named": true
+          },
+          {
+            "type": "underscore",
+            "named": true
+          },
+          {
+            "type": "var_declaration_lhs",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -5401,6 +5448,16 @@
     "type": "struct_field_declaration",
     "named": true,
     "fields": {
+      "annotations": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "annotation_list",
+            "named": true
+          }
+        ]
+      },
       "default": {
         "multiple": false,
         "required": false,

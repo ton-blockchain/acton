@@ -1,55 +1,54 @@
 {
+  "success": true,
   "diagnostics": [
     {
+      "file": "[ROOT]/contracts/main.tolk",
+      "severity": "warning",
+      "name": "unused-variable",
+      "code": "E002",
+      "message": "variable is unused",
       "annotations": [
         {
-          "is_primary": true,
-          "message": "unused variable `x`",
           "range": {
-            "end": {
-              "character": 21,
-              "line": 2
-            },
             "start": {
-              "character": 20,
-              "line": 2
+              "line": 2,
+              "character": 20
+            },
+            "end": {
+              "line": 2,
+              "character": 21
             }
           },
+          "message": "unused variable `x`",
+          "is_primary": true,
           "tags": [
             "unnecessary"
           ]
         }
       ],
-      "code": "E002",
-      "file": "[ROOT]/contracts/main.tolk",
       "fixes": [
         {
-          "applicability": "auto",
+          "message": "prefix with underscore: `_x`",
           "edits": [
             {
-              "file": "[ROOT]/contracts/main.tolk",
-              "newText": "_x",
               "range": {
-                "end": {
-                  "character": 21,
-                  "line": 2
-                },
                 "start": {
-                  "character": 20,
-                  "line": 2
+                  "line": 2,
+                  "character": 20
+                },
+                "end": {
+                  "line": 2,
+                  "character": 21
                 }
-              }
+              },
+              "newText": "_x",
+              "file": "[ROOT]/contracts/main.tolk"
             }
           ],
-          "message": "prefix with underscore: `_x`"
+          "applicability": "auto"
         }
       ],
-      "help": null,
-      "message": "variable is unused",
-      "name": "unused-variable",
-      "severity": "warning",
       "source": "tolk"
     }
-  ],
-  "success": true
+  ]
 }

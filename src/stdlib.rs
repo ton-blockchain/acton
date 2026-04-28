@@ -24,6 +24,14 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
         return Ok(());
     }
 
+    install_latest(project_root, false)
+}
+
+pub fn update_latest(project_root: &Path) -> anyhow::Result<()> {
+    install_latest(project_root, true)
+}
+
+fn install_latest(project_root: &Path, force: bool) -> anyhow::Result<()> {
     let acton_dir = project_root.join(".acton");
     if !acton_dir.exists() {
         fs::create_dir_all(&acton_dir)?;
@@ -32,11 +40,11 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
     let version_path = acton_dir.join(".version");
     let current_version = current_stdlib_version();
 
-    let needs_update = if version_path.exists() {
+    let needs_update = if force || !version_path.exists() {
+        true
+    } else {
         let stored_version = fs::read_to_string(&version_path)?;
         stored_version.trim() != current_version
-    } else {
-        true
     };
 
     if needs_update {

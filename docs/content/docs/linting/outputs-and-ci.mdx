@@ -27,13 +27,20 @@ This prints a JSON object to stdout with:
 Each diagnostic includes:
 
 - `file` as an absolute file path
-- `severity`, `name`, `code`, `message`, and optional `help`
+- `severity`, `name`, `message`, and optional `code` / `help`
 - `annotations[]` with 0-based `range.start/end.{line,character}`,
   `is_primary`, optional `message`, and optional `tags`
 - `fixes[]` with `message`, `applicability` (`auto` or `manual`), and
   structured `edits[]`
 
 Use this mode for editor integrations and custom tooling.
+
+To validate this output or generate client types from it, print the built-in
+JSON Schema:
+
+```bash
+acton meta get-schema lint-report
+```
 
 JSON output never applies file edits. Even if you pass `--fix`, fixes are only reported and must be applied separately.
 

@@ -66,6 +66,8 @@ fn create_project_and_run_tests() {
     session.send_line("foobar", "failed to enter project name");
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
@@ -90,7 +92,7 @@ fn create_project_and_run_tests() {
         .assert_file_exists("foobar/contracts/Empty.tolk")
         .assert_file_exists("foobar/contracts/types.tolk")
         .assert_file_exists("foobar/tests/contract.test.tolk")
-        .assert_file_exists("foobar/wrappers/Empty.tolk")
+        .assert_file_exists("foobar/wrappers/Empty.gen.tolk")
         .assert_file_exists("foobar/scripts/deploy.tolk")
         .assert_file_exists("foobar/README.md")
         .assert_file_exists("foobar/.github/workflows/ci.yml");

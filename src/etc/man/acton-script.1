@@ -23,7 +23,7 @@ Path to the script file to execute.
 .sp
 \fIargs\fR\[u2026]
 .RS 4
-Arguments passed through to the script.
+Arguments parsed against the \fBmain()\fR ABI and passed to the script.
 .RE
 .sp
 \fB\-\-verbose\fR
@@ -149,6 +149,35 @@ the script arguments:
 acton script scripts/query.tolk \-\- \-\-net\-like\-value
 .fi
 .RE
+.SH "SCRIPT ARGUMENTS"
+Forwarded arguments are parsed against the ABI for \fBmain()\fR\&.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the number of CLI arguments must exactly match the \fBmain()\fR parameters
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'integers use Tolk integer literal syntax such as \fB42\fR, \fB\-1\fR, \fB0xff\fR, and \fB0b1010\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBbool\fR accepts \fBtrue\fR and \fBfalse\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'nullable supported types accept \fBnull\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcell\fR, \fBslice\fR, and \fBbitsN\fR accept plain BoC hex without \fBC{}\fR or \fBCS{}\fR prefixes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
+.RE
+.sp
+Unsupported parameter types currently include \fBstructs\fR, \fBtuple\fR, \fBmap\fR,
+\fBdict\fR, \fBbuilder\fR, \fBany_address\fR and other complex types.
 .SH "SIDE EFFECTS"
 \fBacton script\fR always compiles and executes the selected script. With
 \fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution

@@ -13,7 +13,13 @@ import {
   parseUnits,
 } from '../lib/deploy';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -24,9 +30,12 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { StatusAlert, PreviewRow, NetworkBadge } from './DeployPage';
 import { useTheme } from '../App';
 
-const DEFAULT_JETTON_MAINNET = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
-const DEFAULT_JETTON_TESTNET = 'kQAzgQ4T081rhYewF9g19vJIX1iRCy_31OvgzFPtfEM3ivw0';
-const ZERO_ADDRESS = '0:0000000000000000000000000000000000000000000000000000000000000000';
+const DEFAULT_JETTON_MAINNET =
+  'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
+const DEFAULT_JETTON_TESTNET =
+  'kQAzgQ4T081rhYewF9g19vJIX1iRCy_31OvgzFPtfEM3ivw0';
+const ZERO_ADDRESS =
+  '0:0000000000000000000000000000000000000000000000000000000000000000';
 
 function tryParseAddress(raw: string): Address | null {
   try {
@@ -51,12 +60,19 @@ interface JettonInfo {
 
 type ManageTab = 'mint' | 'transfer' | 'burn' | 'admin';
 
-export function ManagePage({ network, initialAddress, onAddressChange }: Props) {
+export function ManagePage({
+  network,
+  initialAddress,
+  onAddressChange,
+}: Props) {
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
 
-  const defaultAddr = network === 'testnet' ? DEFAULT_JETTON_TESTNET : DEFAULT_JETTON_MAINNET;
-  const [contractAddr, setContractAddrRaw] = useState(initialAddress || defaultAddr);
+  const defaultAddr =
+    network === 'testnet' ? DEFAULT_JETTON_TESTNET : DEFAULT_JETTON_MAINNET;
+  const [contractAddr, setContractAddrRaw] = useState(
+    initialAddress || defaultAddr,
+  );
 
   function setContractAddr(addr: string) {
     setContractAddrRaw(addr);
@@ -72,7 +88,9 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
     message: string;
   } | null>(null);
 
-  const ownerAddress = wallet?.account?.address ? Address.parse(wallet.account.address) : null;
+  const ownerAddress = wallet?.account?.address
+    ? Address.parse(wallet.account.address)
+    : null;
 
   const isConnected = !!wallet;
   const { theme } = useTheme();
@@ -97,14 +115,21 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
       });
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('exit_code') || msg.includes('-13') || msg.includes('unable to execute')) {
+      if (
+        msg.includes('exit_code') ||
+        msg.includes('-13') ||
+        msg.includes('unable to execute')
+      ) {
         const otherNet = network === 'mainnet' ? 'Testnet' : 'Mainnet';
         setStatus({
           type: 'error',
           message: `Contract not found on ${network === 'mainnet' ? 'Mainnet' : 'Testnet'}. Make sure the address is correct or try switching to ${otherNet}.`,
         });
       } else {
-        setStatus({ type: 'error', message: msg || 'Failed to load jetton data' });
+        setStatus({
+          type: 'error',
+          message: msg || 'Failed to load jetton data',
+        });
       }
     } finally {
       setLoading(false);
@@ -131,7 +156,10 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
     const whole = amount / divisor;
     const remainder = amount % divisor;
     if (remainder === 0n) return whole.toString();
-    const fracStr = remainder.toString().padStart(decimals, '0').replace(/0+$/, '');
+    const fracStr = remainder
+      .toString()
+      .padStart(decimals, '0')
+      .replace(/0+$/, '');
     return `${whole}.${fracStr}`;
   }
 
@@ -140,8 +168,12 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
       <div className="space-y-4.5">
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl tracking-tight">Manage Jetton</CardTitle>
-            <CardDescription>Enter a Jetton minter contract address</CardDescription>
+            <CardTitle className="text-xl tracking-tight">
+              Manage Jetton
+            </CardTitle>
+            <CardDescription>
+              Enter a Jetton minter contract address
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2.5">
@@ -163,7 +195,11 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
             </div>
 
             {status && !jettonInfo && status.type !== 'error' && (
-              <StatusAlert type={status.type} message={status.message} className="mt-4" />
+              <StatusAlert
+                type={status.type}
+                message={status.message}
+                className="mt-4"
+              />
             )}
           </CardContent>
         </Card>
@@ -180,17 +216,21 @@ export function ManagePage({ network, initialAddress, onAddressChange }: Props) 
               >
                 <TabsList
                   className="w-full h-10 rounded-full p-[3px]"
-                  style={{ background: theme === 'light' ? '#F0F1F3' : '#222224' }}
+                  style={{
+                    background: theme === 'light' ? '#F0F1F3' : '#222224',
+                  }}
                 >
-                  {(['mint', 'transfer', 'burn', 'admin'] as ManageTab[]).map((t) => (
-                    <TabsTrigger
-                      key={t}
-                      value={t}
-                      className="flex-1 h-[34px] rounded-full text-[13px] font-bold uppercase tracking-wider text-[#9a9a9f] hover:text-foreground data-[state=active]:bg-[#0098EA] data-[state=active]:text-white"
-                    >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </TabsTrigger>
-                  ))}
+                  {(['mint', 'transfer', 'burn', 'admin'] as ManageTab[]).map(
+                    (t) => (
+                      <TabsTrigger
+                        key={t}
+                        value={t}
+                        className="flex-1 h-[34px] rounded-full text-[13px] font-bold uppercase tracking-wider text-[#9a9a9f] hover:text-foreground data-[state=active]:bg-[#0098EA] data-[state=active]:text-white"
+                      >
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </TabsTrigger>
+                    ),
+                  )}
                 </TabsList>
 
                 <TabsContent value="mint" className="mt-5">
@@ -327,27 +367,40 @@ function JettonInfoCard({
         <div className="flex items-center gap-3.5 mb-5">
           <Avatar className="size-14 border-2 border-border">
             {imageUrl && !imgError ? (
-              <AvatarImage src={imageUrl} alt={name} onError={() => setImgError(true)} />
+              <AvatarImage
+                src={imageUrl}
+                alt={name}
+                onError={() => setImgError(true)}
+              />
             ) : null}
             <AvatarFallback className="bg-[#0098EA] text-white text-xl font-extrabold">
               {initial}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <div className="text-lg font-bold tracking-tight truncate">{name}</div>
-            <div className="font-mono text-[13px] font-semibold text-[#0098EA]">${symbol}</div>
+            <div className="text-lg font-bold tracking-tight truncate">
+              {name}
+            </div>
+            <div className="font-mono text-[13px] font-semibold text-[#0098EA]">
+              ${symbol}
+            </div>
           </div>
         </div>
 
         <Separator className="my-4" />
 
-        <PreviewRow label="Supply" value={`${formatAmount(info.totalSupply)} ${symbol}`} />
+        <PreviewRow
+          label="Supply"
+          value={`${formatAmount(info.totalSupply)} ${symbol}`}
+        />
         <PreviewRow label="Decimals" value={String(decimals)} />
         <PreviewRow label="Standard" value="TEP-74 Jetton" />
         <PreviewRow
           label="Mintable"
           value={info.mintable ? 'Yes' : 'No'}
-          valueClassName={info.mintable ? 'text-[var(--success)]' : 'text-[var(--warning)]'}
+          valueClassName={
+            info.mintable ? 'text-[var(--success)]' : 'text-[var(--warning)]'
+          }
         />
         <div className="flex justify-between items-center py-2">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -416,8 +469,17 @@ function shortenAddress(addr: string): string {
   return addr.slice(0, 4) + '...' + addr.slice(-4);
 }
 
-function AddressLink({ address, network }: { address: string; network: 'mainnet' | 'testnet' }) {
-  const base = network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
+function AddressLink({
+  address,
+  network,
+}: {
+  address: string;
+  network: 'mainnet' | 'testnet';
+}) {
+  const base =
+    network === 'testnet'
+      ? 'https://testnet.tonviewer.com'
+      : 'https://tonviewer.com';
   return (
     <a
       href={`${base}/${address}`}
@@ -444,10 +506,14 @@ function EmptyState({
 }) {
   return (
     <div className="text-center py-8 px-4">
-      <div className="mb-3.5 text-muted-foreground flex justify-center">{icon}</div>
+      <div className="mb-3.5 text-muted-foreground flex justify-center">
+        {icon}
+      </div>
       <div className="text-[15px] font-semibold mb-1.5">{title}</div>
       {description && (
-        <p className="text-sm text-muted-foreground mb-4.5 leading-relaxed">{description}</p>
+        <p className="text-sm text-muted-foreground mb-4.5 leading-relaxed">
+          {description}
+        </p>
       )}
       {action}
     </div>
@@ -504,7 +570,10 @@ function MintTab({
   const [toAddr, setToAddr] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const [status, setStatus] = useState<{
+    type: string;
+    message: string;
+  } | null>(null);
 
   if (!isConnected) return <WalletRequired tonConnectUI={tonConnectUI} />;
   if (!isAdmin) return <AdminRequired />;
@@ -592,7 +661,10 @@ function MintTab({
           disabled={loading}
         />
       </div>
-      <Button className="w-full h-12 rounded-full text-[15px] font-bold" disabled={loading}>
+      <Button
+        className="w-full h-12 rounded-full text-[15px] font-bold"
+        disabled={loading}
+      >
         {loading ? (
           <>
             <span className="spinner" /> Minting...
@@ -624,7 +696,10 @@ function TransferTab({
   const [toAddr, setToAddr] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const [status, setStatus] = useState<{
+    type: string;
+    message: string;
+  } | null>(null);
 
   if (!isConnected) return <WalletRequired tonConnectUI={tonConnectUI} />;
 
@@ -656,7 +731,11 @@ function TransferTab({
       });
 
       const client = getTonClient(network);
-      const walletAddr = await getWalletAddress(client, Address.parse(contractAddr), ownerAddress);
+      const walletAddr = await getWalletAddress(
+        client,
+        Address.parse(contractAddr),
+        ownerAddress,
+      );
 
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -713,7 +792,10 @@ function TransferTab({
           disabled={loading}
         />
       </div>
-      <Button className="w-full h-12 rounded-full text-[15px] font-bold" disabled={loading}>
+      <Button
+        className="w-full h-12 rounded-full text-[15px] font-bold"
+        disabled={loading}
+      >
         {loading ? (
           <>
             <span className="spinner" /> Transferring...
@@ -746,7 +828,10 @@ function BurnTab({
 }) {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const [status, setStatus] = useState<{
+    type: string;
+    message: string;
+  } | null>(null);
 
   if (!isConnected) return <WalletRequired tonConnectUI={tonConnectUI} />;
 
@@ -768,7 +853,11 @@ function BurnTab({
       const body = buildBurnBody(burnAmount, ownerAddress);
 
       const client = getTonClient(network);
-      const walletAddr = await getWalletAddress(client, Address.parse(contractAddr), ownerAddress);
+      const walletAddr = await getWalletAddress(
+        client,
+        Address.parse(contractAddr),
+        ownerAddress,
+      );
 
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -853,12 +942,17 @@ function AdminTab({
 }) {
   const [newAdmin, setNewAdmin] = useState(ZERO_ADDRESS);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const [status, setStatus] = useState<{
+    type: string;
+    message: string;
+  } | null>(null);
 
   const [newName, setNewName] = useState(info.metadata.name || '');
   const [newSymbol, setNewSymbol] = useState(info.metadata.symbol || '');
   const [newDecimals, setNewDecimals] = useState(info.metadata.decimals || '9');
-  const [newDescription, setNewDescription] = useState(info.metadata.description || '');
+  const [newDescription, setNewDescription] = useState(
+    info.metadata.description || '',
+  );
   const [newImage, setNewImage] = useState(info.metadata.image || '');
 
   if (!isConnected) return <WalletRequired tonConnectUI={tonConnectUI} />;
@@ -928,7 +1022,10 @@ function AdminTab({
           },
         ],
       });
-      setStatus({ type: 'success', message: 'Content update transaction sent!' });
+      setStatus({
+        type: 'success',
+        message: 'Content update transaction sent!',
+      });
       setTimeout(onSuccess, 5000);
     } catch (err: any) {
       const msg = err?.message || '';
@@ -993,7 +1090,10 @@ function AdminTab({
             disabled={loading}
           />
         </div>
-        <Button className="w-full h-12 rounded-full text-[15px] font-bold" disabled={loading}>
+        <Button
+          className="w-full h-12 rounded-full text-[15px] font-bold"
+          disabled={loading}
+        >
           {loading ? (
             <>
               <span className="spinner" /> Updating...
@@ -1038,7 +1138,13 @@ function AdminTab({
         </Button>
       </form>
 
-      {status && <StatusAlert type={status.type} message={status.message} className="mt-4" />}
+      {status && (
+        <StatusAlert
+          type={status.type}
+          message={status.message}
+          className="mt-4"
+        />
+      )}
     </div>
   );
 }

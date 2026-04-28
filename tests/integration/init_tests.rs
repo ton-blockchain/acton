@@ -25,6 +25,18 @@ hash = "beef"
 code = "te6ccgEBAQEAAgAAAA=="
 "#;
 
+fn expected_stdlib_version() -> String {
+    if acton::build_info::RELEASE_CHANNEL == "trunk" {
+        format!(
+            "{}-trunk+{}",
+            acton::build_info::PACKAGE_VERSION,
+            acton::build_info::GIT_HASH
+        )
+    } else {
+        acton::build_info::PACKAGE_VERSION.to_owned()
+    }
+}
+
 // ========================================
 // Basic Init Tests
 // ========================================
@@ -167,6 +179,60 @@ fn test_init_updates_stdlib_if_already_initialized() {
     output.assert_contains("Updated Acton project");
 
     assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_stdlib_only_updates_without_touching_acton_toml() {
+    let original_manifest = "\
+# keep this exact file
+this is intentionally not valid toml
+";
+    let project = ProjectBuilder::new("init-stdlib-only-preserve-manifest")
+        .without_acton_toml()
+        .raw_file("Acton.toml", original_manifest)
+        .build();
+
+    let acton_dir = project.path().join(".acton");
+    let stale_stdlib_file = acton_dir.join("testing/assert.tolk");
+    fs::create_dir_all(stale_stdlib_file.parent().unwrap()).unwrap();
+    fs::write(acton_dir.join(".version"), expected_stdlib_version()).unwrap();
+    fs::write(&stale_stdlib_file, "stale stdlib content").unwrap();
+
+    let output = project.acton().init().arg("--stdlib-only").run().success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_init_stdlib_only_updates_without_touching_acton_toml.stdout.txt",
+    );
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
+    );
+    assert_ne!(
+        fs::read_to_string(&stale_stdlib_file).unwrap(),
+        "stale stdlib content"
+    );
+    assert!(!project.path().join(".gitignore").exists());
+}
+
+#[test]
+fn test_init_stdlib_only_installs_without_acton_toml() {
+    let project = ProjectBuilder::new("init-stdlib-only-no-manifest")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .init()
+        .arg("--stdlib-only")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_init_stdlib_only_installs_without_acton_toml.stdout.txt",
+        );
+
+    assert!(!project.path().join("Acton.toml").exists());
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+    assert!(!project.path().join(".gitignore").exists());
 }
 
 #[test]

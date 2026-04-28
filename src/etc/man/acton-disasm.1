@@ -31,7 +31,11 @@ BoC value in hex or base64 format.
 .sp
 \fB\-o\fR, \fB\-\-output\fR \fIpath\fR
 .RS 4
-Write disassembled output to a file instead of standard output.
+Write plain disassembly text to a file.
+.sp
+Without \fB\-\-json\fR, this replaces standard output. With \fB\-\-json\fR, Acton still
+prints the JSON envelope to stdout and writes only the \fBassembly\fR field to the
+file.
 .sp
 If the parent directory does not exist, Acton creates it automatically.
 Existing files are overwritten.
@@ -45,6 +49,15 @@ Show cell hashes alongside code blocks.
 \fB\-\-show\-offsets\fR
 .RS 4
 Show instruction bit offsets in the left column.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Print machine\-readable disassembly JSON to stdout.
+.sp
+Successful output includes \fBsuccess\fR, the plain disassembly in \fBassembly\fR, and
+\fBblocks\fR derived from \fB\-\-source\-map\fR\&. Without \fB\-\-source\-map\fR, \fBblocks\fR is
+empty.
 .RE
 .sp
 \fB\-\-source\-map\fR \fIpath\fR
@@ -167,6 +180,29 @@ source map JSON here to annotate the disassembly with original Tolk locations.
 .sp
 \fB\-\-source\-map\fR only affects annotations in the output. It does not change which
 BoC is disassembled.
+.SH "JSON OUTPUT"
+With \fB\-\-json\fR, Acton prints pretty\-printed JSON to stdout.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBsuccess\fR: \fBtrue\fR for successful disassembly
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBassembly\fR: plain disassembly text without inline source\-map comments
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBblocks\fR: source\-to\-assembly mappings derived from \fB\-\-source\-map\fR
+.RE
+.sp
+Each item in \fBblocks\fR contains a \fBsource\fR location and \fBassembly_ranges\fR\&.
+\fBassembly_ranges\fR stores inclusive zero\-based \fBstart_line\fR/\fBend_line\fR pairs
+into the \fBassembly\fR string.
+.sp
+If \fB\-\-source\-map\fR is not provided, \fBblocks\fR is empty.
+.sp
+If \fB\-\-output\fR is also provided, the output file contains the same plain
+\fBassembly\fR text while stdout remains JSON.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -246,6 +282,16 @@ acton disasm contract.boc \-\-output build/disasm/contract.tasm
 .RS 4
 .nf
 acton disasm library\-ref.boc \-\-follow\-libraries \-\-net custom:staging
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 8.\h'+01'Print machine\-readable JSON with source\-map ranges:
+.sp
+.RS 4
+.nf
+acton disasm contract.boc \-\-source\-map contract.json \-\-json
 .fi
 .RE
 .RE

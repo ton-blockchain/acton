@@ -29,7 +29,7 @@ This function is required to be called when you process an external message (fro
 and "accept" it to blockchain.
 Without calling this function, an external message would be discarded.
 As an effect, the current smart contract agrees to buy some gas to finish the current transaction.
-For more details, check [accept_message effects](https://ton.org/docs/#/smart-contracts/accept).
+For more details, check [accept_message effects](https://docs.ton.org/foundations/messages/external-in#accepting-message).
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/gas-payments.tolk#L17" />
 
@@ -75,10 +75,10 @@ Calculates fee (amount in nanotoncoins to be paid) for a transaction which consu
 
 ```tolk
 @pure
-fun calculateGasFeeWithoutFlatPrice(workchain: int8, gasUsed: coins): coins
+fun calculateGasFeeWithoutFlatPrice(workchain: int8, gasUsed: int): coins
 ```
 
-Same as [calculateGasFee](#calculategasfee), but without flat price. [Docs about fees](https://docs.ton.org/develop/howto/fees-low-level)
+Same as [calculateGasFee](#calculategasfee), but without flat price. [Docs about fees](https://docs.ton.org/foundations/fees)
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/gas-payments.tolk#L41" />
 
@@ -111,7 +111,7 @@ Calculates amount of nanotoncoins you should pay to send a message of a specifie
 fun calculateForwardFeeWithoutLumpPrice(workchain: int8, bits: int, cells: int): coins
 ```
 
-Same as [calculateForwardFee](#calculateforwardfee), but without lump price. [Docs about fees](https://docs.ton.org/develop/howto/fees-low-level)
+Same as [calculateForwardFee](#calculateforwardfee), but without lump price. [Docs about fees](https://docs.ton.org/foundations/fees)
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/gas-payments.tolk#L56" />
 
@@ -129,6 +129,7 @@ Calculates fee that was paid by the sender of an incoming internal message.
 ## `contract.getStorageDuePayment`
 
 ```tolk
+@pure
 fun contract.getStorageDuePayment(): coins
 ```
 
@@ -147,5 +148,5 @@ fun contract.getStoragePaidPayment(): coins
 Returns the amount of nanotoncoins charged for storage.
 (during the storage phase preceeding to current computation phase)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/gas-payments.tolk#L72" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/gas-payments.tolk#L73" />
 

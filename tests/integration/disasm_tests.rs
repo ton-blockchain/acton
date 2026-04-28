@@ -215,6 +215,43 @@ fn test_disasm_reads_source_map_emitted_by_compile_with_show_hashes_and_offsets(
 }
 
 #[test]
+fn test_disasm_json_includes_source_map_blocks() {
+    let project = build_counter_source_map_project("disasm-source-map-json");
+
+    project
+        .acton()
+        .disasm_file("counter.boc")
+        .with_source_map("counter.source_map.json")
+        .with_json()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/disasm/test_disasm_json_includes_source_map_blocks.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_json_with_output_writes_assembly_file() {
+    let project = build_simple_contract_project("disasm-json-output");
+
+    let output = project
+        .acton()
+        .disasm_file("simple.boc")
+        .with_output("output.tasm")
+        .with_json()
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/disasm/test_disasm_json_with_output_writes_assembly_file.stdout.txt",
+    );
+    output.assert_file_snapshot_matches(
+        "output.tasm",
+        "integration/snapshots/disasm/test_disasm_json_with_output_writes_assembly_file.tasm.gen",
+    );
+}
+
+#[test]
 fn test_disasm_missing_source_map_file() {
     let project = build_simple_contract_project("disasm-source-map-missing");
 

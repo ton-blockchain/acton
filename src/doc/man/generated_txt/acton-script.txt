@@ -20,7 +20,7 @@ OPTIONS
            Path to the script file to execute.
 
        args…
-           Arguments passed through to the script.
+           Arguments parsed against the main() ABI and passed to the script.
 
        --verbose
            Enable executor debug logs at verbosity level 1.
@@ -112,6 +112,26 @@ ARGUMENT FORWARDING
        before the script arguments:
 
            acton script scripts/query.tolk -- --net-like-value
+
+SCRIPT ARGUMENTS
+       Forwarded arguments are parsed against the ABI for main().
+
+       o  the number of CLI arguments must exactly match the main() parameters
+
+       o  integers use Tolk integer literal syntax such as 42, -1, 0xff, and
+          0b1010
+
+       o  bool accepts true and false
+
+       o  nullable supported types accept null
+
+       o  cell, slice, and bitsN accept plain BoC hex without C{} or CS{}
+          prefixes
+
+       o  arrays accept [item1, item2]
+
+       Unsupported parameter types currently include structs, tuple, map, dict,
+       builder, any_address and other complex types.
 
 SIDE EFFECTS
        acton script always compiles and executes the selected script. With
