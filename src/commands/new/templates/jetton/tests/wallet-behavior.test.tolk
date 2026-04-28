@@ -51,7 +51,7 @@ get fun `test wallet: non-owner cannot send jettons`() {
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: notDeployer.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
@@ -75,7 +75,7 @@ get fun `test wallet: cannot send more jettons than balance`() {
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: deployer.address,
         to: wallet.address,
-        exitCode: Errors.BalanceError as int32,
+        exitCode: Errors.BalanceError,
     });
 
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
@@ -222,7 +222,7 @@ get fun `test wallet: non-owner cannot burn jettons`() {
     expect(res).toHaveFailedTx<AskToBurn>({
         from: notDeployer.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
@@ -246,7 +246,7 @@ get fun `test wallet: cannot burn more jettons than balance`() {
     expect(res).toHaveFailedTx<AskToBurn>({
         from: deployer.address,
         to: wallet.address,
-        exitCode: Errors.BalanceError as int32,
+        exitCode: Errors.BalanceError,
     });
 
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
