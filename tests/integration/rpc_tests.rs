@@ -121,10 +121,6 @@ get fun owner(): address {
 
     return storage.owner;
 }
-
-get fun sampleExcessesBody(): cell {
-    return ReturnExcessesBack { queryId: 7 }.toCell();
-}
 "#;
 const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
 kind = "v4r2"

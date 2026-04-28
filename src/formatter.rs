@@ -885,16 +885,28 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             return None;
         }
 
+        let body = self.resolve_transaction_inbound_message_body(tx)?;
+        Some(self.format_decoded_message_body(&body))
+    }
+
+    pub(crate) fn transaction_inbound_message_name(&self, tx: &Transaction) -> Option<String> {
+        self.resolve_transaction_inbound_message_body(tx)
+            .map(|body| body.name)
+    }
+
+    fn resolve_transaction_inbound_message_body(
+        &self,
+        tx: &Transaction,
+    ) -> Option<DecodedMessageBody> {
         if let Some(in_msg) = tx.in_msg.as_ref()
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
             && let Some(body) = self.resolve_incoming_message_body(&in_msg)
         {
-            return Some(self.format_decoded_message_body(&body));
+            return Some(body);
         }
 
         let in_msg = tx.load_in_msg().ok()??;
-        let body = self.resolve_external_incoming_message_body(tx, &in_msg)?;
-        Some(self.format_decoded_message_body(&body))
+        self.resolve_external_incoming_message_body(tx, &in_msg)
     }
 
     fn resolve_incoming_message_body(&self, in_msg: &RelaxedMessage) -> Option<DecodedMessageBody> {
@@ -913,14 +925,12 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                             self.prioritized_builds(destination_build),
                             MessageBodyDirection::Outgoing,
                             true,
-                            true,
                         )
                         .or_else(|| {
                             self.try_decode_message_with_builds(
                                 in_msg.body,
                                 self.prioritized_builds(source_build),
                                 MessageBodyDirection::Incoming,
-                                true,
                                 true,
                             )
                         });
@@ -930,7 +940,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                     in_msg.body,
                     self.prioritized_builds(destination_build),
                     MessageBodyDirection::Incoming,
-                    true,
                     false,
                 )
                 .or_else(|| {
@@ -938,7 +947,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                         in_msg.body,
                         self.prioritized_builds(source_build),
                         MessageBodyDirection::Outgoing,
-                        true,
                         false,
                     )
                 })
@@ -1095,7 +1103,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         body: CellSlice<'_>,
         builds: Vec<context::CompilationResult>,
         direction: MessageBodyDirection,
-        is_internal: bool,
         bounced: bool,
     ) -> Option<DecodedMessageBody> {
         for build in builds {
@@ -1103,8 +1110,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                 continue;
             };
             let opcode = Self::opcode_after_bounce_prefix(body, bounced);
-            let candidates =
-                Self::compiler_message_candidates(compiler_abi, direction, is_internal, opcode);
+            let candidates = Self::compiler_message_candidates(compiler_abi, direction, opcode);
             if let Some(decoded) = self.try_decode_message_body_types(
                 body,
                 compiler_abi,
@@ -1121,7 +1127,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     fn compiler_message_candidates(
         abi: &CompilerContractABI,
         direction: MessageBodyDirection,
-        is_internal: bool,
         opcode: Option<u32>,
     ) -> Vec<CompilerAbiType> {
         let mut candidates = Vec::new();
@@ -1129,23 +1134,12 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         match direction {
             MessageBodyDirection::Incoming => {
-                if is_internal {
-                    for message in &abi.incoming_messages {
-                        Self::push_compiler_message_candidate(
-                            &mut candidates,
-                            &mut seen,
-                            message.body_ty.clone(),
-                        );
-                    }
-                } else {
-                    for message in &abi.incoming_external {
-                        Self::push_compiler_message_candidate(
-                            &mut candidates,
-                            &mut seen,
-                            message.body_ty.clone(),
-                        );
-                    }
-                    return candidates;
+                for message in &abi.incoming_messages {
+                    Self::push_compiler_message_candidate(
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty.clone(),
+                    );
                 }
             }
             MessageBodyDirection::Outgoing => {

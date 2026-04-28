@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
+use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::abi_serde::Data as CompilerAbiData;
 use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
 use ton_api::{
@@ -28,11 +28,11 @@ use ton_api::{
 };
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellSlice, HashBytes, Lazy};
+use tycho_types::cell::{Cell, HashBytes, Lazy};
 use tycho_types::models::{
     Account, AccountState as TychoAccountState, Base64StdAddrFlags, CurrencyCollection,
     DisplayBase64StdAddr, IntAddr, OptionalAccount, ShardAccount, StateInit, StdAddr,
-    StdAddrFormat, StorageInfo,
+    StdAddrFormat, StorageInfo, Transaction,
 };
 
 #[derive(Subcommand, Clone)]
@@ -255,16 +255,13 @@ fn rpc_trace_cmd(
         .pop()
         .ok_or_else(|| anyhow!("No trace found for transaction hash {hash} on {network}"))?;
 
-    let trace_txs = (mode != TraceOutputMode::Summary)
-        .then(|| build_rpc_trace_transactions(&trace))
-        .transpose()?;
-
-    print_rpc_trace_summary(hash, &trace);
     if mode == TraceOutputMode::Summary {
+        print_rpc_trace_summary(hash, &trace);
         return Ok(());
     }
 
-    let trace_txs = trace_txs.expect("trace transactions are built above for non-summary modes");
+    let trace_txs = build_rpc_trace_transactions(&trace)?;
+    print_rpc_trace_summary(hash, &trace);
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
     print_section("Trace Tree");
@@ -298,7 +295,7 @@ struct RpcTraceTransaction {
     hash: String,
     summary: V3TransactionSummary,
     tx_cell: Cell,
-    transaction: tycho_types::models::Transaction,
+    transaction: Transaction,
     parent_lt: Option<u64>,
     child_lts: Vec<u64>,
 }
@@ -478,11 +475,14 @@ fn print_rpc_trace_details(
                 format_optional_address(&message.destination, network)
             );
             println!("    value: {}", format_message_value(message));
-            println!("    opcode: {}", format_message_opcode(message, formatter));
+            println!(
+                "    opcode: {}",
+                format_message_opcode(&tx.transaction, message, formatter)
+            );
             println!("    bounced: {}", message.bounced.unwrap_or(false));
             println!(
                 "    branch: {}",
-                trace_branch_kind(&tx.summary, message, formatter)
+                trace_branch_kind(&tx.transaction, &tx.summary, message, formatter)
             );
         } else {
             println!("    from: <none>");
@@ -557,6 +557,7 @@ fn format_action_result_code(tx: &V3TransactionSummary) -> String {
 }
 
 fn trace_branch_kind(
+    parsed_tx: &Transaction,
     tx: &V3TransactionSummary,
     message: &V3MessageSummary,
     formatter: Option<&FormatterContext<'_>>,
@@ -571,9 +572,8 @@ fn trace_branch_kind(
     {
         return "deploy";
     }
-    if format_message_opcode(message, formatter)
-        .to_ascii_lowercase()
-        .contains("notification")
+    if resolved_message_name(parsed_tx, formatter)
+        .is_some_and(|name| name.to_ascii_lowercase().contains("notification"))
     {
         return "notification";
     }
@@ -581,6 +581,7 @@ fn trace_branch_kind(
 }
 
 fn format_message_opcode(
+    parsed_tx: &Transaction,
     message: &V3MessageSummary,
     formatter: Option<&FormatterContext<'_>>,
 ) -> String {
@@ -590,7 +591,7 @@ fn format_message_opcode(
     } else {
         format!("0x{opcode:08x}")
     };
-    let name = local_message_name(message, opcode, formatter)
+    let name = resolved_message_name(parsed_tx, formatter)
         .or_else(|| (opcode == 0).then(|| "empty".to_owned()));
     match name {
         Some(name) => format!("{opcode_text} ({name})"),
@@ -617,102 +618,11 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
     parser.load_u32().unwrap_or(0)
 }
 
-fn local_message_name(
-    message: &V3MessageSummary,
-    _opcode: u32,
+fn resolved_message_name(
+    parsed_tx: &Transaction,
     formatter: Option<&FormatterContext<'_>>,
 ) -> Option<String> {
-    let formatter = formatter?;
-    let dst = message.destination.as_deref()?;
-    let (dst, _) = StdAddr::from_str_ext(dst, StdAddrFormat::any()).ok()?;
-    let code = FormatterContext::account_code(&formatter.accounts, &dst);
-    let (_, build) = formatter.build_cache.result_for_code(&code)?;
-    let compiler_abi = build.compiler_abi.as_ref()?;
-    let body = decode_message_body(message)?;
-    let candidates = if message.source.is_none() {
-        MessageBodyCandidates::External
-    } else {
-        MessageBodyCandidates::Internal {
-            bounced: message.bounced.unwrap_or(false),
-        }
-    };
-    local_message_name_from_body(body.as_slice_allow_exotic(), compiler_abi, candidates)
-        .filter(|name| !name.is_empty())
-}
-
-enum MessageBodyCandidates {
-    Internal { bounced: bool },
-    External,
-}
-
-fn decode_message_body(message: &V3MessageSummary) -> Option<Cell> {
-    let body_boc64 = message
-        .message_content
-        .as_ref()
-        .and_then(|content| content.body.as_deref())
-        .filter(|body| !body.is_empty())?;
-    Boc::decode_base64(body_boc64).ok()
-}
-
-fn local_message_name_from_body(
-    body: CellSlice<'_>,
-    abi: &CompilerContractABI,
-    candidates: MessageBodyCandidates,
-) -> Option<String> {
-    match candidates {
-        MessageBodyCandidates::Internal { bounced } => {
-            let prefix_to_skip = if bounced { 32 } else { 0 };
-            decoded_message_body_name(
-                body,
-                abi,
-                abi.incoming_messages.iter().map(|message| &message.body_ty),
-                prefix_to_skip,
-            )
-        }
-        MessageBodyCandidates::External => decoded_message_body_name(
-            body,
-            abi,
-            abi.incoming_external.iter().map(|message| &message.body_ty),
-            0,
-        ),
-    }
-}
-
-fn decoded_message_body_name<'msg, I>(
-    body: CellSlice<'_>,
-    abi: &CompilerContractABI,
-    candidates: I,
-    prefix_to_skip: u16,
-) -> Option<String>
-where
-    I: IntoIterator<Item = &'msg CompilerAbiType>,
-{
-    for body_ty in candidates {
-        let mut parser = body;
-        if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
-            continue;
-        }
-
-        if compiler_abi_serde::decode(&mut parser, abi, body_ty).is_err() {
-            continue;
-        }
-        if parser.size_bits() != 0 || parser.size_refs() != 0 {
-            continue;
-        }
-
-        return Some(compiler_body_type_name(body_ty));
-    }
-
-    None
-}
-
-fn compiler_body_type_name(body_ty: &CompilerAbiType) -> String {
-    match body_ty {
-        CompilerAbiType::StructRef { struct_name, .. } => struct_name.clone(),
-        CompilerAbiType::AliasRef { alias_name, .. } => alias_name.clone(),
-        CompilerAbiType::EnumRef { enum_name } => enum_name.clone(),
-        _ => body_ty.render_type(),
-    }
+    formatter?.transaction_inbound_message_name(parsed_tx)
 }
 
 fn format_message_value(message: &V3MessageSummary) -> String {
