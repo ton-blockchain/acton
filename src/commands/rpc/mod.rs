@@ -2,7 +2,6 @@ use crate::commands::common::error_fmt;
 use crate::context::{BuildCache, KnownAddresses};
 use crate::ffi::emulation::{
     V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions, v3_message_hash,
-    v3_trace_transactions_to_send_result_list,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -27,12 +26,13 @@ use ton_api::{
     AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
     V3TransactionSummary,
 };
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes, Lazy};
 use tycho_types::models::{
     Account, AccountState as TychoAccountState, Base64StdAddrFlags, CurrencyCollection,
     DisplayBase64StdAddr, IntAddr, OptionalAccount, ShardAccount, StateInit, StdAddr,
-    StdAddrFormat, StorageInfo, Transaction,
+    StdAddrFormat, StorageInfo,
 };
 
 #[derive(Subcommand, Clone)]
@@ -95,15 +95,19 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             hash,
             net,
             summary,
-            tree,
+            tree: _,
             verbose,
             show_bodies,
-        } => rpc_trace_cmd(
-            &hash,
-            net,
-            trace_output_mode(summary, tree, verbose),
-            show_bodies,
-        ),
+        } => {
+            let mode = if summary {
+                TraceOutputMode::Summary
+            } else if verbose {
+                TraceOutputMode::Verbose
+            } else {
+                TraceOutputMode::Tree
+            };
+            rpc_trace_cmd(&hash, net, mode, show_bodies)
+        }
     }
 }
 
@@ -228,16 +232,6 @@ enum TraceOutputMode {
     Verbose,
 }
 
-const fn trace_output_mode(summary: bool, _tree: bool, verbose: bool) -> TraceOutputMode {
-    if summary {
-        TraceOutputMode::Summary
-    } else if verbose {
-        TraceOutputMode::Verbose
-    } else {
-        TraceOutputMode::Tree
-    }
-}
-
 fn rpc_trace_cmd(
     hash: &str,
     net: Option<String>,
@@ -270,7 +264,15 @@ fn rpc_trace_cmd(
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
     print_section("Trace Tree");
-    let send_result_list = v3_trace_transactions_to_send_result_list(&trace_txs);
+    let send_result_list = TupleItem::TypedTuple {
+        type_name: "SendResultList".to_owned(),
+        inner: Tuple(
+            trace_txs
+                .iter()
+                .map(V3TraceTransaction::to_send_result_tuple)
+                .collect(),
+        ),
+    };
     let formatted_tree = formatter.format(&send_result_list);
     println!("{}", formatted_tree.trim_end());
 
@@ -379,6 +381,8 @@ fn print_rpc_trace_details(
         println!("    child_lts: {}", format_child_lts(&tx.child_lts));
 
         if let Some(message) = &tx.summary.in_msg {
+            let message_name = formatter
+                .and_then(|formatter| formatter.transaction_inbound_message_name(&tx.transaction));
             println!(
                 "    from: {}",
                 format_optional_address(&message.source, network)
@@ -390,12 +394,12 @@ fn print_rpc_trace_details(
             println!("    value: {}", format_message_value(message));
             println!(
                 "    opcode: {}",
-                format_message_opcode(&tx.transaction, message, formatter)
+                format_message_opcode(message, message_name.as_deref())
             );
             println!("    bounced: {}", message.bounced.unwrap_or(false));
             println!(
                 "    branch: {}",
-                trace_branch_kind(&tx.transaction, &tx.summary, message, formatter)
+                trace_branch_kind(&tx.summary, message, message_name.as_deref())
             );
         } else {
             println!("    from: <none>");
@@ -470,10 +474,9 @@ fn format_action_result_code(tx: &V3TransactionSummary) -> String {
 }
 
 fn trace_branch_kind(
-    parsed_tx: &Transaction,
     tx: &V3TransactionSummary,
     message: &V3MessageSummary,
-    formatter: Option<&FormatterContext<'_>>,
+    message_name: Option<&str>,
 ) -> &'static str {
     if message.bounced.unwrap_or(false) {
         return "bounce";
@@ -485,27 +488,20 @@ fn trace_branch_kind(
     {
         return "deploy";
     }
-    if resolved_message_name(parsed_tx, formatter)
-        .is_some_and(|name| name.to_ascii_lowercase().contains("notification"))
-    {
+    if message_name.is_some_and(|name| name.to_ascii_lowercase().contains("notification")) {
         return "notification";
     }
     "message"
 }
 
-fn format_message_opcode(
-    parsed_tx: &Transaction,
-    message: &V3MessageSummary,
-    formatter: Option<&FormatterContext<'_>>,
-) -> String {
+fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>) -> String {
     let opcode = extract_message_opcode(message);
     let opcode_text = if opcode == 0 {
         "0x00000000".to_owned()
     } else {
         format!("0x{opcode:08x}")
     };
-    let name = resolved_message_name(parsed_tx, formatter)
-        .or_else(|| (opcode == 0).then(|| "empty".to_owned()));
+    let name = message_name.or_else(|| (opcode == 0).then_some("empty"));
     match name {
         Some(name) => format!("{opcode_text} ({name})"),
         None => opcode_text,
@@ -529,13 +525,6 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
         parser.load_u32().unwrap_or(0);
     }
     parser.load_u32().unwrap_or(0)
-}
-
-fn resolved_message_name(
-    parsed_tx: &Transaction,
-    formatter: Option<&FormatterContext<'_>>,
-) -> Option<String> {
-    formatter?.transaction_inbound_message_name(parsed_tx)
 }
 
 fn format_message_value(message: &V3MessageSummary) -> String {

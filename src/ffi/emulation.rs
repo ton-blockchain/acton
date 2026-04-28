@@ -557,20 +557,6 @@ pub(crate) enum V3TraceTransactions {
     Pending { tx_hash: String },
 }
 
-pub(crate) fn v3_trace_transactions_to_send_result_list(
-    transactions: &[V3TraceTransaction],
-) -> TupleItem {
-    TupleItem::TypedTuple {
-        type_name: "SendResultList".to_owned(),
-        inner: Tuple(
-            transactions
-                .iter()
-                .map(V3TraceTransaction::to_send_result_tuple)
-                .collect(),
-        ),
-    }
-}
-
 pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
     let mut transactions = Vec::with_capacity(trace.transactions_order.len());
     for tx_hash in &trace.transactions_order {
