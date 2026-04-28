@@ -611,11 +611,10 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
         return 0;
     };
     let mut parser = body.as_slice_allow_exotic();
-    let mut opcode = parser.load_u32().unwrap_or(0);
     if message.bounced.unwrap_or(false) {
-        opcode = parser.load_u32().unwrap_or(0);
+        parser.load_u32().unwrap_or(0);
     }
-    opcode
+    parser.load_u32().unwrap_or(0)
 }
 
 fn local_message_name(

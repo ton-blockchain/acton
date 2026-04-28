@@ -12,4 +12,5 @@ N/A -> EQAzMz..MzM7SN A
 └── IncreaseCounter 0.1 TON -> counter B                                        gas=123
     increaseBy: 5
     ├── empty 0.000000001 TON -> EQAzMz..MzM7SN A                               gas=123
-    └── 0xd53276db 0.000000002 TON -> counter B                                 gas=123
+    └── ReturnExcessesBack 0.000000002 TON -> counter B                         gas=123
+        queryId: 7
