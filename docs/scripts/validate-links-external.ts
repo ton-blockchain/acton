@@ -1,6 +1,8 @@
 import { type ExternalLinkResult, printErrors, validateFiles } from 'next-validate-link';
 import { createLinkValidationConfig, getLinkValidationInput } from './link-validation';
 
+const externalLinkTimeoutMs = 15_000;
+
 async function validateExternalLinks() {
   const { files, scanned } = await getLinkValidationInput();
 
@@ -54,6 +56,7 @@ async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
   const response = await fetch(url, {
     method: 'GET',
     redirect: 'manual',
+    signal: AbortSignal.timeout(externalLinkTimeoutMs),
   });
 
   await response.body?.cancel();
