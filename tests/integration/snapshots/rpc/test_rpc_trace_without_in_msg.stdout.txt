@@ -1,0 +1,12 @@
+
+Trace Summary
+  Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Root Tx Hash:      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace Complete:    true
+  Total Txs:         1
+  Total Messages:    0
+
+Trace Tree
+N/A -> system
+└── system -> EQAiIi..IiIp3C                                                    gas=123

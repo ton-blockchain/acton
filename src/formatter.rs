@@ -759,8 +759,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                         "external".dimmed()
                     );
                 }
-                tx_builder += "└── ".dimmed().to_string().as_str();
+            } else {
+                tx_builder += &format!(
+                    "{} {} {}\n",
+                    "N/A".dimmed(),
+                    "->".dimmed(),
+                    "system".dimmed()
+                );
             }
+            tx_builder += "└── ".dimmed().to_string().as_str();
         }
 
         tx_builder += &main_part;
@@ -821,7 +828,13 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             );
         }
 
-        String::new()
+        let account = IntAddr::Std(StdAddr::new(0, tx.account));
+        format!(
+            "{} {} {}",
+            "system".blue(),
+            "->".dimmed(),
+            self.format_address_with_letter(&account, contract_letters, true)
+        )
     }
 
     fn format_single_message(

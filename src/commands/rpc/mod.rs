@@ -1,8 +1,8 @@
 use crate::commands::common::error_fmt;
 use crate::context::{BuildCache, KnownAddresses};
 use crate::ffi::emulation::{
-    V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions,
-    tx_cell_to_send_result_tuple_with_relations, v3_message_hash,
+    V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions, v3_message_hash,
+    v3_trace_transactions_to_send_result_list,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -27,7 +27,6 @@ use ton_api::{
     AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
     V3TransactionSummary,
 };
-use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes, Lazy};
 use tycho_types::models::{
@@ -267,26 +266,11 @@ fn rpc_trace_cmd(
             anyhow::bail!("Trace references missing transaction {tx_hash}");
         }
     };
-    ensure_rpc_trace_in_msgs(&trace_txs)?;
     print_rpc_trace_summary(hash, &trace);
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
     print_section("Trace Tree");
-    let send_results = trace_txs
-        .iter()
-        .map(|tx| {
-            tx_cell_to_send_result_tuple_with_relations(
-                tx.tx_cell.clone(),
-                &tx.transaction,
-                &tx.child_lts,
-                tx.parent_lt,
-            )
-        })
-        .collect::<Vec<_>>();
-    let send_result_list = TupleItem::TypedTuple {
-        type_name: "SendResultList".to_owned(),
-        inner: Tuple(send_results),
-    };
+    let send_result_list = v3_trace_transactions_to_send_result_list(&trace_txs);
     let formatted_tree = formatter.format(&send_result_list);
     println!("{}", formatted_tree.trim_end());
 
@@ -295,18 +279,6 @@ fn rpc_trace_cmd(
         print_rpc_trace_details(&trace_txs, Some(&formatter), &network);
     }
 
-    Ok(())
-}
-
-fn ensure_rpc_trace_in_msgs(trace_txs: &[V3TraceTransaction]) -> anyhow::Result<()> {
-    for tx in trace_txs {
-        if tx.summary.in_msg.is_none() {
-            anyhow::bail!(
-                "Trace transaction {} has no in_msg in TonCenter v3 /traces response",
-                tx.hash
-            );
-        }
-    }
     Ok(())
 }
 

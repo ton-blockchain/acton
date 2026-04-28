@@ -648,7 +648,7 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_rpc_trace_rejects_v3_trace_without_in_msg() {
+fn test_rpc_trace_formats_v3_trace_without_in_msg() {
     let project = ProjectBuilder::new("rpc-trace-v3-missing-in-msg").build();
     let log_dir = prepare_log_dir(project.path());
     let (mock_url, mock_handle, captured) =
@@ -670,9 +670,9 @@ fn test_rpc_trace_rejects_v3_trace_without_in_msg() {
         .env("MOCK_API_KEY", "custom-mock-api-key")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_trace_without_in_msg.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_trace_without_in_msg.stdout.txt",
         );
 
     mock_handle.join().expect("mock server thread must finish");

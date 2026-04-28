@@ -541,9 +541,34 @@ pub(crate) struct V3TraceTransaction {
     pub(crate) child_lts: Vec<u64>,
 }
 
+impl V3TraceTransaction {
+    pub(crate) fn to_send_result_tuple(&self) -> TupleItem {
+        tx_cell_to_send_result_tuple_with_relations(
+            self.tx_cell.clone(),
+            &self.transaction,
+            &self.child_lts,
+            self.parent_lt,
+        )
+    }
+}
+
 pub(crate) enum V3TraceTransactions {
     Ready(Vec<V3TraceTransaction>),
     Pending { tx_hash: String },
+}
+
+pub(crate) fn v3_trace_transactions_to_send_result_list(
+    transactions: &[V3TraceTransaction],
+) -> TupleItem {
+    TupleItem::TypedTuple {
+        type_name: "SendResultList".to_owned(),
+        inner: Tuple(
+            transactions
+                .iter()
+                .map(V3TraceTransaction::to_send_result_tuple)
+                .collect(),
+        ),
+    }
 }
 
 pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
@@ -3519,15 +3544,8 @@ fn poll_send_results_by_trace(
         return Ok(TracePollOutcome::NotYet);
     }
     let results = transactions
-        .into_iter()
-        .map(|tx| {
-            tx_cell_to_send_result_tuple_with_relations(
-                tx.tx_cell,
-                &tx.transaction,
-                &tx.child_lts,
-                tx.parent_lt,
-            )
-        })
+        .iter()
+        .map(V3TraceTransaction::to_send_result_tuple)
         .collect::<Vec<_>>();
 
     Ok(TracePollOutcome::Settled(results))
