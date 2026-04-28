@@ -138,10 +138,6 @@ pub fn new_cmd(
         path
     };
 
-    if !project_path.exists() {
-        fs::create_dir_all(&project_path)?;
-    }
-
     let default_name = project_path
         .file_name()
         .and_then(|n| n.to_str())
@@ -150,16 +146,18 @@ pub fn new_cmd(
 
     let project_name = if let Some(name) = name {
         name
-    } else {
+    } else if interactive {
         Text::new("Project name:")
             .with_placeholder(default_name)
             .with_default(default_name)
             .prompt()?
+    } else {
+        default_name.to_owned()
     };
 
     let template = if let Some(template) = template {
         template
-    } else {
+    } else if interactive {
         let template_options = template::get_available_templates()
             .into_iter()
             .map(TemplateSelectItem)
@@ -169,6 +167,20 @@ pub fn new_cmd(
             .with_starting_cursor(0)
             .prompt()?
             .0
+    } else {
+        let available_templates = template::get_available_templates()
+            .into_iter()
+            .map(ProjectTemplate::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let template_flag = "--template <TEMPLATE>".yellow().bold().to_string();
+        let example = format!("acton new {path} --template empty")
+            .cyan()
+            .to_string();
+        let available_templates = available_templates.cyan().to_string();
+        anyhow::bail!(
+            "Project template is required when running acton new non-interactively.\n\nPass {template_flag}, for example:\n  {example}\n\nAvailable templates: {available_templates}"
+        );
     };
 
     let git_available = is_git_available();
@@ -191,6 +203,10 @@ pub fn new_cmd(
             template.to_string().cyan()
         )
     })?;
+
+    if !project_path.exists() {
+        fs::create_dir_all(&project_path)?;
+    }
 
     let mut config = ActonConfig::default();
     config.package.name = project_name.clone();

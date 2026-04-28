@@ -374,6 +374,37 @@ fn test_new_empty_project_non_interactive() {
 }
 
 #[test]
+fn test_new_project_non_interactive_requires_template() {
+    let project = ProjectBuilder::new("new-non-interactive-requires-template")
+        .without_acton_toml()
+        .build();
+
+    let target_dir = project.path().join("foobar");
+
+    let output = project
+        .acton()
+        .arg("--color")
+        .arg("always")
+        .arg("new")
+        .arg(&target_dir.display().to_string())
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.txt",
+        )
+        .assert_stderr_svg_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.svg",
+        );
+
+    assert!(
+        !target_dir.exists(),
+        "new should not create the target directory before required non-interactive arguments are valid"
+    );
+}
+
+#[test]
 fn test_new_counter_project_non_interactive() {
     let project = ProjectBuilder::new("new-counter")
         .without_acton_toml()
