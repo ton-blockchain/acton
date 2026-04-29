@@ -405,11 +405,22 @@ fn select_impl(
             .prompt()
             .unwrap_or_default()
     } else {
-        String::new()
+        default_select_value(&default_index, &variants)
     };
 
     stack.push_string(&result);
     Ok(())
+}
+
+fn default_select_value(default_index: &BigInt, variants: &[String]) -> String {
+    let Some(cursor) = default_index
+        .to_usize()
+        .map(|index| index.min(variants.len().saturating_sub(1)))
+    else {
+        return variants.first().cloned().unwrap_or_default();
+    };
+
+    variants.get(cursor).cloned().unwrap_or_default()
 }
 
 extension!(confirm in (Context) with (help_message: String, default: BigInt, message: String) using confirm_impl);
@@ -420,14 +431,15 @@ fn confirm_impl(
     default: BigInt,
     message: String,
 ) -> anyhow::Result<()> {
+    let default = default != BigInt::ZERO;
     let res = if stdin().is_terminal() {
         Confirm::new(&message)
-            .with_default(default != BigInt::ZERO)
+            .with_default(default)
             .with_help_message(&help_message)
             .prompt()
-            .unwrap_or(false)
+            .unwrap_or(default)
     } else {
-        false
+        default
     };
 
     stack.push_bool(res);

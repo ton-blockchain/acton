@@ -4,15 +4,11 @@
 /// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
 ///
 /// Deterministic fallback matrix:
-/// - `prompt(...)`: returns `default` when no interactive stdin is available
-///   or the host prompt fails; when `default` is omitted, that still means `""`
-/// - `select(...)`: returns `""` in non-interactive mode or on prompt failure
-/// - `confirm(...)`: returns `false` in non-interactive mode or on prompt
-///   failure, even if `default` is `true`
-/// - `promptInt(...)`: parses `default` in non-interactive mode; invalid
-///   interactive input is rejected until corrected
-/// - `promptAddress(...)`: parses `default` in non-interactive mode; invalid
-///   interactive input is rejected until corrected
+/// - `prompt(...)`: returns `default` in non-interactive mode
+/// - `select(...)`: returns the `defaultIndex` option in non-interactive mode
+/// - `confirm(...)`: returns `default` in non-interactive mode
+/// - `promptInt(...)`: parses `default` in non-interactive mode
+/// - `promptAddress(...)`: parses `default` in non-interactive mode
 /// - `promptWallet(...)`: returns `"emulated-wallet"` in emulate mode; in
 ///   broadcast mode it auto-selects the only configured wallet, but otherwise
 ///   fails when no wallet is available or wallet choice cannot be collected
@@ -44,10 +40,8 @@ import "fmt"
 /// - `default` is the value returned when the user presses Enter without typing
 ///   anything. It is displayed next to the question (e.g. `(John)`).
 ///
-/// Non-interactive fallback:
-/// - Returns `default` when user input cannot be collected (for example,
-///   non-interactive runner) or the host prompt fails.
-/// - If `default` is omitted, the fallback result is still `""`.
+/// Non-interactive behavior:
+/// - Returns `default`; if `default` is omitted, returns `""`.
 ///
 /// Example:
 /// ```tolk
@@ -67,7 +61,8 @@ fun prompt(message: string, placeholder: string = "", default: string = ""): str
 /// - `defaultIndex` positions the cursor on the given option when the prompt
 ///   opens, so the user can accept it by pressing Enter. Out-of-range values
 ///   are clamped to a valid index (defaults to `0`).
-/// - If prompt execution fails (including non-interactive mode), returns `""`.
+/// - In non-interactive mode returns the `defaultIndex` option.
+/// - If interactive prompt execution fails, returns `""`.
 ///
 /// Example:
 /// ```tolk
@@ -82,8 +77,8 @@ fun select(message: string, variants: array<string>, defaultIndex: int = 0): str
 ///
 /// Default and fallback behavior:
 /// - `default` is forwarded to the interactive host confirm prompt.
-/// - If prompt execution fails, result is `false` even when `default` is `true`
-///   (this includes non-interactive mode and known empty-input failure flows).
+/// - In non-interactive mode returns `default`.
+/// - If interactive prompt execution fails, result is `default`.
 ///
 /// Example:
 /// ```tolk
@@ -103,10 +98,10 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 ///   corrects it.
 /// - Pressing Enter accepts `default` when it is non-empty.
 ///
-/// Non-interactive fallback:
+/// Non-interactive behavior:
 /// - Parses and returns `default`.
-/// - If `default` is empty or invalid, execution fails with the same integer
-///   parser error as `parseInt(...)`.
+/// - If the selected value is empty or invalid, execution fails with the same
+///   integer parser error as `parseInt(...)`.
 fun promptInt(message: string, default: string = "", placeholder: string = ""): int {
     return ffi.promptInt(message, placeholder, default);
 }
@@ -118,10 +113,10 @@ fun promptInt(message: string, default: string = "", placeholder: string = ""): 
 ///   corrects it.
 /// - Pressing Enter accepts `default` when it is not `null`.
 ///
-/// Non-interactive fallback:
+/// Non-interactive behavior:
 /// - Parses and returns `default`.
-/// - If `default` is `null` or invalid, execution fails with the same address
-///   parser error as `parseAddress(...)`.
+/// - If the selected value is empty or invalid, execution fails with the same
+///   address parser error as `parseAddress(...)`.
 fun promptAddress(
     message: string,
     default: address? = null,
