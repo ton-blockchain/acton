@@ -13,22 +13,21 @@ A poll needs to:
 2. Check whether that wallet has voted before
 3. If not, count the vote and record the wallet
 
-The first instinct is to keep everything in one contract, using a dictionary (a hash map) stored in the contract's persistent data:
+The first instinct is to keep everything in one contract, using a dictionary stored in the contract's persistent data:
 
 ```tolk
 struct PollStorage {
     owner:    address
     option0:  uint32
     option1:  uint32
-    voters:   dict  // address → bool
+    voters:   map<address, bool>
 }
 ```
-
-Not runnable — partial sketch only.
 
 On each `Vote`, look up the sender in the dict. If absent, add them and increment the count:
 
 ```tolk
+// TODO: paste complete example, not a snippet
 // Inside onInternalMessage — Vote branch (not runnable, partial sketch)
 var storage = lazy PollStorage.load();
 
@@ -44,7 +43,9 @@ if (msg.option == 0) {
 storage.save();
 ```
 
-This compiles. With two or three voters in a test, it works correctly.
+TODO: give a simple test to run and confirm that things work.
+
+With a small number of voters in a test, it works correctly.
 
 ## The wall
 
@@ -52,13 +53,9 @@ TON contracts store persistent data in a **cell tree**. A single cell holds at m
 
 More fundamentally: **TON itself shards**. Different contracts run in parallel on different shards. A single contract holding all voter state becomes a sequential bottleneck — every vote is a write to the same storage.
 
-<Callout type="info" title="The TON sharding model">
-The canonical solution on TON is per-user contracts. Instead of one large map, deploy a tiny `Voter` contract per wallet address. The parent `Poll` counts votes — it never stores who voted. Each `Voter` tracks whether its owner has already voted.
-
-This pattern is called **sharding** and appears everywhere on TON — Jetton wallets, NFT items, and more.
-</Callout>
-
 ## The target architecture
+
+The canonical solution on TON is per-user contracts. Instead of one large map, deploy a tiny `Voter` contract per wallet address. The parent `Poll` counts votes — it never stores who voted. Each `Voter` tracks whether its owner has already voted. This pattern is called **sharding** and appears everywhere on TON — Jetton wallets, NFT items, and more.
 
 ```
         Wallet A                   Wallet B

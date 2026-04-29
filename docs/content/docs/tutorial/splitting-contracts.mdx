@@ -6,7 +6,7 @@ description: "Write two contracts, where the parent deploys a child contract for
 import { Callout } from "fumadocs-ui/components/callout";
 
 <Callout type="info">
-  Delete `contracts/Empty.tolk` and `wrappers/Empty.gen.tolk` — they are no longer needed.
+  Delete `contracts/Empty.tolk` and `wrappers/Empty.gen.tolk` — they are no longer needed. Remove the `Empty` contract entry from `Acton.toml`.
 </Callout>
 
 ## Write the shared types
@@ -155,7 +155,7 @@ fun onInternalMessage(in: InMessage) {
 }
 
 fun onBouncedMessage(_in: InMessageBounced) {
-    // Bounce handling added on page 5.
+    // Bounce handling added later in the tutorial.
 }
 
 get fun results(): (uint32, uint32) {
@@ -169,9 +169,9 @@ get fun owner(): address {
 }
 ```
 
-`dest: { stateInit: voterInit }` — instead of a plain address, pass a `ContractState` (code + initial data). Acton derives the address from the stateInit automatically. There is exactly one possible address for each `(poll, voter)` pair, and it can also be calculated off-chain.
+- `dest: { stateInit: voterInit }` — instead of a plain address, pass a `ContractState` (code + initial data). Acton derives the address from the stateInit automatically. There is exactly one possible address for each `(poll, voter)` pair, and it can also be calculated off-chain.
 
-`bounce: BounceMode.Only256BitsOfBody` — if the message fails on Voter, the first 256 bits of the body are included in the bounced message returned to Poll. The `Vote` struct is 40 bits (32-bit opcode + 8-bit option), which fits entirely within that limit.
+- `bounce: BounceMode.Only256BitsOfBody` — if the message fails on Voter, the first 256 bits of the body are included in the bounced message returned to Poll. The `Vote` struct is 40 bits (32-bit opcode + 8-bit option), which fits entirely within that limit.
 
 ## Register both contracts in `Acton.toml`
 
@@ -184,10 +184,10 @@ description = "A TON blockchain project"
 version = "0.1.0"
 license = "MIT"
 
-[contracts."Poll"]
+[contracts.Poll]
 path = "contracts/Poll.tolk"
 
-[contracts."Voter"]
+[contracts.Voter]
 path = "contracts/Voter.tolk"
 
 [test]
@@ -255,7 +255,7 @@ The generated `Poll` wrapper includes:
 
 ## Checkpoint
 
-Two contracts compile and wrappers are generated. Poll deploys a unique Voter per sender address. Voter rejects duplicate votes — currently causing a bounce that Poll ignores. That bounce handler is the subject of page 5.
+Two contracts compile and wrappers are generated. Poll deploys a unique Voter per sender address. Voter rejects duplicate votes — currently causing a bounce that Poll ignores. That bounce handler is the subject of later pages in the tutorial.
 
 Run `acton check` and `acton fmt` before moving on.
 
