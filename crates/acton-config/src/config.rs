@@ -1824,7 +1824,7 @@ unused-variable = "allow"
 
         match lint.entries.get("unused-variable").unwrap() {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Deny),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint
@@ -1833,14 +1833,14 @@ unused-variable = "allow"
             .unwrap()
         {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Warn),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint.entries.get("counter").unwrap() {
             LintEntry::Config(config) => {
                 assert_eq!(*config.get("unused-variable").unwrap(), LintLevel::Allow);
             }
-            _ => panic!("Expected config"),
+            LintEntry::Level(_) => panic!("Expected config"),
         }
     }
 

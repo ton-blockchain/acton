@@ -456,11 +456,11 @@ fn build_send_result_tuple(
     let gas_used = match parsed_tx.load_info() {
         Ok(TxInfo::Ordinary(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
-            _ => BigInt::ZERO,
+            ComputePhase::Skipped(_) => BigInt::ZERO,
         },
         Ok(TxInfo::TickTock(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
-            _ => BigInt::ZERO,
+            ComputePhase::Skipped(_) => BigInt::ZERO,
         },
         _ => BigInt::ZERO,
     };
@@ -1727,7 +1727,7 @@ fn transaction_matches_predicates(
         let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
         let is_success = match &ord_info.compute_phase {
             ComputePhase::Executed(compute) => action_success && compute.success,
-            _ => false,
+            ComputePhase::Skipped(_) => false,
         };
         if !call_predicate(executor, &field.predicate, bool_item(is_success))? {
             return Ok(false);
@@ -1868,7 +1868,7 @@ fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchPara
 
         let is_success = match &info.compute_phase {
             ComputePhase::Executed(compute) => action_phase_success && compute.success,
-            _ => false,
+            ComputePhase::Skipped(_) => false,
         };
         if is_success != expected_success {
             return false;

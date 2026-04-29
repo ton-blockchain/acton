@@ -319,7 +319,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                 };
                 display.to_string()
             }
-            _ => address.to_string(),
+            IntAddr::Var(_) => address.to_string(),
         }
     }
 

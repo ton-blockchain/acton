@@ -479,11 +479,11 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
 
         let from_addr = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let to_addr = failure.params.to.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let diff_output = format!(
             "{tx_tree}\nCannot find transaction from {} to {}\nwith:\n{}",
@@ -503,11 +503,11 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
 
         let from_addr2 = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let to_addr2 = failure.params.to.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let from_to = if failure.params.from.is_none() && failure.params.to.is_none() {
             ""

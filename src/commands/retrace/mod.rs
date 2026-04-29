@@ -169,7 +169,7 @@ fn print_retrace_result(
     } else if !compute_success {
         let exit_code = match &tx.compute_info {
             ComputeInfo::Success { exit_code, .. } => *exit_code,
-            _ => 0,
+            ComputeInfo::Skipped => 0,
         };
         format!(
             "{} {}",

@@ -177,8 +177,7 @@ fn get_code_context(
 
                         let _ = writeln!(
                             output,
-                            "  {} {} {}{}",
-                            "    ",
+                            "       {} {}{}",
                             "│".dimmed(),
                             padding,
                             replacement.green().bold()

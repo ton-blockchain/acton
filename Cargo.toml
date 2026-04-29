@@ -347,6 +347,7 @@ doc_markdown = "warn"
 redundant_closure_for_method_calls = "warn"
 uninlined_format_args = "warn"
 trivially_copy_pass_by_ref = "warn"
+match_wildcard_for_single_variants = "warn"
 match_same_arms = "warn"
 
 use_self = "allow"

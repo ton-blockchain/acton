@@ -2484,7 +2484,7 @@ fn render_optional_int_addr(addr: Option<&IntAddr>) -> RenderedValue {
 fn render_int_addr(addr: &IntAddr) -> RenderedValue {
     match addr {
         IntAddr::Std(addr) => render_std_address("address".to_owned(), addr.to_string(), addr),
-        _ => RenderedValue::typed_leaf(addr.to_string(), "address"),
+        IntAddr::Var(_) => RenderedValue::typed_leaf(addr.to_string(), "address"),
     }
 }
 
