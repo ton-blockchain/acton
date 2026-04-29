@@ -422,4 +422,4 @@ wallets, the keyring ID usually matches the wallet name.
 
 - `acton help localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
-- [Wallet setup guide](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)
+- [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

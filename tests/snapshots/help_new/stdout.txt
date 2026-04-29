@@ -316,8 +316,8 @@ EXAMPLES
 SEE ALSO
        o  acton help init
 
-       o  Project initialization guide
-          <https://ton-blockchain.github.io/acton/docs/tutorial/project-init>
+       o  Project management guide
+          <https://ton-blockchain.github.io/acton/docs/projects>
 
        o  Build system configuration reference
           <https://ton-blockchain.github.io/acton/docs/building/reference>

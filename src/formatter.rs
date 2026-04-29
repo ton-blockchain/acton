@@ -264,7 +264,7 @@ keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
 [wallets.deployer.expected]
 address-testnet = \"<<ADDRESS>>\"
 
-See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more information
+See https://ton-blockchain.github.io/acton/docs/wallets for more information
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),

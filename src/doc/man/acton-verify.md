@@ -226,5 +226,5 @@ blockchain transaction.
 
 ## See Also
 
-- [Contract verification guide](https://ton-blockchain.github.io/acton/docs/tutorial/contract-verification)
-- [Wallet setup guide](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)
+- [Contract verification guide](https://ton-blockchain.github.io/acton/docs/verify)
+- [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

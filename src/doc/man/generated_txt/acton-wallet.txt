@@ -369,6 +369,6 @@ SEE ALSO
        o  Wallet command guide
           <https://ton-blockchain.github.io/acton/docs/commands/wallet>
 
-       o  Wallet setup guide
-          <https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets>
+       o  Wallet management guide
+          <https://ton-blockchain.github.io/acton/docs/wallets>
 

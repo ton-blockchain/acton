@@ -232,4 +232,4 @@ one-off overrides or CI.
 
 - `acton help run`
 - [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting/overview)
-- [Wallet setup](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)
+- [Wallet setup](https://ton-blockchain.github.io/acton/docs/wallets)
