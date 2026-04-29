@@ -761,18 +761,25 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     runner.reporter_manager.finalize()?;
 
     if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
-        match profiling::collect_profile(&runner) {
-            Ok(()) => {}
-            Err(err) => {
-                if config.fail_on_diff {
-                    return Err(err);
+        if total_failed == 0 {
+            match profiling::collect_profile(&runner) {
+                Ok(()) => {}
+                Err(err) => {
+                    if config.fail_on_diff {
+                        return Err(err);
+                    }
+                    eprintln!(
+                        "{}: Cannot collect profiling result: {}",
+                        "Error".red(),
+                        err
+                    );
                 }
-                eprintln!(
-                    "{}: Cannot collect profiling result: {}",
-                    "Error".red(),
-                    err
-                );
             }
+        } else {
+            println!(
+                "\n{} Gas profiling snapshot and comparison tables were skipped because tests failed.",
+                "Note:".yellow()
+            );
         }
     }
 
