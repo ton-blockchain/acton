@@ -931,9 +931,16 @@ fn test_coverage_empty_no_tests() {
         .acton()
         .test()
         .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("empty-coverage.txt")
         .run()
-        .success()
-        .assert_passed(0);
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_coverage_empty_no_tests.stdout.txt");
+
+    assert!(
+        !project.path().join("empty-coverage.txt").exists(),
+        "coverage report should not be generated when no tests are selected"
+    );
 }
 
 #[test]

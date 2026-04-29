@@ -678,6 +678,12 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     };
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
+    if let Some(message) = empty_test_selection_message(&test_files, &config, total_tests) {
+        runner.reporter_manager.finalize()?;
+        println!("\n{message}");
+        process::exit(1);
+    }
+
     let mut coverage_lcov = None;
     let mut coverage_threshold_failed = false;
 
@@ -794,22 +800,6 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         })?;
     }
 
-    if let Some(filter) = &config.filter
-        && total_tests == 0
-    {
-        // there is some `--filter` and no test ran, likely something is wrong
-        println!(
-            "\nNo tests matched filter {}, please check the filter spelling/pattern.",
-            filter.yellow()
-        );
-        process::exit(1);
-    }
-
-    if require_tests() && total_tests == 0 {
-        println!("\nNo tests were selected. Mutation testing requires at least one baseline test.");
-        process::exit(1);
-    }
-
     if total_failed > 0 || coverage_threshold_failed {
         process::exit(1)
     }
@@ -828,6 +818,41 @@ fn require_tests() -> bool {
     std::env::var(INTERNAL_REQUIRE_TESTS_ENV)
         .map(|value| value.trim() == "1")
         .unwrap_or(false)
+}
+
+fn empty_test_selection_message(
+    test_files: &[String],
+    config: &TestConfig,
+    total_tests: usize,
+) -> Option<String> {
+    if total_tests != 0 {
+        return None;
+    }
+
+    if test_files.is_empty() {
+        let hint = if config.include_patterns.is_empty() && config.exclude_patterns.is_empty() {
+            "Check the test path or add a *.test.tolk file."
+        } else {
+            "Check the test path or --include/--exclude patterns."
+        };
+        return Some(format!("No test files found. {hint}"));
+    }
+
+    if let Some(filter) = &config.filter {
+        return Some(format!(
+            "No tests matched filter {}, please check the filter spelling/pattern.",
+            filter.yellow()
+        ));
+    }
+
+    if require_tests() {
+        return Some(
+            "No tests were selected. Mutation testing requires at least one baseline test."
+                .to_string(),
+        );
+    }
+
+    Some("No tests found in selected test files. Add tests or adjust the selection.".to_string())
 }
 
 fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
