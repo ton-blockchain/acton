@@ -283,7 +283,7 @@ enum Commands {
         coverage_include_wrappers: bool,
         #[arg(
             long,
-            help = "Include .test.tolk files in coverage reports",
+            help = "Include files under tests/ and .test.tolk files in coverage reports",
             help_heading = "Coverage"
         )]
         coverage_include_tests: bool,

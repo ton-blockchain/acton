@@ -1532,7 +1532,7 @@ impl ActonCommand {
         self
     }
 
-    /// Include `.test.tolk` files in coverage reports.
+    /// Include files under `tests/` and `.test.tolk` files in coverage reports.
     pub(crate) fn with_coverage_include_tests(mut self) -> Self {
         self.cmd = self.cmd.arg("--coverage-include-tests");
         self

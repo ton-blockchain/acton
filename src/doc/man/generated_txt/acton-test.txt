@@ -306,8 +306,9 @@ REPORTING AND ARTIFACTS
        o  --coverage-minimum-percent checks the final blended Score shown in
           the summary, not just % Lines
 
-       o  coverage excludes .test.tolk files and @wrappers sources by default;
-          use --coverage-include-tests or --coverage-include-wrappers to opt in
+       o  coverage excludes files under tests/, .test.tolk files, and @wrappers
+          sources by default; use --coverage-include-tests or
+          --coverage-include-wrappers to opt in
 
        o  --save-test-trace without a value writes traces to build/traces
 
