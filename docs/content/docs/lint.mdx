@@ -102,7 +102,7 @@ Keep these `exclude` rules in mind:
 - Excluded roots do not report compiler errors or lint diagnostics in project-wide runs.
 - Exclude matching works against both project-root-relative and absolute paths.
 
-When only one line needs an exception, suppress the next line instead of weakening the whole project policy:
+When only one line needs an exception, suppress the rule on the next line instead of weakening the whole project policy:
 
 ```tolk
 // check-disable-next-line unused-variable
@@ -125,7 +125,7 @@ For suppressions:
 - The comment must use `//` and sit directly above the target line.
 - `all` suppresses all diagnostics for the next line.
 - Unknown rule names in the suppression list are ignored.
-- `compiler-error` rule (`C001`) cannot be suppressed.
+- `compiler-error` rule (`C001`) and `parse-error` rule cannot be suppressed.
 
 ## Use linting in CI
 
