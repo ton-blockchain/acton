@@ -624,7 +624,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
         r = self.value.iterateNext(r);
     }
 
-    Assert.equal(length, mapLength, "expect(<actual>).toHaveLength(<expected>)", self.location);
+    Assert.equal(mapLength, length, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 
 /// Creates a new expectation for the given value.

@@ -271,11 +271,11 @@ impl TestReporter for ConsoleReporter {
                 known_addresses: Cow::Borrowed(&failure_context.known_addresses),
                 known_code_cells: Cow::Borrowed(&failure_context.known_code_cells),
                 show_bodies: test.show_bodies,
-                has_wallets_config: false,
-                available_wallets: vec![],
+                has_wallets_config: failure_context.has_wallets_config,
+                available_wallets: failure_context.available_wallets.clone(),
                 backtrace: test.backtrace,
-                fork_net: None,
-                network: None,
+                fork_net: failure_context.fork_net.clone(),
+                network: failure_context.network.clone(),
             };
 
             match &failure_context.get_result {
@@ -386,6 +386,36 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
             }
         }
 
+        return;
+    }
+
+    if let AssertFailure::WalletNotFound(failure) = &failure {
+        let formatted = fmt.format_wallet_not_found_message(failure);
+        let has_location = failure.location.is_some();
+        for (idx, line) in formatted.lines().enumerate() {
+            if idx == 0 {
+                let branch = if has_location { "├─" } else { "└─" };
+                println!(
+                    "    {} {} {}",
+                    branch.dimmed(),
+                    "Error:".bright_red(),
+                    FormatterContext::highlight_actual_expected(line)
+                );
+            } else if line.trim().is_empty() {
+                if has_location {
+                    println!("    {}", "│".dimmed());
+                } else {
+                    println!();
+                }
+            } else {
+                let prefix = if has_location { "│" } else { " " };
+                println!("    {} {}", prefix.dimmed(), line);
+            }
+        }
+
+        if let Some(location) = failure.location.as_ref() {
+            println!("    {} at {}", "└─".dimmed(), location.format().dimmed());
+        }
         return;
     }
 

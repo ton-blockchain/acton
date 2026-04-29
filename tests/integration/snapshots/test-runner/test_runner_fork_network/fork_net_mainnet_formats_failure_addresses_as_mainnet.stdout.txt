@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/address_failure.test.tolk (1 test)
+  ✗ mainnet failure format [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            [WALLET_ADDRESS_BASE],
+            [WALLET_ADDRESS_BASE]
+        )
+      └─ at tests/address_failure.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

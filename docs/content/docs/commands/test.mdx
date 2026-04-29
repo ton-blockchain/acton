@@ -806,7 +806,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   observed for a file
 - `--coverage-minimum-percent` checks the final blended `Score` shown in the
   summary, not just `% Lines`
-- coverage excludes `.test.tolk` files and `@wrappers` sources by default;
+- coverage excludes files under `tests/`, `.test.tolk` files, and `@wrappers`
+  sources by default;
   use `--coverage-include-tests` or `--coverage-include-wrappers` to opt in
 - `--save-test-trace` without a value writes traces to `build/traces`
 - each executed test produces its own `<test-name>_trace.json` artifact

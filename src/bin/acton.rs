@@ -283,7 +283,7 @@ enum Commands {
         coverage_include_wrappers: bool,
         #[arg(
             long,
-            help = "Include .test.tolk files in coverage reports",
+            help = "Include files under tests/ and .test.tolk files in coverage reports",
             help_heading = "Coverage"
         )]
         coverage_include_tests: bool,
@@ -2381,7 +2381,7 @@ fn create_test_config(
 ) -> anyhow::Result<TestConfig> {
     let acton_config = ActonConfig::load();
 
-    if let Ok(acton_config) = acton_config
+    if let Ok(acton_config) = &acton_config
         && let Some(test_settings) = &acton_config.test
     {
         validate_test_settings(test_settings)?;
@@ -2446,10 +2446,11 @@ fn create_test_config(
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
+        validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
         return Ok(config);
     }
 
-    Ok(TestConfig {
+    let config = TestConfig {
         show_bodies,
         verbosity,
         debug,
@@ -2492,13 +2493,74 @@ fn create_test_config(
         ui,
         ui_port: ui_port.unwrap_or(12344),
         fork_net,
-    })
+    };
+
+    validate_merged_test_fork_network(acton_config.as_ref().ok(), config.fork_net.as_ref())?;
+
+    Ok(config)
 }
 
 fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
     if let Some(fork_net) = test_settings.fork_net.as_deref() {
         Network::from_str(fork_net)
             .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
+    }
+
+    Ok(())
+}
+
+fn validate_merged_test_fork_network(
+    acton_config: Option<&ActonConfig>,
+    fork_net: Option<&Network>,
+) -> anyhow::Result<()> {
+    let Some(fork_net) = fork_net else {
+        return Ok(());
+    };
+
+    let Some(acton_config) = acton_config else {
+        if let Network::Custom(name) = fork_net {
+            anyhow::bail!(
+                "Custom test fork network 'custom:{name}' requires Acton.toml with [networks.{name}.api].v2"
+            );
+        }
+        return Ok(());
+    };
+
+    if let Network::Custom(name) = fork_net {
+        validate_custom_test_network(acton_config, name)?;
+    }
+
+    let custom_networks = acton_config.custom_networks();
+    let v2_url = fork_net
+        .toncenter_v2_url(&custom_networks)
+        .map_err(|err| anyhow::anyhow!("Invalid test fork network '{fork_net}': {err}"))?;
+    reqwest::Url::parse(&v2_url).map_err(|err| {
+        anyhow::anyhow!("Invalid TonCenter v2 URL for test fork network '{fork_net}': {err}")
+    })?;
+
+    Ok(())
+}
+
+fn validate_custom_test_network(acton_config: &ActonConfig, name: &str) -> anyhow::Result<()> {
+    let network = acton_config
+        .networks
+        .as_ref()
+        .and_then(|networks| networks.get(name))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unknown custom test fork network 'custom:{name}'. Define [networks.{name}.api].v2 in Acton.toml."
+            )
+        })?;
+
+    let has_v2 = network
+        .api
+        .as_ref()
+        .and_then(|api| api.v2.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if !has_v2 {
+        anyhow::bail!(
+            "Custom test fork network 'custom:{name}' must define [networks.{name}.api].v2 in Acton.toml."
+        );
     }
 
     Ok(())

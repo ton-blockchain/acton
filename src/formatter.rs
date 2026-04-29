@@ -280,7 +280,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 .join("\n");
 
             format!(
-                "Wallet {} not found in Acton.toml\nAvailable wallets:\n{}",
+                "Wallet {} not found in wallets.toml or global.wallets.toml\nAvailable wallets:\n{}",
                 failure.wallet_name.yellow(),
                 available
             )

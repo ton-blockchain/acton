@@ -20,29 +20,29 @@ fn run_select_success(project_name: &str, test_body: &str, snapshot_path: &str) 
 }
 
 #[test]
-fn select_multiple_options_return_empty_string_in_non_interactive_mode() {
+fn select_multiple_options_returns_default_option_in_non_interactive_mode() {
     run_select_success(
-        "ap-stdlib-select-multiple-options-fallback",
+        "ap-stdlib-select-multiple-options-default",
         r#"
 get fun `test ap stdlib select multiple options fallback`() {
     val selected = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
-    expect(selected).toEqual("");
+    expect(selected).toEqual("Mainnet");
 }
 "#,
-        "integration/snapshots/test-runner/select_multiple_options_return_empty_string_in_non_interactive_mode/select_multiple_options_return_empty_string_in_non_interactive_mode.stdout.txt",
+        "integration/snapshots/test-runner/select_multiple_options_return_empty_string_in_non_interactive_mode/select_multiple_options_returns_default_option_in_non_interactive_mode.stdout.txt",
     );
 }
 
 #[test]
-fn select_does_not_honor_starting_cursor_index_zero_in_non_interactive_mode_bug() {
+fn select_honors_starting_cursor_index_zero_in_non_interactive_mode() {
     run_select_success(
-        "ap-stdlib-select-starting-cursor-index-zero-bug",
+        "ap-stdlib-select-starting-cursor-index-zero",
         r#"
 get fun `test ap stdlib select starting cursor index zero bug`() {
     val selected = select("Choose deployment profile:", ["Safe", "Fast", "Experimental"]);
-    expect(selected).toEqual("");
+    expect(selected).toEqual("Safe");
 }
 "#,
-        "integration/snapshots/test-runner/select_multiple_options_return_empty_string_in_non_interactive_mode/select_does_not_honor_starting_cursor_index_zero_in_non_interactive_mode_bug.stdout.txt",
+        "integration/snapshots/test-runner/select_multiple_options_return_empty_string_in_non_interactive_mode/select_honors_starting_cursor_index_zero_in_non_interactive_mode.stdout.txt",
     );
 }

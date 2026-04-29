@@ -526,12 +526,16 @@ fn is_ignored_coverage_file(
         || path
             .components()
             .any(|component| component.as_os_str() == "wrappers");
+    let is_test_file = path
+        .components()
+        .any(|component| component.as_os_str() == "tests")
+        || file.ends_with(".test.tolk");
 
     file.is_empty()
         || file.contains("@stdlib/")
         || file.contains("/lib/")
         || file.contains("/.acton/")
-        || (!include_tests && file.contains(".test.tolk"))
+        || (!include_tests && is_test_file)
         || (!include_wrappers && is_wrapper_file)
 }
 

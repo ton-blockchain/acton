@@ -489,6 +489,68 @@ fn test_new_nft_project_non_interactive() {
 }
 
 #[test]
+fn test_new_empty_project_with_app_flag() {
+    let project = ProjectBuilder::new("new-empty-app")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("Empty App Project")
+        .arg("--description")
+        .arg("empty app description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_with_app_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/Acton.toml",
+            "integration/snapshots/test_new_empty_project_with_app_flag.acton.toml.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_empty_project_with_app_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/README.md",
+            "integration/snapshots/test_new_empty_project_with_app_flag.readme.md",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/.github/workflows/ci.yml",
+            "integration/snapshots/test_new_empty_project_with_app_flag.ci.yml",
+        );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(project_dir.join("app/src/styles.css").exists());
+    assert!(project_dir.join("components.json").exists());
+    assert!(project_dir.join(".prettierignore").exists());
+    assert!(project_dir.join("contracts/src/Empty.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/tests/contract.test.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/Empty.gen.tolk")
+            .exists()
+    );
+    assert!(!project_dir.join("app/src/app.css").exists());
+}
+
+#[test]
 fn test_new_counter_project_with_app_flag() {
     let project = ProjectBuilder::new("new-counter-app")
         .without_acton_toml()
@@ -1636,13 +1698,24 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
-    assert!(
-        test_output.status.success(),
-        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&test_output.stdout),
-        String::from_utf8_lossy(&test_output.stderr)
-    );
+    if template == "empty" {
+        assert!(
+            !scripts.contains_key("test"),
+            "empty app template is also used by acton init --create-app and must not require an Acton project"
+        );
+    } else {
+        assert!(
+            scripts.contains_key("test"),
+            "{template} app template must expose npm run test"
+        );
+        let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+        assert!(
+            test_output.status.success(),
+            "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&test_output.stdout),
+            String::from_utf8_lossy(&test_output.stderr)
+        );
+    }
 
     let typecheck_output =
         run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
@@ -1665,7 +1738,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
 #[cfg(unix)]
 #[test]
 fn test_new_app_templates_npm_quality_checks() {
-    for template in ["counter", "jetton", "nft"] {
+    for template in ["empty", "counter", "jetton", "nft"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,

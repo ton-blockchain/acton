@@ -15,7 +15,9 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
 
  > tests/wallet_missing.test.tolk (1 test)
   ✗ bw wallet missing with wallets config [TIME]
-    └─
+    └─ Error: Wallet bw_missing_wallet not found in wallets.toml or global.wallets.toml
+      Available wallets:
+        deployer
 
  ✗ 1 failed in 1 file
 

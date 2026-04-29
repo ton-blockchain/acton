@@ -1264,6 +1264,13 @@ fn run_file_tests(
         let test_passed = outcome.passed;
 
         test_report.duration = duration;
+        let has_wallets_config = runner.acton_config.wallets.is_some();
+        let available_wallets = runner
+            .acton_config
+            .wallets
+            .as_ref()
+            .map(|wallets| wallets.wallets.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         let failure_execution = if test_passed {
             None
         } else {
@@ -1274,6 +1281,10 @@ fn run_file_tests(
                 emulations: runner.emulations.clone(),
                 known_addresses: runner.known_addresses.clone(),
                 known_code_cells: runner.known_code_cells.clone(),
+                has_wallets_config,
+                available_wallets: available_wallets.clone(),
+                fork_net: runner.config.fork_net.clone(),
+                network: runner.config.fork_net.clone(),
             })
         };
         test_report.execution = Some(TestExecutionContext {
@@ -1301,11 +1312,11 @@ fn run_file_tests(
                 known_addresses: Cow::Borrowed(&runner.known_addresses),
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
                 show_bodies: runner.config.show_bodies,
-                has_wallets_config: false,
-                available_wallets: vec![],
+                has_wallets_config,
+                available_wallets: available_wallets.clone(),
                 backtrace: runner.config.backtrace,
-                fork_net: None,
-                network: None,
+                fork_net: runner.config.fork_net.clone(),
+                network: runner.config.fork_net.clone(),
             };
 
             if let Some(gas_limit) = test.gas_limit.filter(|limit| gas_used > *limit) {

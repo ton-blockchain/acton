@@ -13,7 +13,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
 
  TEST  [ROOT]
 
- > tests/confirm_empty_input_bug.test.tolk (1 test)
+ > tests/confirm_empty_input_default.test.tolk (1 test)
   ✓ confirm empty input defaults [TIME]
 
  ✓ 1 passed in 1 file

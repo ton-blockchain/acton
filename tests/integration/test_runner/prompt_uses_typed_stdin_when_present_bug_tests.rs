@@ -2,8 +2,8 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 #[test]
-fn prompt_uses_typed_stdin_when_present_bug() {
-    let project = ProjectBuilder::new("ao-stdlib-prompt-typed-stdin")
+fn prompt_ignores_typed_stdin_and_uses_default_in_non_interactive_mode() {
+    let project = ProjectBuilder::new("ao-stdlib-prompt-non-interactive-default")
         .test_file(
             "prompt_stdin_value",
             r#"
@@ -11,8 +11,8 @@ fn prompt_uses_typed_stdin_when_present_bug() {
             import "../../lib/testing/expect"
 
             get fun `test ao prompt typed stdin`() {
-                val name = prompt("Enter your name:", "Guest");
-                expect(name).toEqual("");
+                val name = prompt("Enter your name:", "type your name", "Bob");
+                expect(name).toEqual("Bob");
             }
         "#,
         )
@@ -26,6 +26,6 @@ fn prompt_uses_typed_stdin_when_present_bug() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/prompt_uses_typed_stdin_when_present_bug/prompt_uses_typed_stdin_when_present_bug.stdout.txt",
+            "integration/snapshots/test-runner/prompt_uses_typed_stdin_when_present_bug/prompt_ignores_typed_stdin_and_uses_default_in_non_interactive_mode.stdout.txt",
         );
 }

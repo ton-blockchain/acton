@@ -104,6 +104,11 @@ impl TeamCityReporter {
                 }
                 AssertFailure::WalletNotFound(failure) => {
                     message = format!("Wallet '{}' not found", failure.wallet_name);
+                    if let Some(formatter) = &formatter {
+                        details = FormatterContext::strip_ansi_text(
+                            &formatter.format_wallet_not_found_message(failure),
+                        );
+                    }
                 }
             }
 
