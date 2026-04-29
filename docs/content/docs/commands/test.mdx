@@ -106,6 +106,12 @@ May be passed multiple times.
 
 Stop after the first failing test.
 
+<CommandOptionMeta label="Default">
+
+`[test].fail-fast`, or `false` when it is not configured.
+
+</CommandOptionMeta>
+
 </CommandOption>
 
 
@@ -379,6 +385,12 @@ Show decoded message bodies in printed transaction trees when ABI is known.
 
 Output directory for JUnit XML reports.
 
+<CommandOptionMeta label="Default">
+
+`[test].junit-path`, or `test-results` when it is not configured.
+
+</CommandOptionMeta>
+
 </CommandOption>
 
 
@@ -415,6 +427,12 @@ Open test results in a browser UI.
 
 Port for the browser UI server.
 
+<CommandOptionMeta label="Default">
+
+`[test].ui-port`, or `12344` when it is not configured.
+
+</CommandOptionMeta>
+
 </CommandOption>
 
 
@@ -433,6 +451,12 @@ Port for the browser UI server.
 </CommandOptionTitle>
 
 Clear the compilation cache before running tests.
+
+<CommandOptionMeta label="Default">
+
+`false`.
+
+</CommandOptionMeta>
 
 </CommandOption>
 
@@ -768,8 +792,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - `--ui` adds the browser UI in addition to text reporters
 - `--coverage --ui` adds a `Coverage` tab to the browser UI for browsing
   coverage summaries, files, and annotated source
-- `--junit-path` matters when the JUnit reporter is enabled; the default output
-  directory is `test-results`
+- `--junit-path` matters when the JUnit reporter is enabled; it defaults to
+  `[test].junit-path`, or `test-results` when it is not configured
 - executor debug logs are hidden by default; re-run with `--verbose` when you need
   level-1 executor output such as `debug.dumpStack()`
 - `--verbose` is only low-level executor logging; `--coverage` also collects
