@@ -221,7 +221,6 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "network request",
         "network timeout",
         "socket hang up",
-        "request to https://registry.npmjs.org",
         "Bad response from registry",
         "503 Service Unavailable",
         "502 Bad Gateway",
