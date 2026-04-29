@@ -1,7 +1,14 @@
 [files]
 extend-exclude = [
   "dist-workspace.toml",
-  "docs/**",
+  "docs/.next/**",
+  "docs/.source/**",
+  "docs/bun.lock",
+  "docs/grammars/**",
+  "docs/node_modules/**",
+  "docs/out/**",
+  "docs/public/resources/**",
+  "docs/src/lib/og/**",
   "block.tlb",
   "crates/tasm-core/spec/**",
   "crates/tolk-compiler/assets/**",

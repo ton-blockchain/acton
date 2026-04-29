@@ -484,13 +484,13 @@ Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These 
 
 | Field   | Type     | Description                                                                        |
 |:--------|:---------|:-----------------------------------------------------------------------------------|
-| `key`   | `string` | The alias prefix (e.g., `@core`). If `@` is omitted (preffered), it will be added. |
+| `key`   | `string` | The alias prefix (e.g., `@core`). If `@` is omitted (preferred), it will be added. |
 | `value` | `string` | The relative or absolute path the prefix points to.                                |
 
 Example:
 ```toml
 [import-mappings]
-utils = "./libs/utils" # Equivalent to "@utils" and prefered
+utils = "./libs/utils" # Equivalent to "@utils" and preferred
 "@core" = "./libs/core"
 ```
 
