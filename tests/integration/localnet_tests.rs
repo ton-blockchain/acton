@@ -2680,28 +2680,30 @@ fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str
         &format!("/api/v2/unpackAddress?address={address}"),
         Duration::from_secs(12),
     );
-    response["result"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    response["result"].as_str().map_or_else(
+        || {
             panic!(
                 "Expected string result from unpackAddress for `{address}`:\n{}",
                 serde_json::to_string_pretty(&response).unwrap_or_default()
             )
-        })
+        },
+        ToOwned::to_owned,
+    )
 }
 
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
     response_payload(response)
         .get("transactions")
         .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected `transactions` array in response payload:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
-        })
+        .map_or_else(
+            || {
+                panic!(
+                    "Expected `transactions` array in response payload:\n{}",
+                    serde_json::to_string_pretty(response).unwrap_or_default()
+                )
+            },
+            Vec::as_slice,
+        )
 }
 
 fn hashes_equivalent(left: &str, right: &str) -> bool {

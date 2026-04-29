@@ -2712,10 +2712,7 @@ fn create_project_and_check_wrappers_inner(
 
         let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
             .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to read generated wrapper {}: {e}",
-                    template_wrapper_path
-                )
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
             });
 
         assert_eq!(

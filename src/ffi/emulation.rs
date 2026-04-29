@@ -3345,7 +3345,7 @@ mod tests {
         assert!(!message_iters.is_done(cursor_id));
     }
 
-    /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell BoCs
+    /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell `BoCs`
     /// match a captured snapshot, and whose `repr_hash` equals the on-chain `hash` reported
     /// by toncenter.
     ///
@@ -3583,11 +3583,11 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
 ///
-/// TonCenter `/traces` only ships structured summary fields, not the raw BoC, so we
+/// `TonCenter` `/traces` only ships structured summary fields, not the raw `BoC`, so we
 /// reconstruct a structurally valid `Transaction` from them. The synthesized cell's
 /// `repr_hash` matches the on-chain hash for traces whose external-in messages carry no
 /// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original
-/// cell had a non-addr_none src, a non-zero import_fee, or an init), the original
+/// cell had a non-addr_none src, a non-zero `import_fee`, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
 pub(crate) fn synthesize_tx_cell_from_v3(
     summary: &V3TransactionSummary,
@@ -3842,7 +3842,7 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 }
 
 /// Translate a v3 transaction description into a minimal `TxInfo::Ordinary`. Fields we
-/// don't have (credit_phase, bounce_phase, per-phase cell hashes / message sizes) are left
+/// don't have (`credit_phase`, `bounce_phase`, per-phase cell hashes / message sizes) are left
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.

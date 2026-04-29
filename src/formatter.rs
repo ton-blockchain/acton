@@ -3157,12 +3157,14 @@ impl FormatterContext<'_> {
                         "  opcode={} {}",
                         format!("0x{opcode:x}").green(),
                         opcode_type
-                            .map(|typ| typ.name)
-                            .unwrap_or_else(|| if *opcode == 0 {
-                                "empty".to_owned()
-                            } else {
-                                "unknown".to_owned()
-                            })
+                            .map_or_else(
+                                || if *opcode == 0 {
+                                    "empty".to_owned()
+                                } else {
+                                    "unknown".to_owned()
+                                },
+                                |typ| typ.name
+                            )
                             .purple()
                             .bold()
                     ));

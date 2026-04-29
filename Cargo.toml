@@ -338,7 +338,13 @@ unused_qualifications = "warn"
 nursery = { level = "warn", priority = -1 }
 perf = { level = "warn", priority = -1 }
 
+elidable_lifetime_names = "warn"
 manual_let_else = "warn"
+map_unwrap_or = "warn"
+needless_raw_string_hashes = "warn"
+doc_markdown = "warn"
+redundant_closure_for_method_calls = "warn"
+uninlined_format_args = "warn"
 trivially_copy_pass_by_ref = "warn"
 match_same_arms = "warn"
 
@@ -363,6 +369,7 @@ wildcard_imports = "allow"
 implicit_hasher = "allow"
 struct_field_names = "allow"
 literal_string_with_formatting_args = "allow"
+ignored_unit_patterns = "allow"
 unwrap-used = "deny"
 undocumented_unsafe_blocks = "deny"
 

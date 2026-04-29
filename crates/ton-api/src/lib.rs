@@ -822,10 +822,10 @@ struct TonCenterErrorResponse {
     error: String,
 }
 
-/// TonCenter v3 transaction summary returned by `/api/v3/transactionsByMessage` and
+/// `TonCenter` v3 transaction summary returned by `/api/v3/transactionsByMessage` and
 /// embedded inside `/api/v3/traces` responses.
 ///
-/// `/traces` does not ship the raw Transaction BoC — callers reconstruct a synthetic
+/// `/traces` does not ship the raw Transaction `BoC` — callers reconstruct a synthetic
 /// `Transaction` cell from the structured fields below.
 #[derive(Deserialize, Debug, Clone)]
 pub struct V3TransactionSummary {
@@ -987,7 +987,7 @@ pub struct V3StoragePhase {
 }
 
 /// v3 message summary (embedded in `in_msg` / `out_msgs` of each transaction). Contains
-/// enough to reconstruct a full `Message` cell without querying raw BoCs.
+/// enough to reconstruct a full `Message` cell without querying raw `BoCs`.
 #[derive(Deserialize, Debug, Clone)]
 pub struct V3MessageSummary {
     #[serde(default)]
@@ -1030,7 +1030,7 @@ pub struct V3MessageContent {
     pub body: Option<String>,
 }
 
-/// TonCenter v3 trace envelope returned by `/api/v3/traces`.
+/// `TonCenter` v3 trace envelope returned by `/api/v3/traces`.
 ///
 /// Only the fields actually used by acton are deserialized. `transactions_order` lists
 /// transactions in their natural parent-first order; each entry keys into `transactions`.

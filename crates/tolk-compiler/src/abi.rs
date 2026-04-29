@@ -567,8 +567,9 @@ fn default_struct_value(
         return "null".to_owned();
     }
 
-    let result = find_struct_decl_full(abi, struct_name)
-        .map(|(type_params, fields)| {
+    let result = find_struct_decl_full(abi, struct_name).map_or_else(
+        || "null".to_owned(),
+        |(type_params, fields)| {
             if type_args.as_ref().is_some_and(|args| !args.is_empty())
                 || type_params.is_some_and(|params| !params.is_empty())
             {
@@ -591,8 +592,8 @@ fn default_struct_value(
             } else {
                 format!("{qualified_name} {{ {} }}", rendered_fields.join(", "))
             }
-        })
-        .unwrap_or_else(|| "null".to_owned());
+        },
+    );
 
     visited_defs.remove(&visit_key);
     result
@@ -610,8 +611,9 @@ fn default_alias_value(
         return "null".to_owned();
     }
 
-    let result = find_alias_decl_full(abi, alias_name)
-        .map(|(type_params, target_ty)| {
+    let result = find_alias_decl_full(abi, alias_name).map_or_else(
+        || "null".to_owned(),
+        |(type_params, target_ty)| {
             if type_args.as_ref().is_some_and(|args| !args.is_empty())
                 || type_params.is_some_and(|params| !params.is_empty())
             {
@@ -624,8 +626,8 @@ fn default_alias_value(
             } else {
                 format!("({target_default} as {qualified_name})")
             }
-        })
-        .unwrap_or_else(|| "null".to_owned());
+        },
+    );
 
     visited_defs.remove(&visit_key);
     result

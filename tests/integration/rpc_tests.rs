@@ -21,7 +21,7 @@ const MATCHED_INFO_OWNER_ADDRESS: &str =
 const TRACE_ROOT_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const TRACE_CHILD_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const TRACE_RETURN_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const TRACE_COUNTER_TYPES: &str = r#"
+const TRACE_COUNTER_TYPES: &str = r"
 enum Errors {
     NotOwner = 100
     CounterUnderflow = 0x1001
@@ -55,7 +55,7 @@ struct (0x3a752f06) ResetCounter {}
 struct (0xd53276db) ReturnExcessesBack {
     queryId: uint64
 }
-"#;
+";
 const TRACE_COUNTER_CONTRACT: &str = r#"
 import "types"
 

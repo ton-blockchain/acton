@@ -252,7 +252,7 @@ pub struct Trace {
     pub start_gas: usize,
     /// Sequential list of all execution steps.
     pub steps: Vec<TraceStep>,
-    /// Full BoC hex payloads registered by compact VM stack logs, keyed by cell hash.
+    /// Full `BoC` hex payloads registered by compact VM stack logs, keyed by cell hash.
     pub registered_cell_bocs: HashMap<String, String>,
 }
 

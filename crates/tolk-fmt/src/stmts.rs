@@ -16,7 +16,7 @@ pub fn print_block_statement<'a>(ctx: &Context<'_>, block: &Block) -> Option<RcD
         ctx,
         &statements,
         |ctx, stmt| print_statement(ctx, stmt),
-        |stmt| stmt.syntax(),
+        Stmt::syntax,
         |_| {
             block
                 .statements_including_comments()

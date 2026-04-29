@@ -380,7 +380,7 @@ fn print_tensor_tuple_pattern<'a>(
         ctx,
         vars,
         print_var_declaration_pattern,
-        |v| v.syntax(),
+        AstNode::syntax,
         |_| vec![],
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),

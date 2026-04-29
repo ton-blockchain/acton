@@ -1,5 +1,5 @@
 //! Simplified vendored variant of pretty.rs:
-//! https://github.com/Marwes/pretty.rs
+//! <https://github.com/Marwes/pretty.rs>
 //!
 //! Adapted for tolk-fmt and extended with `break parent` support via
 //! `Doc::BreakParent`.
@@ -120,7 +120,7 @@ where
 #[derive(Clone)]
 pub struct RcDoc<'a, A = ()>(Rc<Doc<'a, RcDoc<'a, A>, A>>);
 
-impl<'a, A> fmt::Debug for RcDoc<'a, A>
+impl<A> fmt::Debug for RcDoc<'_, A>
 where
     A: fmt::Debug,
 {
@@ -877,7 +877,7 @@ where
     fn as_string<U: fmt::Display>(&'a self, data: U) -> DocBuilder<'a, Self, A> {
         use std::fmt::Write;
         let mut buf = FmtText::Small(SmallText::new());
-        write!(buf, "{}", data).expect("FmtText write must be infallible");
+        write!(buf, "{data}").expect("FmtText write must be infallible");
         let doc = match buf {
             FmtText::Small(b) => Doc::SmallText(b),
             FmtText::Large(b) => Doc::OwnedText(b.into()),
@@ -909,7 +909,7 @@ where
         I: IntoIterator,
         I::Item: Pretty<'a, Self, A>,
     {
-        docs.into_iter().fold(self.nil(), |a, b| a.append(b))
+        docs.into_iter().fold(self.nil(), DocBuilder::append)
     }
 
     /// Allocate a document that intersperses the given separator `S` between the given documents
@@ -1771,7 +1771,7 @@ mod tests {
         let trailer = RcDoc::nil();
 
         let doc = hang2(from, RcDoc::line(), body, trailer);
-        eprintln!("{:#?}", doc);
+        eprintln!("{doc:#?}");
 
         test!(doc, "let x = \\y -> y");
         test!(14, doc, "let x = \\y ->\n  y");

@@ -375,7 +375,7 @@ fn run_single_mutation(
     match (result, restore_result) {
         (Ok(execution), Ok(())) => Ok(execution),
         (Ok(_), Err(err)) => Err(err.into()),
-        (Err(err), Ok(())) | (Err(err), Err(_)) => Err(err),
+        (Err(err), Ok(()) | Err(_)) => Err(err),
     }
 }
 
@@ -574,8 +574,7 @@ fn append_mutation_test_command_args(
 ) {
     let test_path = path
         .as_deref()
-        .map(Path::new)
-        .unwrap_or_else(|| configured_project_root());
+        .map_or_else(|| configured_project_root(), Path::new);
 
     cmd.arg("--project-root")
         .arg(configured_project_root())

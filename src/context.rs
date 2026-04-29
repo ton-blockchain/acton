@@ -37,6 +37,7 @@ impl std::fmt::Display for DebugStopRequested {
 
 impl std::error::Error for DebugStopRequested {}
 
+#[must_use]
 pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
     err.downcast_ref::<DebugStopRequested>().is_some()
 }

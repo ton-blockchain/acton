@@ -121,8 +121,7 @@ fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
         trace
             .transactions_order
             .first()
-            .map(String::as_str)
-            .unwrap_or("<none>"),
+            .map_or("<none>", String::as_str),
     );
     print_kv("Trace Complete", (!trace.is_incomplete).to_string());
     print_kv("Total Txs", trace.transactions_order.len().to_string());

@@ -72,8 +72,7 @@ fn build_import_items<'tree>(
             let path = import
                 .path()
                 .and_then(|p| p.0.utf8_text(ctx.code.as_ref().as_ref()).ok())
-                .map(strip_import_quotes)
-                .unwrap_or("");
+                .map_or("", strip_import_quotes);
 
             let had_empty_line_after = imports.get(i + 1).is_some_and(|next_import| {
                 common::empty_lines_between(ctx, &import.0, &next_import.0) > 1

@@ -203,11 +203,10 @@ pub fn map_send_message(bt: &LocalnetBlockTransactions) -> Value {
         .as_ref()
         .map(super::super::types::Hash256::to_base64)
         .unwrap_or_default();
-    let message_hash_norm = bt
-        .msg_hash_norm
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
-        .unwrap_or_else(|| message_hash.clone());
+    let message_hash_norm = bt.msg_hash_norm.as_ref().map_or_else(
+        || message_hash.clone(),
+        super::super::types::Hash256::to_base64,
+    );
     serde_json::json!({
         "message_hash": message_hash,
         "message_hash_norm": message_hash_norm,
@@ -818,9 +817,10 @@ fn map_trace_message_info(
     tx_utime: u32,
     is_in_msg: bool,
 ) -> Value {
-    convert_to_message_struct(&msg.meta, &msg.boc)
-        .map(|message| map_v3_message(&message, tx_hash, tx_utime, is_in_msg))
-        .unwrap_or_else(|_| map_message(&msg.meta))
+    convert_to_message_struct(&msg.meta, &msg.boc).map_or_else(
+        |_| map_message(&msg.meta),
+        |message| map_v3_message(&message, tx_hash, tx_utime, is_in_msg),
+    )
 }
 
 fn map_message(msg: &MsgMeta) -> Value {

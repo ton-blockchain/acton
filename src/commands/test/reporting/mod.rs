@@ -297,7 +297,7 @@ pub(super) fn extract_suite_name(file_path: &Path) -> Arc<str> {
         .into()
 }
 
-pub(super) fn formatter_for_failed_test<'a>(test: &'a TestReport) -> Option<FormatterContext<'a>> {
+pub(super) fn formatter_for_failed_test(test: &TestReport) -> Option<FormatterContext<'_>> {
     let failure = test.execution.as_ref()?.failure.as_ref()?;
 
     Some(FormatterContext {
