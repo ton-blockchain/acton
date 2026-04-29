@@ -4,7 +4,7 @@ use crate::support::project::{Project, ProjectBuilder};
 use serde_json::Value as JsonValue;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 #[cfg(unix)]
@@ -28,24 +28,21 @@ fn make_executable(path: &Path) {
 }
 
 #[cfg(unix)]
-fn setup_real_npm_toolchain(project_root: &Path) -> (String, PathBuf) {
+fn setup_real_npm_toolchain(project_root: &Path, cache_dir: &Path) -> String {
     let bin_dir = project_root.join("bin");
-    let cache_dir = project_root.join(".npm-cache");
     fs::create_dir_all(&bin_dir).unwrap();
-    fs::create_dir_all(&cache_dir).unwrap();
+    fs::create_dir_all(cache_dir).unwrap();
 
     let acton_path = bin_dir.join("acton");
 
     fs::write(&acton_path, ACTON_SHIM).unwrap();
     make_executable(&acton_path);
 
-    let path_env = format!(
+    format!(
         "{}:{}",
         bin_dir.display(),
         env::var("PATH").unwrap_or_default()
-    );
-
-    (path_env, cache_dir)
+    )
 }
 
 #[cfg(unix)]
@@ -183,8 +180,10 @@ fn run_npm_command(
         .env("NPM_CONFIG_CACHE", cache_dir)
         .env("NPM_CONFIG_AUDIT", "false")
         .env("NPM_CONFIG_FUND", "false")
-        .env("NPM_CONFIG_FETCH_RETRIES", "0")
-        .env("NPM_CONFIG_FETCH_TIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRIES", "3")
+        .env("NPM_CONFIG_FETCH_RETRY_MINTIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT", "30000")
+        .env("NPM_CONFIG_FETCH_TIMEOUT", "60000")
         .env("NPM_CONFIG_PROGRESS", "false")
         .env("NPM_CONFIG_UPDATE_NOTIFIER", "false")
         .env("NPM_CONFIG_PREFER_OFFLINE", "true")
@@ -213,9 +212,20 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "ECONNREFUSED",
         "ECONNRESET",
         "ETIMEDOUT",
+        "EPIPE",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "ENETDOWN",
         "fetch failed",
         "getaddrinfo",
         "network request",
+        "network timeout",
+        "socket hang up",
+        "Bad response from registry",
+        "503 Service Unavailable",
+        "502 Bad Gateway",
+        "504 Gateway",
+        "429 Too Many Requests",
         "Failed to execute `npx",
         "Exit handler never called!",
         "cb() never called!",
@@ -1518,9 +1528,11 @@ fn test_new_counter_app_project_supports_npm_scripts() {
             .contains_key("app")
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
+    let cache_path = project_dir.join(".npm-cache");
+    let cache_dir = cache_path.as_path();
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
 
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping real npm integration test due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1536,7 +1548,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&install_output.stderr)
     );
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1544,7 +1556,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+    let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
     assert!(
         test_output.status.success(),
         "npm run test failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1553,7 +1565,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
     );
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1561,7 +1573,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1642,7 +1654,7 @@ fn package_uses_eslint(package_json: &JsonValue) -> bool {
 }
 
 #[cfg(unix)]
-fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
+fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache_dir: &Path) {
     if !is_npm_available() {
         eprintln!("Skipping npm app template checks: npm is not available in PATH");
         return;
@@ -1661,8 +1673,8 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         "{template} app template must expose npm run fmt:check"
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping npm app template checks for {template} due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1679,7 +1691,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
     );
 
     if scripts.contains_key("lint") {
-        let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
+        let lint_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "lint"]);
         assert!(
             lint_output.status.success(),
             "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1693,7 +1705,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         );
     }
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1711,7 +1723,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
             scripts.contains_key("test"),
             "{template} app template must expose npm run test"
         );
-        let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+        let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
         assert!(
             test_output.status.success(),
             "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1721,7 +1733,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
     }
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1729,7 +1741,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1741,10 +1753,16 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
 #[cfg(unix)]
 #[test]
 fn test_new_app_templates_npm_quality_checks() {
+    let cache_workspace = ProjectBuilder::new("new-app-templates-npm-cache")
+        .without_acton_toml()
+        .build();
+    let cache_dir = cache_workspace.path().join("npm-cache");
+
     for template in ["empty", "counter", "jetton", "nft"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,
+            &cache_dir,
         );
     }
 }
