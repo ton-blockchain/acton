@@ -117,7 +117,7 @@ var tmp = 10;
 tmp = 20;
 ```
 
-Use rule names such as `unused-variable`, or diagnostic names such as `compiler-error` and `parse-error`, not diagnostic codes such as `E002` or `C001`, in suppression comments.
+Use rule names such as `unused-variable` or `deprecated-symbol-use`, not diagnostic codes such as `E002` or `E004`, in suppression comments.
 
 For suppressions:
 
@@ -125,6 +125,7 @@ For suppressions:
 - The comment must use `//` and sit directly above the target line.
 - `all` suppresses all diagnostics for the next line.
 - Unknown rule names in the suppression list are ignored.
+- `compiler-error` rule (`C001`) cannot be suppressed.
 
 ## Use linting in CI
 
