@@ -1032,7 +1032,7 @@ fn send_transaction_debug(
         ctx.chain.world_state,
         msg_cell.clone(),
         libs,
-        src_addr,
+        src_addr.clone(),
     )?;
     let config_b64 = ctx.chain.world_state.get_config_b64();
 
@@ -1066,7 +1066,13 @@ fn send_transaction_debug(
         "Failed to prepare Emulator in debug mode"
     );
     if prepare_result.skipped {
-        return Ok(None);
+        // SBS has no VM steps to expose for skipped compute, but the caller still
+        // expects the same transaction/error shape as normal emulation.
+        return ctx
+            .chain
+            .emulator
+            .send_transaction(ctx.chain.world_state, msg_cell.clone(), libs, src_addr)
+            .map(Some);
     }
 
     let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
