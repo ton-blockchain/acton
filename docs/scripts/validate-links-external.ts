@@ -28,12 +28,12 @@ function whitelist(url: string): boolean {
     return true;
   }
 
-  // remove after release
+  // TODO(danil42russia): remove after release
   if (url.startsWith('https://github.com/ton-blockchain/setup-acton')) {
     return true;
   }
 
-  // remove after release
+  // TODO(danil42russia): remove after release
   if (url.startsWith('https://github.com/i582/acton-public/releases')) {
     return true;
   }
