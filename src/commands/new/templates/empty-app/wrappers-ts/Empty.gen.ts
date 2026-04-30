@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a Counter contract in Tolk
+// it's a TypeScript wrapper for a Empty contract in Tolk
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -126,128 +126,72 @@ type uint32 = bigint
 type uint256 = bigint
 
 /**
- > struct (0x7e8764ef) IncreaseCounter {
- >     increaseBy: uint32
+ > struct (0x2ce05111) ChangeOwner {
+ >     newOwner: address
  > }
  */
-export interface IncreaseCounter {
-    readonly $: 'IncreaseCounter'
-    increaseBy: uint32
+export interface ChangeOwner {
+    readonly $: 'ChangeOwner'
+    newOwner: c.Address
 }
 
-export const IncreaseCounter = {
-    PREFIX: 0x7e8764ef,
+export const ChangeOwner = {
+    PREFIX: 0x2ce05111,
 
     create(args: {
-        increaseBy: uint32
-    }): IncreaseCounter {
+        newOwner: c.Address
+    }): ChangeOwner {
         return {
-            $: 'IncreaseCounter',
+            $: 'ChangeOwner',
             ...args
         }
     },
-    fromSlice(s: c.Slice): IncreaseCounter {
-        loadAndCheckPrefix32(s, 0x7e8764ef, 'IncreaseCounter');
+    fromSlice(s: c.Slice): ChangeOwner {
+        loadAndCheckPrefix32(s, 0x2ce05111, 'ChangeOwner');
         return {
-            $: 'IncreaseCounter',
-            increaseBy: s.loadUintBig(32),
+            $: 'ChangeOwner',
+            newOwner: s.loadAddress(),
         }
     },
-    store(self: IncreaseCounter, b: c.Builder): void {
-        b.storeUint(0x7e8764ef, 32);
-        b.storeUint(self.increaseBy, 32);
+    store(self: ChangeOwner, b: c.Builder): void {
+        b.storeUint(0x2ce05111, 32);
+        b.storeAddress(self.newOwner);
     },
-    toCell(self: IncreaseCounter): c.Cell {
-        return makeCellFrom<IncreaseCounter>(self, IncreaseCounter.store);
+    toCell(self: ChangeOwner): c.Cell {
+        return makeCellFrom<ChangeOwner>(self, ChangeOwner.store);
     }
 }
 
 /**
- > struct (0x283b4c3f) DecreaseCounter {
- >     decreaseBy: uint32
- > }
+ > type AllowedMessage = ChangeOwner
  */
-export interface DecreaseCounter {
-    readonly $: 'DecreaseCounter'
-    decreaseBy: uint32
-}
+export type AllowedMessage = ChangeOwner
 
-export const DecreaseCounter = {
-    PREFIX: 0x283b4c3f,
-
-    create(args: {
-        decreaseBy: uint32
-    }): DecreaseCounter {
-        return {
-            $: 'DecreaseCounter',
-            ...args
-        }
+export const AllowedMessage = {
+    fromSlice(s: c.Slice): AllowedMessage {
+        return ChangeOwner.fromSlice(s);
     },
-    fromSlice(s: c.Slice): DecreaseCounter {
-        loadAndCheckPrefix32(s, 0x283b4c3f, 'DecreaseCounter');
-        return {
-            $: 'DecreaseCounter',
-            decreaseBy: s.loadUintBig(32),
-        }
+    store(self: AllowedMessage, b: c.Builder): void {
+        ChangeOwner.store(self, b);
     },
-    store(self: DecreaseCounter, b: c.Builder): void {
-        b.storeUint(0x283b4c3f, 32);
-        b.storeUint(self.decreaseBy, 32);
-    },
-    toCell(self: DecreaseCounter): c.Cell {
-        return makeCellFrom<DecreaseCounter>(self, DecreaseCounter.store);
-    }
-}
-
-/**
- > struct (0x3a752f06) ResetCounter {
- > }
- */
-export interface ResetCounter {
-    readonly $: 'ResetCounter'
-}
-
-export const ResetCounter = {
-    PREFIX: 0x3a752f06,
-
-    create(): ResetCounter {
-        return {
-            $: 'ResetCounter',
-        }
-    },
-    fromSlice(s: c.Slice): ResetCounter {
-        loadAndCheckPrefix32(s, 0x3a752f06, 'ResetCounter');
-        return {
-            $: 'ResetCounter',
-        }
-    },
-    store(self: ResetCounter, b: c.Builder): void {
-        b.storeUint(0x3a752f06, 32);
-    },
-    toCell(self: ResetCounter): c.Cell {
-        return makeCellFrom<ResetCounter>(self, ResetCounter.store);
+    toCell(self: AllowedMessage): c.Cell {
+        return makeCellFrom<AllowedMessage>(self, AllowedMessage.store);
     }
 }
 
 /**
  > struct Storage {
- >     id: uint32
  >     owner: address
- >     counter: uint32
  > }
  */
 export interface Storage {
     readonly $: 'Storage'
-    id: uint32
     owner: c.Address
-    counter: uint32
 }
 
 export const Storage = {
     create(args: {
-        id: uint32
         owner: c.Address
-        counter: uint32
     }): Storage {
         return {
             $: 'Storage',
@@ -257,15 +201,11 @@ export const Storage = {
     fromSlice(s: c.Slice): Storage {
         return {
             $: 'Storage',
-            id: s.loadUintBig(32),
             owner: s.loadAddress(),
-            counter: s.loadUintBig(32),
         }
     },
     store(self: Storage, b: c.Builder): void {
-        b.storeUint(self.id, 32);
         b.storeAddress(self.owner);
-        b.storeUint(self.counter, 32);
     },
     toCell(self: Storage): c.Cell {
         return makeCellFrom<Storage>(self, Storage.store);
@@ -273,7 +213,7 @@ export const Storage = {
 }
 
 // ————————————————————————————————————————————
-//    class Counter
+//    class Empty
 //
 
 interface ExtraSendOptions {
@@ -310,12 +250,11 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
     return new c.Address(options.workchain ?? 0, addrHash);
 }
 
-export class Counter implements c.Contract {
-    static CodeCell = c.Cell.fromBase64('te6ccgEBBwEA1gABFP8A9KQT9LzyyAsBAgFiAgMB+ND4kZEw4CDXLCP0Oyd8jiQx7UTQ1h/6SNcLH/iSIscF8uBkA9cLHxOgAcjOEvpSyx/J7VTg1ywhQdph/I4sMe1E0NYf+kjXCx/4kiLHBfLgZAPXCx+BEAFTQb7y9BOhAcjOEvpSyx/J7VTg1ywh06l4NDHjAoQPAccA8vQEAgEgBQYAPjDtRNDWH/pIMPiSIccF8uBkAcjO+lLPkAAAAALJ7VQAF74o72omhpj5j9JBhAAdvlaHaiaGmPmP0kGOuFj8');
+export class Empty implements c.Contract {
+    static CodeCell = c.Cell.fromBase64('te6ccgEBBAEATwABFP8A9KQT9LzyyAsBAgFiAgMAYND4kZEw4CDXLCFnAoiMjhcx7UTQ+kgw+JLHBfLgZPpIMMj6UsntVOAwhA8BxwDy9AARoIo72omh9JBh');
 
     static Errors = {
         'Errors.NotOwner': 100,
-        'Errors.CounterUnderflow': 4097,
         'Errors.InvalidMessage': 65535,
     }
 
@@ -328,37 +267,22 @@ export class Counter implements c.Contract {
     }
 
     static fromAddress(address: c.Address) {
-        return new Counter(address);
+        return new Empty(address);
     }
 
     static fromStorage(emptyStorage: {
-        id: uint32
         owner: c.Address
-        counter: uint32
     }, deployedOptions?: DeployedAddrOptions) {
         const initialState = {
-            code: deployedOptions?.overrideContractCode ?? Counter.CodeCell,
+            code: deployedOptions?.overrideContractCode ?? Empty.CodeCell,
             data: Storage.toCell(Storage.create(emptyStorage)),
         };
         const address = calculateDeployedAddress(initialState.code, initialState.data, deployedOptions ?? {});
-        return new Counter(address, initialState);
+        return new Empty(address, initialState);
     }
 
-    static createCellOfIncreaseCounter(body: {
-        increaseBy: uint32
-    }) {
-        return IncreaseCounter.toCell(IncreaseCounter.create(body));
-    }
-
-    static createCellOfDecreaseCounter(body: {
-        decreaseBy: uint32
-    }) {
-        return DecreaseCounter.toCell(DecreaseCounter.create(body));
-    }
-
-    static createCellOfResetCounter(body: {
-    }) {
-        return ResetCounter.toCell(ResetCounter.create());
+    static createCellOfAllowedMessage(body: AllowedMessage) {
+        return AllowedMessage.toCell(body);
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, msgValue: coins, extraOptions?: ExtraSendOptions) {
@@ -369,38 +293,12 @@ export class Counter implements c.Contract {
         });
     }
 
-    async sendIncreaseCounter(provider: ContractProvider, via: Sender, msgValue: coins, body: {
-        increaseBy: uint32
-    }, extraOptions?: ExtraSendOptions) {
+    async sendAllowedMessage(provider: ContractProvider, via: Sender, msgValue: coins, body: AllowedMessage, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
-            body: IncreaseCounter.toCell(IncreaseCounter.create(body)),
+            body: AllowedMessage.toCell(body),
             ...extraOptions
         });
-    }
-
-    async sendDecreaseCounter(provider: ContractProvider, via: Sender, msgValue: coins, body: {
-        decreaseBy: uint32
-    }, extraOptions?: ExtraSendOptions) {
-        return provider.internal(via, {
-            value: msgValue,
-            body: DecreaseCounter.toCell(DecreaseCounter.create(body)),
-            ...extraOptions
-        });
-    }
-
-    async sendResetCounter(provider: ContractProvider, via: Sender, msgValue: coins, body: {
-    }, extraOptions?: ExtraSendOptions) {
-        return provider.internal(via, {
-            value: msgValue,
-            body: ResetCounter.toCell(ResetCounter.create()),
-            ...extraOptions
-        });
-    }
-
-    async getCurrentCounter(provider: ContractProvider): Promise<bigint> {
-        const r = StackReader.fromGetMethod(1, await provider.get('currentCounter', []));
-        return r.readBigInt();
     }
 
     async getOwner(provider: ContractProvider): Promise<c.Address> {

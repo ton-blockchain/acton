@@ -18,8 +18,10 @@ if [ "${1:-}" = "--yes" ]; then
     shift
 fi
 
-if [ "${1:-}" != "gen-typescript-from-tolk" ] && [ "${1:-}" != "gen-typescript-from-tolk-dev" ]; then
-    echo "unexpected package: ${1:-}" >&2
+package="${1:-}"
+package_name="${package%%@*}"
+if [ "$package_name" != "gen-typescript-from-tolk" ] && [ "$package_name" != "gen-typescript-from-tolk-dev" ]; then
+    echo "unexpected package: ${package}" >&2
     exit 1
 fi
 
