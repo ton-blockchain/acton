@@ -6,7 +6,7 @@ use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
 use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -63,7 +63,7 @@ impl TestRunner<'_> {
         dest_address: &str,
         abi: Arc<ContractAbi>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        source_map: Arc<SourceMap>,
         fuzz: FuzzConfig,
     ) -> anyhow::Result<TestResult> {
         let fuzz = resolve_fuzz_config(fuzz, &self.config);

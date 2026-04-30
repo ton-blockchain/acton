@@ -1,6 +1,6 @@
 use crate::types::{ArgValue, Code, Instruction};
 use std::fs;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
@@ -12,7 +12,7 @@ const MAX_RENDERED_SOURCE_RANGE_LINES: usize = 4;
 pub struct FormatOptions {
     pub show_hashes: bool,
     pub show_offsets: bool,
-    pub source_map: Option<Box<TolkSourceMap>>,
+    pub source_map: Option<Box<SourceMap>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -115,7 +115,7 @@ impl Instruction {
 }
 
 fn get_source_location(
-    source_map: &TolkSourceMap,
+    source_map: &SourceMap,
     cell: Option<&Cell>,
     offset: u16,
 ) -> Option<SourceLocation> {

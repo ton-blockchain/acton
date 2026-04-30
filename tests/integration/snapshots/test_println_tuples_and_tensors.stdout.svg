@@ -25,7 +25,7 @@
 </tspan>
     <tspan x="10px" y="64px"><tspan>[</tspan><tspan class="fg-yellow">1</tspan><tspan>, </tspan><tspan class="fg-yellow">2</tspan><tspan>, </tspan><tspan class="fg-yellow">3</tspan><tspan>, </tspan><tspan class="fg-yellow">4</tspan><tspan>, </tspan><tspan class="fg-yellow">5</tspan><tspan>]</tspan>
 </tspan>
-    <tspan x="10px" y="82px"><tspan>(</tspan><tspan class="fg-yellow">1</tspan><tspan>, </tspan><tspan class="fg-yellow">2</tspan><tspan>, [</tspan><tspan class="fg-yellow">3</tspan><tspan>, </tspan><tspan class="fg-yellow">4</tspan><tspan>])</tspan>
+    <tspan x="10px" y="82px"><tspan>((</tspan><tspan class="fg-yellow">1</tspan><tspan>, </tspan><tspan class="fg-yellow">2</tspan><tspan>), [</tspan><tspan class="fg-yellow">3</tspan><tspan>, </tspan><tspan class="fg-yellow">4</tspan><tspan>])</tspan>
 </tspan>
     <tspan x="10px" y="100px"><tspan>[[</tspan><tspan class="fg-yellow">1</tspan><tspan>, </tspan><tspan class="fg-yellow">2</tspan><tspan>, </tspan><tspan class="fg-yellow">3</tspan><tspan>], [</tspan><tspan class="fg-yellow">4</tspan><tspan>, </tspan><tspan class="fg-yellow">5</tspan><tspan>, </tspan><tspan class="fg-yellow">6</tspan><tspan>]]</tspan>
 </tspan>

@@ -29,7 +29,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
 use ton_abi::{ContractAbi, contract_abi};
@@ -192,11 +192,7 @@ fn run_script_file(
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
             let stack = parse_script_stack_args(result.abi.as_ref(), &args)?;
-            let source_map = Arc::new(TolkSourceMap::from_code_cell(
-                result.new_source_map.unwrap_or_default(),
-                &code_cell,
-                result.debug_mark_base64.as_deref(),
-            )?);
+            let source_map = Arc::new(result.source_map.unwrap_or_default());
             execute_script(
                 &code_cell,
                 &data_cell,
@@ -225,7 +221,7 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    source_map: Arc<TolkSourceMap>,
+    source_map: Arc<SourceMap>,
     compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
@@ -236,7 +232,7 @@ fn execute_script(
     stack: Tuple,
     abi: Arc<ContractAbi>,
     compiler_abi: Option<Arc<CompilerContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+    source_map: Arc<SourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -312,6 +308,7 @@ fn execute_script(
             config: &config,
             project_root: project_root().to_path_buf(),
             abi,
+            source_map: Some(source_map.clone()),
             show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),

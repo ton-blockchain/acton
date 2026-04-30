@@ -546,10 +546,10 @@ impl ReplayerDebugSession {
         let Some(top_frame) = call_stack.last() else {
             return false;
         };
-        let file_id = top_frame.definition_loc.as_ref().map_or_else(
-            || ctx.replayer.current_file_id(),
-            tolk_compiler::source_map::SrcRange::file_id,
-        );
+        let Some(definition_loc) = top_frame.definition_loc.as_ref() else {
+            return true;
+        };
+        let file_id = definition_loc.file_id();
         let Some(path) = ctx.replayer.file_full_path(file_id) else {
             return true;
         };
