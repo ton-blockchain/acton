@@ -9,12 +9,11 @@ use super::debug_executor_handle::DebugExecutorHandle;
 use super::debug_executor_handle::RuntimeDebugSnapshot;
 use super::types_render::{
     RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack, render_runtime_in_message,
-    render_runtime_out_actions, render_runtime_storage_with_compiler_abi, render_runtime_vm_value,
+    render_runtime_out_actions, render_runtime_storage_with_abi, render_runtime_vm_value,
 };
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, OnceLock};
-use tolk_compiler::TolkSourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::debug_marks_dict::DebugMarksDict;
 use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
@@ -545,7 +544,7 @@ pub struct TolkReplayer {
     // glob_name → (ty_idx, captured TVM values) for globals that have been SET
     global_var_values: HashMap<String, (usize, Vec<VmStackValue>)>,
 
-    compiler_abi: Option<Arc<ContractABI>>,
+    abi: Option<Arc<ContractABI>>,
 
     // TVM stack from runtime events.
     // global (not per-context) because TvmStackValues tick arrives before PushFrame
@@ -584,35 +583,37 @@ pub struct TolkReplayer {
 }
 
 impl TolkReplayer {
-    pub fn new(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+    pub fn new(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(VmLogRuntimeEventSource::from_vm_logs(vm_logs)),
         ))
     }
 
-    pub fn new_for_coverage(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+    pub fn new_for_coverage(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
         let mut replayer = Self::new(source_map, vm_logs)?;
         replayer.coverage_mode = true;
         Ok(replayer)
     }
 
     pub fn new_live_vm(
-        source_map: &TolkSourceMap,
+        source_map: &SourceMap,
         executor: DebugExecutorHandle,
     ) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(LiveVmRuntimeEventSource::new(executor)),
         ))
     }
@@ -643,7 +644,7 @@ impl TolkReplayer {
             current_vm_position: None,
             exec_stack: vec![NoinlineExecState::new()],
             global_var_values: HashMap::new(),
-            compiler_abi: None,
+            abi: None,
             tvm_stack_values: RuntimeStack::default(),
             coverage_mode: false,
             breakpoints: HashSet::new(),
@@ -717,8 +718,8 @@ impl TolkReplayer {
         }
     }
 
-    pub fn set_compiler_abi(&mut self, compiler_abi: Option<Arc<ContractABI>>) {
-        self.compiler_abi = compiler_abi;
+    pub fn set_abi(&mut self, abi: Option<Arc<ContractABI>>) {
+        self.abi = abi;
     }
 
     /// Set breakpoints for a file. Each requested line is resolved to the nearest
@@ -761,7 +762,7 @@ impl TolkReplayer {
 
     fn resolve_exception_symbolic_name(&self, errno: &str) -> Option<String> {
         let code = errno.parse::<i32>().ok()?;
-        self.compiler_abi
+        self.abi
             .as_deref()
             .and_then(|abi| abi.thrown_errors.iter().find(|err| err.err_code == code))
             .and_then(|err| (!err.name.is_empty()).then(|| err.name.clone()))
@@ -783,16 +784,16 @@ impl TolkReplayer {
             values.push(LocalVarRendered {
                 var_name: "c4 (storage)".to_owned(),
                 value: self
-                    .compiler_abi
+                    .abi
                     .as_deref()
-                    .and_then(|abi| render_runtime_storage_with_compiler_abi(c4, abi))
+                    .and_then(|abi| render_runtime_storage_with_abi(c4, &self.source_map, abi))
                     .unwrap_or_else(|| render_runtime_vm_value(c4)),
             });
         }
         if let Some(c5) = snapshot.c5.as_ref() {
             values.push(LocalVarRendered {
                 var_name: "c5 (output actions)".to_owned(),
-                value: render_runtime_out_actions(c5, self.compiler_abi.as_deref())
+                value: render_runtime_out_actions(c5, &self.source_map, self.abi.as_deref())
                     .unwrap_or_else(|| render_runtime_vm_value(c5)),
             });
         }
@@ -867,7 +868,7 @@ impl TolkReplayer {
                 definition_loc: self
                     .source_map
                     .get_function_by_idx(f.f_idx)
-                    .map(|fun| fun.ident_loc.clone()),
+                    .and_then(|fun| (!fun.ident_loc.is_undefined()).then(|| fun.ident_loc.clone())),
                 call_site_loc: f.call_site_loc.clone(),
             })
             .collect()

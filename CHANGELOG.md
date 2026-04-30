@@ -18,7 +18,7 @@ found after 0.3.1.
 
 ### Added
 
-- Added `acton init --create-app` for scaffolding Vite-based TypeScript apps,
+- Added `acton init --create-dapp` for scaffolding Vite-based TypeScript apps,
   along with app templates and generated TypeScript wrappers for Counter,
   Jetton, and NFT projects.
 - Added `acton meta get-schema` support for the custom mutation rules schema

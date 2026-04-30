@@ -1,5 +1,5 @@
 use acton::commands;
-use acton::commands::build::build_cmd;
+use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::create_app::DEFAULT_APP_DIR;
@@ -32,7 +32,8 @@ use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
     TestSettings, WalletsFile, global_wallets_path, init_manifest_path_with_source,
-    init_project_root_with_source, project_root as configured_project_root,
+    init_project_root_with_source, manifest_path as configured_manifest_path,
+    project_root as configured_project_root,
 };
 use acton_config::test::{
     BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
@@ -55,7 +56,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -96,19 +97,19 @@ struct Cli {
 enum Commands {
     #[command(
         about = "Add Acton support to current directory",
-        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-app, Acton skips project initialization and only scaffolds a TypeScript app. With --stdlib-only, Acton only refreshes the bundled standard library.",
+        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-dapp, Acton skips project initialization and only scaffolds a TypeScript app. With --stdlib-only, Acton only refreshes the bundled standard library.",
         after_help = detailed_help_pointer("init")
     )]
     Init {
         #[arg(
-            long,
+            long = "create-dapp",
             value_name = "PATH",
             num_args = 0..=1,
             default_missing_value = DEFAULT_APP_DIR,
             conflicts_with = "stdlib_only",
             help = "Create a TypeScript app scaffold in PATH (default: app)"
         )]
-        create_app: Option<PathBuf>,
+        create_dapp: Option<PathBuf>,
         #[arg(
             long,
             help = "Update the bundled standard library without touching Acton.toml"
@@ -634,6 +635,12 @@ enum Commands {
             help = "Output directory for generated dependency files (default: gen/)"
         )]
         gen_dir: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save contract ABI JSON files (default: build/abi/)"
+        )]
+        output_abi: Option<String>,
         #[arg(
             long,
             value_name = "DIR",
@@ -1661,42 +1668,40 @@ fn main() {
     };
     init_color_mode(color);
 
-    if !matches!(
-        command,
-        Commands::Init { .. }
-            | Commands::New { .. }
-            | Commands::Help { .. }
-            | Commands::Rpc { .. }
-            | Commands::Meta { .. }
-            | Commands::Lint { .. }
-    ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
-    {
-        eprintln!("{} {}", "Error:".red(), err);
-        process::exit(1);
+    if command_configures_project_roots(&command) {
+        if let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone()) {
+            eprintln!("{} {}", "Error:".red(), err);
+            process::exit(1);
+        }
+
+        if command_checks_toolchain_version(&command)
+            && let Err(err) = validate_project_toolchain_version()
+        {
+            print_error(&err);
+            process::exit(1);
+        }
     }
 
     if !matches!(
         command,
         Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
-    ) && let Err(err) = setup_logging()
+    ) && let Err(_) = setup_logging()
     {
-        eprintln!(
-            "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
-            "Warning:".yellow()
-        );
+        // previously we print error here, but it is too annoying for LLM agents
+        // we need some better way
     }
 
     let result = match command {
         Commands::Init {
-            create_app,
+            create_dapp,
             stdlib_only,
-        } => init_cmd(create_app.as_deref(), stdlib_only),
+        } => init_cmd(create_dapp.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::Rpc { command } => {
             if manifest_path.is_some() || project_root.is_some() {
                 match configure_project_roots(manifest_path, project_root) {
-                    Ok(()) => rpc_cmd(command),
+                    Ok(()) => validate_project_toolchain_version().and_then(|()| rpc_cmd(command)),
                     Err(err) => Err(err),
                 }
             } else {
@@ -1894,17 +1899,19 @@ fn main() {
             graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
             info,
-        } => build_cmd(
+        } => build_cmd(BuildCommandOptions {
             contract_id,
             clear_cache,
-            graph,
+            graph_output: graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
-            info,
-        ),
+            show_info: info,
+        }),
         Commands::Compile {
             path,
             json,
@@ -2178,6 +2185,55 @@ fn main() {
     }
 }
 
+const fn command_configures_project_roots(command: &Commands) -> bool {
+    !matches!(
+        command,
+        Commands::Init { .. }
+            | Commands::New { .. }
+            | Commands::Help { .. }
+            | Commands::Rpc { .. }
+            | Commands::Meta { .. }
+            | Commands::Lint { .. }
+    )
+}
+
+const fn command_checks_toolchain_version(command: &Commands) -> bool {
+    command_configures_project_roots(command)
+        && !matches!(command, Commands::Up { .. } | Commands::Completions { .. })
+}
+
+fn validate_project_toolchain_version() -> anyhow::Result<()> {
+    if !configured_manifest_path().exists() {
+        return Ok(());
+    }
+
+    let config = ActonConfig::load_manifest()?;
+    let Some(expected) = config
+        .toolchain
+        .as_ref()
+        .and_then(|toolchain| toolchain.acton.as_deref())
+    else {
+        return Ok(());
+    };
+
+    let expected = expected.trim();
+    if expected.is_empty() {
+        anyhow::bail!(
+            "Acton.toml has empty [toolchain].acton.\n\nSet it to the required Acton CLI version, for example:\n\n[toolchain]\nacton = \"{}\"",
+            acton::build_info::SHORT_VERSION
+        );
+    }
+
+    let installed = acton::build_info::SHORT_VERSION;
+    if expected == installed {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update [toolchain].acton if this project supports acton {installed}."
+    );
+}
+
 fn print_error(err: &anyhow::Error) {
     eprintln!("{} {}", "Error:".red(), err);
 
@@ -2247,7 +2303,7 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -2260,7 +2316,7 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
 
         let content = fs::read_to_string(&path)
             .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+        let result = serde_json::from_str::<SourceMap>(content.as_str()).map_err(|err| {
             anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
         })?;
         Some(Box::new(result))

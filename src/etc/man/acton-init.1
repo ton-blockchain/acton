@@ -23,7 +23,7 @@ If \fBActon.toml\fR does not exist, the command scans \fB\&.tolk\fR files in the
 directory tree and auto\-registers files that define \fBonInternalMessage\fR as
 contract entry files.
 .sp
-With \fB\-\-create\-app\fR, \fBacton init\fR switches to app\-only mode. In that mode,
+With \fB\-\-create\-dapp\fR, \fBacton init\fR switches to app\-only mode. In that mode,
 Acton does not create or patch \fBActon.toml\fR, \fB\&.gitignore\fR, \fB\&.acton/\fR,
 or overlay symlinks. It only creates a Vite\-based TypeScript app scaffold in
 \fB\&./app\fR by default, or in the provided path.
@@ -57,14 +57,14 @@ the file when backfilling default mappings
 \h'-04'\(bu\h'+03'it re\-attempts global wallet and library symlinks on each run
 .RE
 .sp
-The \fB\-\-create\-app\fR mode is not idempotent: it fails if the target app
+The \fB\-\-create\-dapp\fR mode is not idempotent: it fails if the target app
 directory already exists.
 .sp
 The \fB\-\-stdlib\-only\fR mode is safe to run repeatedly, but it always re\-extracts
 the bundled standard library instead of relying on the stored version marker.
 .SH "INIT OPTIONS"
 .sp
-\fB\-\-create\-app\fR [\fIpath\fR]
+\fB\-\-create\-dapp\fR [\fIpath\fR]
 .RS 4
 Create a Vite\-based TypeScript app scaffold instead of performing project
 initialization.
@@ -124,7 +124,7 @@ The default \fBacton init\fR flow can create or update:
 \h'-04'\(bu\h'+03'local symlinks for \fBglobal.wallets.toml\fR and \fBglobal.libraries.toml\fR
 .RE
 .sp
-With \fB\-\-create\-app\fR, \fBacton init\fR only creates \fBapp/\fR or the provided app
+With \fB\-\-create\-dapp\fR, \fBacton init\fR only creates \fBapp/\fR or the provided app
 directory.
 .sp
 With \fB\-\-stdlib\-only\fR, \fBacton init\fR only creates or updates \fB\&.acton/\fR\&.
@@ -217,7 +217,12 @@ When it patches an existing \fBActon.toml\fR, it rewrites the parsed manifest an
 may drop TOML comments or unknown keys; \fB\&.gitignore\fR patching remains
 append\-only.
 .sp
-With \fB\-\-create\-app\fR, \fBacton init\fR writes only inside the new app directory and
+The default flow normally refreshes the bundled standard library under
+\fB\&.acton/\fR\&. Set \fBACTON_DISABLE_AUTO_STDLIB=1\fR to skip that automatic refresh.
+This does not affect \fB\-\-stdlib\-only\fR, which always refreshes \fB\&.acton/\fR
+explicitly.
+.sp
+With \fB\-\-create\-dapp\fR, \fBacton init\fR writes only inside the new app directory and
 does not touch Acton project files.
 .sp
 With \fB\-\-stdlib\-only\fR, \fBacton init\fR writes only inside \fB\&.acton/\fR\&.
@@ -261,7 +266,7 @@ acton init
 .sp
 .RS 4
 .nf
-acton init \-\-create\-app
+acton init \-\-create\-dapp
 .fi
 .RE
 .RE
@@ -271,7 +276,7 @@ acton init \-\-create\-app
 .sp
 .RS 4
 .nf
-acton init \-\-create\-app frontend
+acton init \-\-create\-dapp frontend
 .fi
 .RE
 .RE

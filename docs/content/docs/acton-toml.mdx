@@ -40,6 +40,7 @@ Examples:
 The top-level of `Acton.toml` contains the following sections:
 
 - `[package]` — Project metadata.
+- `[toolchain]` — Required Acton CLI version for this project.
 - `[contracts]` — Definition of smart contracts in the project.
 - `[build]` — Build command output settings.
 - `[wrappers]` — Default output settings for `acton wrapper`.
@@ -74,6 +75,27 @@ version = "0.1.0"
 repository = "https://github.com/user/my-awesome-contract"
 license = "MIT"
 ```
+
+---
+
+## `[toolchain]` Section
+
+Pins project-level tooling versions. Acton checks this section before running
+project commands and exits with an error when the installed CLI version does
+not match the configured version.
+
+| Field   | Type     | Required | Description                                                            |
+|:--------|:---------|:---------|:-----------------------------------------------------------------------|
+| `acton` | `string` | No       | Required Acton CLI version without a leading `v`, for example `0.3.2`. |
+
+Example:
+```toml
+[toolchain]
+acton = "0.3.2"
+```
+
+`acton up` remains available when the configured version does not match, so you
+can install the expected version from the same project directory.
 
 ---
 
@@ -128,6 +150,7 @@ Configures defaults for `acton build`.
 |:--------------|:---------|:---------|:-----------------------------------------------------------------------------------------|
 | `out-dir`     | `string` | No       | Directory where build JSON artifacts are written (default: `build`).                     |
 | `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
+| `output-abi`  | `string` | No       | Directory where contract ABI JSON files are written (default: `build/abi`).              |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
 
 Example:
@@ -135,12 +158,13 @@ Example:
 [build]
 out-dir = "build"
 gen-dir = "gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
 Config values here are project-root-relative. The CLI flags stay cwd-relative unless you pass absolute paths.
-Precompiled `.boc` contracts are skipped for Fift output.
+Precompiled `.boc` contracts are skipped for ABI and Fift output.
 
 ---
 

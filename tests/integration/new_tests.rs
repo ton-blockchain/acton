@@ -1716,7 +1716,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache
     if template == "empty" {
         assert!(
             !scripts.contains_key("test"),
-            "empty app template is also used by acton init --create-app and must not require an Acton project"
+            "empty app template is also used by acton init --create-dapp and must not require an Acton project"
         );
     } else {
         assert!(

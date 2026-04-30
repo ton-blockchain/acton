@@ -790,7 +790,6 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
         code,
         methodId,
         methodName,
-        reflect.typeNameOf<Ret>(),
         args,
     );
     if (res == null) {
@@ -1238,7 +1237,6 @@ fun ffi.runGetMethod(
     code: cell,
     methodId: int,
     methodName: string,
-    returnType: string,
     args: tuple,
 ): tuple?
     asm "8 EXTCALL"

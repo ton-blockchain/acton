@@ -2,9 +2,10 @@ use crate::context::{
     AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, FailAssertFailure,
     TransactionGenericAssertFailure, TransactionNotFoundParams, WalletNotFoundFailure,
 };
-use anyhow::Context as ErrorContext;
+use anyhow::{Context as ErrorContext, anyhow};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use tolk_compiler::abi::Ty;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_source_map::SourceLocation;
@@ -43,7 +44,7 @@ fn assume_reject_impl(
     Ok(())
 }
 
-extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_name: String, left: Tuple, left_name: String, operator: String) using assert_bin_impl);
+extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_ty_json: String, left: Tuple, left_ty_json: String, operator: String) using assert_bin_impl);
 #[allow(clippy::too_many_arguments)]
 fn assert_bin_impl(
     ctx: &mut Context,
@@ -51,13 +52,15 @@ fn assert_bin_impl(
     location: String,
     message: String,
     right: Tuple,
-    right_name: String,
+    right_ty_json: String,
     left: Tuple,
-    left_name: String,
+    left_ty_json: String,
     operator: String,
 ) -> anyhow::Result<()> {
     let left = left.unwrap_single();
     let right = right.unwrap_single();
+    let left_ty: Ty = serde_json::from_str(&left_ty_json)?;
+    let right_ty: Ty = serde_json::from_str(&right_ty_json)?;
 
     if operator == "==" && left.equal_to(&right) {
         stack.push_bool(true);
@@ -81,15 +84,19 @@ fn assert_bin_impl(
             return Ok(());
         }
 
-        *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
-            operator,
-            left,
-            right,
-            left_type: left_name,
-            right_type: right_name,
-            message: Some(message),
-            location: SourceLocation::parse(&location)?,
-        }));
+        *ctx.asserts.assert_failure =
+            Some(AssertFailure::Bin(AssertBinFailure {
+                operator,
+                left,
+                right,
+                left_ty,
+                right_ty,
+                source_map: ctx.env.source_map.clone().ok_or_else(|| {
+                    anyhow!("symbol types are required to format assertion values")
+                })?,
+                message: Some(message),
+                location: SourceLocation::parse(&location)?,
+            }));
         stack.push_bool(false);
         return Ok(());
     }
@@ -98,8 +105,13 @@ fn assert_bin_impl(
         operator,
         left,
         right,
-        left_type: left_name,
-        right_type: right_name,
+        left_ty,
+        right_ty,
+        source_map: ctx
+            .env
+            .source_map
+            .clone()
+            .ok_or_else(|| anyhow!("symbol types are required to format assertion values"))?,
         message: Some(message),
         location: SourceLocation::parse(&location)?,
     }));
@@ -211,7 +223,7 @@ fn fail_to_find_transaction_by_params_impl(
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionNotFound(
         TransactionGenericAssertFailure {
-            txs: TupleItem::big_array_from_items(txs).to_typed("SendResultList"),
+            txs,
             parsed_txs,
             params,
             message: Some(message),
@@ -248,7 +260,7 @@ fn fail_to_not_find_transaction_by_params_impl(
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionIsFound(
         TransactionGenericAssertFailure {
-            txs: TupleItem::big_array_from_items(txs).to_typed("SendResultList"),
+            txs,
             parsed_txs,
             params,
             message: if message.is_empty() {
@@ -456,7 +468,6 @@ fn read_int_like_param(item: &TupleItem) -> Option<&BigInt> {
     match item {
         TupleItem::Int(num) => Some(num),
         TupleItem::Tuple(items) => items.first().and_then(read_int_like_param),
-        TupleItem::TypedTuple { inner, .. } => inner.0.first().and_then(read_int_like_param),
         _ => None,
     }
 }

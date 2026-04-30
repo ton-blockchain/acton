@@ -28,10 +28,9 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
-use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -118,9 +117,6 @@ pub fn script_cmd(
         anyhow::bail!("Script file must end with {}", ".tolk".yellow());
     }
 
-    let content = fs::read_to_string(path)
-        .map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
-
     let (network, fork_net) = resolve_script_networks(net.as_deref(), fork_net.as_deref())?;
     let debug_listener = if debug {
         Some(reserve_dap_listener(debug_port)?)
@@ -130,7 +126,6 @@ pub fn script_cmd(
 
     run_script_file(
         path,
-        &content,
         mappings.as_ref(),
         args,
         verbose,
@@ -153,7 +148,6 @@ pub fn script_cmd(
 #[allow(clippy::too_many_arguments)]
 fn run_script_file(
     file_path: &str,
-    content: &str,
     mappings: Option<&BTreeMap<String, String>>,
     args: Vec<String>,
     verbose: u8,
@@ -167,7 +161,6 @@ fn run_script_file(
     show_bodies: bool,
 ) -> anyhow::Result<()> {
     let mappings = mappings.cloned();
-    let abi = contract_abi(content.into(), file_path, mappings.as_ref());
 
     let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
@@ -182,16 +175,11 @@ fn run_script_file(
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
             let stack = parse_script_stack_args(result.abi.as_ref(), &args)?;
-            let source_map = Arc::new(TolkSourceMap::from_code_cell(
-                result.new_source_map.unwrap_or_default(),
-                &code_cell,
-                result.debug_mark_base64.as_deref(),
-            )?);
+            let source_map = Arc::new(result.source_map.unwrap_or_default());
             execute_script(
                 &code_cell,
                 &data_cell,
                 stack,
-                Arc::new(abi),
                 result.abi.map(Arc::new),
                 source_map,
                 debug,
@@ -214,8 +202,8 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    source_map: Arc<TolkSourceMap>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    source_map: Arc<SourceMap>,
+    abi: Option<Arc<ContractABI>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -223,9 +211,8 @@ fn execute_script(
     code_cell: &Cell,
     data_cell: &Cell,
     stack: Tuple,
-    abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Arc<SourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -287,7 +274,8 @@ fn execute_script(
         env: Env {
             config: &config,
             project_root: project_root().to_path_buf(),
-            abi,
+            abi: abi.clone(),
+            source_map: Some(source_map.clone()),
             show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
@@ -341,7 +329,7 @@ fn execute_script(
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
         let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-        replayer.set_compiler_abi(compiler_abi.clone());
+        replayer.set_abi(abi.clone());
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);
@@ -355,7 +343,7 @@ fn execute_script(
             ScriptResult {
                 result,
                 source_map,
-                compiler_abi,
+                abi,
             },
         );
         return Ok(());
@@ -370,7 +358,7 @@ fn execute_script(
         ScriptResult {
             result,
             source_map,
-            compiler_abi,
+            abi,
         },
     );
     Ok(())
@@ -397,8 +385,8 @@ fn print_script_result<'a>(ctx: &'a Context<'a>, result: ScriptResult) {
                             println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                         }
                     } else {
-                        let detailed_message = formatter
-                            .format_detailed_assert_failure(assert_failure, ctx.env.abi.clone());
+                        let detailed_message =
+                            formatter.format_detailed_assert_failure(assert_failure);
 
                         if detailed_message.is_empty() {
                             println!("{}", "└─".dimmed());
@@ -456,11 +444,7 @@ fn format_nonzero_script_exit_code_details<'a>(
     let custom_exit_code_info = if FormatterContext::is_special_get_method_exit_code(exit_code) {
         None
     } else {
-        FormatterContext::find_custom_exit_code_info(
-            exit_code,
-            Some(ctx.env.abi.as_ref()),
-            script_result.compiler_abi.as_deref(),
-        )
+        FormatterContext::find_custom_exit_code_info(exit_code, script_result.abi.as_deref())
     };
 
     if let Some(info) = &exit_code_info {
@@ -554,17 +538,14 @@ fn format_std_address(address: &StdAddr, network: Option<&Network>) -> String {
     .to_string()
 }
 
-fn parse_script_stack_args(
-    compiler_abi: Option<&CompilerContractABI>,
-    args: &[String],
-) -> anyhow::Result<Tuple> {
-    let Some(compiler_abi) = compiler_abi else {
+fn parse_script_stack_args(abi: Option<&ContractABI>, args: &[String]) -> anyhow::Result<Tuple> {
+    let Some(abi) = abi else {
         if args.is_empty() {
             return Ok(Tuple::empty());
         }
         anyhow::bail!("Cannot parse script arguments: missing ABI");
     };
-    let Some(main) = compiler_abi
+    let Some(main) = abi
         .get_methods
         .iter()
         .find(|method| method.tvm_method_id == 0)

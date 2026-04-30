@@ -118,7 +118,6 @@ fn deploy_script_fails_when_toncenter_is_unavailable() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .current_dir(&project_dir)
         .verify_network("custom:toncenter-down")

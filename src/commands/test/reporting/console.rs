@@ -264,7 +264,6 @@ impl TestReporter for ConsoleReporter {
             };
 
             let formatter = FormatterContext {
-                contract_abi: test.abi.clone(),
                 accounts: Cow::Borrowed(&failure_context.accounts),
                 build_cache: Cow::Borrowed(&failure_context.build_cache),
                 emulations: Cow::Borrowed(&failure_context.emulations),
@@ -347,7 +346,7 @@ fn process_test_fail(
     }
 }
 
-fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
+fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &FormatterContext<'_>) {
     if let AssertFailure::GetMethod(failure) = &failure {
         let formatted = fmt.format_get_method_assert_failure(failure);
         let mut lines = formatted.lines();
@@ -441,8 +440,9 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         let diff_output = fmt.format_tuple_diff(
             &failure.left,
             &failure.right,
-            &failure.left_type,
-            &failure.right_type,
+            &failure.left_ty,
+            &failure.right_ty,
+            &failure.source_map,
         );
 
         for line in diff_output.lines() {
@@ -453,7 +453,7 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     if let AssertFailure::Bin(failure) = &failure
         && failure.operator == "!="
     {
-        let value = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
+        let value = fmt.format_tuple_value(&failure.left, &failure.left_ty, &failure.source_map, 8);
         println!("       Values are equal but expected to be different:");
         println!("         {}", value.dimmed());
     }
@@ -461,8 +461,9 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     if let AssertFailure::Bin(failure) = &failure
         && failure.is_ord()
     {
-        let left = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
-        let right = fmt.format_tuple_value(&failure.right, &failure.right_type, 8);
+        let left = fmt.format_tuple_value(&failure.left, &failure.left_ty, &failure.source_map, 8);
+        let right =
+            fmt.format_tuple_value(&failure.right, &failure.right_ty, &failure.source_map, 8);
 
         println!("        Actual:   {}", left.red());
         println!("        Expected: {}", right.green());
@@ -474,8 +475,8 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionNotFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
-        let tx_tree = fmt.format(&failure.txs);
+        let params = fmt.format_search_transaction_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
@@ -498,8 +499,8 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionIsFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
-        let tx_tree = fmt.format(&failure.txs);
+        let params = fmt.format_search_transaction_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr2 = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),

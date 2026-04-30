@@ -410,7 +410,7 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
 }
 
 /// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
-/// without any contract files, for `acton init --create-app`.
+/// without any contract files, for `acton init --create-dapp`.
 pub fn extract_standalone_app_scaffold(
     target_dir: &Path,
     npm_package_name: &str,

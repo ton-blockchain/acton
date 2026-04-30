@@ -1,3 +1,4 @@
+use crate::source_map::SourceMap;
 pub use crate::types_kernel::{Ty, UnionVariant};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,9 @@ pub enum ABIDeclaration {
 
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
+
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        overrides_client_type: bool,
     },
 
     #[serde(rename = "alias")]
@@ -120,6 +124,7 @@ pub enum ABIDeclaration {
         name: String,
         encoded_as: Ty,
         members: Vec<ABIEnumMember>,
+
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
     },
@@ -154,12 +159,6 @@ pub struct ABIInternalMessage {
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub minimal_msg_value: Option<i64>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub preferred_send_mode: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,6 +182,9 @@ pub struct ABIStorage {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_at_deployment_ty: Option<Ty>,
+
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -199,15 +201,9 @@ pub struct ABIThrownError {
     pub kind: Option<ABIThrownErrorKind>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    pub err_code: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ABIConstant {
-    pub name: String,
-    pub value: ABIConstValue,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    pub err_code: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -233,7 +229,6 @@ pub struct ContractABI {
 
     pub get_methods: Vec<ABIGetMethod>,
     pub thrown_errors: Vec<ABIThrownError>,
-    pub constants: Vec<ABIConstant>,
 
     pub compiler_name: String,
     pub compiler_version: String,
@@ -246,6 +241,52 @@ pub struct ABIResolvedStruct {
 }
 
 impl ContractABI {
+    #[must_use]
+    pub fn find_get_method_by_id(&self, id: i32) -> Option<&ABIGetMethod> {
+        self.get_methods
+            .iter()
+            .find(|method| method.tvm_method_id == id)
+    }
+
+    #[must_use]
+    pub fn find_message_name_by_opcode(&self, opcode: u32) -> Option<&str> {
+        self.declarations.iter().find_map(|declaration| {
+            let ABIDeclaration::Struct {
+                name,
+                type_params,
+                prefix,
+                ..
+            } = declaration
+            else {
+                return None;
+            };
+
+            if type_params
+                .as_ref()
+                .is_some_and(|params| !params.is_empty())
+            {
+                return None;
+            }
+
+            let matches_opcode = prefix.as_ref().is_some_and(|prefix| {
+                prefix.prefix_len == 32
+                    && parse_abi_prefix_number(&prefix.prefix_str) == Some(opcode)
+            });
+            matches_opcode.then_some(name.as_str())
+        })
+    }
+
+    #[must_use]
+    pub fn find_message_name_by_opcode_with_symbols<'a>(
+        symbols: &'a SourceMap,
+        abi: Option<&'a Self>,
+        opcode: u32,
+    ) -> Option<&'a str> {
+        symbols
+            .find_message_name_by_opcode(opcode)
+            .or_else(|| abi.and_then(|abi| abi.find_message_name_by_opcode(opcode)))
+    }
+
     pub fn resolve_storage_struct(&self) -> anyhow::Result<Option<ABIResolvedStruct>> {
         let Some(storage_ty) = self
             .storage
@@ -312,6 +353,22 @@ impl ContractABI {
 
         Ok(first)
     }
+}
+
+fn parse_abi_prefix_number(prefix: &str) -> Option<u32> {
+    let prefix = prefix.trim();
+    if prefix.is_empty() {
+        return None;
+    }
+    let parsed = if let Some(hex) = prefix
+        .strip_prefix("0x")
+        .or_else(|| prefix.strip_prefix("0X"))
+    {
+        u64::from_str_radix(hex, 16).ok()?
+    } else {
+        prefix.parse::<u64>().ok()?
+    };
+    u32::try_from(parsed).ok()
 }
 
 impl Ty {
@@ -749,10 +806,10 @@ mod tests {
             storage: ABIStorage {
                 storage_ty: None,
                 storage_at_deployment_ty: None,
+                description: String::new(),
             },
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
-            constants: Vec::new(),
             compiler_name: "tolk".to_owned(),
             compiler_version: "test".to_owned(),
         }
@@ -822,6 +879,7 @@ mod tests {
                     description: String::new(),
                 }],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
             ABIDeclaration::Struct {
                 name: "MsgB".to_owned(),
@@ -832,6 +890,7 @@ mod tests {
                 }),
                 fields: vec![],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
             ABIDeclaration::Alias {
                 name: "Incoming".to_owned(),
@@ -872,8 +931,6 @@ mod tests {
                 type_args: None,
             },
             description: String::new(),
-            minimal_msg_value: None,
-            preferred_send_mode: None,
         }];
 
         let resolved = abi
@@ -895,6 +952,7 @@ mod tests {
                 prefix: None,
                 fields: vec![],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
             ABIDeclaration::Struct {
                 name: "DeploymentStorage".to_owned(),
@@ -902,6 +960,7 @@ mod tests {
                 prefix: None,
                 fields: vec![],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
         ];
         abi.storage = ABIStorage {
@@ -913,6 +972,7 @@ mod tests {
                 struct_name: "DeploymentStorage".to_owned(),
                 type_args: None,
             }),
+            description: String::new(),
         };
 
         let resolved = abi
@@ -941,8 +1001,6 @@ mod tests {
                 type_args: None,
             },
             description: String::new(),
-            minimal_msg_value: None,
-            preferred_send_mode: None,
         }];
 
         let error = abi
@@ -1064,6 +1122,7 @@ mod tests {
                     description: String::new(),
                 }],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
             ABIDeclaration::Alias {
                 name: "UserId".to_owned(),
@@ -1140,6 +1199,7 @@ mod tests {
                     },
                 ],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             },
         ];
 

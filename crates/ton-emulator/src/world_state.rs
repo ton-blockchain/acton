@@ -87,6 +87,13 @@ impl AccountsState {
         }
     }
 
+    /// Invalidates cached remote accounts. Local state is left untouched.
+    pub fn invalidate_remote_cache(&mut self) {
+        if let Self::Remote(r) = self {
+            r.invalidate_cache();
+        }
+    }
+
     /// Returns a reference to the underlying map of accounts.
     #[must_use]
     pub const fn accounts(&self) -> &FxHashMap<StdAddr, ShardAccount> {
@@ -178,6 +185,10 @@ impl RemoteSnapshotCache {
     pub fn insert(&self, key: RemoteCacheKey, val: ShardAccount) {
         self.inner.borrow_mut().insert(key, val);
     }
+
+    pub fn clear(&self) {
+        self.inner.borrow_mut().clear();
+    }
 }
 
 /// A state implementation that fetches missing accounts from a remote network.
@@ -238,6 +249,11 @@ impl RemoteAccountState {
 
     fn update(&mut self, address: &StdAddr, account: ShardAccount) {
         self.accounts.insert(address.clone(), account);
+    }
+
+    fn invalidate_cache(&mut self) {
+        self.accounts.clear();
+        self.cache.clear();
     }
 
     fn resolve_remote_account(&self, address: &StdAddr) -> anyhow::Result<ShardAccount> {
@@ -455,6 +471,11 @@ impl WorldState {
         self.accounts_state.update(addr, account.clone());
     }
 
+    /// Clears cached remote accounts so subsequent reads refetch live network state.
+    pub fn invalidate_remote_cache(&mut self) {
+        self.accounts_state.invalidate_remote_cache();
+    }
+
     /// Increments and returns the current logical time.
     ///
     /// Each call increments the time by 1,000,000 to ensure enough gap for transactions.
@@ -617,5 +638,60 @@ impl WorldState {
             .clone()
             .ok_or_else(|| anyhow!("Config has no root"))?;
         Ok(Cow::Owned(Boc::encode_base64(root)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_address(seed: u8) -> StdAddr {
+        StdAddr {
+            anycast: None,
+            workchain: 0,
+            address: HashBytes([seed; 32]),
+        }
+    }
+
+    fn empty_shard_account() -> ShardAccount {
+        ShardAccount {
+            account: Lazy::new(&OptionalAccount(None)).expect("empty account should serialize"),
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        }
+    }
+
+    #[test]
+    fn remote_cache_invalidation_clears_local_and_shared_caches() {
+        let cache = RemoteSnapshotCache::new();
+        let address = test_address(1);
+        let account = empty_shard_account();
+        let cache_key = RemoteCacheKey {
+            fork_block_number: None,
+            fork_net: Network::Testnet,
+            address: address.clone(),
+        };
+
+        let mut remote = RemoteAccountState::new(Network::Testnet, None, cache.clone());
+        remote.accounts.insert(address, account.clone());
+        cache.insert(cache_key.clone(), account);
+
+        remote.invalidate_cache();
+
+        assert!(remote.accounts.is_empty());
+        assert!(cache.get(&cache_key).is_none());
+    }
+
+    #[test]
+    fn local_cache_invalidation_keeps_local_accounts() {
+        let address = test_address(2);
+        let account = empty_shard_account();
+        let mut state = AccountsState::Local(LocalAccountsState {
+            accounts: FxHashMap::from_iter([(address.clone(), account)]),
+        });
+
+        state.invalidate_remote_cache();
+
+        assert!(state.accounts().contains_key(&address));
     }
 }

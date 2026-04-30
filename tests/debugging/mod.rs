@@ -4,7 +4,6 @@ use acton::context::{
 };
 use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
-use acton::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, LibrariesConfig, WalletsConfig, normalize_mappings};
 use acton_debug::ReplayerDebugSession;
 use acton_debug::replayer::TolkReplayer;
@@ -16,20 +15,18 @@ use dap::types::StackFrame;
 use dap_client::DapClient;
 use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
-use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use tolk_compiler::{CompilerResult, TolkSourceMap};
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::{CompilerResult, SourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
-use ton_abi::{ContractAbi, contract_abi};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
@@ -164,7 +161,6 @@ fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
 
 pub(crate) fn run_script_file(
     file_path: &str,
-    content: &str,
     project_root: &Path,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
@@ -172,12 +168,10 @@ pub(crate) fn run_script_file(
 ) -> anyhow::Result<String> {
     let script_path = Path::new(file_path);
 
-    let (abi, compiler_abi, code_cell, source_map) = {
+    let (abi, code_cell, source_map) = {
         let _compile_guard = DEBUG_COMPILER_LOCK
             .lock()
             .expect("debug compiler lock poisoned");
-
-        let abi = contract_abi(content.into(), file_path, None);
 
         let config = load_project_config(project_root);
 
@@ -189,16 +183,11 @@ pub(crate) fn run_script_file(
 
         match compiler.compile(script_path, true) {
             CompilerResult::Success(result) => {
-                let code = Boc::decode_base64(&result.code_boc64)?;
                 let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
-                let source_map = Arc::new(TolkSourceMap::from_code_cell(
-                    result.new_source_map.unwrap_or_default(),
-                    &code,
-                    result.debug_mark_base64.as_deref(),
-                )?);
-                let compiler_abi: Option<Arc<CompilerContractABI>> = result.abi.map(Arc::new);
+                let source_map = Arc::new(result.source_map.unwrap_or_default());
+                let abi: Option<Arc<ContractABI>> = result.abi.map(Arc::new);
 
-                (abi, compiler_abi, code_cell, source_map)
+                (abi, code_cell, source_map)
             }
             CompilerResult::Error(error) => {
                 anyhow::bail!("Cannot compile script file {}", error.message)
@@ -210,8 +199,7 @@ pub(crate) fn run_script_file(
     let execution = execute_script(
         &code_cell,
         &data_cell,
-        abi.into(),
-        compiler_abi,
+        abi,
         source_map,
         debug_port,
         debug_listener,
@@ -219,27 +207,26 @@ pub(crate) fn run_script_file(
         stack,
         project_root,
     );
-    let (script_result, io, formatter) = match execution {
+    let script_result = match execution {
         Ok(result) => result,
         Err(err) if is_debug_stop_requested(&err) => return Ok(String::new()),
         Err(err) => return Err(err),
     };
-    get_script_result(script_result, io, formatter)
+    get_script_result(script_result)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_script<'a>(
-    code_cell: &'a TonCell,
-    data_cell: &'a TonCell,
-    abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+fn execute_script(
+    code_cell: &TonCell,
+    data_cell: &TonCell,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Arc<SourceMap>,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
     project_root: &Path,
-) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
+) -> anyhow::Result<GetMethodResult> {
     let dest_address = contract_address(code_cell)?;
 
     let now = std::time::SystemTime::now();
@@ -287,6 +274,7 @@ fn execute_script<'a>(
             config: &config,
             project_root: project_root.to_path_buf(),
             abi: abi.clone(),
+            source_map: Some(source_map.clone()),
             show_bodies: false,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
@@ -338,7 +326,7 @@ fn execute_script<'a>(
     };
     executor.prepare(0, &stack)?;
     let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-    replayer.set_compiler_abi(compiler_abi);
+    replayer.set_abi(abi);
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 
@@ -347,24 +335,7 @@ fn execute_script<'a>(
     }
 
     let result = executor.finish(&params.code)?;
-    let Context { io, .. } = ctx;
-
-    let formatter = FormatterContext {
-        contract_abi: abi,
-        accounts: Cow::Owned(world_state.get_accounts().clone()),
-        build_cache: Cow::Owned(build_cache.clone()),
-        emulations: Cow::Owned(emulations.clone()),
-        known_addresses: Cow::Owned(known_addresses.clone()),
-        known_code_cells: Cow::Owned(known_code_cell.clone()),
-        show_bodies: false,
-        has_wallets_config: false,
-        available_wallets: vec![],
-        backtrace: None,
-        fork_net: None,
-        network: None,
-    };
-
-    Ok((result, io, formatter))
+    Ok(result)
 }
 
 fn load_project_config(project_root: &Path) -> anyhow::Result<ActonConfig> {
@@ -389,23 +360,17 @@ fn load_project_config(project_root: &Path) -> anyhow::Result<ActonConfig> {
     Ok(config)
 }
 
-fn get_script_result(
-    result: GetMethodResult,
-    io: IoContext,
-    formatter: FormatterContext,
-) -> anyhow::Result<String> {
+fn get_script_result(result: GetMethodResult) -> anyhow::Result<String> {
     match &result {
         GetMethodResult::Success(result) => {
             if result.vm_exit_code != 0 {
                 anyhow::bail!("VM exit code {}", result.vm_exit_code)
             }
 
-            let cell = Boc::decode_base64(result.stack.as_ref())?;
-
-            let tuple = Tuple::deserialize(&cell)?;
-            let tuple_str = formatter.format_tuple(&tuple, false, false);
-
-            Ok(tuple_str + io.stdout_buffer.as_str() + io.stderr_buffer.as_str())
+            // Debug tests assert DAP state snapshots; this process output is discarded by
+            // `DebugClient::finish_execution`, so formatting the final stack here only keeps
+            // an otherwise unused raw tuple formatter alive.
+            Ok(String::new())
         }
         GetMethodResult::Error(error) => {
             anyhow::bail!("{} {}", "Execution error:".red(), error.error.red())

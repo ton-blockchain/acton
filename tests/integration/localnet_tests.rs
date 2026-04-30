@@ -154,6 +154,104 @@ fun main() {
 }
 "#;
 
+const LOCALNET_CACHE_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+";
+
+const LOCALNET_CACHE_COUNTER_CONTRACT: &str = r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounter(): int {
+    val storage = lazy Storage.load();
+    return storage.counter;
+}
+"#;
+
+const LOCALNET_CACHE_REFRESH_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/types"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val counterInit = ContractState {
+        code: build("counter"),
+        data: Storage {
+            id: 0,
+            counter: 7,
+        }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress {
+        stateInit: counterInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: counterInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val before: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("BEFORE={}", before);
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.05"),
+        dest: counterAddress,
+        body: IncreaseCounter {
+            increaseBy: 5,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("INCREASE_NULL");
+        return;
+    }
+
+    val after: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("AFTER={}", after);
+}
+"#;
+
 const V3_MESSAGE_TEST_BOC: &str = "te6ccgEBCAEA3gACq0gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ALmmY2giNrr7xsgbsuxgdjCwn44jNXXhSczUiwyp4TxsQ7msoAAAAAAAAAAAAANL430UZAgEAEAAAAAAAAAAAART/APSkE/S88sgLAwIBYgcEAgFYBgUAF7itDtRNDTHzHXCx+AAFu+F4AJzQ+JGRMOAg1ywj9DsnfI4YMe1E0AHXCx8B1h/XCx9YoAHIzssfye1U4NcsIdOpeDQxjhIw7UTQ1h8wyM7PkAAAAALJ7VTggQ/2AccA8vQ=";
 const V3_TRANSACTIONS_TEST_ACCOUNT_A: &str =
     "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79";
@@ -545,6 +643,41 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_not_contains("compute phase skipped")
         .assert_snapshot_matches(
             "integration/snapshots/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+        );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_invalidates_remote_cache_after_broadcast_before_get_method() {
+    let project = ProjectBuilder::new("localnet-script-cache-refresh")
+        .file("contracts/types", LOCALNET_CACHE_COUNTER_TYPES)
+        .contract("counter", LOCALNET_CACHE_COUNTER_CONTRACT)
+        .script_file("cache_refresh", LOCALNET_CACHE_REFRESH_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/cache_refresh.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output
+        .assert_contains("BEFORE=7")
+        .assert_contains("AFTER=12")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_localnet_script_invalidates_remote_cache_after_broadcast_before_get_method.stdout.txt",
         );
 
     node.stop();
@@ -2450,25 +2583,23 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .expect("accountStates code_hash must be valid base64")
         .to_hex();
 
-    let compiler_abi_response = wait_for_ok_response(
+    let abi_response = wait_for_ok_response(
         &node,
         &format!("/admin/compiler-abi?code_hash={code_hash_hex}"),
         Duration::from_secs(12),
     );
-    let compiler_abi = response_payload(&compiler_abi_response);
+    let abi = response_payload(&abi_response);
 
-    assert_eq!(compiler_abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(compiler_abi["contract_name"].as_str(), Some("getter"));
+    assert_eq!(abi["compiler_name"].as_str(), Some("tolk"));
+    assert_eq!(abi["contract_name"].as_str(), Some("getter"));
     assert!(
-        compiler_abi["get_methods"]
-            .as_array()
-            .is_some_and(|methods| {
-                methods
-                    .iter()
-                    .any(|method| method["name"].as_str() == Some("addTen"))
-            }),
+        abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("addTen"))
+        }),
         "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(compiler_abi).unwrap_or_default()
+        serde_json::to_string_pretty(abi).unwrap_or_default()
     );
 
     let missing_response = node.get_json(

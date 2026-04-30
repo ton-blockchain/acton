@@ -17,7 +17,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
   ✗ ej stdlib assert not equal complex tuple diagnostic [TIME]
     └─ Error: ej tuple/map notEqual diagnostic tuple
        Values are equal but expected to be different:
-         [11, [22, 33], [BOC_HEX]]
+         [11, [ 22 33 ], C{[BOC_HEX]}]
   ✗ ej stdlib assert not equal complex map diagnostic [TIME]
     └─ Error: ej tuple/map notEqual diagnostic map
        Values are equal but expected to be different:

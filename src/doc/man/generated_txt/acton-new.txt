@@ -278,7 +278,8 @@ SIDE EFFECTS
        ., that means the current directory itself, and existing files with the
        same paths as template files can be overwritten.
 
-       It also installs .acton/tolk-stdlib there, may create .githooks/ plus an
+       It also installs .acton/tolk-stdlib there unless
+       ACTON_DISABLE_AUTO_STDLIB=1 is set, may create .githooks/ plus an
        AGENTS.md file when requested, and, when git is available, initializes
        the project repository and runs git add ., which stages all
        current-directory contents.

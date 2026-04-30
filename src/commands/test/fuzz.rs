@@ -6,9 +6,8 @@ use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
-use ton_abi::{BaseTypeInfo, ContractAbi, TypeInfo};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
@@ -61,9 +60,8 @@ impl TestRunner<'_> {
         test: &TestDescriptor,
         code_cell: &Cell,
         dest_address: &str,
-        abi: Arc<ContractAbi>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        abi: Option<Arc<ContractABI>>,
+        source_map: Arc<SourceMap>,
         fuzz: FuzzConfig,
     ) -> anyhow::Result<TestResult> {
         let fuzz = resolve_fuzz_config(fuzz, &self.config);
@@ -111,7 +109,6 @@ impl TestRunner<'_> {
                 code_cell,
                 dest_address,
                 abi.clone(),
-                compiler_abi.clone(),
                 source_map.clone(),
                 &generated.stack,
             )?;
@@ -374,11 +371,10 @@ fn format_std_address(address: &StdAddr) -> String {
 
 pub(super) fn attach_test_parameter_metadata(
     mut tests: Vec<TestDescriptor>,
-    abi: &ContractAbi,
-    compiler_abi: Option<&CompilerContractABI>,
+    abi: Option<&ContractABI>,
 ) -> Vec<TestDescriptor> {
     for test in &mut tests {
-        if let Some(method) = compiler_abi.and_then(|abi| {
+        if let Some(method) = abi.and_then(|abi| {
             abi.get_methods
                 .iter()
                 .find(|method| method.tvm_method_id == test.id || method.name == test.name.as_ref())
@@ -387,19 +383,6 @@ pub(super) fn attach_test_parameter_metadata(
                 .parameters
                 .iter()
                 .map(map_compiler_parameter)
-                .collect();
-            continue;
-        }
-
-        if let Some(method) = abi
-            .get_methods
-            .iter()
-            .find(|method| method.id == test.id as u32 || method.name == test.name.as_ref())
-        {
-            test.parameters = method
-                .parameters
-                .iter()
-                .map(map_ton_abi_parameter)
                 .collect();
         }
     }
@@ -453,51 +436,6 @@ fn map_compiler_type(ty: &Ty) -> FuzzParameterKind {
         Ty::AddressAny => FuzzParameterKind::AnyAddress,
         Ty::AddressOpt => FuzzParameterKind::Nullable(Box::new(FuzzParameterKind::Address)),
         Ty::Nullable { inner, .. } => match map_compiler_type(inner) {
-            FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
-            inner => FuzzParameterKind::Nullable(Box::new(inner)),
-        },
-        _ => FuzzParameterKind::Unsupported,
-    }
-}
-
-fn map_ton_abi_parameter(parameter: &ton_abi::Field) -> FuzzParameter {
-    FuzzParameter {
-        name: parameter.name.clone(),
-        type_name: parameter.type_info.human_readable.clone(),
-        kind: map_ton_abi_type(&parameter.type_info),
-    }
-}
-
-fn map_ton_abi_type(ty: &TypeInfo) -> FuzzParameterKind {
-    match &ty.base {
-        BaseTypeInfo::Int { width } if *width > 0 => FuzzParameterKind::Int {
-            signed: true,
-            bits: Some(*width),
-        },
-        BaseTypeInfo::UInt { width } if *width > 0 => FuzzParameterKind::Int {
-            signed: false,
-            bits: Some(*width),
-        },
-        BaseTypeInfo::Coins | BaseTypeInfo::VarUInt16 => FuzzParameterKind::Int {
-            signed: false,
-            bits: Some(120),
-        },
-        BaseTypeInfo::Bool => FuzzParameterKind::Bool,
-        BaseTypeInfo::Address => FuzzParameterKind::Address,
-        BaseTypeInfo::AnyAddress => FuzzParameterKind::AnyAddress,
-        BaseTypeInfo::VarInt16 => FuzzParameterKind::Int {
-            signed: true,
-            bits: Some(120),
-        },
-        BaseTypeInfo::VarInt32 => FuzzParameterKind::Int {
-            signed: true,
-            bits: Some(248),
-        },
-        BaseTypeInfo::VarUInt32 => FuzzParameterKind::Int {
-            signed: false,
-            bits: Some(248),
-        },
-        BaseTypeInfo::Nullable { inner } => match map_ton_abi_type(inner) {
             FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
             inner => FuzzParameterKind::Nullable(Box::new(inner)),
         },

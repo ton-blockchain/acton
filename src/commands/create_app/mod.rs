@@ -19,7 +19,7 @@ pub fn create_app_cmd(path: Option<&Path>) -> anyhow::Result<()> {
 fn validate_app_target_dir(target_dir: &Path) -> anyhow::Result<()> {
     if target_dir.exists() {
         anyhow::bail!(
-            "Directory {} already exists. Delete it before running `acton init --create-app`.",
+            "Directory {} already exists. Delete it before running `acton init --create-dapp`.",
             target_dir.display().to_string().yellow()
         );
     }

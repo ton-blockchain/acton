@@ -27,7 +27,7 @@ If `Acton.toml` does not exist, the command scans `.tolk` files in the current
 directory tree and auto-registers files that define `onInternalMessage` as
 contract entry files.
 
-With `--create-app`, `acton init` switches to app-only mode. In that mode,
+With `--create-dapp`, `acton init` switches to app-only mode. In that mode,
 Acton does not create or patch `Acton.toml`, `.gitignore`, `.acton/`,
 or overlay symlinks. It only creates a Vite-based TypeScript app scaffold in
 `./app` by default, or in the provided path.
@@ -49,7 +49,7 @@ stdlib version already matches the current Acton version.
 - it refreshes `.acton/tolk-stdlib`
 - it re-attempts global wallet and library symlinks on each run
 
-The `--create-app` mode is not idempotent: it fails if the target app
+The `--create-dapp` mode is not idempotent: it fails if the target app
 directory already exists.
 
 The `--stdlib-only` mode is safe to run repeatedly, but it always re-extracts
@@ -63,7 +63,7 @@ the bundled standard library instead of relying on the stored version marker.
 <CommandOption>
 <CommandOptionTitle>
 
-`--create-app` [_path_]
+`--create-dapp` [_path_]
 
 </CommandOptionTitle>
 
@@ -172,7 +172,7 @@ The default `acton init` flow can create or update:
 - `.acton/`
 - local symlinks for `global.wallets.toml` and `global.libraries.toml`
 
-With `--create-app`, `acton init` only creates `app/` or the provided app
+With `--create-dapp`, `acton init` only creates `app/` or the provided app
 directory.
 
 With `--stdlib-only`, `acton init` only creates or updates `.acton/`.
@@ -235,7 +235,12 @@ When it patches an existing `Acton.toml`, it rewrites the parsed manifest and
 may drop TOML comments or unknown keys; `.gitignore` patching remains
 append-only.
 
-With `--create-app`, `acton init` writes only inside the new app directory and
+The default flow normally refreshes the bundled standard library under
+`.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic refresh.
+This does not affect `--stdlib-only`, which always refreshes `.acton/`
+explicitly.
+
+With `--create-dapp`, `acton init` writes only inside the new app directory and
 does not touch Acton project files.
 
 With `--stdlib-only`, `acton init` writes only inside `.acton/`.
@@ -266,13 +271,13 @@ With `--stdlib-only`, `acton init` writes only inside `.acton/`.
 3. Create only the default app scaffold:
 
    ```bash
-   acton init --create-app
+   acton init --create-dapp
    ```
 
 4. Create only the app scaffold in `frontend/`:
 
    ```bash
-   acton init --create-app frontend
+   acton init --create-dapp frontend
    ```
 
 5. Re-run safely after adding more contracts:

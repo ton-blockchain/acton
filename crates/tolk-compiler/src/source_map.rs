@@ -1,63 +1,95 @@
-// Parsing of the source map JSON produced by the Tolk compiler.
-// The JSON contains type declarations, function metadata, and debug marks
-// that map IR variables and stack positions back to the original Tolk source.
+// Parsing of the symbol-types and debug-marks JSON produced by the Tolk compiler.
+// Symbol types contain type declarations and function metadata; debug marks map
+// IR variables and stack positions back to the original Tolk source.
 
+use crate::abi::ABICustomPackUnpack;
+use crate::debug_marks_dict::DebugMarksDict;
 use crate::types_kernel::Ty;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use std::fs;
-use std::path::Path;
+use std::sync::OnceLock;
+use ton_source_map::SourceLocation;
 // ---------------------------------------------------------------------------
 // Top-level structure
 // ---------------------------------------------------------------------------
 
 type BigintAsString = String;
 
-#[derive(Clone, Serialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SourceMap {
     files: Vec<SrcFileInfo>,
     declarations: Vec<Declaration>,
     unique_ty: Vec<UniqueTy>,
     functions: Vec<FunctionInfo>,
+
+    #[serde(default)]
     debug_marks: Vec<DebugMark>,
+    #[serde(default, skip_serializing_if = "DebugMarksDict::is_empty")]
+    marks_dict: DebugMarksDict,
 
     #[serde(skip)]
-    structs: HashMap<String, AbiStruct>,
-    #[serde(skip)]
-    aliases: HashMap<String, AbiAlias>,
-    #[serde(skip)]
-    enums: HashMap<String, AbiEnum>,
+    decl_index: OnceLock<DeclarationIndex>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct SymbolTypesJson {
+    files: Vec<SrcFileInfo>,
+    declarations: Vec<Declaration>,
+    unique_ty: Vec<UniqueTy>,
+    functions: Vec<FunctionInfo>,
 }
 
 impl SourceMap {
-    pub fn from_json_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let text = fs::read_to_string(path)?;
-        Self::from_json_str(&text)
-    }
-
-    pub fn from_json_str(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(serde_json::from_str(json)?)
-    }
-
-    fn index_declarations(&mut self) {
-        self.structs.clear();
-        self.aliases.clear();
-        self.enums.clear();
-
-        for decl in &self.declarations {
-            match decl {
-                Declaration::Struct(s) => {
-                    self.structs.insert(s.name.clone(), s.clone());
-                }
-                Declaration::Alias(a) => {
-                    self.aliases.insert(a.name.clone(), a.clone());
-                }
-                Declaration::Enum(e) => {
-                    self.enums.insert(e.name.clone(), e.clone());
-                }
-            }
+    #[must_use]
+    pub fn from_parts(
+        symbol_types: SymbolTypesJson,
+        debug_marks: Vec<DebugMark>,
+        marks_dict: DebugMarksDict,
+    ) -> Self {
+        SourceMap {
+            files: symbol_types.files,
+            declarations: symbol_types.declarations,
+            unique_ty: symbol_types.unique_ty,
+            functions: symbol_types.functions,
+            debug_marks,
+            marks_dict,
+            decl_index: OnceLock::new(),
         }
+    }
+
+    #[must_use]
+    pub fn without_debug_info() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn find_source_loc(&self, hash: &str, offset: u16) -> Option<SourceLocation> {
+        let marks = self.marks_dict.get(hash)?;
+        let target_offset = i32::from(offset);
+
+        let mut approx_loc = None;
+        let mut exact_loc = None;
+
+        for &(mark_offset, mark_id) in marks {
+            let Some(loc) = self.source_location_for_mark(mark_id as usize) else {
+                continue;
+            };
+
+            if mark_offset < target_offset {
+                approx_loc = Some(loc);
+                continue;
+            }
+
+            if mark_offset == target_offset {
+                exact_loc = Some(loc);
+                continue;
+            }
+
+            break;
+        }
+
+        exact_loc.or(approx_loc)
     }
 
     #[must_use]
@@ -97,24 +129,64 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn find_message_name_by_opcode(&self, opcode: u32) -> Option<&str> {
+        self.declarations.iter().find_map(|declaration| {
+            let Declaration::Struct(struct_decl) = declaration else {
+                return None;
+            };
+
+            if struct_decl
+                .type_params
+                .as_ref()
+                .is_some_and(|params| !params.is_empty())
+            {
+                return None;
+            }
+
+            let matches_opcode = struct_decl.prefix.as_ref().is_some_and(|prefix| {
+                prefix.prefix_len == 32 && parse_prefix_number(&prefix.prefix_str) == Some(opcode)
+            });
+            matches_opcode.then_some(struct_decl.name.as_str())
+        })
+    }
+
+    #[must_use]
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
-        self.structs
+        let idx = *self
+            .declaration_index()
+            .structs
             .get(name)
-            .unwrap_or_else(|| panic!("struct `{name}` not found"))
+            .unwrap_or_else(|| panic!("struct `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Struct(s) => s,
+            _ => unreachable!("declaration index points to non-struct"),
+        }
     }
 
     #[must_use]
     pub fn get_alias(&self, name: &str) -> &AbiAlias {
-        self.aliases
+        let idx = *self
+            .declaration_index()
+            .aliases
             .get(name)
-            .unwrap_or_else(|| panic!("alias `{name}` not found"))
+            .unwrap_or_else(|| panic!("alias `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Alias(a) => a,
+            _ => unreachable!("declaration index points to non-alias"),
+        }
     }
 
     #[must_use]
     pub fn get_enum(&self, name: &str) -> &AbiEnum {
-        self.enums
+        let idx = *self
+            .declaration_index()
+            .enums
             .get(name)
-            .unwrap_or_else(|| panic!("enum `{name}` not found"))
+            .unwrap_or_else(|| panic!("enum `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Enum(e) => e,
+            _ => unreachable!("declaration index points to non-enum"),
+        }
     }
 
     #[must_use]
@@ -190,6 +262,16 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn has_debug_marks(&self) -> bool {
+        !self.marks_dict.is_empty()
+    }
+
+    #[must_use]
+    pub const fn debug_marks_dict(&self) -> &DebugMarksDict {
+        &self.marks_dict
+    }
+
+    #[must_use]
     pub fn get_debug_mark(&self, mark_id: usize) -> &DebugMark {
         &self.debug_marks[mark_id]
     }
@@ -222,36 +304,64 @@ impl SourceMap {
 
         normalized
     }
-}
 
-#[derive(Deserialize)]
-struct SourceMapDe {
-    files: Vec<SrcFileInfo>,
-    declarations: Vec<Declaration>,
-    unique_ty: Vec<UniqueTy>,
-    functions: Vec<FunctionInfo>,
-    debug_marks: Vec<DebugMark>,
-}
-
-impl<'de> Deserialize<'de> for SourceMap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = SourceMapDe::deserialize(deserializer)?;
-        let mut sm = SourceMap {
-            files: raw.files,
-            declarations: raw.declarations,
-            unique_ty: raw.unique_ty,
-            functions: raw.functions,
-            debug_marks: raw.debug_marks,
-            structs: HashMap::new(),
-            aliases: HashMap::new(),
-            enums: HashMap::new(),
-        };
-        sm.index_declarations();
-        Ok(sm)
+    fn declaration_index(&self) -> &DeclarationIndex {
+        self.decl_index.get_or_init(|| {
+            let mut index = DeclarationIndex::default();
+            for (idx, decl) in self.declarations.iter().enumerate() {
+                match decl {
+                    Declaration::Struct(s) => {
+                        index.structs.insert(s.name.clone(), idx);
+                    }
+                    Declaration::Alias(a) => {
+                        index.aliases.insert(a.name.clone(), idx);
+                    }
+                    Declaration::Enum(e) => {
+                        index.enums.insert(e.name.clone(), idx);
+                    }
+                }
+            }
+            index
+        })
     }
+
+    fn source_location_for_mark(&self, mark_id: usize) -> Option<SourceLocation> {
+        let (DebugMark::EnterFun {
+            is_inlined: true,
+            range,
+            ..
+        }
+        | DebugMark::Loc { range, .. }
+        | DebugMark::LeaveFun { range, .. }) = self.get_debug_mark(mark_id)
+        else {
+            return None;
+        };
+
+        let file_id = range.file_id();
+        let file = self
+            .resolve_file_full_path(file_id)
+            .unwrap_or_else(|| self.resolve_file_name(file_id))
+            .to_owned();
+        if file.is_empty() || file.starts_with("@stdlib/") {
+            return None;
+        }
+
+        Some(SourceLocation {
+            file,
+            line: range.start_line() as i64,
+            column: range.start_col() as i64,
+            end_line: range.end_line() as i64,
+            end_column: range.end_col() as i64,
+            length: 0,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct DeclarationIndex {
+    structs: HashMap<String, usize>,
+    aliases: HashMap<String, usize>,
+    enums: HashMap<String, usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +372,11 @@ impl<'de> Deserialize<'de> for SourceMap {
 pub struct SrcRange(pub Vec<usize>);
 
 impl SrcRange {
+    #[must_use]
+    pub fn is_undefined(&self) -> bool {
+        self.start_line() == 0
+    }
+
     #[must_use]
     pub fn file_id(&self) -> usize {
         self.0[0]
@@ -321,6 +436,8 @@ pub struct AbiStruct {
     #[serde(default)]
     pub prefix: Option<PrefixInfo>,
     pub fields: Vec<FieldInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -330,6 +447,8 @@ pub struct AbiAlias {
     pub target_ty: Ty,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -338,6 +457,8 @@ pub struct AbiEnum {
     pub ident_loc: SrcRange,
     pub encoded_as: Ty,
     pub members: Vec<EnumMemberInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -355,6 +476,22 @@ pub enum Declaration {
 pub struct PrefixInfo {
     pub prefix_str: String,
     pub prefix_len: i32,
+}
+
+fn parse_prefix_number(prefix: &str) -> Option<u32> {
+    let prefix = prefix.trim();
+    if prefix.is_empty() {
+        return None;
+    }
+    let parsed = if let Some(hex) = prefix
+        .strip_prefix("0x")
+        .or_else(|| prefix.strip_prefix("0X"))
+    {
+        u64::from_str_radix(hex, 16).ok()?
+    } else {
+        prefix.parse::<u64>().ok()?
+    };
+    u32::try_from(parsed).ok()
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

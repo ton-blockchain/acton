@@ -2537,7 +2537,6 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2")
         .run()
@@ -2566,7 +2565,6 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account")
         .run()
@@ -2595,7 +2593,6 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("localnet")
         .run()
@@ -2883,7 +2880,6 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account-with-init")
         .run()
@@ -2916,7 +2912,6 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-wallet-rejection-with-init")
         .run()
@@ -3960,7 +3955,6 @@ fun main() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/show_config.tolk")
         .verify_network("custom:mock-v2-config")
         .run()

@@ -8,7 +8,7 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
         .without_acton_toml()
         .build();
 
-    let output = project.acton().init().arg("--create-app").run().success();
+    let output = project.acton().init().arg("--create-dapp").run().success();
     output.assert_snapshot_matches(
         "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.stdout.txt",
     );
@@ -49,7 +49,7 @@ fn test_init_create_app_scaffolds_empty_ui_into_custom_directory() {
     let output = project
         .acton()
         .init()
-        .arg("--create-app=frontend")
+        .arg("--create-dapp=frontend")
         .run()
         .success();
     output.assert_snapshot_matches(
@@ -71,7 +71,7 @@ fn test_init_create_app_rejects_existing_app_directory() {
         .build();
     fs::create_dir(project.path().join("app")).expect("failed to create existing app dir");
 
-    let output = project.acton().init().arg("--create-app").run().failure();
+    let output = project.acton().init().arg("--create-dapp").run().failure();
     output.assert_stderr_snapshot_matches(
         "integration/snapshots/create_app/test_init_create_app_rejects_existing_app_directory.stderr.txt",
     );

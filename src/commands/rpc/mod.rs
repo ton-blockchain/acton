@@ -10,9 +10,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use ton_abi::abi_serde::Data as CompilerAbiData;
-use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
@@ -122,11 +122,12 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
         .flatten();
 
     let decoded_storage = match (&data, matched_contract.as_ref()) {
-        (Some(data), Some(contract)) => contract
-            .compiler_abi
-            .as_ref()
-            .map(|abi| decode_storage_json(data, abi, &network))
-            .transpose()?,
+        (Some(data), Some(contract)) => match (&contract.abi, &contract.source_map) {
+            (Some(abi), Some(source_map)) => {
+                Some(decode_storage_json(data, source_map, abi, &network)?)
+            }
+            _ => None,
+        },
         _ => None,
     };
 
@@ -172,9 +173,6 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
                     .green()
                     .to_string(),
             );
-            if let Some(abi) = &contract.abi {
-                print_kv("ABI", abi.name.as_str().green().to_string());
-            }
         } else {
             print_kv("Contract", "<none>".dimmed().to_string());
         }
@@ -250,8 +248,8 @@ fn load_rpc_config() -> anyhow::Result<ActonConfig> {
 struct LocalContractMatch {
     contract_id: String,
     contract_name: String,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Option<Arc<SourceMap>>,
 }
 
 fn find_local_contract_match(
@@ -264,7 +262,7 @@ fn find_local_contract_match(
                 contract_id: candidate.contract_id,
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
-                compiler_abi: candidate.compiler_abi,
+                source_map: candidate.source_map,
             }));
         }
     }
@@ -308,8 +306,8 @@ struct LocalContractCandidate {
     contract_name: String,
     code_boc64: String,
     code_hash: HashBytes,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Option<Arc<SourceMap>>,
 }
 
 fn load_local_contract_candidate(
@@ -332,7 +330,7 @@ fn load_local_contract_candidate(
             code_boc64,
             code_hash: *code.repr_hash(),
             abi: None,
-            compiler_abi: None,
+            source_map: None,
         });
     }
 
@@ -340,8 +338,12 @@ fn load_local_contract_candidate(
     let cached = file_cache
         .as_mut()
         .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.3"));
-    let (code_boc64, compiler_abi) = if let Some(cached) = cached {
-        (cached.code_boc64, cached.abi.map(Arc::new))
+    let (code_boc64, abi, source_map) = if let Some(cached) = cached {
+        (
+            cached.code_boc64,
+            cached.abi.map(Arc::new),
+            cached.source_map.map(Arc::new),
+        )
     } else {
         let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
         match compiler.compile(&contract_path, false) {
@@ -349,7 +351,11 @@ fn load_local_contract_candidate(
                 if let Some(cache) = file_cache.as_mut() {
                     let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.3");
                 }
-                (result.code_boc64, result.abi.map(Arc::new))
+                (
+                    result.code_boc64,
+                    result.abi.map(Arc::new),
+                    result.source_map.map(Arc::new),
+                )
             }
             tolk_compiler::CompilerResult::Error(err) => {
                 return Err(anyhow!(err.message)
@@ -360,11 +366,6 @@ fn load_local_contract_candidate(
 
     let code = Boc::decode_base64(&code_boc64)
         .with_context(|| format!("Failed to decode code for {}", contract_path.display()))?;
-    let content = fs::read_to_string(&contract_path)
-        .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-    let path = contract_path.to_string_lossy().to_string();
-    let mappings = config.mappings();
-    let abi = Arc::new(contract_abi(content.into(), &path, mappings.as_ref()));
 
     Ok(LocalContractCandidate {
         contract_path,
@@ -372,14 +373,15 @@ fn load_local_contract_candidate(
         contract_name: contract.display_name(contract_id).to_owned(),
         code_boc64,
         code_hash: *code.repr_hash(),
-        abi: Some(abi),
-        compiler_abi,
+        abi,
+        source_map,
     })
 }
 
 fn decode_storage_json(
     data: &Cell,
-    abi: &CompilerContractABI,
+    source_map: &SourceMap,
+    abi: &ContractABI,
     network: &Network,
 ) -> anyhow::Result<serde_json::Value> {
     let storage_ty = abi
@@ -389,11 +391,11 @@ fn decode_storage_json(
         .or(abi.storage.storage_ty.as_ref())
         .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
     let mut parser = data.as_slice_allow_exotic();
-    let decoded = compiler_abi_serde::decode(&mut parser, abi, storage_ty)
-        .context("Failed to decode storage with compiler ABI")?;
+    let decoded = dynamic_unpack::unpack_from_slice(&mut parser, source_map, storage_ty)
+        .context("Failed to decode storage with compiler symbols")?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         anyhow::bail!(
-            "Storage cell has {} extra bits and {} extra refs after ABI decode",
+            "Storage cell has {} extra bits and {} extra refs after type decode",
             parser.size_bits(),
             parser.size_refs()
         );
@@ -401,37 +403,35 @@ fn decode_storage_json(
     Ok(compiler_data_to_json(&decoded, network))
 }
 
-fn compiler_data_to_json(data: &CompilerAbiData, network: &Network) -> serde_json::Value {
+fn compiler_data_to_json(data: &UnpackedValue, network: &Network) -> serde_json::Value {
     match data {
-        CompilerAbiData::Null => serde_json::Value::Null,
-        CompilerAbiData::Number(value) => serde_json::Value::String(value.to_string()),
-        CompilerAbiData::Bool(value) => serde_json::Value::Bool(*value),
-        CompilerAbiData::String(value) | CompilerAbiData::Symbol(value) => {
-            serde_json::Value::String(value.clone())
-        }
-        CompilerAbiData::Address(value) => {
+        UnpackedValue::Null => serde_json::Value::Null,
+        UnpackedValue::Number(value) => serde_json::Value::String(value.to_string()),
+        UnpackedValue::Bool(value) => serde_json::Value::Bool(*value),
+        UnpackedValue::String(value) => serde_json::Value::String(value.clone()),
+        UnpackedValue::Address(value) => {
             serde_json::Value::String(format_int_address(value, network))
         }
-        CompilerAbiData::ExtAddress(value) => serde_json::json!({
+        UnpackedValue::ExtAddress(value) => serde_json::json!({
             "bits": value.data_bit_len,
             "hex": hex::encode(&value.data),
         }),
-        CompilerAbiData::Cell(value) | CompilerAbiData::RemainingBitsAndRefs(value) => {
+        UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
             serde_json::json!({
                 "boc64": Boc::encode_base64(value.clone()),
             })
         }
-        CompilerAbiData::Bits((bytes, bit_len)) => serde_json::json!({
+        UnpackedValue::Bits((bytes, bit_len)) => serde_json::json!({
             "bits": bit_len,
             "hex": hex::encode(bytes),
         }),
-        CompilerAbiData::Array(values) => serde_json::Value::Array(
+        UnpackedValue::Array(values) => serde_json::Value::Array(
             values
                 .iter()
                 .map(|value| compiler_data_to_json(value, network))
                 .collect(),
         ),
-        CompilerAbiData::Map(values) => serde_json::Value::Array(
+        UnpackedValue::Map(values) => serde_json::Value::Array(
             values
                 .iter()
                 .map(|(key, value)| {
@@ -442,13 +442,10 @@ fn compiler_data_to_json(data: &CompilerAbiData, network: &Network) -> serde_jso
                 })
                 .collect(),
         ),
-        CompilerAbiData::Object(object) => {
+        UnpackedValue::Object { fields, .. } => {
             let mut result = serde_json::Map::new();
-            for field in &object.fields {
-                result.insert(
-                    field.name.clone(),
-                    compiler_data_to_json(&field.value, network),
-                );
+            for (name, value) in fields {
+                result.insert(name.clone(), compiler_data_to_json(value, network));
             }
             serde_json::Value::Object(result)
         }

@@ -17,12 +17,12 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use ton_api::{
     AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
     V3TransactionSummary,
 };
-use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{HashBytes, Lazy};
 use tycho_types::models::{
@@ -63,16 +63,11 @@ pub(super) fn rpc_trace_cmd(
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
     print_section("Trace Tree");
-    let send_result_list = TupleItem::TypedTuple {
-        type_name: "SendResultList".to_owned(),
-        inner: Tuple(
-            trace_txs
-                .iter()
-                .map(V3TraceTransaction::to_send_result_tuple)
-                .collect(),
-        ),
-    };
-    let formatted_tree = formatter.format(&send_result_list);
+    let send_result_list: Vec<TupleItem> = trace_txs
+        .iter()
+        .map(V3TraceTransaction::to_send_result_tuple)
+        .collect();
+    let formatted_tree = formatter.format_transaction_list(&send_result_list);
     println!("{}", formatted_tree.trim_end());
 
     if verbose {
@@ -442,9 +437,10 @@ fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
             &candidate.contract_path,
             &candidate.code_boc64,
             candidate.code_hash,
-            Arc::new(TolkSourceMap::without_debug_info()),
+            candidate
+                .source_map
+                .unwrap_or_else(|| Arc::new(SourceMap::without_debug_info())),
             candidate.abi,
-            candidate.compiler_abi,
         );
     }
     Ok(build_cache)
