@@ -128,6 +128,9 @@ fmt-ui:
 play-tree-sitter:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter build --wasm && yarn tree-sitter playground
 
+update-template-wrappers:
+    cargo xtask update-template-wrappers
+
 precommit: fmt fmt-ui build build-ui check check-ui
 
 clean:

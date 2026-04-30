@@ -104,10 +104,18 @@ class StackReader {
 
     private popExpecting<ItemT>(itemType: string): ItemT {
         const item = this.tuple.shift();
-        if (item?.type !== itemType) {
-            throw new Error(`not '${itemType}' on a stack`);
+        if (item?.type === itemType) {
+            return item as ItemT;
         }
-        return item as ItemT;
+        throw new Error(`not '${itemType}' on a stack`);
+    }
+
+    private popCellLike(): c.Cell {
+        const item = this.tuple.shift();
+        if (item && (item.type === 'cell' || item.type === 'slice' || item.type === 'builder')) {
+            return item.cell;
+        }
+        throw new Error(`not cell/slice on a stack`);
     }
 
     readBigInt(): bigint {
@@ -119,11 +127,11 @@ class StackReader {
     }
 
     readCell(): c.Cell {
-        return this.popExpecting<c.TupleItemCell>('cell').cell;
+        return this.popCellLike();
     }
 
     readSlice(): c.Slice {
-        return this.popExpecting<c.TupleItemSlice>('slice').cell.beginParse();
+        return this.popCellLike().beginParse();
     }
 
     readSnakeString(): string {
@@ -653,14 +661,14 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
         code,
         data,
         splitDepth: options.toShard?.fixedPrefixLength,
-        special: null,          // todo will somebody need special?
-        libraries: null,        // todo will somebody need libraries?
+        special: null,
+        libraries: null,
     })).endCell();
 
     let addrHash = stateInitCell.hash();
     if (options.toShard) {
         const shardDepth = options.toShard.fixedPrefixLength;
-        addrHash = beginCell()  // todo any way to do it better? N bits from closeTo + 256-N from stateInitCell
+        addrHash = beginCell()
             .storeBits(new c.BitString(options.toShard.closeTo.hash, 0, shardDepth))
             .storeBits(new c.BitString(stateInitCell.hash(), shardDepth, 256 - shardDepth))
             .endCell()
