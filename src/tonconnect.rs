@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
+use std::io::ErrorKind;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -27,6 +28,7 @@ use tycho_types::models::{
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
 const TONCONNECT_TESTNET_CHAIN: &str = "-3";
 const API_TOKEN_HEADER: &str = "x-acton-tonconnect-token";
+pub const DEFAULT_TONCONNECT_PORT: u16 = 52258;
 
 const INDEX_HTML: &str = r#"<!doctype html>
 <html lang="en">
@@ -145,11 +147,23 @@ const INDEX_HTML: &str = r#"<!doctype html>
       publishWallet(wallet).catch((error) => setStatus(error.message));
     });
 
-    tonConnectUI.connectionRestored.then(() => {
-      if (tonConnectUI.wallet) {
-        publishWallet(tonConnectUI.wallet).catch((error) => setStatus(error.message));
+    const restoreConnection = async () => {
+      setStatus('Restoring TON Connect session...');
+      try {
+        await tonConnectUI.connectionRestored;
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        console.debug('TON Connect restore failed:', message);
       }
-    });
+
+      if (tonConnectUI.wallet) {
+        await publishWallet(tonConnectUI.wallet);
+      } else {
+        setStatus('Waiting for wallet connection...');
+      }
+    };
+
+    restoreConnection();
 
     const poll = async () => {
       try {
@@ -165,6 +179,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 
         setStatus('Approve the transaction in your wallet...');
         try {
+          await tonConnectUI.connectionRestored;
           const result = await tonConnectUI.sendTransaction(request.transaction);
           await postJson('/api/response', {id: request.id, ok: true, boc: result.boc});
           setStatus('Transaction approved. Waiting for the next request...');
@@ -305,9 +320,8 @@ struct StorageGetResponse {
 }
 
 impl TonConnectSession {
-    pub fn start(storage_path: PathBuf) -> anyhow::Result<Self> {
-        let listener = TcpListener::bind(("127.0.0.1", 0))
-            .context("Failed to bind local TON Connect server")?;
+    pub fn start(port: u16, storage_path: PathBuf) -> anyhow::Result<Self> {
+        let listener = bind_listener(port)?;
         listener
             .set_nonblocking(true)
             .context("Failed to configure local TON Connect server socket")?;
@@ -469,6 +483,18 @@ impl Drop for TonConnectSession {
         if let Some(thread) = self.server_thread.take() {
             let _ = thread.join();
         }
+    }
+}
+
+fn bind_listener(port: u16) -> anyhow::Result<TcpListener> {
+    match TcpListener::bind(("127.0.0.1", port)) {
+        Ok(listener) => Ok(listener),
+        Err(error) if error.kind() == ErrorKind::AddrInUse => anyhow::bail!(
+            "TON Connect port 127.0.0.1:{port} is already in use. Stop the process using it or pass `--tonconnect-port <port>`."
+        ),
+        Err(error) => Err(error).with_context(|| {
+            format!("Failed to bind local TON Connect server to 127.0.0.1:{port}")
+        }),
     }
 }
 
@@ -919,6 +945,23 @@ mod tests {
             format_address(&dest, &Network::Testnet, true)
         );
         assert!(message.payload.is_some());
+    }
+
+    #[test]
+    fn tonconnect_page_restores_sdk_connection_from_storage() {
+        assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
+        assert!(INDEX_HTML.contains("await tonConnectUI.connectionRestored"));
+        assert!(INDEX_HTML.contains("const result = await tonConnectUI.sendTransaction"));
+    }
+
+    #[test]
+    fn tonconnect_busy_port_error_mentions_override_flag() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let error = bind_listener(port).unwrap_err().to_string();
+
+        assert!(error.contains("--tonconnect-port <port>"));
     }
 
     #[test]

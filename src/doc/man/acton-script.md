@@ -105,6 +105,14 @@ reused by later runs in the same project. Currently supported only with
 `--net mainnet` or `--net testnet`.
 {{/option}}
 
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port. Defaults to `52258`.
+
+Acton keeps this port stable so injected wallets can recognize the same local
+dApp on later runs. If the default port is busy, pass another port explicitly
+and keep using the same value for that project.
+{{/option}}
+
 {{#option "`--explorer` _name_" }}
 Explorer to use for transaction links.
 

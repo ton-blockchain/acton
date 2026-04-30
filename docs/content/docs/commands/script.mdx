@@ -203,6 +203,22 @@ reused by later runs in the same project. Currently supported only with
 <CommandOption>
 <CommandOptionTitle>
 
+`--tonconnect-port` _port_
+
+</CommandOptionTitle>
+
+Local TON Connect page port. Defaults to `52258`.
+
+Acton keeps this port stable so injected wallets can recognize the same local
+dApp on later runs. If the default port is busy, pass another port explicitly
+and keep using the same value for that project.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
 `--explorer` _name_
 
 </CommandOptionTitle>

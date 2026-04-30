@@ -602,6 +602,13 @@ enum Commands {
             help_heading = "Broadcasting"
         )]
         tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
 
         #[arg(
             value_enum,
@@ -1881,6 +1888,7 @@ fn main() {
             fork_block_number,
             net,
             tonconnect,
+            tonconnect_port,
             explorer,
             show_bodies,
         } => match commands::common::validate_cli_verbosity(verbose) {
@@ -1898,6 +1906,7 @@ fn main() {
                 explorer,
                 show_bodies,
                 tonconnect,
+                tonconnect_port,
             ),
             Err(err) => Err(err),
         },
