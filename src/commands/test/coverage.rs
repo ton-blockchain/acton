@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tolk_compiler::{
-    TolkSourceMap,
+    SourceMap,
     source_map::{DebugMark, SrcRange},
 };
 use tvm_logs::parser::VmStackValue;
@@ -109,7 +109,7 @@ pub(super) fn collect_coverage(
 
 struct SourceMapAndLogs {
     build_path: PathBuf,
-    source_map: Arc<TolkSourceMap>,
+    source_map: Arc<SourceMap>,
     logs: Arc<str>,
 }
 
@@ -285,10 +285,7 @@ fn current_coverage_loc(
     Some((file, zero_based_line(line)))
 }
 
-fn coverage_location_for_range(
-    source_map: &tolk_compiler::SourceMap,
-    range: &SrcRange,
-) -> Option<(String, i64)> {
+fn coverage_location_for_range(source_map: &SourceMap, range: &SrcRange) -> Option<(String, i64)> {
     let file = source_map
         .resolve_file_full_path(range.file_id())
         .unwrap_or_else(|| source_map.resolve_file_name(range.file_id()))
@@ -387,13 +384,11 @@ fn build_executable_lines_per_files(
 
 fn build_executable_lines_per_file(
     executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
-    source_map: &TolkSourceMap,
+    source_map: &SourceMap,
     wrapper_roots: &[PathBuf],
     include_wrappers: bool,
     include_tests: bool,
 ) {
-    let source_map = &source_map.source_map;
-
     for mark_id in 0..source_map.debug_marks_count() {
         let Some(range) = (match source_map.get_debug_mark(mark_id) {
             DebugMark::Loc { range, .. }

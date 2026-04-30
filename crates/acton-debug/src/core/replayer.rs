@@ -14,7 +14,6 @@ use super::types_render::{
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, OnceLock};
-use tolk_compiler::TolkSourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::debug_marks_dict::DebugMarksDict;
 use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
@@ -584,35 +583,37 @@ pub struct TolkReplayer {
 }
 
 impl TolkReplayer {
-    pub fn new(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+    pub fn new(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(VmLogRuntimeEventSource::from_vm_logs(vm_logs)),
         ))
     }
 
-    pub fn new_for_coverage(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+    pub fn new_for_coverage(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
         let mut replayer = Self::new(source_map, vm_logs)?;
         replayer.coverage_mode = true;
         Ok(replayer)
     }
 
     pub fn new_live_vm(
-        source_map: &TolkSourceMap,
+        source_map: &SourceMap,
         executor: DebugExecutorHandle,
     ) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(LiveVmRuntimeEventSource::new(executor)),
         ))
     }
@@ -867,7 +868,7 @@ impl TolkReplayer {
                 definition_loc: self
                     .source_map
                     .get_function_by_idx(f.f_idx)
-                    .map(|fun| fun.ident_loc.clone()),
+                    .and_then(|fun| (!fun.ident_loc.is_undefined()).then(|| fun.ident_loc.clone())),
                 call_site_loc: f.call_site_loc.clone(),
             })
             .collect()

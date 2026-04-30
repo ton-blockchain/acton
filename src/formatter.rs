@@ -8,28 +8,30 @@ use crate::context::{
 use crate::retrace::{
     self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
 };
-use acton_config::color::OwoColorize;
+use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::BacktraceMode;
-use acton_debug::exit_codes;
+use acton_debug::{
+    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, exit_codes, render_tuple_as_tolk_type,
+};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::sync::Arc;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{
     ABIDeclaration, ContractABI as CompilerContractABI, Ty as CompilerAbiType,
 };
+use ton_abi::ContractAbi;
 use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
-use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
-use tycho_types::dict;
+use tycho_types::cell::{Cell, CellSlice, HashBytes};
 use tycho_types::models::{
     AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
     DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
@@ -79,29 +81,6 @@ enum FormattedExtraInfo {
 pub(crate) struct AbiExitCodeInfo {
     pub symbolic_name: String,
     pub description: String,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum MapScalarType {
-    Int { bits: u16, signed: bool },
-    VarInt { len_bits: u8, signed: bool },
-    Bool,
-    Address,
-    Cell,
-    String,
-}
-
-impl MapScalarType {
-    const fn bit_len(self) -> u16 {
-        match self {
-            Self::Int { bits, .. } => bits,
-            Self::Bool => 1,
-            // Std addr without anycast.
-            Self::Address => StdAddr::BITS_WITHOUT_ANYCAST,
-            // Variable-length integers are not valid dict keys.
-            Self::VarInt { .. } | Self::Cell | Self::String => 0,
-        }
-    }
 }
 
 /// Context for formatting `TupleItems` with rich information
@@ -159,63 +138,63 @@ impl<'a> FormatterContext<'a> {
         }
     }
 
-    fn compiler_abi_symbol_description(
-        compiler_abi: &CompilerContractABI,
-        symbol: &str,
-    ) -> Option<String> {
-        if let Some((enum_name, member_name)) = symbol.rsplit_once('.')
-            && let Some(description) = compiler_abi
-                .declarations
-                .iter()
-                .find_map(|declaration| match declaration {
-                    ABIDeclaration::Enum { name, members, .. } if name == enum_name => members
-                        .iter()
-                        .find(|member| member.name == member_name)
-                        .map(|member| member.description.as_str()),
-                    _ => None,
-                })
-                .filter(|description| !description.is_empty())
-        {
-            return Some(description.to_owned());
-        }
-
-        compiler_abi
-            .constants
-            .iter()
-            .find(|constant| constant.name == symbol && !constant.description.is_empty())
-            .map(|constant| constant.description.clone())
+    #[must_use]
+    pub(crate) fn use_mainnet_addresses(&self) -> bool {
+        self.fork_net == Some(Network::Mainnet) || self.network == Some(Network::Mainnet)
     }
 
-    fn compiler_abi_symbol_name(compiler_abi: &CompilerContractABI, code: i32) -> Option<String> {
-        compiler_abi
-            .thrown_errors
+    #[must_use]
+    pub(crate) fn pretty_render_options(&self) -> PrettyRenderOptions {
+        self.pretty_render_options_with_color(false)
+    }
+
+    #[must_use]
+    pub(crate) fn pretty_render_options_with_cli_color(&self) -> PrettyRenderOptions {
+        self.pretty_render_options_with_color(colors_enabled())
+    }
+
+    fn pretty_render_options_with_color(&self, colorize: bool) -> PrettyRenderOptions {
+        let mut address_labels: HashMap<String, String> = self
+            .known_addresses
+            .addresses
             .iter()
-            .find(|error| error.err_code == code && !error.name.is_empty())
-            .map(|thrown| thrown.name.clone())
+            .map(|(addr, known)| (addr.to_string(), known.name.clone()))
+            .collect();
+
+        for addr in self.accounts.keys() {
+            if let Some(label) = self.get_contract_type(&IntAddr::Std(addr.clone())) {
+                address_labels.entry(addr.to_string()).or_insert(label);
+            }
+        }
+
+        PrettyRenderOptions {
+            address_format: if self.use_mainnet_addresses() {
+                PrettyAddressFormat::Mainnet
+            } else {
+                PrettyAddressFormat::Testnet
+            },
+            address_labels,
+            colorize,
+        }
     }
 
     #[must_use]
     pub(crate) fn find_custom_exit_code_info(
         code: i32,
-        abi: Option<&ContractAbi>,
+        _abi: Option<&ContractAbi>,
         compiler_abi: Option<&CompilerContractABI>,
     ) -> Option<AbiExitCodeInfo> {
-        if let Some(compiler_abi) = compiler_abi
-            && let Some(symbolic_name) = Self::compiler_abi_symbol_name(compiler_abi, code)
-        {
-            let description = Self::compiler_abi_symbol_description(compiler_abi, &symbolic_name)
-                .unwrap_or_else(|| symbolic_name.clone());
-            return Some(AbiExitCodeInfo {
-                symbolic_name,
-                description,
-            });
-        }
+        let thrown = compiler_abi?
+            .thrown_errors
+            .iter()
+            .find(|error| error.err_code == code && !error.name.is_empty())?;
 
-        let exit_code = abi?.exit_codes.iter().find(|item| item.value == code)?;
-        let symbolic_name = exit_code.constant_name.clone();
-        let description = compiler_abi
-            .and_then(|abi| Self::compiler_abi_symbol_description(abi, &symbolic_name))
-            .unwrap_or_else(|| symbolic_name.clone());
+        let symbolic_name = thrown.name.clone();
+        let description = if thrown.description.is_empty() {
+            symbolic_name.clone()
+        } else {
+            thrown.description.clone()
+        };
 
         Some(AbiExitCodeInfo {
             symbolic_name,
@@ -287,32 +266,13 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         }
     }
 
-    fn format_slice(&self, slice: &Cell) -> String {
-        let mut parser = slice.as_slice_allow_exotic();
-
-        if parser.size_bits() == 2 && parser.load_small_uint(2).unwrap_or(1) == 0 {
-            return "addr_none".to_string();
-        }
-
-        if parser.size_bits() == 267
-            && let Ok(address) = IntAddr::load_from(&mut parser)
-        {
-            return self.address_to_string(&address);
-        }
-
-        Boc::encode_hex(slice)
-    }
-
     fn address_to_string(&self, address: &IntAddr) -> String {
         match address {
             IntAddr::Std(addr) => {
-                let need_mainnet_address = self.fork_net == Some(Network::Mainnet)
-                    || self.network == Some(Network::Mainnet);
-
                 let display = DisplayBase64StdAddr {
                     addr,
                     flags: Base64StdAddrFlags {
-                        testnet: !need_mainnet_address,
+                        testnet: !self.use_mainnet_addresses(),
                         base64_url: true,
                         bounceable: true,
                     },
@@ -330,28 +290,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         };
 
         format!("{rendered} ({contract_type})")
-    }
-
-    fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
-        let mut parser = slice.as_slice_allow_exotic();
-        let Ok(addr) = IntAddr::load_from(&mut parser) else {
-            return Boc::encode_hex(slice);
-        };
-
-        let addr_base64 = self.address_to_string(&addr);
-
-        let addr_str = if colorize {
-            addr_base64.cyan().to_string()
-        } else {
-            addr_base64
-        };
-
-        let contract_type = self.get_contract_type(&addr);
-        if let Some(contract_type) = contract_type {
-            return format!("{addr_str} ({contract_type})");
-        }
-
-        addr_str
     }
 
     /// Format transaction list as a tree
@@ -2236,585 +2174,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     }
 
     #[must_use]
-    pub fn format_tuple(&self, tuple: &Tuple, root: bool, colorize: bool) -> String {
-        self.format_tuple_with_brackets(tuple, root, colorize, '[', ']')
-    }
-
-    #[must_use]
-    pub fn format_tensor(&self, tuple: &Tuple, root: bool, colorize: bool) -> String {
-        self.format_tuple_with_brackets(tuple, root, colorize, '(', ')')
-    }
-
-    fn format_tuple_with_brackets(
+    pub fn format_tuple_value(
         &self,
         tuple: &Tuple,
-        root: bool,
-        colorize: bool,
-        open: char,
-        close: char,
+        ty: &CompilerAbiType,
+        source_map: &SourceMap,
+        indent: usize,
     ) -> String {
-        if tuple.len() == 1 {
-            return self.format_internal(&tuple[0], root, colorize);
-        }
-
-        let mut res = String::new();
-        write!(res, "{open}").ok();
-        for (i, item) in tuple.iter().enumerate() {
-            if i > 0 {
-                write!(res, ", ").ok();
-            }
-            write!(res, "{}", self.format_internal(item, false, colorize)).ok();
-        }
-        write!(res, "{close}").ok();
-        res
-    }
-
-    /// Format any `TupleItem` with rich formatting
-    #[must_use]
-    pub fn format(&self, item: &TupleItem) -> String {
-        self.format_internal(item, true, false)
-    }
-
-    /// Format any `TupleItem` with rich formatting and colors
-    #[must_use]
-    pub fn format_with_color(&self, item: &TupleItem) -> String {
-        self.format_internal(item, true, true)
-    }
-
-    fn format_internal(&self, item: &TupleItem, root: bool, colorize: bool) -> String {
-        match item {
-            TupleItem::TypedTuple {
-                type_name,
-                inner: items,
-            } => {
-                if items.is_empty() {
-                    return format!("{type_name}()");
-                }
-
-                if type_name.ends_with('?') {
-                    return self.format_nullable(item, root, colorize);
-                }
-
-                if type_name == "SendResultList" {
-                    return self.format_transaction_list(items);
-                }
-
-                if type_name.starts_with("map<")
-                    && let Some(formatted_map) = self.format_map(type_name, items, root, colorize)
-                {
-                    return formatted_map;
-                }
-
-                let abi = self.contract_abi.find_any_type(type_name);
-
-                // Format structure as Foo { ... }
-                if let Some(struct_desc) = abi {
-                    return self.format_structure(
-                        struct_desc,
-                        0,
-                        &mut VecDeque::from(items.0.clone()),
-                        colorize,
-                    );
-                }
-
-                if let TupleItem::Slice(cell) = &items[0]
-                    && type_name == "address"
-                {
-                    return self.format_address_slice(cell, colorize);
-                }
-                if let TupleItem::Int(value) = &items[0]
-                    && type_name == "bool"
-                {
-                    let s = if value == &BigInt::ZERO {
-                        "false".to_owned()
-                    } else if value == &BigInt::from(-1) {
-                        "true".to_owned()
-                    } else {
-                        format!("{value}")
-                    };
-                    return if colorize { s.yellow().to_string() } else { s };
-                }
-
-                if type_name == "string"
-                    && let TupleItem::Cell(cell) | TupleItem::Slice(cell) = &items[0]
-                    && let Some(string) = Tuple::parse_snake_string(cell)
-                {
-                    if root {
-                        // for `println("hello")` show `hello`
-                        return string;
-                    }
-
-                    let s = format!("\"{string}\"");
-                    return if colorize { s.green().to_string() } else { s };
-                }
-
-                if let TupleItem::Slice(_) = &items[0] {
-                    return self.format_internal(&items[0], root, colorize);
-                }
-
-                if type_name.starts_with('(') {
-                    // (int, slice, etc.) tensor
-                    return self.format_tensor(items, root, colorize);
-                }
-
-                self.format_tuple(items, root, colorize)
-            }
-            TupleItem::Slice(cell) => {
-                if cell.bit_len() == 0 && cell.reference_count() == 0 {
-                    return "empty slice".to_owned();
-                }
-
-                self.format_slice(cell)
-            }
-            TupleItem::Int(value) => {
-                let s = format!("{value}");
-                if colorize { s.yellow().to_string() } else { s }
-            }
-            TupleItem::Null => {
-                if colorize {
-                    "null".bold().to_string()
-                } else {
-                    "null".to_owned()
-                }
-            }
-            TupleItem::Cont(cont) => {
-                let s = Boc::encode_hex(&cont.code);
-                if colorize { s.dimmed().to_string() } else { s }
-            }
-            TupleItem::Nan => "NaN".to_owned(),
-            TupleItem::Cell(cell) | TupleItem::Builder(cell) => {
-                let s = Boc::encode_hex(cell);
-                if colorize { s.dimmed().to_string() } else { s }
-            }
-            TupleItem::Tuple(items) => self.format_tuple(items, root, colorize),
-        }
-    }
-
-    fn format_nullable(&self, item: &TupleItem, root: bool, colorize: bool) -> String {
-        let TupleItem::TypedTuple { type_name, inner } = item else {
-            return String::new();
-        };
-
-        // From Tolk compiler:
-        // pass `null` to `T?` when T is wide (stores some nulls and UTag=0 at runtime)
-        // - `null` to `(int, int)?`
-        // - `null` to `int | slice | null`
-        // to represent a non-primitive null value, we need N nulls + 1 null flag (UTag=0, type_id of TypeDataNullLiteral)
-        //
-        // So we can just check if the last element is zero to understand if whole tuple represents null.
-        if inner.last() == Some(&TupleItem::Int(0.into())) {
-            return if colorize {
-                "null".bold().to_string()
-            } else {
-                "null".to_owned()
-            };
-        }
-
-        let inner_type = &type_name[..type_name.len() - 1];
-
-        // map<K, V> and (null, X) -> empty map
-        if inner_type.starts_with("map<")
-            && inner.len() == 2
-            && inner.first() == Some(&TupleItem::Null)
-            && matches!(inner.last(), Some(&TupleItem::Int(_)))
-        {
-            return format!("{inner_type} {{}}");
-        }
-
-        self.format_internal(
-            &TupleItem::TypedTuple {
-                type_name: inner_type.to_owned(),
-                inner: inner.clone(),
-            },
-            root,
-            colorize,
-        )
-    }
-
-    fn format_map(
-        &self,
-        type_name: &str,
-        items: &Tuple,
-        is_root: bool,
-        colorize: bool,
-    ) -> Option<String> {
-        let map_item = items.iter().find(|item| {
-            matches!(
-                item,
-                TupleItem::Null | TupleItem::Cell(_) | TupleItem::Slice(_)
-            )
-        })?;
-
-        let dict_root = match map_item {
-            TupleItem::Null => None,
-            TupleItem::Cell(cell) | TupleItem::Slice(cell) => Some(cell.clone()),
-            _ => return Some(format!("{type_name} {{...}}")),
-        };
-
-        let Some((key_type_name, value_type_name)) = Self::parse_map_type(type_name) else {
-            return Some(self.format_map_raw(type_name, dict_root.as_ref(), colorize));
-        };
-
-        let Some(key_type) = Self::parse_map_key_type(&key_type_name) else {
-            return Some(self.format_map_raw(type_name, dict_root.as_ref(), colorize));
-        };
-        let value_type = Self::parse_map_value_type(&value_type_name);
-        let allow_raw_value_fallback = value_type.is_none()
-            && !value_type_name.ends_with('?')
-            && !value_type_name.starts_with("map<");
-
-        let mut entries = Vec::new();
-        for entry in dict::RawIter::new(&dict_root, key_type.bit_len()) {
-            let Ok((key_data, mut value_slice)) = entry else {
-                return Some(format!("{type_name} {{...}}"));
-            };
-
-            let key = {
-                let mut key_slice = key_data.as_data_slice();
-                self.format_map_scalar(&mut key_slice, key_type, colorize)
-                    .unwrap_or_else(|_| "<key>".to_owned())
-            };
-
-            let value = if let Some(value_type) = value_type {
-                self.format_map_scalar(&mut value_slice, value_type, colorize)
-                    .unwrap_or_else(|err| format!("<value: {err}>"))
-            } else if allow_raw_value_fallback {
-                self.format_map_raw_value(value_slice, colorize)
-                    .unwrap_or_else(|err| format!("<value: {err}>"))
-            } else {
-                "<value>".to_owned()
-            };
-
-            entries.push((key, value));
-        }
-
-        if entries.is_empty() {
-            return Some(format!("{type_name} {{}}"));
-        }
-
-        if !is_root {
-            let mut formatted_entries = Vec::with_capacity(entries.len());
-            for (key, value) in entries {
-                formatted_entries.push(format!("{key}: {value}"));
-            }
-            return Some(format!("{type_name} {{{}}}", formatted_entries.join(", ")));
-        }
-
-        let mut result = String::new();
-        writeln!(result, "{type_name} {{").ok();
-        for (key, value) in &entries {
-            writeln!(result, "    {key}: {value},").ok();
-        }
-        result.push('}');
-
-        Some(result)
-    }
-
-    fn parse_map_type(type_name: &str) -> Option<(String, String)> {
-        let type_name = type_name.trim();
-        let inner = type_name.strip_prefix("map<")?.strip_suffix('>')?;
-        let split_idx = Self::find_top_level_comma(inner)?;
-        let key_type = inner[..split_idx].trim().to_owned();
-        let value_type = inner[split_idx + 1..].trim().to_owned();
-        Some((key_type, value_type))
-    }
-
-    fn find_top_level_comma(source: &str) -> Option<usize> {
-        let mut angle_depth = 0usize;
-        let mut paren_depth = 0usize;
-        let mut square_depth = 0usize;
-
-        for (idx, ch) in source.char_indices() {
-            match ch {
-                '<' => angle_depth += 1,
-                '>' => angle_depth = angle_depth.saturating_sub(1),
-                '(' => paren_depth += 1,
-                ')' => paren_depth = paren_depth.saturating_sub(1),
-                '[' => square_depth += 1,
-                ']' => square_depth = square_depth.saturating_sub(1),
-                ',' if angle_depth == 0 && paren_depth == 0 && square_depth == 0 => {
-                    return Some(idx);
-                }
-                _ => {}
-            }
-        }
-
-        None
-    }
-
-    fn parse_map_key_type(type_name: &str) -> Option<MapScalarType> {
-        let type_name = type_name.trim();
-        match type_name {
-            "bool" => Some(MapScalarType::Bool),
-            "address" | "any_address" => Some(MapScalarType::Address),
-            "int" => Some(MapScalarType::Int {
-                bits: 257,
-                signed: true,
-            }),
-            "uint" => Some(MapScalarType::Int {
-                bits: 256,
-                signed: false,
-            }),
-            _ => {
-                if let Some(bits) = type_name.strip_prefix("int") {
-                    return bits
-                        .parse::<u16>()
-                        .ok()
-                        .map(|bits| MapScalarType::Int { bits, signed: true });
-                }
-                if let Some(bits) = type_name.strip_prefix("uint") {
-                    return bits.parse::<u16>().ok().map(|bits| MapScalarType::Int {
-                        bits,
-                        signed: false,
-                    });
-                }
-                None
-            }
-        }
-    }
-
-    fn parse_map_value_type(type_name: &str) -> Option<MapScalarType> {
-        let type_name = type_name.trim();
-        if type_name.ends_with('?') || type_name.starts_with("map<") {
-            return None;
-        }
-
-        if type_name == "cell" || type_name.starts_with("Cell<") {
-            return Some(MapScalarType::Cell);
-        }
-        if type_name == "string" {
-            return Some(MapScalarType::String);
-        }
-
-        match type_name {
-            "bool" => Some(MapScalarType::Bool),
-            "address" | "any_address" => Some(MapScalarType::Address),
-            "coins" => Some(MapScalarType::VarInt {
-                len_bits: 4,
-                signed: false,
-            }),
-            "int" => Some(MapScalarType::Int {
-                bits: 257,
-                signed: true,
-            }),
-            "uint" => Some(MapScalarType::Int {
-                bits: 256,
-                signed: false,
-            }),
-            _ => {
-                if let Some(bits) = type_name.strip_prefix("int") {
-                    return bits
-                        .parse::<u16>()
-                        .ok()
-                        .map(|bits| MapScalarType::Int { bits, signed: true });
-                }
-                if let Some(bits) = type_name.strip_prefix("uint") {
-                    return bits.parse::<u16>().ok().map(|bits| MapScalarType::Int {
-                        bits,
-                        signed: false,
-                    });
-                }
-                if let Some(bytes) = type_name.strip_prefix("varint") {
-                    return match bytes {
-                        "16" => Some(MapScalarType::VarInt {
-                            len_bits: 4,
-                            signed: true,
-                        }),
-                        "32" => Some(MapScalarType::VarInt {
-                            len_bits: 5,
-                            signed: true,
-                        }),
-                        _ => None,
-                    };
-                }
-                if let Some(bytes) = type_name.strip_prefix("varuint") {
-                    return match bytes {
-                        "16" => Some(MapScalarType::VarInt {
-                            len_bits: 4,
-                            signed: false,
-                        }),
-                        "32" => Some(MapScalarType::VarInt {
-                            len_bits: 5,
-                            signed: false,
-                        }),
-                        _ => None,
-                    };
-                }
-                None
-            }
-        }
-    }
-
-    fn format_map_scalar(
-        &self,
-        slice: &mut CellSlice<'_>,
-        ty: MapScalarType,
-        colorize: bool,
-    ) -> Result<String, String> {
-        match ty {
-            MapScalarType::Int { bits, signed } => {
-                if !signed && bits == 256 {
-                    let value = format!("0x{}", slice.load_u256().map_err(|e| e.to_string())?);
-                    return Ok(if colorize {
-                        value.yellow().to_string()
-                    } else {
-                        value
-                    });
-                }
-
-                let value = slice
-                    .load_bigint(bits, signed)
-                    .map_err(|e| e.to_string())?
-                    .to_string();
-                Ok(if colorize {
-                    value.yellow().to_string()
-                } else {
-                    value
-                })
-            }
-            MapScalarType::VarInt { len_bits, signed } => {
-                let value = slice
-                    .load_var_bigint(u16::from(len_bits), signed)
-                    .map_err(|e| e.to_string())?
-                    .to_string();
-                Ok(if colorize {
-                    value.yellow().to_string()
-                } else {
-                    value
-                })
-            }
-            MapScalarType::Bool => {
-                let value = slice.load_bit().map_err(|e| e.to_string())?.to_string();
-                Ok(if colorize {
-                    value.yellow().to_string()
-                } else {
-                    value
-                })
-            }
-            MapScalarType::Address => {
-                let value =
-                    self.address_to_string(&IntAddr::load_from(slice).map_err(|e| e.to_string())?);
-                Ok(if colorize {
-                    value.cyan().to_string()
-                } else {
-                    value
-                })
-            }
-            MapScalarType::Cell => {
-                let value =
-                    Boc::encode_hex(&slice.load_reference_cloned().map_err(|e| e.to_string())?);
-                Ok(if colorize {
-                    value.dimmed().to_string()
-                } else {
-                    value
-                })
-            }
-            MapScalarType::String => {
-                let cell = slice.load_reference_cloned().map_err(|e| e.to_string())?;
-                if let Some(string) = Tuple::parse_snake_string(&cell) {
-                    let value = format!("\"{string}\"");
-                    return Ok(if colorize {
-                        value.green().to_string()
-                    } else {
-                        value
-                    });
-                }
-
-                let value = Boc::encode_hex(&cell);
-                Ok(if colorize {
-                    value.dimmed().to_string()
-                } else {
-                    value
-                })
-            }
-        }
-    }
-
-    fn format_map_raw_value(&self, slice: CellSlice<'_>, colorize: bool) -> Result<String, String> {
-        let mut builder = CellBuilder::new();
-        builder.store_slice(slice).map_err(|e| e.to_string())?;
-        let cell = builder.build().map_err(|e| e.to_string())?;
-        let value = Boc::encode_hex(&cell);
-
-        Ok(if colorize {
-            value.dimmed().to_string()
-        } else {
-            value
-        })
-    }
-
-    fn format_map_raw(&self, type_name: &str, root: Option<&Cell>, colorize: bool) -> String {
-        let Some(cell) = root else {
-            return format!("{type_name} {{}}");
-        };
-
-        let raw = Boc::encode_hex(cell);
-        let raw = if colorize {
-            raw.dimmed().to_string()
-        } else {
-            raw
-        };
-
-        format!("{type_name} {{raw: {raw}}}")
-    }
-
-    fn format_structure(
-        &self,
-        struct_desc: TypeAbi,
-        level: usize,
-        items: &mut VecDeque<TupleItem>,
-        colorize: bool,
-    ) -> String {
-        let mut f = String::new();
-
-        if colorize {
-            writeln!(f, "{} {}", struct_desc.name.magenta(), "{".dimmed()).ok();
-        } else {
-            writeln!(f, "{} {{", struct_desc.name).ok();
-        }
-
-        for (i, field) in struct_desc.fields.iter().enumerate() {
-            let field_type = field.type_info.human_readable.clone();
-            let field_value = if let Some(abi) = self.contract_abi.find_any_type(&field_type) {
-                let result = self.format_structure(abi, level, items, colorize);
-                Self::add_indent_to_lines_except_first(result.as_str(), (level + 1) * 4)
-            } else if let Some(field_value) = items.pop_front() {
-                self.format_internal(&field_value.to_typed(&field_type), false, colorize)
-            } else {
-                "<unknown value>".to_string()
-            };
-
-            write!(f, "    {}: {}", field.name, field_value).ok();
-            if i < struct_desc.fields.len() - 1 {
-                write!(f, ",").ok();
-            }
-            writeln!(f).ok();
-
-            if items.is_empty() {
-                break;
-            }
-        }
-
-        if colorize {
-            write!(f, "{}", "}".dimmed()).ok();
-        } else {
-            write!(f, "}}").ok();
-        }
-        f
-    }
-
-    #[must_use]
-    pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &str, indent: usize) -> String {
-        fn add_indent_to_lines(text: &str, indent: usize) -> String {
-            let indent_str = " ".repeat(indent);
-            text.lines()
-                .map(|line| format!("{indent_str}{line}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
-
-        let item = tuple.to_typed(type_name);
-        let formatted = self.format(&item);
+        let rendered = self.render_assert_value(tuple, ty, source_map);
+        let formatted = self.format_rendered_assert_value(&rendered, Some(ty));
 
         if !formatted.contains('\n') {
             // Fast path for values with single line
@@ -2823,8 +2191,54 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         let lines: Vec<_> = formatted.lines().collect();
         let mut result = lines[0].to_string() + "\n";
-        result += &add_indent_to_lines(&lines[1..].join("\n"), indent);
+        result += &Self::add_indent_to_lines(&lines[1..].join("\n"), indent);
         result
+    }
+
+    fn render_assert_value(
+        &self,
+        tuple: &Tuple,
+        ty: &CompilerAbiType,
+        source_map: &SourceMap,
+    ) -> RenderedValue {
+        render_tuple_as_tolk_type(source_map, tuple, ty)
+    }
+
+    fn format_rendered_assert_value(
+        &self,
+        value: &RenderedValue,
+        top_level_ty: Option<&CompilerAbiType>,
+    ) -> String {
+        let formatted = value.to_pretty_string(self.pretty_render_options());
+        if top_level_ty.is_some_and(Self::is_string_like_ty) {
+            Self::strip_top_level_string_quotes(formatted)
+        } else {
+            formatted
+        }
+    }
+
+    fn is_string_like_ty(ty: &CompilerAbiType) -> bool {
+        match ty {
+            CompilerAbiType::String => true,
+            CompilerAbiType::Nullable { inner, .. } => Self::is_string_like_ty(inner),
+            _ => false,
+        }
+    }
+
+    fn strip_top_level_string_quotes(formatted: String) -> String {
+        if formatted.len() >= 2 && formatted.starts_with('"') && formatted.ends_with('"') {
+            formatted[1..formatted.len() - 1].to_owned()
+        } else {
+            formatted
+        }
+    }
+
+    fn add_indent_to_lines(text: &str, indent: usize) -> String {
+        let indent_str = " ".repeat(indent);
+        text.lines()
+            .map(|line| format!("{indent_str}{line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn add_indent_to_lines_except_first(text: &str, indent: usize) -> String {
@@ -2857,16 +2271,12 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     }
 
     #[must_use]
-    pub fn format_address(&self, txs: &TupleItem, addr: Option<&IntAddr>) -> String {
+    pub fn format_address(&self, txs: &[TupleItem], addr: Option<&IntAddr>) -> String {
         let Some(addr) = addr else {
             return "<any>".cyan().to_string();
         };
 
-        let TupleItem::TypedTuple { inner: items, .. } = txs else {
-            return Self::format_addr_hash(addr);
-        };
-
-        let send_results = self.parse_send_results(items);
+        let send_results = self.parse_send_results(txs);
         let known_contracts = self.collect_known_contracts(&send_results);
         let contract_letters = self.create_contract_letters(&known_contracts);
 
@@ -2894,155 +2304,292 @@ impl FormatterContext<'_> {
         &self,
         left: &Tuple,
         right: &Tuple,
-        left_type: &str,
-        right_type: &str,
+        left_ty: &CompilerAbiType,
+        right_ty: &CompilerAbiType,
+        source_map: &SourceMap,
     ) -> String {
-        let left_items = &left.0;
-        let right_items = &right.0;
+        let left_rendered = self.render_assert_value(left, left_ty, source_map);
+        let right_rendered = self.render_assert_value(right, right_ty, source_map);
 
-        if left_type != right_type {
+        if !Self::same_compiler_ty(left_ty, right_ty) {
             return format!(
                 "{} != {}",
-                self.format_tuple(left, false, false),
-                self.format_tuple(right, false, false)
+                self.format_rendered_assert_value(&left_rendered, Some(left_ty)),
+                self.format_rendered_assert_value(&right_rendered, Some(right_ty))
             );
         }
 
-        let abi = self.contract_abi.find_any_type(&left_type.to_string());
-        if let Some(struct_desc) = abi {
-            let mut left_queue = VecDeque::from(left_items.clone());
-            let mut right_queue = VecDeque::from(right_items.clone());
-            self.format_structure_diff(struct_desc, 0, &mut left_queue, &mut right_queue)
-        } else {
-            let mut result = "(\n".to_string();
-            let max_len = left_items.len().max(right_items.len());
+        self.format_rendered_diff(&left_rendered, &right_rendered, Some(left_ty))
+    }
 
-            for i in 0..max_len {
-                let left_val = left_items.get(i).map(|i| i.to_typed(left_type));
-                let right_val = right_items.get(i).map(|i| i.to_typed(right_type));
+    fn same_compiler_ty(left: &CompilerAbiType, right: &CompilerAbiType) -> bool {
+        serde_json::to_string(left).ok() == serde_json::to_string(right).ok()
+    }
 
-                match (left_val, right_val) {
-                    (Some(left_val), Some(right_val)) => {
-                        if left_val == right_val {
-                            let _ = writeln!(result, "    {},", self.format(&left_val).dimmed());
-                        } else {
-                            let _ = writeln!(result, "    {},", self.format(&left_val).red());
-                            let _ = writeln!(result, "    {}", self.format(&right_val).green());
-                        }
-                    }
-                    (Some(left_val), None) => {
-                        let _ = writeln!(result, "    {},", self.format(&left_val).red());
-                    }
-                    (None, Some(right_val)) => {
-                        let _ = writeln!(result, "    {}", self.format(&right_val).green());
-                    }
-                    (None, None) => {}
-                }
+    fn rendered_values_equal(&self, left: &RenderedValue, right: &RenderedValue) -> bool {
+        self.format_rendered_assert_value(left, None)
+            == self.format_rendered_assert_value(right, None)
+    }
+
+    fn format_rendered_diff(
+        &self,
+        left: &RenderedValue,
+        right: &RenderedValue,
+        top_level_ty: Option<&CompilerAbiType>,
+    ) -> String {
+        if self.rendered_values_equal(left, right) {
+            return self.format_rendered_assert_value(left, top_level_ty);
+        }
+
+        match (left, right) {
+            (
+                RenderedValue::Struct {
+                    type_name: left_type,
+                    fields: left_fields,
+                },
+                RenderedValue::Struct {
+                    type_name: right_type,
+                    fields: right_fields,
+                },
+            ) if left_type == right_type => {
+                self.format_struct_diff(left_type, left_fields, right_fields)
             }
-
-            result.push(')');
-            result
+            (
+                RenderedValue::Tensor {
+                    items: left_items, ..
+                },
+                RenderedValue::Tensor {
+                    items: right_items, ..
+                },
+            ) => self.format_collection_diff(left_items, right_items, '(', ')'),
+            (
+                RenderedValue::ArrayOf {
+                    items: left_items, ..
+                },
+                RenderedValue::ArrayOf {
+                    items: right_items, ..
+                },
+            ) => self.format_collection_diff(left_items, right_items, '[', ']'),
+            _ => self.format_leaf_diff(left, right, top_level_ty),
         }
     }
 
-    fn format_structure_diff(
+    fn format_struct_diff(
         &self,
-        struct_desc: TypeAbi,
-        level: usize,
-        left_items: &mut VecDeque<TupleItem>,
-        right_items: &mut VecDeque<TupleItem>,
+        type_name: &str,
+        left_fields: &[(String, RenderedValue)],
+        right_fields: &[(String, RenderedValue)],
     ) -> String {
+        let mut field_names: Vec<String> =
+            left_fields.iter().map(|(name, _)| name.clone()).collect();
+        for (name, _) in right_fields {
+            if !field_names.iter().any(|existing| existing == name) {
+                field_names.push(name.clone());
+            }
+        }
+
         let mut f = String::new();
+        writeln!(f, "{type_name} {{").ok();
 
-        writeln!(f, "{} {{", struct_desc.name).ok();
+        for (i, field_name) in field_names.iter().enumerate() {
+            let is_last = i + 1 == field_names.len();
+            let left_value = left_fields
+                .iter()
+                .find(|(name, _)| name == field_name)
+                .map(|(_, value)| value);
+            let right_value = right_fields
+                .iter()
+                .find(|(name, _)| name == field_name)
+                .map(|(_, value)| value);
 
-        for (i, field) in struct_desc.fields.iter().enumerate() {
-            let field_type = field.type_info.human_readable.clone();
-
-            if let Some(abi) = self.contract_abi.find_any_type(&field_type) {
-                let result = self.format_structure_diff(abi, level, left_items, right_items);
-                let has_diff = result.contains("\x1b[31m") || result.contains("\x1b[32m");
-
-                let field_name = if has_diff {
-                    field.name.clone()
-                } else {
-                    field.name.dimmed().to_string()
-                };
-                let colon = if has_diff {
-                    ": ".to_string()
-                } else {
-                    ": ".dimmed().to_string()
-                };
-
-                let field_value =
-                    Self::add_indent_to_lines_except_first(result.as_str(), (level + 1) * 4);
-                write!(f, "    {field_name}{colon}{field_value}").ok();
-            } else {
-                let left_val = left_items.pop_front();
-                let right_val = right_items.pop_front();
-
-                match (left_val, right_val) {
-                    (Some(l), Some(r)) => {
-                        let l_typed = l.to_typed(&field_type);
-                        let r_typed = r.to_typed(&field_type);
-
-                        if l_typed == r_typed {
-                            write!(
-                                f,
-                                "    {}{}{}",
-                                field.name.dimmed(),
-                                ": ".dimmed(),
-                                self.format(&l_typed).dimmed()
-                            )
-                            .ok();
-                        } else {
-                            writeln!(f, "    {}: {}", field.name, self.format(&l_typed).red()).ok();
-                            write!(
-                                f,
-                                "    {:<width$}  {}",
-                                "",
-                                self.format(&r_typed).green(),
-                                width = field.name.len()
-                            )
-                            .ok();
-                        }
-                    }
-                    (Some(l), None) => {
-                        write!(
-                            f,
-                            "    {}: {}",
-                            field.name,
-                            self.format(&l.to_typed(&field_type)).red()
-                        )
-                        .ok();
-                    }
-                    (None, Some(r)) => {
-                        writeln!(f, "    {}:", field.name.yellow()).ok();
-                        write!(
-                            f,
-                            "    {:<width$}  {}",
-                            "",
-                            self.format(&r.to_typed(&field_type)).green(),
-                            width = field.name.len()
-                        )
-                        .ok();
-                    }
-                    (None, None) => {}
+            match (left_value, right_value) {
+                (Some(left), Some(right)) if self.rendered_values_equal(left, right) => {
+                    self.write_equal_struct_field(&mut f, field_name, left, is_last);
                 }
-            }
-
-            if i < struct_desc.fields.len() - 1 {
-                write!(f, "{}", ",".dimmed()).ok();
-            }
-            writeln!(f).ok();
-
-            if left_items.is_empty() && right_items.is_empty() {
-                break;
+                (Some(left), Some(right)) if Self::can_diff_inline(left, right) => {
+                    let left_value = self.format_rendered_assert_value(left, None);
+                    let right_value = self.format_rendered_assert_value(right, None);
+                    writeln!(f, "    {field_name}: {}", left_value.red()).ok();
+                    write!(
+                        f,
+                        "    {:<width$}  {}",
+                        "",
+                        right_value.green(),
+                        width = field_name.len()
+                    )
+                    .ok();
+                    if !is_last {
+                        write!(f, "{}", ",".dimmed()).ok();
+                    }
+                    writeln!(f).ok();
+                }
+                (Some(left), Some(right)) => {
+                    let diff = self.format_rendered_diff(left, right, None);
+                    let diff = Self::add_indent_to_lines_except_first(&diff, 4);
+                    write!(f, "    {field_name}: {diff}").ok();
+                    if !is_last {
+                        write!(f, "{}", ",".dimmed()).ok();
+                    }
+                    writeln!(f).ok();
+                }
+                (Some(left), None) => {
+                    let value = self.format_rendered_assert_value(left, None);
+                    write!(f, "    {field_name}: {}", value.red()).ok();
+                    if !is_last {
+                        write!(f, "{}", ",".dimmed()).ok();
+                    }
+                    writeln!(f).ok();
+                }
+                (None, Some(right)) => {
+                    let value = self.format_rendered_assert_value(right, None);
+                    writeln!(f, "    {}:", field_name.yellow()).ok();
+                    write!(
+                        f,
+                        "    {:<width$}  {}",
+                        "",
+                        value.green(),
+                        width = field_name.len()
+                    )
+                    .ok();
+                    if !is_last {
+                        write!(f, "{}", ",".dimmed()).ok();
+                    }
+                    writeln!(f).ok();
+                }
+                (None, None) => {}
             }
         }
 
         write!(f, "}}").ok();
         f
+    }
+
+    fn write_equal_struct_field(
+        &self,
+        f: &mut String,
+        field_name: &str,
+        value: &RenderedValue,
+        is_last: bool,
+    ) {
+        let value = self.format_rendered_assert_value(value, None);
+        let value = Self::add_indent_to_lines_except_first(&value, 4);
+        write!(
+            f,
+            "    {}{}{}",
+            field_name.dimmed(),
+            ": ".dimmed(),
+            value.dimmed()
+        )
+        .ok();
+        if !is_last {
+            write!(f, "{}", ",".dimmed()).ok();
+        }
+        writeln!(f).ok();
+    }
+
+    fn format_collection_diff(
+        &self,
+        left_items: &[RenderedValue],
+        right_items: &[RenderedValue],
+        open: char,
+        close: char,
+    ) -> String {
+        let mut result = String::new();
+        writeln!(result, "{open}").ok();
+
+        let max_len = left_items.len().max(right_items.len());
+        for i in 0..max_len {
+            let is_last = i + 1 == max_len;
+            match (left_items.get(i), right_items.get(i)) {
+                (Some(left), Some(right)) if self.rendered_values_equal(left, right) => {
+                    self.write_collection_value(
+                        &mut result,
+                        &self
+                            .format_rendered_assert_value(left, None)
+                            .dimmed()
+                            .to_string(),
+                        is_last,
+                    );
+                }
+                (Some(left), Some(right)) if Self::can_diff_inline(left, right) => {
+                    self.write_collection_value(
+                        &mut result,
+                        &self
+                            .format_rendered_assert_value(left, None)
+                            .red()
+                            .to_string(),
+                        false,
+                    );
+                    self.write_collection_value(
+                        &mut result,
+                        &self
+                            .format_rendered_assert_value(right, None)
+                            .green()
+                            .to_string(),
+                        is_last,
+                    );
+                }
+                (Some(left), Some(right)) => {
+                    let diff = self.format_rendered_diff(left, right, None);
+                    self.write_collection_value(&mut result, &diff, is_last);
+                }
+                (Some(left), None) => {
+                    self.write_collection_value(
+                        &mut result,
+                        &self
+                            .format_rendered_assert_value(left, None)
+                            .red()
+                            .to_string(),
+                        is_last,
+                    );
+                }
+                (None, Some(right)) => {
+                    self.write_collection_value(
+                        &mut result,
+                        &self
+                            .format_rendered_assert_value(right, None)
+                            .green()
+                            .to_string(),
+                        is_last,
+                    );
+                }
+                (None, None) => {}
+            }
+        }
+
+        write!(result, "{close}").ok();
+        result
+    }
+
+    fn write_collection_value(&self, result: &mut String, value: &str, is_last: bool) {
+        write!(result, "{}", Self::add_indent_to_lines(value, 4)).ok();
+        if !is_last {
+            write!(result, "{}", ",".dimmed()).ok();
+        }
+        writeln!(result).ok();
+    }
+
+    fn format_leaf_diff(
+        &self,
+        left: &RenderedValue,
+        right: &RenderedValue,
+        top_level_ty: Option<&CompilerAbiType>,
+    ) -> String {
+        format!(
+            "(\n    {},\n    {}\n)",
+            self.format_rendered_assert_value(left, top_level_ty).red(),
+            self.format_rendered_assert_value(right, top_level_ty)
+                .green()
+        )
+    }
+
+    const fn can_diff_inline(left: &RenderedValue, right: &RenderedValue) -> bool {
+        !matches!(
+            (left, right),
+            (RenderedValue::Struct { .. }, RenderedValue::Struct { .. })
+                | (RenderedValue::Tensor { .. }, RenderedValue::Tensor { .. })
+                | (RenderedValue::ArrayOf { .. }, RenderedValue::ArrayOf { .. })
+        )
     }
 
     #[must_use]
@@ -3392,12 +2939,8 @@ impl FormatterContext<'_> {
     }
 
     #[must_use]
-    pub fn parse_failed_transactions(&self, txs: &TupleItem) -> Vec<TransactionInfo> {
-        let TupleItem::TypedTuple { inner: items, .. } = txs else {
-            return vec![];
-        };
-
-        let send_results = self.parse_send_results(items);
+    pub fn parse_failed_transactions(&self, txs: &[TupleItem]) -> Vec<TransactionInfo> {
+        let send_results = self.parse_send_results(txs);
         send_results
             .into_iter()
             .map(|res| {
@@ -3455,19 +2998,35 @@ impl FormatterContext<'_> {
                 let diff = self.format_tuple_diff(
                     &bin_failure.left,
                     &bin_failure.right,
-                    &bin_failure.left_type,
-                    &bin_failure.right_type,
+                    &bin_failure.left_ty,
+                    &bin_failure.right_ty,
+                    &bin_failure.source_map,
                 );
                 writeln!(result, "{diff}").ok();
             }
             AssertFailure::Bin(bin_failure) if bin_failure.operator == "!=" => {
-                let value = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
+                let value = self.format_tuple_value(
+                    &bin_failure.left,
+                    &bin_failure.left_ty,
+                    &bin_failure.source_map,
+                    0,
+                );
                 writeln!(result, "Values are equal but expected to be different:").ok();
                 writeln!(result, "  {value}").ok();
             }
             AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
-                let left = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
-                let right = self.format_tuple_value(&bin_failure.right, &bin_failure.right_type, 0);
+                let left = self.format_tuple_value(
+                    &bin_failure.left,
+                    &bin_failure.left_ty,
+                    &bin_failure.source_map,
+                    0,
+                );
+                let right = self.format_tuple_value(
+                    &bin_failure.right,
+                    &bin_failure.right_ty,
+                    &bin_failure.source_map,
+                    0,
+                );
                 writeln!(result, "        Actual:   {left}").ok();
                 writeln!(result, "        Expected: {right}").ok();
             }
@@ -3477,7 +3036,7 @@ impl FormatterContext<'_> {
             }
             AssertFailure::TransactionNotFound(tx_failure) => {
                 let params = self.format_search_transaction_parameters(tx_failure, abi);
-                let tx_tree = self.format(&tx_failure.txs);
+                let tx_tree = self.format_transaction_list(&tx_failure.txs);
                 writeln!(result, "{tx_tree}").ok();
                 let from_addr = tx_failure.params.from.as_ref().and_then(|dp| match dp {
                     DisplayParam::Value(a) => Some(a.clone()),
@@ -3519,7 +3078,7 @@ impl FormatterContext<'_> {
             }
             AssertFailure::TransactionIsFound(tx_failure) => {
                 let params = self.format_search_transaction_parameters(tx_failure, abi);
-                let tx_tree = self.format(&tx_failure.txs);
+                let tx_tree = self.format_transaction_list(&tx_failure.txs);
                 writeln!(result, "{tx_tree}").ok();
                 let from_to = if tx_failure.params.from.is_none() && tx_failure.params.to.is_none()
                 {

@@ -154,12 +154,6 @@ pub struct ABIInternalMessage {
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub minimal_msg_value: Option<i64>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub preferred_send_mode: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,6 +177,9 @@ pub struct ABIStorage {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_at_deployment_ty: Option<Ty>,
+
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -199,15 +196,9 @@ pub struct ABIThrownError {
     pub kind: Option<ABIThrownErrorKind>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    pub err_code: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ABIConstant {
-    pub name: String,
-    pub value: ABIConstValue,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    pub err_code: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -233,7 +224,6 @@ pub struct ContractABI {
 
     pub get_methods: Vec<ABIGetMethod>,
     pub thrown_errors: Vec<ABIThrownError>,
-    pub constants: Vec<ABIConstant>,
 
     pub compiler_name: String,
     pub compiler_version: String,
@@ -749,10 +739,10 @@ mod tests {
             storage: ABIStorage {
                 storage_ty: None,
                 storage_at_deployment_ty: None,
+                description: String::new(),
             },
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
-            constants: Vec::new(),
             compiler_name: "tolk".to_owned(),
             compiler_version: "test".to_owned(),
         }
@@ -872,8 +862,6 @@ mod tests {
                 type_args: None,
             },
             description: String::new(),
-            minimal_msg_value: None,
-            preferred_send_mode: None,
         }];
 
         let resolved = abi
@@ -913,6 +901,7 @@ mod tests {
                 struct_name: "DeploymentStorage".to_owned(),
                 type_args: None,
             }),
+            description: String::new(),
         };
 
         let resolved = abi
@@ -941,8 +930,6 @@ mod tests {
                 type_args: None,
             },
             description: String::new(),
-            minimal_msg_value: None,
-            preferred_send_mode: None,
         }];
 
         let error = abi

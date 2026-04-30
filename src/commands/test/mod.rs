@@ -48,7 +48,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
 use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
@@ -256,7 +256,7 @@ impl<'a> TestRunner<'a> {
         dest_address: &str,
         abi: Arc<ContractAbi>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        source_map: Arc<SourceMap>,
     ) -> anyhow::Result<TestResult> {
         if let Some(fuzz) = test.fuzz {
             return self.execute_fuzz_test(
@@ -290,7 +290,7 @@ impl<'a> TestRunner<'a> {
         dest_address: &str,
         abi: Arc<ContractAbi>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        source_map: Arc<SourceMap>,
         stack: &Tuple,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.effective_log_verbosity();
@@ -340,6 +340,7 @@ impl<'a> TestRunner<'a> {
                 config: &self.acton_config,
                 project_root: self.project_root.clone(),
                 abi,
+                source_map: Some(source_map.clone()),
                 show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
@@ -1008,8 +1009,7 @@ fn compile_test_file(
                 fift_code: cache_entry.fift_code.unwrap_or_default(),
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
-                debug_mark_base64: cache_entry.debug_mark_base64,
-                new_source_map: cache_entry.new_source_map,
+                source_map: cache_entry.source_map,
                 abi: cache_entry.abi,
             },
         ));
@@ -1083,11 +1083,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     };
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
-    let source_map = Arc::new(TolkSourceMap::from_code_cell(
-        result.new_source_map.unwrap_or_default(),
-        &code_cell,
-        result.debug_mark_base64.as_deref(),
-    )?);
+    let source_map = Arc::new(result.source_map.unwrap_or_default());
     let compiler_abi = result.abi.map(Arc::new);
     let tests = attach_test_parameter_metadata(tests, &abi, compiler_abi.as_deref());
     let stats = run_file_tests(
@@ -1110,7 +1106,7 @@ fn run_file_tests(
     code: &Cell,
     abi: Arc<ContractAbi>,
     compiler_abi: Option<Arc<tolk_compiler::abi::ContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+    source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {

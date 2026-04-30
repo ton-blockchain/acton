@@ -55,7 +55,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -2247,7 +2247,7 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -2260,7 +2260,7 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
 
         let content = fs::read_to_string(&path)
             .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+        let result = serde_json::from_str::<SourceMap>(content.as_str()).map_err(|err| {
             anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
         })?;
         Some(Box::new(result))

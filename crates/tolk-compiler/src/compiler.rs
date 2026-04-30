@@ -36,11 +36,6 @@ pub fn compile(path: &Path, debug: bool) -> CompilerResult {
     Compiler::new(2).compile(path, debug)
 }
 
-#[must_use]
-pub fn compile_fast(path: &Path, debug: bool) -> CompilerResult {
-    Compiler::new(0).compile(path, debug)
-}
-
 pub fn prime_debug_cp0() -> anyhow::Result<()> {
     // SAFETY: `tolk_prime_debug_cp0` is a pure native initializer that returns
     // either null on success or a malloc-allocated error string on failure.
@@ -137,18 +132,48 @@ impl Compiler {
     ///
     /// Returns successful result with `code_boc64` or error with `message`.
     #[must_use]
-    pub fn compile(&self, path: &Path, with_debug_info: bool) -> CompilerResult {
-        let result = self.run_internal::<CompilerInternalResult>(path, with_debug_info, false);
+    pub fn compile(&self, path: &Path, with_debug_marks: bool) -> CompilerResult {
+        let result = self.run_internal::<CompilerInternalResult>(path, with_debug_marks, false);
 
         match result {
             Ok(CompilerInternalResult::Success(result)) => {
+                let CompilerInternalResultSuccess {
+                    fift_code,
+                    code_boc64,
+                    code_hash_hex,
+                    debug_mark_base64,
+                    symbol_types_json,
+                    debug_marks_json,
+                    abi,
+                    ..
+                } = result;
+                let source_map = if let Some(symbol_types) = symbol_types_json {
+                    let marks_dict = match crate::debug_marks_dict::parse_debug_marks(
+                        debug_mark_base64.as_deref(),
+                        &code_boc64,
+                    ) {
+                        Ok(marks_dict) => marks_dict,
+                        Err(err) => {
+                            return CompilerResult::Error(CompilerResultError {
+                                message: err.to_string(),
+                            });
+                        }
+                    };
+                    Some(crate::source_map::SourceMap::from_parts(
+                        symbol_types,
+                        debug_marks_json.unwrap_or_default(),
+                        marks_dict,
+                    ))
+                } else {
+                    None
+                };
+
                 CompilerResult::Success(CompilerResultSuccess {
-                    fift_code: result.fift_code,
-                    code_boc64: result.code_boc64,
-                    code_hash_hex: result.code_hash_hex,
-                    debug_mark_base64: result.debug_mark_base64,
-                    new_source_map: result.source_maps_json,
-                    abi: result.abi,
+                    fift_code,
+                    code_boc64,
+                    code_hash_hex,
+                    source_map,
+                    abi,
                 })
             }
             Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
@@ -161,7 +186,7 @@ impl Compiler {
     fn run_internal<TBody: DeserializeOwned>(
         &self,
         path: &Path,
-        with_debug_info: bool,
+        with_debug_marks: bool,
         check_only: bool,
     ) -> anyhow::Result<TBody> {
         let mut callback_context = FsCallbackContext {
@@ -173,7 +198,8 @@ impl Compiler {
             optimization_level: self.opt_level,
             with_stack_comments: self.with_stack_comments,
             with_src_line_comments: self.with_src_line_comments,
-            collect_source_map: with_debug_info,
+            with_symbol_types: true,
+            with_debug_marks,
             json_errors: check_only,
             check_only,
             allow_no_entrypoint: self.allow_no_entrypoint,
@@ -365,8 +391,10 @@ pub struct CompilerConfig {
     pub with_stack_comments: bool,
     #[serde(rename = "withSrcLineComments")]
     pub with_src_line_comments: bool,
-    #[serde(rename = "collectSourceMap")]
-    pub collect_source_map: bool,
+    #[serde(rename = "withSymbolTypes")]
+    pub with_symbol_types: bool,
+    #[serde(rename = "withDebugMarks")]
+    pub with_debug_marks: bool,
     #[serde(rename = "checkOnly")]
     pub check_only: bool,
     #[serde(rename = "jsonErrors")]
@@ -387,8 +415,7 @@ pub struct CompilerResultSuccess {
     pub fift_code: String,
     pub code_boc64: String,
     pub code_hash_hex: String,
-    pub debug_mark_base64: Option<String>,
-    pub new_source_map: Option<crate::source_map::SourceMap>,
+    pub source_map: Option<crate::source_map::SourceMap>,
     pub abi: Option<ContractABI>,
 }
 
@@ -410,8 +437,10 @@ pub struct CompilerInternalResultSuccess {
     pub code_hash_hex: String,
     #[serde(rename = "debugMarksBase64", default)]
     pub debug_mark_base64: Option<String>,
-    #[serde(rename = "sourceMapsJson")]
-    pub source_maps_json: Option<crate::source_map::SourceMap>,
+    #[serde(rename = "symbolTypesJson", default)]
+    pub symbol_types_json: Option<crate::source_map::SymbolTypesJson>,
+    #[serde(rename = "debugMarksJson", default)]
+    pub debug_marks_json: Option<Vec<crate::source_map::DebugMark>>,
     #[serde(rename = "abiJson")]
     pub abi: Option<ContractABI>,
     #[serde(rename = "tolkVersion")]

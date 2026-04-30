@@ -132,6 +132,7 @@ dependencies = [
  "dap",
  "log",
  "num-bigint",
+ "owo-colors",
  "serde_json",
  "tolk-compiler",
  "tolk-syntax",

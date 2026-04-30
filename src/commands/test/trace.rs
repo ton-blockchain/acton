@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
@@ -32,7 +32,7 @@ pub(super) struct TransactionList {
 pub(super) struct ContractInfo {
     pub name: String,
     pub code_boc64: String,
-    pub source_map: TolkSourceMap,
+    pub source_map: SourceMap,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }

@@ -642,7 +642,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
 fun expect<T>(value: T, loc: string = reflect.sourceLocationAsString()): Expectation<T> {
     return Expectation<T>.create(
         value,
-        reflect.typeNameOfObject(value),
+        reflect.typeAbiJsonOfObject(value),
         loc,
     );
 }

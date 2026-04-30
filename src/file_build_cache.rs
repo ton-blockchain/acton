@@ -21,7 +21,7 @@ use xxhash_rust::xxh3::Xxh3;
 
 use crate::paths;
 
-const CACHE_SCHEMA_VERSION: u32 = 8;
+const CACHE_SCHEMA_VERSION: u32 = 10;
 const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
 const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
 const DEBUG_CACHE_SUBDIR: &str = "debug";
@@ -30,9 +30,8 @@ const DEBUG_CACHE_SUBDIR: &str = "debug";
 pub struct CacheEntry {
     pub code_boc64: String,
     pub code_hash_hex: String,
-    pub debug_mark_base64: Option<String>,
     pub fift_code: Option<String>,
-    pub new_source_map: Option<tolk_compiler::SourceMap>,
+    pub source_map: Option<tolk_compiler::SourceMap>,
     pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,
@@ -246,9 +245,8 @@ impl FileBuildCache {
         let entry = CacheEntry {
             code_boc64: result.code_boc64.clone(),
             code_hash_hex: result.code_hash_hex.clone(),
-            debug_mark_base64: result.debug_mark_base64.clone(),
             fift_code: with_fift.then(|| result.fift_code.clone()),
-            new_source_map: result.new_source_map.clone(),
+            source_map: result.source_map.clone(),
             abi: result.abi.clone(),
             dependencies_hash,
             timestamp: SystemTime::now()
@@ -676,8 +674,7 @@ mod tests {
             fift_code: "test_fift_code".to_string(),
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
-            debug_mark_base64: Some("test_debug_marks".to_string()),
-            new_source_map: None,
+            source_map: None,
             abi: None,
         };
 
@@ -718,8 +715,7 @@ mod tests {
             fift_code: "test_fift_code".to_string(),
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
-            debug_mark_base64: None,
-            new_source_map: None,
+            source_map: None,
             abi: None,
         };
 
@@ -763,8 +759,7 @@ mod tests {
             fift_code: "test_fift_code".to_string(),
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
-            debug_mark_base64: Some("test_debug_marks".to_string()),
-            new_source_map: None,
+            source_map: None,
             abi: None,
         };
 
@@ -774,10 +769,6 @@ mod tests {
         assert!(cached.is_some());
         let cached = cached.unwrap();
         assert_eq!(cached.code_boc64, "test_boc");
-        assert_eq!(
-            cached.debug_mark_base64.as_deref(),
-            Some("test_debug_marks")
-        );
         assert_eq!(cached.fift_code, None);
         Ok((cache, lib_path, main_path))
     }
