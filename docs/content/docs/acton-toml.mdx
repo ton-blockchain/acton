@@ -128,6 +128,7 @@ Configures defaults for `acton build`.
 |:--------------|:---------|:---------|:-----------------------------------------------------------------------------------------|
 | `out-dir`     | `string` | No       | Directory where build JSON artifacts are written (default: `build`).                     |
 | `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
+| `output-abi`  | `string` | No       | Directory where contract ABI JSON files are written (default: `build/abi`).              |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
 
 Example:
@@ -135,12 +136,13 @@ Example:
 [build]
 out-dir = "build"
 gen-dir = "gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
 Config values here are project-root-relative. The CLI flags stay cwd-relative unless you pass absolute paths.
-Precompiled `.boc` contracts are skipped for Fift output.
+Precompiled `.boc` contracts are skipped for ABI and Fift output.
 
 ---
 

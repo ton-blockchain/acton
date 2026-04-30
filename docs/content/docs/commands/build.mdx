@@ -20,9 +20,10 @@ By default, `acton build` compiles every configured contract. If you pass a
 dependencies.
 
 For each successful build, Acton writes a JSON artifact to the build output
-directory and, when the contract config has an `output` path, also writes the
-compiled `.boc` file there. Dependency helper files are emitted into the
-generated-code directory, and optional Fift output can be written separately.
+directory and a contract ABI JSON file to the ABI output directory. When the contract config has an
+`output` path, Acton also writes the compiled `.boc` file there. Dependency
+helper files are emitted into the generated-code directory, and optional Fift
+output can be written separately.
 
 Contracts with `.boc` sources are treated as precompiled inputs: Acton loads
 their code, includes them in dependency resolution, and skips recompilation.
@@ -106,6 +107,24 @@ Directory for generated dependency helper files such as
 <CommandOptionMeta label="Default">
 
 `[build].gen-dir` when configured, otherwise `gen/`.
+
+</CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--output-abi` _dir_
+
+</CommandOptionTitle>
+
+Directory for contract ABI JSON files.
+
+<CommandOptionMeta label="Default">
+
+`[build].output-abi` when configured, otherwise `build/abi/`.
 
 </CommandOptionMeta>
 
@@ -225,6 +244,7 @@ Optional default output paths can be configured in `[build]`:
 [build]
 out-dir = "build"
 gen-dir = "gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
 ```
 
@@ -237,6 +257,8 @@ resolved `gen-dir` for that helper file.
 Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
+- `<output-abi>/<contract-name>.json` with the compiler ABI for `.tolk`
+  contracts that declare ABI metadata
 - the configured contract `output` `.boc` file
 - `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
   (or a dependency-specific custom path when `depends[].path` is configured)
@@ -306,7 +328,7 @@ built successfully, the successful artifacts remain on disk.
 5. Override output locations for a single run:
 
    ```bash
-   acton build --out-dir artifacts --gen-dir artifacts/gen --output-fift artifacts/fift
+   acton build --out-dir artifacts --gen-dir artifacts/gen --output-abi artifacts/abi --output-fift artifacts/fift
    ```
 
 6. Print compiled code and hashes after the build:

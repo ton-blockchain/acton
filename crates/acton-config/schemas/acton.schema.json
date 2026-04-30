@@ -118,6 +118,10 @@
           "description": "Directory where JSON build artifacts are saved",
           "type": "string"
         },
+        "output-abi": {
+          "description": "Directory where per-contract ABI JSON files are saved",
+          "type": "string"
+        },
         "output-fift": {
           "description": "Directory where per-contract compiled Fift files are saved",
           "type": "string"

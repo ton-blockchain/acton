@@ -1,5 +1,5 @@
 use acton::commands;
-use acton::commands::build::build_cmd;
+use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::create_app::DEFAULT_APP_DIR;
@@ -634,6 +634,12 @@ enum Commands {
             help = "Output directory for generated dependency files (default: gen/)"
         )]
         gen_dir: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save contract ABI JSON files (default: build/abi/)"
+        )]
+        output_abi: Option<String>,
         #[arg(
             long,
             value_name = "DIR",
@@ -1894,17 +1900,19 @@ fn main() {
             graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
             info,
-        } => build_cmd(
+        } => build_cmd(BuildCommandOptions {
             contract_id,
             clear_cache,
-            graph,
+            graph_output: graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
-            info,
-        ),
+            show_info: info,
+        }),
         Commands::Compile {
             path,
             json,

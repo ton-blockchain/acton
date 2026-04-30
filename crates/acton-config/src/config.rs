@@ -431,6 +431,8 @@ pub struct BuildSettings {
     pub out_dir: Option<String>,
     /// Directory where generated dependency files are saved
     pub gen_dir: Option<String>,
+    /// Directory where per-contract ABI JSON files are saved
+    pub output_abi: Option<String>,
     /// Directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
 }
@@ -2069,6 +2071,7 @@ version = "0.1.0"
 [build]
 out-dir = "artifacts/build"
 gen-dir = "artifacts/gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
 "#;
 
@@ -2076,6 +2079,7 @@ output-fift = "build/fift"
         let build = config.build.as_ref().unwrap();
         assert_eq!(build.out_dir.as_deref(), Some("artifacts/build"));
         assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
+        assert_eq!(build.output_abi.as_deref(), Some("build/abi"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
     }
 

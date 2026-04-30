@@ -1,4 +1,4 @@
-use crate::commands::build::build_cmd;
+use crate::commands::build::{BuildCommandOptions, build_cmd};
 use crate::commands::common::{
     error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
 };
@@ -549,7 +549,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
     if need_to_build() {
-        build_cmd(None, config.clear_cache, None, None, None, None, false)?;
+        build_cmd(BuildCommandOptions {
+            clear_cache: config.clear_cache,
+            ..BuildCommandOptions::default()
+        })?;
     }
     println!("     {} tests", "Running".green().bold());
 

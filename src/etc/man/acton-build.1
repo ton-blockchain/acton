@@ -16,9 +16,10 @@ By default, \fBacton build\fR compiles every configured contract. If you pass a
 dependencies.
 .sp
 For each successful build, Acton writes a JSON artifact to the build output
-directory and, when the contract config has an \fBoutput\fR path, also writes the
-compiled \fB\&.boc\fR file there. Dependency helper files are emitted into the
-generated\-code directory, and optional Fift output can be written separately.
+directory and a contract ABI JSON file to the ABI output directory. When the contract config has an
+\fBoutput\fR path, Acton also writes the compiled \fB\&.boc\fR file there. Dependency
+helper files are emitted into the generated\-code directory, and optional Fift
+output can be written separately.
 .sp
 Contracts with \fB\&.boc\fR sources are treated as precompiled inputs: Acton loads
 their code, includes them in dependency resolution, and skips recompilation.
@@ -58,6 +59,13 @@ Directory for generated dependency helper files such as
 \fBgen/<dependency>.code.tolk\fR\&.
 .sp
 Defaults to \fB[build].gen\-dir\fR when configured, otherwise \fBgen/\fR\&.
+.RE
+.sp
+\fB\-\-output\-abi\fR \fIdir\fR
+.RS 4
+Directory for contract ABI JSON files.
+.sp
+Defaults to \fB[build].output\-abi\fR when configured, otherwise \fBbuild/abi/\fR\&.
 .RE
 .sp
 \fB\-\-output\-fift\fR \fIdir\fR
@@ -117,6 +125,7 @@ Optional default output paths can be configured in \fB[build]\fR:
 [build]
 out\-dir = "build"
 gen\-dir = "gen"
+output\-abi = "build/abi"
 output\-fift = "build/fift"
 .fi
 .RE
@@ -129,6 +138,11 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB<out\-dir>/<contract\-name>.json\fR with \fBcode_boc64\fR and \fBhash\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<output\-abi>/<contract\-name>.json\fR with the compiler ABI for \fB\&.tolk\fR
+contracts that declare ABI metadata
 .RE
 .sp
 .RS 4
@@ -236,7 +250,7 @@ acton build \-\-graph deps.dot
 .sp
 .RS 4
 .nf
-acton build \-\-out\-dir artifacts \-\-gen\-dir artifacts/gen \-\-output\-fift artifacts/fift
+acton build \-\-out\-dir artifacts \-\-gen\-dir artifacts/gen \-\-output\-abi artifacts/abi \-\-output\-fift artifacts/fift
 .fi
 .RE
 .RE
