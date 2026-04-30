@@ -79,6 +79,15 @@ Broadcast to the selected network. If omitted, the script runs in emulation
 mode. Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
 .RE
 .sp
+\fB\-\-tonconnect\fR
+.RS 4
+Use Ton Connect wallet approval for broadcast messages.
+.sp
+This opens a local browser page, connects a wallet, and sends \fBnet.send(...)\fR
+messages through that wallet instead of loading local wallet mnemonics.
+Currently supported only with \fB\-\-net mainnet\fR or \fB\-\-net testnet\fR\&.
+.RE
+.sp
 \fB\-\-explorer\fR \fIname\fR
 .RS 4
 Explorer to use for transaction links.
@@ -135,9 +144,14 @@ A Tolk script defines a \fBmain()\fR function and runs as an isolated execution.
 \h'-04'\(bu\h'+03'\fB\-\-net\fR sends real transactions using configured wallets
 .RE
 .sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-net ... \-\-tonconnect\fR sends real transactions through the connected Ton Connect wallet
+.RE
+.sp
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local \fBwallets.toml\fR entries overriding
-\fBglobal.wallets.toml\fR on name conflicts.
+\fBglobal.wallets.toml\fR on name conflicts. With \fB\-\-tonconnect\fR, any
+\fBscripts.wallet("name")\fR call resolves to the connected wallet address.
 .SH "ARGUMENT FORWARDING"
 Arguments after \fB_path_\fR are passed through to the script runtime.
 .sp
@@ -261,6 +275,16 @@ TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainne
 .RS 4
 .nf
 acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Broadcast through Ton Connect instead of local wallet keys:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-net testnet \-\-tonconnect
 .fi
 .RE
 .RE

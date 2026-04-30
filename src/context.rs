@@ -1,5 +1,6 @@
 use crate::file_build_cache::FileBuildCache;
 use crate::retrace::TolkTraceInfo;
+use crate::tonconnect::TonConnectContext;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
@@ -713,6 +714,7 @@ pub struct Env<'a> {
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
+    pub tonconnect: Option<TonConnectContext>,
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
@@ -847,6 +849,13 @@ impl Env<'_> {
             .find(|(_, wallet)| &wallet.address() == addr)?;
 
         Some(found.1.clone())
+    }
+
+    #[must_use]
+    pub fn find_tonconnect_by_address(&self, addr: &StdAddr) -> Option<&TonConnectContext> {
+        self.tonconnect
+            .as_ref()
+            .filter(|tonconnect| tonconnect.wallet.address == *addr)
     }
 
     #[must_use]

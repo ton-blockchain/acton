@@ -60,6 +60,14 @@ OPTIONS
            emulation mode. Conflicting --net and --fork-net values are
            rejected.
 
+       --tonconnect
+           Use Ton Connect wallet approval for broadcast messages.
+
+           This opens a local browser page, connects a wallet, and sends
+           net.send(...) messages through that wallet instead of loading local
+           wallet mnemonics. Currently supported only with --net mainnet or
+           --net testnet.
+
        --explorer name
            Explorer to use for transaction links.
 
@@ -101,9 +109,13 @@ SCRIPT MODEL
 
        o  --net sends real transactions using configured wallets
 
+       o  --net ... --tonconnect sends real transactions through the connected
+          Ton Connect wallet
+
        Wallet names referenced by the script are resolved from the merged
        wallet configuration, with local wallets.toml entries overriding
-       global.wallets.toml on name conflicts.
+       global.wallets.toml on name conflicts. With --tonconnect, any
+       scripts.wallet("name") call resolves to the connected wallet address.
 
 ARGUMENT FORWARDING
        Arguments after _path_ are passed through to the script runtime.
@@ -179,6 +191,10 @@ EXAMPLES
        5. Broadcast a deploy flow and print explorer links:
 
               acton script scripts/deploy.tolk --net testnet --explorer tonscan
+
+       6. Broadcast through Ton Connect instead of local wallet keys:
+
+              acton script scripts/deploy.tolk --net testnet --tonconnect
 
 TONCENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or

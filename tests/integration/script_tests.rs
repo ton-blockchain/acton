@@ -2779,6 +2779,51 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
 }
 
 #[test]
+fn test_script_tonconnect_requires_net() {
+    let project = ProjectBuilder::new("script-tonconnect-requires-net")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tonconnect_requires_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tonconnect_rejects_localnet() {
+    let project = ProjectBuilder::new("script-tonconnect-localnet")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .with_net("localnet")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tonconnect_rejects_localnet.stderr.txt",
+        );
+}
+
+#[test]
 fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
     let project = build_localnet_wait_project(
         "script-wait-for-trace-localnet",

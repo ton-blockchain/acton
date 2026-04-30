@@ -291,6 +291,7 @@ fn execute_script<'a>(
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets: BTreeMap::new(),
+            tonconnect: None,
             build_override: BTreeMap::new(),
             explorer: None,
             fork_net: None,

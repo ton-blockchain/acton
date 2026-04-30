@@ -344,6 +344,7 @@ impl<'a> TestRunner<'a> {
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
+                tonconnect: None,
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
                 fork_net: self.config.fork_net.clone(),

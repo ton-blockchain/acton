@@ -1,0 +1,1 @@
+Error: `--tonconnect` requires `--net mainnet` or `--net testnet`

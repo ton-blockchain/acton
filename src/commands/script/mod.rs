@@ -8,6 +8,7 @@ use crate::context::{
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use crate::retrace;
+use crate::tonconnect::{TonConnectContext, TonConnectSession};
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
@@ -88,6 +89,7 @@ pub fn script_cmd(
     net: Option<String>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
@@ -122,6 +124,12 @@ pub fn script_cmd(
         .map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
 
     let (network, fork_net) = resolve_script_networks(net.as_deref(), fork_net.as_deref())?;
+    if tonconnect && network.is_none() {
+        anyhow::bail!("`--tonconnect` requires `--net mainnet` or `--net testnet`");
+    }
+    if tonconnect && let Some(network) = &network {
+        crate::tonconnect::ensure_supported_network(network)?;
+    }
     let debug_listener = if debug {
         Some(reserve_dap_listener(debug_port)?)
     } else {
@@ -142,6 +150,7 @@ pub fn script_cmd(
         network,
         explorer,
         show_bodies,
+        tonconnect,
     )
 }
 
@@ -165,6 +174,7 @@ fn run_script_file(
     net: Option<Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
 ) -> anyhow::Result<()> {
     let mappings = mappings.cloned();
     let abi = contract_abi(content.into(), file_path, mappings.as_ref());
@@ -203,6 +213,7 @@ fn run_script_file(
                 net.as_ref(),
                 explorer,
                 show_bodies,
+                tonconnect,
             )?;
             Ok(())
         }
@@ -235,6 +246,7 @@ fn execute_script(
     net: Option<&Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
 ) -> anyhow::Result<()> {
     let broadcast = net.is_some();
     let dest_address = contract_address(code_cell)?;
@@ -281,7 +293,19 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let open_wallets = wallets::open_wallets(&config, net, broadcast)?;
+    let tonconnect = if tonconnect {
+        let network = net.expect("`--tonconnect` must be validated before script execution");
+        let session = Arc::new(TonConnectSession::start()?);
+        let wallet = session.connect(network)?;
+        Some(TonConnectContext { session, wallet })
+    } else {
+        None
+    };
+    let open_wallets = if tonconnect.is_some() {
+        BTreeMap::new()
+    } else {
+        wallets::open_wallets(&config, net, broadcast)?
+    };
 
     let mut ctx = Context {
         env: Env {
@@ -292,6 +316,7 @@ fn execute_script(
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets,
+            tonconnect,
             build_override: BTreeMap::new(),
             explorer,
             fork_net,

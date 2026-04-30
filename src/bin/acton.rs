@@ -596,6 +596,12 @@ enum Commands {
             help_heading = "Broadcasting"
         )]
         net: Option<String>,
+        #[arg(
+            long,
+            help = "Use Ton Connect wallet approval for broadcast messages",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect: bool,
 
         #[arg(
             value_enum,
@@ -1874,6 +1880,7 @@ fn main() {
             fork_net,
             fork_block_number,
             net,
+            tonconnect,
             explorer,
             show_bodies,
         } => match commands::common::validate_cli_verbosity(verbose) {
@@ -1890,6 +1897,7 @@ fn main() {
                 net,
                 explorer,
                 show_bodies,
+                tonconnect,
             ),
             Err(err) => Err(err),
         },
