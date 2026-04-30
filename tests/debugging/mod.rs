@@ -21,13 +21,12 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::abi::ContractABI;
 use tolk_compiler::{CompilerResult, SourceMap};
 use ton::block_tlb::StateInit;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
-use ton_abi::{ContractAbi, contract_abi};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
@@ -162,7 +161,6 @@ fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
 
 pub(crate) fn run_script_file(
     file_path: &str,
-    content: &str,
     project_root: &Path,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
@@ -170,12 +168,10 @@ pub(crate) fn run_script_file(
 ) -> anyhow::Result<String> {
     let script_path = Path::new(file_path);
 
-    let (abi, compiler_abi, code_cell, source_map) = {
+    let (abi, code_cell, source_map) = {
         let _compile_guard = DEBUG_COMPILER_LOCK
             .lock()
             .expect("debug compiler lock poisoned");
-
-        let abi = contract_abi(content.into(), file_path, None);
 
         let config = load_project_config(project_root);
 
@@ -189,9 +185,9 @@ pub(crate) fn run_script_file(
             CompilerResult::Success(result) => {
                 let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
                 let source_map = Arc::new(result.source_map.unwrap_or_default());
-                let compiler_abi: Option<Arc<CompilerContractABI>> = result.abi.map(Arc::new);
+                let abi: Option<Arc<ContractABI>> = result.abi.map(Arc::new);
 
-                (abi, compiler_abi, code_cell, source_map)
+                (abi, code_cell, source_map)
             }
             CompilerResult::Error(error) => {
                 anyhow::bail!("Cannot compile script file {}", error.message)
@@ -203,8 +199,7 @@ pub(crate) fn run_script_file(
     let execution = execute_script(
         &code_cell,
         &data_cell,
-        abi.into(),
-        compiler_abi,
+        abi,
         source_map,
         debug_port,
         debug_listener,
@@ -224,8 +219,7 @@ pub(crate) fn run_script_file(
 fn execute_script(
     code_cell: &TonCell,
     data_cell: &TonCell,
-    abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
     source_map: Arc<SourceMap>,
     debug_port: u16,
     debug_listener: Option<TcpListener>,
@@ -279,7 +273,7 @@ fn execute_script(
         env: Env {
             config: &config,
             project_root: project_root.to_path_buf(),
-            abi,
+            abi: abi.clone(),
             source_map: Some(source_map.clone()),
             show_bodies: false,
             default_log_level: verbosity,
@@ -333,7 +327,7 @@ fn execute_script(
     };
     executor.prepare(0, &stack)?;
     let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-    replayer.set_compiler_abi(compiler_abi);
+    replayer.set_abi(abi);
     let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
     ctx.debug = DebugCtx::new(&mut dbg_session);
 

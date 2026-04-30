@@ -1329,7 +1329,7 @@ Typically, call once before [random.uint256](#randomuint256) / [random.range](#r
 
 ```tolk
 @pure
-fun cell.calculateSize(self, maxCells: int): (int, int, int, bool)
+fun cell.calculateSize(self, maxCells: int): (int?, int?, int?, bool)
 ```
 
 Returns `(x, y, z, -1)` or `(null, null, null, 0)`.
@@ -1348,7 +1348,7 @@ a zero flag is returned to indicate failure.
 
 ```tolk
 @pure
-fun slice.calculateSize(self, maxCells: int): (int, int, int, bool)
+fun slice.calculateSize(self, maxCells: int): (int?, int?, int?, bool)
 ```
 
 Similar to [cell.calculateSize](#cellcalculatesize), but accepting a slice instead of a cell.

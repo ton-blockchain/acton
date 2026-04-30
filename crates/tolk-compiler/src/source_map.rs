@@ -2,6 +2,7 @@
 // Symbol types contain type declarations and function metadata; debug marks map
 // IR variables and stack positions back to the original Tolk source.
 
+use crate::abi::ABICustomPackUnpack;
 use crate::debug_marks_dict::DebugMarksDict;
 use crate::types_kernel::Ty;
 use serde::{Deserialize, Serialize};
@@ -125,6 +126,28 @@ impl SourceMap {
     #[must_use]
     pub fn declarations(&self) -> &[Declaration] {
         &self.declarations
+    }
+
+    #[must_use]
+    pub fn find_message_name_by_opcode(&self, opcode: u32) -> Option<&str> {
+        self.declarations.iter().find_map(|declaration| {
+            let Declaration::Struct(struct_decl) = declaration else {
+                return None;
+            };
+
+            if struct_decl
+                .type_params
+                .as_ref()
+                .is_some_and(|params| !params.is_empty())
+            {
+                return None;
+            }
+
+            let matches_opcode = struct_decl.prefix.as_ref().is_some_and(|prefix| {
+                prefix.prefix_len == 32 && parse_prefix_number(&prefix.prefix_str) == Some(opcode)
+            });
+            matches_opcode.then_some(struct_decl.name.as_str())
+        })
     }
 
     #[must_use]
@@ -413,6 +436,8 @@ pub struct AbiStruct {
     #[serde(default)]
     pub prefix: Option<PrefixInfo>,
     pub fields: Vec<FieldInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -422,6 +447,8 @@ pub struct AbiAlias {
     pub target_ty: Ty,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -430,6 +457,8 @@ pub struct AbiEnum {
     pub ident_loc: SrcRange,
     pub encoded_as: Ty,
     pub members: Vec<EnumMemberInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -447,6 +476,22 @@ pub enum Declaration {
 pub struct PrefixInfo {
     pub prefix_str: String,
     pub prefix_len: i32,
+}
+
+fn parse_prefix_number(prefix: &str) -> Option<u32> {
+    let prefix = prefix.trim();
+    if prefix.is_empty() {
+        return None;
+    }
+    let parsed = if let Some(hex) = prefix
+        .strip_prefix("0x")
+        .or_else(|| prefix.strip_prefix("0X"))
+    {
+        u64::from_str_radix(hex, 16).ok()?
+    } else {
+        prefix.parse::<u64>().ok()?
+    };
+    u32::try_from(parsed).ok()
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

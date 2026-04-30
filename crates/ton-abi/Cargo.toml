@@ -11,17 +11,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-tree-sitter = { workspace = true }
-tolk-syntax = { workspace = true }
-tolk-compiler = { workspace = true }
-crc = { workspace = true }
-num-bigint = { workspace = true }
 anyhow = { workspace = true }
 tycho-types = { workspace = true }
-serde = { workspace = true }
-dunce = { workspace = true }
-rustc-hash = { workspace = true }
 path-absolutize = { workspace = true }
+
+[dev-dependencies]
+dunce = { workspace = true }
 
 [lints]
 workspace = true

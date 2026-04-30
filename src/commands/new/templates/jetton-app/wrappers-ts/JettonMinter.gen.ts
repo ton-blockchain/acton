@@ -781,57 +781,37 @@ export const ResponseWalletAddress = {
 }
 
 /**
- > struct (0x00) SnakeDataReply {
- >     string: string
- > }
+ > type string_prefixed0x = string
  */
-export interface SnakeDataReply {
-    readonly $: 'SnakeDataReply'
-    string: string
-}
+export type string_prefixed0x = string
 
-export const SnakeDataReply = {
-    PREFIX: 0x00,
-
-    create(args: {
-        string: string
-    }): SnakeDataReply {
-        return {
-            $: 'SnakeDataReply',
-            ...args
-        }
+export const string_prefixed0x = {
+    fromSlice(s: c.Slice): string_prefixed0x {
+        return s.loadStringRefTail();
     },
-    fromSlice(s: c.Slice): SnakeDataReply {
-        loadAndCheckPrefix(s, 0x00, 8, 'SnakeDataReply');
-        return {
-            $: 'SnakeDataReply',
-            string: s.loadStringRefTail(),
-        }
+    store(self: string_prefixed0x, b: c.Builder): void {
+        b.storeStringRefTail(self);
     },
-    store(self: SnakeDataReply, b: c.Builder): void {
-        b.storeUint(0x00, 8);
-        b.storeStringRefTail(self.string);
-    },
-    toCell(self: SnakeDataReply): c.Cell {
-        return makeCellFrom<SnakeDataReply>(self, SnakeDataReply.store);
+    toCell(self: string_prefixed0x): c.Cell {
+        return makeCellFrom<string_prefixed0x>(self, string_prefixed0x.store);
     }
 }
 
 /**
  > struct (0x00) OnchainMetadataReply {
- >     contentDict: map<uint256, Cell<SnakeDataReply>>
+ >     contentDict: map<uint256, string_prefixed0x>
  > }
  */
 export interface OnchainMetadataReply {
     readonly $: 'OnchainMetadataReply'
-    contentDict: c.Dictionary<uint256, CellRef<SnakeDataReply>>
+    contentDict: c.Dictionary<uint256, string_prefixed0x>
 }
 
 export const OnchainMetadataReply = {
     PREFIX: 0x00,
 
     create(args: {
-        contentDict: c.Dictionary<uint256, CellRef<SnakeDataReply>>
+        contentDict: c.Dictionary<uint256, string_prefixed0x>
     }): OnchainMetadataReply {
         return {
             $: 'OnchainMetadataReply',
@@ -842,18 +822,12 @@ export const OnchainMetadataReply = {
         loadAndCheckPrefix(s, 0x00, 8, 'OnchainMetadataReply');
         return {
             $: 'OnchainMetadataReply',
-            contentDict: c.Dictionary.load<uint256, CellRef<SnakeDataReply>>(c.Dictionary.Keys.BigUint(256), createDictionaryValue<CellRef<SnakeDataReply>>(
-                (s) => loadCellRef<SnakeDataReply>(s, SnakeDataReply.fromSlice),
-                (v,b) => storeCellRef<SnakeDataReply>(v, b, SnakeDataReply.store)
-            ), s),
+            contentDict: c.Dictionary.load<uint256, string_prefixed0x>(c.Dictionary.Keys.BigUint(256), createDictionaryValue<string_prefixed0x>(string_prefixed0x.fromSlice, string_prefixed0x.store), s),
         }
     },
     store(self: OnchainMetadataReply, b: c.Builder): void {
         b.storeUint(0x00, 8);
-        b.storeDict<uint256, CellRef<SnakeDataReply>>(self.contentDict, c.Dictionary.Keys.BigUint(256), createDictionaryValue<CellRef<SnakeDataReply>>(
-            (s) => loadCellRef<SnakeDataReply>(s, SnakeDataReply.fromSlice),
-            (v,b) => storeCellRef<SnakeDataReply>(v, b, SnakeDataReply.store)
-        ));
+        b.storeDict<uint256, string_prefixed0x>(self.contentDict, c.Dictionary.Keys.BigUint(256), createDictionaryValue<string_prefixed0x>(string_prefixed0x.fromSlice, string_prefixed0x.store));
     },
     toCell(self: OnchainMetadataReply): c.Cell {
         return makeCellFrom<OnchainMetadataReply>(self, OnchainMetadataReply.store);

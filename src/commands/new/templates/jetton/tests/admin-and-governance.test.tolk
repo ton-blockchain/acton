@@ -18,8 +18,10 @@ fun extractUriString(contentCell: cell): string? {
     if (!uriCell.isFound) {
         return null;
     }
-    val uri = uriCell.loadValue().load();
-    return uri.string;
+    val prefixed = uriCell.loadValue();
+    var s = (prefixed as unknown as cell).beginParse();
+    s.loadUint(8);
+    return s.loadString();
 }
 
 fun assertSameShardPrefix(owner: address, wallet: address) {

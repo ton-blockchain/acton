@@ -437,9 +437,10 @@ fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
             &candidate.contract_path,
             &candidate.code_boc64,
             candidate.code_hash,
-            Arc::new(SourceMap::without_debug_info()),
+            candidate
+                .source_map
+                .unwrap_or_else(|| Arc::new(SourceMap::without_debug_info())),
             candidate.abi,
-            candidate.compiler_abi,
         );
     }
     Ok(build_cache)

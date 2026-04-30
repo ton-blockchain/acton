@@ -136,7 +136,6 @@ dependencies = [
  "serde_json",
  "tolk-compiler",
  "tolk-syntax",
- "ton-abi",
  "ton-executor",
  "tvm-ffi",
  "tvm-logs",
@@ -4937,6 +4936,7 @@ dependencies = [
  "anyhow",
  "dunce",
  "include_dir",
+ "num-bigint",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
@@ -5186,15 +5186,8 @@ name = "ton-abi"
 version = "0.3.2"
 dependencies = [
  "anyhow",
- "crc",
  "dunce",
- "num-bigint",
  "path-absolutize",
- "rustc-hash 2.1.1",
- "serde",
- "tolk-compiler",
- "tolk-syntax",
- "tree-sitter",
  "tycho-types",
 ]
 
