@@ -289,9 +289,11 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
+    let current_project_root = project_root().to_path_buf();
     let tonconnect = if tonconnect {
         let network = net.expect("`--tonconnect` must be validated before script execution");
-        let session = Arc::new(TonConnectSession::start()?);
+        let storage_path = crate::tonconnect::session_storage_path(&current_project_root, network)?;
+        let session = Arc::new(TonConnectSession::start(storage_path)?);
         let wallet = session.connect(network)?;
         Some(TonConnectContext { session, wallet })
     } else {
@@ -306,7 +308,7 @@ fn execute_script(
     let mut ctx = Context {
         env: Env {
             config: &config,
-            project_root: project_root().to_path_buf(),
+            project_root: current_project_root,
             abi,
             source_map: Some(source_map.clone()),
             show_bodies,

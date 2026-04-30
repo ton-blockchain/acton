@@ -1,11 +1,16 @@
 use anyhow::{Context as AnyhowContext, anyhow};
-use axum::extract::State;
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::extract::{Query, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::fs;
 use std::net::TcpListener;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -21,13 +26,16 @@ use tycho_types::models::{
 
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
 const TONCONNECT_TESTNET_CHAIN: &str = "-3";
+const API_TOKEN_HEADER: &str = "x-acton-tonconnect-token";
 
 const INDEX_HTML: &str = r#"<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <title>Acton TON Connect</title>
+  <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
     :root {
@@ -77,10 +85,10 @@ const INDEX_HTML: &str = r#"<!doctype html>
   </main>
   <script>
     const statusEl = document.getElementById('status');
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json',
-      buttonRootId: 'ton-connect-button',
-    });
+    const apiToken = '__ACTON_API_TOKEN__';
+    const apiHeaders = () => ({'x-acton-tonconnect-token': apiToken});
+    const TonConnect = TonConnectSDK.TonConnect;
+    const manifestUrl = 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
 
     const setStatus = (text) => {
       statusEl.textContent = text;
@@ -89,13 +97,37 @@ const INDEX_HTML: &str = r#"<!doctype html>
     const postJson = async (url, body) => {
       const response = await fetch(url, {
         method: 'POST',
-        headers: {'content-type': 'application/json'},
+        headers: {'content-type': 'application/json', ...apiHeaders()},
         body: JSON.stringify(body),
       });
       if (!response.ok) {
         throw new Error(await response.text());
       }
     };
+
+    const storage = {
+      async getItem(key) {
+        const response = await fetch(`/api/storage?key=${encodeURIComponent(key)}`, {
+          headers: apiHeaders(),
+        });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        const body = await response.json();
+        return body.value ?? null;
+      },
+      async setItem(key, value) {
+        await postJson('/api/storage', {key, value});
+      },
+      async removeItem(key) {
+        await postJson('/api/storage/remove', {key});
+      },
+    };
+    const connector = new TonConnect({manifestUrl, storage});
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      connector,
+      buttonRootId: 'ton-connect-button',
+    });
 
     const publishWallet = async (wallet) => {
       if (!wallet || !wallet.account || !wallet.account.address) {
@@ -121,7 +153,10 @@ const INDEX_HTML: &str = r#"<!doctype html>
 
     const poll = async () => {
       try {
-        const response = await fetch('/api/request');
+        const response = await fetch('/api/request', {headers: apiHeaders()});
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
         const request = await response.json();
         if (!request.pending) {
           setTimeout(poll, 500);
@@ -198,6 +233,8 @@ struct PendingTonConnectRequest {
 struct TonConnectWebState {
     inner: Arc<TonConnectState>,
     base_url: Arc<str>,
+    storage_path: Arc<PathBuf>,
+    api_token: Arc<str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -251,8 +288,24 @@ struct ResponsePayload {
     error: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct StorageKey {
+    key: String,
+}
+
+#[derive(Deserialize)]
+struct StorageSetPayload {
+    key: String,
+    value: String,
+}
+
+#[derive(Serialize)]
+struct StorageGetResponse {
+    value: Option<String>,
+}
+
 impl TonConnectSession {
-    pub fn start() -> anyhow::Result<Self> {
+    pub fn start(storage_path: PathBuf) -> anyhow::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", 0))
             .context("Failed to bind local TON Connect server")?;
         listener
@@ -261,7 +314,9 @@ impl TonConnectSession {
         let addr = listener
             .local_addr()
             .context("Failed to read local TON Connect server address")?;
-        let url = format!("http://{addr}");
+        let base_url = format!("http://{addr}");
+        let api_token = generate_api_token();
+        let url = base_url.clone();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         let state = Arc::new(TonConnectState {
@@ -273,7 +328,9 @@ impl TonConnectSession {
         });
         let web_state = TonConnectWebState {
             inner: Arc::clone(&state),
-            base_url: Arc::<str>::from(url.as_str()),
+            base_url: Arc::<str>::from(base_url.as_str()),
+            storage_path: Arc::new(storage_path),
+            api_token: Arc::<str>::from(api_token),
         };
 
         let app = Router::new()
@@ -283,6 +340,8 @@ impl TonConnectSession {
             .route("/api/connect", post(connect))
             .route("/api/request", get(request))
             .route("/api/response", post(response))
+            .route("/api/storage", get(storage_get).post(storage_set))
+            .route("/api/storage/remove", post(storage_remove))
             .with_state(web_state);
 
         let server_thread = thread::Builder::new()
@@ -417,6 +476,13 @@ pub fn ensure_supported_network(network: &Network) -> anyhow::Result<()> {
     tonconnect_chain(network).map(|_| ())
 }
 
+pub fn session_storage_path(project_root: &Path, network: &Network) -> anyhow::Result<PathBuf> {
+    Ok(project_root
+        .join(".acton")
+        .join("tonconnect")
+        .join(format!("{}.json", tonconnect_network_name(network)?)))
+}
+
 pub fn transaction_from_message(
     message: &Cell,
     network: &Network,
@@ -529,6 +595,11 @@ fn tonconnect_chain(network: &Network) -> anyhow::Result<&'static str> {
     }
 }
 
+fn tonconnect_network_name(network: &Network) -> anyhow::Result<&'static str> {
+    let chain = tonconnect_chain(network)?;
+    Ok(chain_name(chain).expect("supported TON Connect chain must have a network name"))
+}
+
 fn chain_name(chain: &str) -> Option<&'static str> {
     match chain {
         TONCONNECT_MAINNET_CHAIN => Some("mainnet"),
@@ -537,8 +608,8 @@ fn chain_name(chain: &str) -> Option<&'static str> {
     }
 }
 
-async fn index() -> Html<&'static str> {
-    Html(INDEX_HTML)
+async fn index(State(state): State<TonConnectWebState>) -> Html<String> {
+    Html(INDEX_HTML.replace("__ACTON_API_TOKEN__", state.api_token.as_ref()))
 }
 
 async fn icon() -> Response {
@@ -560,8 +631,10 @@ async fn manifest(State(state): State<TonConnectWebState>) -> Json<TonConnectMan
 
 async fn connect(
     State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
     Json(payload): Json<ConnectPayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
     let (address, _) =
         StdAddr::from_str_ext(&payload.address, StdAddrFormat::any()).map_err(|error| {
             (
@@ -583,7 +656,11 @@ async fn connect(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn request(State(state): State<TonConnectWebState>) -> Json<RequestPollResponse> {
+async fn request(
+    State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
+) -> Result<Json<RequestPollResponse>, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
     let response = {
         let pending = state
             .inner
@@ -607,13 +684,15 @@ async fn request(State(state): State<TonConnectWebState>) -> Json<RequestPollRes
         }
     };
 
-    Json(response)
+    Ok(Json(response))
 }
 
 async fn response(
     State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
     Json(payload): Json<ResponsePayload>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
     {
         let mut pending = state
             .inner
@@ -646,6 +725,146 @@ async fn response(
     }
     state.inner.pending_cv.notify_all();
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn storage_get(
+    State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
+    Query(query): Query<StorageKey>,
+) -> Result<Json<StorageGetResponse>, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
+    let value = storage_get_item(&state.storage_path, &query.key).map_err(storage_error)?;
+    Ok(Json(StorageGetResponse { value }))
+}
+
+async fn storage_set(
+    State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
+    Json(payload): Json<StorageSetPayload>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
+    storage_set_item(&state.storage_path, payload.key, payload.value).map_err(storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn storage_remove(
+    State(state): State<TonConnectWebState>,
+    headers: HeaderMap,
+    Json(payload): Json<StorageKey>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    verify_api_token(&state, &headers)?;
+    storage_remove_item(&state.storage_path, &payload.key).map_err(storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn verify_api_token(
+    state: &TonConnectWebState,
+    headers: &HeaderMap,
+) -> Result<(), (StatusCode, String)> {
+    if headers
+        .get(API_TOKEN_HEADER)
+        .and_then(|value| value.to_str().ok())
+        == Some(state.api_token.as_ref())
+    {
+        return Ok(());
+    }
+
+    Err((
+        StatusCode::UNAUTHORIZED,
+        "Invalid TON Connect session token".to_string(),
+    ))
+}
+
+fn storage_get_item(path: &Path, key: &str) -> anyhow::Result<Option<String>> {
+    Ok(read_storage(path)?.get(key).cloned())
+}
+
+fn storage_set_item(path: &Path, key: String, value: String) -> anyhow::Result<()> {
+    let mut storage = read_storage(path)?;
+    storage.insert(key, value);
+    write_storage(path, &storage)
+}
+
+fn storage_remove_item(path: &Path, key: &str) -> anyhow::Result<()> {
+    let mut storage = read_storage(path)?;
+    storage.remove(key);
+    write_storage(path, &storage)
+}
+
+fn read_storage(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+
+    let content = fs::read_to_string(path).with_context(|| {
+        format!(
+            "Failed to read TON Connect session storage {}",
+            path.display()
+        )
+    })?;
+    if content.trim().is_empty() {
+        return Ok(BTreeMap::new());
+    }
+
+    serde_json::from_str(&content).with_context(|| {
+        format!(
+            "Failed to parse TON Connect session storage {}",
+            path.display()
+        )
+    })
+}
+
+fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "Failed to create TON Connect session storage directory {}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let content =
+        serde_json::to_vec_pretty(storage).context("Failed to serialize TON Connect session")?;
+    fs::write(path, content).with_context(|| {
+        format!(
+            "Failed to write TON Connect session storage {}",
+            path.display()
+        )
+    })?;
+    set_storage_permissions(path)?;
+    Ok(())
+}
+
+fn storage_error(error: anyhow::Error) -> (StatusCode, String) {
+    (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+}
+
+fn generate_api_token() -> String {
+    let mut bytes = [0; 32];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    let mut token = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(&mut token, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    token
+}
+
+#[cfg(unix)]
+fn set_storage_permissions(path: &Path) -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).with_context(|| {
+        format!(
+            "Failed to restrict TON Connect session storage permissions {}",
+            path.display()
+        )
+    })
+}
+
+#[cfg(not(unix))]
+fn set_storage_permissions(_path: &Path) -> anyhow::Result<()> {
+    Ok(())
 }
 
 fn chain_value_to_string(value: &serde_json::Value) -> Option<String> {
@@ -700,5 +919,67 @@ mod tests {
             format_address(&dest, &Network::Testnet, true)
         );
         assert!(message.payload.is_some());
+    }
+
+    #[test]
+    fn tonconnect_session_storage_path_is_project_local_and_network_scoped() {
+        let root = Path::new("/tmp/acton-project");
+
+        assert_eq!(
+            session_storage_path(root, &Network::Mainnet).unwrap(),
+            root.join(".acton").join("tonconnect").join("mainnet.json")
+        );
+        assert_eq!(
+            session_storage_path(root, &Network::Testnet).unwrap(),
+            root.join(".acton").join("tonconnect").join("testnet.json")
+        );
+    }
+
+    #[test]
+    fn tonconnect_storage_roundtrips_values() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join(".acton/tonconnect/testnet.json");
+
+        assert_eq!(storage_get_item(&path, "missing").unwrap(), None);
+
+        storage_set_item(&path, "session".to_string(), "value".to_string()).unwrap();
+        assert_eq!(
+            storage_get_item(&path, "session").unwrap(),
+            Some("value".to_string())
+        );
+
+        let persisted = fs::read_to_string(path).unwrap();
+        assert!(persisted.contains("\"session\""));
+        assert!(persisted.contains("\"value\""));
+    }
+
+    #[test]
+    fn tonconnect_storage_remove_deletes_only_requested_key() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join(".acton/tonconnect/testnet.json");
+
+        storage_set_item(&path, "keep".to_string(), "1".to_string()).unwrap();
+        storage_set_item(&path, "remove".to_string(), "2".to_string()).unwrap();
+        storage_remove_item(&path, "remove").unwrap();
+
+        assert_eq!(
+            storage_get_item(&path, "keep").unwrap(),
+            Some("1".to_string())
+        );
+        assert_eq!(storage_get_item(&path, "remove").unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tonconnect_storage_file_is_private_on_unix() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join(".acton/tonconnect/testnet.json");
+
+        storage_set_item(&path, "session".to_string(), "value".to_string()).unwrap();
+
+        let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
     }
 }
