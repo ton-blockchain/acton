@@ -289,7 +289,8 @@ fn send_message_impl(
     if is_external && ctx.can_broadcast_to_network() {
         if ctx.env.tonconnect.is_some() {
             anyhow::bail!(
-                "`net.sendExternal` cannot be used with `--tonconnect`; use `net.send(wallet.address, createMessage(...))` so the connected wallet can sign the internal message"
+                "`net.sendExternal` cannot be used with {}; use `net.send(wallet.address, createMessage(...))` so the connected wallet can sign the internal message",
+                "--tonconnect".yellow()
             );
         }
 

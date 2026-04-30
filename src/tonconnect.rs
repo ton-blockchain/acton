@@ -1,3 +1,4 @@
+use acton_config::color::OwoColorize;
 use anyhow::{Context as AnyhowContext, anyhow};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -490,7 +491,8 @@ fn bind_listener(port: u16) -> anyhow::Result<TcpListener> {
     match TcpListener::bind(("127.0.0.1", port)) {
         Ok(listener) => Ok(listener),
         Err(error) if error.kind() == ErrorKind::AddrInUse => anyhow::bail!(
-            "TON Connect port 127.0.0.1:{port} is already in use. Stop the process using it or pass `--tonconnect-port <port>`."
+            "TON Connect port 127.0.0.1:{port} is already in use. Stop the process using it or pass {}.",
+            "--tonconnect-port <port>".yellow()
         ),
         Err(error) => Err(error).with_context(|| {
             format!("Failed to bind local TON Connect server to 127.0.0.1:{port}")
@@ -604,7 +606,8 @@ fn validate_wallet_network(wallet: &TonConnectWallet, network: &Network) -> anyh
             .unwrap_or("unknown");
         let expected_name = chain_name(expected).unwrap_or("unknown");
         anyhow::bail!(
-            "Connected TON Connect wallet is on {actual}, but --net {expected_name} was requested. Switch the wallet network and run the script again."
+            "Connected TON Connect wallet is on {actual}, but {} was requested. Switch the wallet network and run the script again.",
+            format!("--net {expected_name}").yellow()
         );
     }
 
@@ -616,7 +619,10 @@ fn tonconnect_chain(network: &Network) -> anyhow::Result<&'static str> {
         Network::Mainnet => Ok(TONCONNECT_MAINNET_CHAIN),
         Network::Testnet => Ok(TONCONNECT_TESTNET_CHAIN),
         Network::Localnet | Network::Custom(_) => anyhow::bail!(
-            "`--tonconnect` supports only `--net mainnet` and `--net testnet`; use configured local wallets for {network}"
+            "{} supports only {} and {}; use configured local wallets for {network}",
+            "--tonconnect".yellow(),
+            "--net mainnet".yellow(),
+            "--net testnet".yellow()
         ),
     }
 }

@@ -1,1 +1,1 @@
-Error: `--tonconnect` requires `--net mainnet` or `--net testnet`
+Error: --tonconnect requires --net mainnet or --net testnet

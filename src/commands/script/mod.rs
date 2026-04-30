@@ -61,7 +61,10 @@ fn resolve_script_networks(
         && net != fork_net
     {
         anyhow::bail!(
-            "`--net` ({net}) and `--fork-net` ({fork_net}) cannot differ when broadcasting; use one network or omit `--fork-net`"
+            "{} ({net}) and {} ({fork_net}) cannot differ when broadcasting; use one network or omit {}",
+            "--net".yellow(),
+            "--fork-net".yellow(),
+            "--fork-net".yellow()
         );
     }
 
@@ -122,7 +125,12 @@ pub fn script_cmd(
 
     let (network, fork_net) = resolve_script_networks(net.as_deref(), fork_net.as_deref())?;
     if tonconnect && network.is_none() {
-        anyhow::bail!("`--tonconnect` requires `--net mainnet` or `--net testnet`");
+        anyhow::bail!(
+            "{} requires {} or {}",
+            "--tonconnect".yellow(),
+            "--net mainnet".yellow(),
+            "--net testnet".yellow()
+        );
     }
     if tonconnect && let Some(network) = &network {
         crate::tonconnect::ensure_supported_network(network)?;
@@ -305,7 +313,7 @@ fn execute_script(
         env: Env {
             config: &config,
             project_root: current_project_root,
-            abi,
+            abi: abi.clone(),
             source_map: Some(source_map.clone()),
             show_bodies,
             default_log_level: verbosity,
