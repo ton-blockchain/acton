@@ -2768,8 +2768,7 @@ fn register_localnet_compiler_abis(
             .collect(),
     };
 
-    let client = reqwest::blocking::Client::builder()
-        .no_proxy()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(2))
         .timeout(Duration::from_secs(5))
         .user_agent(crate::build_info::user_agent())

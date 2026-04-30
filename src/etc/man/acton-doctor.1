@@ -75,6 +75,12 @@ embedded in the linked libraries
 \h'-04'\(bu\h'+03'selected environment variables such as \fBHOME\fR, \fBSHELL\fR, \fBNO_COLOR\fR, and
 \fBACTON_DISABLE_AUTO_STDLIB\fR
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_USE_PROXY\fR, which opts Acton CLI HTTP clients into \fBHTTP_PROXY\fR,
+\fBHTTPS_PROXY\fR, \fBALL_PROXY\fR, and system proxy settings. Acton ignores those
+proxy settings by default to avoid macOS sandbox proxy autodetection crashes.
+.RE
 .SH "PATH AND OVERLAY CHECKS"
 For each reported path, Acton shows whether it exists, whether it appears
 writable, and when relevant which resolution source selected it.

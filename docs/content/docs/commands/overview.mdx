@@ -38,6 +38,14 @@ Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic `.acton/` refresh for
 the current process. Explicit standard-library commands, such as
 `acton init --stdlib-only`, still update `.acton/`.
 
+Acton disables HTTP proxy detection by default for its own HTTP clients. This
+means `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and system proxy settings are
+ignored unless you opt in. The default avoids macOS sandbox crashes caused by
+system proxy autodetection.
+
+Set `ACTON_USE_PROXY=1` or `ACTON_USE_PROXY=true` to let Acton use those proxy
+settings for the current process.
+
 ## Help And Manuals
 
 Use the CLI help surfaces intentionally:

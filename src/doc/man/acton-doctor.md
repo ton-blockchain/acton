@@ -39,6 +39,9 @@ and Tolk library metadata, logging paths, and relevant environment variables.
 - resolved logging directory and debug log path
 - selected environment variables such as `HOME`, `SHELL`, `NO_COLOR`, and
   `ACTON_DISABLE_AUTO_STDLIB`
+- `ACTON_USE_PROXY`, which opts Acton CLI HTTP clients into `HTTP_PROXY`,
+  `HTTPS_PROXY`, `ALL_PROXY`, and system proxy settings. Acton ignores those
+  proxy settings by default to avoid macOS sandbox proxy autodetection crashes.
 
 ## Path And Overlay Checks
 

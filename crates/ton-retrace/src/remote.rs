@@ -7,17 +7,41 @@ use crate::types::{
 use reqwest::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
+use std::env;
+use std::ffi::OsStr;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use toncenter_keys::api_key as toncenter_api_key;
 
+const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
 
 const fn user_agent() -> &'static str {
     concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
+fn http_client_builder() -> reqwest::ClientBuilder {
+    let builder = Client::builder();
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn proxy_enabled() -> bool {
+    proxy_enabled_from_value(env::var_os(USE_PROXY_ENV).as_deref())
+}
+
+fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|value| {
+        let value = value.to_string_lossy();
+        let value = value.trim();
+        value == "1" || value == "true"
+    })
 }
 
 /// Client for `TonCenter` V2/V3 API.
@@ -40,7 +64,7 @@ impl TonCenterClient {
             }
         };
         Ok(Self {
-            client: Client::new(),
+            client: http_client_builder().build()?,
             api_key: toncenter_api_key(&network),
             base_url,
         })
@@ -253,7 +277,7 @@ impl TonHubClient {
             }
         };
         Ok(Self {
-            client: Client::new(),
+            client: http_client_builder().build()?,
             base_url,
         })
     }
@@ -386,7 +410,9 @@ impl DtonClient {
     /// Creates a new Dton client with an optional API key.
     pub(crate) fn new(api_key: Option<String>) -> Self {
         Self {
-            client: Client::new(),
+            client: http_client_builder()
+                .build()
+                .expect("failed to build dton HTTP client"),
             api_key: api_key.unwrap_or_else(|| "fpYxhGTWfIe3ZEf2s6vvgAGmps_qnNmD".to_string()),
         }
     }

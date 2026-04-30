@@ -1,6 +1,6 @@
 use crate::build_info;
 use crate::paths;
-use crate::stdlib;
+use crate::{http, stdlib};
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, LibrariesFile, WalletsFile, global_libraries_path, global_wallets_path,
@@ -145,6 +145,7 @@ struct DoctorEnvironmentVars {
     shell: Option<String>,
     no_color: Option<String>,
     disable_auto_stdlib: Option<String>,
+    use_proxy: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -730,6 +731,7 @@ fn collect_doctor_report() -> Result<DoctorReport> {
                 shell: env::var("SHELL").ok(),
                 no_color: env::var("NO_COLOR").ok(),
                 disable_auto_stdlib: env::var(stdlib::DISABLE_AUTO_STDLIB_ENV).ok(),
+                use_proxy: env::var(http::USE_PROXY_ENV).ok(),
             },
         },
     })
@@ -879,11 +881,7 @@ fn send_doctor_api_request(
 }
 
 fn build_doctor_api_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
-    // `doctor` is best-effort diagnostics: prefer direct requests over
-    // reqwest system-proxy autodiscovery, which can panic in restricted
-    // macOS environments instead of returning a recoverable transport error.
-    reqwest::blocking::Client::builder()
-        .no_proxy()
+    http::blocking_client_builder()
         .connect_timeout(DOCTOR_API_CONNECT_TIMEOUT)
         .timeout(DOCTOR_API_REQUEST_TIMEOUT)
         .build()
@@ -1430,6 +1428,15 @@ fn print_report(report: &DoctorReport) {
             .environment
             .vars
             .disable_auto_stdlib
+            .as_deref()
+            .unwrap_or("<unset>"),
+    );
+    print_kv(
+        http::USE_PROXY_ENV,
+        report
+            .environment
+            .vars
+            .use_proxy
             .as_deref()
             .unwrap_or("<unset>"),
     );
