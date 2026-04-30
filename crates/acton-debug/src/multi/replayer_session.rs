@@ -1198,7 +1198,7 @@ impl ReplayerDebugSession {
         let Ok(mut replayer) = TolkReplayer::new_live_vm(source_map.as_ref(), spec.executor) else {
             return Ok(false);
         };
-        replayer.set_compiler_abi(spec.compiler_abi);
+        replayer.set_abi(spec.abi);
         replayer.set_exception_breakpoints(self.exception_mode);
 
         // Freeze the currently visible parent frames before switching active context.

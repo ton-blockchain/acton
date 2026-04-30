@@ -264,7 +264,6 @@ impl TestReporter for ConsoleReporter {
             };
 
             let formatter = FormatterContext {
-                contract_abi: test.abi.clone(),
                 accounts: Cow::Borrowed(&failure_context.accounts),
                 build_cache: Cow::Borrowed(&failure_context.build_cache),
                 emulations: Cow::Borrowed(&failure_context.emulations),
@@ -347,7 +346,7 @@ fn process_test_fail(
     }
 }
 
-fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
+fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &FormatterContext<'_>) {
     if let AssertFailure::GetMethod(failure) = &failure {
         let formatted = fmt.format_get_method_assert_failure(failure);
         let mut lines = formatted.lines();
@@ -476,7 +475,7 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionNotFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
+        let params = fmt.format_search_transaction_parameters(failure);
         let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr = failure.params.from.as_ref().and_then(|dp| match dp {
@@ -500,7 +499,7 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionIsFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
+        let params = fmt.format_search_transaction_parameters(failure);
         let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr2 = failure.params.from.as_ref().and_then(|dp| match dp {

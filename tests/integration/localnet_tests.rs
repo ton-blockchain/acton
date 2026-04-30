@@ -2583,25 +2583,23 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .expect("accountStates code_hash must be valid base64")
         .to_hex();
 
-    let compiler_abi_response = wait_for_ok_response(
+    let abi_response = wait_for_ok_response(
         &node,
         &format!("/admin/compiler-abi?code_hash={code_hash_hex}"),
         Duration::from_secs(12),
     );
-    let compiler_abi = response_payload(&compiler_abi_response);
+    let abi = response_payload(&abi_response);
 
-    assert_eq!(compiler_abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(compiler_abi["contract_name"].as_str(), Some("getter"));
+    assert_eq!(abi["compiler_name"].as_str(), Some("tolk"));
+    assert_eq!(abi["contract_name"].as_str(), Some("getter"));
     assert!(
-        compiler_abi["get_methods"]
-            .as_array()
-            .is_some_and(|methods| {
-                methods
-                    .iter()
-                    .any(|method| method["name"].as_str() == Some("addTen"))
-            }),
+        abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("addTen"))
+        }),
         "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(compiler_abi).unwrap_or_default()
+        serde_json::to_string_pretty(abi).unwrap_or_default()
     );
 
     let missing_response = node.get_json(

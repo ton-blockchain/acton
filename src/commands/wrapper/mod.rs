@@ -9,11 +9,10 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
 use tempfile::TempDir;
-use tolk_compiler::CompilerResult;
 use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
-use ton_abi::ContractAbi as LegacyContractAbi;
+use tolk_compiler::source_map::Declaration;
+use tolk_compiler::{CompilerResult, SourceMap};
 
 const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.2.4";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
@@ -80,19 +79,20 @@ fn build_model(
         );
     }
 
-    let content: Arc<str> = fs::read_to_string(&contract_path)
-        .map_err(|e| anyhow!("Failed to read contract file: {e}"))?
-        .into();
-
-    let contract_path_str = contract_path.to_str().unwrap_or_default();
     let mappings = config.mappings();
     let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-    let (abi, code_boc64) = match compiler.compile(&contract_path, false) {
+    let (abi, code_boc64, source_map) = match compiler.compile(&contract_path, false) {
         CompilerResult::Success(result) => (
             result.abi.ok_or_else(|| {
                 anyhow!("Compiler did not produce ABI for {}", contract_id.yellow())
             })?,
             result.code_boc64,
+            result.source_map.ok_or_else(|| {
+                anyhow!(
+                    "Compiler did not produce symbol types for {}",
+                    contract_id.yellow()
+                )
+            })?,
         ),
         CompilerResult::Error(error) => {
             anyhow::bail!(
@@ -102,7 +102,6 @@ fn build_model(
             );
         }
     };
-    let fallback_abi = ton_abi::contract_abi(content, contract_path_str, mappings.as_ref());
 
     let file_stem = contract_path
         .file_stem()
@@ -123,10 +122,10 @@ fn build_model(
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let storage_path = storage
         .iter()
-        .find_map(|storage| find_type_path(&fallback_abi, &storage.name));
+        .find_map(|storage| find_type_path(&source_map, &storage.name));
     let message_paths = incoming_messages
         .iter()
-        .filter_map(|message| find_type_path(&fallback_abi, &message.name))
+        .filter_map(|message| find_type_path(&source_map, &message.name))
         .collect::<BTreeSet<_>>();
 
     let wrapper_path = resolve_wrapper_path(
@@ -439,12 +438,20 @@ fn serialize_typescript_abi(model: &WrapperModel) -> anyhow::Result<String> {
     .context("Failed to encode ABI JSON for TypeScript wrapper generation")
 }
 
-fn find_type_path(fallback_abi: &LegacyContractAbi, type_name: &str) -> Option<PathBuf> {
-    fallback_abi
-        .types
-        .iter()
-        .find(|typ| typ.name == type_name)
-        .map(|typ| PathBuf::from(&typ.pos.uri))
+fn find_type_path(source_map: &SourceMap, type_name: &str) -> Option<PathBuf> {
+    source_map.declarations().iter().find_map(|declaration| {
+        let Declaration::Struct(struct_decl) = declaration else {
+            return None;
+        };
+
+        if struct_decl.name != type_name {
+            return None;
+        }
+
+        source_map
+            .resolve_file_full_path(struct_decl.ident_loc.file_id())
+            .map(PathBuf::from)
+    })
 }
 
 fn to_pascal_case(s: &str) -> String {

@@ -1,22 +1,5 @@
 {
   "abi": {
-    "entryPoint": {
-      "pos": {
-        "column": 4,
-        "row": 1,
-        "uri": "[ROOT]/contracts/simple.tolk"
-      }
-    },
-    "exitCodes": [],
-    "externalEntryPoint": null,
-    "getMethods": [],
-    "messages": [],
-    "name": "simple",
-    "storage": null,
-    "types": []
-  },
-  "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
-  "compiler_abi": {
     "abi_schema_version": "1.0",
     "compiler_name": "tolk",
     "compiler_version": "1.3.0",
@@ -30,6 +13,7 @@
     "storage": {},
     "thrown_errors": []
   },
+  "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
   "name": "simple",
   "source_map": {
     "debug_marks": [],
