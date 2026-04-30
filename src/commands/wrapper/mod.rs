@@ -15,7 +15,7 @@ use tolk_compiler::CompilerResult;
 use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
 use ton_abi::ContractAbi as LegacyContractAbi;
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.2.3";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
