@@ -112,6 +112,36 @@ Acton offers a GitHub action to set itself up. [`setup-acton`](https://github.co
 ```yaml
 - name: Setup Acton
   uses: ton-blockchain/setup-acton@master
+  with:
+    # (optional) Acton version to install.
+    # Supported values include 'latest', a release tag such as 'v1.0.0',
+    # or a bare semantic version such as '1.0.0'.
+    # Defaults to 'latest'.
+    version: '1.0.0'
+
+    # (optional) Target architecture.
+    # Supported values: x86_64, aarch64.
+    # Auto-detected from the runner if not specified.
+    architecture: 'x86_64'
+
+    # (optional) Target platform.
+    # Supported values: linux, apple, windows.
+    # Auto-detected from the runner if not specified.
+    platform: 'linux'
+
+    # (optional) GitHub token.
+    # Used for authenticated release metadata and asset downloads.
+    # Defaults to the current github.token value.
+    github-token: ${{ github.token }}
+
+# The setup-action produces following outputs: acton-path and acton-version.
+- run: |
+    # acton-path contains full path to the installed Acton binary.
+    echo "Path: ${{ steps.setup-acton.outputs.acton-path }}"
+
+    # acton-version contains installed Acton version parsed from `acton --version`.
+    # If the version cannot be detected, acton-version returns 'unknown'.
+    echo "Version: ${{ steps.setup-acton.outputs.acton-version }}"
 ```
 
 For a contract-only repository, create `.github/workflows/ci.yml`:
