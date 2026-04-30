@@ -1,3 +1,4 @@
+import "@stdlib/strings"
 import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
@@ -14,7 +15,7 @@ import "@wrappers/utils"
 
 fun buildTestMetadata(uri: string): cell {
     var metadata: OnchainMetadataReply = { contentDict: [] };
-    metadata.contentDict.set("uri".sha256(), SnakeDataReply { string: uri }.toCell());
+    metadata.contentDict.set("uri".sha256(), uri.prefixWith00());
     return metadata.toCell();
 }
 
