@@ -44,7 +44,6 @@ get fun `test bm load library unknown hash project builder`() {{
 
     project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .fork_net("custom:bm-missing-net")
         .run()
@@ -87,7 +86,6 @@ get fun `test bm load library unknown hash fixture`() {{
 
     fixture
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .path(test_path)
         .fork_net("custom:bm-missing-net")

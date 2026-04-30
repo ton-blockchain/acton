@@ -79,7 +79,6 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
                 tuple: JsonTuple { elements },
             })
         }
-        TupleItem::TypedTuple { inner, .. } => item_to_json(&TupleItem::Tuple(inner.clone())),
     }
 }
 
@@ -106,9 +105,6 @@ pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
                     .map(legacy_item_to_json)
                     .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(serde_json::json!(["tuple", { "elements": elements }]))
-        }
-        TupleItem::TypedTuple { inner, .. } => {
-            legacy_item_to_json(&TupleItem::Tuple(inner.clone()))
         }
         TupleItem::Nan => anyhow::bail!("NaN not supported in legacy JSON stack"),
     }

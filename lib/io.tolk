@@ -76,17 +76,17 @@ fun println<
     value6: T6,
 ): void {
     ffi.println(
-        reflect.typeNameOfObject(value1),
+        reflect.typeAbiJsonOfObject(value1),
         value1.toTuple(),
-        reflect.typeNameOfObject(value2),
+        reflect.typeAbiJsonOfObject(value2),
         value2.toTuple(),
-        reflect.typeNameOfObject(value3),
+        reflect.typeAbiJsonOfObject(value3),
         value3.toTuple(),
-        reflect.typeNameOfObject(value4),
+        reflect.typeAbiJsonOfObject(value4),
         value4.toTuple(),
-        reflect.typeNameOfObject(value5),
+        reflect.typeAbiJsonOfObject(value5),
         value5.toTuple(),
-        reflect.typeNameOfObject(value6),
+        reflect.typeAbiJsonOfObject(value6),
         value6.toTuple(),
     );
 }

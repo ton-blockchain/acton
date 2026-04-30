@@ -67,6 +67,9 @@ const BASE_ENV_EXAMPLE: &str = "
 # Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
 # exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
 # You can obtain a key in the bot at https://t.me/toncenter.
+# Acton ignores HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and system proxy settings by default
+# to avoid macOS sandbox proxy autodetection crashes. Set ACTON_USE_PROXY=1 or
+# ACTON_USE_PROXY=true if you need Acton CLI HTTP requests to use those proxies.
 # Uncomment the network keys you need:
 # TONCENTER_MAINNET_API_KEY=\"your-mainnet-key-here\"
 # TONCENTER_TESTNET_API_KEY=\"your-testnet-key-here\"

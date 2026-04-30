@@ -109,7 +109,6 @@ get fun `test do stdlib get config stays local with broadcast flag`() {
 
     project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .arg("--fork-net")
         .arg("custom:mock-config-unused")

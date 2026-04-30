@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
@@ -192,11 +192,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64).map_err(|e| {
             anyhow::anyhow!("Failed to decode cached code BoC for {path_display}: {e}")
         })?;
-        let source_map = Arc::new(TolkSourceMap::from_code_cell(
-            cached_entry.new_source_map.clone().unwrap_or_default(),
-            &code_cell,
-            cached_entry.debug_mark_base64.as_deref(),
-        )?);
+        let source_map = Arc::new(cached_entry.source_map.clone().unwrap_or_default());
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         let mappings = ctx.env.config.mappings();
         let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
@@ -243,11 +239,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path_display}: {e}")
             })?;
-            let source_map = Arc::new(TolkSourceMap::from_code_cell(
-                success.new_source_map.unwrap_or_default(),
-                &code_cell,
-                success.debug_mark_base64.as_deref(),
-            )?);
+            let source_map = Arc::new(success.source_map.unwrap_or_default());
             let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
 
             ctx.build.build_cache.memoize(
@@ -316,6 +308,7 @@ fn send_message_impl(
             .map_err(|error| format_send_boc_error(error, SendBocContext::Generic))?;
 
         let pseudo_tx = build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), msg, norm_hash);
+        ctx.chain.world_state.invalidate_remote_cache();
         stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
         return Ok(());
     }
@@ -332,6 +325,8 @@ fn send_message_impl(
         let (wallet_ext_in, norm_hash) =
             send_wallet_message(&msg, wallet, &network, custom_networks)
                 .context("Failed to send message to real network")?;
+
+        ctx.chain.world_state.invalidate_remote_cache();
 
         let pseudo_tx =
             build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
@@ -1455,7 +1450,6 @@ fn read_int_like_param(item: &TupleItem) -> Option<&BigInt> {
     match item {
         TupleItem::Int(num) => Some(num),
         TupleItem::Tuple(items) => items.first().and_then(read_int_like_param),
-        TupleItem::TypedTuple { inner, .. } => inner.0.first().and_then(read_int_like_param),
         _ => None,
     }
 }
@@ -2014,13 +2008,12 @@ fn find_transaction_by_predicate_params_impl(
     Ok(())
 }
 
-extension!(run_get_method in (Context) with (args: Tuple, return_type_name: String, name: String, id: BigInt, code: Cell, address: StdAddr) using run_get_method_impl);
+extension!(run_get_method in (Context) with (args: Tuple, name: String, id: BigInt, code: Cell, address: StdAddr) using run_get_method_impl);
 #[allow(clippy::too_many_arguments)]
 fn run_get_method_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
     args: Tuple,
-    return_type_name: String,
     name: String,
     id: BigInt,
     code: Cell,
@@ -2076,7 +2069,7 @@ fn run_get_method_impl(
     // Remote/forked contracts may have no local debug info. We still run the live
     // executor, but the child replayer will then fall back to a synthetic source map.
     let source_map = compilation_result.as_ref().map_or_else(
-        || Arc::new(TolkSourceMap::without_debug_info()),
+        || Arc::new(SourceMap::without_debug_info()),
         |result| result.source_map.clone(),
     );
     let compiler_abi = compilation_result
@@ -2204,10 +2197,7 @@ fn run_get_method_impl(
                 return Ok(());
             }
 
-            stack.push(TupleItem::TypedTuple {
-                type_name: return_type_name,
-                inner: tuple,
-            });
+            stack.push(TupleItem::Tuple(tuple));
         }
         GetMethodResult::Error(result) => {
             println!("Error: {}", result.error);
@@ -2583,6 +2573,9 @@ fn wait_for_transaction_impl(
                     let link = transaction_link(ctx, &dest_address, &polled);
                     println!("You can view it at {}", link.underline());
                 }
+
+                ctx.chain.world_state.invalidate_remote_cache();
+
                 // Tolk expects a BigArray here (see the Tolk-side unwrap): a bare struct tuple
                 // would be spread across multiple stack slots and cause a stack underflow.
                 stack.push(TupleItem::big_array_from_items(vec![polled.send_result]));
@@ -2762,8 +2755,7 @@ fn register_localnet_compiler_abis(
             .collect(),
     };
 
-    let client = reqwest::blocking::Client::builder()
-        .no_proxy()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(2))
         .timeout(Duration::from_secs(5))
         .user_agent(crate::build_info::user_agent())
@@ -3084,7 +3076,7 @@ fn load_world_state_snapshot_impl(
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build : 2,
-        8 => run_get_method : 6,
+        8 => run_get_method : 5,
         9 => send_message : 2,
         10 => find_transaction_by_params : 3,
         11 => is_deployed : 1,
@@ -3475,6 +3467,7 @@ fn wait_for_trace_impl(
                 if !quiet {
                     println!("Trace settled with {} transaction(s)", send_results.len());
                 }
+                ctx.chain.world_state.invalidate_remote_cache();
                 stack.push(TupleItem::big_array_from_items(send_results));
                 return Ok(());
             }

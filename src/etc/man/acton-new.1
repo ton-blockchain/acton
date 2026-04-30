@@ -389,7 +389,8 @@ it
 \fB\&.\fR, that means the current directory itself, and existing files with the same
 paths as template files can be overwritten.
 .sp
-It also installs \fB\&.acton/tolk\-stdlib\fR there, may create \fB\&.githooks/\fR plus an
+It also installs \fB\&.acton/tolk\-stdlib\fR there unless
+\fBACTON_DISABLE_AUTO_STDLIB=1\fR is set, may create \fB\&.githooks/\fR plus an
 \fBAGENTS.md\fR file when requested, and, when \fBgit\fR is available, initializes the
 project repository and runs \fBgit add .\fR, which stages all current\-directory
 contents.

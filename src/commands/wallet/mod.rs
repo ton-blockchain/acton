@@ -420,7 +420,7 @@ fn perform_testnet_airdrop(
         .join("claim")
         .with_context(|| format!("Failed to build claim URL from faucet base URL {faucet_base}"))?;
 
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))
         .user_agent(crate::build_info::user_agent())
@@ -521,7 +521,7 @@ fn perform_localnet_airdrop(
     amount_ton: f64,
     port: u16,
 ) -> anyhow::Result<AirdropResult> {
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
         .user_agent(crate::build_info::user_agent())

@@ -13,19 +13,35 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use tolk_compiler::abi::ContractABI;
 use tycho_types::boc::Boc;
 
 mod dep_graph;
 
-pub fn build_cmd(
-    contract_id: Option<String>,
-    clear_cache: bool,
-    graph_output: Option<String>,
-    out_dir: Option<String>,
-    gen_dir: Option<String>,
-    output_fift: Option<String>,
-    show_info: bool,
-) -> anyhow::Result<()> {
+#[derive(Debug, Default)]
+pub struct BuildCommandOptions {
+    pub contract_id: Option<String>,
+    pub clear_cache: bool,
+    pub graph_output: Option<String>,
+    pub out_dir: Option<String>,
+    pub gen_dir: Option<String>,
+    pub output_abi: Option<String>,
+    pub output_fift: Option<String>,
+    pub show_info: bool,
+}
+
+pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
+    let BuildCommandOptions {
+        contract_id,
+        clear_cache,
+        graph_output,
+        out_dir,
+        gen_dir,
+        output_abi,
+        output_fift,
+        show_info,
+    } = options;
+
     let project_root = configured_project_root();
     stdlib::ensure_latest(project_root)?;
 
@@ -58,6 +74,15 @@ pub fn build_cmd(
             .as_ref()
             .and_then(|build| non_empty_path(build.gen_dir.clone())),
         "gen",
+        project_root,
+    );
+    let output_abi_dir = resolve_build_output_dir(
+        output_abi,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| non_empty_path(build.output_abi.clone())),
+        "build/abi",
         project_root,
     );
     let output_fift_dir = resolve_optional_build_output_dir(
@@ -151,7 +176,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             project_root,
         )?;
 
-        let (code_boc64, code_hash, fift_code) = match process_contract(
+        let (code_boc64, code_hash, fift_code, abi) = match process_contract(
             &mut file_cache,
             &parent_contract,
             contract_config,
@@ -161,7 +186,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             &config,
             output_fift_dir.is_some(),
         ) {
-            Ok((code, hash, fift_code)) => (code, hash, fift_code),
+            Ok((code, hash, fift_code, abi)) => (code, hash, fift_code, abi),
             Err(err) => {
                 error_count += 1;
                 compile_errors.insert(parent_contract.clone(), err);
@@ -191,6 +216,13 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
         }
 
         if let Err(err) = save_boc_file(project_root, contract_config, &code_boc64) {
+            record_contract_error(&mut artifact_errors, &parent_contract, err);
+            error_count += 1;
+        }
+
+        if let Some(abi) = &abi
+            && let Err(err) = save_abi_file(project_root, &output_abi_dir, &parent_contract, abi)
+        {
             record_contract_error(&mut artifact_errors, &parent_contract, err);
             error_count += 1;
         }
@@ -277,14 +309,14 @@ fn process_contract(
     contract_path: &Path,
     acton_config: &ActonConfig,
     with_fift: bool,
-) -> anyhow::Result<(String, String, Option<String>)> {
-    let (code_boc64, code_hash, fift_code) = if contract_src_display.ends_with(".boc") {
+) -> anyhow::Result<(String, String, Option<String>, Option<ContractABI>)> {
+    let (code_boc64, code_hash, fift_code, abi) = if contract_src_display.ends_with(".boc") {
         debug!("Loading BoC file: {}", contract_path.display());
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
                 Ok(boc) => {
                     let code_boc64 = Boc::encode_base64(&boc);
-                    (code_boc64, boc.repr_hash().to_string(), None)
+                    (code_boc64, boc.repr_hash().to_string(), None, None)
                 }
                 Err(e) => {
                     anyhow::bail!("Failed to decode BoC file {contract_src_display}: {e}");
@@ -303,6 +335,7 @@ fn process_contract(
                 cached_result.code_boc64,
                 cached_result.code_hash_hex,
                 cached_result.fift_code,
+                cached_result.abi,
             )
         } else {
             debug!("Cache miss, recompile '{}'", contract_path.display());
@@ -331,6 +364,7 @@ fn process_contract(
                         result.code_boc64,
                         result.code_hash_hex,
                         with_fift.then_some(result.fift_code),
+                        result.abi,
                     )
                 }
                 tolk_compiler::CompilerResult::Error(error) => {
@@ -344,7 +378,7 @@ fn process_contract(
             }
         }
     };
-    Ok((code_boc64, code_hash, fift_code))
+    Ok((code_boc64, code_hash, fift_code, abi))
 }
 
 fn save_boc_file(
@@ -406,6 +440,37 @@ fn save_build_artifact(
     fs::write(&path, serde_json::to_string_pretty(&json_data)?).map_err(|err| {
         anyhow!(
             "Failed to save build artifact file {}: {}",
+            display_path.display(),
+            err
+        )
+    })?;
+
+    Ok(())
+}
+
+fn save_abi_file(
+    project_root: &Path,
+    output_abi_dir: &Path,
+    contract_key: &str,
+    abi: &ContractABI,
+) -> anyhow::Result<()> {
+    let filename = format!("{contract_key}.json");
+    let path = output_abi_dir.join(filename);
+
+    if let Some(parent_dir) = path.parent()
+        && let Err(err) = fs::create_dir_all(parent_dir)
+    {
+        anyhow::bail!(
+            "Failed to create directory for ABI file {}: {}",
+            parent_dir.display(),
+            err
+        );
+    }
+
+    let display_path = path.strip_prefix(project_root).unwrap_or(&path);
+    fs::write(&path, serde_json::to_string_pretty(abi)?).map_err(|err| {
+        anyhow!(
+            "Failed to save ABI file {}: {}",
             display_path.display(),
             err
         )

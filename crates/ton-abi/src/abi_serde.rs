@@ -4,6 +4,10 @@ use tolk_compiler::abi::Ty;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
 use tycho_types::models::{AnyAddr, ExtAddr, IntAddr};
 
+// this is OLD, DEPRECATED, do not use, to be deleted;
+// it's a hand-written "old version of ABI" that was implemented as MVP
+// before the compiler was taught to emit ABI by itself
+
 #[derive(Debug)]
 pub enum Data {
     Null,

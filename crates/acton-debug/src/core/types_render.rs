@@ -1,3 +1,5 @@
+use owo_colors::OwoColorize;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
@@ -82,6 +84,21 @@ pub enum RenderedValue {
     },
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct PrettyRenderOptions {
+    pub address_format: PrettyAddressFormat,
+    pub address_labels: HashMap<String, String>,
+    pub colorize: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum PrettyAddressFormat {
+    #[default]
+    Raw,
+    Mainnet,
+    Testnet,
+}
+
 impl RenderedValue {
     pub fn leaf(value: impl Into<String>) -> Self {
         Self::Leaf {
@@ -100,6 +117,7 @@ impl RenderedValue {
     /// Build `(value, type)` the way DAP UIs expect it.
     ///
     /// For structs we keep the type name in `type` instead of duplicating it in `value`.
+    #[must_use]
     pub fn dap_parts(&self) -> (String, Option<String>) {
         match self {
             RenderedValue::Leaf { value, type_field } => (value.clone(), type_field.clone()),
@@ -187,6 +205,7 @@ impl RenderedValue {
         }
     }
 
+    #[must_use]
     pub fn dap_parts_for_client(&self, name: Option<&str>) -> (String, Option<String>) {
         if dap_legacy_value_enabled() {
             // TODO: remove legacy path
@@ -233,10 +252,12 @@ impl RenderedValue {
         }
     }
 
+    #[must_use]
     pub fn dap_value(&self) -> String {
         self.dap_parts().0
     }
 
+    #[must_use]
     pub fn has_children(&self) -> bool {
         match self {
             RenderedValue::Struct { fields, .. }
@@ -261,6 +282,433 @@ impl RenderedValue {
             _ => None,
         }
     }
+
+    #[must_use]
+    pub fn to_pretty_string(&self, options: PrettyRenderOptions) -> String {
+        let mut out = String::new();
+        self.write_pretty(&mut out, 0, &options)
+            .expect("writing to String should not fail");
+        out
+    }
+
+    fn write_pretty(
+        &self,
+        out: &mut String,
+        indent: usize,
+        options: &PrettyRenderOptions,
+    ) -> fmt::Result {
+        match self {
+            RenderedValue::Leaf { value, type_field } => {
+                write!(
+                    out,
+                    "{}",
+                    pretty_leaf_value(value, type_field.as_deref(), options)
+                )
+            }
+            RenderedValue::CellLike { value, raw, .. } => {
+                write!(
+                    out,
+                    "{}",
+                    pretty_cell_like_value(value, raw.as_ref(), options)
+                )
+            }
+            RenderedValue::EnumValue { value, .. } => {
+                write!(out, "{}", pretty_magenta(value, options))
+            }
+            RenderedValue::Address { value, fields, .. } => {
+                let value = pretty_address_value(value, fields, options);
+                write!(out, "{}", pretty_cyan(&value, options))
+            }
+            RenderedValue::CellOf {
+                type_name,
+                value,
+                raw,
+                ..
+            } => write!(
+                out,
+                "{} {}",
+                pretty_magenta(type_name, options),
+                pretty_cell_like_value(value, raw.as_ref(), options)
+            ),
+            RenderedValue::UnionCase {
+                variant_name,
+                fields,
+                ..
+            } => match fields.iter().find(|(name, _)| name == "value") {
+                Some((_, value)) => {
+                    write!(out, "{} ", pretty_magenta(variant_name, options))?;
+                    value.write_pretty(out, indent, options)
+                }
+                None => write!(out, "{}", pretty_magenta(variant_name, options)),
+            },
+            RenderedValue::Struct { type_name, fields } if fields.is_empty() => {
+                write!(
+                    out,
+                    "{} {}{}",
+                    pretty_magenta(type_name, options),
+                    pretty_dimmed("{", options),
+                    pretty_dimmed("}", options)
+                )
+            }
+            RenderedValue::Struct { type_name, fields } => {
+                writeln!(
+                    out,
+                    "{} {}",
+                    pretty_magenta(type_name, options),
+                    pretty_dimmed("{", options)
+                )?;
+                for (name, value) in fields {
+                    write_indent(out, indent + 4)?;
+                    let name = pretty_field_name(type_name, name, options);
+                    let name = pretty_map_key(type_name, &name, options);
+                    write!(out, "{name}: ")?;
+                    value.write_pretty(out, indent + 4, options)?;
+                    writeln!(out, ",")?;
+                }
+                write_indent(out, indent)?;
+                write!(out, "{}", pretty_dimmed("}", options))
+            }
+            RenderedValue::Tensor { items, .. } => {
+                write_collection_pretty(out, indent, items, '(', ')', options)
+            }
+            RenderedValue::ArrayOf { items, .. } => {
+                write_collection_pretty(out, indent, items, '[', ']', options)
+            }
+            RenderedValue::LastSeen { inner } => {
+                inner.write_pretty(out, indent, options)?;
+                write!(out, " (last seen)")
+            }
+            RenderedValue::OptimizedOut => {
+                write!(out, "{}", pretty_dimmed("<optimized out>", options))
+            }
+            RenderedValue::LazyNotYetLoaded { preview } => {
+                preview.write_pretty(out, indent, options)?;
+                write!(out, " (not loaded)")
+            }
+            RenderedValue::LazyCantParseSlice => {
+                write!(out, "{}", pretty_dimmed("<not loaded>", options))
+            }
+            RenderedValue::LazyUnresolved { type_name } => {
+                write!(
+                    out,
+                    "{} (lazy, unresolved)",
+                    pretty_magenta(type_name, options)
+                )
+            }
+        }
+    }
+
+    fn wants_multiline_pretty(&self) -> bool {
+        match self {
+            RenderedValue::Struct { fields, .. } => !fields.is_empty(),
+            RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
+                items.iter().any(Self::wants_multiline_pretty)
+            }
+            RenderedValue::LastSeen { inner }
+            | RenderedValue::LazyNotYetLoaded { preview: inner } => inner.wants_multiline_pretty(),
+            _ => false,
+        }
+    }
+}
+
+fn pretty_field_name<'a>(
+    type_name: &str,
+    name: &'a str,
+    options: &PrettyRenderOptions,
+) -> Cow<'a, str> {
+    if !map_key_is_address(type_name) {
+        return Cow::Borrowed(name);
+    }
+
+    name.parse::<StdAddr>()
+        .ok()
+        .map(|addr| Cow::Owned(format_std_address_for_pretty(&addr, options)))
+        .unwrap_or(Cow::Borrowed(name))
+}
+
+fn map_key_is_address(type_name: &str) -> bool {
+    type_name.starts_with("map<address,") || type_name.starts_with("map<any_address,")
+}
+
+fn pretty_leaf_value(
+    value: &str,
+    type_field: Option<&str>,
+    options: &PrettyRenderOptions,
+) -> String {
+    if value == "null" {
+        return pretty_bold(value, options);
+    }
+
+    let Some(type_field) = type_field else {
+        return value.to_owned();
+    };
+
+    if type_is_string_like(type_field) && value.starts_with('"') && value.ends_with('"') {
+        return pretty_green(value, options);
+    }
+    if type_is_number_like(type_field) || type_field == "bool" {
+        return pretty_yellow(value, options);
+    }
+    if type_is_address_like(type_field) {
+        return pretty_cyan(value, options);
+    }
+    if type_is_cell_like(type_field) {
+        return pretty_cell_like_value(value, None, options);
+    }
+
+    value.to_owned()
+}
+
+fn pretty_map_key(type_name: &str, key: &str, options: &PrettyRenderOptions) -> String {
+    let Some(key_ty) = map_key_type_name(type_name) else {
+        return key.to_owned();
+    };
+
+    if type_is_string_like(key_ty) {
+        return pretty_green(key, options);
+    }
+    if type_is_number_like(key_ty) || key_ty == "bool" {
+        return pretty_yellow(key, options);
+    }
+    if type_is_address_like(key_ty) {
+        return pretty_cyan(key, options);
+    }
+    if type_is_cell_like(key_ty) {
+        return pretty_cell_like_value(key, None, options);
+    }
+
+    key.to_owned()
+}
+
+fn map_key_type_name(type_name: &str) -> Option<&str> {
+    let inner = type_name.trim().strip_prefix("map<")?.strip_suffix('>')?;
+    let split_idx = find_top_level_comma(inner)?;
+    Some(inner[..split_idx].trim())
+}
+
+fn find_top_level_comma(source: &str) -> Option<usize> {
+    let mut angle_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut square_depth = 0usize;
+
+    for (idx, ch) in source.char_indices() {
+        match ch {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            '[' => square_depth += 1,
+            ']' => square_depth = square_depth.saturating_sub(1),
+            ',' if angle_depth == 0 && paren_depth == 0 && square_depth == 0 => return Some(idx),
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn type_is_number_like(type_name: &str) -> bool {
+    matches!(type_name, "int" | "uint" | "coins")
+        || type_name.starts_with("int")
+        || type_name.starts_with("uint")
+        || type_name.starts_with("varint")
+        || type_name.starts_with("varuint")
+}
+
+fn type_is_string_like(type_name: &str) -> bool {
+    type_name == "string"
+}
+
+fn type_is_address_like(type_name: &str) -> bool {
+    matches!(type_name, "address" | "any_address" | "external_address")
+}
+
+fn type_is_cell_like(type_name: &str) -> bool {
+    matches!(type_name, "cell" | "slice" | "builder" | "bits")
+        || type_name.starts_with("Cell<")
+        || type_name.starts_with("bits")
+}
+
+fn pretty_yellow(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.yellow().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_green(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.green().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_magenta(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.magenta().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_cyan(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.cyan().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_dimmed(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.dimmed().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_cell_like_value(
+    value: &str,
+    raw: Option<&CellLike>,
+    options: &PrettyRenderOptions,
+) -> String {
+    let value = raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex);
+    pretty_dimmed(&value, options)
+}
+
+fn raw_cell_like_hex(raw: &CellLike) -> Cow<'_, str> {
+    match raw {
+        CellLike::Cell(hex) | CellLike::Builder(hex) => Cow::Borrowed(hex),
+    }
+}
+
+fn compact_cell_like_text(value: &str) -> Cow<'_, str> {
+    for prefix in ["cell{", "builder{", "slice{"] {
+        if let Some(inner) = value.strip_prefix(prefix)
+            && let Some(end) = inner.find('}')
+        {
+            let (hex, suffix) = inner.split_at(end);
+            let suffix = &suffix[1..];
+            if suffix.is_empty() {
+                return Cow::Borrowed(hex);
+            }
+            if suffix.starts_with(" + ") {
+                return Cow::Owned(format!("{hex}{suffix}"));
+            }
+        }
+    }
+
+    Cow::Borrowed(value)
+}
+
+fn pretty_bold(value: &str, options: &PrettyRenderOptions) -> String {
+    if options.colorize {
+        value.bold().to_string()
+    } else {
+        value.to_owned()
+    }
+}
+
+fn pretty_address_value<'a>(
+    raw: &'a str,
+    fields: &'a [(String, RenderedValue)],
+    options: &PrettyRenderOptions,
+) -> Cow<'a, str> {
+    let field_name = match options.address_format {
+        PrettyAddressFormat::Raw => return labeled_address_value(raw, raw, options),
+        PrettyAddressFormat::Mainnet => "mainnet",
+        PrettyAddressFormat::Testnet => "testnet",
+    };
+
+    let rendered = fields
+        .iter()
+        .find_map(|(name, value)| {
+            if name == field_name
+                && let RenderedValue::Leaf { value, .. } = value
+            {
+                Some(value.as_str())
+            } else {
+                None
+            }
+        })
+        .unwrap_or(raw);
+
+    labeled_address_value(rendered, raw, options)
+}
+
+fn labeled_address_value<'a>(
+    rendered: &'a str,
+    raw: &str,
+    options: &PrettyRenderOptions,
+) -> Cow<'a, str> {
+    match options.address_labels.get(raw) {
+        Some(label) => Cow::Owned(format!("{rendered} ({label})")),
+        None => Cow::Borrowed(rendered),
+    }
+}
+
+fn format_std_address_for_pretty(addr: &StdAddr, options: &PrettyRenderOptions) -> String {
+    match options.address_format {
+        PrettyAddressFormat::Raw => addr.to_string(),
+        PrettyAddressFormat::Mainnet | PrettyAddressFormat::Testnet => DisplayBase64StdAddr {
+            addr,
+            flags: Base64StdAddrFlags {
+                testnet: matches!(options.address_format, PrettyAddressFormat::Testnet),
+                base64_url: true,
+                bounceable: true,
+            },
+        }
+        .to_string(),
+    }
+}
+
+fn render_int_address(type_name: String, addr: &IntAddr) -> RenderedValue {
+    match addr {
+        IntAddr::Std(addr) => render_std_address(type_name, addr.to_string(), addr),
+        IntAddr::Var(_) => RenderedValue::typed_leaf(addr.to_string(), type_name),
+    }
+}
+
+fn write_indent(out: &mut String, indent: usize) -> fmt::Result {
+    for _ in 0..indent {
+        out.write_char(' ')?;
+    }
+    Ok(())
+}
+
+fn write_collection_pretty(
+    out: &mut String,
+    indent: usize,
+    items: &[RenderedValue],
+    open: char,
+    close: char,
+    options: &PrettyRenderOptions,
+) -> fmt::Result {
+    if items.is_empty() {
+        return write!(out, "{open}{close}");
+    }
+
+    if !items.iter().any(RenderedValue::wants_multiline_pretty) {
+        write!(out, "{open}")?;
+        for (i, item) in items.iter().enumerate() {
+            if i > 0 {
+                write!(out, ", ")?;
+            }
+            item.write_pretty(out, indent, options)?;
+        }
+        return write!(out, "{close}");
+    }
+
+    writeln!(out, "{open}")?;
+    for item in items {
+        write_indent(out, indent + 4)?;
+        item.write_pretty(out, indent + 4, options)?;
+        writeln!(out, ",")?;
+    }
+    write_indent(out, indent)?;
+    write!(out, "{close}")
 }
 
 const DAP_LEGACY_VALUE_ENV: &str = "ACTON_DEBUG_DAP_USE_LEGACY_VALUE";
@@ -854,7 +1302,7 @@ fn map_type_name(k: &Ty, v: &Ty) -> String {
 fn render_map_raw(type_name: String, root: Option<&Cell>) -> RenderedValue {
     match root {
         Some(root) => RenderedValue::typed_leaf(
-            format!("{type_name} {{raw: cell{{{}}}}}", Boc::encode_hex(root)),
+            format!("{type_name} {{raw: {}}}", Boc::encode_hex(root)),
             type_name,
         ),
         None => RenderedValue::Struct {
@@ -953,15 +1401,15 @@ fn format_map_scalar(slice: &mut TyCellSlice<'_>, ty: MapScalarType) -> Result<S
         MapScalarType::Address => Ok(IntAddr::load_from(slice)
             .map_err(|e| e.to_string())?
             .to_string()),
-        MapScalarType::Cell => Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(
+        MapScalarType::Cell => Ok(Boc::encode_hex(
             &slice.load_reference_cloned().map_err(|e| e.to_string())?,
-        )))),
+        )),
         MapScalarType::String => {
             let cell = slice.load_reference_cloned().map_err(|e| e.to_string())?;
             if let Some(string) = Tuple::parse_snake_string(&cell) {
                 return Ok(format!("\"{string}\""));
             }
-            Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))))
+            Ok(Boc::encode_hex(&cell))
         }
     }
 }
@@ -970,7 +1418,7 @@ fn format_map_raw_value(slice: TyCellSlice<'_>) -> Result<String, String> {
     let mut builder = CellBuilder::new();
     builder.store_slice(slice).map_err(|e| e.to_string())?;
     let cell = builder.build().map_err(|e| e.to_string())?;
-    Ok(render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))))
+    Ok(Boc::encode_hex(&cell))
 }
 
 fn decode_abi_data(
@@ -1193,12 +1641,11 @@ fn render_abi_data(data: ParsedAbiData, ty: &Ty) -> RenderedValue {
         ParsedAbiData::Address(IntAddr::Std(addr)) => {
             render_std_address(ty.to_string(), addr.to_string(), &addr)
         }
-        ParsedAbiData::Address(addr) => typed_leaf_for_ty(ty, addr.to_string()),
+        ParsedAbiData::Address(addr) => render_int_address(ty.to_string(), &addr),
         ParsedAbiData::ExtAddress(addr) => typed_leaf_for_ty(ty, addr.to_string()),
-        ParsedAbiData::Cell(cell) | ParsedAbiData::RemainingBitsAndRefs(cell) => typed_leaf_for_ty(
-            ty,
-            render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))),
-        ),
+        ParsedAbiData::Cell(cell) | ParsedAbiData::RemainingBitsAndRefs(cell) => {
+            typed_leaf_for_ty(ty, Boc::encode_hex(&cell))
+        }
         ParsedAbiData::Bits((bytes, bit_len)) => {
             typed_leaf_for_ty(ty, format_abi_bits(&bytes, bit_len))
         }
@@ -1265,7 +1712,7 @@ fn format_abi_map_key(data: &ParsedAbiData, key_ty: &Ty) -> String {
         ParsedAbiData::Address(value) => value.to_string(),
         ParsedAbiData::ExtAddress(value) => value.to_string(),
         ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
-            render_cell_like(&CellLike::Cell(Boc::encode_hex(value)))
+            Boc::encode_hex(value)
         }
         ParsedAbiData::Bits((bytes, bit_len)) => format_abi_bits(bytes, *bit_len),
         ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_) => {
@@ -1297,6 +1744,13 @@ fn render_map_value(
         scalar_type.is_none() && !matches!(value_ty, Ty::Nullable { .. } | Ty::MapKV { .. });
 
     let mut value_slice = value_slice;
+    if matches!(scalar_type, Some(MapScalarType::Address)) {
+        return match IntAddr::load_from(&mut value_slice) {
+            Ok(addr) => render_int_address(value_ty.to_string(), &addr),
+            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+        };
+    }
+
     if let Some(scalar_type) = scalar_type {
         return match format_map_scalar(&mut value_slice, scalar_type) {
             Ok(value) => typed_leaf_for_ty(value_ty, value),
@@ -1533,6 +1987,7 @@ fn debug_format(
         | Ty::VaruintN { .. }
         | Ty::Coins => match r.read_slot() {
             SlotValue::Live(VmStackValue::Integer(s)) => typed_leaf_for_ty(ty, s.clone()),
+            SlotValue::Live(VmStackValue::NaN) => typed_leaf_for_ty(ty, "NaN"),
             SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
             _ => typed_leaf_for_ty(ty, "not a TVM int"),
         },
@@ -1896,6 +2351,79 @@ pub(crate) fn debug_print_from_stack(
 ) -> RenderedValue {
     let mut r = StackReader::new(slots);
     debug_format(symbols, &mut r, ty, false)
+}
+
+fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
+    match item {
+        TupleItem::Null => VmStackValue::Null,
+        TupleItem::Int(value) => VmStackValue::Integer(value.to_string()),
+        TupleItem::Nan => VmStackValue::NaN,
+        TupleItem::Cont(cont) => VmStackValue::Continuation(Boc::encode_hex(&cont.code)),
+        TupleItem::Cell(cell) => VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(cell))),
+        TupleItem::Slice(cell) => VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(cell),
+            bits: None,
+            refs: None,
+        }),
+        TupleItem::Builder(cell) => VmStackValue::Builder(Boc::encode_hex(cell)),
+        TupleItem::Tuple(tuple) => VmStackValue::Tuple(tuple_items_to_vm_stack_values(tuple)),
+    }
+}
+
+fn tuple_items_to_vm_stack_values(tuple: &Tuple) -> Vec<VmStackValue> {
+    tuple.iter().map(tuple_item_to_vm_stack_value).collect()
+}
+
+pub fn render_tuple_as_tolk_type(symbols: &SourceMap, tuple: &Tuple, ty: &Ty) -> RenderedValue {
+    let stack_values = tuple_items_to_vm_stack_values(tuple);
+    let slots: Vec<SlotValue<'_>> = stack_values.iter().map(SlotValue::Live).collect();
+    debug_print_from_stack(symbols, &slots, ty)
+}
+
+pub fn render_tuple_item_as_tolk_type(
+    symbols: &SourceMap,
+    item: &TupleItem,
+    ty: &Ty,
+) -> RenderedValue {
+    match item {
+        TupleItem::Tuple(tuple) if top_level_tuple_is_stack_frame(symbols, ty) => {
+            render_tuple_as_tolk_type(symbols, tuple, ty)
+        }
+        _ => {
+            let stack_value = tuple_item_to_vm_stack_value(item);
+            let slots = [SlotValue::Live(&stack_value)];
+            debug_print_from_stack(symbols, &slots, ty)
+        }
+    }
+}
+
+fn top_level_tuple_is_stack_frame(symbols: &SourceMap, ty: &Ty) -> bool {
+    match ty {
+        Ty::Tensor { .. } | Ty::StructRef { .. } => true,
+        Ty::Nullable {
+            inner, stack_width, ..
+        } => stack_width.is_some_and(|w| w != 1) || top_level_tuple_is_stack_frame(symbols, inner),
+        Ty::Union {
+            stack_width: Some(stack_width),
+            ..
+        } => *stack_width != 1,
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => {
+            let alias_ref = symbols.get_alias(alias_name);
+            let target_ty = match type_args {
+                Some(type_args) => instantiate_generics(
+                    &alias_ref.target_ty,
+                    alias_ref.type_params.as_deref().unwrap_or(&[]),
+                    type_args,
+                ),
+                None => alias_ref.target_ty.clone(),
+            };
+            top_level_tuple_is_stack_frame(symbols, &target_ty)
+        }
+        _ => false,
+    }
 }
 
 fn render_lazy_struct_fields(
@@ -3060,6 +3588,7 @@ mod tests {
                     struct_name: "DeploymentStorage".to_owned(),
                     type_args: None,
                 }),
+                description: String::new(),
             },
             ..Default::default()
         };
@@ -3356,6 +3885,61 @@ mod tests {
         };
         assert_eq!(variant_name, "null");
         assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn render_top_level_nullable_map_unpacks_tuple_as_stack_frame() {
+        let nullable_map_ty = Ty::Nullable {
+            inner: Box::new(Ty::MapKV {
+                k: Box::new(Ty::IntN { n: 32 }),
+                v: Box::new(Ty::IntN { n: 32 }),
+            }),
+            stack_type_id: Some(1),
+            stack_width: Some(2),
+        };
+        let present_empty_map =
+            TupleItem::Tuple(Tuple(vec![TupleItem::Null, TupleItem::Int(1.into())]));
+        let rendered = render_tuple_item_as_tolk_type(
+            &SourceMap::default(),
+            &present_empty_map,
+            &nullable_map_ty,
+        );
+
+        let RenderedValue::Struct { type_name, fields } = rendered else {
+            panic!("expected present empty map to render as map struct");
+        };
+        assert_eq!(type_name, "map<int32, int32>");
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn render_top_level_nullable_map_uses_zero_tag_for_null() {
+        let nullable_map_ty = Ty::Nullable {
+            inner: Box::new(Ty::MapKV {
+                k: Box::new(Ty::IntN { n: 32 }),
+                v: Box::new(Ty::IntN { n: 32 }),
+            }),
+            stack_type_id: Some(1),
+            stack_width: Some(2),
+        };
+        let null_map = TupleItem::Tuple(Tuple(vec![TupleItem::Null, TupleItem::Int(0.into())]));
+        let rendered =
+            render_tuple_item_as_tolk_type(&SourceMap::default(), &null_map, &nullable_map_ty);
+
+        assert_eq!(rendered.dap_parts().0, "null");
+        assert_eq!(
+            rendered.dap_parts().1.as_deref(),
+            Some("map<int32, int32>?")
+        );
+    }
+
+    #[test]
+    fn render_nan_as_int_like_value() {
+        let rendered =
+            render_tuple_item_as_tolk_type(&SourceMap::default(), &TupleItem::Nan, &Ty::Int);
+
+        assert_eq!(rendered.dap_parts().0, "NaN");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("int"));
     }
 
     #[test]

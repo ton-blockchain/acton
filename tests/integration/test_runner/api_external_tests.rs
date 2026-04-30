@@ -237,7 +237,6 @@ get fun `test broadcast wait helpers stay local in tests`() {
 
     project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .arg("--fork-net")
         .arg("custom:mock-wait-unused")

@@ -2,12 +2,15 @@ use crate::commands::common::error_fmt;
 use crate::context::{Context, to_cell};
 use crate::ffi::emulation::normalize_address_input;
 use crate::formatter::FormatterContext;
-use anyhow::{Context as AnyhowContext, bail};
+use acton_debug::render_tuple_item_as_tolk_type;
+use anyhow::{Context as AnyhowContext, anyhow, bail};
 use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::io::{IsTerminal, stdin};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::Ty;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::from_stack::FromStack;
@@ -39,24 +42,23 @@ fn println_impl(
         (type4, arg4),
         (type5, arg5),
         (type6, arg6),
-    ]);
+    ])?;
     let formatter = FormatterContext::from_context(ctx);
-    let (mut formatted, tail) = if let Some((type_name, arg)) = args.first()
-        && type_name == "string"
-        && let Ok(fmt) = String::from_item(arg.clone().unwrap_single())
-        && let Ok((rendered, consumed)) = format_args(&formatter, &fmt, &args[1..])
+    let (mut formatted, tail) = if let Some(arg) = args.first()
+        && is_string_type(&arg.ty)
+        && let Ok(fmt) = String::from_item(arg.arg.clone().unwrap_single())
+        && let Ok((rendered, consumed)) = format_args(ctx, &formatter, &fmt, &args[1..], true)
     {
         (rendered, &args[1 + consumed..])
     } else {
         (String::new(), args.as_slice())
     };
 
-    for (type_name, arg) in tail {
+    for arg in tail {
         if !formatted.is_empty() {
             formatted.push(' ');
         }
-        let typed_arg = arg.unwrap_single().to_typed(type_name);
-        formatted.push_str(&formatter.format_with_color(&typed_arg));
+        formatted.push_str(&format_reflected_arg(ctx, &formatter, arg, true)?);
     }
 
     if ctx.io.capture_output {
@@ -102,11 +104,17 @@ fn format_impl(
         (type3, arg3),
         (type4, arg4),
         (type5, arg5),
-    ]);
+    ])?;
     let formatter = FormatterContext::from_context(ctx);
-    let (result, _) = format_args(&formatter, &fmt, &args)?;
+    let (result, _) = format_args(ctx, &formatter, &fmt, &args, false)?;
     stack.push_string(&result);
     Ok(())
+}
+
+#[derive(Clone)]
+struct ReflectedArg {
+    ty: Ty,
+    arg: TupleItem,
 }
 
 #[derive(Copy, Clone)]
@@ -209,26 +217,41 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
     Ok(tokens)
 }
 
-fn format_default(formatter: &FormatterContext<'_>, type_name: &str, arg: TupleItem) -> String {
-    let typed_arg = arg.to_typed(type_name);
-    formatter.format(&typed_arg)
+fn format_default(
+    ctx: &Context<'_>,
+    formatter: &FormatterContext<'_>,
+    ty: &Ty,
+    arg: TupleItem,
+    colorize: bool,
+) -> anyhow::Result<String> {
+    format_reflected_arg(
+        ctx,
+        formatter,
+        &ReflectedArg {
+            ty: ty.clone(),
+            arg,
+        },
+        colorize,
+    )
 }
 
 fn format_single_arg(
+    ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
     kind: PlaceholderKind,
-    type_name: &str,
+    ty: &Ty,
     arg: TupleItem,
-) -> String {
+    colorize: bool,
+) -> anyhow::Result<String> {
     match kind {
         PlaceholderKind::Hex => {
             if let TupleItem::Tuple(items) = &arg
                 && items.len() == 1
                 && let TupleItem::Int(value) = &items[0]
             {
-                return format!("{value:x}");
+                return Ok(format!("{value:x}"));
             }
-            format_default(formatter, type_name, arg)
+            format_default(ctx, formatter, ty, arg, colorize)
         }
         PlaceholderKind::Ton => {
             if let TupleItem::Tuple(items) = &arg
@@ -236,43 +259,53 @@ fn format_single_arg(
                 && let TupleItem::Int(value) = &items[0]
             {
                 let amount = value.to_f64().unwrap_or(0.0) / 1e9;
-                return format!("{amount} TON");
+                return Ok(format!("{amount} TON"));
             }
-            format_default(formatter, type_name, arg)
+            format_default(ctx, formatter, ty, arg, colorize)
         }
-        PlaceholderKind::Plain => format_default(formatter, type_name, arg),
+        PlaceholderKind::Plain => format_default(ctx, formatter, ty, arg, colorize),
     }
 }
 
 fn collect_non_void_args<const N: usize>(
     args: [(String, TupleItem); N],
-) -> Vec<(String, TupleItem)> {
+) -> anyhow::Result<Vec<ReflectedArg>> {
     let mut collected = Vec::with_capacity(N);
-    for (type_name, arg) in args {
-        if type_name == "void" {
+    for (type_desc, arg) in args {
+        let ty: Ty = serde_json::from_str(&type_desc)?;
+        if matches!(ty, Ty::Void) {
             break;
         }
-        collected.push((type_name, arg));
+        collected.push(ReflectedArg { ty, arg });
     }
-    collected
+    Ok(collected)
 }
 
 fn format_args(
+    ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
     fmt: &str,
-    args: &[(String, TupleItem)],
+    args: &[ReflectedArg],
+    colorize: bool,
 ) -> anyhow::Result<(String, usize)> {
     let tokens = parse_format(fmt)?;
     let mut out = String::with_capacity(fmt.len());
-    let mut args_iter = args.iter().cloned();
+    let mut args_iter = args.iter();
     let mut consumed = 0;
 
     for token in tokens {
         match token {
             FormatToken::Literal(text) => out.push_str(&text),
             FormatToken::Placeholder(kind) => {
-                if let Some((type_name, arg)) = args_iter.next() {
-                    let formatted = format_single_arg(formatter, kind, &type_name, arg);
+                if let Some(arg) = args_iter.next() {
+                    let formatted = format_single_arg(
+                        ctx,
+                        formatter,
+                        kind,
+                        &arg.ty,
+                        arg.arg.clone(),
+                        colorize,
+                    )?;
                     out.push_str(&formatted);
                     consumed += 1;
                 } else {
@@ -283,6 +316,93 @@ fn format_args(
     }
 
     Ok((out, consumed))
+}
+
+const fn is_string_type(ty: &Ty) -> bool {
+    matches!(ty, Ty::String)
+}
+
+fn is_top_level_string_type(ty: &Ty) -> bool {
+    match ty {
+        Ty::String => true,
+        Ty::Nullable { inner, .. } => is_top_level_string_type(inner),
+        _ => false,
+    }
+}
+
+fn format_reflected_arg(
+    ctx: &Context<'_>,
+    formatter: &FormatterContext<'_>,
+    arg: &ReflectedArg,
+    colorize: bool,
+) -> anyhow::Result<String> {
+    let item = arg.arg.clone().unwrap_single();
+    if is_top_level_string_type(&arg.ty)
+        && let Ok(value) = String::from_item(item.clone())
+    {
+        return Ok(value);
+    }
+
+    if is_send_result_list_type(&arg.ty) {
+        return Ok(format_send_result_list(formatter, &item));
+    }
+
+    let source_map = ctx
+        .env
+        .source_map
+        .as_ref()
+        .ok_or_else(|| anyhow!("symbol types are required to format `{}`", arg.ty))?;
+
+    Ok(render_with_source_map(
+        source_map, formatter, &item, &arg.ty, colorize,
+    ))
+}
+
+fn render_with_source_map(
+    symbols: &SourceMap,
+    formatter: &FormatterContext<'_>,
+    item: &TupleItem,
+    ty: &Ty,
+    colorize: bool,
+) -> String {
+    let options = if colorize {
+        formatter.pretty_render_options_with_cli_color()
+    } else {
+        formatter.pretty_render_options()
+    };
+    render_tuple_item_as_tolk_type(symbols, item, ty).to_pretty_string(options)
+}
+
+fn is_send_result_list_type(ty: &Ty) -> bool {
+    match ty {
+        Ty::AliasRef {
+            alias_name,
+            type_args: _,
+        } if alias_name == "SendResultList" => true,
+        Ty::AliasRef {
+            alias_name,
+            type_args: Some(type_args),
+        } if alias_name == "BigArray" => type_args.first().is_some_and(is_send_result_type),
+        Ty::Nullable { inner, .. } => is_send_result_list_type(inner),
+        _ => ty.to_string() == "SendResultList",
+    }
+}
+
+fn is_send_result_type(ty: &Ty) -> bool {
+    matches!(
+        ty,
+        Ty::StructRef {
+            struct_name,
+            type_args: _
+        } if struct_name == "SendResult"
+    )
+}
+
+fn format_send_result_list(formatter: &FormatterContext<'_>, item: &TupleItem) -> String {
+    match item {
+        TupleItem::Tuple(items) => formatter.format_transaction_list(items),
+        _ => "not a TVM tuple".to_owned(),
+    }
 }
 
 extension!(prompt in (Context) with (default: String, placeholder: String, message: String) using prompt_impl);

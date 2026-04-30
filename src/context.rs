@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
 use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
@@ -46,9 +46,10 @@ pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
 pub struct AssertBinFailure {
     pub operator: String,
     pub left: Tuple,
-    pub left_type: String,
+    pub left_ty: CompilerAbiType,
     pub right: Tuple,
-    pub right_type: String,
+    pub right_ty: CompilerAbiType,
+    pub source_map: Arc<SourceMap>,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
 }
@@ -83,7 +84,7 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
-    pub source_map: Arc<TolkSourceMap>,
+    pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
@@ -148,7 +149,7 @@ pub struct ParsedSearchParams {
 pub struct TransactionGenericAssertFailure {
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
-    pub txs: TupleItem,
+    pub txs: Vec<TupleItem>,
     pub parsed_txs: Vec<Transaction>,
     pub params: TransactionNotFoundParams,
 }
@@ -226,7 +227,7 @@ impl BuildCache {
         path: &Path,
         code: &str,
         code_hash: HashBytes,
-        source_map: Arc<TolkSourceMap>,
+        source_map: Arc<SourceMap>,
         abi: Option<Arc<ContractAbi>>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
     ) {
@@ -259,8 +260,8 @@ pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: HashBytes,
-    pub source_map: Arc<TolkSourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractAbi>>, // todo remove
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
@@ -709,6 +710,7 @@ pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
     pub abi: Arc<ContractAbi>,
+    pub source_map: Option<Arc<SourceMap>>,
     pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,

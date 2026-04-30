@@ -217,6 +217,11 @@ When it patches an existing \fBActon.toml\fR, it rewrites the parsed manifest an
 may drop TOML comments or unknown keys; \fB\&.gitignore\fR patching remains
 append\-only.
 .sp
+The default flow normally refreshes the bundled standard library under
+\fB\&.acton/\fR\&. Set \fBACTON_DISABLE_AUTO_STDLIB=1\fR to skip that automatic refresh.
+This does not affect \fB\-\-stdlib\-only\fR, which always refreshes \fB\&.acton/\fR
+explicitly.
+.sp
 With \fB\-\-create\-dapp\fR, \fBacton init\fR writes only inside the new app directory and
 does not touch Acton project files.
 .sp

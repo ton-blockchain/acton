@@ -735,7 +735,7 @@ fn remove_random<T>(els: &mut Vec<T>) -> T {
 }
 
 fn build_verify_http_client() -> anyhow::Result<reqwest::blocking::Client> {
-    reqwest::blocking::Client::builder()
+    crate::http::blocking_client_builder()
         .pool_max_idle_per_host(0)
         .user_agent(crate::build_info::user_agent())
         .build()

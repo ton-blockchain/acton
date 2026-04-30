@@ -1,0 +1,6 @@
+Error: Acton.toml has empty [toolchain].acton.
+
+Set it to the required Acton CLI version, for example:
+
+[toolchain]
+acton = "[ACTON_VERSION]"

@@ -71,15 +71,15 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 ): string {
     return ffi.format(
         fmt,
-        reflect.typeNameOfObject(arg1),
+        reflect.typeAbiJsonOfObject(arg1),
         arg1.toTuple(),
-        reflect.typeNameOfObject(arg2),
+        reflect.typeAbiJsonOfObject(arg2),
         arg2.toTuple(),
-        reflect.typeNameOfObject(arg3),
+        reflect.typeAbiJsonOfObject(arg3),
         arg3.toTuple(),
-        reflect.typeNameOfObject(arg4),
+        reflect.typeAbiJsonOfObject(arg4),
         arg4.toTuple(),
-        reflect.typeNameOfObject(arg5),
+        reflect.typeAbiJsonOfObject(arg5),
         arg5.toTuple(),
     );
 }

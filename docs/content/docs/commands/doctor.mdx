@@ -93,7 +93,11 @@ This conflicts with `--manifest-path`.
 - native emulator/Tolk version metadata, including the TON commit hash and date
   embedded in the linked libraries
 - resolved logging directory and debug log path
-- selected environment variables such as `HOME`, `SHELL`, and `NO_COLOR`
+- selected environment variables such as `HOME`, `SHELL`, `NO_COLOR`, and
+  `ACTON_DISABLE_AUTO_STDLIB`
+- `ACTON_USE_PROXY`, which opts Acton CLI HTTP clients into `HTTP_PROXY`,
+  `HTTPS_PROXY`, `ALL_PROXY`, and system proxy settings. Acton ignores those
+  proxy settings by default to avoid macOS sandbox proxy autodetection crashes.
 
 ## Path And Overlay Checks
 

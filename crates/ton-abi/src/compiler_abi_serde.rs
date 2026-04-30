@@ -625,10 +625,10 @@ mod tests {
             storage: ABIStorage {
                 storage_ty: None,
                 storage_at_deployment_ty: None,
+                description: String::new(),
             },
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
-            constants: Vec::new(),
             compiler_name: "tolk".to_owned(),
             compiler_version: "0".to_owned(),
         }
@@ -666,8 +666,6 @@ mod tests {
                 type_args: None,
             },
             description: String::new(),
-            minimal_msg_value: None,
-            preferred_send_mode: None,
         }];
 
         let mut builder = CellBuilder::new();

@@ -235,6 +235,11 @@ When it patches an existing `Acton.toml`, it rewrites the parsed manifest and
 may drop TOML comments or unknown keys; `.gitignore` patching remains
 append-only.
 
+The default flow normally refreshes the bundled standard library under
+`.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic refresh.
+This does not affect `--stdlib-only`, which always refreshes `.acton/`
+explicitly.
+
 With `--create-dapp`, `acton init` writes only inside the new app directory and
 does not touch Acton project files.
 

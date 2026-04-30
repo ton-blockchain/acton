@@ -109,6 +109,7 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     let tmp_dir_unix_escaped = tmp_dir_unix.replace('\\', "\\\\");
 
     let current_version = env!("CARGO_PKG_VERSION");
+    let current_short_version = build_info::SHORT_VERSION;
 
     redactions.insert("[ROOT]", tmp_dir_raw.clone()).unwrap();
     redactions.insert("[ROOT]", tmp_dir_unix.clone()).unwrap();
@@ -204,6 +205,17 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     redactions
         .insert("[ACTON_VERSION]", format!("v{current_version}"))
         .unwrap();
+    redactions
+        .insert("[ACTON_VERSION]", current_version.to_owned())
+        .unwrap();
+    if current_short_version != current_version {
+        redactions
+            .insert("[ACTON_VERSION]", format!("v{current_short_version}"))
+            .unwrap();
+        redactions
+            .insert("[ACTON_VERSION]", current_short_version.to_owned())
+            .unwrap();
+    }
     redactions
         .insert(
             "[ACTON_DOCS_URL]",

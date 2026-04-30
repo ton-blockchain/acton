@@ -1,0 +1,59 @@
+{
+  "abi_schema_version": "1.0",
+  "compiler_name": "tolk",
+  "compiler_version": "1.3.0",
+  "contract_name": "Counter",
+  "declarations": [
+    {
+      "fields": [
+        {
+          "name": "value",
+          "ty": {
+            "kind": "intN",
+            "n": 32
+          }
+        }
+      ],
+      "kind": "struct",
+      "name": "Increment",
+      "prefix": {
+        "prefix_len": 32,
+        "prefix_str": "0x00000001"
+      }
+    },
+    {
+      "fields": [
+        {
+          "name": "counter",
+          "ty": {
+            "kind": "intN",
+            "n": 32
+          }
+        }
+      ],
+      "kind": "struct",
+      "name": "Storage"
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [],
+  "incoming_external": [],
+  "incoming_messages": [
+    {
+      "body_ty": {
+        "kind": "StructRef",
+        "struct_name": "Increment",
+        "type_args": null
+      }
+    }
+  ],
+  "outgoing_messages": [],
+  "storage": {
+    "storage_ty": {
+      "kind": "StructRef",
+      "struct_name": "Storage",
+      "type_args": null
+    }
+  },
+  "thrown_errors": []
+}
