@@ -11,9 +11,9 @@ DESCRIPTION
 
        The command creates the target directory if it does not exist, copies
        the selected template scaffold, writes starter project files such as
-       Acton.toml, .env, .editorconfig, and .gitignore, installs the bundled
-       standard library, and optionally initializes Git hooks and AGENTS.md
-       guidance.
+       Acton.toml, .env.example, .editorconfig, and .gitignore, installs the
+       bundled standard library, and optionally initializes Git hooks and
+       AGENTS.md guidance.
 
        If _path_ already exists as a directory, acton new fails instead of
        trying to merge into that directory, even when it is empty. acton new .
@@ -60,9 +60,9 @@ OPTIONS
        --app
            Include the template’s TypeScript app scaffold when available.
 
-           At the moment only the counter template supports the app layout. If
-           you pass --app for a template that does not support it, acton new
-           fails.
+           All built-in templates currently support the app layout: empty,
+           counter, jetton, and nft. If you pass --app for a template that does
+           not support it, acton new fails.
 
            If the selected template supports the app layout and --app is not
            provided, interactive mode prompts for this choice. Non-interactive
@@ -132,12 +132,6 @@ TEMPLATES
 
        o  optional AGENTS.md
 
-       This template also supports the optional TypeScript app layout with
-       --app.
-
-       With --app, Acton also creates a Vite-based React app, a generated
-       TypeScript wrapper, and top-level npm metadata files.
-
    jetton
        Jetton minter and wallet template with:
 
@@ -163,6 +157,13 @@ TEMPLATES
        o  CI workflow
 
        o  optional AGENTS.md
+
+       All built-in templates support the optional TypeScript app layout with
+       --app: empty, counter, jetton, and nft.
+
+       With --app, Acton also creates a Vite-based React app and top-level npm
+       metadata files. App templates with frontend contract flows also include
+       generated TypeScript wrappers.
 
 INTERACTIVE MODE
        When enough information is missing and standard input/output are
@@ -203,7 +204,7 @@ FILES
 
        o  .acton/
 
-       o  .env
+       o  .env.example
 
        o  .editorconfig
 
@@ -232,8 +233,9 @@ FILES
 
        o  AGENTS.md for --agents
 
-COUNTER APP LAYOUT
-       When acton new --template counter --app is used, the project includes:
+TYPESCRIPT APP LAYOUT
+       When --app is used with a template that supports the app layout, the
+       project includes:
 
        o  contracts/src for contract sources and shared Tolk types
 
@@ -241,7 +243,8 @@ COUNTER APP LAYOUT
 
        o  contracts/scripts for deployment and utility scripts
 
-       o  wrappers-ts/ for the generated TypeScript wrapper used by the app
+       o  wrappers-ts/ for generated TypeScript wrappers in app templates that
+          call contracts from the frontend
 
        o  app/ for the React + Vite frontend
 
@@ -256,17 +259,19 @@ COUNTER APP LAYOUT
        demo files. After npm ci, use the usual frontend lifecycle commands from
        the generated package.json alongside normal Acton contract commands.
 
-       Typical commands in that generated app workspace:
+       Common commands in that generated app workspace:
 
        o  npm run dev to start the Vite development server
 
-       o  npm run build to build both contracts and the frontend bundle
-
-       o  npm run preview to preview the production bundle locally
+       o  npm run build to build the frontend bundle; contract-aware app
+          templates run acton build first
 
        o  npm run typecheck for TypeScript checking
 
-       o  npm test to run the bundled acton test command
+       o  npm run fmt and npm run fmt:check for frontend formatting
+
+       o  npm test to run the bundled acton test command when the template
+          provides it
 
 SIDE EFFECTS
        acton new writes only inside the chosen target directory. When _path_ is
@@ -296,9 +301,9 @@ EXAMPLES
 
               acton new my-project --name "My Project" --description "Cool description" --template counter --license MIT
 
-       3. Create the counter template with the TypeScript app layout:
+       3. Create a project with the TypeScript app layout:
 
-              acton new my-project --template counter --app
+              acton new my-project --template empty --app
 
        4. Create a project and include AGENTS.md guidance:
 

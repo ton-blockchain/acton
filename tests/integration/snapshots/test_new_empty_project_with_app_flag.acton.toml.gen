@@ -1,0 +1,30 @@
+[package]
+name = "Empty App Project"
+description = "empty app description"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.Empty]
+display-name = "Empty"
+src = "contracts/src/Empty.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+deploy-emulation = "acton script contracts/scripts/deploy.tolk"
+deploy-testnet = "acton script contracts/scripts/deploy.tolk --net testnet"
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts/src"
+gen = "gen"
+tests = "contracts/tests"
+wrappers = "contracts/wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# [ACTON_DOCS_URL]/acton-toml

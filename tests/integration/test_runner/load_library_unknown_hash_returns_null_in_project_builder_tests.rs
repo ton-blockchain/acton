@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::append_custom_network;
 use std::fs;
 
 const NETWORK_IMPORTS: &str = r#"
@@ -32,10 +33,18 @@ get fun `test bm load library unknown hash project builder`() {{
 "#
     );
 
-    ProjectBuilder::new("bm-stdlib-load-library-unknown-hash-project-builder")
+    let project = ProjectBuilder::new("bm-stdlib-load-library-unknown-hash-project-builder")
         .test_file("load_library_unknown_hash", &source)
-        .build()
+        .build();
+    append_custom_network(
+        project.path(),
+        "bm-missing-net",
+        "http://127.0.0.1:1/api/v2",
+    );
+
+    project
         .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .fork_net("custom:bm-missing-net")
         .run()
@@ -70,9 +79,15 @@ get fun `test bm load library unknown hash fixture`() {{
 
     fs::write(fixture.path().join(test_path), source)
         .expect("failed to write bm fixture load library test");
+    append_custom_network(
+        fixture.path(),
+        "bm-missing-net",
+        "http://127.0.0.1:1/api/v2",
+    );
 
     fixture
         .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .test()
         .path(test_path)
         .fork_net("custom:bm-missing-net")

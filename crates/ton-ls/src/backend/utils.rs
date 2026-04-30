@@ -1,5 +1,5 @@
 use crate::languages::engine::text_index::TextIndex;
-use lsp_types::*;
+use lsp_types::{Position, Range, Url};
 use std::path::Path;
 use std::sync::Arc;
 use tolk_resolver::FileInfo;
@@ -83,32 +83,39 @@ impl SpanExt for Span {
     }
 }
 
+#[must_use]
 pub fn compute_offsets(text: &str) -> Vec<usize> {
     TextIndex::new(text).line_starts().to_vec()
 }
 
+#[must_use]
 pub fn offset_to_range(file: &Arc<FileInfo>, offset: usize) -> Range {
     let pos = offset_to_pos(file, offset);
     Range::new(pos, Position::new(pos.line, pos.character + 1))
 }
 
+#[must_use]
 pub fn get_byte_offset(text: &str, pos: Position) -> usize {
     TextIndex::new(text).position_to_offset(text, pos)
 }
 
+#[must_use]
 pub fn get_point(text: &str, pos: Position) -> Point {
     TextIndex::new(text).position_to_point(text, pos)
 }
 
+#[must_use]
 pub fn offset_to_pos(file: &Arc<FileInfo>, offset: usize) -> Position {
     let source = &file.source().source;
     TextIndex::new(source).offset_to_position(source, offset)
 }
 
+#[must_use]
 pub fn offset_to_lsp_pos(offset: usize, text: &str) -> Position {
     TextIndex::new(text).offset_to_position(text, offset)
 }
 
+#[must_use]
 pub fn offsets_to_lsp_range(start_offset: usize, end_offset: usize, text: &str) -> Range {
     Range::new(
         offset_to_lsp_pos(start_offset, text),
@@ -116,6 +123,7 @@ pub fn offsets_to_lsp_range(start_offset: usize, end_offset: usize, text: &str) 
     )
 }
 
+#[must_use]
 pub fn ranges_intersect(a: &Range, b: &Range) -> bool {
     let a_start = (a.start.line, a.start.character);
     let a_end = (a.end.line, a.end.character);

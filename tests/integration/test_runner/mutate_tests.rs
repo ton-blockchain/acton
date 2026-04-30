@@ -28,6 +28,14 @@ get fun `test always pass`() {
 }
 "#;
 
+const FAILING_TEST: &str = r#"
+import "../../lib/testing/expect"
+
+get fun `test baseline fails`() {
+    expect(1).toEqual(2);
+}
+"#;
+
 const DEPENDENT_MUTATION_CONTRACT: &str = r#"
 import "../gen/dependency.code.tolk"
 
@@ -309,6 +317,41 @@ fn mutate_reports_summary() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_mutate/mutate_reports_summary.stdout.txt",
+        );
+}
+
+#[test]
+fn mutate_aborts_when_baseline_tests_fail() {
+    ProjectBuilder::new("j-mutate-baseline-fails")
+        .contract("simple", MUTATION_CONTRACT)
+        .test_file("mutation", FAILING_TEST)
+        .build()
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_aborts_when_baseline_tests_fail.stderr.txt",
+        );
+}
+
+#[test]
+fn mutate_aborts_when_filter_selects_no_baseline_tests() {
+    mutation_project("j-mutate-baseline-no-match-filter")
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("simple")
+        .arg("--filter")
+        .arg("does-not-match")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_aborts_when_filter_selects_no_baseline_tests.stderr.txt",
         );
 }
 

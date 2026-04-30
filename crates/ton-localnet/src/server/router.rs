@@ -1,5 +1,17 @@
 use super::handlers::utils::get_extra;
-use super::handlers::*;
+use super::handlers::{
+    detect_address, detect_hash, emulate_trace_v1, faucet, get_account_states_v3,
+    get_address_balance, get_address_information, get_address_information_v3, get_address_name,
+    get_address_state, get_block_header, get_block_transactions, get_block_transactions_ext,
+    get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
+    get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
+    get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
+    get_shards, get_state_source, get_traces, get_transactions, get_transactions_by_message_v3,
+    get_transactions_std, get_transactions_v3, json_rpc, lookup_block, pack_address,
+    register_compiler_abis, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
+    send_boc_return_hash, send_message_v3, set_address_name, set_state_source,
+    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
+};
 use crate::localnet::Localnet;
 use axum::{
     Json, Router,

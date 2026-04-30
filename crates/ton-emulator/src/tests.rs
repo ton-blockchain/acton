@@ -1,7 +1,12 @@
 #![cfg(test)]
 use crate::emulator::Emulator;
-use crate::{AccountsState, LocalAccountsState, WorldState, WorldStateSnapshot};
+use crate::world_state::RemoteSnapshotCache;
+use crate::{
+    AccountsState, LocalAccountsState, RemoteAccountState, WorldState, WorldStateSnapshot,
+};
 use anyhow::Context;
+use std::sync::Arc;
+use ton_networks::Network;
 use tycho_types::cell::Lazy;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::config::{BlockchainConfigParams, MsgForwardPrices};
@@ -60,6 +65,26 @@ fn shard_account(
         last_trans_hash: HashBytes([0x42; 32]),
         last_trans_lt: 1_234_567,
     })
+}
+
+#[test]
+fn remote_account_retrieve_error_uses_current_lt_marker() -> anyhow::Result<()> {
+    let remote = RemoteAccountState::new(
+        Network::Custom(Arc::from("unit-missing-remote-network")),
+        None,
+        RemoteSnapshotCache::default(),
+    );
+    let mut state = WorldState::new(AccountsState::Remote(remote), None)?;
+    let address = std_addr(0, 0xaa);
+
+    let current_lt = state.get_lt();
+    let account = state.get_account(&address);
+
+    assert!(account.account.load()?.0.is_none());
+    assert_eq!(account.last_trans_hash, HashBytes::ZERO);
+    assert_eq!(account.last_trans_lt, current_lt);
+
+    Ok(())
 }
 
 fn make_internal_relaxed_message(

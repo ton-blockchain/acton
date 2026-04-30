@@ -15,6 +15,7 @@ tvm-ffi = { workspace = true }
 ton-executor = { workspace = true }
 tycho-types = { workspace = true }
 anyhow = { workspace = true }
+base64 = { workspace = true }
 num-traits = { workspace = true }
 ton-networks = { workspace = true }
 ton-api = { workspace = true }

@@ -1,5 +1,4 @@
 use crate::commands::common::error_fmt;
-use crate::commands::test::TestConfig;
 use crate::commands::test::mutation::diff::collect_mutation_diff_scope;
 use crate::commands::test::mutation::rules::{
     MutationEdit, MutationMatcher, MutationRule, load_custom_rules, merge_rules, rules,
@@ -8,13 +7,15 @@ use crate::commands::test::mutation::session::{
     MutationRecord, MutationSessionEvent, MutationStatus, append_mutation_session_event,
     load_or_create_mutation_session, mutation_summary,
 };
-use acton_config::color::OwoColorize;
+use crate::commands::test::{INTERNAL_REQUIRE_TESTS_ENV, INTERNAL_SKIP_BUILD_ENV, TestConfig};
+use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use path_absolutize::Absolutize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -127,12 +128,13 @@ fn get_code_context(
         if line_idx >= start_line && line_idx <= end_line {
             match &rule.edit {
                 MutationEdit::Remove => {
-                    output.push_str(&format!(
-                        "  {} {} {}\n",
+                    let _ = writeln!(
+                        output,
+                        "  {} {} {}",
                         format!("{line_num:4}").dimmed(),
                         "│".red(),
                         line.red().strikethrough()
-                    ));
+                    );
                 }
                 MutationEdit::Replace { replacement } => {
                     let start_col = if line_idx == start_line {
@@ -159,12 +161,13 @@ fn get_code_context(
                     line_content.push_str(&matched.red().strikethrough().to_string());
                     line_content.push_str(&suffix.dimmed().to_string());
 
-                    output.push_str(&format!(
-                        "  {} {} {}\n",
+                    let _ = writeln!(
+                        output,
+                        "  {} {} {}",
                         format!("{line_num:4}").dimmed(),
                         "│".dimmed(),
                         line_content
-                    ));
+                    );
 
                     if line_idx == end_line {
                         let padding: String = prefix
@@ -172,23 +175,24 @@ fn get_code_context(
                             .map(|c| if c.is_whitespace() { c } else { ' ' })
                             .collect();
 
-                        output.push_str(&format!(
-                            "  {} {} {}{}\n",
-                            "    ",
+                        let _ = writeln!(
+                            output,
+                            "       {} {}{}",
                             "│".dimmed(),
                             padding,
                             replacement.green().bold()
-                        ));
+                        );
                     }
                 }
             }
         } else {
-            output.push_str(&format!(
-                "  {} {} {}\n",
+            let _ = writeln!(
+                output,
+                "  {} {} {}",
                 format!("{line_num:4}").dimmed(),
                 "│".dimmed(),
                 line.dimmed()
-            ));
+            );
         }
     }
     output
@@ -287,7 +291,7 @@ fn run_single_mutation(
     sources: &[MutationSourceSnapshot],
     mutation: &GlobalMutation,
     mutate_contract: &str,
-    path: &Option<String>,
+    path: Option<&str>,
     config: &TestConfig,
     skip_build_for_child_tests: bool,
 ) -> anyhow::Result<MutationExecution> {
@@ -334,26 +338,12 @@ fn run_single_mutation(
 
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
         let mut cmd = process::Command::new(exe);
-        cmd.arg("test")
-            .arg(path.as_deref().unwrap_or("."))
-            .arg("--fail-fast")
-            .arg("--mutate-overrides")
+        append_mutation_test_command_args(&mut cmd, path, config);
+        cmd.arg("--mutate-overrides")
             .arg(format!("{mutate_contract}:{code_b64}"));
 
         if skip_build_for_child_tests {
-            cmd.env("ACTON_INTERNAL_SKIP_BUILD", "1");
-        }
-
-        if let Some(filter) = &config.filter {
-            cmd.arg("--filter").arg(filter);
-        }
-
-        for exclude in &config.exclude_patterns {
-            cmd.arg("--exclude").arg(exclude);
-        }
-
-        for include in &config.include_patterns {
-            cmd.arg("--include").arg(include);
+            cmd.env(INTERNAL_SKIP_BUILD_ENV, "1");
         }
 
         let output = match run_command_output_interruptible(&mut cmd)? {
@@ -389,7 +379,7 @@ fn run_single_mutation(
     match (result, restore_result) {
         (Ok(execution), Ok(())) => Ok(execution),
         (Ok(_), Err(err)) => Err(err.into()),
-        (Err(err), Ok(())) | (Err(err), Err(_)) => Err(err),
+        (Err(err), Ok(()) | Err(_)) => Err(err),
     }
 }
 
@@ -398,7 +388,7 @@ fn mutation_worker_loop(
     result_tx: Sender<MutationExecutionResult>,
     sources: &[MutationSourceSnapshot],
     mutate_contract: &str,
-    path: &Option<String>,
+    path: Option<&str>,
     config: &TestConfig,
     skip_build_for_child_tests: bool,
 ) -> anyhow::Result<()> {
@@ -581,6 +571,65 @@ fn run_command_output_interruptible(
     }
 }
 
+fn append_mutation_test_command_args(
+    cmd: &mut process::Command,
+    path: Option<&str>,
+    config: &TestConfig,
+) {
+    let test_path = match path {
+        Some(path) => Path::new(path),
+        None => configured_project_root(),
+    };
+
+    cmd.arg("--project-root")
+        .arg(configured_project_root())
+        .arg("--color")
+        .arg(if colors_enabled() { "always" } else { "never" })
+        .arg("test")
+        .arg(test_path)
+        .arg("--fail-fast")
+        .arg("--reporter")
+        .arg("console");
+
+    if let Some(filter) = &config.filter {
+        cmd.arg("--filter").arg(filter);
+    }
+
+    for exclude in &config.exclude_patterns {
+        cmd.arg("--exclude").arg(exclude);
+    }
+
+    for include in &config.include_patterns {
+        cmd.arg("--include").arg(include);
+    }
+
+    if let Some(fork_net) = &config.fork_net {
+        cmd.arg("--fork-net").arg(fork_net.to_string());
+    }
+
+    if let Some(fork_block_number) = config.fork_block_number {
+        cmd.arg("--fork-block-number")
+            .arg(fork_block_number.to_string());
+    }
+
+    if let Some(fuzz_seed) = config.fuzz_seed {
+        cmd.arg("--fuzz-seed").arg(fuzz_seed.to_string());
+    }
+}
+
+fn command_output_details(output: &process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("exit status {}", output.status)
+    }
+}
+
 fn shell_quote(value: &str) -> String {
     if value
         .chars()
@@ -592,7 +641,7 @@ fn shell_quote(value: &str) -> String {
     }
 }
 
-fn mutation_resume_command(path: &Option<String>, config: &TestConfig, session_id: &str) -> String {
+fn mutation_resume_command(path: Option<&str>, config: &TestConfig, session_id: &str) -> String {
     let mut args = vec!["acton".to_owned(), "test".to_owned()];
 
     if let Some(path) = path {
@@ -682,7 +731,7 @@ fn mutation_resume_command(path: &Option<String>, config: &TestConfig, session_i
 }
 
 fn exit_mutation_interrupted(
-    path: &Option<String>,
+    path: Option<&str>,
     config: &TestConfig,
     session_id: Option<&str>,
 ) -> ! {
@@ -725,20 +774,34 @@ fn prepare_project_for_mutation(config: &TestConfig) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let details = if !stderr.is_empty() {
-        stderr
-    } else if !stdout.is_empty() {
-        stdout
-    } else {
-        format!("exit status {}", output.status)
-    };
+    let details = command_output_details(&output);
 
     anyhow::bail!("Failed to prepare project for mutation testing: {details}");
 }
 
-pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+fn run_mutation_baseline_tests(path: Option<&str>, config: &TestConfig) -> anyhow::Result<()> {
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
+    let mut cmd = process::Command::new(exe);
+    append_mutation_test_command_args(&mut cmd, path, config);
+    cmd.env(INTERNAL_SKIP_BUILD_ENV, "1");
+    cmd.env(INTERNAL_REQUIRE_TESTS_ENV, "1");
+
+    let output = match run_command_output_interruptible(&mut cmd)? {
+        InterruptibleOutput::Completed(output) => output,
+        InterruptibleOutput::Interrupted => return Ok(()),
+    };
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let details = command_output_details(&output);
+    anyhow::bail!(
+        "Baseline test suite failed before mutation testing. Fix failing tests or adjust the mutation test selection.\n\n{details}"
+    );
+}
+
+pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Result<()> {
     install_mutation_interrupt_handler()?;
 
     let Some(mutate_contract) = &config.mutate_contract else {
@@ -766,6 +829,10 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     let mutation_diff_scope = collect_mutation_diff_scope(&project_root, config)?;
 
     prepare_project_for_mutation(config)?;
+    if mutation_interrupted() {
+        exit_mutation_interrupted(path, config, None);
+    }
+    run_mutation_baseline_tests(path, config)?;
     if mutation_interrupted() {
         exit_mutation_interrupted(path, config, None);
     }
@@ -801,7 +868,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     });
 
     let mappings = acton_config.mappings();
-    let dependencies = ton_abi::get_file_dependencies(&main_path_str, true, &mappings)?;
+    let dependencies = ton_abi::get_file_dependencies(&main_path_str, true, mappings.as_ref())?;
     for dep_path_str in &dependencies {
         let dep_path = Path::new(dep_path_str)
             .absolutize_from(&project_root)

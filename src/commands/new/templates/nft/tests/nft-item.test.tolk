@@ -107,7 +107,7 @@ get fun `test nft: should not transfer ownership not from owner`() {
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
         from: notOwner.address,
         to: nftItem.address,
-        exitCode: Errors.NotFromOwner as int32,
+        exitCode: Errors.NotFromOwner,
     });
 
     // Owner should NOT have changed
@@ -215,7 +215,7 @@ get fun `test nft: should fail when receiver in different workchain`() {
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
         from: nftOwner.address,
         to: nftItem.address,
-        exitCode: Errors.InvalidWorkchain as int32,
+        exitCode: Errors.InvalidWorkchain,
     });
 }
 
@@ -264,7 +264,7 @@ get fun `test nft: should fail when response address in different workchain`() {
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
         from: nftOwner.address,
         to: nftItem.address,
-        exitCode: Errors.InvalidWorkchain as int32,
+        exitCode: Errors.InvalidWorkchain,
     });
 }
 

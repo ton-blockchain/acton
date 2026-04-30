@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "generated-source": "bunx fumadocs-mdx",
-    "lint:links": "bun ./scripts/validate-link.ts"
+    "lint:links": "bun run lint:links:internal && bun run lint:links:external",
+    "lint:links:internal": "bun ./scripts/validate-links-internal.ts",
+    "lint:links:external": "bun ./scripts/validate-links-external.ts"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
@@ -41,7 +43,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
-    "next-validate-link": "^1.6.4",
+    "next-validate-link": "^1.6.6",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
   }

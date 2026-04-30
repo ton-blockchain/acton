@@ -363,7 +363,8 @@ fn load_local_contract_candidate(
     let content = fs::read_to_string(&contract_path)
         .with_context(|| format!("Failed to read {}", contract_path.display()))?;
     let path = contract_path.to_string_lossy().to_string();
-    let abi = Arc::new(contract_abi(content.into(), &path, &config.mappings()));
+    let mappings = config.mappings();
+    let abi = Arc::new(contract_abi(content.into(), &path, mappings.as_ref()));
 
     Ok(LocalContractCandidate {
         contract_path,

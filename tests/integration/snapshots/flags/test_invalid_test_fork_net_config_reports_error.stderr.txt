@@ -1,0 +1,1 @@
+Error: Invalid [test].fork-net 'bogus': Unknown network 'bogus', supported networks: 'mainnet', 'testnet', 'localnet' and 'custom:<network-name>'

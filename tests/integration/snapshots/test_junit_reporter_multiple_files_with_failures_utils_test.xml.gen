@@ -7,7 +7,13 @@
         <testcase name="test pow2 basic" classname="utils.test.tolk" [TIME]>
         </testcase>
         <testcase name="test pow2 edge" classname="utils.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toEqual(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/utils.test[LINE]</failure>
+            <failure message="expect(&lt;actual&gt;).toEqual(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/utils.test[LINE]
+expect(actual).toEqual(expected)
+(
+    1,
+    2
+)
+at tests/utils.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>

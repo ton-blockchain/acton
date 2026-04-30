@@ -6,6 +6,7 @@
 
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
+use base64::Engine;
 use num_traits::cast::ToPrimitive;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -216,13 +217,13 @@ impl RemoteAccountState {
             return acc.clone();
         }
 
-        match self.resolve_remote_account(address, current_lt) {
+        match self.resolve_remote_account(address) {
             Ok(acc) => {
                 self.accounts.insert(address.clone(), acc.clone());
                 acc
             }
             Err(err) => {
-                eprintln!("Failed to resolve address {address} for account {current_lt}: {err}");
+                eprintln!("Failed to resolve address {address}: {err}");
 
                 // don't cache account on error
                 ShardAccount {
@@ -239,11 +240,7 @@ impl RemoteAccountState {
         self.accounts.insert(address.clone(), account);
     }
 
-    fn resolve_remote_account(
-        &self,
-        address: &StdAddr,
-        current_lt: u64,
-    ) -> anyhow::Result<ShardAccount> {
+    fn resolve_remote_account(&self, address: &StdAddr) -> anyhow::Result<ShardAccount> {
         // return cached version if it already resolved earlier in current suite
         let cache_key = RemoteCacheKey {
             fork_block_number: self.fork_block_number,
@@ -277,16 +274,19 @@ impl RemoteAccountState {
             }
         };
 
+        let last_trans_lt = info.last_transaction_id.lt.parse()?;
+        let last_trans_hash = decode_toncenter_hash(&info.last_transaction_id.hash)?;
+
         let acc = ShardAccount {
             account: Lazy::new(&OptionalAccount(Some(Account {
                 balance: CurrencyCollection::new(balance),
                 address: IntAddr::Std(address.clone()),
-                last_trans_lt: info.last_transaction_id.lt.parse()?,
+                last_trans_lt,
                 state: account_state,
                 storage_stat: StorageInfo::default(),
             })))?,
-            last_trans_hash: HashBytes::ZERO,
-            last_trans_lt: current_lt.to_u64().unwrap_or(0),
+            last_trans_hash,
+            last_trans_lt,
         };
         self.cache.insert(cache_key, acc.clone());
         Ok(acc)
@@ -306,6 +306,19 @@ impl RemoteAccountState {
             .get()
             .ok_or_else(|| anyhow!("Failed to initialize Ton API client"))
     }
+}
+
+pub(crate) fn decode_toncenter_hash(hash: &str) -> anyhow::Result<HashBytes> {
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(hash)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(hash))
+        .map_err(|err| anyhow!("Invalid TonCenter transaction hash '{hash}': {err}"))?;
+    let len = decoded.len();
+    let bytes: [u8; 32] = decoded
+        .try_into()
+        .map_err(|_| anyhow!("TonCenter transaction hash must be 32 bytes, got {len}"))?;
+
+    Ok(HashBytes(bytes))
 }
 
 /// The main entry point for interacting with the emulated world state.

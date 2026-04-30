@@ -140,7 +140,7 @@ pub struct ReplayerDebugSession {
     stop_requested: bool,
     /// Parent step state must survive nested child VM stepping.
     active_step_start: Option<StepFramePosition>,
-    /// Set after child VM returns when the parent may first land on active_step_start.
+    /// Set after child VM returns when the parent may first land on `active_step_start`.
     skip_active_step_start_once: bool,
 }
 

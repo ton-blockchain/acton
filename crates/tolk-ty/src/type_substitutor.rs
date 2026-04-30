@@ -1,5 +1,5 @@
 use crate::type_interner::{TyId, TypeInterner};
-use crate::types::*;
+use crate::types::TyData;
 use rustc_hash::FxHashMap;
 
 pub(crate) struct TypeSubstitutor<'a> {

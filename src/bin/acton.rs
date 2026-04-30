@@ -31,12 +31,13 @@ use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
-    WalletsFile, global_wallets_path, init_manifest_path_with_source,
+    TestSettings, WalletsFile, global_wallets_path, init_manifest_path_with_source,
     init_project_root_with_source, project_root as configured_project_root,
 };
 use acton_config::test::{
     BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
 };
+use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
@@ -48,6 +49,7 @@ use clap_complete::engine::{
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
+use std::fmt::Write as _;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -221,10 +223,13 @@ enum Commands {
         // Execution
         #[arg(
             long,
-            help = "Stop executing tests after the first failure",
-            help_heading = "Execution"
+            help = "Stop executing tests after the first failure (default: [test].fail-fast or false)",
+            help_heading = "Execution",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        fail_fast: bool,
+        fail_fast: Option<bool>,
         #[arg(
             long,
             value_name = "SEED",
@@ -234,7 +239,7 @@ enum Commands {
         fuzz_seed: Option<u64>,
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Execution"
         )]
@@ -279,7 +284,7 @@ enum Commands {
         coverage_include_wrappers: bool,
         #[arg(
             long,
-            help = "Include .test.tolk files in coverage reports",
+            help = "Include files under tests/ and .test.tolk files in coverage reports",
             help_heading = "Coverage"
         )]
         coverage_include_tests: bool,
@@ -321,8 +326,7 @@ enum Commands {
         show_bodies: bool,
         #[arg(
             long,
-            default_value = "test-results",
-            help = "JUnit XML output directory",
+            help = "JUnit XML output directory (default: [test].junit-path or test-results)",
             help_heading = "Reporting"
         )]
         junit_path: Option<String>,
@@ -336,10 +340,13 @@ enum Commands {
         // Cache
         #[arg(
             long,
-            help = "Clear compilation cache before running",
-            help_heading = "Cache"
+            help = "Clear compilation cache before running (default: false)",
+            help_heading = "Cache",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        clear_cache: bool,
+        clear_cache: Option<bool>,
 
         // Remote
         #[arg(
@@ -466,12 +473,11 @@ enum Commands {
         ui: bool,
         #[arg(
             long,
-            help = "UI server port",
-            default_value = "12344",
+            help = "UI server port (default: [test].ui-port or 12344)",
             help_heading = "Reporting",
             value_name = "PORT"
         )]
-        ui_port: u16,
+        ui_port: Option<u16>,
     },
     #[command(
         about = "Generate contract wrappers and test stubs",
@@ -540,7 +546,7 @@ enum Commands {
 
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Script"
         )]
@@ -1450,7 +1456,7 @@ fn base_cli_command() -> clap::Command {
                 .short('v')
                 .short_alias('V')
                 .long("version")
-                .action(clap::ArgAction::Version)
+                .action(ArgAction::Version)
                 .help("Print version"),
         )
 }
@@ -1498,9 +1504,10 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
                 .filter(|(_, score)| *score >= 0.80)
                 .max_by(|left, right| left.1.total_cmp(&right.1))
             {
-                message.push_str(&format!(
+                let _ = write!(
+                    message,
                     "\n\nhelp: a command with a similar name exists: `{suggestion}`"
-                ));
+                );
             }
             message.push_str("\n\nhelp: view all commands with `acton --help`");
 
@@ -1764,7 +1771,7 @@ fn main() {
             commands::common::validate_cli_verbosity(verbose),
         ) {
             (Ok(fork_net), Ok(verbose)) => {
-                let config = create_test_config(
+                match create_test_config(
                     filter,
                     show_bodies,
                     verbose,
@@ -1808,15 +1815,18 @@ fn main() {
                     mutation_minimum_percent,
                     mutation_disable_rules,
                     fuzz_seed,
-                    Some(fail_fast),
+                    fail_fast,
                     ui,
                     ui_port,
-                );
-
-                if mutate {
-                    mutation::test_mutate_cmd(&path, &config)
-                } else {
-                    test_cmd(path, &config)
+                ) {
+                    Ok(config) => {
+                        if mutate {
+                            mutation::test_mutate_cmd(path.as_deref(), &config)
+                        } else {
+                            test_cmd(path, &config)
+                        }
+                    }
+                    Err(err) => Err(err),
                 }
             }
             (Err(err), _) | (_, Err(err)) => Err(err),
@@ -1927,6 +1937,7 @@ fn main() {
                         }))
                         .expect("JSON serialization should not fail")
                     );
+                    process::exit(1);
                 }
                 return;
             }
@@ -2343,7 +2354,7 @@ fn create_test_config(
     coverage_include_tests: bool,
     exclude: Vec<String>,
     include: Vec<String>,
-    clear_cache: bool,
+    clear_cache: Option<bool>,
     report_formats: Vec<ReportFormat>,
     junit_path: Option<String>,
     junit_merge: bool,
@@ -2368,13 +2379,15 @@ fn create_test_config(
     fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
     ui: bool,
-    ui_port: u16,
-) -> TestConfig {
+    ui_port: Option<u16>,
+) -> anyhow::Result<TestConfig> {
     let acton_config = ActonConfig::load();
 
-    if let Ok(acton_config) = acton_config
+    if let Ok(acton_config) = &acton_config
         && let Some(test_settings) = &acton_config.test
     {
+        validate_test_settings(test_settings)?;
+
         let mut config = test_settings.to_test_config(
             filter,
             report_formats,
@@ -2406,7 +2419,7 @@ fn create_test_config(
             } else {
                 Some(include)
             },
-            None,
+            clear_cache,
             junit_path,
             junit_merge,
             snapshot,
@@ -2426,7 +2439,7 @@ fn create_test_config(
             if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
-            Some(ui_port),
+            ui_port,
         );
         config.verbosity = verbosity;
         config.mutation_ids = mutation_ids;
@@ -2435,10 +2448,11 @@ fn create_test_config(
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
-        return config;
+        validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
+        return Ok(config);
     }
 
-    TestConfig {
+    let config = TestConfig {
         show_bodies,
         verbosity,
         debug,
@@ -2453,7 +2467,7 @@ fn create_test_config(
         coverage_file,
         exclude_patterns: exclude,
         include_patterns: include,
-        clear_cache,
+        clear_cache: clear_cache.unwrap_or(false),
         report_formats,
         junit_path,
         junit_merge,
@@ -2479,9 +2493,79 @@ fn create_test_config(
         fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
-        ui_port,
+        ui_port: ui_port.unwrap_or(12344),
         fork_net,
+    };
+
+    validate_merged_test_fork_network(acton_config.as_ref().ok(), config.fork_net.as_ref())?;
+
+    Ok(config)
+}
+
+fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
+    if let Some(fork_net) = test_settings.fork_net.as_deref() {
+        Network::from_str(fork_net)
+            .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
     }
+
+    Ok(())
+}
+
+fn validate_merged_test_fork_network(
+    acton_config: Option<&ActonConfig>,
+    fork_net: Option<&Network>,
+) -> anyhow::Result<()> {
+    let Some(fork_net) = fork_net else {
+        return Ok(());
+    };
+
+    let Some(acton_config) = acton_config else {
+        if let Network::Custom(name) = fork_net {
+            anyhow::bail!(
+                "Custom test fork network 'custom:{name}' requires Acton.toml with [networks.{name}.api].v2"
+            );
+        }
+        return Ok(());
+    };
+
+    if let Network::Custom(name) = fork_net {
+        validate_custom_test_network(acton_config, name)?;
+    }
+
+    let custom_networks = acton_config.custom_networks();
+    let v2_url = fork_net
+        .toncenter_v2_url(&custom_networks)
+        .map_err(|err| anyhow::anyhow!("Invalid test fork network '{fork_net}': {err}"))?;
+    reqwest::Url::parse(&v2_url).map_err(|err| {
+        anyhow::anyhow!("Invalid TonCenter v2 URL for test fork network '{fork_net}': {err}")
+    })?;
+
+    Ok(())
+}
+
+fn validate_custom_test_network(acton_config: &ActonConfig, name: &str) -> anyhow::Result<()> {
+    let network = acton_config
+        .networks
+        .as_ref()
+        .and_then(|networks| networks.get(name))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unknown custom test fork network 'custom:{name}'. Define [networks.{name}.api].v2 in Acton.toml."
+            )
+        })?;
+
+    let has_v2 = network
+        .api
+        .as_ref()
+        .and_then(|api| api.v2.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if !has_v2 {
+        anyhow::bail!(
+            "Custom test fork network 'custom:{name}' must define [networks.{name}.api].v2 in Acton.toml."
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_coverage_percent(raw: &str) -> Result<f64, String> {

@@ -21,7 +21,7 @@ const MATCHED_INFO_OWNER_ADDRESS: &str =
 const TRACE_ROOT_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const TRACE_CHILD_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const TRACE_RETURN_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const TRACE_COUNTER_TYPES: &str = r#"
+const TRACE_COUNTER_TYPES: &str = r"
 enum Errors {
     NotOwner = 100
     CounterUnderflow = 0x1001
@@ -55,7 +55,7 @@ struct (0x3a752f06) ResetCounter {}
 struct (0xd53276db) ReturnExcessesBack {
     queryId: uint64
 }
-"#;
+";
 const TRACE_COUNTER_CONTRACT: &str = r#"
 import "types"
 
@@ -1154,20 +1154,26 @@ fn counter_storage_boc64(id: u32, owner_address: &str, counter: u32) -> String {
 }
 
 fn write_custom_network_config(project_root: &Path, name: &str, url: &str) {
+    use std::fmt::Write as _;
+
     let config_path = project_root.join("Acton.toml");
     let mut config = fs::read_to_string(&config_path).expect("Acton.toml must exist");
-    config.push_str(&format!(
+    let _ = write!(
+        config,
         "\n[networks.{name}]\napi = {{ v2 = \"{url}/api/v2\" }}\n"
-    ));
+    );
     fs::write(config_path, config).expect("failed to update Acton.toml");
 }
 
 fn write_custom_network_config_with_v3(project_root: &Path, name: &str, url: &str) {
+    use std::fmt::Write as _;
+
     let config_path = project_root.join("Acton.toml");
     let mut config = fs::read_to_string(&config_path).expect("Acton.toml must exist");
-    config.push_str(&format!(
+    let _ = write!(
+        config,
         "\n[networks.{name}]\napi = {{ v2 = \"{url}/api/v2\", v3 = \"{url}/api/v3\" }}\n"
-    ));
+    );
     fs::write(config_path, config).expect("failed to update Acton.toml");
 }
 
@@ -1183,16 +1189,19 @@ fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 

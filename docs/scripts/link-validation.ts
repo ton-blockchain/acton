@@ -1,8 +1,16 @@
-import { type FileObject, printErrors, scanURLs, validateFiles } from 'next-validate-link';
+import {
+  type FileObject,
+  type ScanResult,
+  type ValidateConfig,
+  scanURLs,
+} from 'next-validate-link';
 import type { InferPageType } from 'fumadocs-core/source';
 import { source } from '@/lib/source';
 
-async function validateLink() {
+export async function getLinkValidationInput(): Promise<{
+  files: FileObject[];
+  scanned: ScanResult;
+}> {
   const scanned = await scanURLs({
     preset: 'next',
     populate: {
@@ -17,21 +25,29 @@ async function validateLink() {
     },
   });
 
-  printErrors(
-    await validateFiles(await getFiles(), {
-      scanned,
-      markdown: {
-        components: {
-          Card: { attributes: ['href'] },
-          Cards: { attributes: ['href'] },
-          Link: { attributes: ['href'] },
-          SourceCodeLink: { attributes: ['href'] },
-        },
+  return {
+    files: await getFiles(),
+    scanned,
+  };
+}
+
+export function createLinkValidationConfig(
+  scanned: ScanResult,
+  overrides: Partial<ValidateConfig> = {},
+): ValidateConfig {
+  return {
+    scanned,
+    markdown: {
+      components: {
+        Card: { attributes: ['href'] },
+        Cards: { attributes: ['href'] },
+        Link: { attributes: ['href'] },
+        SourceCodeLink: { attributes: ['href'] },
+        LandingVideo: { attributes: ['src'] },
       },
-      checkRelativePaths: 'as-url',
-    }),
-    true,
-  );
+    },
+    ...overrides,
+  };
 }
 
 function getHeadings({ data }: InferPageType<typeof source>): string[] {
@@ -50,5 +66,3 @@ function getFiles() {
 
   return Promise.all(promises);
 }
-
-void validateLink();

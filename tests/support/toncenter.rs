@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
@@ -210,13 +211,14 @@ pub(crate) fn append_custom_network(project_path: &Path, network_name: &str, v2_
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with custom network");
 }
@@ -230,13 +232,14 @@ pub(crate) fn append_custom_network_with_urls(
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with custom network");
 }
@@ -245,13 +248,14 @@ pub(crate) fn append_localnet_network(project_path: &Path, v2_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{v2_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with localnet network");
 }

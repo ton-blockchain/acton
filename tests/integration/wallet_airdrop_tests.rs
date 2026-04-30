@@ -327,16 +327,19 @@ fn status_text(status: u16) -> &'static str {
 }
 
 fn append_localnet_port(project_path: &Path, port: u16) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r"
 
 [localnet]
 port = {port}
 "
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet port");
 }
 

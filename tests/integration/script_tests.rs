@@ -392,6 +392,8 @@ keys = {{ mnemonic-file = "mnemonic.txt" }}
 }
 
 fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let (v2_url, v3_url) = if let Some(root_url) = base_url.strip_suffix("/api/v2") {
         (format!("{root_url}/api/v2"), format!("{root_url}/api/v3"))
     } else {
@@ -400,13 +402,14 @@ fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 
@@ -808,9 +811,9 @@ fn test_script_bool_arg_rejects_numeric_alias() {
     let project = ProjectBuilder::new("script-bool-numeric-arg")
         .script_file(
             "bool",
-            r#"
+            r"
             fun main(flag: bool) {}
-        "#,
+        ",
         )
         .build();
 
@@ -859,9 +862,9 @@ fn test_script_extra_args_reports_count_error() {
     let project = ProjectBuilder::new("script-extra-args")
         .script_file(
             "args",
-            r#"
+            r"
             fun main(a: int, b: int) {}
-        "#,
+        ",
         )
         .build();
 
@@ -883,9 +886,9 @@ fn test_script_arg_type_mismatch_reports_type_error() {
     let project = ProjectBuilder::new("script-arg-type-mismatch")
         .script_file(
             "cell",
-            r#"
+            r"
             fun main(a: cell) {}
-        "#,
+        ",
         )
         .build();
 
@@ -905,9 +908,9 @@ fn test_script_map_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-map-arg")
         .script_file(
             "map",
-            r#"
+            r"
             fun main(items: map<int32, int32>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -927,9 +930,9 @@ fn test_script_dict_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-dict-arg")
         .script_file(
             "dict",
-            r#"
+            r"
             fun main(items: dict) {}
-        "#,
+        ",
         )
         .build();
 
@@ -949,9 +952,9 @@ fn test_script_array_unknown_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-array-args")
         .script_file(
             "array",
-            r#"
+            r"
             fun main(t: array<unknown>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1000,9 +1003,9 @@ fn test_script_unknown_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-unknown-cell-arg")
         .script_file(
             "unknown",
-            r#"
+            r"
             fun main(value: unknown) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1022,9 +1025,9 @@ fn test_script_tuple_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-tuple-arg")
         .script_file(
             "tuple",
-            r#"
+            r"
             fun main(t: tuple) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1044,9 +1047,9 @@ fn test_script_lisp_list_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-lisp-list-arg")
         .script_file(
             "list",
-            r#"
+            r"
             fun main(items: lisp_list<int>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1066,7 +1069,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Abc {
                 a: int,
                 b: int,
@@ -1074,7 +1077,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
             }
 
             fun main(a: Abc) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1094,13 +1097,13 @@ fn test_script_nullable_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-nullable-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Foo {
                 a: int32,
             }
 
             fun main(a: Foo?) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1120,13 +1123,13 @@ fn test_script_array_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-array-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Foo {
                 a: int32,
             }
 
             fun main(items: array<Foo>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1146,7 +1149,7 @@ fn test_script_struct_flat_args_reports_count_error() {
     let project = ProjectBuilder::new("script-struct-flat-args")
         .script_file(
             "item",
-            r#"
+            r"
             struct Abc {
                 a: int,
                 b: int,
@@ -1154,7 +1157,7 @@ fn test_script_struct_flat_args_reports_count_error() {
             }
 
             fun main(a: Abc) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1176,11 +1179,11 @@ fn test_script_alias_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-alias-arg")
         .script_file(
             "alias",
-            r#"
+            r"
             type ItemId = int;
 
             fun main(id: ItemId) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1200,7 +1203,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-nested-struct-arg")
         .script_file(
             "nested",
-            r#"
+            r"
             struct Inner {
                 value: int,
             }
@@ -1210,7 +1213,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
             }
 
             fun main(arg: Outer) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1355,10 +1358,10 @@ fn test_script_builder_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-builder-args")
         .script_file(
             "builder",
-            r#"
+            r"
             fun main(a: builder) {}
 
-        "#,
+        ",
         )
         .build();
 
@@ -1383,9 +1386,9 @@ fn test_script_any_address_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-any-address-arg")
         .script_file(
             "address",
-            r#"
+            r"
             fun main(a: any_address) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1405,9 +1408,9 @@ fn test_script_cell_arg_rejects_prefixed_hex() {
     let project = ProjectBuilder::new("script-cell-prefixed-arg")
         .script_file(
             "cell",
-            r#"
+            r"
             fun main(a: cell) {}
-        "#,
+        ",
         )
         .build();
 

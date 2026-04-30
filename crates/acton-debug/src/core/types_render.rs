@@ -624,8 +624,8 @@ fn decode_cell_like(cell: &CellLike) -> Option<Cell> {
     }
 }
 
-fn parse_range_len(range: &Option<(String, String)>) -> Option<usize> {
-    let (start, end) = range.as_ref()?;
+fn parse_range_len(range: Option<&(String, String)>) -> Option<usize> {
+    let (start, end) = range?;
     Some(end.parse::<usize>().ok()? - start.parse::<usize>().ok()?)
 }
 
@@ -728,7 +728,10 @@ fn exact_slice_cell(cs: &CellSlice) -> Option<Cell> {
 
 fn slice_meta(cs: &CellSlice) -> (Option<usize>, Option<usize>, Option<String>) {
     let (bits, refs) = match (&cs.bits, &cs.refs) {
-        (Some(_), Some(_)) => (parse_range_len(&cs.bits), parse_range_len(&cs.refs)),
+        (Some(_), Some(_)) => (
+            parse_range_len(cs.bits.as_ref()),
+            parse_range_len(cs.refs.as_ref()),
+        ),
         _ => match exact_slice_cell(cs) {
             Some(cell) => {
                 let slice = cell.as_slice_allow_exotic();
@@ -2484,7 +2487,7 @@ fn render_optional_int_addr(addr: Option<&IntAddr>) -> RenderedValue {
 fn render_int_addr(addr: &IntAddr) -> RenderedValue {
     match addr {
         IntAddr::Std(addr) => render_std_address("address".to_owned(), addr.to_string(), addr),
-        _ => RenderedValue::typed_leaf(addr.to_string(), "address"),
+        IntAddr::Var(_) => RenderedValue::typed_leaf(addr.to_string(), "address"),
     }
 }
 

@@ -42,6 +42,10 @@ pub fn disasm_cmd(
     let mut resolved_network = network.clone();
 
     let boc_data = if let Some(string) = boc_string {
+        if string.trim().is_empty() {
+            anyhow::bail!("{} cannot be empty", "--string".yellow());
+        }
+
         string
     } else if let Some(path) = boc_file {
         if !fs::exists(&path).unwrap_or(false) {
@@ -65,6 +69,10 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
+        if addr.trim().is_empty() {
+            anyhow::bail!("{} cannot be empty", "--address".yellow());
+        }
+
         let fetched = remote::fetch_contract_boc(network, &addr)?;
         resolved_network = Some(fetched.network);
         fetched.boc

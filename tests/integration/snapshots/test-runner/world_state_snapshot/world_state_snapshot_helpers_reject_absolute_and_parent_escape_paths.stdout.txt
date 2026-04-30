@@ -13,7 +13,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
 
  TEST  [ROOT]
 
- > tests/confirm_empty_input_bug.test.tolk (1 test)
-  ✓ confirm empty input defaults [TIME]
+ > tests/snapshot_path_sandbox.test.tolk (1 test)
+  ✓ world state snapshot rejects path escapes [TIME]
 
  ✓ 1 passed in 1 file

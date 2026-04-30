@@ -46,6 +46,8 @@ May be passed multiple times.
 \fB\-\-fail\-fast\fR
 .RS 4
 Stop after the first failing test.
+.sp
+Defaults to \fB[test].fail\-fast\fR, or \fBfalse\fR when it is not configured.
 .RE
 .sp
 \fB\-\-fuzz\-seed\fR \fIseed\fR
@@ -160,6 +162,8 @@ Show decoded message bodies in printed transaction trees when ABI is known.
 \fB\-\-junit\-path\fR \fIpath\fR
 .RS 4
 Output directory for JUnit XML reports.
+.sp
+Defaults to \fB[test].junit\-path\fR, or \fBtest\-results\fR when it is not configured.
 .RE
 .sp
 \fB\-\-junit\-merge\fR
@@ -175,12 +179,16 @@ Open test results in a browser UI.
 \fB\-\-ui\-port\fR \fIport\fR
 .RS 4
 Port for the browser UI server.
+.sp
+Defaults to \fB[test].ui\-port\fR, or \fB12344\fR when it is not configured.
 .RE
 .SS "Cache Options"
 .sp
 \fB\-\-clear\-cache\fR
 .RS 4
 Clear the compilation cache before running tests.
+.sp
+Defaults to \fBfalse\fR\&.
 .RE
 .SS "Remote Options"
 .sp
@@ -372,8 +380,8 @@ coverage summaries, files, and annotated source
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-junit\-path\fR matters when the JUnit reporter is enabled; the default output
-directory is \fBtest\-results\fR
+\h'-04'\(bu\h'+03'\fB\-\-junit\-path\fR matters when the JUnit reporter is enabled; it defaults to
+\fB[test].junit\-path\fR, or \fBtest\-results\fR when it is not configured
 .RE
 .sp
 .RS 4
@@ -407,7 +415,8 @@ summary, not just \fB% Lines\fR
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'coverage excludes \fB\&.test.tolk\fR files and \fB@wrappers\fR sources by default;
+\h'-04'\(bu\h'+03'coverage excludes files under \fBtests/\fR, \fB\&.test.tolk\fR files, and \fB@wrappers\fR
+sources by default;
 use \fB\-\-coverage\-include\-tests\fR or \fB\-\-coverage\-include\-wrappers\fR to opt in
 .RE
 .sp

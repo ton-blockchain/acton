@@ -17,7 +17,8 @@ use crate::commands::test::reporting::{
 };
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
-    DebugStopRequested, EmulationsState, Env, IoContext, KnownAddresses, is_debug_stop_requested,
+    DebugStopRequested, EmulationsState, Env, ExecutionMode, IoContext, KnownAddresses,
+    is_debug_stop_requested,
 };
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
@@ -74,6 +75,8 @@ pub mod reporting;
 pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
+pub(crate) const INTERNAL_SKIP_BUILD_ENV: &str = "ACTON_INTERNAL_SKIP_BUILD";
+pub(crate) const INTERNAL_REQUIRE_TESTS_ENV: &str = "ACTON_INTERNAL_REQUIRE_TESTS";
 pub(crate) use self::fuzz::FuzzConfig;
 use self::fuzz::{FuzzParameter, attach_test_parameter_metadata, validate_test_configuration};
 
@@ -345,6 +348,7 @@ impl<'a> TestRunner<'a> {
                 explorer: None,
                 fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
+                execution_mode: ExecutionMode::Test,
                 test_code: Some(code_cell.clone()),
             },
             io: IoContext {
@@ -613,6 +617,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut global_reporter = ReporterManager::new();
     TestRunner::setup_reporters(&mut global_reporter, &config, ui_reporter);
     global_reporter.init()?;
+    let testing_started_at = Instant::now();
     global_reporter.on_testing_started()?;
 
     let mut file_cache = FileBuildCache::new(None)?;
@@ -669,9 +674,15 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         failed: total_failed,
         skipped: total_skipped,
         todo: total_todo,
-        duration: Duration::default(),
+        duration: testing_started_at.elapsed(),
     };
     runner.reporter_manager.on_testing_finished(&global_stats)?;
+
+    if let Some(message) = empty_test_selection_message(&test_files, &config, total_tests) {
+        runner.reporter_manager.finalize()?;
+        println!("\n{message}");
+        process::exit(1);
+    }
 
     let mut coverage_lcov = None;
     let mut coverage_threshold_failed = false;
@@ -750,18 +761,25 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     runner.reporter_manager.finalize()?;
 
     if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
-        match profiling::collect_profile(&runner) {
-            Ok(()) => {}
-            Err(err) => {
-                if config.fail_on_diff {
-                    return Err(err);
+        if total_failed == 0 {
+            match profiling::collect_profile(&runner) {
+                Ok(()) => {}
+                Err(err) => {
+                    if config.fail_on_diff {
+                        return Err(err);
+                    }
+                    eprintln!(
+                        "{}: Cannot collect profiling result: {}",
+                        "Error".red(),
+                        err
+                    );
                 }
-                eprintln!(
-                    "{}: Cannot collect profiling result: {}",
-                    "Error".red(),
-                    err
-                );
             }
+        } else {
+            println!(
+                "\n{} Gas profiling snapshot and comparison tables were skipped because tests failed.",
+                "Note:".yellow()
+            );
         }
     }
 
@@ -789,17 +807,6 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         })?;
     }
 
-    if let Some(filter) = &config.filter
-        && total_tests == 0
-    {
-        // there is some `--filter` and no test ran, likely something is wrong
-        println!(
-            "\nNo tests matched filter {}, please check the filter spelling/pattern.",
-            filter.yellow()
-        );
-        process::exit(1);
-    }
-
     if total_failed > 0 || coverage_threshold_failed {
         process::exit(1)
     }
@@ -807,11 +814,52 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 }
 
 fn need_to_build() -> bool {
-    let Ok(value) = std::env::var("ACTON_INTERNAL_SKIP_BUILD") else {
+    let Ok(value) = std::env::var(INTERNAL_SKIP_BUILD_ENV) else {
         return true;
     };
 
     value.trim() != "1"
+}
+
+fn require_tests() -> bool {
+    std::env::var(INTERNAL_REQUIRE_TESTS_ENV)
+        .map(|value| value.trim() == "1")
+        .unwrap_or(false)
+}
+
+fn empty_test_selection_message(
+    test_files: &[String],
+    config: &TestConfig,
+    total_tests: usize,
+) -> Option<String> {
+    if total_tests != 0 {
+        return None;
+    }
+
+    if test_files.is_empty() {
+        let hint = if config.include_patterns.is_empty() && config.exclude_patterns.is_empty() {
+            "Check the test path or add a *.test.tolk file."
+        } else {
+            "Check the test path or --include/--exclude patterns."
+        };
+        return Some(format!("No test files found. {hint}"));
+    }
+
+    if let Some(filter) = &config.filter {
+        return Some(format!(
+            "No tests matched filter {}, please check the filter spelling/pattern.",
+            filter.yellow()
+        ));
+    }
+
+    if require_tests() {
+        return Some(
+            "No tests were selected. Mutation testing requires at least one baseline test."
+                .to_string(),
+        );
+    }
+
+    Some("No tests found in selected test files. Add tests or adjust the selection.".to_string())
 }
 
 fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
@@ -1006,7 +1054,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         content.into(),
         filepath,
         &file,
-        &mappings,
+        mappings.as_ref(),
         Some(&mut runner.abi_parse_cache),
     );
 
@@ -1083,6 +1131,7 @@ fn run_file_tests(
     runner
         .reporter_manager
         .on_suite_started(&file_path, &filtered_tests)?;
+    let suite_started_at = Instant::now();
 
     let dest_address = contract_address(code)?;
 
@@ -1126,7 +1175,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
-            test_report.details = test.status_description.clone();
+            test_report.details.clone_from(&test.status_description);
             runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
@@ -1134,7 +1183,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
-            test_report.details = test.status_description.clone();
+            test_report.details.clone_from(&test.status_description);
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
@@ -1222,6 +1271,13 @@ fn run_file_tests(
         let test_passed = outcome.passed;
 
         test_report.duration = duration;
+        let has_wallets_config = runner.acton_config.wallets.is_some();
+        let available_wallets = runner
+            .acton_config
+            .wallets
+            .as_ref()
+            .map(|wallets| wallets.wallets.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         let failure_execution = if test_passed {
             None
         } else {
@@ -1232,6 +1288,10 @@ fn run_file_tests(
                 emulations: runner.emulations.clone(),
                 known_addresses: runner.known_addresses.clone(),
                 known_code_cells: runner.known_code_cells.clone(),
+                has_wallets_config,
+                available_wallets: available_wallets.clone(),
+                fork_net: runner.config.fork_net.clone(),
+                network: runner.config.fork_net.clone(),
             })
         };
         test_report.execution = Some(TestExecutionContext {
@@ -1259,11 +1319,11 @@ fn run_file_tests(
                 known_addresses: Cow::Borrowed(&runner.known_addresses),
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
                 show_bodies: runner.config.show_bodies,
-                has_wallets_config: false,
-                available_wallets: vec![],
+                has_wallets_config,
+                available_wallets: available_wallets.clone(),
                 backtrace: runner.config.backtrace,
-                fork_net: None,
-                network: None,
+                fork_net: runner.config.fork_net.clone(),
+                network: runner.config.fork_net.clone(),
             };
 
             if let Some(gas_limit) = test.gas_limit.filter(|limit| gas_used > *limit) {
@@ -1333,8 +1393,12 @@ fn run_file_tests(
                     *code.repr_hash(),
                     source_map.clone(),
                     Some(
-                        contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
-                            .into(),
+                        contract_abi(
+                            content,
+                            file_path.to_string_lossy().as_ref(),
+                            mappings.as_ref(),
+                        )
+                        .into(),
                     ),
                     None,
                 );
@@ -1353,7 +1417,7 @@ fn run_file_tests(
         failed,
         skipped,
         todo,
-        duration: Duration::default(), // TODO: track suite duration
+        duration: suite_started_at.elapsed(),
     };
     runner
         .reporter_manager

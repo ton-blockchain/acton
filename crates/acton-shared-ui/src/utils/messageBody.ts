@@ -1,10 +1,7 @@
 import {Address, Builder, Cell, Dictionary, Slice, loadShardAccount} from "@ton/core"
 import type {Message, MessageRelaxed} from "@ton/core"
-import type {ContractABI} from "gen-typescript-from-tolk-dev/src/abi"
-import type {Ty} from "gen-typescript-from-tolk-dev/src/abi-types"
-import {DynamicCtx} from "gen-typescript-from-tolk-dev/src/dynamic-ctx"
-import {unpackFromSliceDynamic} from "gen-typescript-from-tolk-dev/src/dynamic-serialization"
-import {renderTy} from "gen-typescript-from-tolk-dev/src/types-kernel"
+import type {ContractABI, Ty} from "gen-typescript-from-tolk-dev"
+import {DynamicCtx, renderTy, unpackFromSliceDynamic} from "gen-typescript-from-tolk-dev"
 
 import type {BackendContractInfo} from "@/types"
 import type {

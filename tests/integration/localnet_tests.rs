@@ -6,6 +6,7 @@ use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::thread;
@@ -2559,16 +2560,19 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
 }
 
@@ -2680,28 +2684,30 @@ fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str
         &format!("/api/v2/unpackAddress?address={address}"),
         Duration::from_secs(12),
     );
-    response["result"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    response["result"].as_str().map_or_else(
+        || {
             panic!(
                 "Expected string result from unpackAddress for `{address}`:\n{}",
                 serde_json::to_string_pretty(&response).unwrap_or_default()
             )
-        })
+        },
+        ToOwned::to_owned,
+    )
 }
 
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
     response_payload(response)
         .get("transactions")
         .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected `transactions` array in response payload:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
-        })
+        .map_or_else(
+            || {
+                panic!(
+                    "Expected `transactions` array in response payload:\n{}",
+                    serde_json::to_string_pretty(response).unwrap_or_default()
+                )
+            },
+            Vec::as_slice,
+        )
 }
 
 fn hashes_equivalent(left: &str, right: &str) -> bool {
@@ -2849,7 +2855,9 @@ fn encode_query_component(value: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(char::from(byte));
             }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
         }
     }
     encoded

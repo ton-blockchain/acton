@@ -121,8 +121,7 @@ fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
         trace
             .transactions_order
             .first()
-            .map(String::as_str)
-            .unwrap_or("<none>"),
+            .map_or("<none>", String::as_str),
     );
     print_kv("Trace Complete", (!trace.is_incomplete).to_string());
     print_kv("Total Txs", trace.transactions_order.len().to_string());
@@ -177,11 +176,11 @@ fn print_rpc_trace_details(
                 .and_then(|formatter| formatter.transaction_inbound_message_name(&tx.transaction));
             println!(
                 "    from: {}",
-                format_optional_address(&message.source, network)
+                format_optional_address(message.source.as_deref(), network)
             );
             println!(
                 "    to: {}",
-                format_optional_address(&message.destination, network)
+                format_optional_address(message.destination.as_deref(), network)
             );
             println!("    value: {}", format_message_value(message));
             println!(
@@ -329,8 +328,8 @@ fn format_message_value(message: &V3MessageSummary) -> String {
     }
 }
 
-fn format_optional_address(address: &Option<String>, network: &Network) -> String {
-    address.as_deref().map_or_else(
+fn format_optional_address(address: Option<&str>, network: &Network) -> String {
+    address.map_or_else(
         || "<none>".to_owned(),
         |address| format_trace_address(address, network),
     )

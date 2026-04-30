@@ -8,12 +8,12 @@
  TEST  [ROOT]
 
 ##teamcity[testingStarted]
- > tests/escape.test.tolk (1 test)
-##teamcity[testSuiteStarted name='escape.test.tolk' nodeId='suite_escape.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/escape.test.tolk']
-##teamcity[testStarted name='test teamcity |'|||[|]' nodeId='test_test teamcity |'|||[|]' parentNodeId='suite_escape.test.tolk' locationHint='tolk_qn://[ROOT]/tests/escape.test.tolk:test teamcity |'|||[|]']
+ > tests/teamcity '[] .test.tolk (1 test)
+##teamcity[testSuiteStarted name='teamcity |'|[|] .test.tolk' nodeId='suite_teamcity |'|[|] .test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/teamcity |'|[|] .test.tolk']
+##teamcity[testStarted name='test teamcity |'|||[|]' nodeId='test_test teamcity |'|||[|]' parentNodeId='suite_teamcity |'|[|] .test.tolk' locationHint='tolk_qn://[ROOT]/tests/teamcity |'|[|] .test.tolk:test teamcity |'|||[|]']
   ✓ teamcity '|[] [TIME]
-##teamcity[testFinished name='test teamcity |'|||[|]' nodeId='test_test teamcity |'|||[|]' [DURATION] parentNodeId='suite_escape.test.tolk']
-##teamcity[testSuiteFinished name='escape.test.tolk' nodeId='suite_escape.test.tolk']
+##teamcity[testFinished name='test teamcity |'|||[|]' nodeId='test_test teamcity |'|||[|]' [DURATION] parentNodeId='suite_teamcity |'|[|] .test.tolk']
+##teamcity[testSuiteFinished name='teamcity |'|[|] .test.tolk' nodeId='suite_teamcity |'|[|] .test.tolk']
 
  ✓ 1 passed in 1 file
 ##teamcity[testingFinished]

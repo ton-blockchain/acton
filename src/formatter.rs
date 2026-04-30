@@ -280,7 +280,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                 .join("\n");
 
             format!(
-                "Wallet {} not found in Acton.toml\nAvailable wallets:\n{}",
+                "Wallet {} not found in wallets.toml or global.wallets.toml\nAvailable wallets:\n{}",
                 failure.wallet_name.yellow(),
                 available
             )
@@ -319,7 +319,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                 };
                 display.to_string()
             }
-            _ => address.to_string(),
+            IntAddr::Var(_) => address.to_string(),
         }
     }
 
@@ -745,23 +745,26 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                         contract_letters,
                         show_full_names,
                     );
-                    tx_builder += &format!(
-                        "{} {} {}\n",
+                    let _ = writeln!(
+                        tx_builder,
+                        "{} {} {}",
                         "N/A".dimmed(),
                         "->".dimmed(),
                         src_formatted.trim()
                     );
                 } else if matches!(&in_msg.info, MsgInfo::ExtIn(_)) {
-                    tx_builder += &format!(
-                        "{} {} {}\n",
+                    let _ = writeln!(
+                        tx_builder,
+                        "{} {} {}",
                         "N/A".dimmed(),
                         "->".dimmed(),
                         "external".dimmed()
                     );
                 }
             } else {
-                tx_builder += &format!(
-                    "{} {} {}\n",
+                let _ = writeln!(
+                    tx_builder,
+                    "{} {} {}",
                     "N/A".dimmed(),
                     "->".dimmed(),
                     "system".dimmed()
@@ -2012,9 +2015,9 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         for (idx, (message, balance, location)) in action_parts.iter().enumerate() {
             if idx == executed.actions.len() - 1 {
-                result.push_str(format!("{}    {} ", child_prefix, "└──".dimmed()).as_str());
+                let _ = write!(result, "{}    {} ", child_prefix, "└──".dimmed());
             } else {
-                result.push_str(format!("{}    {} ", child_prefix, "├──".dimmed()).as_str());
+                let _ = write!(result, "{}    {} ", child_prefix, "├──".dimmed());
             }
 
             let message_padding =
@@ -2055,9 +2058,9 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         for (idx, action) in invalid_actions.iter().enumerate() {
             if idx == invalid_actions.len() - 1 {
-                result.push_str(format!("{}    {} ", child_prefix, "└──".dimmed()).as_str());
+                let _ = write!(result, "{}    {} ", child_prefix, "└──".dimmed());
             } else {
-                result.push_str(format!("{}    {} ", child_prefix, "├──".dimmed()).as_str());
+                let _ = write!(result, "{}    {} ", child_prefix, "├──".dimmed());
             }
 
             let reason = if action.during_preprocessing {
@@ -2147,7 +2150,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                 } else {
                     Self::format_addr_hash(addr).dimmed().to_string()
                 };
-                result += &format!(" {} ", letter.bold());
+                let _ = write!(result, " {} ", letter.bold());
                 result
             } else {
                 String::new()
@@ -2449,11 +2452,11 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         };
 
         let Some((key_type_name, value_type_name)) = Self::parse_map_type(type_name) else {
-            return Some(self.format_map_raw(type_name, &dict_root, colorize));
+            return Some(self.format_map_raw(type_name, dict_root.as_ref(), colorize));
         };
 
         let Some(key_type) = Self::parse_map_key_type(&key_type_name) else {
-            return Some(self.format_map_raw(type_name, &dict_root, colorize));
+            return Some(self.format_map_raw(type_name, dict_root.as_ref(), colorize));
         };
         let value_type = Self::parse_map_value_type(&value_type_name);
         let allow_raw_value_fallback = value_type.is_none()
@@ -2740,7 +2743,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         })
     }
 
-    fn format_map_raw(&self, type_name: &str, root: &Option<Cell>, colorize: bool) -> String {
+    fn format_map_raw(&self, type_name: &str, root: Option<&Cell>, colorize: bool) -> String {
         let Some(cell) = root else {
             return format!("{type_name} {{}}");
         };
@@ -2854,7 +2857,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     }
 
     #[must_use]
-    pub fn format_address(&self, txs: &TupleItem, addr: &Option<IntAddr>) -> String {
+    pub fn format_address(&self, txs: &TupleItem, addr: Option<&IntAddr>) -> String {
         let Some(addr) = addr else {
             return "<any>".cyan().to_string();
         };
@@ -2921,17 +2924,17 @@ impl FormatterContext<'_> {
                 match (left_val, right_val) {
                     (Some(left_val), Some(right_val)) => {
                         if left_val == right_val {
-                            result.push_str(&format!("    {},\n", self.format(&left_val).dimmed()));
+                            let _ = writeln!(result, "    {},", self.format(&left_val).dimmed());
                         } else {
-                            result.push_str(&format!("    {},\n", self.format(&left_val).red()));
-                            result.push_str(&format!("    {}\n", self.format(&right_val).green()));
+                            let _ = writeln!(result, "    {},", self.format(&left_val).red());
+                            let _ = writeln!(result, "    {}", self.format(&right_val).green());
                         }
                     }
                     (Some(left_val), None) => {
-                        result.push_str(&format!("    {},\n", self.format(&left_val).red()));
+                        let _ = writeln!(result, "    {},", self.format(&left_val).red());
                     }
                     (None, Some(right_val)) => {
-                        result.push_str(&format!("    {}\n", self.format(&right_val).green()));
+                        let _ = writeln!(result, "    {}", self.format(&right_val).green());
                     }
                     (None, None) => {}
                 }
@@ -3157,12 +3160,14 @@ impl FormatterContext<'_> {
                         "  opcode={} {}",
                         format!("0x{opcode:x}").green(),
                         opcode_type
-                            .map(|typ| typ.name)
-                            .unwrap_or_else(|| if *opcode == 0 {
-                                "empty".to_owned()
-                            } else {
-                                "unknown".to_owned()
-                            })
+                            .map_or_else(
+                                || if *opcode == 0 {
+                                    "empty".to_owned()
+                                } else {
+                                    "unknown".to_owned()
+                                },
+                                |typ| typ.name
+                            )
                             .purple()
                             .bold()
                     ));
@@ -3490,7 +3495,7 @@ impl FormatterContext<'_> {
                 {
                     "<function>".cyan().to_string()
                 } else {
-                    self.format_address(&tx_failure.txs, &from_addr)
+                    self.format_address(&tx_failure.txs, from_addr.as_ref())
                 };
                 let to_str = if tx_failure
                     .params
@@ -3500,7 +3505,7 @@ impl FormatterContext<'_> {
                 {
                     "<function>".cyan().to_string()
                 } else {
-                    self.format_address(&tx_failure.txs, &to_addr)
+                    self.format_address(&tx_failure.txs, to_addr.as_ref())
                 };
                 writeln!(
                     result,
@@ -3536,7 +3541,7 @@ impl FormatterContext<'_> {
                     {
                         "<function>".cyan().to_string()
                     } else {
-                        self.format_address(&tx_failure.txs, &from_addr)
+                        self.format_address(&tx_failure.txs, from_addr.as_ref())
                     };
                     let to_s = if tx_failure
                         .params
@@ -3546,7 +3551,7 @@ impl FormatterContext<'_> {
                     {
                         "<function>".cyan().to_string()
                     } else {
-                        self.format_address(&tx_failure.txs, &to_addr)
+                        self.format_address(&tx_failure.txs, to_addr.as_ref())
                     };
                     format!(" from {from_s} to {to_s}")
                 };

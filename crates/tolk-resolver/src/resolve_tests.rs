@@ -4,6 +4,7 @@ mod tests {
     use crate::resolve_index::Resolved;
     use expect_test::{Expect, expect};
     use std::collections::BTreeMap;
+    use std::fmt::Write as _;
     use std::path::PathBuf;
 
     #[test]
@@ -1657,7 +1658,7 @@ mod tests {
                                     }
                                     Resolved::Unresolved => "Unresolved".to_string(),
                                 };
-                                actual.push_str(&format!("{} -> {}\n", u.name, resolved_str));
+                                let _ = writeln!(actual, "{} -> {}", u.name, resolved_str);
                             }
                             None => {
                                 actual.push_str("Unresolved");
@@ -1675,10 +1676,8 @@ mod tests {
                                         resolved_uses.global_usages_of(*symbol_id).collect();
                                     usages.sort_by_key(|u| u.span.start);
                                     for usage in usages {
-                                        actual.push_str(&format!(
-                                            "{} at {}\n",
-                                            usage.name, usage.span
-                                        ));
+                                        let _ =
+                                            writeln!(actual, "{} at {}", usage.name, usage.span);
                                     }
                                 }
                                 Resolved::Local(local_id) => {
@@ -1686,10 +1685,8 @@ mod tests {
                                         resolved_uses.local_usages_of(*local_id).collect();
                                     usages.sort_by_key(|u| u.span.start);
                                     for usage in usages {
-                                        actual.push_str(&format!(
-                                            "{} at {}\n",
-                                            usage.name, usage.span
-                                        ));
+                                        let _ =
+                                            writeln!(actual, "{} at {}", usage.name, usage.span);
                                     }
                                 }
                                 Resolved::Unresolved => {
@@ -1709,7 +1706,7 @@ mod tests {
                         .collect();
                     unresolved.sort_by_key(|u| u.span.start);
                     for usage in unresolved {
-                        actual.push_str(&format!("{} at {}\n", usage.name, usage.span));
+                        let _ = writeln!(actual, "{} at {}", usage.name, usage.span);
                     }
                 }
             }

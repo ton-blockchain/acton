@@ -37,7 +37,7 @@ impl Backend {
                     self.client
                         .log_message(
                             MessageType::ERROR,
-                            format!("Failed to process content: {}", e),
+                            format!("Failed to process content: {e}"),
                         )
                         .await;
                     return;
@@ -142,7 +142,7 @@ impl Backend {
 
         let diagnostics = checker.diagnostics;
         let linting_time = now.elapsed();
-        log::info!("Linting took {:?}", linting_time);
+        log::info!("Linting took {linting_time:?}");
 
         Ok(AnalysisResult {
             project_index: Arc::new(index),

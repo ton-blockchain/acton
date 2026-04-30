@@ -1,6 +1,6 @@
 use acton::context::{
     AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, DebugStopRequested,
-    EmulationsState, Env, IoContext, KnownAddresses, is_debug_stop_requested,
+    EmulationsState, Env, ExecutionMode, IoContext, KnownAddresses, is_debug_stop_requested,
 };
 use acton::ffi;
 use acton::file_build_cache::FileBuildCache;
@@ -177,7 +177,7 @@ pub(crate) fn run_script_file(
             .lock()
             .expect("debug compiler lock poisoned");
 
-        let abi = contract_abi(content.into(), file_path, &None);
+        let abi = contract_abi(content.into(), file_path, None);
 
         let config = load_project_config(project_root);
 
@@ -295,6 +295,7 @@ fn execute_script<'a>(
             explorer: None,
             fork_net: None,
             running_id: "script".into(),
+            execution_mode: ExecutionMode::Script,
             test_code: Some(test_code_cell),
         },
         io: IoContext {

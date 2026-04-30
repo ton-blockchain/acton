@@ -732,12 +732,12 @@ impl ProjectBuilder {
                 &self.lint_excludes,
                 self.lint_max_warnings,
                 self.lint_output_format,
-                &self.test_config,
+                self.test_config.as_ref(),
                 self.wrappers_tolk_output_dir.as_deref(),
                 self.wrappers_tolk_generate_test,
                 self.wrappers_tolk_test_output_dir.as_deref(),
                 self.wrappers_typescript_output_dir.as_deref(),
-                &self.license,
+                self.license.as_deref(),
             );
         }
 
@@ -773,12 +773,12 @@ impl ProjectBuilder {
         lint_excludes: &[String],
         lint_max_warnings: Option<usize>,
         lint_output_format: Option<String>,
-        test_config: &Option<TestConfig>,
+        test_config: Option<&TestConfig>,
         wrappers_tolk_output_dir: Option<&str>,
         wrappers_tolk_generate_test: Option<bool>,
         wrappers_tolk_test_output_dir: Option<&str>,
         wrappers_typescript_output_dir: Option<&str>,
-        license: &Option<String>,
+        license: Option<&str>,
     ) {
         use std::fmt::Write as _;
 
@@ -831,37 +831,38 @@ version = "0.1.0"
                     toml_content.push_str("depends = [\n");
                     for dep in &contract.depends {
                         if dep.kind.is_none() && dep.function.is_none() && dep.path.is_none() {
-                            toml_content.push_str(&format!("  \"{}\",\n", dep.name));
+                            let _ = writeln!(toml_content, "  \"{}\",", dep.name);
                         } else {
-                            toml_content.push_str(&format!("  {{ name = \"{}\"", dep.name));
+                            let _ = write!(toml_content, "  {{ name = \"{}\"", dep.name);
                             if let Some(kind) = &dep.kind {
-                                toml_content.push_str(&format!(", kind = \"{kind}\""));
+                                let _ = write!(toml_content, ", kind = \"{kind}\"");
                             }
                             if let Some(function) = &dep.function {
-                                toml_content.push_str(&format!(", function = \"{function}\""));
+                                let _ = write!(toml_content, ", function = \"{function}\"");
                             }
                             if let Some(path) = &dep.path {
-                                toml_content.push_str(&format!(", path = \"{path}\""));
+                                let _ = write!(toml_content, ", path = \"{path}\"");
                             }
                             toml_content.push_str(" },\n");
                         }
                     }
                     toml_content.push_str("]\n");
                 } else {
-                    toml_content.push_str(&format!(
-                        "depends = [{}]\n",
+                    let _ = writeln!(
+                        toml_content,
+                        "depends = [{}]",
                         contract
                             .depends
                             .iter()
                             .map(|d| format!("\"{}\"", d.name))
                             .collect::<Vec<_>>()
                             .join(", ")
-                    ));
+                    );
                 }
             }
 
             if let Some(output) = &contract.output {
-                toml_content.push_str(&format!("output = \"{output}\"\n"));
+                let _ = writeln!(toml_content, "output = \"{output}\"");
             }
 
             toml_content.push('\n');
@@ -870,7 +871,7 @@ version = "0.1.0"
         if !mappings.is_empty() {
             toml_content.push_str("[import-mappings]\n");
             for (prefix, target) in mappings {
-                toml_content.push_str(&format!("\"{prefix}\" = \"{target}\"\n"));
+                let _ = writeln!(toml_content, "\"{prefix}\" = \"{target}\"");
             }
             toml_content.push('\n');
         }
@@ -881,27 +882,27 @@ version = "0.1.0"
         {
             toml_content.push_str("[wrappers.tolk]\n");
             if let Some(path) = wrappers_tolk_output_dir {
-                toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+                let _ = writeln!(toml_content, "output-dir = \"{path}\"");
             }
             if let Some(enabled) = wrappers_tolk_generate_test {
-                toml_content.push_str(&format!("generate-test = {enabled}\n"));
+                let _ = writeln!(toml_content, "generate-test = {enabled}");
             }
             if let Some(path) = wrappers_tolk_test_output_dir {
-                toml_content.push_str(&format!("test-output-dir = \"{path}\"\n"));
+                let _ = writeln!(toml_content, "test-output-dir = \"{path}\"");
             }
             toml_content.push('\n');
         }
 
         if let Some(path) = wrappers_typescript_output_dir {
             toml_content.push_str("[wrappers.typescript]\n");
-            toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            let _ = writeln!(toml_content, "output-dir = \"{path}\"");
             toml_content.push('\n');
         }
 
         if !scripts.is_empty() {
             toml_content.push_str("[scripts]\n");
             for (name, cmd) in scripts {
-                toml_content.push_str(&format!("{name} = \"{cmd}\"\n"));
+                let _ = writeln!(toml_content, "{name} = \"{cmd}\"");
             }
             toml_content.push('\n');
         }
@@ -921,11 +922,11 @@ version = "0.1.0"
                 toml_content.push_str("]\n");
             }
             if let Some(max_warnings) = lint_max_warnings {
-                toml_content.push_str(&format!("max-warnings = {max_warnings}\n"));
+                let _ = writeln!(toml_content, "max-warnings = {max_warnings}");
             }
 
             if let Some(output_format) = lint_output_format {
-                toml_content.push_str(&format!("output-format = \"{output_format}\"\n"));
+                let _ = writeln!(toml_content, "output-format = \"{output_format}\"");
             }
 
             toml_content.push('\n');
@@ -934,7 +935,7 @@ version = "0.1.0"
         if !lint_levels.is_empty() {
             toml_content.push_str("[lint.rules]\n");
             for (rule, level) in lint_levels {
-                toml_content.push_str(&format!("{rule} = \"{level}\"\n"));
+                let _ = writeln!(toml_content, "{rule} = \"{level}\"");
             }
             toml_content.push('\n');
         }
@@ -944,68 +945,71 @@ version = "0.1.0"
             toml_content.push_str("[test]\n");
 
             if let Some(filter) = &config.filter {
-                toml_content.push_str(&format!("filter = \"{filter}\"\n"));
+                let _ = writeln!(toml_content, "filter = \"{filter}\"");
             }
 
             if let Some(exclude_patterns) = &config.exclude_patterns {
-                toml_content.push_str(&format!(
-                    "exclude = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "exclude = [{}]",
                     exclude_patterns
                         .iter()
                         .map(|p| format!("\"{p}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(include_patterns) = &config.include_patterns {
-                toml_content.push_str(&format!(
-                    "include = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "include = [{}]",
                     include_patterns
                         .iter()
                         .map(|p| format!("\"{p}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(reporters) = &config.reporters {
-                toml_content.push_str(&format!(
-                    "reporter = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "reporter = [{}]",
                     reporters
                         .iter()
                         .map(|r| format!("\"{r}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(debug) = config.debug {
-                toml_content.push_str(&format!("debug = {debug}\n"));
+                let _ = writeln!(toml_content, "debug = {debug}");
             }
 
             if let Some(debug_port) = config.debug_port {
-                toml_content.push_str(&format!("debug-port = {debug_port}\n"));
+                let _ = writeln!(toml_content, "debug-port = {debug_port}");
             }
 
             if let Some(backtrace) = &config.backtrace {
-                toml_content.push_str(&format!("backtrace = \"{backtrace}\"\n"));
+                let _ = writeln!(toml_content, "backtrace = \"{backtrace}\"");
             }
 
             if let Some(junit_path) = &config.junit_path {
-                toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
+                let _ = writeln!(toml_content, "junit-path = \"{junit_path}\"");
             }
 
             if let Some(junit_merge) = config.junit_merge {
-                toml_content.push_str(&format!("junit-merge = {junit_merge}\n"));
+                let _ = writeln!(toml_content, "junit-merge = {junit_merge}");
             }
 
             if let Some(fail_fast) = config.fail_fast {
-                toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+                let _ = writeln!(toml_content, "fail-fast = {fail_fast}");
             }
 
             if let Some(fail_on_diff) = config.fail_on_diff {
-                toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+                let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
             }
 
             if config.fuzz_runs.is_some()
@@ -1015,15 +1019,15 @@ version = "0.1.0"
                 toml_content.push_str("\n[test.fuzz]\n");
 
                 if let Some(fuzz_runs) = config.fuzz_runs {
-                    toml_content.push_str(&format!("runs = {fuzz_runs}\n"));
+                    let _ = writeln!(toml_content, "runs = {fuzz_runs}");
                 }
 
                 if let Some(fuzz_max_test_rejects) = config.fuzz_max_test_rejects {
-                    toml_content.push_str(&format!("max-test-rejects = {fuzz_max_test_rejects}\n"));
+                    let _ = writeln!(toml_content, "max-test-rejects = {fuzz_max_test_rejects}");
                 }
 
                 if let Some(fuzz_seed) = config.fuzz_seed {
-                    toml_content.push_str(&format!("seed = {fuzz_seed}\n"));
+                    let _ = writeln!(toml_content, "seed = {fuzz_seed}");
                 }
             }
 
@@ -1037,29 +1041,30 @@ version = "0.1.0"
                 toml_content.push_str("\n[test.coverage]\n");
 
                 if let Some(coverage) = config.coverage {
-                    toml_content.push_str(&format!("enabled = {coverage}\n"));
+                    let _ = writeln!(toml_content, "enabled = {coverage}");
                 }
 
                 if let Some(coverage_format) = &config.coverage_format {
-                    toml_content.push_str(&format!("format = \"{coverage_format}\"\n"));
+                    let _ = writeln!(toml_content, "format = \"{coverage_format}\"");
                 }
 
                 if let Some(coverage_file) = &config.coverage_file {
-                    toml_content.push_str(&format!("output-file = \"{coverage_file}\"\n"));
+                    let _ = writeln!(toml_content, "output-file = \"{coverage_file}\"");
                 }
 
                 if let Some(coverage_minimum_percent) = config.coverage_minimum_percent {
-                    toml_content
-                        .push_str(&format!("minimum-percent = {coverage_minimum_percent}\n"));
+                    let _ = writeln!(toml_content, "minimum-percent = {coverage_minimum_percent}");
                 }
 
                 if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
-                    toml_content
-                        .push_str(&format!("include-wrappers = {coverage_include_wrappers}\n"));
+                    let _ = writeln!(
+                        toml_content,
+                        "include-wrappers = {coverage_include_wrappers}"
+                    );
                 }
 
                 if let Some(coverage_include_tests) = config.coverage_include_tests {
-                    toml_content.push_str(&format!("include-tests = {coverage_include_tests}\n"));
+                    let _ = writeln!(toml_content, "include-tests = {coverage_include_tests}");
                 }
             }
 
@@ -1366,7 +1371,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify TonCenter API key env value for test requests
+    /// Specify `TonCenter` API key env value for test requests
     ///
     /// # Examples
     /// ```
@@ -1532,7 +1537,7 @@ impl ActonCommand {
         self
     }
 
-    /// Include `.test.tolk` files in coverage reports.
+    /// Include files under `tests/` and `.test.tolk` files in coverage reports.
     pub(crate) fn with_coverage_include_tests(mut self) -> Self {
         self.cmd = self.cmd.arg("--coverage-include-tests");
         self

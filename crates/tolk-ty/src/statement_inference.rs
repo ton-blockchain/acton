@@ -3,7 +3,10 @@ use crate::try_flow;
 use crate::type_inference::TypeInferenceWalker;
 use crate::type_interner::TyId;
 use tolk_resolver::AstNodeSpanExt;
-use tolk_syntax::*;
+use tolk_syntax::{
+    Assert, Block, Break, Continue, DoWhile, ExprStmt, Ident, If, MatchStmt, Repeat, Return, Stmt,
+    Throw, TryCatch, While,
+};
 
 impl<'t> TypeInferenceWalker<'_, '_> {
     pub(crate) fn process_stmt(&mut self, v: Stmt<'t>, flow: FlowContext) -> FlowContext {

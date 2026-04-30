@@ -4,7 +4,7 @@ use crate::support::project::{Project, ProjectBuilder};
 use serde_json::Value as JsonValue;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 #[cfg(unix)]
@@ -28,24 +28,21 @@ fn make_executable(path: &Path) {
 }
 
 #[cfg(unix)]
-fn setup_real_npm_toolchain(project_root: &Path) -> (String, PathBuf) {
+fn setup_real_npm_toolchain(project_root: &Path, cache_dir: &Path) -> String {
     let bin_dir = project_root.join("bin");
-    let cache_dir = project_root.join(".npm-cache");
     fs::create_dir_all(&bin_dir).unwrap();
-    fs::create_dir_all(&cache_dir).unwrap();
+    fs::create_dir_all(cache_dir).unwrap();
 
     let acton_path = bin_dir.join("acton");
 
     fs::write(&acton_path, ACTON_SHIM).unwrap();
     make_executable(&acton_path);
 
-    let path_env = format!(
+    format!(
         "{}:{}",
         bin_dir.display(),
         env::var("PATH").unwrap_or_default()
-    );
-
-    (path_env, cache_dir)
+    )
 }
 
 #[cfg(unix)]
@@ -183,8 +180,10 @@ fn run_npm_command(
         .env("NPM_CONFIG_CACHE", cache_dir)
         .env("NPM_CONFIG_AUDIT", "false")
         .env("NPM_CONFIG_FUND", "false")
-        .env("NPM_CONFIG_FETCH_RETRIES", "0")
-        .env("NPM_CONFIG_FETCH_TIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRIES", "3")
+        .env("NPM_CONFIG_FETCH_RETRY_MINTIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT", "30000")
+        .env("NPM_CONFIG_FETCH_TIMEOUT", "60000")
         .env("NPM_CONFIG_PROGRESS", "false")
         .env("NPM_CONFIG_UPDATE_NOTIFIER", "false")
         .env("NPM_CONFIG_PREFER_OFFLINE", "true")
@@ -213,9 +212,20 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "ECONNREFUSED",
         "ECONNRESET",
         "ETIMEDOUT",
+        "EPIPE",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "ENETDOWN",
         "fetch failed",
         "getaddrinfo",
         "network request",
+        "network timeout",
+        "socket hang up",
+        "Bad response from registry",
+        "503 Service Unavailable",
+        "502 Bad Gateway",
+        "504 Gateway",
+        "429 Too Many Requests",
         "Failed to execute `npx",
         "Exit handler never called!",
         "cb() never called!",
@@ -251,16 +261,19 @@ keys = {{ mnemonic = "{LOCALNET_TEST_MNEMONIC}" }}
 }
 
 fn append_localnet_network(project_dir: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_dir.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
 }
 
@@ -374,6 +387,37 @@ fn test_new_empty_project_non_interactive() {
 }
 
 #[test]
+fn test_new_project_non_interactive_requires_template() {
+    let project = ProjectBuilder::new("new-non-interactive-requires-template")
+        .without_acton_toml()
+        .build();
+
+    let target_dir = project.path().join("foobar");
+
+    let output = project
+        .acton()
+        .arg("--color")
+        .arg("always")
+        .arg("new")
+        .arg(&target_dir.display().to_string())
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.txt",
+        )
+        .assert_stderr_svg_snapshot_matches(
+            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.svg",
+        );
+
+    assert!(
+        !target_dir.exists(),
+        "new should not create the target directory before required non-interactive arguments are valid"
+    );
+}
+
+#[test]
 fn test_new_counter_project_non_interactive() {
     let project = ProjectBuilder::new("new-counter")
         .without_acton_toml()
@@ -455,6 +499,68 @@ fn test_new_nft_project_non_interactive() {
     assert!(project_dir.join("tests/nft-item.test.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
+}
+
+#[test]
+fn test_new_empty_project_with_app_flag() {
+    let project = ProjectBuilder::new("new-empty-app")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("Empty App Project")
+        .arg("--description")
+        .arg("empty app description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_with_app_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/Acton.toml",
+            "integration/snapshots/test_new_empty_project_with_app_flag.acton.toml.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_empty_project_with_app_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/README.md",
+            "integration/snapshots/test_new_empty_project_with_app_flag.readme.md",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/.github/workflows/ci.yml",
+            "integration/snapshots/test_new_empty_project_with_app_flag.ci.yml",
+        );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(project_dir.join("app/src/styles.css").exists());
+    assert!(project_dir.join("components.json").exists());
+    assert!(project_dir.join(".prettierignore").exists());
+    assert!(project_dir.join("contracts/src/Empty.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/tests/contract.test.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/Empty.gen.tolk")
+            .exists()
+    );
+    assert!(!project_dir.join("app/src/app.css").exists());
 }
 
 #[test]
@@ -1422,9 +1528,11 @@ fn test_new_counter_app_project_supports_npm_scripts() {
             .contains_key("app")
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
+    let cache_path = project_dir.join(".npm-cache");
+    let cache_dir = cache_path.as_path();
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
 
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping real npm integration test due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1440,7 +1548,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&install_output.stderr)
     );
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1448,7 +1556,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+    let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
     assert!(
         test_output.status.success(),
         "npm run test failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1457,7 +1565,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
     );
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1465,7 +1573,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1546,7 +1654,7 @@ fn package_uses_eslint(package_json: &JsonValue) -> bool {
 }
 
 #[cfg(unix)]
-fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
+fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache_dir: &Path) {
     if !is_npm_available() {
         eprintln!("Skipping npm app template checks: npm is not available in PATH");
         return;
@@ -1565,8 +1673,8 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         "{template} app template must expose npm run fmt:check"
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping npm app template checks for {template} due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1583,7 +1691,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
     );
 
     if scripts.contains_key("lint") {
-        let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
+        let lint_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "lint"]);
         assert!(
             lint_output.status.success(),
             "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1597,7 +1705,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         );
     }
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1605,16 +1713,27 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
-    assert!(
-        test_output.status.success(),
-        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&test_output.stdout),
-        String::from_utf8_lossy(&test_output.stderr)
-    );
+    if template == "empty" {
+        assert!(
+            !scripts.contains_key("test"),
+            "empty app template is also used by acton init --create-app and must not require an Acton project"
+        );
+    } else {
+        assert!(
+            scripts.contains_key("test"),
+            "{template} app template must expose npm run test"
+        );
+        let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
+        assert!(
+            test_output.status.success(),
+            "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&test_output.stdout),
+            String::from_utf8_lossy(&test_output.stderr)
+        );
+    }
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1622,7 +1741,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1634,10 +1753,16 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
 #[cfg(unix)]
 #[test]
 fn test_new_app_templates_npm_quality_checks() {
-    for template in ["counter", "jetton", "nft"] {
+    let cache_workspace = ProjectBuilder::new("new-app-templates-npm-cache")
+        .without_acton_toml()
+        .build();
+    let cache_dir = cache_workspace.path().join("npm-cache");
+
+    for template in ["empty", "counter", "jetton", "nft"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,
+            &cache_dir,
         );
     }
 }
@@ -2590,10 +2715,7 @@ fn create_project_and_check_wrappers_inner(
 
         let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
             .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to read generated wrapper {}: {e}",
-                    template_wrapper_path
-                )
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
             });
 
         assert_eq!(

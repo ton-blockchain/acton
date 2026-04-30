@@ -2,7 +2,11 @@ use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
-use crate::server::models::*;
+use crate::server::models::{
+    AddressRequest, DetectHashRequest, GetAddressInformationRequest, GetBlockRequest,
+    GetConfigAllRequest, GetConfigParamRequest, GetLibrariesRequest, GetTransactionsRequest,
+    JsonRpcRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest, TryLocateTxRequest,
+};
 use crate::types::Hash256;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};

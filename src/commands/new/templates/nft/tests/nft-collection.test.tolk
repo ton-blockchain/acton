@@ -113,7 +113,7 @@ get fun `test nft: should not deploy nft with invalid item index`() {
     expect(nftDeployResult).toHaveFailedTx<DeployNft>({
         from: deployer.address,
         to: nftCollection.address,
-        exitCode: Errors.InvalidItemIndex as int32,
+        exitCode: Errors.InvalidItemIndex,
     });
 }
 

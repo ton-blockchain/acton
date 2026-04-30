@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::{append_custom_network, spawn_toncenter_v2_mock_with_capture};
 
 const EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -181,6 +182,77 @@ get fun `test send external collects externals`() {
 ",
         "send external collects externals",
     );
+}
+
+#[test]
+fn send_external_stays_local_when_broadcast_flag_enabled_in_test_runner() {
+    run_snapshot_case(
+        "o-lib-api-send-external-broadcast-flag-local",
+        r"
+get fun `test send external stays local with broadcast flag in tests`() {
+    val (harness, _) = deployHarness();
+
+    net.enableBroadcast();
+    expect(net.isBroadcasting()).toBeTrue();
+
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 9 }),
+    )!;
+
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    expect(tx.loadBody<TriggerExternal>()).toEqual(TriggerExternal { id: 9 });
+    expect(txs.at(0).externals).toHaveLength(2);
+}
+",
+        "integration/snapshots/test-runner/api_external/send_external_stays_local_when_broadcast_flag_enabled_in_test_runner.stdout.txt",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn broadcast_wait_helpers_stay_local_in_test_runner() {
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock_with_capture(vec![]);
+    let source = with_prelude(
+        r"
+get fun `test broadcast wait helpers stay local in tests`() {
+    val (harness, _) = deployHarness();
+
+    net.enableBroadcast();
+    val txs = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 10 }),
+    )!;
+
+    expect(txs.waitForFirstTransaction(true, 1, 1)).toBeNull();
+    expect(txs.waitForTrace(true, 1, 1)).toBeNull();
+}
+",
+    );
+
+    let project = ProjectBuilder::new("o-lib-api-broadcast-wait-helpers-local")
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build();
+    append_custom_network(project.path(), "mock-wait-unused", &mock_url);
+
+    project
+        .acton()
+        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
+        .test()
+        .arg("--fork-net")
+        .arg("custom:mock-wait-unused")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/broadcast_wait_helpers_stay_local_in_test_runner.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(captured.len(), 0, "acton test must not poll toncenter");
 }
 
 #[test]

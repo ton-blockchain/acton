@@ -104,6 +104,11 @@ impl TeamCityReporter {
                 }
                 AssertFailure::WalletNotFound(failure) => {
                     message = format!("Wallet '{}' not found", failure.wallet_name);
+                    if let Some(formatter) = &formatter {
+                        details = FormatterContext::strip_ansi_text(
+                            &formatter.format_wallet_not_found_message(failure),
+                        );
+                    }
                 }
             }
 
@@ -115,7 +120,7 @@ impl TeamCityReporter {
         }
 
         if let Some(ref test_message) = test.message {
-            message = test_message.clone();
+            message.clone_from(test_message);
         }
 
         if let Some(exec) = &test.execution
@@ -158,10 +163,10 @@ impl TestReporter for TeamCityReporter {
     ) -> anyhow::Result<()> {
         let suite_name = extract_suite_name(file_path);
         let escaped_name = self.escape_name(&suite_name);
+        let location_hint = self.escape_name(&format!("file://{}", file_path.display()));
 
         println!(
-            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' locationHint='file://{}']",
-            file_path.display()
+            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' locationHint='{location_hint}']"
         );
         Ok(())
     }

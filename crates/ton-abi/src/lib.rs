@@ -17,7 +17,7 @@ use tolk_syntax::{SourceFile, parse_tolk_int_literal};
 
 fn resolve_mapped_path<'a>(
     import_path: &'a str,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> Cow<'a, str> {
     if import_path.starts_with("@stdlib/") || import_path.starts_with("@fiftlib/") {
         return Cow::Borrowed(import_path);
@@ -222,7 +222,7 @@ impl ContractAbiParseCache {
 pub fn get_file_dependencies(
     file_path: &str,
     include_itself: bool,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> anyhow::Result<Vec<String>> {
     if file_path.ends_with(".boc") {
         if include_itself {
@@ -243,7 +243,7 @@ pub fn get_file_dependencies(
 
 fn collect_file_dependency_paths_from_imports(
     file_path: &str,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> anyhow::Result<Vec<String>> {
     let mut processed = HashSet::with_capacity(4);
     collect_file_dependency_paths_from_imports_recursive(
@@ -260,7 +260,7 @@ fn collect_file_dependency_paths_from_imports(
 
 fn collect_file_dependency_paths_from_imports_recursive(
     file_path: String,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
     processed: &mut HashSet<String>,
 ) {
     if processed.contains(file_path.as_str()) {
@@ -330,7 +330,7 @@ fn parse_import_path_line(line: &str) -> Option<&str> {
 pub fn contract_abi(
     content: Arc<str>,
     file_path: &str,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> ContractAbi {
     let file = tolk_syntax::parse(&content);
     contract_abi_with_file(content, file_path, &file, mappings, None)
@@ -341,7 +341,7 @@ pub fn contract_abi_with_file(
     content: Arc<str>,
     file_path: &str,
     file: &anyhow::Result<SourceFile>,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
     cache: Option<&mut ContractAbiParseCache>,
 ) -> ContractAbi {
     let contract_name = get_contract_name_from_file_path(file_path);
@@ -397,7 +397,7 @@ pub fn extract_handled_messages(
     };
 
     let mut cache = ContractAbiParseCache::default();
-    let files = collect_imported_files(&file, content, file_path, mappings, &mut cache);
+    let files = collect_imported_files(&file, content, file_path, mappings.as_ref(), &mut cache);
 
     let mut handled_messages = Vec::new();
 
@@ -471,7 +471,7 @@ fn collect_imported_files(
     file: &SourceFile,
     content: Arc<str>,
     file_path: &str,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
     cache: &mut ContractAbiParseCache,
 ) -> Vec<FileInfo> {
     let mut files = Vec::with_capacity(4);
@@ -507,7 +507,7 @@ fn collect_imported_files_recursive(
     file_path: &str,
     files: &mut Vec<FileInfo>,
     processed: &mut HashSet<String>,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
     cache: &mut ContractAbiParseCache,
 ) {
     for import in file.imports() {
@@ -1048,7 +1048,7 @@ fun onInternalMessage() {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert_eq!(abi.name, "test");
         assert!(abi.entry_point.is_some());
@@ -1069,7 +1069,7 @@ get fun custom_method(): int {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert_eq!(abi.get_methods.len(), 1);
         assert_eq!(abi.get_methods[0].name, "custom_method");
@@ -1106,7 +1106,7 @@ get fun custom_id(): int {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert_eq!(abi.get_methods.len(), 5);
 
@@ -1157,7 +1157,7 @@ struct (0b10_10) BinaryData {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert_eq!(abi.types.len(), 5);
         assert_eq!(abi.messages.len(), 3); // Only structs with pack_prefix
@@ -1204,7 +1204,7 @@ fun regular_function() {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert!(abi.entry_point.is_some());
         assert!(abi.external_entry_point.is_some());
@@ -1247,7 +1247,7 @@ get fun large_id(): int {
 }
 ";
 
-        let abi = contract_abi(code.into(), "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", None);
 
         assert_eq!(abi.get_methods.len(), 3);
 
@@ -1296,7 +1296,7 @@ get fun main_method(): int {
 }
 "#;
 
-        let abi = contract_abi(main_content.into(), "main.tolk", &None);
+        let abi = contract_abi(main_content.into(), "main.tolk", None);
 
         let _ = fs::remove_file(import_path);
 
@@ -1356,7 +1356,7 @@ this is invalid syntax but should not affect import scanning
         fs::write(&dep_b, "let x = 1\n").unwrap();
 
         let main_str = main.to_string_lossy().to_string();
-        let deps = get_file_dependencies(&main_str, true, &None).unwrap();
+        let deps = get_file_dependencies(&main_str, true, None).unwrap();
 
         let deps_canon: HashSet<String> = deps
             .iter()

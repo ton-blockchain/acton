@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 pub use ton_networks::{CustomNetworkUrls, Network};
 
@@ -1294,27 +1295,14 @@ impl TestSettings {
             include_patterns: include_override
                 .unwrap_or_else(|| self.include.clone().unwrap_or_default()),
             clear_cache: clear_cache_override.unwrap_or(false),
-            junit_path: if self.junit_path == Some("test-results".to_owned()) {
-                junit_path_override
-            } else {
-                Some(
-                    self.junit_path
-                        .clone()
-                        .unwrap_or_else(|| junit_path_override.unwrap_or_default()),
-                )
-            },
+            junit_path: junit_path_override.or_else(|| self.junit_path.clone()),
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
             fork_net: fork_net_override.or_else(|| {
                 self.fork_net
-                    .as_ref()
-                    .and_then(|n| match n.to_lowercase().as_str() {
-                        "mainnet" => Some(Network::Mainnet),
-                        "testnet" => Some(Network::Testnet),
-                        "localnet" => Some(Network::Localnet),
-                        _ => None,
-                    })
+                    .as_deref()
+                    .and_then(|n| Network::from_str(n).ok())
             }),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
             save_test_trace: save_test_trace_override,
@@ -1368,6 +1356,97 @@ impl TestSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_settings_to_config(
+        settings: &TestSettings,
+        clear_cache_override: Option<bool>,
+        junit_path_override: Option<&str>,
+        fork_net_override: Option<Network>,
+        fail_fast_override: Option<bool>,
+        ui_port_override: Option<u16>,
+    ) -> TestConfig {
+        settings.to_test_config(
+            None,
+            Vec::new(),
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            clear_cache_override,
+            junit_path_override.map(str::to_owned),
+            false,
+            None,
+            None,
+            fork_net_override,
+            None,
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            None,
+            Vec::new(),
+            None,
+            None,
+            fail_fast_override,
+            false,
+            ui_port_override,
+        )
+    }
+
+    #[test]
+    fn test_settings_merge_cli_overrides_config_for_test_flags() {
+        let settings = TestSettings {
+            junit_path: Some("configured-reports".to_owned()),
+            fork_net: Some("custom:devnet".to_owned()),
+            fail_fast: Some(true),
+            ui_port: Some(23_456),
+            ..TestSettings::default()
+        };
+
+        let config = test_settings_to_config(&settings, None, None, None, None, None);
+        assert!(!config.clear_cache);
+        assert_eq!(config.junit_path.as_deref(), Some("configured-reports"));
+        assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
+        assert!(config.fail_fast);
+        assert_eq!(config.ui_port, 23_456);
+
+        let config = test_settings_to_config(
+            &settings,
+            Some(true),
+            Some("cli-reports"),
+            Some(Network::Testnet),
+            Some(false),
+            Some(34_567),
+        );
+        assert!(config.clear_cache);
+        assert_eq!(config.junit_path.as_deref(), Some("cli-reports"));
+        assert_eq!(config.fork_net, Some(Network::Testnet));
+        assert!(!config.fail_fast);
+        assert_eq!(config.ui_port, 34_567);
+    }
+
+    #[test]
+    fn test_settings_merge_uses_test_defaults_without_config_or_cli() {
+        let config =
+            test_settings_to_config(&TestSettings::default(), None, None, None, None, None);
+
+        assert!(!config.clear_cache);
+        assert_eq!(config.junit_path, None);
+        assert_eq!(config.fork_net, None);
+        assert!(!config.fail_fast);
+        assert_eq!(config.ui_port, 12_344);
+    }
 
     #[test]
     fn test_config_parsing() {
@@ -1745,7 +1824,7 @@ unused-variable = "allow"
 
         match lint.entries.get("unused-variable").unwrap() {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Deny),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint
@@ -1754,14 +1833,14 @@ unused-variable = "allow"
             .unwrap()
         {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Warn),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint.entries.get("counter").unwrap() {
             LintEntry::Config(config) => {
                 assert_eq!(*config.get("unused-variable").unwrap(), LintLevel::Allow);
             }
-            _ => panic!("Expected config"),
+            LintEntry::Level(_) => panic!("Expected config"),
         }
     }
 

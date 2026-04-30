@@ -2,7 +2,7 @@ use acton_config::config::{ActonConfig, project_root as configured_project_root}
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;
-use path_absolutize::*;
+use path_absolutize::Absolutize;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -326,7 +326,7 @@ impl FileBuildCache {
         }
 
         let mappings = self.config.mappings();
-        let file_deps = ton_abi::get_file_dependencies(file_path, true, &mappings)
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, mappings.as_ref())
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let Some(contract_name) = self.contract_src_index.get(&normalized_path).cloned() else {

@@ -5,6 +5,7 @@ use crate::support::tempdir::create_tmp_dir;
 use anyhow::Context;
 use dap::types::StackFrame;
 use std::cmp::max;
+use std::fmt::Write as _;
 use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -543,23 +544,19 @@ impl ExecutionTrace {
         let mut result = String::new();
 
         for step in &self.steps {
-            result.push_str(&format!("Step {} ({}):\n", step.step_number, step.action));
+            let _ = writeln!(result, "Step {} ({}):", step.step_number, step.action);
 
             if !step.code_context.is_empty() {
                 result.push_str("  Code:\n");
                 for line in &step.code_context {
-                    result.push_str(&format!("    {line}\n"));
+                    let _ = writeln!(result, "    {line}");
                 }
             }
 
             if !step.variables.is_empty() {
                 result.push_str("  Variables:\n");
                 for var in &step.variables {
-                    result.push_str(&format!(
-                        "    {} = {}\n",
-                        var.name,
-                        render_variable_value(var)
-                    ));
+                    let _ = writeln!(result, "    {} = {}", var.name, render_variable_value(var));
                 }
             }
 

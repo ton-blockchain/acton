@@ -199,7 +199,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         )?);
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         let mappings = ctx.env.config.mappings();
-        let contract_abi = contract_abi(content, &path_display, &mappings);
+        let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
 
         ctx.build.build_cache.memoize(
             &display_name,
@@ -248,7 +248,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 &code_cell,
                 success.debug_mark_base64.as_deref(),
             )?);
-            let contract_abi = contract_abi(content, &path_display, &mappings);
+            let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
 
             ctx.build.build_cache.memoize(
                 &display_name,
@@ -300,7 +300,7 @@ fn send_message_impl(
         Err(_) => true,
     };
 
-    if is_external && ctx.is_broadcasting {
+    if is_external && ctx.can_broadcast_to_network() {
         let parsed_ext_in = msg
             .parse::<Message<'_>>()
             .context("Failed to parse external-in message cell")?;
@@ -320,7 +320,9 @@ fn send_message_impl(
         return Ok(());
     }
 
-    if let Some(wallet) = ctx.env.find_wallet_by_address(src_std) {
+    if ctx.can_broadcast_to_network()
+        && let Some(wallet) = ctx.env.find_wallet_by_address(src_std)
+    {
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
         if let Err(err) = register_localnet_compiler_abis(ctx, &custom_networks) {
@@ -454,11 +456,11 @@ fn build_send_result_tuple(
     let gas_used = match parsed_tx.load_info() {
         Ok(TxInfo::Ordinary(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
-            _ => BigInt::ZERO,
+            ComputePhase::Skipped(_) => BigInt::ZERO,
         },
         Ok(TxInfo::TickTock(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
-            _ => BigInt::ZERO,
+            ComputePhase::Skipped(_) => BigInt::ZERO,
         },
         _ => BigInt::ZERO,
     };
@@ -1030,7 +1032,7 @@ fn send_transaction_debug(
         ctx.chain.world_state,
         msg_cell.clone(),
         libs,
-        src_addr,
+        src_addr.clone(),
     )?;
     let config_b64 = ctx.chain.world_state.get_config_b64();
 
@@ -1064,7 +1066,13 @@ fn send_transaction_debug(
         "Failed to prepare Emulator in debug mode"
     );
     if prepare_result.skipped {
-        return Ok(None);
+        // SBS has no VM steps to expose for skipped compute, but the caller still
+        // expects the same transaction/error shape as normal emulation.
+        return ctx
+            .chain
+            .emulator
+            .send_transaction(ctx.chain.world_state, msg_cell.clone(), libs, src_addr)
+            .map(Some);
     }
 
     let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
@@ -1719,7 +1727,7 @@ fn transaction_matches_predicates(
         let action_success = ord_info.action_phase.as_ref().is_some_and(|a| a.success);
         let is_success = match &ord_info.compute_phase {
             ComputePhase::Executed(compute) => action_success && compute.success,
-            _ => false,
+            ComputePhase::Skipped(_) => false,
         };
         if !call_predicate(executor, &field.predicate, bool_item(is_success))? {
             return Ok(false);
@@ -1860,7 +1868,7 @@ fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchPara
 
         let is_success = match &info.compute_phase {
             ComputePhase::Executed(compute) => action_phase_success && compute.success,
-            _ => false,
+            ComputePhase::Skipped(_) => false,
         };
         if is_success != expected_success {
             return false;
@@ -2544,6 +2552,11 @@ fn wait_for_transaction_impl(
         return Ok(());
     };
 
+    if !ctx.can_broadcast_to_network() {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
     let network = ctx.network();
     let custom_networks = ctx.env.config.custom_networks();
     let api_client = match TonApiClient::new(network, custom_networks) {
@@ -2727,7 +2740,7 @@ fn register_localnet_compiler_abis(
         };
         let mut compiler_abi = compiler_abi.as_ref().clone();
         if compiler_abi.contract_name.is_empty() {
-            compiler_abi.contract_name = result.name.clone();
+            compiler_abi.contract_name.clone_from(&result.name);
         }
         entries_by_hash
             .entry(result.code_hash.to_string())
@@ -2838,7 +2851,7 @@ fn explorer_transaction_link(explorer_base: &str, tx_hash_hex: &str) -> Option<S
 
 extension!(get_config in (Context) using get_config_impl);
 fn get_config_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
-    if ctx.is_broadcasting {
+    if ctx.can_broadcast_to_network() {
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
         let api_client = TonApiClient::new(network, custom_networks)?;
@@ -3033,12 +3046,17 @@ fn save_world_state_snapshot_impl(
     stack: &mut Tuple,
     path: String,
 ) -> anyhow::Result<()> {
+    let Some(path) = ctx.resolve_project_write_path(&path) else {
+        stack.push_bool(false);
+        return Ok(());
+    };
+
     let success = ctx
         .chain
         .world_state
         .snapshot()
         .and_then(|snapshot| serde_json::to_string_pretty(&snapshot).map_err(Into::into))
-        .is_ok_and(|json| fs::write(&path, json).is_ok());
+        .is_ok_and(|json| fs::write(path, json).is_ok());
     stack.push_bool(success);
     Ok(())
 }
@@ -3049,7 +3067,12 @@ fn load_world_state_snapshot_impl(
     stack: &mut Tuple,
     path: String,
 ) -> anyhow::Result<()> {
-    let success = fs::read_to_string(&path)
+    let Some(path) = ctx.resolve_project_read_path(&path) else {
+        stack.push_bool(false);
+        return Ok(());
+    };
+
+    let success = fs::read_to_string(path)
         .ok()
         .and_then(|content| serde_json::from_str(&content).ok())
         .and_then(|snapshot| ctx.chain.world_state.load_snapshot(snapshot).ok())
@@ -3322,7 +3345,7 @@ mod tests {
         assert!(!message_iters.is_done(cursor_id));
     }
 
-    /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell BoCs
+    /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell `BoCs`
     /// match a captured snapshot, and whose `repr_hash` equals the on-chain `hash` reported
     /// by toncenter.
     ///
@@ -3422,6 +3445,12 @@ fn wait_for_trace_impl(
         stack.push(TupleItem::Null);
         return Ok(());
     };
+
+    if !ctx.can_broadcast_to_network() {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
     let msg_hash_hex = hex::encode(target_hash.as_slice());
 
     let network = ctx.network();
@@ -3554,11 +3583,11 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 
 /// Synthesize a `Transaction` cell from a toncenter v3 trace summary.
 ///
-/// TonCenter `/traces` only ships structured summary fields, not the raw BoC, so we
+/// `TonCenter` `/traces` only ships structured summary fields, not the raw `BoC`, so we
 /// reconstruct a structurally valid `Transaction` from them. The synthesized cell's
 /// `repr_hash` matches the on-chain hash for traces whose external-in messages carry no
 /// non-standard fields; when toncenter reports a distinct `hash_norm` (i.e. the original
-/// cell had a non-addr_none src, a non-zero import_fee, or an init), the original
+/// cell had a non-addr_none src, a non-zero `import_fee`, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
 pub(crate) fn synthesize_tx_cell_from_v3(
     summary: &V3TransactionSummary,
@@ -3813,7 +3842,7 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 }
 
 /// Translate a v3 transaction description into a minimal `TxInfo::Ordinary`. Fields we
-/// don't have (credit_phase, bounce_phase, per-phase cell hashes / message sizes) are left
+/// don't have (`credit_phase`, `bounce_phase`, per-phase cell hashes / message sizes) are left
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
