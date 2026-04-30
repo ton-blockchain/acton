@@ -27,7 +27,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acton Ton Connect</title>
+  <title>Acton TON Connect</title>
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
     :root {
@@ -70,7 +70,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 </head>
 <body>
   <main>
-    <h1>Acton Ton Connect</h1>
+    <h1>Acton TON Connect</h1>
     <p>Connect a wallet and approve transactions requested by the running Acton script.</p>
     <div id="ton-connect-button"></div>
     <div id="status">Waiting for wallet connection...</div>
@@ -254,13 +254,13 @@ struct ResponsePayload {
 impl TonConnectSession {
     pub fn start() -> anyhow::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", 0))
-            .context("Failed to bind local Ton Connect server")?;
+            .context("Failed to bind local TON Connect server")?;
         listener
             .set_nonblocking(true)
-            .context("Failed to configure local Ton Connect server socket")?;
+            .context("Failed to configure local TON Connect server socket")?;
         let addr = listener
             .local_addr()
-            .context("Failed to read local Ton Connect server address")?;
+            .context("Failed to read local TON Connect server address")?;
         let url = format!("http://{addr}");
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
@@ -295,7 +295,7 @@ impl TonConnectSession {
                 {
                     Ok(runtime) => runtime,
                     Err(error) => {
-                        eprintln!("Failed to start Ton Connect runtime: {error}");
+                        eprintln!("Failed to start TON Connect runtime: {error}");
                         return;
                     }
                 };
@@ -304,7 +304,7 @@ impl TonConnectSession {
                     let listener = match tokio::net::TcpListener::from_std(listener) {
                         Ok(listener) => listener,
                         Err(error) => {
-                            eprintln!("Failed to start Ton Connect listener: {error}");
+                            eprintln!("Failed to start TON Connect listener: {error}");
                             return;
                         }
                     };
@@ -315,11 +315,11 @@ impl TonConnectSession {
                         })
                         .await
                     {
-                        eprintln!("Ton Connect server stopped with an error: {error}");
+                        eprintln!("TON Connect server stopped with an error: {error}");
                     }
                 });
             })
-            .context("Failed to spawn local Ton Connect server")?;
+            .context("Failed to spawn local TON Connect server")?;
 
         Ok(Self {
             state,
@@ -330,29 +330,29 @@ impl TonConnectSession {
     }
 
     pub fn connect(&self, network: &Network) -> anyhow::Result<TonConnectWallet> {
-        println!("Ton Connect page: {}", self.url);
+        println!("TON Connect page: {}", self.url);
         if let Err(error) = opener::open(&self.url) {
             eprintln!("Failed to open browser automatically: {error}");
-            eprintln!("Open the Ton Connect page manually: {}", self.url);
+            eprintln!("Open the TON Connect page manually: {}", self.url);
         }
-        println!("Waiting for Ton Connect wallet...");
+        println!("Waiting for TON Connect wallet...");
 
         let mut connected = self
             .state
             .connected
             .lock()
-            .expect("Ton Connect connected wallet mutex poisoned");
+            .expect("TON Connect connected wallet mutex poisoned");
         while connected.is_none() {
             connected = self
                 .state
                 .connected_cv
                 .wait(connected)
-                .expect("Ton Connect connected wallet mutex poisoned");
+                .expect("TON Connect connected wallet mutex poisoned");
         }
 
         let wallet = connected
             .clone()
-            .expect("Ton Connect wallet must be available after wait");
+            .expect("TON Connect wallet must be available after wait");
         drop(connected);
         validate_wallet_network(&wallet, network)?;
         Ok(wallet)
@@ -365,13 +365,13 @@ impl TonConnectSession {
             .state
             .pending
             .lock()
-            .expect("Ton Connect pending request mutex poisoned");
+            .expect("TON Connect pending request mutex poisoned");
         while pending.is_some() {
             pending = self
                 .state
                 .pending_cv
                 .wait(pending)
-                .expect("Ton Connect pending request mutex poisoned");
+                .expect("TON Connect pending request mutex poisoned");
         }
 
         *pending = Some(PendingTonConnectRequest {
@@ -380,7 +380,7 @@ impl TonConnectSession {
             response: None,
         });
         self.state.pending_cv.notify_all();
-        println!("Approve Ton Connect transaction #{id} in your wallet...");
+        println!("Approve TON Connect transaction #{id} in your wallet...");
 
         loop {
             if let Some(request) = pending.as_mut()
@@ -390,14 +390,14 @@ impl TonConnectSession {
                 *pending = None;
                 self.state.pending_cv.notify_all();
                 return response
-                    .map_err(|error| anyhow!("Ton Connect transaction failed: {error}"));
+                    .map_err(|error| anyhow!("TON Connect transaction failed: {error}"));
             }
 
             pending = self
                 .state
                 .pending_cv
                 .wait(pending)
-                .expect("Ton Connect pending request mutex poisoned");
+                .expect("TON Connect pending request mutex poisoned");
         }
     }
 }
@@ -434,15 +434,15 @@ pub fn transaction_from_message(
 fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<TonConnectMessage> {
     let parsed = message
         .parse::<OwnedRelaxedMessage>()
-        .context("Failed to parse internal message for Ton Connect")?;
+        .context("Failed to parse internal message for TON Connect")?;
     let RelaxedMsgInfo::Int(info) = parsed.info else {
-        anyhow::bail!("Ton Connect can broadcast only internal wallet messages");
+        anyhow::bail!("TON Connect can broadcast only internal wallet messages");
     };
     if !info.value.other.is_empty() {
-        anyhow::bail!("Ton Connect does not support extra currencies in wallet messages");
+        anyhow::bail!("TON Connect does not support extra currencies in wallet messages");
     }
     let IntAddr::Std(dest) = info.dst else {
-        anyhow::bail!("Ton Connect does not support variable destination addresses");
+        anyhow::bail!("TON Connect does not support variable destination addresses");
     };
 
     let payload = body_to_cell(parsed.body)?
@@ -452,7 +452,7 @@ fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<TonCon
         .init
         .map(|state_init| CellBuilder::build_from(state_init).map(|cell| Boc::encode_base64(&cell)))
         .transpose()
-        .context("Failed to serialize state init for Ton Connect")?;
+        .context("Failed to serialize state init for TON Connect")?;
 
     Ok(TonConnectMessage {
         address: format_address(&dest, network, info.bounce),
@@ -470,15 +470,15 @@ fn body_to_cell(body: tycho_types::cell::CellSliceParts) -> anyhow::Result<Optio
     let (range, cell) = body;
     let slice = range
         .apply(&cell)
-        .context("Failed to extract message body for Ton Connect")?;
+        .context("Failed to extract message body for TON Connect")?;
     let mut builder = CellBuilder::new();
     builder
         .store_slice(slice)
-        .context("Failed to serialize message body for Ton Connect")?;
+        .context("Failed to serialize message body for TON Connect")?;
     Ok(Some(
         builder
             .build()
-            .context("Failed to build message body for Ton Connect")?,
+            .context("Failed to build message body for TON Connect")?,
     ))
 }
 
@@ -512,7 +512,7 @@ fn validate_wallet_network(wallet: &TonConnectWallet, network: &Network) -> anyh
             .unwrap_or("unknown");
         let expected_name = chain_name(expected).unwrap_or("unknown");
         anyhow::bail!(
-            "Connected Ton Connect wallet is on {actual}, but --net {expected_name} was requested. Switch the wallet network and run the script again."
+            "Connected TON Connect wallet is on {actual}, but --net {expected_name} was requested. Switch the wallet network and run the script again."
         );
     }
 
@@ -566,7 +566,7 @@ async fn connect(
         StdAddr::from_str_ext(&payload.address, StdAddrFormat::any()).map_err(|error| {
             (
                 StatusCode::BAD_REQUEST,
-                format!("Invalid Ton Connect wallet address: {error}"),
+                format!("Invalid TON Connect wallet address: {error}"),
             )
         })?;
     let chain = payload.chain.as_ref().and_then(chain_value_to_string);
@@ -576,7 +576,7 @@ async fn connect(
             .inner
             .connected
             .lock()
-            .expect("Ton Connect connected wallet mutex poisoned");
+            .expect("TON Connect connected wallet mutex poisoned");
         *connected = Some(TonConnectWallet { address, chain });
     }
     state.inner.connected_cv.notify_all();
@@ -589,7 +589,7 @@ async fn request(State(state): State<TonConnectWebState>) -> Json<RequestPollRes
             .inner
             .pending
             .lock()
-            .expect("Ton Connect pending request mutex poisoned");
+            .expect("TON Connect pending request mutex poisoned");
         if let Some(request) = pending.as_ref()
             && request.response.is_none()
         {
@@ -619,11 +619,11 @@ async fn response(
             .inner
             .pending
             .lock()
-            .expect("Ton Connect pending request mutex poisoned");
+            .expect("TON Connect pending request mutex poisoned");
         let Some(request) = pending.as_mut().filter(|request| request.id == payload.id) else {
             return Err((
                 StatusCode::NOT_FOUND,
-                format!("Unknown Ton Connect request {}", payload.id),
+                format!("Unknown TON Connect request {}", payload.id),
             ));
         };
 
@@ -633,7 +633,7 @@ async fn response(
                 .ok_or_else(|| {
                     (
                         StatusCode::BAD_REQUEST,
-                        "Ton Connect response is missing boc".to_string(),
+                        "TON Connect response is missing boc".to_string(),
                     )
                 })
                 .map(Ok)?

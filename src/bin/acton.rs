@@ -598,7 +598,7 @@ enum Commands {
         net: Option<String>,
         #[arg(
             long,
-            help = "Use Ton Connect wallet approval for broadcast messages",
+            help = "Use TON Connect wallet approval for broadcast messages",
             help_heading = "Broadcasting"
         )]
         tonconnect: bool,

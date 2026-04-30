@@ -96,7 +96,7 @@ mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{/option}}
 
 {{#option "`--tonconnect`" }}
-Use Ton Connect wallet approval for broadcast messages.
+Use TON Connect wallet approval for broadcast messages.
 
 This opens a local browser page, connects a wallet, and sends `net.send(...)`
 messages through that wallet instead of loading local wallet mnemonics.
@@ -137,7 +137,7 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
 - `--net` sends real transactions using configured wallets
-- `--net ... --tonconnect` sends real transactions through the connected Ton Connect wallet
+- `--net ... --tonconnect` sends real transactions through the connected TON Connect wallet
 
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
@@ -225,7 +225,7 @@ When a script can affect on-chain state, the usual safe sequence is:
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
 
-6. Broadcast through Ton Connect instead of local wallet keys:
+6. Broadcast through TON Connect instead of local wallet keys:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --tonconnect

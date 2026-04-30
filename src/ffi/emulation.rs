@@ -325,7 +325,7 @@ fn send_message_impl(
     {
         let network = ctx.network();
         let (wallet_ext_in, norm_hash) = send_tonconnect_message(&msg, tonconnect, &network)
-            .context("Failed to send message with Ton Connect")?;
+            .context("Failed to send message with TON Connect")?;
 
         ctx.chain.world_state.invalidate_remote_cache();
 
@@ -1047,10 +1047,10 @@ fn send_tonconnect_message(
     let transaction = tonconnect::transaction_from_message(message, network)?;
     let boc = tonconnect.session.send_transaction(transaction)?;
     let external_in_cell =
-        Boc::decode_base64(&boc).context("Failed to decode Ton Connect external-in BoC")?;
+        Boc::decode_base64(&boc).context("Failed to decode TON Connect external-in BoC")?;
     let parsed_ext_in = external_in_cell
         .parse::<Message<'_>>()
-        .context("Failed to parse Ton Connect external-in message")?;
+        .context("Failed to parse TON Connect external-in message")?;
     let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
     drop(parsed_ext_in);
     Ok((external_in_cell, norm_hash))
