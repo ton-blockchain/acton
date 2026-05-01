@@ -479,6 +479,61 @@ impl TonApiClient {
         Ok(data.result)
     }
 
+    pub fn get_shard_account_cell(
+        &self,
+        seqno: Option<u64>,
+        address: &str,
+    ) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getShardAccountCell?address={}{}",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
+            urlencoding::encode(address),
+            seqno
+                .map(|seqno| format!("&seqno={seqno}"))
+                .unwrap_or_default(),
+        );
+
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send getShardAccountCell request to TonCenter",
+        )?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterShardAccountCellResponse {
+            ok: bool,
+            result: Option<TonCenterTvmCell>,
+            error: Option<String>,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterTvmCell {
+            bytes: String,
+        }
+
+        let data: TonCenterShardAccountCellResponse = response
+            .json()
+            .context("Failed to parse getShardAccountCell response")?;
+
+        if !data.ok {
+            anyhow::bail!(
+                "{}",
+                data.error
+                    .unwrap_or_else(|| "TonCenter returned ok=false for getShardAccountCell".into())
+            );
+        }
+
+        let cell_boc = data
+            .result
+            .ok_or_else(|| anyhow!("TonCenter getShardAccountCell response has no result"))?
+            .bytes;
+
+        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
+    }
+
     pub fn get_library_by_hash(&self, hash: &HashBytes) -> anyhow::Result<Cell> {
         let url = format!(
             "{}/getLibraries",
