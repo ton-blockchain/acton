@@ -812,6 +812,9 @@ pub trait Walker<'tree> {
     }
 
     fn walk_struct_field(&mut self, node: &StructField<'tree>) -> Self::Result {
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
         if let Some(name) = node.name() {
             self.walk_ident(&name);
         }

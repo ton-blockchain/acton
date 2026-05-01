@@ -418,6 +418,27 @@ fn test_struct_with_annotations() {
 }
 
 #[test]
+fn test_struct_fields_with_abi_client_type_annotations() {
+    check(
+        r#"struct Message {
+                // field docs
+                @abi.clientType("number")
+                flags: uint8 // inline field
+                @abi.clientType("Address | null") // annotation comment
+                readonly admin: address? = null
+            }"#,
+        expect![[r#"
+                struct Message {
+                    // field docs
+                    @abi.clientType("number")
+                    flags: uint8 // inline field
+                    @abi.clientType("Address | null") // annotation comment
+                    readonly admin: address? = null
+                }"#]],
+    );
+}
+
+#[test]
 fn test_struct_field_modifiers() {
     check(
         "struct Test { readonly x: int, private y: slice, private readonly z: slice }",

@@ -441,6 +441,10 @@ pub fn print_struct_field_declaration<'a>(ctx: &Context, f: &StructField) -> Opt
     let typ = f.typ()?;
 
     let mut parts = vec![];
+    if let Some(annotations) = f.annotations() {
+        parts.push(print_annotation_list(ctx, &annotations)?);
+    }
+
     if let Some(modifiers) = f.modifiers() {
         for modifier in modifiers.modifiers() {
             parts.push(RcDoc::text(modifier.as_str()));
