@@ -1,17 +1,12 @@
 import { Address, beginCell, Cell, toNano } from '@ton/core';
 import {
   JettonMinter,
-  MinterStorage,
   MintNewJettons,
   InternalTransferStep,
   ChangeMinterAdmin,
   ChangeMinterMetadata,
 } from '@wrappers/JettonMinter.gen';
-import {
-  JettonWallet,
-  AskToBurn,
-  AskToTransfer,
-} from '@wrappers/JettonWallet.gen';
+import { AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
 import { buildOnchainMetadata, type JettonMetadata } from './jettonContent';
 
 export function parseUnits(amount: string, decimals: number): bigint {

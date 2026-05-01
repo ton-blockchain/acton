@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type FormEvent } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { Address, toNano } from '@ton/core';
-import { Search, AlertCircle, Wallet, Lock, Check } from 'lucide-react';
+import { Search, AlertCircle, Wallet, Lock } from 'lucide-react';
 import { getTonClient, getWalletAddress, fetchJettonMaster } from '../lib/ton';
 import type { JettonMetadata } from '../lib/jettonContent';
 import {
@@ -142,6 +142,8 @@ export function ManagePage({
       onAddressChange(contractAddr.trim());
       loadJettonInfo();
     }
+    // Reload only when the network changes; address changes are handled via the input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [network]);
 
   const isAdmin =
@@ -949,7 +951,7 @@ function AdminTab({
 
   const [newName, setNewName] = useState(info.metadata.name || '');
   const [newSymbol, setNewSymbol] = useState(info.metadata.symbol || '');
-  const [newDecimals, setNewDecimals] = useState(info.metadata.decimals || '9');
+  const newDecimals = info.metadata.decimals || '9';
   const [newDescription, setNewDescription] = useState(
     info.metadata.description || '',
   );
