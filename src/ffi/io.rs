@@ -576,6 +576,11 @@ fn prompt_wallet_impl(ctx: &mut Context, stack: &mut Tuple, message: String) -> 
         return Ok(());
     }
 
+    if ctx.env.tonconnect.is_some() {
+        stack.push_string("tonconnect");
+        return Ok(());
+    }
+
     let wallet_names: Vec<String> = ctx.env.open_wallets.keys().cloned().collect();
 
     if wallet_names.is_empty() {

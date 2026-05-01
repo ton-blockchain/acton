@@ -6,6 +6,7 @@ use crate::context::{
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
 use crate::retrace;
+use crate::tonconnect;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use acton_debug::ChildDebugContextSpec;
@@ -25,9 +26,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
-use ton_abi::contract_abi;
 use ton_api::{
     Network, TonApiClient, V3MessageSummary, V3Trace, V3TransactionSummary, V3TxDescription,
 };
@@ -193,9 +194,6 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             anyhow::anyhow!("Failed to decode cached code BoC for {path_display}: {e}")
         })?;
         let source_map = Arc::new(cached_entry.source_map.clone().unwrap_or_default());
-        let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
-        let mappings = ctx.env.config.mappings();
-        let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
 
         ctx.build.build_cache.memoize(
             &display_name,
@@ -203,7 +201,6 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             &cached_entry.code_boc64,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             source_map,
-            Some(contract_abi.into()),
             cached_entry.abi.clone().map(Into::into),
         );
 
@@ -235,12 +232,10 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 warn!("Failed to build cached code BoC for {path_display}: {err}");
             }
 
-            let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path_display}: {e}")
             })?;
             let source_map = Arc::new(success.source_map.unwrap_or_default());
-            let contract_abi = contract_abi(content, &path_display, mappings.as_ref());
 
             ctx.build.build_cache.memoize(
                 &display_name,
@@ -248,7 +243,6 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 &success.code_boc64,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 source_map,
-                Some(contract_abi.into()),
                 success.abi.clone().map(Into::into),
             );
 
@@ -293,6 +287,13 @@ fn send_message_impl(
     };
 
     if is_external && ctx.can_broadcast_to_network() {
+        if ctx.env.tonconnect.is_some() {
+            anyhow::bail!(
+                "`net.sendExternal` cannot be used with {}; use `net.send(wallet.address, createMessage(...))` so the connected wallet can sign the internal message",
+                "--tonconnect".yellow()
+            );
+        }
+
         let parsed_ext_in = msg
             .parse::<Message<'_>>()
             .context("Failed to parse external-in message cell")?;
@@ -314,11 +315,26 @@ fn send_message_impl(
     }
 
     if ctx.can_broadcast_to_network()
+        && let Some(tonconnect) = ctx.env.find_tonconnect_by_address(src_std)
+    {
+        let network = ctx.network();
+        let (wallet_ext_in, norm_hash) = send_tonconnect_message(&msg, tonconnect, &network)
+            .context("Failed to send message with TON Connect")?;
+
+        ctx.chain.world_state.invalidate_remote_cache();
+
+        let pseudo_tx =
+            build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
+        stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
+        return Ok(());
+    }
+
+    if ctx.can_broadcast_to_network()
         && let Some(wallet) = ctx.env.find_wallet_by_address(src_std)
     {
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
-        if let Err(err) = register_localnet_compiler_abis(ctx, &custom_networks) {
+        if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
             warn!("Failed to register compiler ABI in localnet: {err:#}");
         }
 
@@ -1017,6 +1033,42 @@ fn send_wallet_message(
     Ok((external_in_cell, norm_hash))
 }
 
+fn send_tonconnect_message(
+    message: &Cell,
+    tonconnect: &tonconnect::TonConnectContext,
+    network: &Network,
+) -> anyhow::Result<(Cell, HashBytes)> {
+    let transaction = tonconnect::transaction_from_message(message, network)?;
+    let boc = tonconnect.session.send_transaction(transaction)?;
+    let external_in_cell =
+        Boc::decode_base64(&boc).context("Failed to decode TON Connect external-in BoC")?;
+    let parsed_ext_in = external_in_cell
+        .parse::<Message<'_>>()
+        .context("Failed to parse TON Connect external-in message")?;
+    validate_tonconnect_external_in(&parsed_ext_in, &tonconnect.wallet.address)?;
+    let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
+    drop(parsed_ext_in);
+    Ok((external_in_cell, norm_hash))
+}
+
+fn validate_tonconnect_external_in(
+    message: &Message<'_>,
+    wallet_address: &StdAddr,
+) -> anyhow::Result<()> {
+    let MsgInfo::ExtIn(info) = &message.info else {
+        anyhow::bail!("TON Connect wallet returned a non external-in message");
+    };
+    let IntAddr::Std(dst) = &info.dst else {
+        anyhow::bail!(
+            "TON Connect wallet returned an external-in message with variable destination"
+        );
+    };
+    if dst != wallet_address {
+        anyhow::bail!("TON Connect wallet returned a message for a different wallet address");
+    }
+    Ok(())
+}
+
 fn send_transaction_debug(
     ctx: &mut Context,
     msg_cell: &Cell,
@@ -1049,9 +1101,9 @@ fn send_transaction_debug(
     let source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
-    let compiler_abi = compilation_result
+    let abi = compilation_result
         .as_ref()
-        .and_then(|result| result.compiler_abi.clone());
+        .and_then(|result| result.abi.clone());
 
     let prepare_result = step_executor
         .prepare_transaction(&prepared.message_b64, &prepared.run_args)
@@ -1080,7 +1132,7 @@ fn send_transaction_debug(
             name: "Send message".to_string(),
             executor: step_executor.clone().into(),
             source_map,
-            compiler_abi,
+            abi,
             stop_on_entry: need_to_stop_on_entry,
         })
         .context("Cannot start nested debug context")?;
@@ -2064,7 +2116,7 @@ fn run_get_method_impl(
     let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&Some(code.clone()))
+        .result_for_code(&Some(code))
         .map(|(_, result)| result);
     // Remote/forked contracts may have no local debug info. We still run the live
     // executor, but the child replayer will then fall back to a synthetic source map.
@@ -2072,9 +2124,9 @@ fn run_get_method_impl(
         || Arc::new(SourceMap::without_debug_info()),
         |result| result.source_map.clone(),
     );
-    let compiler_abi = compilation_result
+    let abi = compilation_result
         .as_ref()
-        .and_then(|result| result.compiler_abi.clone());
+        .and_then(|result| result.abi.clone());
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -2098,7 +2150,7 @@ fn run_get_method_impl(
                 name: "Run get method".to_string(),
                 executor: step_executor.clone().into(),
                 source_map: Some(source_map.clone()),
-                compiler_abi,
+                abi: abi.clone(),
                 stop_on_entry: need_to_stop_on_entry,
             })
             .context("Cannot send response")?;
@@ -2147,7 +2199,9 @@ fn run_get_method_impl(
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
 
             if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
-                let get_method = ctx.env.abi.find_get_method_by_id(&id);
+                let get_method = abi
+                    .as_deref()
+                    .and_then(|abi| abi.find_get_method_by_id(method_id));
 
                 let id_presentation = format!("({id})");
                 let id_presentation = id_presentation.dimmed();
@@ -2162,13 +2216,10 @@ fn run_get_method_impl(
 
                 let suggested_name = if result.vm_exit_code == 11 {
                     // TODO: right now get methods may not include all get methods
-                    let get_methods: Vec<&str> = ctx
-                        .env
-                        .abi
-                        .get_methods
-                        .iter()
-                        .map(|m| m.name.as_str())
-                        .collect();
+                    let get_methods: Vec<&str> = abi
+                        .as_ref()
+                        .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
+                        .unwrap_or_default();
                     suggest_name(&name, &get_methods).map(ToOwned::to_owned)
                 } else {
                     None
@@ -2176,7 +2227,6 @@ fn run_get_method_impl(
 
                 let location =
                     retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc);
-                let build = ctx.build.build_cache.result_for_code(&Some(code));
 
                 *ctx.asserts.assert_failure =
                     Some(AssertFailure::GetMethod(GetMethodAssertFailure {
@@ -2185,10 +2235,7 @@ fn run_get_method_impl(
                         suggested_name,
                         vm_log: result.vm_log,
                         source_map,
-                        abi: build.as_ref().and_then(|(_, result)| result.abi.clone()),
-                        compiler_abi: build
-                            .as_ref()
-                            .and_then(|(_, result)| result.compiler_abi.clone()),
+                        abi: abi.clone(),
                         caller_trace: None,
                         location,
                     }));
@@ -2268,11 +2315,17 @@ fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) -> anyhow::Re
 extension!(type_name_by_opcode in (Context) with (id: BigInt) using type_name_by_opcode_impl);
 fn type_name_by_opcode_impl(ctx: &mut Context, stk: &mut Tuple, id: BigInt) -> anyhow::Result<()> {
     let id = u32::try_from(&id).context("ID is too big for uint32 opcode")?;
-    let Some(type_abi) = ctx.env.abi.find_type_by_opcode(id) else {
+    let Some(type_name) = ctx.env.source_map.as_deref().and_then(|source_map| {
+        ContractABI::find_message_name_by_opcode_with_symbols(
+            source_map,
+            ctx.env.abi.as_deref(),
+            id,
+        )
+    }) else {
         stk.push(TupleItem::Null);
         return Ok(());
     };
-    stk.push_string(&type_abi.name);
+    stk.push_string(type_name);
     Ok(())
 }
 
@@ -2442,14 +2495,18 @@ fn get_wallet_by_name_impl(
     stack: &mut Tuple,
     name: String,
 ) -> anyhow::Result<()> {
-    let Some(wallet) = ctx.env.open_wallets.get(&name) else {
-        stack.push(TupleItem::Null);
+    if let Some(wallet) = ctx.env.open_wallets.get(&name) {
+        let addr = wallet.address();
+        stack.push(TupleItem::Cell(to_cell(&addr)));
         return Ok(());
-    };
+    }
 
-    let addr = wallet.address();
-    stack.push(TupleItem::Cell(to_cell(&addr)));
+    if let Some(tonconnect) = &ctx.env.tonconnect {
+        stack.push(TupleItem::Cell(to_cell(&tonconnect.wallet.address)));
+        return Ok(());
+    }
 
+    stack.push(TupleItem::Null);
     Ok(())
 }
 
@@ -2708,17 +2765,18 @@ fn localnet_transaction_link(ctx: &Context, tx_hash_hex: &str) -> Option<String>
 }
 
 #[derive(Serialize)]
-struct RegisterCompilerAbiPayload {
-    entries: Vec<RegisterCompilerAbiEntry>,
+struct RegisterAbiPayload {
+    entries: Vec<RegisterAbiEntry>,
 }
 
 #[derive(Serialize)]
-struct RegisterCompilerAbiEntry {
+struct RegisterAbiEntry {
     code_hash: String,
-    compiler_abi: serde_json::Value,
+    #[serde(rename = "compiler_abi")]
+    abi: serde_json::Value,
 }
 
-fn register_localnet_compiler_abis(
+fn register_localnet_abis(
     ctx: &Context,
     custom_networks: &HashMap<String, acton_config::config::CustomNetworkUrls>,
 ) -> anyhow::Result<()> {
@@ -2728,16 +2786,16 @@ fn register_localnet_compiler_abis(
 
     let mut entries_by_hash = HashMap::<String, serde_json::Value>::new();
     for result in ctx.build.build_cache.built.values() {
-        let Some(compiler_abi) = result.compiler_abi.as_ref() else {
+        let Some(abi) = result.abi.as_ref() else {
             continue;
         };
-        let mut compiler_abi = compiler_abi.as_ref().clone();
-        if compiler_abi.contract_name.is_empty() {
-            compiler_abi.contract_name.clone_from(&result.name);
+        let mut abi = abi.as_ref().clone();
+        if abi.contract_name.is_empty() {
+            abi.contract_name.clone_from(&result.name);
         }
         entries_by_hash
             .entry(result.code_hash.to_string())
-            .or_insert(serde_json::to_value(&compiler_abi)?);
+            .or_insert(serde_json::to_value(&abi)?);
     }
 
     if entries_by_hash.is_empty() {
@@ -2745,13 +2803,10 @@ fn register_localnet_compiler_abis(
     }
 
     let url = localnet_admin_url(custom_networks, "compiler-abis")?;
-    let payload = RegisterCompilerAbiPayload {
+    let payload = RegisterAbiPayload {
         entries: entries_by_hash
             .into_iter()
-            .map(|(code_hash, compiler_abi)| RegisterCompilerAbiEntry {
-                code_hash,
-                compiler_abi,
-            })
+            .map(|(code_hash, abi)| RegisterAbiEntry { code_hash, abi })
             .collect(),
     };
 
@@ -3127,6 +3182,7 @@ mod tests {
     use anyhow::anyhow;
     use rustc_hash::FxHashSet;
     use std::sync::Arc;
+    use tycho_types::models::OwnedMessage;
 
     fn test_hash(byte: u8) -> HashBytes {
         HashBytes([byte; 32])
@@ -3196,6 +3252,20 @@ mod tests {
             executor_logs: None,
             missing_libraries: FxHashSet::default(),
         })
+    }
+
+    fn test_external_in_message(dst: StdAddr) -> Cell {
+        CellBuilder::build_from(OwnedMessage {
+            info: MsgInfo::ExtIn(ExtInMsgInfo {
+                src: None,
+                dst: IntAddr::Std(dst),
+                import_fee: Tokens::ZERO,
+            }),
+            init: None,
+            body: Cell::default().into(),
+            layout: None,
+        })
+        .expect("external-in message must be buildable")
     }
 
     #[test]
@@ -3335,6 +3405,20 @@ mod tests {
         assert_eq!(pending.parent_lt, Some(200));
         assert_eq!(pending.message, second_child);
         assert!(!message_iters.is_done(cursor_id));
+    }
+
+    #[test]
+    fn tonconnect_external_in_validation_rejects_different_wallet() {
+        let expected = StdAddr::new(0, test_hash(10));
+        let other = StdAddr::new(0, test_hash(11));
+        let cell = test_external_in_message(other);
+        let parsed = cell.parse::<Message<'_>>().unwrap();
+
+        let error = validate_tonconnect_external_in(&parsed, &expected)
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("different wallet address"));
     }
 
     /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell `BoCs`

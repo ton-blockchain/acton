@@ -220,9 +220,7 @@ impl DotReporter {
         }
 
         if let Some(assert_failure) = &exec.assert_failure {
-            return Some(
-                formatter.format_detailed_assert_failure(assert_failure, test.abi.clone()),
-            );
+            return Some(formatter.format_detailed_assert_failure(assert_failure));
         }
 
         let failure = exec.failure.as_ref()?;

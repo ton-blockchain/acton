@@ -22,6 +22,7 @@ use ton_objs as _;
 pub mod abi;
 pub mod compiler;
 pub mod debug_marks_dict;
+pub mod dynamic_unpack;
 pub mod source_map;
 pub mod types_kernel;
 mod version;

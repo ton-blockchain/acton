@@ -1,5 +1,6 @@
 use crate::file_build_cache::FileBuildCache;
 use crate::retrace::TolkTraceInfo;
+use crate::tonconnect::TonConnectContext;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
@@ -12,9 +13,8 @@ use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
-use tolk_compiler::abi::{ContractABI as CompilerContractABI, Ty as CompilerAbiType};
+use tolk_compiler::abi::{ContractABI, Ty};
 use ton::ton_wallet::TonWallet;
-use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
@@ -46,9 +46,9 @@ pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
 pub struct AssertBinFailure {
     pub operator: String,
     pub left: Tuple,
-    pub left_ty: CompilerAbiType,
+    pub left_ty: Ty,
     pub right: Tuple,
-    pub right_ty: CompilerAbiType,
+    pub right_ty: Ty,
     pub source_map: Arc<SourceMap>,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
@@ -85,8 +85,7 @@ pub struct GetMethodAssertFailure {
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
     pub source_map: Arc<SourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub abi: Option<Arc<ContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
@@ -220,7 +219,6 @@ impl BuildCache {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn memoize(
         &mut self,
         name: &str,
@@ -228,8 +226,7 @@ impl BuildCache {
         code: &str,
         code_hash: HashBytes,
         source_map: Arc<SourceMap>,
-        abi: Option<Arc<ContractAbi>>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
+        abi: Option<Arc<ContractABI>>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -239,7 +236,6 @@ impl BuildCache {
                 code_hash,
                 source_map,
                 abi,
-                compiler_abi,
             },
         );
     }
@@ -261,8 +257,7 @@ pub struct CompilationResult {
     pub code_boc64: String,
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
-    pub abi: Option<Arc<ContractAbi>>, // todo remove
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub abi: Option<Arc<ContractABI>>,
 }
 
 #[derive(Debug, Clone)]
@@ -709,12 +704,13 @@ impl Wallet {
 pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
-    pub abi: Arc<ContractAbi>,
+    pub abi: Option<Arc<ContractABI>>,
     pub source_map: Option<Arc<SourceMap>>,
     pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
+    pub tonconnect: Option<TonConnectContext>,
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
@@ -849,6 +845,13 @@ impl Env<'_> {
             .find(|(_, wallet)| &wallet.address() == addr)?;
 
         Some(found.1.clone())
+    }
+
+    #[must_use]
+    pub fn find_tonconnect_by_address(&self, addr: &StdAddr) -> Option<&TonConnectContext> {
+        self.tonconnect
+            .as_ref()
+            .filter(|tonconnect| tonconnect.wallet.address == *addr)
     }
 
     #[must_use]

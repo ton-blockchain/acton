@@ -13,7 +13,7 @@
     "scripting",
     "debug.mdx",
     "format.mdx",
-    "linting",
+    "lint.mdx",
     "deploy.mdx",
     "verify.mdx",
     "libraries.mdx",

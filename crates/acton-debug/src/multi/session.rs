@@ -18,7 +18,7 @@ pub struct ChildDebugContextSpec {
     /// Debug info for the code being entered. Without it we cannot create a replayer.
     pub source_map: Option<Arc<SourceMap>>,
     /// Optional ABI used to render runtime storage / messages in "Registers".
-    pub compiler_abi: Option<Arc<ContractABI>>,
+    pub abi: Option<Arc<ContractABI>>,
     /// True when parent Step Into should land on the first user-visible child location.
     pub stop_on_entry: bool,
 }

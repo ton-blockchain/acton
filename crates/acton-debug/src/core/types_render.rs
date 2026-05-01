@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
-use tolk_compiler::abi::{ABIDeclaration, ABIEnumMember, ABIOpcode, ABIStructField, ContractABI};
-use tolk_compiler::source_map::{AbiStruct, Declaration, SourceMap};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
+use tolk_compiler::source_map::AbiStruct;
 use tolk_compiler::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
-use ton_abi::abi_serde::Data as ParsedAbiData;
-use ton_abi::compiler_abi_serde;
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
@@ -1425,17 +1425,8 @@ fn decode_abi_data(
     symbols: &SourceMap,
     parser: &mut TyCellSlice<'_>,
     ty: &Ty,
-) -> Option<ParsedAbiData> {
-    let abi = build_compiler_abi(symbols)?;
-    decode_abi_data_with_compiler_abi(&abi, parser, ty)
-}
-
-fn decode_abi_data_with_compiler_abi(
-    abi: &ContractABI,
-    parser: &mut TyCellSlice<'_>,
-    ty: &Ty,
-) -> Option<ParsedAbiData> {
-    let data = compiler_abi_serde::decode(parser, abi, ty).ok()?;
+) -> Option<UnpackedValue> {
+    let data = dynamic_unpack::unpack_from_slice(parser, symbols, ty).ok()?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         // there are remaining data
         return None;
@@ -1443,49 +1434,41 @@ fn decode_abi_data_with_compiler_abi(
     Some(data)
 }
 
-fn render_map_value_with_abi(
+fn render_map_value_with_symbols(
     symbols: &SourceMap,
     value_slice: TyCellSlice<'_>,
     value_ty: &Ty,
 ) -> Option<RenderedValue> {
     let mut parser = value_slice;
     let data = decode_abi_data(symbols, &mut parser, value_ty)?;
-    Some(render_abi_data(data, value_ty))
+    Some(render_abi_data(symbols, data, value_ty))
 }
 
 fn render_typed_cell(symbols: &SourceMap, ty: &Ty, inner: &Ty, cell: &CellLike) -> RenderedValue {
-    let abi = build_compiler_abi(symbols);
-    render_typed_cell_with_compiler_abi(abi.as_ref(), ty, inner, cell)
-}
-
-fn render_typed_cell_with_compiler_abi(
-    abi: Option<&ContractABI>,
-    ty: &Ty,
-    inner: &Ty,
-    cell: &CellLike,
-) -> RenderedValue {
-    let decoded = if let Some(cell) = decode_cell_like(cell)
-        && let Some(abi) = abi
-    {
+    let decoded = if let Some(cell) = decode_cell_like(cell) {
         let mut parser = cell.as_slice_allow_exotic();
-        decode_abi_data_with_compiler_abi(abi, &mut parser, inner).map(|data| (inner, data))
+        decode_abi_data(symbols, &mut parser, inner).map(|data| (inner, data))
     } else {
         None
     };
-    render_typed_cell_with_decoded_data(ty, cell, decoded)
+    render_typed_cell_with_decoded_data(symbols, ty, cell, decoded)
 }
 
 fn render_typed_cell_with_decoded_data(
+    symbols: &SourceMap,
     ty: &Ty,
     cell: &CellLike,
-    decoded: Option<(&Ty, ParsedAbiData)>,
+    decoded: Option<(&Ty, UnpackedValue)>,
 ) -> RenderedValue {
     let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
     let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(value));
 
     if let Some((inner, data)) = decoded {
-        fields.insert(0, ("decoded".to_owned(), render_abi_data(data, inner)));
+        fields.insert(
+            0,
+            ("decoded".to_owned(), render_abi_data(symbols, data, inner)),
+        );
     }
 
     RenderedValue::CellOf {
@@ -1496,8 +1479,9 @@ fn render_typed_cell_with_decoded_data(
     }
 }
 
-pub(crate) fn render_runtime_storage_with_compiler_abi(
+pub(crate) fn render_runtime_storage_with_abi(
     value: &VmStackValue,
+    symbols: &SourceMap,
     abi: &ContractABI,
 ) -> Option<RenderedValue> {
     let VmStackValue::Cell(cell) = value else {
@@ -1515,12 +1499,13 @@ pub(crate) fn render_runtime_storage_with_compiler_abi(
         .chain(abi.storage.storage_ty.as_ref())
     {
         let mut parser = decoded_cell.as_slice_allow_exotic();
-        if let Some(data) = decode_abi_data_with_compiler_abi(abi, &mut parser, storage_ty) {
+        if let Some(data) = decode_abi_data(symbols, &mut parser, storage_ty) {
             let cell_ty = Ty::CellOf {
                 inner: Box::new(storage_ty.clone()),
             };
 
             return Some(render_typed_cell_with_decoded_data(
+                symbols,
                 &cell_ty,
                 cell,
                 Some((storage_ty, data)),
@@ -1531,12 +1516,13 @@ pub(crate) fn render_runtime_storage_with_compiler_abi(
     None
 }
 
-fn decode_abi_data_with_compiler_abi_result(
-    abi: &ContractABI,
+fn decode_abi_data_result(
+    symbols: &SourceMap,
     parser: &mut TyCellSlice<'_>,
     ty: &Ty,
-) -> Result<ParsedAbiData, String> {
-    let data = compiler_abi_serde::decode(parser, abi, ty).map_err(|err| err.to_string())?;
+) -> Result<UnpackedValue, String> {
+    let data =
+        dynamic_unpack::unpack_from_slice(parser, symbols, ty).map_err(|err| err.to_string())?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         return Err(format!(
             "remaining bits/refs after decode: {} bits, {} refs",
@@ -1571,8 +1557,6 @@ pub(crate) fn render_cell_like_as_type(
         ));
     };
 
-    let abi = build_compiler_abi(symbols)
-        .ok_or_else(|| "Failed to build debug ABI from SourceMap declarations".to_owned())?;
     let decoded_cell = decode_cell_like(cell_like).ok_or_else(|| {
         format!(
             "Failed to materialize {} as a TVM cell while decoding `{ty}`",
@@ -1580,9 +1564,10 @@ pub(crate) fn render_cell_like_as_type(
         )
     })?;
     let mut parser = decoded_cell.as_slice_allow_exotic();
-    let data = decode_abi_data_with_compiler_abi_result(&abi, &mut parser, inner.as_ref())?;
+    let data = decode_abi_data_result(symbols, &mut parser, inner.as_ref())?;
 
     Ok(render_typed_cell_with_decoded_data(
+        symbols,
         ty,
         cell_like,
         Some((inner.as_ref(), data)),
@@ -1612,75 +1597,90 @@ fn debugger_value_kind(value: &RenderedValue) -> String {
     }
 }
 
-fn render_abi_data(data: ParsedAbiData, ty: &Ty) -> RenderedValue {
+fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty: &Ty) -> RenderedValue {
     match data {
-        ParsedAbiData::Object(object) if matches!(ty, Ty::EnumRef { .. }) => {
-            let mut fields = object.fields.into_iter();
+        UnpackedValue::Object { name, fields } if abi_object_is_enum(symbols, ty) => {
+            let mut fields = fields.into_iter();
             match fields.next() {
-                Some(field) => render_enum_value(
-                    ty,
-                    object.name,
-                    render_abi_data(field.value, &field.field_type),
-                ),
-                None => typed_leaf_for_ty(ty, object.name),
+                Some((_, value)) => {
+                    let enum_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
+                    let raw_ty = enum_raw_value_ty(symbols, &enum_ty).unwrap_or(Ty::Unknown);
+                    render_enum_value(ty, name, render_abi_data(symbols, value, &raw_ty))
+                }
+                None => typed_leaf_for_ty(ty, name),
             }
         }
-        ParsedAbiData::Object(object) => RenderedValue::Struct {
-            type_name: object.name,
-            fields: object
-                .fields
-                .into_iter()
-                .map(|field| (field.name, render_abi_data(field.value, &field.field_type)))
-                .collect(),
-        },
-        ParsedAbiData::Array(items) => RenderedValue::ArrayOf {
+        UnpackedValue::Object { name, fields } => {
+            let object_ty = abi_object_context_ty(symbols, &name, ty).unwrap_or_else(|| ty.clone());
+            RenderedValue::Struct {
+                type_name: name.clone(),
+                fields: fields
+                    .into_iter()
+                    .map(|(field_name, value)| {
+                        let field_ty = abi_object_field_ty(symbols, &object_ty, &name, &field_name)
+                            .unwrap_or(Ty::Unknown);
+                        (field_name, render_abi_data(symbols, value, &field_ty))
+                    })
+                    .collect(),
+            }
+        }
+        UnpackedValue::Array(items) => RenderedValue::ArrayOf {
             type_name: ty.to_string(),
-            items: render_abi_array_items(items, ty),
+            items: render_abi_array_items(symbols, items, ty),
         },
-        ParsedAbiData::Map(entries) => render_abi_map(entries, ty),
-        ParsedAbiData::Address(IntAddr::Std(addr)) => {
+        UnpackedValue::Map(entries) => render_abi_map(symbols, entries, ty),
+        UnpackedValue::Address(IntAddr::Std(addr)) => {
             render_std_address(ty.to_string(), addr.to_string(), &addr)
         }
-        ParsedAbiData::Address(addr) => render_int_address(ty.to_string(), &addr),
-        ParsedAbiData::ExtAddress(addr) => typed_leaf_for_ty(ty, addr.to_string()),
-        ParsedAbiData::Cell(cell) | ParsedAbiData::RemainingBitsAndRefs(cell) => {
+        UnpackedValue::Address(addr) => render_int_address(ty.to_string(), &addr),
+        UnpackedValue::ExtAddress(addr) => typed_leaf_for_ty(ty, addr.to_string()),
+        UnpackedValue::Cell(cell) | UnpackedValue::RemainingBitsAndRefs(cell) => {
             typed_leaf_for_ty(ty, Boc::encode_hex(&cell))
         }
-        ParsedAbiData::Bits((bytes, bit_len)) => {
+        UnpackedValue::Bits((bytes, bit_len)) => {
             typed_leaf_for_ty(ty, format_abi_bits(&bytes, bit_len))
         }
-        ParsedAbiData::Null => typed_leaf_for_ty(ty, "null"),
-        ParsedAbiData::Number(value) => typed_leaf_for_ty(ty, value.to_string()),
-        ParsedAbiData::Bool(value) => typed_leaf_for_ty(ty, value.to_string()),
-        ParsedAbiData::String(value) => typed_leaf_for_ty(ty, format!("\"{value}\"")),
-        ParsedAbiData::Symbol(value) => typed_leaf_for_ty(ty, value),
+        UnpackedValue::Null => typed_leaf_for_ty(ty, "null"),
+        UnpackedValue::Number(value) => typed_leaf_for_ty(ty, value.to_string()),
+        UnpackedValue::Bool(value) => typed_leaf_for_ty(ty, value.to_string()),
+        UnpackedValue::String(value) => typed_leaf_for_ty(ty, format!("\"{value}\"")),
     }
 }
 
-fn render_abi_array_items(items: Vec<ParsedAbiData>, ty: &Ty) -> Vec<RenderedValue> {
-    match ty {
+fn render_abi_array_items(
+    symbols: &SourceMap,
+    items: Vec<UnpackedValue>,
+    ty: &Ty,
+) -> Vec<RenderedValue> {
+    let shape_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
+    match &shape_ty {
         Ty::ArrayOf { inner } => items
             .into_iter()
-            .map(|item| render_abi_data(item, inner.as_ref()))
+            .map(|item| render_abi_data(symbols, item, inner.as_ref()))
             .collect(),
         Ty::Tensor { items: item_types } | Ty::ShapedTuple { items: item_types } => items
             .into_iter()
             .enumerate()
             .map(|(index, item)| {
                 let item_ty = item_types.get(index).cloned().unwrap_or(Ty::Unknown);
-                render_abi_data(item, &item_ty)
+                render_abi_data(symbols, item, &item_ty)
             })
             .collect(),
         _ => items
             .into_iter()
-            .map(|item| render_abi_data(item, &Ty::Unknown))
+            .map(|item| render_abi_data(symbols, item, &Ty::Unknown))
             .collect(),
     }
 }
 
-fn render_abi_map(entries: Vec<(ParsedAbiData, ParsedAbiData)>, ty: &Ty) -> RenderedValue {
+fn render_abi_map(
+    symbols: &SourceMap,
+    entries: Vec<(UnpackedValue, UnpackedValue)>,
+    ty: &Ty,
+) -> RenderedValue {
     let type_name = ty.to_string();
-    let (key_ty, value_ty) = match ty {
+    let shape_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
+    let (key_ty, value_ty) = match &shape_ty {
         Ty::MapKV { k, v } => (k.as_ref().clone(), v.as_ref().clone()),
         _ => (Ty::Unknown, Ty::Unknown),
     };
@@ -1691,34 +1691,246 @@ fn render_abi_map(entries: Vec<(ParsedAbiData, ParsedAbiData)>, ty: &Ty) -> Rend
             .into_iter()
             .map(|(key, value)| {
                 (
-                    format_abi_map_key(&key, &key_ty),
-                    render_abi_data(value, &value_ty),
+                    format_abi_map_key(symbols, &key, &key_ty),
+                    render_abi_data(symbols, value, &value_ty),
                 )
             })
             .collect(),
     }
 }
 
-fn format_abi_map_key(data: &ParsedAbiData, key_ty: &Ty) -> String {
+fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty: &Ty) -> String {
     match data {
-        ParsedAbiData::Null => "null".to_owned(),
-        ParsedAbiData::Number(value) => value.to_string(),
-        ParsedAbiData::Bool(value) => value.to_string(),
-        ParsedAbiData::String(value) => format!("\"{value}\""),
-        ParsedAbiData::Symbol(value) => value.clone(),
-        ParsedAbiData::Object(object) if matches!(key_ty, Ty::EnumRef { .. }) => {
-            object.name.clone()
-        }
-        ParsedAbiData::Address(value) => value.to_string(),
-        ParsedAbiData::ExtAddress(value) => value.to_string(),
-        ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
+        UnpackedValue::Null => "null".to_owned(),
+        UnpackedValue::Number(value) => value.to_string(),
+        UnpackedValue::Bool(value) => value.to_string(),
+        UnpackedValue::String(value) => format!("\"{value}\""),
+        UnpackedValue::Object { name, .. } if abi_object_is_enum(symbols, key_ty) => name.clone(),
+        UnpackedValue::Address(value) => value.to_string(),
+        UnpackedValue::ExtAddress(value) => value.to_string(),
+        UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
             Boc::encode_hex(value)
         }
-        ParsedAbiData::Bits((bytes, bit_len)) => format_abi_bits(bytes, *bit_len),
-        ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_) => {
+        UnpackedValue::Bits((bytes, bit_len)) => format_abi_bits(bytes, *bit_len),
+        UnpackedValue::Object { .. } | UnpackedValue::Array(_) | UnpackedValue::Map(_) => {
             typed_leaf_for_ty(key_ty, "<key>").dap_value()
         }
     }
+}
+
+fn abi_object_is_enum(symbols: &SourceMap, ty: &Ty) -> bool {
+    matches!(
+        resolve_alias_shape_ty(symbols, ty).as_ref().unwrap_or(ty),
+        Ty::EnumRef { .. }
+    )
+}
+
+fn enum_raw_value_ty(symbols: &SourceMap, ty: &Ty) -> Option<Ty> {
+    match ty {
+        Ty::EnumRef { enum_name } => Some(symbols.get_enum(enum_name).encoded_as.clone()),
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => {
+            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
+            enum_raw_value_ty(symbols, &target)
+        }
+        _ => None,
+    }
+}
+
+fn abi_object_context_ty(symbols: &SourceMap, object_name: &str, ty: &Ty) -> Option<Ty> {
+    match ty {
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => {
+            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
+            abi_object_context_ty(symbols, object_name, &target).or(Some(target))
+        }
+        Ty::Union { variants, .. } => resolve_union_object_ty(symbols, variants, object_name),
+        _ => None,
+    }
+}
+
+fn abi_object_field_ty(
+    symbols: &SourceMap,
+    ty: &Ty,
+    object_name: &str,
+    field_name: &str,
+) -> Option<Ty> {
+    match ty {
+        Ty::StructRef {
+            struct_name,
+            type_args,
+        } => {
+            let struct_ref = symbols.get_struct(struct_name);
+            let type_args = type_args.as_deref().unwrap_or(&[]);
+            struct_ref
+                .fields
+                .iter()
+                .find(|field| field.name == field_name)
+                .map(|field| {
+                    instantiate_generics(
+                        &field.ty,
+                        struct_ref.type_params.as_deref().unwrap_or(&[]),
+                        type_args,
+                    )
+                })
+        }
+        Ty::EnumRef { enum_name } if field_name == "value" => {
+            Some(symbols.get_enum(enum_name).encoded_as.clone())
+        }
+        Ty::CellOf { inner } if object_name == "Cell" && field_name == "ref" => {
+            Some(inner.as_ref().clone())
+        }
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => {
+            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
+            abi_object_field_ty(symbols, &target, object_name, field_name)
+        }
+        Ty::Union { variants, .. } => {
+            for (variant, label) in variants.iter().zip(union_variant_labels(symbols, variants)) {
+                if label.as_deref() == Some(object_name) {
+                    return if field_name == "value" {
+                        Some(variant.variant_ty.clone())
+                    } else {
+                        abi_object_field_ty(symbols, &variant.variant_ty, object_name, field_name)
+                    };
+                }
+                if union_label_simple(symbols, &variant.variant_ty).as_deref() == Some(object_name)
+                {
+                    return abi_object_field_ty(
+                        symbols,
+                        &variant.variant_ty,
+                        object_name,
+                        field_name,
+                    );
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn resolve_alias_shape_ty(symbols: &SourceMap, ty: &Ty) -> Option<Ty> {
+    match ty {
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => resolve_alias_target_ty(symbols, alias_name, type_args.as_deref()),
+        _ => None,
+    }
+}
+
+fn resolve_alias_target_ty(
+    symbols: &SourceMap,
+    alias_name: &str,
+    type_args: Option<&[Ty]>,
+) -> Option<Ty> {
+    let alias_ref = symbols.get_alias(alias_name);
+    Some(match type_args {
+        Some(type_args) => instantiate_generics(
+            &alias_ref.target_ty,
+            alias_ref.type_params.as_deref().unwrap_or(&[]),
+            type_args,
+        ),
+        None => alias_ref.target_ty.clone(),
+    })
+}
+
+fn resolve_union_object_ty(
+    symbols: &SourceMap,
+    variants: &[tolk_compiler::types_kernel::UnionVariant],
+    object_name: &str,
+) -> Option<Ty> {
+    let labels = union_variant_labels(symbols, variants);
+    variants.iter().zip(labels).find_map(|(variant, label)| {
+        if label.as_deref() == Some(object_name)
+            || union_label_simple(symbols, &variant.variant_ty).as_deref() == Some(object_name)
+        {
+            Some(variant.variant_ty.clone())
+        } else {
+            None
+        }
+    })
+}
+
+fn union_variant_labels(
+    symbols: &SourceMap,
+    variants: &[tolk_compiler::types_kernel::UnionVariant],
+) -> Vec<Option<String>> {
+    let simple_labels = variants
+        .iter()
+        .map(|variant| union_label_simple(symbols, &variant.variant_ty))
+        .collect::<Vec<_>>();
+    let has_duplicates = simple_labels.iter().enumerate().any(|(idx, label)| {
+        label.is_some() && simple_labels[..idx].iter().any(|prev| prev == label)
+    });
+
+    variants
+        .iter()
+        .zip(simple_labels)
+        .map(|(variant, simple_label)| {
+            if matches!(variant.variant_ty, Ty::NullLiteral) {
+                Some(String::new())
+            } else if has_duplicates {
+                Some(variant.variant_ty.render_type())
+            } else {
+                simple_label
+            }
+        })
+        .collect()
+}
+
+fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> Option<String> {
+    Some(match ty {
+        Ty::Int => "int".to_owned(),
+        Ty::IntN { n } => format!("int{n}"),
+        Ty::UintN { n } => format!("uint{n}"),
+        Ty::VarintN { n } => format!("varint{n}"),
+        Ty::VaruintN { n } => format!("varuint{n}"),
+        Ty::Coins => "coins".to_owned(),
+        Ty::Bool => "bool".to_owned(),
+        Ty::Cell => "cell".to_owned(),
+        Ty::Builder => "builder".to_owned(),
+        Ty::Slice => "slice".to_owned(),
+        Ty::Remaining => "RemainingBitsAndRefs".to_owned(),
+        Ty::Address => "address".to_owned(),
+        Ty::AddressOpt => "address?".to_owned(),
+        Ty::AddressExt => "ext_address".to_owned(),
+        Ty::AddressAny => "any_address".to_owned(),
+        Ty::BitsN { n } => format!("bits{n}"),
+        Ty::NullLiteral => "null".to_owned(),
+        Ty::Callable => "callable".to_owned(),
+        Ty::Void => "void".to_owned(),
+        Ty::Nullable { inner, .. } => format!("{}?", union_label_simple(symbols, inner)?),
+        Ty::CellOf { .. } => "Cell".to_owned(),
+        Ty::Tensor { .. } | Ty::ShapedTuple { .. } => "tensor".to_owned(),
+        Ty::MapKV { .. } => "map".to_owned(),
+        Ty::EnumRef { enum_name } => enum_name.clone(),
+        Ty::StructRef { struct_name, .. } => struct_name.clone(),
+        Ty::AliasRef {
+            alias_name,
+            type_args,
+        } => {
+            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
+            union_label_simple(symbols, &target)?
+        }
+        Ty::GenericT { name_t } => name_t.clone(),
+        Ty::Union { variants, .. } => variants
+            .iter()
+            .filter_map(|variant| union_label_simple(symbols, &variant.variant_ty))
+            .collect::<Vec<_>>()
+            .join("|"),
+        Ty::ArrayOf { .. } => "array".to_owned(),
+        Ty::LispListOf { .. } => "lisp_list".to_owned(),
+        Ty::Unknown => "unknown".to_owned(),
+        Ty::String => "string".to_owned(),
+    })
 }
 
 fn format_abi_bits(bytes: &[u8], bit_len: usize) -> String {
@@ -1758,7 +1970,7 @@ fn render_map_value(
         };
     }
 
-    if let Some(value) = render_map_value_with_abi(symbols, value_slice, value_ty) {
+    if let Some(value) = render_map_value_with_symbols(symbols, value_slice, value_ty) {
         return value;
     }
 
@@ -2433,16 +2645,15 @@ fn render_lazy_struct_fields(
     slot_values: &[SlotValue],
     ir_slots: &[usize],
     last_seen: &HashMap<usize, VmStackValue>,
-    lazy_cell_abi: Option<(&Cell, &ContractABI)>,
+    lazy_cell: Option<&Cell>,
 ) -> Vec<(String, RenderedValue)> {
-    let mut lazy_s = lazy_cell_abi.as_ref().map(|(cell, _)| {
+    let mut lazy_s = lazy_cell.map(|cell| {
         let mut s = cell.as_slice_allow_exotic();
         if let Some(ref prefix) = struct_ref.prefix {
             let _ = s.skip_first(prefix.prefix_len as u16, 0);
         }
         s
     });
-    let abi = lazy_cell_abi.as_ref().map(|(_, a)| *a);
 
     let mut fields = Vec::new();
     let mut offset = 0;
@@ -2459,15 +2670,15 @@ fn render_lazy_struct_fields(
         let field_ir_slots = &ir_slots[offset..offset + f_width];
         let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
 
-        let preview = match (lazy_s.as_mut(), abi) {
-            (Some(lazy_s), Some(abi)) => {
-                if let Ok(parsed) = compiler_abi_serde::decode(lazy_s, abi, &f_ty) {
-                    Some(render_abi_data(parsed, &f_ty))
+        let preview = match lazy_s.as_mut() {
+            Some(lazy_s) => {
+                if let Ok(parsed) = dynamic_unpack::unpack_from_slice(lazy_s, symbols, &f_ty) {
+                    Some(render_abi_data(symbols, parsed, &f_ty))
                 } else {
                     None
                 }
             }
-            _ => None,
+            None => None,
         };
 
         let field_val = if field_ever_seen {
@@ -2550,18 +2761,15 @@ pub(crate) fn debug_format_lazy(
 
             let ty_args = type_args.as_deref();
             let fields = match &slice_as_cell {
-                Some(cell) => {
-                    let tmp_abi = build_compiler_abi(symbols).expect("always not None");
-                    render_lazy_struct_fields(
-                        symbols,
-                        struct_ref,
-                        ty_args,
-                        slot_values,
-                        ir_slots,
-                        last_seen,
-                        Some((cell, &tmp_abi)),
-                    )
-                }
+                Some(cell) => render_lazy_struct_fields(
+                    symbols,
+                    struct_ref,
+                    ty_args,
+                    slot_values,
+                    ir_slots,
+                    last_seen,
+                    Some(cell),
+                ),
                 None => render_lazy_struct_fields(
                     symbols,
                     struct_ref,
@@ -2588,6 +2796,7 @@ pub(crate) fn debug_format_lazy(
 
 pub(crate) fn render_runtime_out_actions(
     value: &VmStackValue,
+    symbols: &SourceMap,
     abi: Option<&ContractABI>,
 ) -> Option<RenderedValue> {
     let VmStackValue::Cell(cell) = value else {
@@ -2606,7 +2815,7 @@ pub(crate) fn render_runtime_out_actions(
                 type_name: "array<OutAction>".to_owned(),
                 items: actions
                     .iter()
-                    .map(|action| render_out_action(action, abi))
+                    .map(|action| render_out_action(action, symbols, abi))
                     .collect(),
             },
         ),
@@ -2629,7 +2838,11 @@ fn decode_out_actions(root: &Cell) -> Option<Vec<OutAction>> {
     Some(actions)
 }
 
-fn render_out_action(action: &OutAction, abi: Option<&ContractABI>) -> RenderedValue {
+fn render_out_action(
+    action: &OutAction,
+    symbols: &SourceMap,
+    abi: Option<&ContractABI>,
+) -> RenderedValue {
     match action {
         OutAction::SendMsg { mode, out_msg } => {
             let mode_text = format_send_msg_flags(*mode);
@@ -2642,7 +2855,7 @@ fn render_out_action(action: &OutAction, abi: Option<&ContractABI>) -> RenderedV
             ];
             match out_msg.load() {
                 Ok(message) => {
-                    let body_meta = resolve_send_message_body_meta(&message, abi);
+                    let body_meta = resolve_send_message_body_meta(&message, symbols, abi);
                     fields.insert(
                         1,
                         (
@@ -2790,6 +3003,7 @@ fn render_message_body(
 
 fn resolve_send_message_body_meta(
     message: &OwnedRelaxedMessage,
+    symbols: &SourceMap,
     abi: Option<&ContractABI>,
 ) -> Option<ResolvedSendMessageBodyMeta> {
     let body = message.body.0.apply(&message.body.1).ok()?;
@@ -2807,13 +3021,13 @@ fn resolve_send_message_body_meta(
     let resolved_body = abi.and_then(|abi| match &message.info {
         RelaxedMsgInfo::Int(_) => try_resolve_message_body(
             body,
-            abi,
+            symbols,
             abi.outgoing_messages.iter().map(|message| &message.body_ty),
             prefix_to_skip,
         ),
         RelaxedMsgInfo::ExtOut(_) => try_resolve_message_body(
             body,
-            abi,
+            symbols,
             abi.emitted_events.iter().map(|message| &message.body_ty),
             prefix_to_skip,
         ),
@@ -2840,7 +3054,7 @@ struct ResolvedDecodedMessageBody {
 
 fn try_resolve_message_body<'a, I>(
     body: TyCellSlice<'a>,
-    abi: &ContractABI,
+    symbols: &SourceMap,
     candidates: I,
     prefix_to_skip: u16,
 ) -> Option<ResolvedDecodedMessageBody>
@@ -2853,7 +3067,7 @@ where
             continue;
         }
 
-        let Ok(data) = compiler_abi_serde::decode(&mut parser, abi, body_ty) else {
+        let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, symbols, body_ty) else {
             continue;
         };
         if parser.size_bits() != 0 || parser.size_refs() != 0 {
@@ -2865,7 +3079,7 @@ where
         };
         return Some(ResolvedDecodedMessageBody {
             type_name,
-            decoded: render_abi_data(data, body_ty),
+            decoded: render_abi_data(symbols, data, body_ty),
         });
     }
 
@@ -3295,94 +3509,57 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
     }
 }
 
-/// Helper to convert data from `SourceMap` to ABI
-fn build_compiler_abi(symbols: &SourceMap) -> Option<ContractABI> {
-    Some(ContractABI {
-        abi_schema_version: "1.0".to_owned(),
-        declarations: source_map_declarations_to_abi(symbols)?,
-        ..Default::default()
-    })
-}
-
-// TODO: do we really need two types for declarations?
-fn source_map_declarations_to_abi(symbols: &SourceMap) -> Option<Vec<ABIDeclaration>> {
-    symbols
-        .declarations()
-        .iter()
-        .map(source_map_declaration_to_abi)
-        .collect()
-}
-
-fn source_map_declaration_to_abi(decl: &Declaration) -> Option<ABIDeclaration> {
-    Some(match decl {
-        Declaration::Struct(decl) => {
-            let prefix = decl.prefix.as_ref().map(|prefix| ABIOpcode {
-                prefix_str: prefix.prefix_str.clone(),
-                prefix_len: prefix.prefix_len,
-            });
-            ABIDeclaration::Struct {
-                name: decl.name.clone(),
-                type_params: decl.type_params.clone(),
-                prefix,
-                fields: decl
-                    .fields
-                    .iter()
-                    .map(|field| ABIStructField {
-                        name: field.name.clone(),
-                        ty: field.ty.clone(),
-                        default_value: None,
-                        description: String::new(),
-                    })
-                    .collect(),
-                custom_pack_unpack: None,
-            }
-        }
-        Declaration::Alias(decl) => ABIDeclaration::Alias {
-            name: decl.name.clone(),
-            target_ty: decl.target_ty.clone(),
-            type_params: decl.type_params.clone(),
-            custom_pack_unpack: None,
-        },
-        Declaration::Enum(decl) => ABIDeclaration::Enum {
-            name: decl.name.clone(),
-            encoded_as: decl.encoded_as.clone(),
-            members: decl
-                .members
-                .iter()
-                .map(|member| ABIEnumMember {
-                    name: member.name.clone(),
-                    value: member.value.clone(),
-                    description: String::new(),
-                })
-                .collect(),
-            custom_pack_unpack: None,
-        },
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tolk_compiler::abi::{
         ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField,
     };
+    use tolk_compiler::source_map::{
+        AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
+    };
     use tolk_compiler::types_kernel::UnionVariant;
-    use ton_abi::abi_serde::{DataField, DataObject};
     use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
     use tycho_types::models::{ReserveCurrencyFlags, StdAddr};
 
+    fn source_map_with_declarations(declarations: Vec<Declaration>) -> SourceMap {
+        serde_json::from_value(serde_json::json!({
+            "files": [],
+            "declarations": declarations,
+            "unique_ty": [],
+            "functions": [],
+        }))
+        .unwrap()
+    }
+
+    fn empty_symbols() -> SourceMap {
+        source_map_with_declarations(Vec::new())
+    }
+
+    fn loc() -> SrcRange {
+        SrcRange(vec![0, 0, 0, 0, 0])
+    }
+
     #[test]
     fn render_abi_data_uses_field_type_for_object_fields() {
+        let symbols = source_map_with_declarations(vec![Declaration::Struct(AbiStruct {
+            name: "Payload".to_owned(),
+            ident_loc: loc(),
+            type_params: None,
+            prefix: None,
+            fields: vec![FieldInfo {
+                name: "flag".to_owned(),
+                ty: Ty::Bool,
+            }],
+            custom_pack_unpack: None,
+        })]);
         let rendered = render_abi_data(
-            ParsedAbiData::Object(DataObject {
+            &symbols,
+            UnpackedValue::Object {
                 name: "Payload".to_owned(),
-                fields: vec![DataField {
-                    name: "flag".to_owned(),
-                    field_type: Ty::Bool,
-                    value: ParsedAbiData::Bool(true),
-                }],
-            }),
+                fields: vec![("flag".to_owned(), UnpackedValue::Bool(true))],
+            },
             &Ty::StructRef {
                 struct_name: "Payload".to_owned(),
                 type_args: None,
@@ -3399,9 +3576,10 @@ mod tests {
     #[test]
     fn render_abi_data_uses_container_types_for_tensor_items() {
         let rendered = render_abi_data(
-            ParsedAbiData::Array(vec![
-                ParsedAbiData::Bool(true),
-                ParsedAbiData::Number(7.into()),
+            &empty_symbols(),
+            UnpackedValue::Array(vec![
+                UnpackedValue::Bool(true),
+                UnpackedValue::Number(7.into()),
             ]),
             &Ty::Tensor {
                 items: vec![Ty::Bool, Ty::UintN { n: 32 }],
@@ -3417,15 +3595,22 @@ mod tests {
 
     #[test]
     fn render_abi_enum_value_exposes_raw_value_field() {
+        let symbols = source_map_with_declarations(vec![Declaration::Enum(AbiEnum {
+            name: "Color".to_owned(),
+            ident_loc: loc(),
+            encoded_as: Ty::UintN { n: 8 },
+            members: vec![EnumMemberInfo {
+                name: "Blue".to_owned(),
+                value: "2".to_owned(),
+            }],
+            custom_pack_unpack: None,
+        })]);
         let rendered = render_abi_data(
-            ParsedAbiData::Object(DataObject {
+            &symbols,
+            UnpackedValue::Object {
                 name: "Color.Blue".to_owned(),
-                fields: vec![DataField {
-                    name: "value".to_owned(),
-                    field_type: Ty::UintN { n: 8 },
-                    value: ParsedAbiData::Number(2.into()),
-                }],
-            }),
+                fields: vec![("value".to_owned(), UnpackedValue::Number(2.into()))],
+            },
             &Ty::EnumRef {
                 enum_name: "Color".to_owned(),
             },
@@ -3552,6 +3737,30 @@ mod tests {
 
     #[test]
     fn render_runtime_storage_chooses_storage_type_that_decodes_cell() {
+        let symbols = source_map_with_declarations(vec![
+            Declaration::Struct(AbiStruct {
+                name: "Storage".to_owned(),
+                ident_loc: loc(),
+                type_params: None,
+                prefix: None,
+                fields: vec![FieldInfo {
+                    name: "count".to_owned(),
+                    ty: Ty::UintN { n: 32 },
+                }],
+                custom_pack_unpack: None,
+            }),
+            Declaration::Struct(AbiStruct {
+                name: "DeploymentStorage".to_owned(),
+                ident_loc: loc(),
+                type_params: None,
+                prefix: None,
+                fields: vec![FieldInfo {
+                    name: "ready".to_owned(),
+                    ty: Ty::Bool,
+                }],
+                custom_pack_unpack: None,
+            }),
+        ]);
         let abi = ContractABI {
             declarations: vec![
                 ABIDeclaration::Struct {
@@ -3565,6 +3774,7 @@ mod tests {
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
+                    overrides_client_type: false,
                 },
                 ABIDeclaration::Struct {
                     name: "DeploymentStorage".to_owned(),
@@ -3577,6 +3787,7 @@ mod tests {
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
+                    overrides_client_type: false,
                 },
             ],
             storage: ABIStorage {
@@ -3596,8 +3807,9 @@ mod tests {
         builder.store_uint(7, 32).unwrap();
         let cell = builder.build().unwrap();
 
-        let rendered = render_runtime_storage_with_compiler_abi(
+        let rendered = render_runtime_storage_with_abi(
             &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &symbols,
             &abi,
         )
         .expect("expected decoded c4");
@@ -4056,6 +4268,7 @@ mod tests {
 
         let rendered = render_runtime_out_actions(
             &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &empty_symbols(),
             None,
         )
         .expect("expected decoded c5");
@@ -4099,6 +4312,17 @@ mod tests {
 
     #[test]
     fn render_runtime_out_actions_decodes_send_msg() {
+        let symbols = source_map_with_declarations(vec![Declaration::Struct(AbiStruct {
+            name: "Transfer".to_owned(),
+            ident_loc: loc(),
+            type_params: None,
+            prefix: Some(PrefixInfo {
+                prefix_str: "0xfeedbeef".to_owned(),
+                prefix_len: 32,
+            }),
+            fields: vec![],
+            custom_pack_unpack: None,
+        })]);
         let abi = ContractABI {
             declarations: vec![ABIDeclaration::Struct {
                 name: "Transfer".to_owned(),
@@ -4109,6 +4333,7 @@ mod tests {
                 }),
                 fields: vec![],
                 custom_pack_unpack: None,
+                overrides_client_type: false,
             }],
             outgoing_messages: vec![ABIOutgoingMessage {
                 body_ty: Ty::StructRef {
@@ -4140,6 +4365,7 @@ mod tests {
 
         let rendered = render_runtime_out_actions(
             &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &symbols,
             Some(&abi),
         )
         .expect("expected decoded c5");
