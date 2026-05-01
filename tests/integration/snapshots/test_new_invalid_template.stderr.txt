@@ -1,4 +1,4 @@
 error: invalid value 'unknown-template' for '--template <TEMPLATE>'
-  [possible values: empty, counter, jetton, nft]
+  [possible values: empty, counter, jetton, nft, w5-plugin]
 
 For more information, try '--help'.

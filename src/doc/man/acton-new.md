@@ -83,8 +83,20 @@ NFT collection and item template with:
 - CI workflow
 - optional `AGENTS.md`
 
+### w5-plugin
+
+Wallet V5 extension (subscription plugin) template with:
+
+- the plugin contract and shared types
+- vendored Wallet V5 sources for end-to-end testing
+- plugin and Wallet V5 wrappers
+- integration tests for install, payment, and cancellation flows
+- deploy, install, and delete scripts
+- CI workflow
+- optional `AGENTS.md`
+
 All built-in templates support the optional TypeScript app layout with `--app`:
-`empty`, `counter`, `jetton`, and `nft`.
+`empty`, `counter`, `jetton`, `nft`, and `w5-plugin`.
 
 With `--app`, Acton also creates a Vite-based React app and top-level npm
 metadata files. App templates with frontend contract flows also include

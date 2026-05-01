@@ -502,6 +502,75 @@ fn test_new_nft_project_non_interactive() {
 }
 
 #[test]
+fn test_new_w5_plugin_project_non_interactive() {
+    let project = ProjectBuilder::new("new-w5-plugin")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-plugin-project")
+        .arg("--description")
+        .arg("w5-plugin description")
+        .arg("--template")
+        .arg("w5-plugin")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: w5-plugin");
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "w5-plugin-project""#));
+    assert!(content.contains(r"[contracts.SimpleExtension]"));
+    assert!(content.contains(r"[contracts.WalletV5]"));
+    assert!(content.contains(r#"src = "contracts/walletv5/WalletV5.tolk""#));
+    assert!(content.contains("acton script scripts/deploy.tolk"));
+    assert!(content.contains("install-extension = \"acton script scripts/install-extension.tolk"));
+    assert!(content.contains("delete-extension = \"acton script scripts/delete-extension.tolk"));
+    assert!(content.contains("[lint]"));
+    assert!(content.contains("**/walletv5/**"));
+
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(project_dir.join("contracts/types.tolk").exists());
+    assert!(project_dir.join("contracts/errors.tolk").exists());
+    assert!(project_dir.join("contracts/w5-types.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/walletv5/messages.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("contracts/walletv5/storage.tolk").exists());
+    assert!(
+        project_dir
+            .join("wrappers/SimpleExtension.gen.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers/WalletV5Contract.tolk").exists());
+    assert!(
+        project_dir
+            .join("tests/simple-extension.test.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("scripts/deploy.tolk").exists());
+    assert!(project_dir.join("scripts/install-extension.tolk").exists());
+    assert!(project_dir.join("scripts/delete-extension.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+}
+
+#[test]
 fn test_new_empty_project_with_app_flag() {
     let project = ProjectBuilder::new("new-empty-app")
         .without_acton_toml()
@@ -626,6 +695,74 @@ fn test_new_counter_project_with_app_flag() {
     assert!(
         project_dir
             .join("contracts/wrappers/Counter.gen.tolk")
+            .exists()
+    );
+    assert!(project_dir.join(".prettierrc").exists());
+}
+
+#[test]
+fn test_new_w5_plugin_project_with_app_flag() {
+    let project = ProjectBuilder::new("new-w5-plugin-app")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("W5 Plugin App Project")
+        .arg("--description")
+        .arg("w5-plugin app description")
+        .arg("--template")
+        .arg("w5-plugin")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+
+    output.assert_contains("Template: w5-plugin");
+
+    let project_dir = project.path().join("foobar");
+    let package_lock = fs::read_to_string(project_dir.join("package-lock.json")).unwrap();
+    assert!(package_lock.contains(r#""name": "w5-plugin-app-project""#));
+    assert!(!package_lock.contains(r#""name": "simple-extension""#));
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(
+        project_dir
+            .join("wrappers-ts/SimpleExtension.gen.ts")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers-ts/WalletV5.gen.ts").exists());
+    assert!(
+        project_dir
+            .join("contracts/src/SimpleExtension.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/src/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/tests/simple-extension.test.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/SimpleExtension.gen.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/WalletV5Contract.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/scripts/install-extension.tolk")
             .exists()
     );
     assert!(project_dir.join(".prettierrc").exists());
@@ -1069,6 +1206,45 @@ fn test_new_templates_returns_machine_readable_json() {
                                     "id": "NftItem",
                                     "name": "NftItem",
                                     "src": "contracts/src/NftItem.tolk"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "w5-plugin",
+                    "description": "Wallet V5 extension (subscription plugin)",
+                    "supports_app": true,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "SimpleExtension",
+                                    "name": "SimpleExtension",
+                                    "src": "contracts/SimpleExtension.tolk"
+                                },
+                                {
+                                    "id": "WalletV5",
+                                    "name": "WalletV5",
+                                    "src": "contracts/walletv5/WalletV5.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "SimpleExtension",
+                                    "name": "SimpleExtension",
+                                    "src": "contracts/src/SimpleExtension.tolk"
+                                },
+                                {
+                                    "id": "WalletV5",
+                                    "name": "WalletV5",
+                                    "src": "contracts/src/walletv5/WalletV5.tolk"
                                 }
                             ]
                         }
@@ -1758,7 +1934,7 @@ fn test_new_app_templates_npm_quality_checks() {
         .build();
     let cache_dir = cache_workspace.path().join("npm-cache");
 
-    for template in ["empty", "counter", "jetton", "nft"] {
+    for template in ["empty", "counter", "jetton", "nft", "w5-plugin"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,
@@ -2570,6 +2746,92 @@ fn test_new_nft_project_full_flow() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/test_new_nft_project_full_flow_fmt.stdout.txt",
+        );
+}
+
+#[test]
+fn test_new_w5_plugin_project_full_flow() {
+    let project = ProjectBuilder::new("new-w5-plugin-full")
+        .without_acton_toml()
+        .build();
+
+    let dir = project.path();
+    let project_dir = project.path().join("foobar");
+
+    // 1. Create project
+    project
+        .acton()
+        .arg("new")
+        .arg(&dir.join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("w5-plugin")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_new.stdout.txt",
+        );
+
+    // 2. Build project
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_build.stdout.txt",
+        );
+
+    // 3. Run tests
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("test")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_test.stdout.txt",
+        );
+
+    // 4. Run deploy script in emulation mode
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/deploy.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_script.stdout.txt",
+        );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_plugin_project_full_flow_fmt.stdout.txt",
         );
 }
 
