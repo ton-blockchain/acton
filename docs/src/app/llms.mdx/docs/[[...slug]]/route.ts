@@ -8,9 +8,37 @@ interface RouteProps {
   params: Promise<{ slug?: string[] }>;
 }
 
+function stripMarkdownExtension(slug?: string[]) {
+  if (!slug || slug.length === 0) {
+    return slug;
+  }
+
+  const last = slug.at(-1);
+
+  if (!last?.endsWith('.md')) {
+    return slug;
+  }
+
+  return [...slug.slice(0, -1), last.slice(0, -'.md'.length)];
+}
+
+function appendMarkdownExtension(slug: string[]) {
+  if (slug.length === 0) {
+    return slug;
+  }
+
+  const last = slug.at(-1);
+
+  if (!last) {
+    return slug;
+  }
+
+  return [...slug.slice(0, -1), `${last}.md`];
+}
+
 export async function GET(_request: Request, { params }: RouteProps) {
   const { slug } = await params;
-  const page = source.getPage(slug);
+  const page = source.getPage(stripMarkdownExtension(slug));
 
   if (!page) {
     notFound();
@@ -24,5 +52,7 @@ export async function GET(_request: Request, { params }: RouteProps) {
 }
 
 export function generateStaticParams() {
-  return source.generateParams();
+  return source.generateParams().map(({ slug }) => ({
+    slug: appendMarkdownExtension(slug),
+  }));
 }
