@@ -1,7 +1,8 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, Context, DebugStopRequested, GetMethodAssertFailure, KnownAddress,
-    MessageIterState, ParsedSearchParams, PendingMessageStep, SearchField, Wallet, to_cell,
+    AssertFailure, CompilationResult, Context, DebugStopRequested, GetMethodAssertFailure,
+    KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep, SearchField, Wallet,
+    to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
@@ -259,6 +260,113 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     }
 
     Ok(())
+}
+
+fn compilation_result_for_code(
+    ctx: &mut Context,
+    code: Option<&Cell>,
+) -> Option<CompilationResult> {
+    let code = code?;
+    // Fast path: wrappers created via `fromStorage()` call `build(...)`, so the
+    // matching code hash is already present in the per-run build cache.
+    if let Some((_, result)) = ctx.build.build_cache.result_for_code(&Some(code.clone())) {
+        return Some(result);
+    }
+
+    if !ctx.build.need_debug_info {
+        return None;
+    }
+
+    // Forked or manually addressed contracts can arrive only as a code cell from
+    // account state. In debug/backtrace mode, match that cell against local
+    // project contracts so nested execution can still use their source maps.
+    let target_hash = *code.repr_hash();
+
+    let contracts = &ctx.env.config.contracts.as_ref()?.contracts;
+    for (contract_id, contract) in contracts {
+        let path = contract.absolute_source_path(&ctx.env.project_root);
+        let path_display = path.display().to_string();
+        if path_display.ends_with(".boc") {
+            continue;
+        }
+
+        if let Some(cached_entry) = ctx.build.file_build_cache.get(
+            &path_display,
+            ctx.build.need_debug_info,
+            false,
+            2,
+            "1.3",
+        ) {
+            let Ok(code_hash) = HashBytes::from_str(&cached_entry.code_hash_hex) else {
+                continue;
+            };
+            // Memoize every candidate we inspect. Even non-matching contracts can
+            // be useful later in the same script/debug session.
+            let source_map = Arc::new(cached_entry.source_map.clone().unwrap_or_default());
+            ctx.build.build_cache.memoize(
+                contract.display_name(contract_id),
+                &path,
+                &cached_entry.code_boc64,
+                code_hash,
+                source_map,
+                cached_entry.abi.clone().map(Into::into),
+            );
+            if code_hash == target_hash {
+                return ctx
+                    .build
+                    .build_cache
+                    .result_for_code(&Some(code.clone()))
+                    .map(|(_, result)| result);
+            }
+            continue;
+        }
+
+        let mappings = ctx.env.config.mappings();
+        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+        let result = match compiler.compile(&path, ctx.build.need_debug_info) {
+            tolk_compiler::CompilerResult::Success(success) => success,
+            tolk_compiler::CompilerResult::Error(error) => {
+                warn!(
+                    "Failed to compile {path_display} while resolving debug source map: {}",
+                    error.message
+                );
+                continue;
+            }
+        };
+
+        if let Err(err) = ctx.build.file_build_cache.put(
+            &path_display,
+            &result,
+            ctx.build.need_debug_info,
+            false,
+            2,
+            "1.3",
+        ) {
+            warn!("Failed to cache debug source map candidate {path_display}: {err}");
+        }
+
+        let Ok(code_hash) = HashBytes::from_str(&result.code_hash_hex) else {
+            continue;
+        };
+        let source_map = Arc::new(result.source_map.unwrap_or_default());
+        ctx.build.build_cache.memoize(
+            contract.display_name(contract_id),
+            &path,
+            &result.code_boc64,
+            code_hash,
+            source_map,
+            result.abi.clone().map(Into::into),
+        );
+        if code_hash == target_hash {
+            return ctx
+                .build
+                .build_cache
+                .result_for_code(&Some(code.clone()))
+                .map(|(_, result)| result);
+        }
+    }
+
+    None
 }
 
 extension!(send_message in (Context) with (src: IntAddr, msg: Cell) using send_message_impl);
@@ -1093,11 +1201,7 @@ fn send_transaction_debug(
         .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
         .context("Failed to register missing library callback")?;
 
-    let compilation_result = ctx
-        .build
-        .build_cache
-        .result_for_code(&prepared.code)
-        .map(|(_, result)| result);
+    let compilation_result = compilation_result_for_code(ctx, prepared.code.as_ref());
     let source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
@@ -2072,10 +2176,9 @@ fn run_get_method_impl(
     addr: StdAddr,
 ) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
-    let world_state = &mut ctx.chain.world_state;
     let addr_str = addr.to_string();
 
-    let shard_account = world_state.get_account(&addr);
+    let shard_account = ctx.chain.world_state.get_account(&addr);
     let state = shard_account
         .account
         .load()
@@ -2091,11 +2194,10 @@ fn run_get_method_impl(
 
     let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
     let libs_root = libs.into_root();
-    let world_state = &mut ctx.chain.world_state;
 
     let method_id = id.to_i32().unwrap_or(0);
 
-    let unixtime = resolve_get_method_unixtime(world_state)?;
+    let unixtime = resolve_get_method_unixtime(ctx.chain.world_state)?;
 
     let params = RunGetMethodArgs {
         code: Boc::encode_base64(&code),
@@ -2113,11 +2215,7 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let compilation_result = ctx
-        .build
-        .build_cache
-        .result_for_code(&Some(code))
-        .map(|(_, result)| result);
+    let compilation_result = compilation_result_for_code(ctx, Some(&code));
     // Remote/forked contracts may have no local debug info. We still run the live
     // executor, but the child replayer will then fall back to a synthetic source map.
     let source_map = compilation_result.as_ref().map_or_else(
@@ -2128,7 +2226,7 @@ fn run_get_method_impl(
         .as_ref()
         .and_then(|result| result.abi.clone());
 
-    let config_b64 = world_state.get_config_b64();
+    let config_b64 = ctx.chain.world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize tuple")?;
