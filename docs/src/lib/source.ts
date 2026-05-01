@@ -17,6 +17,19 @@ export const source = loader({
     },
 });
 
+export const llmSource = loader({
+    baseUrl: 'llms.mdx/docs',
+    source: docs.toFumadocsSource(),
+});
+
+export async function getSource() {
+    return source;
+}
+
+export async function getLlmSource() {
+    return llmSource;
+}
+
 export function getPageImage(page: InferPageType<typeof source>) {
     const segments = [...page.slugs, 'image.png'];
 

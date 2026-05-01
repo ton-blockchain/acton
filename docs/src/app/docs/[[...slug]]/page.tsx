@@ -33,7 +33,7 @@ export default async function Page(props: PageProps) {
       <div className="flex flex-row flex-wrap gap-2 items-center border-b pb-6">
         <LLMCopyButton content={llmText}/>
         <ViewOptions
-          markdownUrl={`${page.url}.mdx`}
+          markdownUrl={`/llms.mdx${page.url}`}
           githubUrl={`https://github.com/ton-blockchain/acton/blob/master/docs/content/docs/${page.path}`}
         />
       </div>
