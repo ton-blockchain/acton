@@ -710,30 +710,75 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
         code,
         "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{"
     );
-    code.push_str("    val genericMsg = createMessage({\n");
-    code.push_str("        bounce: config.bounce,\n");
-    code.push_str("        value: config.value,\n");
-    code.push_str("        dest: self.address,\n");
 
-    if fields.is_empty() {
-        let _ = writeln!(code, "        body: {} {{}},", message_type.name);
-    } else {
-        let _ = writeln!(code, "        body: {} {{", message_type.name);
+    if message_type.overrides_client_type {
+        let prefix = message_type.prefix.as_ref();
+        code.push_str(
+            "    // build body cell manually, because some fields have @abi.clientType\n",
+        );
+        code.push_str("    val bodyB = beginCell()\n");
+        let mut chain: Vec<String> = Vec::new();
+        if let Some(prefix) = prefix {
+            chain.push(format!(
+                ".storeUint({}, {})",
+                prefix.prefix_str, prefix.prefix_len
+            ));
+        }
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
-
-            if field.ty.is_typed_cell() {
-                let _ = writeln!(code, "            {}: {}.toCell(),", field.name, param_name);
-            } else if field.name == param_name {
-                let _ = writeln!(code, "            {},", field.name);
+            let value = if field.ty.is_typed_cell() {
+                format!("{param_name}.toCell()")
             } else {
-                let _ = writeln!(code, "            {}: {},", field.name, param_name);
+                param_name
+            };
+            chain.push(format!(".storeAny({value})"));
+        }
+        if chain.is_empty() {
+            code.push_str("        ;\n");
+        } else {
+            let last = chain.len() - 1;
+            for (idx, call) in chain.iter().enumerate() {
+                let suffix = if idx == last { ";" } else { "" };
+                let _ = writeln!(code, "        {call}{suffix}");
             }
         }
-        code.push_str("        },\n");
+        code.push_str("    val genericMsg = createMessage({\n");
+        code.push_str("        bounce: config.bounce,\n");
+        code.push_str("        value: config.value,\n");
+        code.push_str("        dest: self.address,\n");
+        let _ = writeln!(
+            code,
+            "        body: {}.fromSlice(bodyB.toSlice()),",
+            message_type.name
+        );
+        code.push_str("    });\n");
+    } else {
+        code.push_str("    val genericMsg = createMessage({\n");
+        code.push_str("        bounce: config.bounce,\n");
+        code.push_str("        value: config.value,\n");
+        code.push_str("        dest: self.address,\n");
+
+        if fields.is_empty() {
+            let _ = writeln!(code, "        body: {} {{}},", message_type.name);
+        } else {
+            let _ = writeln!(code, "        body: {} {{", message_type.name);
+            for field in &fields {
+                let param_name = normalize_param_name(&field.name);
+
+                if field.ty.is_typed_cell() {
+                    let _ = writeln!(code, "            {}: {}.toCell(),", field.name, param_name);
+                } else if field.name == param_name {
+                    let _ = writeln!(code, "            {},", field.name);
+                } else {
+                    let _ = writeln!(code, "            {}: {},", field.name, param_name);
+                }
+            }
+            code.push_str("        },\n");
+        }
+
+        code.push_str("    });\n");
     }
 
-    code.push_str("    });\n");
     code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
 

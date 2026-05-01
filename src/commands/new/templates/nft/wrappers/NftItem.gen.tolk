@@ -57,18 +57,20 @@ fun NftItem.sendAskToChangeOwnership(
     forwardPayload: Payload,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x5fcc3d14, 32)
+        .storeAny(queryId)
+        .storeAny(newOwnerAddress)
+        .storeAny(sendExcessesTo)
+        .storeAny(customPayload)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: AskToChangeOwnership {
-            queryId,
-            newOwnerAddress,
-            sendExcessesTo,
-            customPayload,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: AskToChangeOwnership.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }

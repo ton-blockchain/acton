@@ -13,7 +13,7 @@
   ✓ nft: should not increment item index if not last [TIME]
   ✓ nft: should deploy some nfts via batch deploy [TIME]
   ✓ nft: should change owner [TIME]
- > tests/nft-item.test.tolk (11 tests)
+ > tests/nft-item.test.tolk (12 tests)
   ✓ nft: should transfer ownership [TIME]
   ✓ nft: should transfer ownership and return excesses [TIME]
   ✓ nft: should not transfer ownership not from owner [TIME]
@@ -22,8 +22,9 @@
   ✓ nft: should fail when receiver in different workchain [TIME]
   ✓ nft: should fail when op not on list [TIME]
   ✓ nft: should fail when response address in different workchain [TIME]
+  ✓ nft: should fail with no fwd payload provided [TIME]
   ✓ nft: should transfer ownership with forward payload in slice [TIME]
   ✓ nft: should fail with incomplete transfer body [TIME]
   ✓ nft: bench should deploy 100 nfts via batch deploy [TIME]
 
- ✓ 19 passed in 2 files
+ ✓ 20 passed in 2 files

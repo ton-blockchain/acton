@@ -237,7 +237,9 @@ pub struct ContractABI {
 #[derive(Debug, Clone)]
 pub struct ABIResolvedStruct {
     pub name: String,
+    pub prefix: Option<ABIOpcode>,
     pub fields: Vec<ABIStructField>,
+    pub overrides_client_type: bool,
 }
 
 impl ContractABI {
@@ -418,10 +420,15 @@ fn collect_structs_from_type(
 ) -> anyhow::Result<()> {
     match ty {
         Ty::StructRef { struct_name, .. } => {
-            let fields = find_struct_decl(abi, struct_name)
+            let (prefix, fields, overrides_client_type) = find_struct_decl(abi, struct_name)
                 .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
             if seen_structs.insert(struct_name.clone()) {
-                resolved.push(to_resolved_struct(struct_name, fields));
+                resolved.push(to_resolved_struct(
+                    struct_name,
+                    prefix,
+                    fields,
+                    overrides_client_type,
+                ));
             }
             Ok(())
         }
@@ -467,11 +474,22 @@ fn collect_structs_from_type(
     }
 }
 
-fn find_struct_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a [ABIStructField]> {
+fn find_struct_decl<'a>(
+    abi: &'a ContractABI,
+    target_name: &str,
+) -> Option<(Option<&'a ABIOpcode>, &'a [ABIStructField], bool)> {
     abi.declarations.iter().find_map(|decl| match decl {
-        ABIDeclaration::Struct { name, fields, .. } if name == target_name => {
-            Some(fields.as_slice())
-        }
+        ABIDeclaration::Struct {
+            name,
+            prefix,
+            fields,
+            overrides_client_type,
+            ..
+        } if name == target_name => Some((
+            prefix.as_ref(),
+            fields.as_slice(),
+            *overrides_client_type,
+        )),
         _ => None,
     })
 }
@@ -485,10 +503,17 @@ fn find_alias_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a Ty
     })
 }
 
-fn to_resolved_struct(name: &str, fields: &[ABIStructField]) -> ABIResolvedStruct {
+fn to_resolved_struct(
+    name: &str,
+    prefix: Option<&ABIOpcode>,
+    fields: &[ABIStructField],
+    overrides_client_type: bool,
+) -> ABIResolvedStruct {
     ABIResolvedStruct {
         name: name.to_owned(),
+        prefix: prefix.cloned(),
         fields: fields.to_vec(),
+        overrides_client_type,
     }
 }
 
@@ -766,7 +791,7 @@ fn render_const_object_value(
     struct_name: &str,
     fields: &[ABIConstValue],
 ) -> String {
-    let Some(struct_fields) = find_struct_decl(abi, struct_name) else {
+    let Some((_, struct_fields, _)) = find_struct_decl(abi, struct_name) else {
         return format!("{struct_name} {{}}");
     };
 

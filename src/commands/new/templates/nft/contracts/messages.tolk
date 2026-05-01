@@ -46,16 +46,6 @@ struct (0x8b771735) ResponseStaticData {
     collectionAddress: address
 }
 
-struct (0x05138d91) NotificationForNewOwner {
-    queryId: uint64
-    oldOwnerAddress: address
-    payload: Payload
-}
-
-struct (0xd53276db) ReturnExcessesBack {
-    queryId: uint64
-}
-
 struct (0b0) PayloadInline {
     value: RemainingBitsAndRefs
 }
@@ -66,11 +56,23 @@ struct (0b1) PayloadInRef {
 
 type Payload = PayloadInline | PayloadInRef
 
+struct (0x05138d91) NotificationForNewOwner {
+    queryId: uint64
+    oldOwnerAddress: address
+    @abi.clientType(Payload)
+    payload: RemainingBitsAndRefs
+}
+
+struct (0xd53276db) ReturnExcessesBack {
+    queryId: uint64
+}
+
 struct (0x5fcc3d14) AskToChangeOwnership {
     queryId: uint64
     newOwnerAddress: address
     sendExcessesTo: address?
     customPayload: cell?
     forwardTonAmount: coins
-    forwardPayload: Payload
+    @abi.clientType(Payload)
+    forwardPayload: RemainingBitsAndRefs
 }

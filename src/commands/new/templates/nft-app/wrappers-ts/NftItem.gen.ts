@@ -679,13 +679,14 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
 }
 
 export class NftItem implements c.Contract {
-    static CodeCell = c.Cell.fromBase64('te6ccgECBwEAAWsAART/APSkE/S88sgLAQIBYgIDAeTQ+JHyQO1E0NM/+kggxwCOHDD4kiHHBfLhlQL6SNTRAsjLPxP6UhL6UszJ7VTg+kjXTCTXLCL+Yeik4wJsIdcsIX5ZNRSOITMC1ws/+JLIz4UI+lKCEIt3FzXPC47LP8v/+lLJgED7AOBfA4QPAccA8vQEADWhH5/aiaGmf/SQQY4BKmDgstrbwfSRrpj+qmEC6jX4kiLHBfLhkQTTP/pI+lD0AfoA1ywCk4EAgpzXLAaS8j/h10yBAIPiJPpEMPLRTfiTcPg6+CdvEIIK+vCAoSSUU0Ggod4lbpExmCX6RDDy0U2i4iDC//LhkiOTN18D4w0gbpMTXwPjDgLIyz/6UvpSzMntVAUGAGLIz5AUTjZGJ88LPxj6UoEAgli6k8+BzpPPg8ziycjPhQhSQPpSWPoCcc8LaszJcfsAADLIz4UI+lJQA/oCghDVMnbbzwuKyz/JcfsA');
+    static CodeCell = c.Cell.fromBase64('te6ccgECBwEAAU8AART/APSkE/S88sgLAQIBYgIDAeTQ+JHyQO1E0NM/+kggxwCOHDD4kiHHBfLhlQL6SNTRAsjLPxP6UhL6UszJ7VTg+kjXTCTXLCL+Yeik4wJsIdcsIX5ZNRSOITMC1ws/+JLIz4UI+lKCEIt3FzXPC47LP8v/+lLJgED7AOBfA4QPAccA8vQEADWhH5/aiaGmf/SQQY4BKmDgstrbwfSRrpj+qmEC/jX4kiLHBfLhkQTTP/pI+lD0AfoAINdJ8uLEI/pEMPLRTfiTcPg6+CdvEIIK+vCAoSOUUzGgod4kbpExmCT6RDDy0U2i4iDC//LhkiKOJMjPkBRONkYmzws/F/pSzsnIz4UIUkD6Ulj6AnHPC2rMyXH7AJI2W+IgbpMTXwPjDgIFBgAyyM+FCPpSUAP6AoIQ1TJ2288Liss/yXH7AAAWyMs/+lL6UszJ7VQ=');
 
     static Errors = {
         'Errors.InvalidWorkchain': 333,
         'Errors.NotFromOwner': 401,
         'Errors.TooSmallRestAmount': 402,
         'Errors.NotFromCollection': 405,
+        'Errors.IncorrectForwardPayload': 708,
     }
 
     readonly address: c.Address
