@@ -1,9 +1,0 @@
-{
-  "title": "Linting",
-  "icon": "FileCheck",
-  "pages": [
-    "overview",
-    "configuration",
-    "outputs-and-ci"
-  ]
-}
