@@ -18,7 +18,7 @@ Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 - Native speed (Rust-based toolchain and test runtime).
 - Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
 - Ready for dApp development with project templates and automatically generated TypeScript wrappers.
-- Fast test runner with fork mode, gas snapshots, coverage, mutation and fuzzing testing and nice UI.
+- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzzing testing and nice UI.
 - Browser test UI for failed tests, traces, logs, and coverage inspection.
 
 ## Install
