@@ -1,11 +1,14 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
+    append_custom_network, format_captured_requests, spawn_toncenter_v2_mock,
+    spawn_toncenter_v2_mock_with_capture, toncenter_v2_account_info_ok_response,
     toncenter_v2_error_response,
 };
 use base64::Engine;
+use std::fmt::Write as _;
 use std::fs;
+use std::path::Path;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -152,6 +155,160 @@ fn forked_remote_account_preserves_last_transaction_metadata() {
         );
 
     mock_handle.join().expect("mock toncenter must finish");
+}
+
+#[test]
+fn fork_block_number_is_forwarded_to_remote_account_requests() {
+    let last_hash_bytes = [0x22_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 101, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-number-forwarded")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_block",
+            &format!(
+                r#"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test remote fork block number`() {{
+                val shard = testing.getShardAccount(address("{RAW_ADDRESS_MAINNET}"));
+                expect(shard).toBeNotNull();
+            }}
+        "#
+            ),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-block",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block")
+        .arg("--fork-block-number")
+        .arg("123456")
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured fork-block request log");
+    output.assert_file_snapshot_matches(
+        "fork-block-requests.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn configured_fork_block_number_is_forwarded_to_remote_account_requests() {
+    let last_hash_bytes = [0x44_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 303, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-number-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_config_block",
+            &remote_shard_account_test_source("configured fork block number"),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "config-block",
+        &format!("{mock_url}/api/v2"),
+    );
+    append_test_fork_settings(project.path(), "custom:config-block", 111111);
+
+    let output = project.acton().test().run().success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/configured_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("configured-fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured configured fork-block request log");
+    output.assert_file_snapshot_matches(
+        "configured-fork-block-requests.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/configured_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn cli_fork_block_number_overrides_configured_fork_block_number() {
+    let last_hash_bytes = [0x55_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 404, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-number-cli-override")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_override_block",
+            &remote_shard_account_test_source("cli fork block number override"),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "config-block-override",
+        &format!("{mock_url}/api/v2"),
+    );
+    append_test_fork_settings(project.path(), "custom:config-block-override", 111111);
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--fork-block-number")
+        .arg("222222")
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/cli_fork_block_number_overrides_configured_fork_block_number.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("cli-override-fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured cli override fork-block request log");
+    output.assert_file_snapshot_matches(
+        "cli-override-fork-block-requests.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/cli_fork_block_number_overrides_configured_fork_block_number.requests.txt",
+    );
 }
 
 #[test]
@@ -306,27 +463,33 @@ explorer = "https://example.invalid"
         );
 }
 
-fn toncenter_v2_account_info_ok_response(
-    balance: i64,
-    state: &str,
-    lt: u64,
-    hash: &str,
-) -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "balance": balance.to_string(),
-                "code": "",
-                "data": "",
-                "state": state,
-                "frozen_hash": "",
-                "last_transaction_id": {
-                    "lt": lt.to_string(),
-                    "hash": hash,
-                }
+fn remote_shard_account_test_source(test_name: &str) -> String {
+    r#"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test __TEST_NAME__`() {
+                val shard = testing.getShardAccount(address("__REMOTE_ADDRESS__"));
+                expect(shard).toBeNotNull();
             }
-        })
-        .to_string(),
-    }
+        "#
+    .replace("__TEST_NAME__", test_name)
+    .replace("__REMOTE_ADDRESS__", RAW_ADDRESS_MAINNET)
+}
+
+fn append_test_fork_settings(project_path: &Path, fork_net: &str, fork_block_number: u64) {
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    let _ = write!(
+        acton_toml,
+        r#"
+
+[test]
+fork-net = "{fork_net}"
+fork-block-number = {fork_block_number}
+"#
+    );
+    fs::write(&acton_toml_path, acton_toml)
+        .expect("failed to write Acton.toml with test fork settings");
 }

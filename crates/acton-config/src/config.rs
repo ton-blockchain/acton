@@ -1382,6 +1382,7 @@ mod tests {
         clear_cache_override: Option<bool>,
         junit_path_override: Option<&str>,
         fork_net_override: Option<Network>,
+        fork_block_number_override: Option<u64>,
         fail_fast_override: Option<bool>,
         ui_port_override: Option<u16>,
     ) -> TestConfig {
@@ -1406,7 +1407,7 @@ mod tests {
             None,
             None,
             fork_net_override,
-            None,
+            fork_block_number_override,
             None,
             false,
             None,
@@ -1431,13 +1432,15 @@ mod tests {
             fork_net: Some("custom:devnet".to_owned()),
             fail_fast: Some(true),
             ui_port: Some(23_456),
+            fork_block_number: Some(111_111),
             ..TestSettings::default()
         };
 
-        let config = test_settings_to_config(&settings, None, None, None, None, None);
+        let config = test_settings_to_config(&settings, None, None, None, None, None, None);
         assert!(!config.clear_cache);
         assert_eq!(config.junit_path.as_deref(), Some("configured-reports"));
         assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
+        assert_eq!(config.fork_block_number, Some(111_111));
         assert!(config.fail_fast);
         assert_eq!(config.ui_port, 23_456);
 
@@ -1446,12 +1449,14 @@ mod tests {
             Some(true),
             Some("cli-reports"),
             Some(Network::Testnet),
+            Some(222_222),
             Some(false),
             Some(34_567),
         );
         assert!(config.clear_cache);
         assert_eq!(config.junit_path.as_deref(), Some("cli-reports"));
         assert_eq!(config.fork_net, Some(Network::Testnet));
+        assert_eq!(config.fork_block_number, Some(222_222));
         assert!(!config.fail_fast);
         assert_eq!(config.ui_port, 34_567);
     }
@@ -1459,11 +1464,12 @@ mod tests {
     #[test]
     fn test_settings_merge_uses_test_defaults_without_config_or_cli() {
         let config =
-            test_settings_to_config(&TestSettings::default(), None, None, None, None, None);
+            test_settings_to_config(&TestSettings::default(), None, None, None, None, None, None);
 
         assert!(!config.clear_cache);
         assert_eq!(config.junit_path, None);
         assert_eq!(config.fork_net, None);
+        assert_eq!(config.fork_block_number, None);
         assert!(!config.fail_fast);
         assert_eq!(config.ui_port, 12_344);
     }
