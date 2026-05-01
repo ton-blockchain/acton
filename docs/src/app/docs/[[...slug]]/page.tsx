@@ -6,12 +6,13 @@ import {
   PageLastUpdate,
   DocsTitle,
 } from 'fumadocs-ui/layouts/docs/page';
-import {notFound} from 'next/navigation';
 import {getMDXComponents} from '@/lib/mdx-components';
 import type {Metadata} from 'next';
 import {createRelativeLink} from 'fumadocs-ui/mdx';
 import {LLMCopyButton, ViewOptions} from "@/components/page-actions";
 import {getLLMText} from "@/lib/get-llm-text";
+import { NotFound } from '@/components/layouts/not-found';
+import { getSuggestions } from './suggestions';
 
 interface PageProps {
   params: Promise<{ slug?: string[] }>;
@@ -20,7 +21,14 @@ interface PageProps {
 export default async function Page(props: PageProps) {
   const params = await props.params;
   const page = source.getPage(params.slug);
-  if (!page) notFound();
+
+  if (!page) {
+    return (
+      <NotFound
+        getSuggestions={async () => (params.slug ? getSuggestions(params.slug.join(' ')) : [])}
+      />
+    );
+  }
 
   const { body: MDX, lastModified } = page.data;
 
@@ -69,7 +77,13 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const page = source.getPage(params.slug);
-  if (!page) notFound();
+
+  if (!page) {
+    return {
+      title: 'Not Found',
+      metadataBase: new URL('https://ton-blockchain.github.io/acton'),
+    };
+  }
 
   return {
     title: page.data.title,
