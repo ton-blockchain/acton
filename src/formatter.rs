@@ -460,6 +460,23 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         Some(result)
     }
 
+    pub(crate) fn send_result_transactions(items: &[TupleItem]) -> Vec<Transaction> {
+        let tx_items = Self::flatten_big_array_items(items).unwrap_or_else(|| items.to_vec());
+
+        tx_items
+            .iter()
+            .filter_map(|el| {
+                let TupleItem::Tuple(tuple) = el else {
+                    return None;
+                };
+                let Some(TupleItem::Cell(tx)) = tuple.first() else {
+                    return None;
+                };
+                tx.parse::<Transaction>().ok()
+            })
+            .collect()
+    }
+
     /// Collect all known contract addresses from send results
     fn collect_known_contracts(&self, send_results: &[SendResult]) -> Vec<IntAddr> {
         let mut known_contracts: Vec<IntAddr> = vec![];

@@ -7,6 +7,7 @@ use crate::{
 use anyhow::Context;
 use std::sync::Arc;
 use ton_networks::Network;
+use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::config::{BlockchainConfigParams, MsgForwardPrices};
@@ -225,6 +226,51 @@ fn compute_in_msg_fwd_fee_uses_workchain_specific_prices() -> anyhow::Result<()>
         assert_ne!(sc_fee, mc_fee);
     }
 
+    Ok(())
+}
+
+#[test]
+fn prepare_send_transaction_preserves_valid_remote_previous_lts() -> anyhow::Result<()> {
+    let account_addr = std_addr(0, 0x45);
+    let mut account = shard_account(
+        account_addr.clone(),
+        123_456_789,
+        Some(body_with_u32(0x1234_5678)?),
+    )?;
+    let mut optional_account = account.account.load()?;
+    let large_lt = 74_118_931_000_008;
+    optional_account
+        .0
+        .as_mut()
+        .expect("test account must exist")
+        .last_trans_lt = large_lt + 1;
+    account.account = Lazy::new(&optional_account)?;
+    let last_trans_hash = HashBytes([0x99; 32]);
+    account.last_trans_hash = last_trans_hash;
+    account.last_trans_lt = large_lt;
+
+    let mut state = new_world_state()?;
+    state.update_account(&account_addr, &account);
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        IntAddr::Std(account_addr),
+        body_with_u32(0xabcd_ef01)?,
+    );
+    let libs = Default::default();
+
+    let prepared = Emulator::prepare_send_transaction(&mut state, to_cell(&message)?, &libs, None)?;
+    let executor_account =
+        Boc::decode_base64(&prepared.run_args.shard_account)?.parse::<ShardAccount>()?;
+    let account = executor_account
+        .account
+        .load()?
+        .0
+        .expect("executor account must exist");
+
+    assert_eq!(prepared.run_args.lt, large_lt + 1_000_000);
+    assert_eq!(account.last_trans_lt, large_lt + 1);
+    assert_eq!(executor_account.last_trans_lt, large_lt);
+    assert_eq!(executor_account.last_trans_hash, last_trans_hash);
     Ok(())
 }
 

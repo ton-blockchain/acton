@@ -729,9 +729,7 @@ impl ActonConfig {
         Ok(toml::from_str(&content)?)
     }
 
-    pub fn load() -> Result<Self> {
-        let mut config = Self::load_manifest()?;
-
+    pub fn load_wallets() -> Result<WalletsConfig> {
         // Merge wallets from different sources
         // Order of importance (later overrides earlier):
         // 1. Global ~/.config/acton/wallets/global.wallets.toml
@@ -764,9 +762,14 @@ impl ActonConfig {
             }
         }
 
-        config.wallets = Some(WalletsConfig {
+        Ok(WalletsConfig {
             wallets: merged_wallets,
-        });
+        })
+    }
+
+    pub fn load() -> Result<Self> {
+        let mut config = Self::load_manifest()?;
+        config.wallets = Some(Self::load_wallets()?);
 
         // Merge libraries from different sources
         let mut merged_libraries = BTreeMap::new();

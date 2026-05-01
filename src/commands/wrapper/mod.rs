@@ -195,8 +195,10 @@ fn generated_wrapper_header(contract_name: &str) -> String {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn wrapper_cmd(
-    contract_id: &str,
+    contract_id: Option<&str>,
+    all: bool,
     wrapper_output: Option<String>,
     wrapper_output_dir: Option<String>,
     test_output: Option<String>,
@@ -219,8 +221,54 @@ pub fn wrapper_cmd(
     let generate_test_stub =
         !generate_typescript && (explicit_test_request || config.tolk_wrapper_generate_test());
 
+    if all {
+        let contracts = config
+            .contracts()
+            .filter(|c| !c.is_empty())
+            .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?;
+        for contract_id in contracts.keys() {
+            generate_for_contract(
+                &config,
+                contract_id,
+                None,
+                wrapper_output_dir.clone(),
+                None,
+                test_output_dir.clone(),
+                generate_test_stub,
+                generate_typescript,
+            )?;
+        }
+    } else {
+        let contract_id =
+            contract_id.ok_or_else(|| anyhow!("contract_id is required when --all is not set"))?;
+        generate_for_contract(
+            &config,
+            contract_id,
+            wrapper_output,
+            wrapper_output_dir,
+            test_output,
+            test_output_dir,
+            generate_test_stub,
+            generate_typescript,
+        )?;
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn generate_for_contract(
+    config: &ActonConfig,
+    contract_id: &str,
+    wrapper_output: Option<String>,
+    wrapper_output_dir: Option<String>,
+    test_output: Option<String>,
+    test_output_dir: Option<String>,
+    generate_test_stub: bool,
+    generate_typescript: bool,
+) -> anyhow::Result<()> {
     let model = build_model(
-        &config,
+        config,
         contract_id,
         wrapper_output,
         wrapper_output_dir,

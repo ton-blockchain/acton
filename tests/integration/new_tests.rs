@@ -1864,20 +1864,21 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache
         String::from_utf8_lossy(&install_output.stderr)
     );
 
-    if scripts.contains_key("lint") {
-        let lint_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "lint"]);
-        assert!(
-            lint_output.status.success(),
-            "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&lint_output.stdout),
-            String::from_utf8_lossy(&lint_output.stderr)
-        );
-    } else {
-        assert!(
-            !package_uses_eslint(&package_json),
-            "{template} app template uses ESLint but does not expose npm run lint"
-        );
-    }
+    assert!(
+        scripts.contains_key("lint"),
+        "{template} app template must expose npm run lint"
+    );
+    assert!(
+        package_uses_eslint(&package_json),
+        "{template} app template must depend on ESLint"
+    );
+    let lint_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "lint"]);
+    assert!(
+        lint_output.status.success(),
+        "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&lint_output.stdout),
+        String::from_utf8_lossy(&lint_output.stderr)
+    );
 
     let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(

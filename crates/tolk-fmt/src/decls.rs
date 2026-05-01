@@ -441,6 +441,10 @@ pub fn print_struct_field_declaration<'a>(ctx: &Context, f: &StructField) -> Opt
     let typ = f.typ()?;
 
     let mut parts = vec![];
+    if let Some(annotations) = f.annotations() {
+        parts.push(print_annotation_list(ctx, &annotations)?);
+    }
+
     if let Some(modifiers) = f.modifiers() {
         for modifier in modifiers.modifiers() {
             parts.push(RcDoc::text(modifier.as_str()));
@@ -866,6 +870,17 @@ pub fn print_annotation<'a>(ctx: &Context<'_>, a: &Annotation) -> Option<RcDoc<'
 }
 
 pub fn print_annotation_arguments<'a>(ctx: &Context<'_>, a: &AnnotationArgs) -> Option<RcDoc<'a>> {
+    if let Some(typ) = a.typ() {
+        return common::print_list(
+            ctx,
+            &[typ],
+            types::print_type,
+            Type::syntax,
+            |_| vec![],
+            common::ListOptions::default(),
+        );
+    }
+
     let arguments: Vec<_> = a.args().collect();
     let never_break_if_items_lt = if matches!(arguments.as_slice(), [Expr::StringLit(_)]) {
         2

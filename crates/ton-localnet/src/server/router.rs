@@ -6,11 +6,11 @@ use super::handlers::{
     get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
     get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
     get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
-    get_shards, get_state_source, get_traces, get_transactions, get_transactions_by_message_v3,
-    get_transactions_std, get_transactions_v3, json_rpc, lookup_block, pack_address,
-    register_compiler_abis, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
-    send_boc_return_hash, send_message_v3, set_address_name, set_state_source,
-    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
+    get_shard_account_cell, get_shards, get_state_source, get_traces, get_transactions,
+    get_transactions_by_message_v3, get_transactions_std, get_transactions_v3, json_rpc,
+    lookup_block, pack_address, register_compiler_abis, run_get_method, run_get_method_std,
+    run_get_method_v3, send_boc, send_boc_return_hash, send_message_v3, set_address_name,
+    set_state_source, try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::localnet::Localnet;
 use axum::{
@@ -50,6 +50,7 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         .route("/v2/packAddress", get(pack_address))
         .route("/v2/unpackAddress", get(unpack_address))
         .route("/v2/getAddressInformation", get(get_address_information))
+        .route("/v2/getShardAccountCell", get(get_shard_account_cell))
         .route("/v2/getAddressBalance", get(get_address_balance))
         .route("/v2/getAddressState", get(get_address_state))
         .route("/v2/getLibraries", get(get_libraries))

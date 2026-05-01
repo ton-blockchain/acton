@@ -115,6 +115,12 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
                 .await
                 .map(|r| v2::map_account_state(&r))?
         }
+        "getShardAccountCell" => {
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_shard_account_cell(req.address, req.seqno)
+                .await
+                .map(|r| v2::map_shard_account_cell(&r))?
+        }
         "getAddressBalance" => {
             let req: GetAddressInformationRequest = parse_params(params, method)?;
             node.get_address_balance(req.address, req.seqno)

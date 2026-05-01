@@ -655,6 +655,130 @@ fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
 }
 
 #[test]
+fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract() {
+    let project = ProjectBuilder::new("script-send-result-abi-from-address")
+        .mapping("@acton", "../lib")
+        .file(
+            "contracts/script_remote_messages",
+            r"
+struct (0xF8200001) ScriptRemotePing {
+    queryId: uint64
+}
+",
+        )
+        .contract(
+            "script_remote_sink",
+            r#"
+import "script_remote_messages"
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract ScriptRemoteSink {
+    incomingMessages: ScriptRemotePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptRemotePing.fromSlice(in.body);
+    throw Errors.NotOwner;
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "prepare_remote",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val sender = testing.treasury("remote_prepare_sender");
+    val init = ContractState {
+        code: build("script_remote_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    if (!testing.saveSnapshot("world-state.json")) {
+        println("SAVE_FAILED");
+        return;
+    }
+
+    println("REMOTE_SINK={}", sinkAddress);
+}
+"#,
+        )
+        .script_file(
+            "send_remote",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../wrappers/ScriptRemoteSink.gen"
+
+fun main(sinkAddress: address) {
+    if (!testing.loadSnapshot("world-state.json")) {
+        println("LOAD_FAILED");
+        return;
+    }
+
+    val sender = testing.treasury("remote_call_sender");
+    val sink = ScriptRemoteSink.fromAddress(sinkAddress);
+    val txs = sink.sendScriptRemotePing(sender.address, 7, { value: ton("0.1") });
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("script_remote_sink")
+        .run()
+        .success();
+
+    let prepare_output = project
+        .acton()
+        .script("scripts/prepare_remote.tolk")
+        .run()
+        .success();
+    let remote_address = prepare_output
+        .get_stdout()
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("REMOTE_SINK=")
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .expect("prepare script must print remote sink address");
+
+    project
+        .acton()
+        .script("scripts/send_remote.tolk")
+        .arg(&remote_address)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_file_not_found() {
     let project = ProjectBuilder::new("script-not-found").build();
 

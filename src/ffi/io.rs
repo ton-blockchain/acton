@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
-use crate::context::{Context, to_cell};
-use crate::ffi::emulation::normalize_address_input;
+use crate::context::{BuildCache, Context, to_cell};
+use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
 use crate::formatter::FormatterContext;
 use acton_debug::render_tuple_item_as_tolk_type;
 use anyhow::{Context as AnyhowContext, anyhow, bail};
@@ -8,6 +8,8 @@ use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::io::{IsTerminal, stdin};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::Ty;
@@ -281,6 +283,44 @@ fn collect_non_void_args<const N: usize>(
     Ok(collected)
 }
 
+fn build_cache_for_send_result_list(
+    ctx: &Context<'_>,
+    base_cache: &BuildCache,
+    item: &TupleItem,
+) -> BuildCache {
+    let mut build_cache = base_cache.clone();
+    let TupleItem::Tuple(items) = item else {
+        return build_cache;
+    };
+
+    let mut seen = HashSet::new();
+
+    for tx in FormatterContext::send_result_transactions(items) {
+        let addr = StdAddr::new(0, tx.account);
+        let Some(code) =
+            FormatterContext::account_code(ctx.chain.world_state.get_accounts(), &addr)
+        else {
+            continue;
+        };
+
+        if !seen.insert(*code.repr_hash()) {
+            continue;
+        }
+        if build_cache.result_for_code(&Some(code.clone())).is_some() {
+            continue;
+        }
+        // A contract created via `fromAddress()` does not call `build(...)`, so
+        // its ABI is absent from the main BuildCache. Resolve it into this
+        // formatter-local overlay so rendering has names without mutating the
+        // script/test environment.
+        if let Some((path, result)) = compilation_result_for_code(ctx, Some(&code), true) {
+            build_cache.built.insert(path, result);
+        }
+    }
+
+    build_cache
+}
+
 fn format_args(
     ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
@@ -344,7 +384,7 @@ fn format_reflected_arg(
     }
 
     if is_send_result_list_type(&arg.ty) {
-        return Ok(format_send_result_list(formatter, &item));
+        return Ok(format_send_result_list(ctx, formatter, &item));
     }
 
     let source_map = ctx
@@ -398,7 +438,16 @@ fn is_send_result_type(ty: &Ty) -> bool {
     )
 }
 
-fn format_send_result_list(formatter: &FormatterContext<'_>, item: &TupleItem) -> String {
+fn format_send_result_list(
+    ctx: &Context<'_>,
+    formatter: &FormatterContext<'_>,
+    item: &TupleItem,
+) -> String {
+    let build_cache = build_cache_for_send_result_list(ctx, formatter.build_cache.as_ref(), item);
+    let formatter = FormatterContext {
+        build_cache: Cow::Owned(build_cache),
+        ..formatter.clone()
+    };
     match item {
         TupleItem::Tuple(items) => formatter.format_transaction_list(items),
         _ => "not a TVM tuple".to_owned(),

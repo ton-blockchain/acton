@@ -20,7 +20,8 @@ use ton_localnet::types::Hash256;
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
 use tycho_types::models::{
-    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, OwnedMessage, StdAddr,
+    AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo,
+    OwnedMessage, ShardAccount, StdAddr,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -105,6 +106,36 @@ fun main() {
     });
 
     println(net.send(wallet.address, deployChild));
+}
+"#;
+
+const DEPLOY_TRACKED_CONTRACT_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val trackedInit = ContractState {
+        code: build("tracked"),
+        data: createEmptyCell(),
+    };
+    val trackedAddress = AutoDeployAddress {
+        stateInit: trackedInit,
+    }.calculateAddress();
+
+    val deployTracked = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: trackedInit,
+        },
+    });
+    net.send(wallet.address, deployTracked);
+
+    println("TRACKED_CONTRACT={}", trackedAddress);
 }
 "#;
 
@@ -419,6 +450,120 @@ fn localnet_starts_and_serves_masterchain_info() {
         response["result"]["last"]["seqno"].as_u64().is_some(),
         "Expected getMasterchainInfo result.last.seqno to be present:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_empty_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
+    let node = project.localnet().start();
+    let address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let mut response = node.get_json(&format!("/api/v2/getShardAccountCell?address={address}"));
+    normalize_extra_for_snapshot(&mut response);
+
+    let _parsed = decode_shard_account_cell_response(&response);
+
+    let mut rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getShardAccountCell",
+            "params": {
+                "address": address
+            }
+        }),
+    );
+    normalize_extra_for_snapshot(&mut rpc_response);
+    let _rpc_parsed = decode_shard_account_cell_response(&rpc_response);
+
+    let mut invalid_response =
+        node.get_json("/api/v2/getShardAccountCell?address=not-a-ton-address");
+    normalize_extra_for_snapshot(&mut invalid_response);
+
+    let snapshot = json!({
+        "empty_http": response,
+        "empty_json_rpc": rpc_response,
+        "invalid_address": invalid_response,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("Failed to serialize JSON response")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_empty.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_active_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-active")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let stdout = output.get_stdout();
+    let tracked_address = extract_marker_value(&stdout, "TRACKED_CONTRACT=");
+
+    wait_until_address_state_active(&node, &tracked_address, Duration::from_secs(12));
+    let raw_address = unpack_address(&node, &tracked_address);
+
+    let http_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={tracked_address}"),
+        Duration::from_secs(12),
+    );
+    let rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "tracked",
+            "method": "getShardAccountCell",
+            "params": {
+                "address": tracked_address
+            }
+        }),
+    );
+
+    let http_boc = shard_account_cell_boc64(&http_response);
+    let rpc_boc = shard_account_cell_boc64(&rpc_response);
+    let snapshot = json!({
+        "http": summarize_shard_account_cell_response(&http_response, Some(&raw_address)),
+        "json_rpc": summarize_shard_account_cell_response(&rpc_response, Some(&raw_address)),
+        "same_cell_bytes": http_boc == rpc_boc,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot)
+            .expect("Failed to serialize active shard account summary")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_active.summary.json"),
     );
 
     node.stop();
@@ -2826,6 +2971,80 @@ fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str
     )
 }
 
+fn shard_account_cell_boc64(response: &Value) -> &str {
+    response["result"]["bytes"].as_str().unwrap_or_else(|| {
+        panic!(
+            "getShardAccountCell result must contain cell bytes:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        )
+    })
+}
+
+fn decode_shard_account_cell_response(response: &Value) -> ShardAccount {
+    Boc::decode_base64(shard_account_cell_boc64(response))
+        .expect("getShardAccountCell bytes must be a valid BoC")
+        .parse::<ShardAccount>()
+        .expect("getShardAccountCell bytes must decode as ShardAccount")
+}
+
+fn summarize_shard_account_cell_response(
+    response: &Value,
+    expected_raw_address: Option<&str>,
+) -> Value {
+    let shard_account = decode_shard_account_cell_response(response);
+    let last_trans_lt = if shard_account.last_trans_lt == 0 {
+        "zero"
+    } else {
+        "nonzero"
+    };
+    let last_trans_hash_nonzero = shard_account.last_trans_hash != HashBytes::ZERO;
+
+    let optional_account = shard_account
+        .account
+        .load()
+        .expect("ShardAccount account reference must load");
+    let Some(account) = optional_account.0 else {
+        return json!({
+            "ok": response["ok"],
+            "cell_type": response["result"]["@type"],
+            "state": "nonexist",
+            "last_trans_lt": last_trans_lt,
+            "last_trans_hash_nonzero": last_trans_hash_nonzero,
+        });
+    };
+
+    let address_matches = expected_raw_address.map(|expected| match &account.address {
+        IntAddr::Std(std) => {
+            format!("{}:{}", std.workchain, hex::encode(std.address.0)) == expected
+        }
+        IntAddr::Var(_) => false,
+    });
+    let balance: u128 = account.balance.tokens.into();
+    let (state, code_present, data_present, frozen_hash_present) = match account.state {
+        AccountState::Active(state_init) => (
+            "active",
+            state_init.code.is_some(),
+            state_init.data.is_some(),
+            false,
+        ),
+        AccountState::Uninit => ("uninitialized", false, false, false),
+        AccountState::Frozen(hash) => ("frozen", false, false, hash != HashBytes::ZERO),
+    };
+
+    json!({
+        "ok": response["ok"],
+        "cell_type": response["result"]["@type"],
+        "state": state,
+        "balance_positive": balance > 0,
+        "address_matches": address_matches,
+        "code_present": code_present,
+        "data_present": data_present,
+        "frozen_hash_present": frozen_hash_present,
+        "last_trans_lt": last_trans_lt,
+        "last_trans_hash_nonzero": last_trans_hash_nonzero,
+    })
+}
+
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
     response_payload(response)
         .get("transactions")
@@ -3111,16 +3330,12 @@ fn extract_first_outgoing_message_locator(
 }
 
 fn normalize_transactions_std_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
     redact_dynamic_transaction_fields(response);
 }
 
 fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
 
     if let Some(shards) = response
         .pointer_mut("/result/shards")
@@ -3139,6 +3354,12 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 }
             }
         }
+    }
+}
+
+fn normalize_extra_for_snapshot(response: &mut Value) {
+    if let Some(extra) = response.get_mut("@extra") {
+        *extra = json!("[EXTRA]");
     }
 }
 

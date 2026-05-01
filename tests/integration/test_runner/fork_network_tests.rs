@@ -2,6 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
     ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
+    toncenter_v2_error_response,
 };
 use base64::Engine;
 use std::fs;
@@ -111,13 +112,10 @@ fn forked_remote_account_preserves_last_transaction_metadata() {
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
     let last_hash_hex = hex::encode(last_hash_bytes);
     let last_lt = 424_242_u64;
-    let (mock_url, mock_handle) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
-            1000,
-            "uninitialized",
-            last_lt,
-            &last_hash_b64,
-        )]);
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", last_lt, &last_hash_b64),
+    ]);
 
     let source = format!(
         r#"

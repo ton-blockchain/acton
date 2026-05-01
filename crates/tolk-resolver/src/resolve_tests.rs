@@ -1146,6 +1146,25 @@ mod tests {
     }
 
     #[test]
+    fn test_abi_client_type_annotation_resolves_struct_field_type_argument() {
+        check_definition(
+            r"
+                type ClientAddress = address;
+                type ClientPayload = cell;
+
+                struct Message {
+                    @abi.clientType(<caret>ClientAddress | <caret>ClientPayload)
+                    admin: address
+                }
+            ",
+            expect![[r"
+                ClientAddress -> Global(ClientAddress at test.tolk:22-35)
+                ClientPayload -> Global(ClientPayload at test.tolk:68-81)
+            "]],
+        );
+    }
+
+    #[test]
     fn test_local_var_references() {
         check_references(
             r"

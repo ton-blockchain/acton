@@ -113,6 +113,17 @@ pub async fn get_extended_address_information(
     .await
 }
 
+pub async fn get_shard_account_cell(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<GetAddressInformationRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.get_shard_account_cell(payload.address, payload.seqno),
+        v2::map_shard_account_cell,
+    )
+    .await
+}
+
 pub async fn get_libraries(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetLibrariesRequest>,

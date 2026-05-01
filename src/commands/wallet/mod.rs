@@ -950,7 +950,7 @@ fn remove_wallet_with_merged_precedence(name: &str, config: &ActonConfig) -> any
 }
 
 fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
-    let config = ActonConfig::load()?;
+    let wallets_config = ActonConfig::load_wallets()?;
 
     let mut wallets_info = Vec::new();
 
@@ -968,9 +968,7 @@ fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
         Default::default()
     };
 
-    let wallets = config
-        .wallets()
-        .ok_or_else(|| anyhow!(error_fmt::no_wallets_found()))?;
+    let wallets = &wallets_config.wallets;
 
     if wallets.is_empty() {
         if json {
