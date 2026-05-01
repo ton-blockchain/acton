@@ -485,8 +485,20 @@ enum Commands {
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
-        contract_id: String,
+        #[arg(
+            help = "Contract name to generate wrappers for",
+            value_name = "CONTRACT_NAME",
+            required_unless_present = "all",
+            conflicts_with = "all",
+            add = ArgValueCompleter::new(complete_contracts)
+        )]
+        contract_id: Option<String>,
+        #[arg(
+            long,
+            help = "Generate wrappers for every contract defined in Acton.toml",
+            conflicts_with_all = ["output", "test_output"],
+        )]
+        all: bool,
         #[arg(
             long,
             short,
@@ -1861,6 +1873,7 @@ fn main() {
         } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
         Commands::Wrapper {
             contract_id,
+            all,
             output: wrapper_output,
             output_dir: wrapper_output_dir,
             test_output,
@@ -1868,7 +1881,8 @@ fn main() {
             test,
             ts,
         } => wrapper_cmd(
-            &contract_id,
+            contract_id.as_deref(),
+            all,
             wrapper_output,
             wrapper_output_dir,
             test_output,
