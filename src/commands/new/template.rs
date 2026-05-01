@@ -125,7 +125,6 @@ pub(super) struct ProjectScaffold {
     layout: ProjectLayout,
     contracts: &'static [ContractTemplate],
     deploy_script: &'static str,
-    lint_excludes: &'static [&'static str],
     extra_scripts: &'static [ExtraScript],
 }
 
@@ -148,14 +147,6 @@ impl ProjectScaffold {
     #[must_use]
     pub(super) fn contract_src(&self, contract: &ContractTemplate) -> String {
         self.layout.remap_path(contract.src)
-    }
-
-    #[must_use]
-    pub(super) fn lint_excludes(&self) -> Vec<String> {
-        self.lint_excludes
-            .iter()
-            .map(|pattern| self.layout.remap_path(pattern))
-            .collect()
     }
 
     #[must_use]
@@ -273,7 +264,6 @@ const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -283,7 +273,6 @@ const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -293,7 +282,6 @@ const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -303,7 +291,6 @@ const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -313,7 +300,6 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -323,7 +309,6 @@ const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -333,7 +318,6 @@ const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deployCollection.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
 
@@ -343,11 +327,8 @@ const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deployCollection.tolk",
-    lint_excludes: &[],
     extra_scripts: &[],
 };
-
-const W5_PLUGIN_LINT_EXCLUDES: &[&str] = &["**/walletv5/**", "**/wrappers/WalletV5Contract.tolk"];
 
 const W5_PLUGIN_EXTRA_SCRIPTS: &[ExtraScript] = &[
     ExtraScript {
@@ -368,7 +349,6 @@ const W5_PLUGIN_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &W5_PLUGIN_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: W5_PLUGIN_LINT_EXCLUDES,
     extra_scripts: W5_PLUGIN_EXTRA_SCRIPTS,
 };
 
@@ -378,7 +358,6 @@ const W5_PLUGIN_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &W5_PLUGIN_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    lint_excludes: W5_PLUGIN_LINT_EXCLUDES,
     extra_scripts: W5_PLUGIN_EXTRA_SCRIPTS,
 };
 

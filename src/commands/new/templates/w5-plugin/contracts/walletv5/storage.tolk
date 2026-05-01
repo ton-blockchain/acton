@@ -8,7 +8,7 @@ struct Storage {
     extensions: ExtensionsDict // from address hash to true
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 

@@ -22,47 +22,47 @@ fun processExtraActions(extraActions: SnakedExtraActions, isExtension: bool) {
             AddExtensionExtraAction => {
                 val (extensionWorkchain, extensionAddrHash) = action.addr.getWorkchainAndHash();
                 val myWorkchain = contract.getAddress().getWorkchain();
-                assert (myWorkchain == extensionWorkchain) throw ERROR_EXTENSION_WRONG_WORKCHAIN;
+                assert (myWorkchain == extensionWorkchain) throw Errors.ExtensionWrongWorkchain;
 
                 var storage = lazy Storage.load();
                 val inserted = storage.extensions.addIfNotExists(extensionAddrHash, true);
-                assert (inserted) throw ERROR_ADD_EXTENSION;
+                assert (inserted) throw Errors.AddExtension;
                 storage.save();
             }
 
             RemoveExtensionExtraAction => {
                 val (extensionWorkchain, extensionAddrHash) = action.addr.getWorkchainAndHash();
                 val myWorkchain = contract.getAddress().getWorkchain();
-                assert (myWorkchain == extensionWorkchain) throw ERROR_EXTENSION_WRONG_WORKCHAIN;
+                assert (myWorkchain == extensionWorkchain) throw Errors.ExtensionWrongWorkchain;
 
                 var storage = lazy Storage.load();
                 val removed = storage.extensions.delete(extensionAddrHash);
-                assert (removed) throw ERROR_REMOVE_EXTENSION;
+                assert (removed) throw Errors.RemoveExtension;
                 if (!storage.isSignatureAllowed) {
                     assert (
                         !storage.extensions.isEmpty()
-                    ) throw ERROR_REMOVE_LAST_EXTENSION_WHEN_SIGNATURE_DISABLED;
+                    ) throw Errors.RemoveLastExtensionWhenSignatureDisabled;
                 }
                 storage.save();
             }
 
             SetSignatureAllowedExtraAction => {
-                assert (isExtension) throw ERROR_ONLY_EXTENSION_CAN_CHANGE_SIGNATURE_MODE;
+                assert (isExtension) throw Errors.OnlyExtensionCanChangeSignatureMode;
 
                 var storage = lazy Storage.load();
                 assert (
                     storage.isSignatureAllowed != action.allowSignature
-                ) throw ERROR_THIS_SIGNATURE_MODE_ALREADY_SET;
+                ) throw Errors.ThisSignatureModeAlreadySet;
                 if (!action.allowSignature) {
                     assert (
                         !storage.extensions.isEmpty()
-                    ) throw ERROR_DISABLE_SIGNATURE_WHEN_EXTENSIONS_IS_EMPTY;
+                    ) throw Errors.DisableSignatureWhenExtensionsIsEmpty;
                 }
                 storage.isSignatureAllowed = action.allowSignature;
                 storage.save();
             }
 
-            else => throw ERROR_UNSUPPORTED_ACTION,
+            else => throw Errors.UnsupportedAction,
         }
         if (!extraActions.hasNext()) {
             return;
@@ -97,20 +97,20 @@ fun onExternalMessage(inMsgBody: slice) {
 
     val msg = AllowedExternalMessageToWalletV5.fromSlice(
         signedSlice,
-        { throwIfOpcodeDoesNotMatch: ERROR_INVALID_MESSAGE_OPERATION },
+        { throwIfOpcodeDoesNotMatch: Errors.InvalidMessageOperation },
     );
 
     var storage = lazy Storage.load();
 
     assert (
         isSignatureValid(signedSlice.hash(), signature, storage.publicKey)
-    ) throw ERROR_INVALID_SIGNATURE;
+    ) throw Errors.InvalidSignature;
     assert (
         storage.isSignatureAllowed | storage.extensions.isEmpty()
-    ) throw ERROR_SIGNATURE_DISABLED;
-    assert (msg.seqno == storage.seqno) throw ERROR_INVALID_SEQNO;
-    assert (msg.walletId == storage.subwalletId) throw ERROR_INVALID_WALLET_ID;
-    assert (msg.validUntil > blockchain.now()) throw ERROR_EXPIRED;
+    ) throw Errors.SignatureDisabled;
+    assert (msg.seqno == storage.seqno) throw Errors.InvalidSeqno;
+    assert (msg.walletId == storage.subwalletId) throw Errors.InvalidWalletId;
+    assert (msg.validUntil > blockchain.now()) throw Errors.Expired;
 
     acceptExternalMessage();
 
@@ -144,10 +144,10 @@ fun onInternalMessage(in: InMessage) {
 
             assert (
                 storage.isSignatureAllowed | storage.extensions.isEmpty()
-            ) throw ERROR_SIGNATURE_DISABLED;
-            assert (msg.seqno == storage.seqno) throw ERROR_INVALID_SEQNO;
-            assert (msg.walletId == storage.subwalletId) throw ERROR_INVALID_WALLET_ID;
-            assert (msg.validUntil > blockchain.now()) throw ERROR_EXPIRED;
+            ) throw Errors.SignatureDisabled;
+            assert (msg.seqno == storage.seqno) throw Errors.InvalidSeqno;
+            assert (msg.walletId == storage.subwalletId) throw Errors.InvalidWalletId;
+            assert (msg.validUntil > blockchain.now()) throw Errors.Expired;
 
             // Store and commit the seqno increment to prevent replays even if the subsequent requests fail.
             storage.isSignatureAllowed = true;

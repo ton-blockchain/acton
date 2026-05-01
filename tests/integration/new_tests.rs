@@ -534,8 +534,6 @@ fn test_new_w5_plugin_project_non_interactive() {
     assert!(content.contains("acton script scripts/deploy.tolk"));
     assert!(content.contains("install-extension = \"acton script scripts/install-extension.tolk"));
     assert!(content.contains("delete-extension = \"acton script scripts/delete-extension.tolk"));
-    assert!(content.contains("[lint]"));
-    assert!(content.contains("**/walletv5/**"));
 
     assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
     assert!(project_dir.join("contracts/types.tolk").exists());

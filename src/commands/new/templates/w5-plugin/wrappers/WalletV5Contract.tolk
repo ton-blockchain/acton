@@ -3,12 +3,10 @@ import "@acton/build"
 import "@acton/crypto"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
+import "@acton/testing/assert"
 import "@acton/testing/expect"
-import "@acton/types/message"
 import "@contracts/walletv5/messages"
 import "@contracts/walletv5/storage"
-
-const ERROR_WALLET_V5_INIT_REQUIRED = 666
 
 fun constructAddressFromWorkchainAndHash(wc: int8, hash: uint256): address {
     return beginCell().storeUint(4, 3).storeUint(wc, 8).storeUint(hash, 256).toSlice() as address;
@@ -26,7 +24,7 @@ fun WalletV5Contract.deployCodeLib(): cell {
     return realCode.toLibraryReference();
 }
 
-fun WalletV5Contract.fromStorage(storage: Storage) {
+fun WalletV5Contract.fromStorage(storage: Storage): WalletV5Contract {
     val init = ContractState {
         code: WalletV5Contract.deployCodeLib(),
         data: storage.toCell(),
@@ -37,7 +35,7 @@ fun WalletV5Contract.fromStorage(storage: Storage) {
 
 fun WalletV5Contract.deploy(self, from: address, config: SendParams = {}): SendResultList {
     if (self.init == null) {
-        throw ERROR_WALLET_V5_INIT_REQUIRED;
+        Assert.fail("Cannot deploy a WalletV5Contract that lacks state init for deployment");
     }
     val msgDeploy = createMessage({
         bounce: config.bounce,

@@ -20,7 +20,7 @@ type ExtraAction =
 // "extra actions" are represented in a snake format: "data".ref("data.ref("data"...))
 type SnakedExtraActions = RemainingBitsAndRefs
 
-fun SnakedExtraActions.hasNext(self) {
+fun SnakedExtraActions.hasNext(self): int {
     return self.remainingRefsCount();
 }
 

@@ -33,26 +33,26 @@ fun OutActionsCell.verifyC5Actions(self, isExternal: bool): self {
     var cs = self.beginParseAllowExotic();
     do {
         // these checks could be cheaper in terms of gas if we just try to parse cs;
-        // but we want to throw exactly `ERROR_INVALID_C5` (not `9` "cell underflow")
+        // but we want to throw exactly `Errors.InvalidC5` (not `9` "cell underflow")
         val (nBits, nRefs) = cs.remainingBitsAndRefsCount();
-        assert (nRefs == 2) throw ERROR_INVALID_C5;
-        assert (nBits == 32 + 8) throw ERROR_INVALID_C5;
+        assert (nRefs == 2) throw Errors.InvalidC5;
+        assert (nBits == 32 + 8) throw Errors.InvalidC5;
 
         val outAction = lazy OutActionWithSendMessageOnly.fromSlice(
             cs,
-            { throwIfOpcodeDoesNotMatch: ERROR_INVALID_C5 },
+            { throwIfOpcodeDoesNotMatch: Errors.InvalidC5 },
         );
 
         if (isExternal) {
             assert (
                 (outAction.sendMode & SEND_MODE_IGNORE_ERRORS) != 0
-            ) throw ERROR_EXTERNAL_SEND_MESSAGE_MUST_HAVE_IGNORE_ERRORS_SEND_MODE;
+            ) throw Errors.ExternalSendMessageMustHaveIgnoreErrorsSendMode;
         }
 
         cs = outAction.prev.beginParseAllowExotic();
         count += 1;
     } while (!cs.isEmpty());
 
-    assert (count <= 255) throw ERROR_INVALID_C5;
+    assert (count <= 255) throw Errors.InvalidC5;
     return self;
 }
