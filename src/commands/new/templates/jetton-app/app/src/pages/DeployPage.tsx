@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { buildDeployMessage, parseUnits } from '../lib/deploy';
+import { getErrorMessage, isCancelledTransactionError } from '../lib/errors';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -134,18 +135,14 @@ export function DeployPage({ network }: Props) {
       });
       setDeployedAddress(friendlyAddr);
       setStatus({ type: 'success', message: 'Jetton deployed successfully!' });
-    } catch (err: any) {
-      const msg = err?.message || String(err) || '';
-      if (
-        msg.includes('Interrupted') ||
-        msg.includes('cancel') ||
-        msg.includes('reject') ||
-        msg.includes('Cancelled') ||
-        msg.includes('closed')
-      ) {
+    } catch (err) {
+      if (isCancelledTransactionError(err)) {
         setStatus({ type: 'error', message: 'Transaction cancelled' });
       } else {
-        setStatus({ type: 'error', message: msg || 'Deployment failed' });
+        setStatus({
+          type: 'error',
+          message: getErrorMessage(err) || 'Deployment failed',
+        });
       }
     } finally {
       setLoading(false);
