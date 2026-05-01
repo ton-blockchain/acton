@@ -42,10 +42,14 @@ fun main() {
     val external = net.createExternalMessage(deployer.address, signedBody);
 
     val extResult = net.sendExternal(external);
-    val result = extResult!.waitForFirstTransaction();
-
-    if (result == null) {
+    if (extResult == null) {
         println("External message was not accepted");
+        return;
+    }
+
+    val result = extResult.waitForFirstTransaction();
+    if (result == null) {
+        println("External message did not produce a transaction");
         return;
     }
 
