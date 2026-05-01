@@ -1,8 +1,8 @@
 use acton_config::color::OwoColorize;
 use anyhow::{Context as AnyhowContext, anyhow};
 use axum::extract::{Query, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{Html, IntoResponse, Response};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Html;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use rand::RngCore;
@@ -38,6 +38,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Acton TON Connect</title>
+  <link rel="icon" href="https://ton-blockchain.github.io/acton/logo.png">
   <script src="https://unpkg.com/@tonconnect/sdk@3.4.1/dist/tonconnect-sdk.min.js"></script>
   <script src="https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js"></script>
   <style>
@@ -60,15 +61,23 @@ const INDEX_HTML: &str = r#"<!doctype html>
       box-sizing: border-box;
       width: min(660px, calc(100vw - 32px));
       padding: 28px;
-      border: 1px solid #2b333d;
       border-radius: 8px;
       background: #151b22;
     }
     h1 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin: 0 0 12px;
       font-size: 24px;
       line-height: 1.2;
       letter-spacing: 0;
+    }
+    .title-icon {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      border-radius: 6px;
     }
     p {
       margin: 0 0 20px;
@@ -77,7 +86,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     }
     #status {
       margin-top: 18px;
-      color: #d7dde5;
+      color: #9ca7b5;
       font-size: 14px;
       line-height: 1.45;
       overflow-wrap: anywhere;
@@ -87,7 +96,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 </head>
 <body>
   <main>
-    <h1>Acton TON Connect</h1>
+    <h1><img class="title-icon" src="https://ton-blockchain.github.io/acton/logo.png" alt="">Acton TON Connect</h1>
     <p>Connect a wallet and approve transactions requested by the running Acton script.</p>
     <div id="ton-connect-button"></div>
     <div id="status">Waiting for wallet connection...</div>
@@ -97,7 +106,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     const apiToken = '__ACTON_API_TOKEN__';
     const apiHeaders = () => ({'x-acton-tonconnect-token': apiToken});
     const TonConnect = TonConnectSDK.TonConnect;
-    const manifestUrl = 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
+    const manifestUrl = 'https://ton-blockchain.github.io/acton/tonconnect-manifest.json';
 
     const setStatus = (text) => {
       statusEl.textContent = text;
@@ -227,13 +236,6 @@ const INDEX_HTML: &str = r#"<!doctype html>
 </html>
 "#;
 
-const ICON_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<rect width="64" height="64" rx="12" fill="#0f1f2e"/>
-<path d="M14 16h36L32 50 14 16z" fill="#35a8ff"/>
-<path d="M21 21h22L32 42 21 21z" fill="#fff" opacity=".86"/>
-</svg>
-"##;
-
 #[derive(Clone)]
 pub struct TonConnectContext {
     pub session: Arc<TonConnectSession>,
@@ -270,7 +272,6 @@ struct PendingTonConnectRequest {
 #[derive(Clone)]
 struct TonConnectWebState {
     inner: Arc<TonConnectState>,
-    base_url: Arc<str>,
     storage_path: Arc<PathBuf>,
     api_token: Arc<str>,
 }
@@ -299,14 +300,6 @@ pub struct TonConnectMessage {
 struct ConnectPayload {
     address: String,
     chain: Option<serde_json::Value>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TonConnectManifest {
-    url: String,
-    name: &'static str,
-    icon_url: String,
 }
 
 #[derive(Serialize)]
@@ -351,9 +344,8 @@ impl TonConnectSession {
         let addr = listener
             .local_addr()
             .context("Failed to read local TON Connect server address")?;
-        let base_url = format!("http://{addr}");
         let api_token = generate_api_token();
-        let url = base_url.clone();
+        let url = format!("http://{addr}");
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         let state = Arc::new(TonConnectState {
@@ -365,15 +357,12 @@ impl TonConnectSession {
         });
         let web_state = TonConnectWebState {
             inner: Arc::clone(&state),
-            base_url: Arc::<str>::from(base_url.as_str()),
             storage_path: Arc::new(storage_path),
             api_token: Arc::<str>::from(api_token),
         };
 
         let app = Router::new()
             .route("/", get(index))
-            .route("/icon.svg", get(icon))
-            .route("/tonconnect-manifest.json", get(manifest))
             .route("/api/connect", post(connect))
             .route("/api/request", get(request))
             .route("/api/response", post(response))
@@ -665,23 +654,6 @@ fn chain_name(chain: &str) -> Option<&'static str> {
 
 async fn index(State(state): State<TonConnectWebState>) -> Html<String> {
     Html(INDEX_HTML.replace("__ACTON_API_TOKEN__", state.api_token.as_ref()))
-}
-
-async fn icon() -> Response {
-    let mut response = ICON_SVG.into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("image/svg+xml; charset=utf-8"),
-    );
-    response
-}
-
-async fn manifest(State(state): State<TonConnectWebState>) -> Json<TonConnectManifest> {
-    Json(TonConnectManifest {
-        url: state.base_url.to_string(),
-        name: "Acton",
-        icon_url: format!("{}/icon.svg", state.base_url),
-    })
 }
 
 async fn connect(
@@ -979,6 +951,11 @@ mod tests {
     #[test]
     fn tonconnect_page_restores_sdk_connection_from_storage() {
         assert!(!INDEX_HTML.contains("@latest"));
+        assert!(
+            INDEX_HTML.contains("https://ton-blockchain.github.io/acton/tonconnect-manifest.json")
+        );
+        assert!(INDEX_HTML.contains("https://ton-blockchain.github.io/acton/logo.png"));
+        assert!(INDEX_HTML.contains(r#"<img class="title-icon""#));
         assert!(INDEX_HTML.contains("const formatStatusError"));
         assert!(INDEX_HTML.contains("Acton has finished running. You can close this page."));
         assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
