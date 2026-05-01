@@ -730,6 +730,9 @@ pub trait Walker<'tree> {
     }
 
     fn walk_annotation_args(&mut self, node: &AnnotationArgs<'tree>) -> Self::Result {
+        if let Some(typ) = node.typ() {
+            self.visit_type(&typ);
+        }
         for arg in node.args() {
             self.visit_expr(&arg);
         }

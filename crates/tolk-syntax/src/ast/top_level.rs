@@ -979,6 +979,11 @@ impl_ast_node!(AnnotationArgs, "annotation_arguments");
 
 impl<'tree> AnnotationArgs<'tree> {
     #[must_use]
+    pub fn typ(&self) -> Option<Type<'tree>> {
+        self.0.field("type")
+    }
+
+    #[must_use]
     pub fn args(&self) -> AstChildren<'tree, Expr<'tree>> {
         AstChildren::new(self.0)
     }

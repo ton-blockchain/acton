@@ -420,21 +420,21 @@ fn test_struct_with_annotations() {
 #[test]
 fn test_struct_fields_with_abi_client_type_annotations() {
     check(
-        r#"struct Message {
+        r"struct Message {
                 // field docs
-                @abi.clientType("number")
+                @abi.clientType(ClientFlags)
                 flags: uint8 // inline field
-                @abi.clientType("Address | null") // annotation comment
+                @abi.clientType(Address | null) // annotation comment
                 readonly admin: address? = null
-            }"#,
-        expect![[r#"
+            }",
+        expect![[r"
                 struct Message {
                     // field docs
-                    @abi.clientType("number")
+                    @abi.clientType(ClientFlags)
                     flags: uint8 // inline field
-                    @abi.clientType("Address | null") // annotation comment
+                    @abi.clientType(Address | null) // annotation comment
                     readonly admin: address? = null
-                }"#]],
+                }"]],
     );
 }
 
