@@ -2245,6 +2245,34 @@ fn read_new_template_package_json(template: &str) -> JsonValue {
         .unwrap_or_else(|e| panic!("Failed to parse {template}/package.json: {e}"))
 }
 
+fn assert_new_template_files_match_baseline(
+    baseline_template: &str,
+    candidate_templates: &[&str],
+    relative_paths: &[&str],
+    reason: &str,
+) {
+    let mut mismatches = Vec::new();
+
+    for candidate_template in candidate_templates {
+        for relative_path in relative_paths {
+            if read_new_template_file(candidate_template, relative_path)
+                != read_new_template_file(baseline_template, relative_path)
+            {
+                mismatches.push(format!(
+                    "- {candidate_template}/{relative_path} differs from {baseline_template}/{relative_path}\n  inspect: diff -u src/commands/new/templates/{baseline_template}/{relative_path} src/commands/new/templates/{candidate_template}/{relative_path}"
+                ));
+            }
+        }
+    }
+
+    if !mismatches.is_empty() {
+        panic!(
+            "App template shared file parity regression.\n\n{}\n\n{reason}",
+            mismatches.join("\n")
+        );
+    }
+}
+
 #[test]
 fn test_new_w5_extension_app_template_matches_contract_app_package_sections() {
     let baseline = read_new_template_package_json("counter-app");
@@ -2275,6 +2303,56 @@ fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
             "w5-extension app template `{relative_path}` must match the common contract app template tooling file"
         );
     }
+}
+
+#[test]
+fn test_new_app_template_common_styles_match_shared_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["empty-app", "jetton-app", "w5-extension-app"],
+        &["app/src/styles.css"],
+        "Keep the shared app CSS baseline byte-for-byte identical across empty, counter, jetton, and w5-extension app templates. If a style change is common, apply it to every shared stylesheet. If a divergence is intentional, document the exception in this test.",
+    );
+}
+
+#[test]
+fn test_new_nft_app_template_styles_only_extend_shared_baseline() {
+    let baseline = read_new_template_file("counter-app", "app/src/styles.css");
+    let nft_styles = read_new_template_file("nft-app", "app/src/styles.css");
+
+    let domain_tail = nft_styles
+        .strip_prefix(&baseline)
+        .unwrap_or_else(|| {
+            panic!(
+                "nft-app/app/src/styles.css no longer starts with the shared app CSS baseline from counter-app/app/src/styles.css.\n\nKeep common theme tokens, base styles, scrollbars, animations, and overlay z-index rules identical, then append NFT-only classes after the shared block.\n\ninspect: diff -u src/commands/new/templates/counter-app/app/src/styles.css src/commands/new/templates/nft-app/app/src/styles.css"
+            )
+        });
+
+    assert!(
+        domain_tail.starts_with("\n/* ─── Domain-specific styles ─── */\n"),
+        "nft-app/app/src/styles.css may only differ from the shared baseline by appending the documented NFT domain-specific block. Found unexpected tail after the shared baseline:\n{domain_tail}"
+    );
+}
+
+#[test]
+fn test_new_contract_app_template_shared_ui_components_match_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["jetton-app", "nft-app", "w5-extension-app"],
+        &[
+            "app/src/components/ui/alert.tsx",
+            "app/src/components/ui/badge.tsx",
+            "app/src/components/ui/button.tsx",
+            "app/src/components/ui/card.tsx",
+            "app/src/components/ui/dropdown-menu.tsx",
+            "app/src/components/ui/input.tsx",
+            "app/src/components/ui/label.tsx",
+            "app/src/components/ui/separator.tsx",
+            "app/src/components/ui/tabs.tsx",
+            "app/src/components/ui/textarea.tsx",
+        ],
+        "These shadcn-style primitives are shared by all contract app templates. Keep them byte-for-byte identical unless a template-specific component is deliberately split into a separate file.",
+    );
 }
 
 #[test]

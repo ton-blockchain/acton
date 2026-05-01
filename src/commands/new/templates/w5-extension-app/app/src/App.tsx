@@ -207,30 +207,56 @@ function Metric({
   );
 }
 
-function NetworkDropdown() {
+function NetworkDropdown({ theme }: { theme: Theme }) {
   const options: { mode: TonNetworkMode; label: string }[] = [
-    { mode: 'testnet', label: 'Testnet' },
     { mode: 'mainnet', label: 'Mainnet' },
+    { mode: 'testnet', label: 'Testnet' },
   ];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Circle className="size-2 fill-primary text-primary" />
+        <Button
+          variant="ghost"
+          className="h-10 rounded-full px-3 text-[15px] font-bold gap-1.5 max-sm:h-9 max-sm:px-2.5 max-sm:text-sm"
+          style={{
+            background: theme === 'light' ? '#F0F1F3' : '#19191B',
+            color: theme === 'light' ? 'var(--foreground)' : '#fff',
+          }}
+          type="button"
+        >
+          <Circle
+            className="size-2 fill-current"
+            style={{
+              color:
+                TON_NETWORK_MODE === 'testnet'
+                  ? 'var(--warning)'
+                  : 'var(--success)',
+            }}
+          />
           {TON_NETWORK_LABEL}
-          <ChevronDown className="size-4" />
+          <ChevronDown className="size-3 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="min-w-[180px] rounded-xl p-2">
         {options.map((option) => (
           <DropdownMenuItem
             key={option.mode}
+            className="cursor-pointer gap-2.5 rounded-xl px-3.5 py-3 text-[15px] font-medium"
             onClick={() => setTonNetworkMode(option.mode)}
           >
+            <Circle
+              className="size-2 fill-current"
+              style={{
+                color:
+                  option.mode === 'testnet'
+                    ? 'var(--warning)'
+                    : 'var(--success)',
+              }}
+            />
             {option.label}
             {TON_NETWORK_MODE === option.mode ? (
-              <Check className="ml-auto size-4" />
+              <Check className="size-4 ml-auto" />
             ) : null}
           </DropdownMenuItem>
         ))}
@@ -655,44 +681,65 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-full bg-background text-foreground">
+    <div className="flex min-h-full flex-col bg-background text-foreground">
       {popup ? <Popup popup={popup} onClose={() => setPopup(null)} /> : null}
 
-      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-4 px-4 py-4 md:px-6">
-        <header className="flex flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Wallet V5 subscription extension
+      <header
+        className="sticky top-0 z-50 flex h-[60px] items-center justify-between border-b px-7 max-sm:h-auto max-sm:flex-wrap max-sm:gap-2.5 max-sm:px-4 max-sm:py-3"
+        style={{
+          background: theme === 'light' ? '#fff' : '#08080A',
+          borderBottomColor:
+            theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+        }}
+      >
+        <div className="flex items-center gap-6 max-sm:w-full max-sm:justify-between max-sm:gap-2.5">
+          <div className="flex items-center gap-2.5 text-[17px] font-bold max-sm:text-[15px]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[#0098EA] text-white max-sm:h-7 max-sm:w-7 max-sm:rounded-[7px]">
+              <PlugZap className="size-4 max-sm:size-3.5" />
             </div>
-            <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
-              Simple Extension Inspector
-            </h1>
+            Wallet W5 Extension
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <NetworkDropdown />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              title={
-                theme === 'dark'
-                  ? 'Switch to light theme'
-                  : 'Switch to dark theme'
-              }
-              onClick={() =>
-                setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
-              }
-            >
-              {theme === 'dark' ? (
-                <Sun className="size-4" />
-              ) : (
-                <Moon className="size-4" />
-              )}
-            </Button>
-            <TonConnectButton />
+        <div className="flex items-center gap-2.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-10 rounded-full max-sm:size-9"
+            style={{
+              background: theme === 'light' ? '#F0F1F3' : '#19191B',
+              color: theme === 'light' ? 'var(--foreground)' : '#fff',
+            }}
+            title={
+              theme === 'dark'
+                ? 'Switch to light theme'
+                : 'Switch to dark theme'
+            }
+            onClick={() =>
+              setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+            }
+          >
+            {theme === 'dark' ? (
+              <Sun className="size-[18px]" />
+            ) : (
+              <Moon className="size-[18px]" />
+            )}
+          </Button>
+          <NetworkDropdown theme={theme} />
+          <TonConnectButton />
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-6 md:px-6 md:py-8">
+        <section className="min-w-0">
+          <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Wallet V5 subscription extension
           </div>
-        </header>
+          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
+            Simple Extension Inspector
+          </h1>
+        </section>
 
         <section className="grid flex-1 gap-4 lg:grid-cols-[420px_minmax(0,1fr)]">
           <div className="flex flex-col gap-4">
@@ -906,7 +953,7 @@ export default function App() {
             </div>
           </div>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

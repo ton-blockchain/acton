@@ -38,11 +38,15 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial,
     Tahoma, Verdana, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+  --font-mono:
+    'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, SFMono-Regular,
+    monospace;
 
   --animate-in: enter 0.2s ease-out;
   --animate-out: exit 0.15s ease-in;
@@ -70,7 +74,6 @@
   --radius: 0.625rem;
   --success: #29cc6a;
   --warning: #f5a73b;
-  --ton-accent: #0098ea;
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
