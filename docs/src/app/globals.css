@@ -38,6 +38,44 @@ code, pre {
   background-color: var(--color-fd-background);
 }
 
+.home-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    #050505;
+  background-size: 26px 26px;
+}
+
+.home-shell::before {
+  left: max(1rem, calc((100vw - 1500px) / 2 + 1rem));
+}
+
+.home-shell::after {
+  right: max(1rem, calc((100vw - 1500px) / 2 + 1rem));
+}
+
+.feature-video-panel {
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, rgba(45, 131, 236, 0.08), transparent 42%),
+    #060606;
+  background-size: 26px 26px, 26px 26px, auto, auto;
+}
+
+.feature-video-panel .landing-video-frame,
+.feature-video-panel .feature-video {
+  height: 100%;
+  min-height: inherit;
+}
+
+.feature-video {
+  aspect-ratio: auto;
+}
+
 .glass-nav {
   background: linear-gradient(
     135deg,

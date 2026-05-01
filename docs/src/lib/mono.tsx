@@ -53,7 +53,7 @@ export async function generate({
   title,
   description,
   logo,
-  site = 'Acton Docs',
+  site = 'Docs',
   siteUrl = 'ton-blockchain.github.io/acton/docs',
 }: GenerateProps) {
   const primaryTextColor = 'rgb(248, 250, 252)';
