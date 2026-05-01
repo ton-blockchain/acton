@@ -100,7 +100,7 @@ Use TON Connect wallet approval for broadcast messages.
 
 This opens a local browser page, connects a wallet, and sends `net.send(...)`
 messages through that wallet instead of loading local wallet mnemonics.
-The TON Connect session is saved under `.acton/tonconnect/<network>.json` and
+The TON Connect session is saved under `build/sessions/tonconnect/<network>.json` and
 reused by later runs in the same project. Currently supported only with
 `--net mainnet` or `--net testnet`.
 {{/option}}
@@ -153,7 +153,7 @@ Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
 `global.wallets.toml` on name conflicts. With `--tonconnect`, any
 `scripts.wallet("name")` call resolves to the connected wallet address.
-Acton saves the TON Connect session in `.acton/tonconnect/<network>.json`, so
+Acton saves the TON Connect session in `build/sessions/tonconnect/<network>.json`, so
 the next script run can restore the wallet connection without asking the user
 to connect again.
 

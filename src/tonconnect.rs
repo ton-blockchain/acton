@@ -38,8 +38,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Acton TON Connect</title>
-  <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/sdk@3.4.1/dist/tonconnect-sdk.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js"></script>
   <style>
     :root {
       color-scheme: light dark;
@@ -54,7 +54,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
       place-items: center;
     }
     main {
-      width: min(520px, calc(100vw - 32px));
+      box-sizing: border-box;
+      width: min(660px, calc(100vw - 32px));
       padding: 28px;
       border: 1px solid #2b333d;
       border-radius: 8px;
@@ -76,6 +77,9 @@ const INDEX_HTML: &str = r#"<!doctype html>
       margin-top: 18px;
       color: #d7dde5;
       font-size: 14px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -506,7 +510,8 @@ pub fn ensure_supported_network(network: &Network) -> anyhow::Result<()> {
 
 pub fn session_storage_path(project_root: &Path, network: &Network) -> anyhow::Result<PathBuf> {
     Ok(project_root
-        .join(".acton")
+        .join("build")
+        .join("sessions")
         .join("tonconnect")
         .join(format!("{}.json", tonconnect_network_name(network)?)))
 }
@@ -955,6 +960,7 @@ mod tests {
 
     #[test]
     fn tonconnect_page_restores_sdk_connection_from_storage() {
+        assert!(!INDEX_HTML.contains("@latest"));
         assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
         assert!(INDEX_HTML.contains("await tonConnectUI.connectionRestored"));
         assert!(INDEX_HTML.contains("const result = await tonConnectUI.sendTransaction"));
@@ -976,18 +982,24 @@ mod tests {
 
         assert_eq!(
             session_storage_path(root, &Network::Mainnet).unwrap(),
-            root.join(".acton").join("tonconnect").join("mainnet.json")
+            root.join("build")
+                .join("sessions")
+                .join("tonconnect")
+                .join("mainnet.json")
         );
         assert_eq!(
             session_storage_path(root, &Network::Testnet).unwrap(),
-            root.join(".acton").join("tonconnect").join("testnet.json")
+            root.join("build")
+                .join("sessions")
+                .join("tonconnect")
+                .join("testnet.json")
         );
     }
 
     #[test]
     fn tonconnect_storage_roundtrips_values() {
         let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join(".acton/tonconnect/testnet.json");
+        let path = temp.path().join("build/sessions/tonconnect/testnet.json");
 
         assert_eq!(storage_get_item(&path, "missing").unwrap(), None);
 
@@ -1005,7 +1017,7 @@ mod tests {
     #[test]
     fn tonconnect_storage_remove_deletes_only_requested_key() {
         let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join(".acton/tonconnect/testnet.json");
+        let path = temp.path().join("build/sessions/tonconnect/testnet.json");
 
         storage_set_item(&path, "keep".to_string(), "1".to_string()).unwrap();
         storage_set_item(&path, "remove".to_string(), "2".to_string()).unwrap();
@@ -1024,7 +1036,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join(".acton/tonconnect/testnet.json");
+        let path = temp.path().join("build/sessions/tonconnect/testnet.json");
 
         storage_set_item(&path, "session".to_string(), "value".to_string()).unwrap();
 

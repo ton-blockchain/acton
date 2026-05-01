@@ -85,7 +85,7 @@ Use TON Connect wallet approval for broadcast messages.
 .sp
 This opens a local browser page, connects a wallet, and sends \fBnet.send(...)\fR
 messages through that wallet instead of loading local wallet mnemonics.
-The TON Connect session is saved under \fB.acton/tonconnect/<network>.json\fR and
+The TON Connect session is saved under \fBbuild/sessions/tonconnect/<network>.json\fR and
 reused by later runs in the same project. Currently supported only with
 \fB\-\-net mainnet\fR or \fB\-\-net testnet\fR\&.
 .RE
@@ -163,7 +163,7 @@ Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local \fBwallets.toml\fR entries overriding
 \fBglobal.wallets.toml\fR on name conflicts. With \fB\-\-tonconnect\fR, any
 \fBscripts.wallet("name")\fR call resolves to the connected wallet address.
-Acton saves the TON Connect session in \fB.acton/tonconnect/<network>.json\fR, so
+Acton saves the TON Connect session in \fBbuild/sessions/tonconnect/<network>.json\fR, so
 the next script run can restore the wallet connection without asking the user
 to connect again.
 .SH "ARGUMENT FORWARDING"
