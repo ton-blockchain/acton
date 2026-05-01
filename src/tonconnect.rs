@@ -1,8 +1,8 @@
 use acton_config::color::OwoColorize;
 use anyhow::{Context as AnyhowContext, anyhow};
-use axum::extract::{Query, State};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::Html;
+use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use rand::RngCore;
@@ -29,6 +29,11 @@ use tycho_types::models::{
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
 const TONCONNECT_TESTNET_CHAIN: &str = "-3";
 const API_TOKEN_HEADER: &str = "x-acton-tonconnect-token";
+const MAX_HTTP_BODY_BYTES: usize = 2 * 1024 * 1024;
+const MAX_STORAGE_ENTRIES: usize = 64;
+const MAX_STORAGE_FILE_BYTES: u64 = 2 * 1024 * 1024;
+const MAX_STORAGE_KEY_BYTES: usize = 256;
+const MAX_STORAGE_VALUE_BYTES: usize = 256 * 1024;
 pub const DEFAULT_TONCONNECT_PORT: u16 = 52258;
 
 const INDEX_HTML: &str = r#"<!doctype html>
@@ -39,8 +44,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
   <meta name="referrer" content="no-referrer">
   <title>Acton TON Connect</title>
   <link rel="icon" href="https://ton-blockchain.github.io/acton/logo.png">
-  <script src="https://unpkg.com/@tonconnect/sdk@3.4.1/dist/tonconnect-sdk.min.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/@tonconnect/sdk@3.4.1/dist/tonconnect-sdk.min.js" integrity="sha384-pR+OiYptKgy3a68Q4V/HO+CeDCBgn12WWYgNl8Eo1HUWWIvDViNOT5xVe0KCY/ms" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@2.4.4/dist/tonconnect-ui.min.js" integrity="sha384-sSX7t/8RIb6F0lgKBLCCytcRdsJv/+lBzIvFAnTlX7HymE9i9wCFIFOQ4iH7dJWO" crossorigin="anonymous"></script>
   <style>
     :root {
       color-scheme: light dark;
@@ -274,6 +279,7 @@ struct TonConnectWebState {
     inner: Arc<TonConnectState>,
     storage_path: Arc<PathBuf>,
     api_token: Arc<str>,
+    page_token: Arc<str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -345,7 +351,8 @@ impl TonConnectSession {
             .local_addr()
             .context("Failed to read local TON Connect server address")?;
         let api_token = generate_api_token();
-        let url = format!("http://{addr}");
+        let page_token = generate_api_token();
+        let url = format!("http://{addr}/{page_token}");
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         let state = Arc::new(TonConnectState {
@@ -359,15 +366,17 @@ impl TonConnectSession {
             inner: Arc::clone(&state),
             storage_path: Arc::new(storage_path),
             api_token: Arc::<str>::from(api_token),
+            page_token: Arc::<str>::from(page_token),
         };
 
         let app = Router::new()
-            .route("/", get(index))
+            .route("/{page_token}", get(index))
             .route("/api/connect", post(connect))
             .route("/api/request", get(request))
             .route("/api/response", post(response))
             .route("/api/storage", get(storage_get).post(storage_set))
             .route("/api/storage/remove", post(storage_remove))
+            .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
             .with_state(web_state);
 
         let server_thread = thread::Builder::new()
@@ -652,8 +661,47 @@ fn chain_name(chain: &str) -> Option<&'static str> {
     }
 }
 
-async fn index(State(state): State<TonConnectWebState>) -> Html<String> {
-    Html(INDEX_HTML.replace("__ACTON_API_TOKEN__", state.api_token.as_ref()))
+async fn index(
+    AxumPath(page_token): AxumPath<String>,
+    State(state): State<TonConnectWebState>,
+) -> Result<Response, (StatusCode, String)> {
+    if page_token != state.page_token.as_ref() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "TON Connect page not found".to_string(),
+        ));
+    }
+
+    let mut response =
+        Html(INDEX_HTML.replace("__ACTON_API_TOKEN__", state.api_token.as_ref())).into_response();
+    add_index_security_headers(response.headers_mut());
+    Ok(response)
+}
+
+fn add_index_security_headers(headers: &mut HeaderMap) {
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; \
+             base-uri 'none'; \
+             object-src 'none'; \
+             form-action 'none'; \
+             frame-ancestors 'none'; \
+             script-src 'self' 'unsafe-inline' https://unpkg.com; \
+             style-src 'unsafe-inline'; \
+             img-src https: data:; \
+             connect-src 'self' https: wss:",
+        ),
+    );
 }
 
 async fn connect(
@@ -803,24 +851,60 @@ fn verify_api_token(
 }
 
 fn storage_get_item(path: &Path, key: &str) -> anyhow::Result<Option<String>> {
+    validate_storage_key(key)?;
     Ok(read_storage(path)?.get(key).cloned())
 }
 
 fn storage_set_item(path: &Path, key: String, value: String) -> anyhow::Result<()> {
+    validate_storage_key(&key)?;
+    validate_storage_value(&value)?;
     let mut storage = read_storage(path)?;
+    if !storage.contains_key(&key) && storage.len() >= MAX_STORAGE_ENTRIES {
+        anyhow::bail!("TON Connect session storage has too many entries");
+    }
     storage.insert(key, value);
     write_storage(path, &storage)
 }
 
 fn storage_remove_item(path: &Path, key: &str) -> anyhow::Result<()> {
+    validate_storage_key(key)?;
     let mut storage = read_storage(path)?;
     storage.remove(key);
     write_storage(path, &storage)
 }
 
+fn validate_storage_key(key: &str) -> anyhow::Result<()> {
+    if key.is_empty() {
+        anyhow::bail!("TON Connect session storage key cannot be empty");
+    }
+    if key.len() > MAX_STORAGE_KEY_BYTES {
+        anyhow::bail!("TON Connect session storage key is too large");
+    }
+    Ok(())
+}
+
+fn validate_storage_value(value: &str) -> anyhow::Result<()> {
+    if value.len() > MAX_STORAGE_VALUE_BYTES {
+        anyhow::bail!("TON Connect session storage value is too large");
+    }
+    Ok(())
+}
+
 fn read_storage(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
     if !path.exists() {
         return Ok(BTreeMap::new());
+    }
+    let metadata = fs::metadata(path).with_context(|| {
+        format!(
+            "Failed to inspect TON Connect session storage {}",
+            path.display()
+        )
+    })?;
+    if metadata.len() > MAX_STORAGE_FILE_BYTES {
+        anyhow::bail!(
+            "TON Connect session storage {} is too large",
+            path.display()
+        );
     }
 
     let content = fs::read_to_string(path).with_context(|| {
@@ -842,6 +926,9 @@ fn read_storage(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
 }
 
 fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Result<()> {
+    if storage.len() > MAX_STORAGE_ENTRIES {
+        anyhow::bail!("TON Connect session storage has too many entries");
+    }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {
             format!(
@@ -853,6 +940,12 @@ fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Res
 
     let content =
         serde_json::to_vec_pretty(storage).context("Failed to serialize TON Connect session")?;
+    if content.len() as u64 > MAX_STORAGE_FILE_BYTES {
+        anyhow::bail!(
+            "TON Connect session storage {} is too large",
+            path.display()
+        );
+    }
     fs::write(path, content).with_context(|| {
         format!(
             "Failed to write TON Connect session storage {}",
@@ -951,6 +1044,8 @@ mod tests {
     #[test]
     fn tonconnect_page_restores_sdk_connection_from_storage() {
         assert!(!INDEX_HTML.contains("@latest"));
+        assert!(INDEX_HTML.contains("integrity=\"sha384-"));
+        assert!(INDEX_HTML.contains("crossorigin=\"anonymous\""));
         assert!(
             INDEX_HTML.contains("https://ton-blockchain.github.io/acton/tonconnect-manifest.json")
         );
@@ -961,6 +1056,25 @@ mod tests {
         assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
         assert!(INDEX_HTML.contains("await tonConnectUI.connectionRestored"));
         assert!(INDEX_HTML.contains("const result = await tonConnectUI.sendTransaction"));
+    }
+
+    #[test]
+    fn tonconnect_index_security_headers_disable_framing() {
+        let mut headers = HeaderMap::new();
+        add_index_security_headers(&mut headers);
+
+        assert_eq!(
+            headers.get(header::X_FRAME_OPTIONS).unwrap(),
+            HeaderValue::from_static("DENY")
+        );
+        assert!(
+            headers
+                .get(header::CONTENT_SECURITY_POLICY)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("frame-ancestors 'none'")
+        );
     }
 
     #[test]
@@ -1025,6 +1139,19 @@ mod tests {
             Some("1".to_string())
         );
         assert_eq!(storage_get_item(&path, "remove").unwrap(), None);
+    }
+
+    #[test]
+    fn tonconnect_storage_rejects_oversized_values() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("build/sessions/tonconnect/testnet.json");
+        let oversized = "x".repeat(MAX_STORAGE_VALUE_BYTES + 1);
+
+        let error = storage_set_item(&path, "session".to_string(), oversized)
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("value is too large"));
     }
 
     #[cfg(unix)]

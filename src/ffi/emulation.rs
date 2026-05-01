@@ -1045,9 +1045,28 @@ fn send_tonconnect_message(
     let parsed_ext_in = external_in_cell
         .parse::<Message<'_>>()
         .context("Failed to parse TON Connect external-in message")?;
+    validate_tonconnect_external_in(&parsed_ext_in, &tonconnect.wallet.address)?;
     let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
     drop(parsed_ext_in);
     Ok((external_in_cell, norm_hash))
+}
+
+fn validate_tonconnect_external_in(
+    message: &Message<'_>,
+    wallet_address: &StdAddr,
+) -> anyhow::Result<()> {
+    let MsgInfo::ExtIn(info) = &message.info else {
+        anyhow::bail!("TON Connect wallet returned a non external-in message");
+    };
+    let IntAddr::Std(dst) = &info.dst else {
+        anyhow::bail!(
+            "TON Connect wallet returned an external-in message with variable destination"
+        );
+    };
+    if dst != wallet_address {
+        anyhow::bail!("TON Connect wallet returned a message for a different wallet address");
+    }
+    Ok(())
 }
 
 fn send_transaction_debug(
@@ -3163,6 +3182,7 @@ mod tests {
     use anyhow::anyhow;
     use rustc_hash::FxHashSet;
     use std::sync::Arc;
+    use tycho_types::models::OwnedMessage;
 
     fn test_hash(byte: u8) -> HashBytes {
         HashBytes([byte; 32])
@@ -3232,6 +3252,20 @@ mod tests {
             executor_logs: None,
             missing_libraries: FxHashSet::default(),
         })
+    }
+
+    fn test_external_in_message(dst: StdAddr) -> Cell {
+        CellBuilder::build_from(OwnedMessage {
+            info: MsgInfo::ExtIn(ExtInMsgInfo {
+                src: None,
+                dst: IntAddr::Std(dst),
+                import_fee: Tokens::ZERO,
+            }),
+            init: None,
+            body: Cell::default().into(),
+            layout: None,
+        })
+        .expect("external-in message must be buildable")
     }
 
     #[test]
@@ -3371,6 +3405,20 @@ mod tests {
         assert_eq!(pending.parent_lt, Some(200));
         assert_eq!(pending.message, second_child);
         assert!(!message_iters.is_done(cursor_id));
+    }
+
+    #[test]
+    fn tonconnect_external_in_validation_rejects_different_wallet() {
+        let expected = StdAddr::new(0, test_hash(10));
+        let other = StdAddr::new(0, test_hash(11));
+        let cell = test_external_in_message(other);
+        let parsed = cell.parse::<Message<'_>>().unwrap();
+
+        let error = validate_tonconnect_external_in(&parsed, &expected)
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("different wallet address"));
     }
 
     /// Verify that `synthesize_tx_cell_from_v3` reconstructs transactions whose cell `BoCs`
