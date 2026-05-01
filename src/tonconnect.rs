@@ -48,10 +48,13 @@ const INDEX_HTML: &str = r#"<!doctype html>
       color: #f5f7fa;
     }
     body {
+      box-sizing: border-box;
       margin: 0;
-      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
-      place-items: center;
+      justify-items: center;
+      align-items: start;
+      padding: clamp(32px, 12vh, 96px) 16px 32px;
     }
     main {
       box-sizing: border-box;
@@ -73,7 +76,6 @@ const INDEX_HTML: &str = r#"<!doctype html>
       line-height: 1.5;
     }
     #status {
-      min-height: 24px;
       margin-top: 18px;
       color: #d7dde5;
       font-size: 14px;
@@ -99,6 +101,18 @@ const INDEX_HTML: &str = r#"<!doctype html>
 
     const setStatus = (text) => {
       statusEl.textContent = text;
+    };
+
+    const formatStatusError = (error) => {
+      const message = error && error.message ? error.message : String(error);
+      if (
+        message === 'Failed to fetch' ||
+        message === 'Load failed' ||
+        message === 'NetworkError when attempting to fetch resource.'
+      ) {
+        return 'Acton has finished running. You can close this page.';
+      }
+      return message;
     };
 
     const postJson = async (url, body) => {
@@ -149,7 +163,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     };
 
     tonConnectUI.onStatusChange((wallet) => {
-      publishWallet(wallet).catch((error) => setStatus(error.message));
+      publishWallet(wallet).catch((error) => setStatus(formatStatusError(error)));
     });
 
     const restoreConnection = async () => {
@@ -162,7 +176,11 @@ const INDEX_HTML: &str = r#"<!doctype html>
       }
 
       if (tonConnectUI.wallet) {
-        await publishWallet(tonConnectUI.wallet);
+        try {
+          await publishWallet(tonConnectUI.wallet);
+        } catch (error) {
+          setStatus(formatStatusError(error));
+        }
       } else {
         setStatus('Waiting for wallet connection...');
       }
@@ -197,7 +215,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
           setStatus('Transaction was rejected or failed.');
         }
       } catch (error) {
-        setStatus(error && error.message ? error.message : String(error));
+        setStatus(formatStatusError(error));
       }
 
       setTimeout(poll, 500);
@@ -961,6 +979,8 @@ mod tests {
     #[test]
     fn tonconnect_page_restores_sdk_connection_from_storage() {
         assert!(!INDEX_HTML.contains("@latest"));
+        assert!(INDEX_HTML.contains("const formatStatusError"));
+        assert!(INDEX_HTML.contains("Acton has finished running. You can close this page."));
         assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
         assert!(INDEX_HTML.contains("await tonConnectUI.connectionRestored"));
         assert!(INDEX_HTML.contains("const result = await tonConnectUI.sendTransaction"));
