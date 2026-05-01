@@ -6,7 +6,7 @@ use std::path::Path;
 pub const DEFAULT_APP_DIR: &str = "app";
 const STANDALONE_APP_NPM_NAME: &str = "ton-dapp-template";
 
-pub fn create_app_cmd(path: Option<&Path>) -> anyhow::Result<()> {
+pub(super) fn create_app_cmd(path: Option<&Path>) -> anyhow::Result<()> {
     let target_dir = resolve_target_dir(path);
     validate_app_target_dir(target_dir)?;
     extract_standalone_app_scaffold(target_dir, STANDALONE_APP_NPM_NAME)

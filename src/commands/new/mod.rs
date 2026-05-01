@@ -265,6 +265,9 @@ pub fn new_cmd(
             scaffold.deploy_script_path()
         ),
     );
+    for (alias, command) in scaffold.extra_scripts() {
+        scripts.insert(alias, command);
+    }
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
 

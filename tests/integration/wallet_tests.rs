@@ -579,6 +579,39 @@ fn test_wallet_list() {
 }
 
 #[test]
+fn test_wallet_list_global_outside_project_without_acton_toml() {
+    let project = ProjectBuilder::new("wallet-list-global-outside-project").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+    let outside_dir = tempfile::TempDir::new().unwrap();
+
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
+    fs::create_dir_all(&global_wallets_dir).unwrap();
+    fs::write(
+        global_wallets_dir.join("global.wallets.toml"),
+        format!(
+            r#"[wallets.global-only]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
+"#
+        ),
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_list()
+        .current_dir(outside_dir.path())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wallet/test_wallet_list_global_outside_project_without_acton_toml.stdout.txt",
+        );
+}
+
+#[test]
 fn test_wallet_import_local() {
     let project = ProjectBuilder::new("wallet-import-local").build();
     let mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";

@@ -1,0 +1,2 @@
+Deployed simple extension to [WALLET_ADDRESS_BASE] (SimpleExtension)
+Configured wallet address [WALLET_ADDRESS_BASE] (deployer-2)
