@@ -289,6 +289,39 @@ pub(crate) fn toncenter_v2_run_get_method_ok_response(
     }
 }
 
+pub(crate) fn toncenter_v2_account_info_ok_response(
+    balance: i64,
+    state: &str,
+    lt: u64,
+    hash: &str,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "balance": balance.to_string(),
+                "code": "",
+                "data": "",
+                "state": state,
+                "frozen_hash": "",
+                "last_transaction_id": {
+                    "lt": lt.to_string(),
+                    "hash": hash,
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn format_captured_requests(requests: &[CapturedToncenterRequest]) -> String {
+    let mut out = String::new();
+    for request in requests {
+        let _ = writeln!(out, "{} {}", request.method, request.path);
+    }
+    out
+}
+
 pub(crate) fn toncenter_v2_verify_registry_address_response(
     registry_address: &str,
 ) -> ToncenterV2MockResponse {

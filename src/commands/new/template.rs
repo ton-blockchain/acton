@@ -29,11 +29,11 @@ static NFT_TEMPLATE_DIR: Dir<'static> =
 static NFT_APP_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft-app");
 
-static W5_PLUGIN_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-plugin");
+static W5_EXTENSION_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension");
 
-static W5_PLUGIN_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-plugin-app");
+static W5_EXTENSION_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension-app");
 
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
 const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
@@ -243,7 +243,7 @@ const NFT_CONTRACTS: [ContractTemplate; 2] = [
     },
 ];
 
-const W5_PLUGIN_CONTRACTS: [ContractTemplate; 2] = [
+const W5_EXTENSION_CONTRACTS: [ContractTemplate; 2] = [
     ContractTemplate {
         id: "SimpleExtension",
         name: "SimpleExtension",
@@ -330,7 +330,7 @@ const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     extra_scripts: &[],
 };
 
-const W5_PLUGIN_EXTRA_SCRIPTS: &[ExtraScript] = &[
+const W5_EXTENSION_EXTRA_SCRIPTS: &[ExtraScript] = &[
     ExtraScript {
         alias: "install-extension",
         script: "scripts/install-extension.tolk",
@@ -343,22 +343,22 @@ const W5_PLUGIN_EXTRA_SCRIPTS: &[ExtraScript] = &[
     },
 ];
 
-const W5_PLUGIN_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &W5_PLUGIN_TEMPLATE_DIR,
+const W5_EXTENSION_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
-    contracts: &W5_PLUGIN_CONTRACTS,
+    contracts: &W5_EXTENSION_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    extra_scripts: W5_PLUGIN_EXTRA_SCRIPTS,
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
 };
 
-const W5_PLUGIN_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &W5_PLUGIN_TEMPLATE_DIR,
-    app_overlay_dir: Some(&W5_PLUGIN_APP_TEMPLATE_DIR),
+const W5_EXTENSION_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    app_overlay_dir: Some(&W5_EXTENSION_APP_TEMPLATE_DIR),
     layout: ProjectLayout::App,
-    contracts: &W5_PLUGIN_CONTRACTS,
+    contracts: &W5_EXTENSION_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    extra_scripts: W5_PLUGIN_EXTRA_SCRIPTS,
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -367,7 +367,8 @@ pub enum ProjectTemplate {
     Counter,
     Jetton,
     Nft,
-    W5Plugin,
+    #[value(alias = "w5-plugin")]
+    W5Extension,
 }
 
 impl ProjectTemplate {
@@ -378,7 +379,7 @@ impl ProjectTemplate {
             Self::Counter => "counter",
             Self::Jetton => "jetton",
             Self::Nft => "nft",
-            Self::W5Plugin => "w5-plugin",
+            Self::W5Extension => "w5-extension",
         }
     }
 
@@ -389,7 +390,7 @@ impl ProjectTemplate {
             Self::Counter => "Simple counter contract",
             Self::Jetton => "Jetton minter and wallet contracts",
             Self::Nft => "NFT collection and item contracts",
-            Self::W5Plugin => "Wallet V5 extension (subscription plugin)",
+            Self::W5Extension => "Wallet V5 extension contract and subscription example",
         }
     }
 }
@@ -420,9 +421,9 @@ const NFT_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     app_scaffold: Some(NFT_APP_SCAFFOLD),
 };
 
-const W5_PLUGIN_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
-    default_scaffold: W5_PLUGIN_SCAFFOLD,
-    app_scaffold: Some(W5_PLUGIN_APP_SCAFFOLD),
+const W5_EXTENSION_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
+    default_scaffold: W5_EXTENSION_SCAFFOLD,
+    app_scaffold: Some(W5_EXTENSION_APP_SCAFFOLD),
 };
 
 const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefinition {
@@ -431,7 +432,7 @@ const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefi
         ProjectTemplate::Counter => &COUNTER_TEMPLATE_DEFINITION,
         ProjectTemplate::Jetton => &JETTON_TEMPLATE_DEFINITION,
         ProjectTemplate::Nft => &NFT_TEMPLATE_DEFINITION,
-        ProjectTemplate::W5Plugin => &W5_PLUGIN_TEMPLATE_DEFINITION,
+        ProjectTemplate::W5Extension => &W5_EXTENSION_TEMPLATE_DEFINITION,
     }
 }
 
@@ -441,7 +442,7 @@ pub(super) fn get_available_templates() -> Vec<ProjectTemplate> {
         ProjectTemplate::Counter,
         ProjectTemplate::Jetton,
         ProjectTemplate::Nft,
-        ProjectTemplate::W5Plugin,
+        ProjectTemplate::W5Extension,
     ]
 }
 

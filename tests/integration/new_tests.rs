@@ -502,8 +502,8 @@ fn test_new_nft_project_non_interactive() {
 }
 
 #[test]
-fn test_new_w5_plugin_project_non_interactive() {
-    let project = ProjectBuilder::new("new-w5-plugin")
+fn test_new_w5_extension_project_non_interactive() {
+    let project = ProjectBuilder::new("new-w5-extension")
         .without_acton_toml()
         .build();
 
@@ -512,22 +512,22 @@ fn test_new_w5_plugin_project_non_interactive() {
         .arg("new")
         .arg(&project.path().join("foobar").display().to_string())
         .arg("--name")
-        .arg("w5-plugin-project")
+        .arg("w5-extension-project")
         .arg("--description")
-        .arg("w5-plugin description")
+        .arg("w5-extension description")
         .arg("--template")
-        .arg("w5-plugin")
+        .arg("w5-extension")
         .arg("--license")
         .arg("MIT")
         .run()
         .success();
 
-    output.assert_contains("Template: w5-plugin");
+    output.assert_contains("Template: w5-extension");
 
     let project_dir = project.path().join("foobar");
     let acton_toml = project_dir.join("Acton.toml");
     let content = fs::read_to_string(&acton_toml).unwrap();
-    assert!(content.contains(r#"name = "w5-plugin-project""#));
+    assert!(content.contains(r#"name = "w5-extension-project""#));
     assert!(content.contains(r"[contracts.SimpleExtension]"));
     assert!(content.contains(r"[contracts.WalletV5]"));
     assert!(content.contains(r#"src = "contracts/walletv5/WalletV5.tolk""#));
@@ -564,8 +564,73 @@ fn test_new_w5_plugin_project_non_interactive() {
     assert!(project_dir.join("scripts/deploy.tolk").exists());
     assert!(project_dir.join("scripts/install-extension.tolk").exists());
     assert!(project_dir.join("scripts/delete-extension.tolk").exists());
+    assert!(project_dir.join("scripts/utils/common.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
+}
+
+#[test]
+fn test_new_w5_plugin_template_alias_still_works() {
+    let project = ProjectBuilder::new("new-w5-plugin-alias")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-extension-project")
+        .arg("--description")
+        .arg("w5 extension description")
+        .arg("--template")
+        .arg("w5-plugin")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: w5-extension");
+    assert!(
+        project
+            .path()
+            .join("foobar/contracts/SimpleExtension.tolk")
+            .exists()
+    );
+}
+
+#[test]
+fn test_new_w5_extension_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-extension-project")
+        .arg("--description")
+        .arg("w5-extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_contains("Template: w5-extension")
+        .assert_contains("AGENTS.md: included")
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_w5_extension_project_with_agents_flag.agents.md.gen",
+        );
+
+    assert!(project.path().join("foobar/AGENTS.md").exists());
 }
 
 #[test]
@@ -699,8 +764,8 @@ fn test_new_counter_project_with_app_flag() {
 }
 
 #[test]
-fn test_new_w5_plugin_project_with_app_flag() {
-    let project = ProjectBuilder::new("new-w5-plugin-app")
+fn test_new_w5_extension_project_with_app_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-app")
         .without_acton_toml()
         .build();
 
@@ -709,22 +774,33 @@ fn test_new_w5_plugin_project_with_app_flag() {
         .arg("new")
         .arg(&project.path().join("foobar").display().to_string())
         .arg("--name")
-        .arg("W5 Plugin App Project")
+        .arg("W5 Extension App Project")
         .arg("--description")
-        .arg("w5-plugin app description")
+        .arg("w5-extension app description")
         .arg("--template")
-        .arg("w5-plugin")
+        .arg("w5-extension")
         .arg("--license")
         .arg("MIT")
         .arg("--app")
         .run()
         .success();
 
-    output.assert_contains("Template: w5-plugin");
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/Acton.toml",
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.acton.toml.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.package.json.gen",
+        );
 
     let project_dir = project.path().join("foobar");
     let package_lock = fs::read_to_string(project_dir.join("package-lock.json")).unwrap();
-    assert!(package_lock.contains(r#""name": "w5-plugin-app-project""#));
+    assert!(package_lock.contains(r#""name": "w5-extension-app-project""#));
     assert!(!package_lock.contains(r#""name": "simple-extension""#));
     assert!(project_dir.join("app/src/App.tsx").exists());
     assert!(
@@ -763,7 +839,49 @@ fn test_new_w5_plugin_project_with_app_flag() {
             .join("contracts/scripts/install-extension.tolk")
             .exists()
     );
+    assert!(
+        project_dir
+            .join("contracts/scripts/utils/common.tolk")
+            .exists()
+    );
     assert!(project_dir.join(".prettierrc").exists());
+}
+
+#[test]
+fn test_new_w5_extension_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("W5 Extension App Project")
+        .arg("--description")
+        .arg("w5-extension app description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.agents.md.gen",
+        );
 }
 
 #[test]
@@ -1210,8 +1328,8 @@ fn test_new_templates_returns_machine_readable_json() {
                     ]
                 },
                 {
-                    "id": "w5-plugin",
-                    "description": "Wallet V5 extension (subscription plugin)",
+                    "id": "w5-extension",
+                    "description": "Wallet V5 extension contract and subscription example",
                     "supports_app": true,
                     "scaffolds": [
                         {
@@ -1449,6 +1567,62 @@ fn test_new_counter_project_can_be_selected_interactively() {
 
 #[cfg(unix)]
 #[test]
+fn test_new_w5_extension_project_can_be_selected_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-template-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-selected-w5-extension")
+        .arg("--description")
+        .arg("interactive selected w5 extension description")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Template:");
+    for _ in 0..4 {
+        session
+            .send("\u{1b}[B")
+            .expect("failed to navigate to w5-extension template");
+    }
+    session.send_line("", "failed to select w5-extension template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-selected-w5-extension");
+    session.expect("Description: interactive selected w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("License: MIT");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_can_be_selected_interactively.acton.toml.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn test_new_counter_project_prompts_for_app_when_supported() {
     use expectrl::Eof;
 
@@ -1502,6 +1676,66 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
 
 #[cfg(unix)]
 #[test]
+fn test_new_w5_extension_project_prompts_for_app_when_supported() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-app-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-w5-extension")
+        .arg("--description")
+        .arg("interactive w5 extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("y", "failed to confirm TypeScript app scaffold");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-w5-extension");
+    session.expect("Description: interactive w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("TypeScript app: included");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
+    session.expect("npm ci");
+    session.expect("npm run dev");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.acton.toml.gen",
+    );
+    session.assert_file_snapshot_matches(
+        "foobar/package.json",
+        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.package.json.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("package.json").exists());
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(
+        project_dir
+            .join("wrappers-ts/SimpleExtension.gen.ts")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers-ts/WalletV5.gen.ts").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     use expectrl::Eof;
 
@@ -1544,6 +1778,60 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
 
     let project_dir = project.path().join("foobar");
     assert!(project_dir.join("contracts/Counter.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_w5_extension_project_interactive_decline_keeps_standard_layout() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-app-interactive-decline")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-w5-extension")
+        .arg("--description")
+        .arg("interactive w5 extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-w5-extension");
+    session.expect("Description: interactive w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
+    session.expect("acton test");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());
@@ -1933,13 +2221,138 @@ fn test_new_app_templates_npm_quality_checks() {
         .build();
     let cache_dir = cache_workspace.path().join("npm-cache");
 
-    for template in ["empty", "counter", "jetton", "nft", "w5-plugin"] {
+    for template in ["empty", "counter", "jetton", "nft", "w5-extension"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,
             &cache_dir,
         );
     }
+}
+
+fn read_new_template_file(template: &str, relative_path: &str) -> String {
+    fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/commands/new/templates")
+            .join(template)
+            .join(relative_path),
+    )
+    .unwrap_or_else(|e| panic!("Failed to read {template}/{relative_path}: {e}"))
+}
+
+fn read_new_template_package_json(template: &str) -> JsonValue {
+    serde_json::from_str(&read_new_template_file(template, "package.json"))
+        .unwrap_or_else(|e| panic!("Failed to parse {template}/package.json: {e}"))
+}
+
+fn assert_new_template_files_match_baseline(
+    baseline_template: &str,
+    candidate_templates: &[&str],
+    relative_paths: &[&str],
+    reason: &str,
+) {
+    let mut mismatches = Vec::new();
+
+    for candidate_template in candidate_templates {
+        for relative_path in relative_paths {
+            if read_new_template_file(candidate_template, relative_path)
+                != read_new_template_file(baseline_template, relative_path)
+            {
+                mismatches.push(format!(
+                    "- {candidate_template}/{relative_path} differs from {baseline_template}/{relative_path}\n  inspect: diff -u src/commands/new/templates/{baseline_template}/{relative_path} src/commands/new/templates/{candidate_template}/{relative_path}"
+                ));
+            }
+        }
+    }
+
+    if !mismatches.is_empty() {
+        panic!(
+            "App template shared file parity regression.\n\n{}\n\n{reason}",
+            mismatches.join("\n")
+        );
+    }
+}
+
+#[test]
+fn test_new_w5_extension_app_template_matches_contract_app_package_sections() {
+    let baseline = read_new_template_package_json("counter-app");
+    let w5_package = read_new_template_package_json("w5-extension-app");
+
+    for section in ["scripts", "dependencies", "devDependencies"] {
+        assert_eq!(
+            w5_package[section], baseline[section],
+            "w5-extension app template package.json `{section}` must match the common contract app template shape"
+        );
+    }
+}
+
+#[test]
+fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
+    for relative_path in [
+        ".github/workflows/ci.yml",
+        ".prettierignore",
+        ".prettierrc",
+        "components.json",
+        "eslint.config.js",
+        "tsconfig.json",
+        "vite.config.ts",
+    ] {
+        assert_eq!(
+            read_new_template_file("w5-extension-app", relative_path),
+            read_new_template_file("counter-app", relative_path),
+            "w5-extension app template `{relative_path}` must match the common contract app template tooling file"
+        );
+    }
+}
+
+#[test]
+fn test_new_app_template_common_styles_match_shared_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["empty-app", "jetton-app", "w5-extension-app"],
+        &["app/src/styles.css"],
+        "Keep the shared app CSS baseline byte-for-byte identical across empty, counter, jetton, and w5-extension app templates. If a style change is common, apply it to every shared stylesheet. If a divergence is intentional, document the exception in this test.",
+    );
+}
+
+#[test]
+fn test_new_nft_app_template_styles_only_extend_shared_baseline() {
+    let baseline = read_new_template_file("counter-app", "app/src/styles.css");
+    let nft_styles = read_new_template_file("nft-app", "app/src/styles.css");
+
+    let domain_tail = nft_styles
+        .strip_prefix(&baseline)
+        .unwrap_or_else(|| {
+            panic!(
+                "nft-app/app/src/styles.css no longer starts with the shared app CSS baseline from counter-app/app/src/styles.css.\n\nKeep common theme tokens, base styles, scrollbars, animations, and overlay z-index rules identical, then append NFT-only classes after the shared block.\n\ninspect: diff -u src/commands/new/templates/counter-app/app/src/styles.css src/commands/new/templates/nft-app/app/src/styles.css"
+            )
+        });
+
+    assert!(
+        domain_tail.starts_with("\n/* ─── Domain-specific styles ─── */\n"),
+        "nft-app/app/src/styles.css may only differ from the shared baseline by appending the documented NFT domain-specific block. Found unexpected tail after the shared baseline:\n{domain_tail}"
+    );
+}
+
+#[test]
+fn test_new_contract_app_template_shared_ui_components_match_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["jetton-app", "nft-app", "w5-extension-app"],
+        &[
+            "app/src/components/ui/alert.tsx",
+            "app/src/components/ui/badge.tsx",
+            "app/src/components/ui/button.tsx",
+            "app/src/components/ui/card.tsx",
+            "app/src/components/ui/dropdown-menu.tsx",
+            "app/src/components/ui/input.tsx",
+            "app/src/components/ui/label.tsx",
+            "app/src/components/ui/separator.tsx",
+            "app/src/components/ui/tabs.tsx",
+            "app/src/components/ui/textarea.tsx",
+        ],
+        "These shadcn-style primitives are shared by all contract app templates. Keep them byte-for-byte identical unless a template-specific component is deliberately split into a separate file.",
+    );
 }
 
 #[test]
@@ -1999,6 +2412,30 @@ fn test_new_nft_project_localnet_deploy_snapshot() {
         "deployer",
         "scripts/deployCollection.tolk",
         "integration/snapshots/test_new_nft_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
+fn test_new_w5_extension_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-w5-extension-localnet-deploy",
+        "w5-extension",
+        false,
+        "deployer",
+        "scripts/deploy.tolk",
+        "integration/snapshots/test_new_w5_extension_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
+fn test_new_w5_extension_app_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-w5-extension-app-localnet-deploy",
+        "w5-extension",
+        true,
+        "deployer",
+        "contracts/scripts/deploy.tolk",
+        "integration/snapshots/test_new_w5_extension_app_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2749,8 +3186,8 @@ fn test_new_nft_project_full_flow() {
 }
 
 #[test]
-fn test_new_w5_plugin_project_full_flow() {
-    let project = ProjectBuilder::new("new-w5-plugin-full")
+fn test_new_w5_extension_project_full_flow() {
+    let project = ProjectBuilder::new("new-w5-extension-full")
         .without_acton_toml()
         .build();
 
@@ -2767,13 +3204,13 @@ fn test_new_w5_plugin_project_full_flow() {
         .arg("--description")
         .arg("test description")
         .arg("--template")
-        .arg("w5-plugin")
+        .arg("w5-extension")
         .arg("--license")
         .arg("MIT")
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_new.stdout.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -2784,7 +3221,7 @@ fn test_new_w5_plugin_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_build.stdout.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -2795,7 +3232,7 @@ fn test_new_w5_plugin_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_test.stdout.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -2807,7 +3244,7 @@ fn test_new_w5_plugin_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_script.stdout.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -2818,7 +3255,7 @@ fn test_new_w5_plugin_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_check.stderr.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -2830,7 +3267,7 @@ fn test_new_w5_plugin_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_plugin_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/test_new_w5_extension_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -3088,6 +3525,19 @@ fn test_new_nft_app_template_typescript_wrappers_match_autogenerated() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn test_new_w5_extension_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-w5-extension-app-ts-wrapper-check",
+        "w5-extension",
+        &[
+            ("SimpleExtension", "wrappers-ts/SimpleExtension.gen.ts"),
+            ("WalletV5", "wrappers-ts/WalletV5.gen.ts"),
+        ],
+    );
+}
+
 #[test]
 fn test_new_empty_template_wrappers_match_autogenerated() {
     create_project_and_check_wrappers(
@@ -3160,5 +3610,26 @@ fn test_new_nft_app_template_wrappers_match_autogenerated() {
             ("NftCollection", "contracts/wrappers/NftCollection.gen.tolk"),
             ("NftItem", "contracts/wrappers/NftItem.gen.tolk"),
         ],
+    );
+}
+
+#[test]
+fn test_new_w5_extension_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-w5-extension-wrapper-check",
+        "w5-extension",
+        &[("SimpleExtension", "wrappers/SimpleExtension.gen.tolk")],
+    );
+}
+
+#[test]
+fn test_new_w5_extension_app_template_wrappers_match_autogenerated() {
+    create_app_project_and_check_wrappers(
+        "new-w5-extension-app-wrapper-check",
+        "w5-extension",
+        &[(
+            "SimpleExtension",
+            "contracts/wrappers/SimpleExtension.gen.tolk",
+        )],
     );
 }

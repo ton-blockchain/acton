@@ -604,7 +604,7 @@ fn append_mutation_test_command_args(
     }
 
     if let Some(fork_net) = &config.fork_net {
-        cmd.arg("--fork-net").arg(fork_net.to_string());
+        cmd.arg("--fork-net").arg(fork_net_cli_arg(fork_net));
     }
 
     if let Some(fork_block_number) = config.fork_block_number {
@@ -673,6 +673,16 @@ fn mutation_resume_command(path: Option<&str>, config: &TestConfig, session_id: 
         args.push(shell_quote(diff_ref));
     }
 
+    if let Some(fork_net) = &config.fork_net {
+        args.push("--fork-net".to_owned());
+        args.push(shell_quote(&fork_net_cli_arg(fork_net)));
+    }
+
+    if let Some(fork_block_number) = config.fork_block_number {
+        args.push("--fork-block-number".to_owned());
+        args.push(fork_block_number.to_string());
+    }
+
     if !config.mutation_levels.is_empty() {
         args.push("--mutation-levels".to_owned());
         args.push(
@@ -728,6 +738,13 @@ fn mutation_resume_command(path: Option<&str>, config: &TestConfig, session_id: 
     }
 
     args.join(" ")
+}
+
+fn fork_net_cli_arg(network: &acton_config::config::Network) -> String {
+    match network {
+        acton_config::config::Network::Custom(name) => format!("custom:{name}"),
+        _ => network.to_string(),
+    }
 }
 
 fn exit_mutation_interrupted(
@@ -1309,4 +1326,58 @@ fn compile_file(path: &str) -> anyhow::Result<Option<String>> {
         anyhow::bail!("No code boc64 found in compilation result")
     };
     Ok(Some(code_b64.clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use acton_config::config::Network;
+    use std::sync::Arc;
+
+    #[test]
+    fn mutation_child_test_command_forwards_fork_flags() {
+        let config = TestConfig {
+            fork_net: Some(Network::Custom(Arc::from("remote-block"))),
+            fork_block_number: Some(123_456),
+            ..TestConfig::default()
+        };
+        let mut cmd = process::Command::new("acton");
+
+        append_mutation_test_command_args(&mut cmd, Some("tests/fork.test.tolk"), &config);
+
+        let args = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(
+            args.windows(2)
+                .any(|pair| pair[0] == "--fork-net" && pair[1] == "custom:remote-block"),
+            "mutation child command must forward --fork-net, got {args:?}"
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair[0] == "--fork-block-number" && pair[1] == "123456"),
+            "mutation child command must forward --fork-block-number, got {args:?}"
+        );
+    }
+
+    #[test]
+    fn mutation_resume_command_includes_fork_flags() {
+        let config = TestConfig {
+            fork_net: Some(Network::Custom(Arc::from("remote-block"))),
+            fork_block_number: Some(123_456),
+            ..TestConfig::default()
+        };
+
+        let command = mutation_resume_command(Some("tests/fork.test.tolk"), &config, "session-1");
+
+        assert!(
+            command.contains("--fork-net custom:remote-block"),
+            "resume command must include parseable --fork-net, got {command}"
+        );
+        assert!(
+            command.contains("--fork-block-number 123456"),
+            "resume command must include --fork-block-number, got {command}"
+        );
+    }
 }

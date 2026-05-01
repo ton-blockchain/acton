@@ -1,0 +1,37 @@
+[package]
+name = "interactive-selected-w5-extension"
+description = "interactive selected w5 extension description"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.SimpleExtension]
+display-name = "SimpleExtension"
+src = "contracts/SimpleExtension.tolk"
+depends = []
+
+[contracts.WalletV5]
+display-name = "WalletV5"
+src = "contracts/walletv5/WalletV5.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+delete-extension = "acton script scripts/delete-extension.tolk --net testnet"
+deploy-emulation = "acton script scripts/deploy.tolk"
+deploy-testnet = "acton script scripts/deploy.tolk --net testnet"
+install-extension = "acton script scripts/install-extension.tolk --net testnet"
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# [ACTON_DOCS_URL]/acton-toml

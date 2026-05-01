@@ -19,7 +19,7 @@ after opting into advanced options.
 {{#option "`--template` _template_" }}
 Project template to use.
 
-Possible values: `empty`, `counter`, `jetton`, `nft`, `w5-plugin`
+Possible values: `empty`, `counter`, `jetton`, `nft`, `w5-extension`
 
 If not provided, interactive mode prompts for the template.
 {{/option}}
@@ -36,7 +36,7 @@ override it after opting into advanced options.
 Include the template's TypeScript app scaffold when available.
 
 All built-in templates currently support the app layout: `empty`, `counter`,
-`jetton`, `nft`, and `w5-plugin`. If you pass `--app` for a template that does
+`jetton`, `nft`, and `w5-extension`. If you pass `--app` for a template that does
 not support it, `acton new` fails.
 
 If the selected template supports the app layout and `--app` is not provided,

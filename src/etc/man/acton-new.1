@@ -51,7 +51,7 @@ after opting into advanced options.
 .RS 4
 Project template to use.
 .sp
-Possible values: \fBempty\fR, \fBcounter\fR, \fBjetton\fR, \fBnft\fR, \fBw5\-plugin\fR
+Possible values: \fBempty\fR, \fBcounter\fR, \fBjetton\fR, \fBnft\fR, \fBw5\-extension\fR
 .sp
 If not provided, interactive mode prompts for the template.
 .RE
@@ -70,7 +70,7 @@ override it after opting into advanced options.
 Include the template\[cq]s TypeScript app scaffold when available.
 .sp
 All built\-in templates currently support the app layout: \fBempty\fR, \fBcounter\fR,
-\fBjetton\fR, \fBnft\fR, and \fBw5\-plugin\fR\&. If you pass \fB\-\-app\fR for a template that does
+\fBjetton\fR, \fBnft\fR, and \fBw5\-extension\fR\&. If you pass \fB\-\-app\fR for a template that does
 not support it, \fBacton new\fR fails.
 .sp
 If the selected template supports the app layout and \fB\-\-app\fR is not provided,
@@ -208,11 +208,11 @@ NFT collection and item template with:
 .RS 4
 \h'-04'\(bu\h'+03'optional \fBAGENTS.md\fR
 .RE
-.SS "w5-plugin"
-Wallet V5 extension (subscription plugin) template with:
+.SS "w5-extension"
+Wallet V5 extension contract and subscription example template with:
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'the plugin contract and shared types
+\h'-04'\(bu\h'+03'the extension contract and shared types
 .RE
 .sp
 .RS 4
@@ -220,7 +220,7 @@ Wallet V5 extension (subscription plugin) template with:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'plugin and Wallet V5 wrappers
+\h'-04'\(bu\h'+03'extension and Wallet V5 wrappers
 .RE
 .sp
 .RS 4
@@ -240,7 +240,7 @@ Wallet V5 extension (subscription plugin) template with:
 .RE
 .sp
 All built\-in templates support the optional TypeScript app layout with \fB\-\-app\fR:
-\fBempty\fR, \fBcounter\fR, \fBjetton\fR, \fBnft\fR, and \fBw5\-plugin\fR\&.
+\fBempty\fR, \fBcounter\fR, \fBjetton\fR, \fBnft\fR, and \fBw5\-extension\fR\&.
 .sp
 With \fB\-\-app\fR, Acton also creates a Vite\-based React app and top\-level npm
 metadata files. App templates with frontend contract flows also include

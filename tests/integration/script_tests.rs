@@ -1,11 +1,13 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
-    spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
+    ToncenterV2MockResponse, append_custom_network, format_captured_requests,
+    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture,
+    toncenter_v2_account_info_ok_response, toncenter_v2_error_response,
     toncenter_v2_seqno_ok_response,
 };
 
+use base64::Engine;
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -217,6 +219,59 @@ fun main() {
     println("RECEIVER_CONTRACT={}", receiverAddress);
 }
 "#;
+
+const FORK_LOCALNET_DEPLOY_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
 const REMOTE_GLOBAL_VERSION: u32 = 777;
 const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
 
@@ -453,6 +508,104 @@ fn wait_until_address_state_active(
         );
         thread::sleep(Duration::from_millis(200));
     }
+}
+
+fn latest_localnet_seqno(node: &crate::support::localnet::LocalnetHandle) -> u64 {
+    let response = node.get_json("/api/v2/getMasterchainInfo");
+    response["result"]["last"]["seqno"]
+        .as_u64()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected getMasterchainInfo result.last.seqno in response:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            )
+        })
+}
+
+fn fork_localnet_trigger_script(forwarder_address: &str, receiver_address: &str) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: address("__FORWARDER_ADDRESS__"),
+        body: TriggerForward {
+            target: address("__RECEIVER_ADDRESS__"),
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 30, 100);
+    if (trace == null) {
+        println("TRIGGER_TRACE_NULL");
+        return;
+    }
+
+    println("BROADCAST_TRIGGERED=true");
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+}
+
+fn fork_localnet_trace_script(
+    forwarder_address: &str,
+    receiver_address: &str,
+    expected_before: u32,
+    expected_after: u32,
+) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val forwarder = address("__FORWARDER_ADDRESS__");
+    val receiver = address("__RECEIVER_ADDRESS__");
+    val sender = testing.treasury("fork_sender");
+
+    val before: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_BEFORE={}", before);
+    if (before != __EXPECTED_BEFORE__) {
+        throw 9101;
+    }
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarder,
+        body: TriggerForward {
+            target: receiver,
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 3, 1);
+    if (trace == null) {
+        println("FORK_TRACE_NULL");
+        return;
+    }
+
+    println("FORK_TRACE_BEGIN");
+    println(trace);
+    println("FORK_TRACE_END");
+
+    val after: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_AFTER={}", after);
+    if (after != __EXPECTED_AFTER__) {
+        throw 9102;
+    }
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+    .replace("__EXPECTED_BEFORE__", &expected_before.to_string())
+    .replace("__EXPECTED_AFTER__", &expected_after.to_string())
 }
 
 #[test]
@@ -2847,6 +3000,7 @@ fun main() {
         .success();
     let counter_address = extract_marker_value(&deploy_output.get_stdout(), "COUNTER_ADDRESS=");
     wait_until_address_state_active(&node, &counter_address, Duration::from_secs(12));
+    let fork_block_number = latest_localnet_seqno(&node).to_string();
 
     fs::write(
         project.path().join("scripts/query_counter.tolk"),
@@ -2868,9 +3022,173 @@ fun main() {{
         .acton()
         .script("scripts/query_counter.tolk")
         .verify_network("localnet")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number)
         .run()
         .success()
         .assert_contains("On-chain counter: 7");
+
+    node.stop();
+}
+
+#[test]
+fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
+    let last_hash_bytes = [0x33_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 202, &last_hash_b64),
+    ]);
+
+    let script = r#"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val shard = scripts.fetchShardAccount(address("__REMOTE_ADDRESS__"));
+    if (shard == null) {
+        println("SCRIPT_FORK_SHARD_NULL");
+        return;
+    }
+
+    println("SCRIPT_FORK_LAST_LT={}", shard!.lastTransLt);
+}
+"#
+    .replace(
+        "__REMOTE_ADDRESS__",
+        "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
+    );
+
+    let project = ProjectBuilder::new("script-fork-block-number-forwarded")
+        .script_file("fork_block_query", &script)
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-remote-block",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/fork_block_query.tolk")
+        .fork_net("custom:script-remote-block")
+        .arg("--fork-block-number")
+        .arg("654321")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("script-fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured script fork-block request log");
+    output.assert_file_snapshot_matches(
+        "script-fork-block-requests.txt",
+        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace() {
+    let project = build_localnet_wait_project(
+        "script-fork-localnet-explicit-block-trace",
+        "deploy_fork_targets",
+        FORK_LOCALNET_DEPLOY_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_fork_targets.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    let deploy_stdout = deploy_output.get_stdout();
+    let forwarder_address = extract_marker_value(&deploy_stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&deploy_stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    let deploy_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_deploy_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 1, 2),
+    )
+    .expect("failed to write fork trace script for deploy block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_deploy_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&deploy_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.deploy_block.stdout.txt",
+        );
+
+    fs::write(
+        project.path().join("scripts/broadcast_trigger.tolk"),
+        fork_localnet_trigger_script(&forwarder_address, &receiver_address),
+    )
+    .expect("failed to write broadcast trigger script");
+
+    project
+        .acton()
+        .script("scripts/broadcast_trigger.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .assert_contains("BROADCAST_TRIGGERED=true");
+
+    let triggered_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_triggered_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 2, 3),
+    )
+    .expect("failed to write fork trace script for triggered block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_triggered_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&triggered_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
+        );
 
     node.stop();
 }
@@ -2899,6 +3217,33 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_rejects_non_numeric_fork_block_number() {
+    let project = ProjectBuilder::new("script-invalid-fork-block")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("hello");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--fork-block-number")
+        .arg("not-a-seqno")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_rejects_non_numeric_fork_block_number.stderr.txt",
         );
 }
 
