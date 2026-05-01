@@ -485,11 +485,9 @@ fn find_struct_decl<'a>(
             fields,
             overrides_client_type,
             ..
-        } if name == target_name => Some((
-            prefix.as_ref(),
-            fields.as_slice(),
-            *overrides_client_type,
-        )),
+        } if name == target_name => {
+            Some((prefix.as_ref(), fields.as_slice(), *overrides_client_type))
+        }
         _ => None,
     })
 }
