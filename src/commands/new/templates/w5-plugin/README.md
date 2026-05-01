@@ -44,20 +44,29 @@ acton run deploy-emulation
 
 Scripts in `scripts/` cover deployment and extension management:
 
-- `deploy.tolk` — deploys the extension with the deployer wallet as admin.
+- `deploy.tolk` — deploys the extension with the deployer wallet as admin and
+  prints the deployed address.
 - `install-extension.tolk` — adds the deployed extension to a real Wallet V5
-  via a signed external message.
+  via a signed external message. Reads `EXT_ADDRESS` from the environment, or
+  prompts for the address interactively when it is not set.
 - `delete-extension.tolk` — removes the extension from the wallet via a signed
-  external message.
+  external message. Reads `EXT_ADDRESS` from the environment, or prompts
+  interactively when it is not set.
 
 Run them with `acton script scripts/<name>.tolk` or use the generated aliases:
 
 ```bash
 acton run deploy-emulation
 acton run deploy-testnet
-acton run install-extension
-acton run delete-extension
+EXT_ADDRESS=<deployed-address> acton run install-extension
+EXT_ADDRESS=<deployed-address> acton run delete-extension
 ```
+
+The deploy script prints the deployed extension address; copy it into
+`EXT_ADDRESS` (env var or `.env`) before running install or delete in
+non-interactive contexts. The extension address depends on the deployer
+wallet and storage, so the scripts intentionally avoid any hard-coded
+fallback.
 
 ## Customize The Starter
 
@@ -86,12 +95,13 @@ acton wallet new --name deployer-2 --local --airdrop --version v5r1
 acton script scripts/deploy.tolk --net testnet
 ```
 
-4. Install the extension into the wallet, then remove it when you no longer
-   need it:
+4. Note the extension address printed by the deploy script and pass it via
+   `EXT_ADDRESS` to install the extension into the wallet, then remove it when
+   you no longer need it:
 
 ```bash
-acton run install-extension
-acton run delete-extension
+EXT_ADDRESS=<deployed-address> acton run install-extension
+EXT_ADDRESS=<deployed-address> acton run delete-extension
 ```
 
 If you need higher Toncenter limits for blockchain queries, copy `.env.example`

@@ -41,9 +41,9 @@ npm run dev
 
 ## Scripts
 
-- `acton script contracts/scripts/deploy.tolk` — deploys the extension with the deployer wallet as admin.
-- `acton script contracts/scripts/install-extension.tolk` — adds the deployed extension to a real Wallet V5 via a signed external message.
-- `acton script contracts/scripts/delete-extension.tolk` — removes the extension from the wallet via a signed external message.
+- `acton script contracts/scripts/deploy.tolk` — deploys the extension with the deployer wallet as admin and prints the deployed address.
+- `EXT_ADDRESS=<deployed-address> acton script contracts/scripts/install-extension.tolk` — adds the deployed extension to a real Wallet V5 via a signed external message. Prompts for the address interactively if `EXT_ADDRESS` is not set.
+- `EXT_ADDRESS=<deployed-address> acton script contracts/scripts/delete-extension.tolk` — removes the extension from the wallet via a signed external message. Prompts for the address interactively if `EXT_ADDRESS` is not set.
 
 ## Notes
 

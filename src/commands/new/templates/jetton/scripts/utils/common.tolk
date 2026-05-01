@@ -38,19 +38,11 @@ fun promptJettonString(envName: string, message: string, default: string): strin
 }
 
 fun promptJettonAddress(envName: string, message: string, default: address): address {
-    val fromEnv = env<address>(envName);
-    if (fromEnv != null) {
-        return fromEnv;
-    }
-    return parseAddress(prompt(message, "", format("{}", default)));
+    return env<address>(envName) ?? promptAddress(message, default);
 }
 
 fun promptJettonAddressRequired(envName: string, message: string): address {
-    val fromEnv = env<address>(envName);
-    if (fromEnv != null) {
-        return fromEnv;
-    }
-    return parseAddress(prompt(message, "EQ... / kQ...", ""));
+    return env<address>(envName) ?? promptAddress(message);
 }
 
 fun promptJettonCoins(envName: string, message: string, default: string): coins {
