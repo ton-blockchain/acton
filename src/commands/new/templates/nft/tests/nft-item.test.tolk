@@ -305,6 +305,41 @@ get fun `test nft: should fail with no fwd payload provided`() {
     expect(ownerAfterTransfer!).toEqual(ownerBeforeTransfer!);
 }
 
+get fun `test nft: should fail with malformed Either fwd payload`() {
+    val (nftCollection, _, _) = setupTest();
+    val nftOwner = testing.treasury("nft-owner");
+    val nftReceiverAddress = randomAddress();
+    val responseAddress = randomAddress();
+
+    val nftItem = nftFixture(nftCollection, nftOwner.address);
+
+    // Either selector = 1 (ref) but with extra trailing bits — malformed per TEP-62
+    val malformedPayload = beginCell()
+        .storeBool(true) // selector says "ref follows"
+        .storeUint(0xDEAD, 16) // but extra inline bits — invalid
+        .storeRef(beginCell().endCell())
+        .toSlice();
+
+    val body = beginCell()
+        .storeUint(0x5fcc3d14, 32) // op::transfer
+        .storeUint(42, 64) // queryId
+        .storeAddress(nftReceiverAddress) // new_owner
+        .storeAddress(responseAddress) // response_destination
+        .storeMaybeRef(null) // custom_payload
+        .storeCoins(0) // forward_amount
+        .storeSlice(malformedPayload)
+        .endCell();
+
+    val result = nftItem.sendAny(nftOwner.address, body, { value: ton("0.05"), bounce: true });
+
+    expect(result).toHaveFailedTx({
+        from: nftOwner.address,
+        to: nftItem.address,
+        body,
+        exitCode: Errors.IncorrectForwardPayload,
+    });
+}
+
 get fun `test nft: should transfer ownership with forward payload in slice`() {
     val (nftCollection, _, _) = setupTest();
     val nftOwner = testing.treasury("nft-owner");
