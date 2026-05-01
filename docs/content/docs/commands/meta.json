@@ -2,6 +2,7 @@
   "title": "Command reference",
   "icon": "Terminal",
   "pages": [
+    "overview",
     "new",
     "init",
     "test",

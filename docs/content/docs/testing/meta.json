@@ -9,12 +9,14 @@
     "test-configuration",
     "world-state-snapshots",
     "step-by-step-execution",
+    "saved-trace-bundles",
     "gas-profiling-with-snapshots",
     "fork-testing",
     "code-coverage",
     "mutation-testing",
     "test-ui",
     "reading-transaction-chains",
+    "built-in-matchers-and-helpers",
     "writing-your-own-matchers",
     "cookbook"
   ]
