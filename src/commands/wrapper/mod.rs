@@ -751,7 +751,6 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
             "        body: {}.fromSlice(bodyB.toSlice()),",
             message_type.name
         );
-        code.push_str("    });\n");
     } else {
         code.push_str("    val genericMsg = createMessage({\n");
         code.push_str("        bounce: config.bounce,\n");
@@ -775,9 +774,8 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
             }
             code.push_str("        },\n");
         }
-
-        code.push_str("    });\n");
     }
+    code.push_str("    });\n");
 
     code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
