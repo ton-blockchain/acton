@@ -679,6 +679,12 @@ async fn index(
 }
 
 fn add_index_security_headers(headers: &mut HeaderMap) {
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, max-age=0"),
+    );
+    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
     headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
@@ -1066,6 +1072,18 @@ mod tests {
         assert_eq!(
             headers.get(header::X_FRAME_OPTIONS).unwrap(),
             HeaderValue::from_static("DENY")
+        );
+        assert_eq!(
+            headers.get(header::CACHE_CONTROL).unwrap(),
+            HeaderValue::from_static("no-store, max-age=0")
+        );
+        assert_eq!(
+            headers.get(header::PRAGMA).unwrap(),
+            HeaderValue::from_static("no-cache")
+        );
+        assert_eq!(
+            headers.get(header::EXPIRES).unwrap(),
+            HeaderValue::from_static("0")
         );
         assert!(
             headers
