@@ -35,9 +35,11 @@ Open `http://localhost:3000` for the landing page and
 - `bun run build`: produce the static production build.
 - `bun run start`: serve the production build locally.
 - `bun run lint`: run ESLint for the docs app.
+- `bun run docs-lint`: validate links and docs navigation.
 - `bun run lint:links`: validate internal and external MDX links.
 - `bun run lint:links:internal`: validate internal MDX links without network requests.
 - `bun run lint:links:external`: validate external MDX links and fail on redirects.
+- `bun run lint:navigation`: validate that every MDX page is reachable from Fumadocs navigation.
 
 Production deployment is handled by CI via `.github/workflows/deploy-docs.yml`.
 

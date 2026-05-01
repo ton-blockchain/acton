@@ -57,9 +57,9 @@ jobs:
         working-directory: docs
         run: bun run generated-source
 
-      - name: Lint Check links
+      - name: Lint Check docs
         working-directory: docs
-        run: bun run lint:links
+        run: bun run docs-lint
 
       - name: Build docs
         working-directory: docs
