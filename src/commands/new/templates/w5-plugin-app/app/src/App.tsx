@@ -2,10 +2,11 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   TonConnectButton,
-  useAddress,
-  useAppKitTheme,
-  useNetwork,
-} from '@ton/appkit-react';
+  THEME,
+  useTonAddress,
+  useTonConnectUI,
+  useTonWallet,
+} from '@tonconnect/ui-react';
 import {
   AlertTriangle,
   Check,
@@ -51,7 +52,7 @@ import {
   normalizeAddress,
   sameAddress,
   setTonNetworkMode,
-  TON_NETWORK,
+  TON_CHAIN,
   TON_NETWORK_LABEL,
   TON_NETWORK_MODE,
   type TonNetworkMode,
@@ -436,9 +437,10 @@ function ExtensionCard({
 }
 
 export default function App() {
-  const walletAddress = useAddress();
-  const walletNetwork = useNetwork();
-  const [, setAppKitTheme] = useAppKitTheme();
+  const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
+  const walletAddress = useTonAddress(false) || undefined;
+  const walletChain = wallet?.account.chain;
 
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem('simple-extension-theme');
@@ -460,8 +462,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('simple-extension-theme', theme);
-    setAppKitTheme(theme);
-  }, [setAppKitTheme, theme]);
+    tonConnectUI.uiOptions = {
+      uiPreferences: {
+        theme: theme === 'light' ? THEME.LIGHT : THEME.DARK,
+      },
+    };
+  }, [theme, tonConnectUI]);
 
   useEffect(() => {
     if (!popup) {
@@ -482,18 +488,14 @@ export default function App() {
     }
 
     try {
-      return formatAddressForNetwork(
-        walletAddress,
-        walletNetwork?.chainId ?? TON_NETWORK.chainId,
-      );
+      return formatAddressForNetwork(walletAddress, walletChain ?? TON_CHAIN);
     } catch {
       return walletAddress;
     }
-  }, [walletAddress, walletNetwork]);
+  }, [walletAddress, walletChain]);
 
   const walletNetworkMismatch =
-    walletNetwork !== undefined &&
-    walletNetwork.chainId !== TON_NETWORK.chainId;
+    walletChain !== undefined && walletChain !== TON_CHAIN;
   const busy = pendingAction !== null || pendingExternalAction !== null;
   const extensions = inspection.data?.extensions ?? [];
   const simpleExtensions = extensions.filter(
