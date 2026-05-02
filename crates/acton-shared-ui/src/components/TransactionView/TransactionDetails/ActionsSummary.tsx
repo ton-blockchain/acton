@@ -159,7 +159,7 @@ const mapExecutorActionsByType = (
   for (const action of actions) {
     let matched: BackendExecutorAction | undefined
     if (cursor < executorActions.length) {
-      const candidate = executorActions[cursor]!
+      const candidate = executorActions[cursor]
       cursor += 1
       const typeMatches =
         (action.type === "sendMsg" && candidate.type === "send_message") ||
