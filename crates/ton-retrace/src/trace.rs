@@ -137,8 +137,13 @@ impl InstalledAction {
             }
             (
                 Self::ChangeLibrary(installed),
-                ExecutedAction::ChangeLibrary { mode, lib_hash, .. },
-            ) => installed.mode == *mode && library_ref_hash_matches(&installed.lib, lib_hash),
+                ExecutedAction::ChangeLibrary {
+                    mode,
+                    lib_hash,
+                    lib_ref,
+                    ..
+                },
+            ) => installed.mode == *mode && library_ref_matches(&installed.lib, lib_hash, lib_ref),
             _ => false,
         }
     }
@@ -650,11 +655,14 @@ fn cell_hash_matches(cell: &Cell, hash: &str) -> bool {
     cell.repr_hash().to_string().eq_ignore_ascii_case(hash)
 }
 
-fn library_ref_hash_matches(lib: &InstalledLibraryRef, hash: &str) -> bool {
-    match lib {
-        InstalledLibraryRef::Hash(installed_hash) => BigInt::parse_bytes(hash.as_bytes(), 16)
-            .is_some_and(|executed_hash| installed_hash == &executed_hash),
-        InstalledLibraryRef::Cell(cell) => cell_hash_matches(cell, hash),
+fn library_ref_matches(lib: &InstalledLibraryRef, hash: &str, ref_kind: &str) -> bool {
+    match (lib, ref_kind) {
+        (InstalledLibraryRef::Cell(cell), "cell") => cell_hash_matches(cell, hash),
+        (InstalledLibraryRef::Hash(installed_hash), "hash") => {
+            BigInt::parse_bytes(hash.as_bytes(), 16)
+                .is_some_and(|executed_hash| installed_hash == &executed_hash)
+        }
+        _ => false,
     }
 }
 
@@ -1004,6 +1012,10 @@ stack: [ C{{0F}} 18 ]
 code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 20
 execute SETLIBCODE
 gas remaining: 998
+stack: [ 12345 1 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 30
+execute CHANGELIB
+gas remaining: 997
         "
         );
 
@@ -1015,13 +1027,21 @@ gas remaining: 998
             .to_string();
         let executor_logs = format!(
             "[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2269]\tprocess set code {cell_hash}
-[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={cell_hash}, lib_ref=cell"
+[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={cell_hash}, lib_ref=cell
+[ 4][t 0][2026-03-03 13:38:24.650055][transaction.cpp:2312]\tprocess change library with mode 1, lib_hash=3039, lib_ref=hash"
         );
         let executed = ExecutedActions::from(&executor_logs);
 
-        assert_eq!(executed.actions.len(), 2);
+        assert_eq!(executed.actions.len(), 3);
         assert!(actions.actions[0].matches_executed_action(&executed.actions[0]));
         assert!(actions.actions[1].matches_executed_action(&executed.actions[1]));
+        assert!(actions.actions[2].matches_executed_action(&executed.actions[2]));
+
+        let mismatched_executor_logs = format!(
+            "[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={cell_hash}, lib_ref=hash"
+        );
+        let mismatched = ExecutedActions::from(&mismatched_executor_logs);
+        assert!(!actions.actions[1].matches_executed_action(&mismatched.actions[0]));
     }
 }
 
