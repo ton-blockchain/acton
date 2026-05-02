@@ -107,6 +107,18 @@ pub enum ExecutorActionInfo {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         failure_code: Option<i32>,
     },
+    SetCode {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        location: Option<SourceLocation>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        failure_code: Option<i32>,
+    },
+    ChangeLibrary {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        location: Option<SourceLocation>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        failure_code: Option<i32>,
+    },
 }
 
 #[must_use]
@@ -117,50 +129,71 @@ pub(crate) fn parse_executor_actions(
 ) -> Vec<ExecutorActionInfo> {
     let source_location =
         |loc_hash: &str, loc_offset| retrace::find_source_loc(source_map?, loc_hash, loc_offset);
+    let action_location = |action: &ExecutedAction| {
+        let installed = installed_actions
+            .actions
+            .iter()
+            .find(|installed| installed.matches_executed_action(action))?;
+        source_location(installed.loc_hash(), installed.loc_offset())
+    };
 
     let executed = ExecutedActions::from(logs);
     executed
         .actions
         .into_iter()
-        .map(|action| match action {
-            ExecutedAction::SendMessage {
-                hash,
-                remaining_balance,
-                failure_reason,
-                failure_code,
-            } => ExecutorActionInfo::SendMessage {
-                location: installed_actions
-                    .find_message(&hash)
-                    .and_then(|action| source_location(&action.loc_hash, action.loc_offset)),
-                hash,
-                remaining_balance: remaining_balance.to_string(),
-                failure_reason: failure_reason.map(convert_failure_reason),
-                failure_code,
-            },
-            ExecutedAction::ReserveCurrency {
-                mode,
-                reserve,
-                balance,
-                original_balance,
-                changed_remaining_balance,
-                changed_reserved_balance,
-                failure_reason,
-                failure_code,
-            } => ExecutorActionInfo::ReserveCurrency {
-                mode,
-                reserve: reserve.to_string(),
-                balance: balance.to_string(),
-                original_balance: original_balance.to_string(),
-                changed_remaining_balance: changed_remaining_balance.to_string(),
-                changed_reserved_balance: changed_reserved_balance.to_string(),
-                location: installed_actions
-                    .find_reserve(mode, &reserve)
-                    .and_then(|action| source_location(&action.loc_hash, action.loc_offset)),
-                failure_reason: failure_reason.map(convert_failure_reason),
-                failure_code,
-            },
+        .map(|action| {
+            let location = action_location(&action);
+            executor_action_info(action, location)
         })
         .collect()
+}
+
+fn executor_action_info(
+    action: ExecutedAction,
+    location: Option<SourceLocation>,
+) -> ExecutorActionInfo {
+    match action {
+        ExecutedAction::SendMessage {
+            hash,
+            remaining_balance,
+            failure_reason,
+            failure_code,
+        } => ExecutorActionInfo::SendMessage {
+            location,
+            hash,
+            remaining_balance: remaining_balance.to_string(),
+            failure_reason: failure_reason.map(convert_failure_reason),
+            failure_code,
+        },
+        ExecutedAction::ReserveCurrency {
+            mode,
+            reserve,
+            balance,
+            original_balance,
+            changed_remaining_balance,
+            changed_reserved_balance,
+            failure_reason,
+            failure_code,
+        } => ExecutorActionInfo::ReserveCurrency {
+            mode,
+            reserve: reserve.to_string(),
+            balance: balance.to_string(),
+            original_balance: original_balance.to_string(),
+            changed_remaining_balance: changed_remaining_balance.to_string(),
+            changed_reserved_balance: changed_reserved_balance.to_string(),
+            location,
+            failure_reason: failure_reason.map(convert_failure_reason),
+            failure_code,
+        },
+        ExecutedAction::SetCode { failure_code, .. } => ExecutorActionInfo::SetCode {
+            location,
+            failure_code,
+        },
+        ExecutedAction::ChangeLibrary { failure_code, .. } => ExecutorActionInfo::ChangeLibrary {
+            location,
+            failure_code,
+        },
+    }
 }
 
 #[must_use]
@@ -336,6 +369,7 @@ fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::retrace::InstalledAction;
 
     #[test]
     fn parse_executor_actions_extracts_send_error_details() {
@@ -401,6 +435,55 @@ mod tests {
                 failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveToncoin { .. }),
                 location: None,
                 ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_executor_actions_includes_set_code_and_change_library_metadata() {
+        let vm_logs = r"
+register new cell 0F: B5EE9C72010101010002000000
+stack: [ C{0F} ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 10
+execute SETCODE
+gas remaining: 999
+stack: [ C{0F} 18 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 20
+execute SETLIBCODE
+gas remaining: 998";
+        let installed_actions = retrace::find_installed_actions(vm_logs);
+        let InstalledAction::SetCode(set_code) = &installed_actions.actions[0] else {
+            panic!("expected set-code action");
+        };
+        let InstalledAction::ChangeLibrary(change_library) = &installed_actions.actions[1] else {
+            panic!("expected change-library action");
+        };
+        let new_code_hash = set_code.new_code.repr_hash().to_string();
+        let lib_hash = match &change_library.lib {
+            ton_retrace::trace::InstalledLibraryRef::Cell(cell) => cell.repr_hash().to_string(),
+            ton_retrace::trace::InstalledLibraryRef::Hash(hash) => hash.to_str_radix(16),
+        };
+        let executor_logs = format!(
+            "[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2269]\tprocess set code {new_code_hash}
+[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={lib_hash}, lib_ref=cell
+[ 4][t 0][2026-03-03 13:38:24.650055][transaction.cpp:2206]\tinvalid action 1 in action list: error code 34"
+        );
+
+        let parsed = parse_executor_actions(&executor_logs, &installed_actions, None);
+        assert_eq!(parsed.len(), 2);
+
+        assert!(matches!(
+            &parsed[0],
+            ExecutorActionInfo::SetCode {
+                location: None,
+                failure_code: None
+            }
+        ));
+        assert!(matches!(
+            &parsed[1],
+            ExecutorActionInfo::ChangeLibrary {
+                location: None,
+                failure_code: Some(34)
             }
         ));
     }
