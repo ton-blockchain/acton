@@ -6,8 +6,7 @@ use crate::context::{
     KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::retrace::{
-    self, ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
-    TolkBacktraceFrame,
+    self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
 };
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::BacktraceMode;
@@ -1565,25 +1564,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
                     let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
                     if let Some(logs) = executor_logs {
-                        let executed_actions = ExecutedActions::from(logs);
-                        let has_unlocated_executed_action =
-                            executed_actions.actions.iter().any(|action| {
-                                installed_actions
-                                    .actions
-                                    .iter()
-                                    .all(|installed| !installed.matches_executed_action(action))
-                            });
-                        let has_unlocated_invalid_action =
-                            executed_actions.invalid_actions.iter().any(|action| {
-                                installed_actions
-                                    .find_by_index(action.action_index)
-                                    .is_none()
-                            });
-                        if self.backtrace.is_none()
-                            && (installed_actions.actions.is_empty()
-                                || has_unlocated_executed_action
-                                || has_unlocated_invalid_action)
-                        {
+                        if self.backtrace.is_none() {
                             extra_infos.push(FormattedExtraInfo::Tree(format!(
                                 "Re-run with {} to get actions location",
                                 "--backtrace full".yellow()
@@ -1594,7 +1575,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                             child_prefix,
                             tx,
                             installed_actions,
-                            &executed_actions,
+                            logs,
                             contract_letters,
                         );
                         if !actions.is_empty() {
@@ -1872,9 +1853,11 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         child_prefix: &str,
         tx: &Transaction,
         installed_actions: InstalledActions,
-        executed: &ExecutedActions,
+        logs: &str,
         contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
+        let executed = retrace::ExecutedActions::from(logs);
+
         if executed.actions.is_empty() && !executed.invalid_actions.is_empty() {
             return self.format_invalid_actions_retrace(
                 child_prefix,
