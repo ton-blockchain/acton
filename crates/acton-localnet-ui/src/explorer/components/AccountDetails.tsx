@@ -80,9 +80,9 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   const [activeTab, setActiveTab] = useState<Tabs>("history")
   const [compilerAbi, setCompilerAbi] = useState<ContractABI | null | undefined>()
   const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
-  const [compilerAbiByAddress, setCompilerAbiByAddress] = useState<
-    Map<string, ContractABI | undefined>
-  >(new Map())
+  const [compilerAbiByAddress, setCompilerAbiByAddress] = useState<Map<string, ContractABI | undefined>>(
+    new Map(),
+  )
 
   useEffect(() => {
     if (
