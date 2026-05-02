@@ -206,8 +206,8 @@ export default function Home() {
                   Everything You Need to Build Contracts on <span className="text-[#9AE7FF]">TON</span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
-                  <span className="font-semibold text-[#9AE7FF]">Acton</span> is the open source development standard for building, testing, debugging, and verifying TON smart contracts.
-                  Built for modern Tolk projects with full developer control.
+                  <span className="font-semibold text-[#9AE7FF]">Acton</span> is an all-in-one TON smart contract development toolkit with blazingly fast feedback loops for
+                  building, testing, debugging, scripting, deployment, and many more.
                 </p>
 
                 <div className="mt-8 space-y-4 sm:mt-10">
