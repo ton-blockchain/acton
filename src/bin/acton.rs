@@ -725,10 +725,16 @@ enum Commands {
     )]
     Disasm {
         #[arg(
-            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)"
+            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)",
+            conflicts_with_all = ["string", "address"]
         )]
         boc_file: Option<String>,
-        #[arg(short, long, help = "BoC string in hex or base64 format")]
+        #[arg(
+            short,
+            long,
+            help = "BoC string in hex or base64 format",
+            conflicts_with_all = ["boc_file", "address"]
+        )]
         string: Option<String>,
         #[arg(
             short,
@@ -746,7 +752,8 @@ enum Commands {
         source_map: Option<String>,
         #[arg(
             long,
-            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
+            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)",
+            conflicts_with_all = ["boc_file", "string"]
         )]
         address: Option<String>,
         #[arg(long, help = "Network for `--address` and library lookups")]
@@ -1046,7 +1053,13 @@ pub enum LocalnetCommand {
     Airdrop {
         #[arg(help = "Address to receive TON")]
         address: String,
-        #[arg(long, short, help = "Amount of TON to request", default_value = "100")]
+        #[arg(
+            long,
+            short,
+            help = "Amount of TON to request",
+            default_value = "100",
+            value_parser = parse_positive_ton_amount
+        )]
         amount: f64,
         #[arg(
             long,
@@ -1078,9 +1091,17 @@ pub enum LibraryCommand {
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
-        #[arg(long, help = "Save library info to local libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to local libraries.toml",
+            conflicts_with = "global"
+        )]
         local: bool,
-        #[arg(long, help = "Save library info to global.libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to global.libraries.toml",
+            conflicts_with = "local"
+        )]
         global: bool,
     },
     #[command(about = "Fetch a library from the blockchain")]
@@ -2233,7 +2254,10 @@ const fn command_configures_project_roots(command: &Commands) -> bool {
 
 const fn command_checks_toolchain_version(command: &Commands) -> bool {
     command_configures_project_roots(command)
-        && !matches!(command, Commands::Up { .. } | Commands::Completions { .. })
+        && !matches!(
+            command,
+            Commands::Up { .. } | Commands::Completions { .. } | Commands::Doctor
+        )
 }
 
 fn validate_project_toolchain_version() -> anyhow::Result<()> {
@@ -2338,6 +2362,22 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
             })
         );
     }
+}
+
+fn parse_positive_ton_amount(value: &str) -> Result<f64, String> {
+    let amount = value
+        .parse::<f64>()
+        .map_err(|err| format!("invalid TON amount '{value}': {err}"))?;
+
+    if !amount.is_finite() {
+        return Err(format!("TON amount must be finite, got '{value}'"));
+    }
+
+    if amount <= 0.0 {
+        return Err(format!("TON amount must be greater than 0, got '{value}'"));
+    }
+
+    Ok(amount)
 }
 
 fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {

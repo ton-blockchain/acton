@@ -1,5 +1,0 @@
-error: the argument '--base64-only' cannot be used with '--json'
-
-Usage: acton[EXE] compile [OPTIONS] <PATH>
-
-For more information, try '--help'.

@@ -1100,9 +1100,9 @@ fn test_disasm_multiple_input_sources_file_and_string() {
         .disasm_string("some_hex_data")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/disasm/test_disasm_multiple_input_sources_file_and_string.stderr.txt",
-        );
+        .assert_stderr_contains("cannot be used with")
+        .assert_stderr_contains("--string")
+        .assert_stderr_contains("BOC_FILE");
 }
 
 #[test]

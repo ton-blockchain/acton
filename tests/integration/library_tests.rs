@@ -2083,55 +2083,24 @@ fn test_library_topup_uses_mainnet_env_api_key_for_mainnet() {
 }
 
 #[test]
-fn test_library_publish_local_and_global_flags_prefer_global_storage() {
+fn test_library_publish_rejects_local_and_global_flags_together() {
     let project = ProjectBuilder::new("library-publish-local-global-precedence").build();
-    write_deployer_wallets(project.path());
-    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
-
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_seqno_ok_response(),
-        toncenter_v2_send_boc_ok_response(),
-    ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
-        .env(
-            "HOME",
-            home_temp.path().to_str().expect("home path should be utf8"),
-        )
         .library()
         .publish()
         .with_code("te6cckEBAQEAAgAAAEysuc0=")
         .with_duration("1d")
         .wallet("deployer")
-        .arg("--net")
-        .arg("custom:mock-v2")
-        .arg("--amount")
-        .arg("1")
         .arg("--yes")
         .arg("--local")
         .arg("--global")
         .run()
-        .success()
-        .assert_contains("Library info saved");
-
-    mock_handle.join().expect("mock toncenter v2 must finish");
-    assert!(
-        !project.path().join("libraries.toml").exists(),
-        "local metadata file should not be created when both --local and --global are set"
-    );
-
-    let global_path = home_temp
-        .path()
-        .join(".config")
-        .join("acton")
-        .join("libraries")
-        .join("global.libraries.toml");
-    assert!(
-        global_path.exists(),
-        "global metadata should win when both --local and --global are set"
-    );
+        .failure()
+        .assert_stderr_contains("cannot be used with")
+        .assert_stderr_contains("--local")
+        .assert_stderr_contains("--global");
 }
 
 #[cfg(unix)]

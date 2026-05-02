@@ -127,13 +127,84 @@ fn test_acton_lint_with_args_shows_check_replacement() {
 
 #[test]
 fn test_acton_compile_rejects_conflicting_stdout_formats() {
-    snapbox::cmd::Command::acton_ui()
+    let assert = snapbox::cmd::Command::acton_ui()
         .args(["compile", "contracts/main.tolk", "--json", "--base64-only"])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""]);
+    assert_stderr_contains_all(&assert, &["cannot be used with", "--json", "--base64-only"]);
+}
+
+#[test]
+fn test_acton_doctor_ignores_project_toolchain_mismatch() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    write_minimal_acton_toml(
+        temp_dir.path(),
+        r#"
+[toolchain]
+acton = "0.0.0-doctor-mismatch-test"
+"#,
+    );
+
+    snapbox::cmd::Command::acton_ui()
+        .arg("doctor")
+        .current_dir(temp_dir.path())
+        .assert()
+        .success()
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
+fn test_acton_disasm_rejects_boc_file_with_address() {
+    let assert = snapbox::cmd::Command::acton_ui()
+        .args([
+            "disasm",
+            "contract.boc",
+            "--address",
+            "UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
+        ])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""]);
+    assert_stderr_contains_all(&assert, &["cannot be used with", "--address", "BOC_FILE"]);
+}
+
+#[test]
+fn test_acton_library_publish_rejects_local_and_global_together() {
+    let assert = snapbox::cmd::Command::acton_ui()
+        .args([
+            "library",
+            "publish",
+            "Math",
+            "--local",
+            "--global",
+            "--duration",
+            "1d",
+            "--wallet",
+            "deployer",
+            "--yes",
+        ])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""]);
+    assert_stderr_contains_all(&assert, &["cannot be used with", "--local", "--global"]);
+}
+
+#[test]
+fn test_acton_localnet_airdrop_rejects_non_positive_amount() {
+    snapbox::cmd::Command::acton_ui()
+        .args([
+            "localnet",
+            "airdrop",
+            "UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
+            "--amount",
+            "0",
+        ])
         .assert()
         .failure()
         .stdout_eq(snapbox::str![""])
         .stderr_eq(snapbox::file![
-            "snapshots/compile_conflicting_stdout_formats/stderr.txt"
+            "snapshots/localnet_airdrop_non_positive_amount/stderr.txt"
         ]);
 }
 
@@ -360,6 +431,28 @@ fn test_acton_meta_get_schema_prints_mutation_rules_schema() {
         MUTATION_RULES_SCHEMA_JSON
     );
     assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+}
+
+fn write_minimal_acton_toml(project_root: &std::path::Path, extra: &str) {
+    let content = format!(
+        r#"[package]
+name = "cli-integration-test"
+version = "0.0.0"
+
+{extra}"#
+    );
+    fs::write(project_root.join("Acton.toml"), content).expect("failed to write Acton.toml");
+}
+
+fn assert_stderr_contains_all(assert: &snapbox::cmd::OutputAssert, expected: &[&str]) {
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+
+    for expected in expected {
+        assert!(
+            stderr.contains(expected),
+            "stderr did not contain {expected:?}\nstderr:\n{stderr}"
+        );
+    }
 }
 
 #[test]
