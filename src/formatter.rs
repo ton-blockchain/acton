@@ -1869,120 +1869,69 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         let mut action_parts = Vec::new();
 
-        if installed_actions.actions.is_empty() {
-            for action in &executed.actions {
-                action_parts.push(self.format_executed_action_retrace_part(action));
-            }
-        } else {
-            let mut used_executed_actions = vec![false; executed.actions.len()];
+        for action in &executed.actions {
+            let installed = installed_actions
+                .actions
+                .iter()
+                .find(|installed| installed.matches_executed_action(action));
+            let loc = installed.and_then(|installed| {
+                self.find_source_loc(tx, installed.loc_hash(), installed.loc_offset())
+            });
+            let location_part = loc
+                .map(|l| format!("at {}", l.format()))
+                .unwrap_or_default();
 
-            for installed in &installed_actions.actions {
-                let loc = self.find_source_loc(tx, installed.loc_hash(), installed.loc_offset());
-                let location_part = loc
-                    .map(|l| format!("at {}", l.format()))
-                    .unwrap_or_default();
-                let matched =
-                    executed
-                        .actions
-                        .iter()
-                        .enumerate()
-                        .find_map(|(index, executed_action)| {
-                            if used_executed_actions[index]
-                                || !installed.matches_executed_action(executed_action)
-                            {
-                                return None;
-                            }
-
-                            used_executed_actions[index] = true;
-                            Some(executed_action)
-                        });
-
-                match (installed, matched) {
-                    (
-                        InstalledAction::Message(message),
-                        Some(ExecutedAction::SendMessage {
-                            remaining_balance, ..
-                        }),
-                    ) => {
-                        let message_part = message.message().map_or_else(
+            match action {
+                ExecutedAction::SendMessage {
+                    hash,
+                    remaining_balance,
+                    ..
+                } => {
+                    let message_part = match installed {
+                        Some(InstalledAction::Message(message)) => message.message().map_or_else(
                             || message.msg_hash.clone(),
                             |msg| self.format_single_message(&msg, contract_letters, false, None),
-                        );
-                        let balance_part =
-                            format!("balance: {}", self.format_ton(remaining_balance));
+                        ),
+                        _ => "msg: ".to_owned() + hash,
+                    };
+                    let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
 
-                        action_parts.push((message_part, balance_part, location_part));
-                    }
-                    (
-                        InstalledAction::Reserve(reserve),
-                        Some(ExecutedAction::ReserveCurrency {
-                            changed_remaining_balance,
-                            ..
-                        }),
-                    ) => {
-                        let mode_flags = ReserveCurrencyFlags::from_bits(reserve.mode as u8)
-                            .unwrap_or(ReserveCurrencyFlags::empty());
-                        let message_part = format!(
-                            "{} {} {}",
-                            "reserve".blue(),
-                            self.format_ton(&reserve.amount),
-                            Self::format_reserve_currency_flags(mode_flags).dimmed()
-                        );
-                        let balance_part =
-                            format!("balance: {}", self.format_ton(changed_remaining_balance));
-
-                        action_parts.push((message_part, balance_part, location_part));
-                    }
-                    (InstalledAction::Message(message), _) => {
-                        let message_part = message.message().map_or_else(
-                            || message.msg_hash.clone(),
-                            |msg| self.format_single_message(&msg, contract_letters, false, None),
-                        );
-                        action_parts.push((
-                            message_part,
-                            "balance: 0 TON".to_owned(),
-                            location_part,
-                        ));
-                    }
-                    (InstalledAction::Reserve(reserve), _) => {
-                        let mode_flags = ReserveCurrencyFlags::from_bits(reserve.mode as u8)
-                            .unwrap_or(ReserveCurrencyFlags::empty());
-                        let message_part = format!(
-                            "{} {} {}",
-                            "reserve".blue(),
-                            self.format_ton(&reserve.amount),
-                            Self::format_reserve_currency_flags(mode_flags).dimmed()
-                        );
-                        action_parts.push((
-                            message_part,
-                            "balance: 0 TON".to_owned(),
-                            location_part,
-                        ));
-                    }
-                    (InstalledAction::SetCode(_), _) => {
-                        action_parts.push((
-                            "set code".magenta().to_string(),
-                            String::new(),
-                            location_part,
-                        ));
-                    }
-                    (InstalledAction::ChangeLibrary(change), _) => {
-                        let message_part = format!(
-                            "{} {}",
-                            "change library".cyan(),
-                            Self::format_change_library_mode(change.mode).dimmed()
-                        );
-                        action_parts.push((message_part, String::new(), location_part));
-                    }
+                    action_parts.push((message_part, balance_part, location_part));
                 }
-            }
+                ExecutedAction::ReserveCurrency {
+                    mode,
+                    reserve,
+                    changed_remaining_balance,
+                    ..
+                } => {
+                    let mode_flags = ReserveCurrencyFlags::from_bits(*mode as u8)
+                        .unwrap_or(ReserveCurrencyFlags::empty());
+                    let message_part = format!(
+                        "{} {} {}",
+                        "reserve".blue(),
+                        self.format_ton(reserve),
+                        Self::format_reserve_currency_flags(mode_flags).dimmed()
+                    );
+                    let balance_part =
+                        format!("balance: {}", self.format_ton(changed_remaining_balance));
 
-            for (index, action) in executed.actions.iter().enumerate() {
-                if used_executed_actions[index] {
-                    continue;
+                    action_parts.push((message_part, balance_part, location_part));
                 }
-
-                action_parts.push(self.format_executed_action_retrace_part(action));
+                ExecutedAction::SetCode { .. } => {
+                    action_parts.push((
+                        "set code".magenta().to_string(),
+                        String::new(),
+                        location_part,
+                    ));
+                }
+                ExecutedAction::ChangeLibrary { mode, .. } => {
+                    let message_part = format!(
+                        "{} {}",
+                        "change library".cyan(),
+                        Self::format_change_library_mode(*mode).dimmed()
+                    );
+                    action_parts.push((message_part, String::new(), location_part));
+                }
             }
         }
 
@@ -2028,57 +1977,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         }
 
         result.trim_end().to_string()
-    }
-
-    fn format_executed_action_retrace_part(
-        &self,
-        action: &ExecutedAction,
-    ) -> (String, String, String) {
-        match action {
-            ExecutedAction::SendMessage {
-                hash,
-                remaining_balance,
-                ..
-            } => {
-                let message_part = "msg: ".to_owned() + hash;
-                let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
-
-                (message_part, balance_part, String::new())
-            }
-            ExecutedAction::ReserveCurrency {
-                mode,
-                reserve,
-                changed_remaining_balance,
-                ..
-            } => {
-                let mode_flags = ReserveCurrencyFlags::from_bits(*mode as u8)
-                    .unwrap_or(ReserveCurrencyFlags::empty());
-
-                let message_part = format!(
-                    "{} {} {}",
-                    "reserve".blue(),
-                    self.format_ton(reserve),
-                    Self::format_reserve_currency_flags(mode_flags).dimmed()
-                );
-                let balance_part =
-                    format!("balance: {}", self.format_ton(changed_remaining_balance));
-
-                (message_part, balance_part, String::new())
-            }
-            ExecutedAction::SetCode { .. } => (
-                "set code".magenta().to_string(),
-                String::new(),
-                String::new(),
-            ),
-            ExecutedAction::ChangeLibrary { mode, .. } => {
-                let message_part = format!(
-                    "{} {}",
-                    "change library".cyan(),
-                    Self::format_change_library_mode(*mode).dimmed()
-                );
-                (message_part, String::new(), String::new())
-            }
-        }
     }
 
     fn format_change_library_mode(mode: i32) -> String {

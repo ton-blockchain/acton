@@ -1,7 +1,7 @@
 use crate::commands::test::{Pos, TestDescriptor};
 use crate::context::{Context, Emulations, FailedSendMessageResult, to_cell};
 use crate::ffi::emulation::compilation_result_for_code;
-use crate::retrace::{self, InstalledAction, InstalledActions};
+use crate::retrace::{self, InstalledActions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -129,144 +129,29 @@ pub(crate) fn parse_executor_actions(
 ) -> Vec<ExecutorActionInfo> {
     let source_location =
         |loc_hash: &str, loc_offset| retrace::find_source_loc(source_map?, loc_hash, loc_offset);
+    let action_location = |action: &ExecutedAction| {
+        let installed = installed_actions
+            .actions
+            .iter()
+            .find(|installed| installed.matches_executed_action(action))?;
+        source_location(installed.loc_hash(), installed.loc_offset())
+    };
 
     let executed = ExecutedActions::from(logs);
-    if installed_actions.actions.is_empty() {
-        return executed
-            .actions
-            .into_iter()
-            .map(executor_action_info)
-            .collect();
-    }
-
-    let mut used_executed_actions = vec![false; executed.actions.len()];
-    installed_actions
+    executed
         .actions
-        .iter()
-        .enumerate()
-        .map(|(index, installed)| {
-            let matched = take_matching_executed_action(
-                &executed.actions,
-                &mut used_executed_actions,
-                installed,
-            );
-            let failure_code = executed
-                .invalid_actions
-                .iter()
-                .find(|action| action.action_index == index)
-                .map(|action| action.error_code);
-            let location = source_location(installed.loc_hash(), installed.loc_offset());
-
-            match (installed, matched) {
-                (
-                    InstalledAction::Message(_),
-                    Some(ExecutedAction::SendMessage {
-                        hash,
-                        remaining_balance,
-                        failure_reason,
-                        failure_code: executed_failure_code,
-                    }),
-                ) => ExecutorActionInfo::SendMessage {
-                    hash: hash.clone(),
-                    remaining_balance: remaining_balance.to_string(),
-                    location,
-                    failure_reason: failure_reason.clone().map(convert_failure_reason),
-                    failure_code: failure_code.or(*executed_failure_code),
-                },
-                (
-                    InstalledAction::Reserve(_),
-                    Some(ExecutedAction::ReserveCurrency {
-                        mode,
-                        reserve,
-                        balance,
-                        original_balance,
-                        changed_remaining_balance,
-                        changed_reserved_balance,
-                        failure_reason,
-                        failure_code: executed_failure_code,
-                    }),
-                ) => ExecutorActionInfo::ReserveCurrency {
-                    mode: *mode,
-                    reserve: reserve.to_string(),
-                    balance: balance.to_string(),
-                    original_balance: original_balance.to_string(),
-                    changed_remaining_balance: changed_remaining_balance.to_string(),
-                    changed_reserved_balance: changed_reserved_balance.to_string(),
-                    location,
-                    failure_reason: failure_reason.clone().map(convert_failure_reason),
-                    failure_code: failure_code.or(*executed_failure_code),
-                },
-                (
-                    InstalledAction::SetCode(_),
-                    Some(ExecutedAction::SetCode {
-                        failure_code: executed_failure_code,
-                        ..
-                    }),
-                ) => ExecutorActionInfo::SetCode {
-                    location,
-                    failure_code: failure_code.or(*executed_failure_code),
-                },
-                (
-                    InstalledAction::ChangeLibrary(_),
-                    Some(ExecutedAction::ChangeLibrary {
-                        failure_code: executed_failure_code,
-                        ..
-                    }),
-                ) => ExecutorActionInfo::ChangeLibrary {
-                    location,
-                    failure_code: failure_code.or(*executed_failure_code),
-                },
-                (InstalledAction::Message(message), _) => ExecutorActionInfo::SendMessage {
-                    hash: message.msg_hash.clone(),
-                    remaining_balance: "0".to_owned(),
-                    location,
-                    failure_reason: None,
-                    failure_code,
-                },
-                (InstalledAction::Reserve(reserve), _) => ExecutorActionInfo::ReserveCurrency {
-                    mode: reserve.mode,
-                    reserve: reserve.amount.to_string(),
-                    balance: "0".to_owned(),
-                    original_balance: "0".to_owned(),
-                    changed_remaining_balance: "0".to_owned(),
-                    changed_reserved_balance: "0".to_owned(),
-                    location,
-                    failure_reason: None,
-                    failure_code,
-                },
-                (InstalledAction::SetCode(_), _) => ExecutorActionInfo::SetCode {
-                    location,
-                    failure_code,
-                },
-                (InstalledAction::ChangeLibrary(_), _) => ExecutorActionInfo::ChangeLibrary {
-                    location,
-                    failure_code,
-                },
-            }
+        .into_iter()
+        .map(|action| {
+            let location = action_location(&action);
+            executor_action_info(action, location)
         })
         .collect()
 }
 
-fn take_matching_executed_action<'a>(
-    actions: &'a [ExecutedAction],
-    used_actions: &mut [bool],
-    installed: &InstalledAction,
-) -> Option<&'a ExecutedAction> {
-    for (index, action) in actions.iter().enumerate() {
-        if used_actions[index] {
-            continue;
-        }
-
-        if installed.matches_executed_action(action) {
-            used_actions[index] = true;
-            return Some(action);
-        }
-    }
-
-    None
-}
-
-fn executor_action_info(action: ExecutedAction) -> ExecutorActionInfo {
+fn executor_action_info(
+    action: ExecutedAction,
+    location: Option<SourceLocation>,
+) -> ExecutorActionInfo {
     match action {
         ExecutedAction::SendMessage {
             hash,
@@ -274,7 +159,7 @@ fn executor_action_info(action: ExecutedAction) -> ExecutorActionInfo {
             failure_reason,
             failure_code,
         } => ExecutorActionInfo::SendMessage {
-            location: None,
+            location,
             hash,
             remaining_balance: remaining_balance.to_string(),
             failure_reason: failure_reason.map(convert_failure_reason),
@@ -296,16 +181,16 @@ fn executor_action_info(action: ExecutedAction) -> ExecutorActionInfo {
             original_balance: original_balance.to_string(),
             changed_remaining_balance: changed_remaining_balance.to_string(),
             changed_reserved_balance: changed_reserved_balance.to_string(),
-            location: None,
+            location,
             failure_reason: failure_reason.map(convert_failure_reason),
             failure_code,
         },
         ExecutedAction::SetCode { failure_code, .. } => ExecutorActionInfo::SetCode {
-            location: None,
+            location,
             failure_code,
         },
         ExecutedAction::ChangeLibrary { failure_code, .. } => ExecutorActionInfo::ChangeLibrary {
-            location: None,
+            location,
             failure_code,
         },
     }
@@ -484,6 +369,7 @@ fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::retrace::InstalledAction;
 
     #[test]
     fn parse_executor_actions_extracts_send_error_details() {
