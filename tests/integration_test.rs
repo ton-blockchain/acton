@@ -295,6 +295,10 @@ fn test_commands_index_links_all_documented_command_pages() {
         .expect("failed to read commands overview.mdx");
 
     for page in meta.pages {
+        if page == "overview" {
+            continue;
+        }
+
         let href = format!("href=\"/docs/commands/{page}\"");
         assert!(
             index.contains(&href),
