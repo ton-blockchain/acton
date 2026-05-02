@@ -195,18 +195,18 @@ export default function Home() {
             <div className="px-4 py-10 sm:px-8 sm:pb-12 sm:pt-14 lg:px-12 lg:pb-14 lg:pt-16">
                 <Link
                   href="/docs/welcome"
-                  className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-teal-400/45 bg-teal-300/10 px-3 py-1.5 text-xs font-medium text-teal-200 transition-colors hover:bg-teal-300/15"
+                  className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-[#1AC9FF]/45 bg-[#2D83EC]/10 px-3 py-1.5 text-xs font-medium text-[#9AE7FF] transition-colors hover:bg-[#2D83EC]/15"
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-teal-300" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#1AC9FF]" />
                   Acton 1.0 and Tolk 1.4 is here
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
 
                 <h1 className="max-w-5xl text-[2.3rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-6xl sm:leading-[1.04] lg:text-[4.9rem] xl:text-[5.8rem]">
-                  Everything You Need to Build Contracts on <span className="text-teal-200">TON</span>
+                  Everything You Need to Build Contracts on <span className="text-[#9AE7FF]">TON</span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-base leading-7 text-[#b8b7af] sm:mt-8 sm:text-xl sm:leading-8">
-                  <span className="font-semibold text-teal-200">Acton</span> is the open source development standard for building, testing, debugging, and verifying TON smart contracts.
+                  <span className="font-semibold text-[#9AE7FF]">Acton</span> is the open source development standard for building, testing, debugging, and verifying TON smart contracts.
                   Built for modern Tolk projects with full developer control.
                 </p>
 
@@ -226,7 +226,7 @@ export default function Home() {
         <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
           <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
                 From zero to testnet
               </p>
               <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
@@ -335,7 +335,7 @@ export default function Home() {
                     <p className="mt-5 text-base leading-7 text-[#9f9e96]">
                       {feature.description}
                     </p>
-                    <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-teal-200">
+                    <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]">
                       Read in docs
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </span>
@@ -350,7 +350,7 @@ export default function Home() {
           <div className="border border-white/10 bg-[#070707] px-4 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-18 lg:px-12 lg:pb-28 lg:pt-20">
             <div className="grid gap-8 sm:gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
                   FunC migration
                 </p>
                 <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
@@ -373,24 +373,24 @@ export default function Home() {
                   <pre className="overflow-x-auto font-mono text-sm leading-7">
                     <code>
                       <span className="text-[#77766f]">$ </span>
-                      <span className="text-teal-200">acton</span>
+                      <span className="text-[#9AE7FF]">acton</span>
                       <span className="text-sky-200"> func2tolk </span>
                       <span className="text-[#ef8cff]">contracts/</span>
                       {'\n'}
-                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#1AC9FF]">✓</span>
                       <span className="text-[#d8d7cf]"> parsed </span>
                       <span className="text-sky-200">14</span>
                       <span className="text-[#d8d7cf]"> FunC files</span>
                       {'\n'}
-                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#1AC9FF]">✓</span>
                       <span className="text-[#d8d7cf]"> generated </span>
                       <span className="text-sky-200">Tolk</span>
                       <span className="text-[#d8d7cf]"> contracts</span>
                       {'\n'}
-                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#1AC9FF]">✓</span>
                       <span className="text-[#d8d7cf]"> wrappers are still compatible</span>
                       {'\n'}
-                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#1AC9FF]">✓</span>
                       <span className="text-[#d8d7cf]"> test snapshots match</span>
                     </code>
                   </pre>
@@ -456,7 +456,7 @@ export default function Home() {
                 <Link
                   href="https://t.me/toncore"
                   target="_blank"
-                  className="font-medium text-teal-200 transition-colors hover:text-white"
+                  className="font-medium text-[#9AE7FF] transition-colors hover:text-white"
                 >
                   TON Core
                 </Link>
@@ -552,7 +552,7 @@ function FeatureTitle({ title }: { title: string }) {
   return (
     <>
       {title.slice(0, accentIndex)}
-      <span className="text-teal-200">{accent}</span>
+      <span className="text-[#9AE7FF]">{accent}</span>
       {title.slice(accentIndex + accent.length)}
     </>
   );
@@ -568,7 +568,7 @@ function FeatureIcon({ title }: { title: string }) {
   const Icon = config.icon;
 
   return (
-    <span className="inline-flex text-teal-200">
+    <span className="inline-flex text-[#9AE7FF]">
       <Icon className="h-9 w-9" strokeWidth={1.8} />
     </span>
   );
@@ -585,7 +585,7 @@ function SectionHeader({
 }) {
   return (
     <div className="max-w-3xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
         {eyebrow}
       </p>
       <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">

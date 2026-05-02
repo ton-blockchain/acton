@@ -22,11 +22,11 @@ const highlightCommand = (command: string) => {
 export function HighlightedInstallCommand() {
   return (
     <>
-      <span className="text-teal-200">curl</span>
+      <span className="text-[#9AE7FF]">curl</span>
       <span className="text-sky-200"> -LsSf </span>
       <span className="text-[#ef8cff]">https://ton.org/acton/install.sh</span>
       <span className="text-white/35"> | </span>
-      <span className="text-teal-200">sh</span>
+      <span className="text-[#9AE7FF]">sh</span>
     </>
   );
 }
@@ -51,7 +51,7 @@ export function InlineInstallationCommand() {
         aria-label={copied ? 'Copied install command' : 'Copy install command'}
         className="shrink-0 rounded-md p-1 text-[#8d8c84] transition-colors hover:bg-white/[0.06] hover:text-white"
       >
-        {copied ? <Check className="h-3.5 w-3.5 text-teal-200" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? <Check className="h-3.5 w-3.5 text-[#9AE7FF]" /> : <Copy className="h-3.5 w-3.5" />}
       </button>
     </div>
   );
