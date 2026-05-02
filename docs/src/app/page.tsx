@@ -447,12 +447,7 @@ export default function Home() {
               </p>
             </div>
             <div className="grid w-full grid-cols-[auto_1fr] items-center gap-4 text-sm text-[#c7c6bf] md:flex md:w-auto md:justify-end">
-              <div className="flex items-center gap-1">
-                {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
-                  <IconLink key={label} href={href} label={label} icon={Icon} />
-                ))}
-              </div>
-              <div className="justify-self-end text-right">
+              <div>
                 Built by{' '}
                 <Link
                   href="https://t.me/toncore"
@@ -461,6 +456,11 @@ export default function Home() {
                 >
                   TON Core
                 </Link>
+              </div>
+              <div className="justify-self-end flex items-center gap-1">
+                {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
+                  <IconLink key={label} href={href} label={label} icon={Icon} />
+                ))}
               </div>
             </div>
           </div>
