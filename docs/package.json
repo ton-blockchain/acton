@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
     "generated-source": "bunx fumadocs-mdx",
     "lint:links": "bun run lint:links:internal && bun run lint:links:external",
     "lint:links:internal": "bun ./scripts/validate-links-internal.ts",
@@ -46,6 +48,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
     "next-validate-link": "^1.6.6",
+    "prettier": "3.4.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
   }

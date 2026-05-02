@@ -57,6 +57,10 @@ jobs:
         working-directory: docs
         run: bun run generated-source
 
+      - name: Check docs formatting
+        working-directory: docs
+        run: bun run fmt:check
+
       - name: Lint Check docs
         working-directory: docs
         run: bun run docs-lint
