@@ -3,7 +3,7 @@ import {useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import type {Cell} from "@ton/core"
 
-import type {BackendContractInfo} from "@/types"
+import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {DataBlock, fmt} from "@/index"
 import {decodeStateInitData} from "@/utils/messageBody"
@@ -33,6 +33,7 @@ export interface TransactionDetailsProps {
   readonly contracts: Map<string, ContractData>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
 export function TransactionDetails({
@@ -40,6 +41,7 @@ export function TransactionDetails({
   contracts,
   allContracts,
   onContractClick,
+  renderSourceLocation,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
   const [showStateInit, setShowStateInit] = useState(false)
@@ -386,10 +388,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip
-                    exitCode={computePhase.exitCode}
-                    abi={targetContract?.abi}
-                  />
+                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -473,6 +472,8 @@ export function TransactionDetails({
               executorActions={tx.executorActions}
               contracts={contracts}
               contractAddress={tx.address?.toString() ?? ""}
+              onContractClick={onContractClick}
+              renderSourceLocation={renderSourceLocation}
             />
           </div>
         </div>

@@ -10,7 +10,7 @@ import {
   type TreeLinkDatum,
 } from "react-d3-tree"
 
-import type {BackendContractInfo} from "@/types"
+import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {fmt} from "@/index"
 import {
@@ -61,6 +61,7 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
 function EdgeTransactionTooltipContent({
@@ -171,6 +172,7 @@ export function TransactionTree({
   contracts,
   allContracts,
   onContractClick,
+  renderSourceLocation,
 }: TransactionTreeProps): React.JSX.Element {
   const {
     tooltip,
@@ -358,7 +360,10 @@ export function TransactionTree({
       return {
         name: addressName,
         attributes: {
-          from: getTransactionSourceLabel(tx.transaction) ?? inMessage?.info.src?.toString() ?? "unknown",
+          from:
+            getTransactionSourceLabel(tx.transaction) ??
+            inMessage?.info.src?.toString() ??
+            "unknown",
           to: inMessage?.info.dest?.toString() ?? "unknown",
           lt,
           success: isSuccess ? "✓" : "✗",
@@ -734,6 +739,7 @@ export function TransactionTree({
             contracts={contracts}
             allContracts={allContracts}
             onContractClick={onContractClick}
+            renderSourceLocation={renderSourceLocation}
           />
         </div>
       )}
@@ -759,7 +765,9 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
   return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
 }
 
-function getSharedInternalSource(rootTransactions: readonly TransactionInfo[]): Address | undefined {
+function getSharedInternalSource(
+  rootTransactions: readonly TransactionInfo[],
+): Address | undefined {
   if (rootTransactions.length === 0) {
     return undefined
   }

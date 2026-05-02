@@ -385,13 +385,7 @@ impl<'a> TestRunner<'a> {
                 if let Some(trace_dir) = &self.config.save_test_trace
                     && let Some(emulations) = ctx.chain.emulations.results_of(&test.name)
                 {
-                    trace::dump_test_transactions(
-                        test,
-                        ctx.build.build_cache,
-                        ctx.build.known_addresses,
-                        emulations,
-                        trace_dir,
-                    )?;
+                    trace::dump_test_transactions(test, &ctx, emulations, trace_dir)?;
                 }
 
                 (
@@ -410,13 +404,7 @@ impl<'a> TestRunner<'a> {
                 if let Some(trace_dir) = &self.config.save_test_trace
                     && let Some(emulations) = ctx.chain.emulations.results_of(&test.name)
                 {
-                    trace::dump_test_transactions(
-                        test,
-                        ctx.build.build_cache,
-                        ctx.build.known_addresses,
-                        emulations,
-                        trace_dir,
-                    )?;
+                    trace::dump_test_transactions(test, &ctx, emulations, trace_dir)?;
                 }
 
                 (

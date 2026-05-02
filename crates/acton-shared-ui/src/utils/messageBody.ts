@@ -71,7 +71,9 @@ const parsePrefixNumber = (prefixStr: string): number | undefined => {
   }
 }
 
-const getDeclarationOpcode = (declaration: ContractABI["declarations"][number]): number | undefined => {
+const getDeclarationOpcode = (
+  declaration: ContractABI["declarations"][number],
+): number | undefined => {
   if (declaration.kind === "struct" && declaration.prefix?.prefix_len === 32) {
     return parsePrefixNumber(declaration.prefix.prefix_str)
   }
@@ -216,9 +218,7 @@ const getIncomingCandidates = (
   isInternal: boolean,
   opcode: number | undefined,
 ): readonly MessageCandidate[] => {
-  const directCandidates = isInternal
-    ? abi.incoming_messages
-    : abi.incoming_external
+  const directCandidates = isInternal ? abi.incoming_messages : abi.incoming_external
   if (!isInternal) {
     return directCandidates
   }

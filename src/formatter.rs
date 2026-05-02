@@ -3008,29 +3008,39 @@ impl FormatterContext<'_> {
                 let tx = res.tx;
                 let code = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
                 let build = self.build_cache.result_for_code(&code);
+                let source_map = build.as_ref().map(|(_, info)| info.source_map.as_ref());
+                let mut source_maps = Vec::new();
+                if let Some(source_map) = source_map {
+                    source_maps.push(source_map);
+                }
+                for result in self.build_cache.built.values() {
+                    source_maps.push(result.source_map.as_ref());
+                }
+                let vm_log = self.emulations.find_tx_logs(tx.lt);
+                let installed_actions =
+                    vm_log.map_or_else(InstalledActions::empty, retrace::find_installed_actions);
+                let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
 
                 TransactionInfo {
                     lt: tx.lt.to_string(),
                     raw_transaction: Boc::encode_base64(to_cell(&tx)).into(),
                     parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
-                    dest_contract_info: build.map(|(_, info)| info.name),
+                    dest_contract_info: build.as_ref().map(|(_, info)| info.name.clone()),
                     child_transactions: res.children_ids.iter().map(ToString::to_string).collect(),
                     shard_account_before: String::new(),
                     shard_account: String::new(),
-                    vm_log_diff: self
-                        .emulations
-                        .find_tx_logs(tx.lt)
+                    vm_log_diff: vm_log
                         .map(tvm_logs::convert_to_diff_logs)
                         .unwrap_or_default(),
-                    executor_logs: self
-                        .emulations
-                        .find_tx_executor_logs(tx.lt)
-                        .map(Arc::from)
-                        .unwrap_or_default(),
-                    executor_actions: self
-                        .emulations
-                        .find_tx_executor_logs(tx.lt)
-                        .map(crate::commands::test::trace::parse_executor_actions)
+                    executor_logs: executor_logs.map(Arc::from).unwrap_or_default(),
+                    executor_actions: executor_logs
+                        .map(|logs| {
+                            crate::commands::test::trace::parse_executor_actions(
+                                logs,
+                                &installed_actions,
+                                &source_maps,
+                            )
+                        })
                         .unwrap_or_default(),
                     actions: Some(Boc::encode_base64(&res.actions).into()),
                 }

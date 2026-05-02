@@ -96,8 +96,8 @@ function collectMessageEntries(
       const declaration = aliasDeclarations.get(aliasName)
       const targetTy = asRecord(declaration?.target_ty)
       if (declaration && targetTy) {
-          collectMessageEntries(targetTy, structDeclarations, aliasDeclarations, out, visitedAliases)
-        }
+        collectMessageEntries(targetTy, structDeclarations, aliasDeclarations, out, visitedAliases)
+      }
       visitedAliases.delete(aliasName)
       return
     }
@@ -135,13 +135,7 @@ function collectMessageEntries(
       if (!inner) {
         return
       }
-      collectMessageEntries(
-        inner,
-        structDeclarations,
-        aliasDeclarations,
-        out,
-        visitedAliases,
-      )
+      collectMessageEntries(inner, structDeclarations, aliasDeclarations, out, visitedAliases)
       return
     }
     default: {
@@ -172,7 +166,9 @@ function resolveMessageTypeName(
       visitedAliases.add(aliasName)
       const declaration = aliasDeclarations.get(aliasName)
       const targetTy = asRecord(declaration?.target_ty)
-      return targetTy ? resolveMessageTypeName(targetTy, aliasDeclarations, visitedAliases) : undefined
+      return targetTy
+        ? resolveMessageTypeName(targetTy, aliasDeclarations, visitedAliases)
+        : undefined
     }
     case "nullable":
     case "cellOf":

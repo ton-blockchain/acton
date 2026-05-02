@@ -210,6 +210,19 @@
   word-break: break-all;
 }
 
+.sourceLocationValue {
+  word-break: break-word;
+}
+
+.sourceLocationLink {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.sourceLocationLink:hover {
+  text-decoration: underline;
+}
+
 .externalDestination {
   display: inline-block;
   max-width: 100%;

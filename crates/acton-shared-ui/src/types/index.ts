@@ -35,6 +35,15 @@ export interface TestExecutionLogs {
   readonly vm_log?: string
 }
 
+export interface SourceLocation {
+  readonly file: string
+  readonly line: number
+  readonly column: number
+  readonly end_line: number
+  readonly end_column: number
+  readonly length: number
+}
+
 export interface BackendTransaction {
   readonly lt: string
   readonly raw_transaction: string
@@ -73,6 +82,7 @@ export type BackendExecutorAction =
       readonly type: "send_message"
       readonly hash: string
       readonly remaining_balance: string
+      readonly location?: SourceLocation
       readonly failure_reason?: BackendExecutorActionFailureReason
       readonly failure_code?: number
     }
@@ -84,6 +94,7 @@ export type BackendExecutorAction =
       readonly original_balance: string
       readonly changed_remaining_balance: string
       readonly changed_reserved_balance: string
+      readonly location?: SourceLocation
       readonly failure_reason?: BackendExecutorActionFailureReason
       readonly failure_code?: number
     }

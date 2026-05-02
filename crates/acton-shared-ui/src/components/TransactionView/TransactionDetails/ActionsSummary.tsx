@@ -2,7 +2,11 @@ import type {OutAction} from "@ton/core"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
 
-import type {BackendExecutorAction, BackendExecutorActionFailureReason} from "@/types"
+import type {
+  BackendExecutorAction,
+  BackendExecutorActionFailureReason,
+  SourceLocation,
+} from "@/types"
 import type {ContractData} from "@/types/transaction"
 import {fmt, DataBlock} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
@@ -25,6 +29,7 @@ interface ActionsSummaryProps {
   readonly contracts: Map<string, ContractData>
   readonly contractAddress: string
   readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
 interface ActionExecutionMeta {
@@ -105,11 +110,7 @@ const renderExternalDestination = (
 
   if (contracts.has(destination)) {
     return (
-      <ContractChip
-        address={destination}
-        contracts={contracts}
-        onContractClick={onContractClick}
-      />
+      <ContractChip address={destination} contracts={contracts} onContractClick={onContractClick} />
     )
   }
 
@@ -184,12 +185,38 @@ const getActionExecutionMeta = (
   failureReasonText: formatFailureReason(executorAction?.failure_reason),
 })
 
+const formatSourceLocation = (location: SourceLocation): string => {
+  const parts = location.file.split("/")
+  const file = parts.length > 3 ? `.../${parts.slice(-3).join("/")}` : location.file
+  return `${file}:${location.line}:${location.column}`
+}
+
+const renderActionSourceLocation = (
+  executorAction: BackendExecutorAction | undefined,
+  renderSourceLocation: ((location: SourceLocation) => React.ReactNode) | undefined,
+): React.JSX.Element | undefined => {
+  const location = executorAction?.location
+  if (!location) {
+    return undefined
+  }
+
+  return (
+    <div className={styles.detailRow}>
+      <span className={styles.detailLabel}>Source:</span>
+      <span className={`${styles.detailValue} ${styles.sourceLocationValue}`}>
+        {renderSourceLocation ? renderSourceLocation(location) : formatSourceLocation(location)}
+      </span>
+    </div>
+  )
+}
+
 const renderActionDetails = (
   action: OutAction,
   executorAction: BackendExecutorAction | undefined,
   contractAddress: string,
   contracts: Map<string, ContractData>,
   onContractClick?: (address: string) => void,
+  renderSourceLocation?: (location: SourceLocation) => React.ReactNode,
 ): React.JSX.Element | undefined => {
   const execution = getActionExecutionMeta(executorAction)
   const contract = contracts.get(contractAddress)
@@ -273,11 +300,7 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
-                    {renderExternalDestination(
-                      info.dest?.toString(),
-                      contracts,
-                      onContractClick,
-                    )}
+                    {renderExternalDestination(info.dest?.toString(), contracts, onContractClick)}
                   </div>
                 </div>
               </>
@@ -322,14 +345,11 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -356,6 +376,7 @@ const renderActionDetails = (
               </span>
             </div>
             <DisasmSection bocHex={newCodeBocHex} />
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -391,14 +412,11 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -443,6 +461,7 @@ const renderActionDetails = (
             {isEmbeddedLibrary && embeddedLibraryBocHex && (
               <DisasmSection bocHex={embeddedLibraryBocHex} title="Library Disassembly" />
             )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -458,6 +477,7 @@ export function ActionsSummary({
   contracts,
   contractAddress,
   onContractClick,
+  renderSourceLocation,
 }: ActionsSummaryProps): React.JSX.Element {
   const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>()
   const mappedExecutorActions = mapExecutorActionsByType(actions, executorActions)
@@ -600,6 +620,7 @@ export function ActionsSummary({
             contractAddress,
             contracts,
             onContractClick,
+            renderSourceLocation,
           )}
         </div>
       )}
