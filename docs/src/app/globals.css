@@ -44,7 +44,7 @@ code, pre {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    #050505;
+    #121212;
   background-size: 24px 24px;
 }
 
@@ -56,13 +56,17 @@ code, pre {
   right: max(1rem, calc((100vw - 1500px) / 2 + 1rem));
 }
 
+.home-hero-panel {
+  background: #121212;
+}
+
 .feature-video-panel {
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     radial-gradient(circle at 50% 50%, rgba(45, 131, 236, 0.08), transparent 42%),
-    #060606;
+    var(--color-fd-background);
   background-size: 24px 24px, 24px 24px, auto, auto;
 }
 
@@ -86,7 +90,7 @@ code, pre {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  background: #050505;
+  background: var(--color-fd-background);
 }
 
 .landing-video-play-button {
@@ -101,7 +105,7 @@ code, pre {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.88);
-  color: #050505;
+  color: var(--color-fd-background);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   transition:

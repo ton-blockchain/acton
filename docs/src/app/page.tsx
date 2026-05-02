@@ -187,11 +187,11 @@ const HEADER_ICON_LINKS: {
 
 export default function Home() {
   return (
-    <div className="home-shell min-h-screen overflow-x-hidden bg-[#050505] text-[#f7f7f2]">
+    <div className="home-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#f7f7f2]">
       <SiteHeader />
       <main>
         <section className="mx-auto max-w-[1500px] px-3 pt-8 sm:px-4 sm:pt-14 md:px-8 lg:px-10">
-          <div className="border-x border-t border-white/10 bg-[#070707]/92">
+          <div className="home-hero-panel border-x border-t border-white/10">
             <div className="px-4 py-10 sm:px-8 sm:pb-12 sm:pt-14 lg:px-12 lg:pb-14 lg:pt-16">
                 <Link
                   href="/docs/welcome"
@@ -224,7 +224,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
                 From zero to testnet
@@ -254,7 +254,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Essential features"
               title={<>A unified toolchain for <span className="text-[#9AE7FF]">TON</span></>}
@@ -268,7 +268,7 @@ export default function Home() {
                 return (
                   <article
                     key={feature.title}
-                    className="grid overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#070707] sm:rounded-[1.75rem] lg:grid-cols-2"
+                    className="grid overflow-hidden rounded-[1.25rem] border border-white/10 bg-fd-background sm:rounded-[1.75rem] lg:grid-cols-2"
                   >
                     <div
                       className={`flex flex-col justify-start p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
@@ -314,7 +314,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Extra depth"
               title={<><span className="text-[#9AE7FF]">More</span> than the happy path</>}
@@ -326,7 +326,7 @@ export default function Home() {
                 <Link
                   key={feature.title}
                   href={feature.docLink}
-                  className="group min-h-[220px] bg-[#0b0b0b] p-5 text-left transition-colors hover:bg-[#111110] sm:min-h-[280px] sm:p-7"
+                  className="group min-h-[220px] bg-[#121212] p-5 text-left transition-colors hover:bg-[#111110] sm:min-h-[280px] sm:p-7"
                 >
                   <div className="flex h-full flex-col">
                     <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef]">
@@ -347,7 +347,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto mt-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border border-white/10 bg-[#070707] px-4 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-18 lg:px-12 lg:pb-28 lg:pt-20">
+          <div className="border border-white/10 bg-fd-background px-4 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-18 lg:px-12 lg:pb-28 lg:pt-20">
             <div className="grid gap-8 sm:gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
@@ -361,7 +361,7 @@ export default function Home() {
                   and then iteratively refactor it keeping green tests.
                 </p>
               </div>
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#050505] shadow-[0_24px_80px_rgba(0,0,0,0.3)] lg:translate-y-6">
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-fd-background shadow-[0_24px_80px_rgba(0,0,0,0.3)] lg:translate-y-6">
                 <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-4 py-3 sm:px-5">
                   <div className="flex items-center gap-2.5">
                     <span className="h-3 w-3 rounded-full bg-[#ff6b6b]" />
@@ -401,7 +401,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto my-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border border-white/10 bg-[#070707] px-4 py-10 sm:px-8 lg:px-12">
+          <div className="border border-white/10 bg-fd-background px-4 py-10 sm:px-8 lg:px-12">
             <div className="flex flex-col items-center gap-6 text-center sm:gap-8">
               <div className="flex flex-col items-center">
                 <h2 className="text-3xl font-semibold text-[#f8f8f4] sm:text-4xl">
@@ -435,7 +435,7 @@ export default function Home() {
       </main>
 
       <footer className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-        <div className="border-x border-t border-white/10 bg-[#070707] p-5 sm:p-7 lg:p-8">
+        <div className="border-x border-t border-white/10 bg-fd-background p-5 sm:p-7 lg:p-8">
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div>
               <Link href="/" className="inline-flex items-center gap-3">
@@ -471,7 +471,7 @@ export default function Home() {
 
 function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#121212]/90 backdrop-blur-xl">
       <nav className="mx-auto flex h-[55px] max-w-[1500px] items-center justify-between px-4 md:h-16 md:px-8 lg:px-10">
         <div className="flex items-center gap-5">
           <Link href="/" className="flex items-center gap-3 md:-translate-x-px">
