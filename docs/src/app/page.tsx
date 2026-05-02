@@ -261,18 +261,18 @@ export default function Home() {
               description="Not another small utility. Not another isolated CLI. A full development environment built as one coherent system around Tolk."
             />
 
-            <div className="mt-8 space-y-px overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/10 sm:mt-14 sm:rounded-[1.75rem]">
+            <div className="mt-8 space-y-10 sm:mt-14">
               {VIDEO_FEATURES.map((feature, index) => {
                 const reversed = index % 2 === 1;
 
                 return (
                   <article
                     key={feature.title}
-                    className="grid bg-[#070707] lg:grid-cols-2"
+                    className="grid overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#070707] sm:rounded-[1.75rem] lg:grid-cols-2"
                   >
                     <div
-                      className={`flex flex-col justify-start border-white/10 p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
-                        reversed ? 'lg:order-2 lg:border-l' : 'lg:border-r'
+                      className={`flex flex-col justify-start p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
+                        reversed ? 'lg:order-2' : ''
                       }`}
                     >
                       <div className={reversed ? 'lg:ml-auto lg:mt-10 lg:max-w-xl lg:text-right' : 'max-w-xl lg:mt-10'}>
