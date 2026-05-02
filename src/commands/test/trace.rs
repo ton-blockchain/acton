@@ -1,5 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{CompilationResult, Context, Emulations, FailedSendMessageResult, to_cell};
+use crate::context::{Context, Emulations, FailedSendMessageResult, to_cell};
 use crate::ffi::emulation::compilation_result_for_code;
 use crate::retrace::{self, InstalledActions};
 use serde::{Deserialize, Serialize};
@@ -12,8 +12,6 @@ use tolk_compiler::abi::ContractABI;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
-use tycho_types::models::{AccountState, IntAddr, MsgInfo, ShardAccount, StdAddr, Transaction};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TestTrace {
@@ -185,56 +183,6 @@ fn convert_failure_reason(reason: ExecutedActionFailureReason) -> ExecutorAction
     }
 }
 
-#[must_use]
-fn build_result_for_transaction(
-    ctx: &Context<'_>,
-    tx_code: Option<&Cell>,
-    shard_account: &ShardAccount,
-    tx: &Transaction,
-) -> Option<CompilationResult> {
-    let account_code = {
-        let addr = transaction_destination(tx).unwrap_or_else(|| StdAddr::new(0, tx.account));
-        ctx.chain
-            .world_state
-            .get_accounts()
-            .get(&addr)
-            .and_then(shard_account_code)
-    };
-
-    [
-        tx_code.cloned(),
-        shard_account_code(shard_account),
-        account_code,
-    ]
-    .into_iter()
-    .flatten()
-    .find_map(|code| compilation_result_for_code(ctx, Some(&code), true).map(|(_, result)| result))
-}
-
-#[must_use]
-fn shard_account_code(shard_account: &ShardAccount) -> Option<Cell> {
-    let state = shard_account.account.load().ok()?.0?.state;
-    match state {
-        AccountState::Active(state) => state.code,
-        AccountState::Uninit | AccountState::Frozen(_) => None,
-    }
-}
-
-#[must_use]
-fn transaction_destination(tx: &Transaction) -> Option<StdAddr> {
-    let in_msg = tx.load_in_msg().ok()??;
-    let dst = match &in_msg.info {
-        MsgInfo::Int(info) => Some(&info.dst),
-        MsgInfo::ExtIn(info) => Some(&info.dst),
-        MsgInfo::ExtOut(_) => None,
-    }?;
-
-    match dst {
-        IntAddr::Std(addr) => Some(addr.clone()),
-        IntAddr::Var(_) => None,
-    }
-}
-
 pub(super) fn dump_test_transactions(
     test: &TestDescriptor,
     ctx: &Context<'_>,
@@ -252,12 +200,8 @@ pub(super) fn dump_test_transactions(
             let transactions = trace_transactions
                 .iter()
                 .map(|tx| {
-                    let build = build_result_for_transaction(
-                        ctx,
-                        tx.code.as_ref(),
-                        &tx.shard_account,
-                        &tx.transaction,
-                    );
+                    let build = compilation_result_for_code(ctx, tx.code.as_ref(), true)
+                        .map(|(_, result)| result);
                     let source_map = build.as_ref().map(|info| info.source_map.as_ref());
                     let installed_actions = retrace::find_installed_actions(&tx.vm_log);
                     let executor_actions =
