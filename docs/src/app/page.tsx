@@ -14,6 +14,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
+import { HeaderSearchField } from '@/components/HeaderSearchField';
 import { InlineInstallationCommand } from '@/components/InstallationCodeBlock';
 import { LandingVideo } from '@/components/LandingVideo';
 import logoDark from '@/public/logo-dark.svg';
@@ -494,6 +495,7 @@ function SiteHeader() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
+            <HeaderSearchField />
             {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
               <IconLink key={label} href={href} label={label} icon={Icon} />
             ))}
