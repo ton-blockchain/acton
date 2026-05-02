@@ -13,7 +13,7 @@ import {
   MonitorPlay,
   Wallet,
 } from 'lucide-react';
-import type { ComponentType, SVGProps } from 'react';
+import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { InlineInstallationCommand } from '@/components/InstallationCodeBlock';
 import { LandingVideo } from '@/components/LandingVideo';
 import logoDark from '@/public/logo-dark.svg';
@@ -257,7 +257,7 @@ export default function Home() {
           <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Essential features"
-              title="A unified toolchain for TON"
+              title={<>A unified toolchain for <span className="text-[#9AE7FF]">TON</span></>}
               description="Not another small utility. Not another isolated CLI. A full development environment built as one coherent system around Tolk."
             />
 
@@ -317,7 +317,7 @@ export default function Home() {
           <div className="border-x border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Extra depth"
-              title="More than the happy path"
+              title={<><span className="text-[#9AE7FF]">More</span> than the happy path</>}
               description="Several principle features that allow dive deep into contract development. Focused on security, error prevention, and gas optimization."
             />
 
@@ -354,7 +354,7 @@ export default function Home() {
                   FunC migration
                 </p>
                 <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
-                  FunC to Tolk in one click
+                  FunC to <span className="text-[#9AE7FF]">Tolk</span> in one click
                 </h2>
                 <p className="mt-5 max-w-xl text-base leading-7 text-[#c7c6bf] sm:mt-6 sm:text-lg sm:leading-8">
                   Convert your existing FunC project to Tolk with a single command,
@@ -580,7 +580,7 @@ function SectionHeader({
   description,
 }: {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   description: string;
 }) {
   return (
