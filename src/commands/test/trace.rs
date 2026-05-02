@@ -178,6 +178,21 @@ fn action_source_location(
 }
 
 #[must_use]
+pub(crate) fn source_maps_for_build<'a>(
+    build: Option<&'a CompilationResult>,
+    build_cache: &'a BuildCache,
+) -> Vec<&'a SourceMap> {
+    let mut source_maps = Vec::new();
+    if let Some(build) = build {
+        source_maps.push(build.source_map.as_ref());
+    }
+    for result in build_cache.built.values() {
+        source_maps.push(result.source_map.as_ref());
+    }
+    source_maps
+}
+
+#[must_use]
 fn convert_failure_reason(reason: ExecutedActionFailureReason) -> ExecutorActionFailureReasonInfo {
     match reason {
         ExecutedActionFailureReason::NotEnoughToncoinToSend {
@@ -203,12 +218,12 @@ fn build_result_for_transaction(
     tx_code: Option<&Cell>,
     shard_account: &ShardAccount,
     tx: &Transaction,
-) -> Option<(std::path::PathBuf, CompilationResult)> {
-    resolve_build_result(ctx, tx_code.cloned())
-        .or_else(|| resolve_build_result(ctx, shard_account_code(shard_account)))
+) -> Option<CompilationResult> {
+    resolve_compilation_result(ctx, tx_code.cloned())
+        .or_else(|| resolve_compilation_result(ctx, shard_account_code(shard_account)))
         .or_else(|| {
             let addr = transaction_destination(tx).unwrap_or_else(|| StdAddr::new(0, tx.account));
-            resolve_build_result(ctx, account_code(ctx, &addr))
+            resolve_compilation_result(ctx, account_code(ctx, &addr))
         })
 }
 
@@ -231,15 +246,9 @@ fn account_code(ctx: &Context<'_>, addr: &StdAddr) -> Option<Cell> {
 }
 
 #[must_use]
-fn resolve_build_result(
-    ctx: &Context<'_>,
-    code: Option<Cell>,
-) -> Option<(std::path::PathBuf, CompilationResult)> {
+fn resolve_compilation_result(ctx: &Context<'_>, code: Option<Cell>) -> Option<CompilationResult> {
     let code = code?;
-    ctx.build
-        .build_cache
-        .result_for_code(&Some(code.clone()))
-        .or_else(|| compilation_result_for_code(ctx, Some(&code), true))
+    compilation_result_for_code(ctx, Some(&code), true).map(|(_, result)| result)
 }
 
 #[must_use]
@@ -263,7 +272,7 @@ pub(super) fn dump_test_transactions(
     txs: &Emulations,
     output_dir: &str,
 ) -> anyhow::Result<()> {
-    let build_cache: &BuildCache = ctx.build.build_cache;
+    let build_cache = &*ctx.build.build_cache;
     let known_addresses = &*ctx.build.known_addresses;
     let mut known_contracts = BTreeMap::new();
     let traces = txs
@@ -280,18 +289,12 @@ pub(super) fn dump_test_transactions(
                         &tx.shard_account,
                         &tx.transaction,
                     );
-                    let mut source_maps = Vec::new();
-                    if let Some((_, info)) = &build {
-                        source_maps.push(info.source_map.as_ref());
-                    }
-                    for result in build_cache.built.values() {
-                        source_maps.push(result.source_map.as_ref());
-                    }
+                    let source_maps = source_maps_for_build(build.as_ref(), build_cache);
                     let installed_actions = retrace::find_installed_actions(&tx.vm_log);
                     let executor_actions =
                         parse_executor_actions(&tx.executor_logs, &installed_actions, &source_maps);
 
-                    let contract_info = build.map(|(_, info)| ContractInfo {
+                    let contract_info = build.map(|info| ContractInfo {
                         name: info.name.clone(),
                         code_boc64: info.code_boc64.clone(),
                         source_map: (*info.source_map).clone(),

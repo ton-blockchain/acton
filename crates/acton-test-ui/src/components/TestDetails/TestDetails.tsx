@@ -2,7 +2,7 @@ import path from "node:path"
 
 import {Address} from "@ton/core"
 import type React from "react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import {FiArrowUpRight, FiCheck, FiChevronDown, FiCircle, FiMinus, FiX} from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
@@ -192,46 +192,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     return ides.find(i => i.name === selectedIdeName) || ides[0]
   }, [ides, selectedIdeName])
 
-  const getRelativePath = useCallback(
-    (path: string) => {
-      if (projectRoot && path.startsWith(projectRoot)) {
-        const rel = path.slice(projectRoot.length)
-        return rel || path
-      }
-      const parts = path.split("/")
-      if (parts.length > 3) {
-        return `.../${parts.slice(-3).join("/")}`
-      }
-      return path
-    },
-    [projectRoot],
-  )
-
-  const renderSourceLocation = useCallback(
-    (location: SourceLocation) => {
-      const line = location.line
-      const column = location.column
-      const label = `${getRelativePath(location.file)}:${line}:${column}`
-      const idePosition = toIdeSourcePosition(location)
-
-      return (
-        <a
-          href={selectedIde.getUrl({
-            ...test,
-            file_path: location.file,
-            row: idePosition.row,
-            column: idePosition.column,
-          })}
-          className={styles.sourceLocationLink}
-          title={`Open ${label} in ${selectedIde.name}`}
-        >
-          {label}
-        </a>
-      )
-    },
-    [getRelativePath, selectedIde, test],
-  )
-
   const handleSelectIde = (ide: IDEConfig) => {
     setSelectedIdeName(ide.name)
     localStorage.setItem("selectedIde", ide.name)
@@ -336,6 +296,38 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
 
     return () => controller.abort()
   }, [test.file_path, test.name, test.row, test.column])
+
+  const getRelativePath = (path: string) => {
+    if (projectRoot && path.startsWith(projectRoot)) {
+      const rel = path.slice(projectRoot.length)
+      return rel || path
+    }
+    const parts = path.split("/")
+    if (parts.length > 3) {
+      return `.../${parts.slice(-3).join("/")}`
+    }
+    return path
+  }
+
+  const renderSourceLocation = (location: SourceLocation) => {
+    const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
+    const idePosition = toIdeSourcePosition(location)
+
+    return (
+      <a
+        href={selectedIde.getUrl({
+          ...test,
+          file_path: location.file,
+          row: idePosition.row,
+          column: idePosition.column,
+        })}
+        className={styles.sourceLocationLink}
+        title={`Open ${label} in ${selectedIde.name}`}
+      >
+        {label}
+      </a>
+    )
+  }
 
   const formatDuration = (duration: {secs: number; nanos: number}) => {
     const ms = duration.secs * 1000 + duration.nanos / 1_000_000
@@ -675,9 +667,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
                 <div className={`${styles.infoValue} ${styles[test.status.toLowerCase()]}`}>
                   {test.status}
                 </div>
-                {statusDescription && (
-                  <div className={styles.statusDescription}>{statusDescription}</div>
-                )}
+                {statusDescription && <div className={styles.statusDescription}>{statusDescription}</div>}
               </div>
             </div>
             <div className={styles.infoItem}>

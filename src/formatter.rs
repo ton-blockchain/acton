@@ -3008,14 +3008,10 @@ impl FormatterContext<'_> {
                 let tx = res.tx;
                 let code = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
                 let build = self.build_cache.result_for_code(&code);
-                let source_map = build.as_ref().map(|(_, info)| info.source_map.as_ref());
-                let mut source_maps = Vec::new();
-                if let Some(source_map) = source_map {
-                    source_maps.push(source_map);
-                }
-                for result in self.build_cache.built.values() {
-                    source_maps.push(result.source_map.as_ref());
-                }
+                let source_maps = crate::commands::test::trace::source_maps_for_build(
+                    build.as_ref().map(|(_, info)| info),
+                    self.build_cache.as_ref(),
+                );
                 let vm_log = self.emulations.find_tx_logs(tx.lt);
                 let installed_actions =
                     vm_log.map_or_else(InstalledActions::empty, retrace::find_installed_actions);
