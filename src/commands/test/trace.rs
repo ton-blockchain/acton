@@ -1,7 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{
-    BuildCache, CompilationResult, Context, Emulations, FailedSendMessageResult, to_cell,
-};
+use crate::context::{CompilationResult, Context, Emulations, FailedSendMessageResult, to_cell};
 use crate::ffi::emulation::compilation_result_for_code;
 use crate::retrace::{self, InstalledActions};
 use serde::{Deserialize, Serialize};
@@ -117,7 +115,7 @@ pub enum ExecutorActionInfo {
 pub(crate) fn parse_executor_actions(
     logs: &str,
     installed_actions: &InstalledActions,
-    source_maps: &[&SourceMap],
+    source_map: Option<&SourceMap>,
 ) -> Vec<ExecutorActionInfo> {
     let executed = ExecutedActions::from(logs);
     executed
@@ -131,7 +129,11 @@ pub(crate) fn parse_executor_actions(
                 failure_code,
             } => ExecutorActionInfo::SendMessage {
                 location: installed_actions.find_message(&hash).and_then(|action| {
-                    action_source_location(source_maps, &action.loc_hash, action.loc_offset)
+                    let loc_hash = &action.loc_hash;
+                    let loc_offset = action.loc_offset;
+                    source_map.and_then(|source_map| {
+                        retrace::find_source_loc(source_map, loc_hash, loc_offset)
+                    })
                 }),
                 hash,
                 remaining_balance: remaining_balance.to_string(),
@@ -157,39 +159,17 @@ pub(crate) fn parse_executor_actions(
                 location: installed_actions
                     .find_reserve(mode, &reserve)
                     .and_then(|action| {
-                        action_source_location(source_maps, &action.loc_hash, action.loc_offset)
+                        let loc_hash = &action.loc_hash;
+                        let loc_offset = action.loc_offset;
+                        source_map.and_then(|source_map| {
+                            retrace::find_source_loc(source_map, loc_hash, loc_offset)
+                        })
                     }),
                 failure_reason: failure_reason.map(convert_failure_reason),
                 failure_code,
             },
         })
         .collect()
-}
-
-#[must_use]
-fn action_source_location(
-    source_maps: &[&SourceMap],
-    loc_hash: &str,
-    loc_offset: u16,
-) -> Option<SourceLocation> {
-    source_maps
-        .iter()
-        .find_map(|source_map| retrace::find_source_loc(source_map, loc_hash, loc_offset))
-}
-
-#[must_use]
-pub(crate) fn source_maps_for_build<'a>(
-    build: Option<&'a CompilationResult>,
-    build_cache: &'a BuildCache,
-) -> Vec<&'a SourceMap> {
-    let mut source_maps = Vec::new();
-    if let Some(build) = build {
-        source_maps.push(build.source_map.as_ref());
-    }
-    for result in build_cache.built.values() {
-        source_maps.push(result.source_map.as_ref());
-    }
-    source_maps
 }
 
 #[must_use]
@@ -289,10 +269,10 @@ pub(super) fn dump_test_transactions(
                         &tx.shard_account,
                         &tx.transaction,
                     );
-                    let source_maps = source_maps_for_build(build.as_ref(), build_cache);
+                    let source_map = build.as_ref().map(|info| info.source_map.as_ref());
                     let installed_actions = retrace::find_installed_actions(&tx.vm_log);
                     let executor_actions =
-                        parse_executor_actions(&tx.executor_logs, &installed_actions, &source_maps);
+                        parse_executor_actions(&tx.executor_logs, &installed_actions, source_map);
 
                     let contract_info = build.map(|info| ContractInfo {
                         name: info.name.clone(),
@@ -431,7 +411,7 @@ mod tests {
 [ 4][t 0][2026-02-25 11:22:27.910199][transaction.cpp:2926]\tnot enough grams to transfer with the message : remaining balance is 997209600ng, need 1000000400000 (including forwarding fees)
 [ 4][t 0][2026-02-25 11:22:27.910201][transaction.cpp:2206]\tinvalid action 1 in action list: error code 37";
 
-        let parsed = parse_executor_actions(logs, &InstalledActions::empty(), &[]);
+        let parsed = parse_executor_actions(logs, &InstalledActions::empty(), None);
         assert_eq!(parsed.len(), 2);
 
         assert!(matches!(
@@ -467,7 +447,7 @@ mod tests {
 [ 4][t 0][2026-02-25 11:24:46.612163][transaction.cpp:3143]\tcannot reserve 1000000000000 nanograms : only 1088500000 available
 [ 4][t 0][2026-02-25 11:24:46.612164][transaction.cpp:2206]\tinvalid action 1 in action list: error code 37";
 
-        let parsed = parse_executor_actions(logs, &InstalledActions::empty(), &[]);
+        let parsed = parse_executor_actions(logs, &InstalledActions::empty(), None);
         assert_eq!(parsed.len(), 2);
 
         assert!(matches!(
