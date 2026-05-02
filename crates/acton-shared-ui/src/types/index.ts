@@ -1,3 +1,5 @@
+import type {ContractABI} from "gen-typescript-from-tolk-dev"
+
 export enum TestStatus {
   Passed = "Passed",
   Failed = "Failed",
@@ -99,60 +101,11 @@ export interface Trace {
   readonly wallets: Record<string, string>
 }
 
-export interface AbiMessage {
-  readonly name: string
-  readonly opcode: number | undefined
-}
-
-export interface AbiExitCode {
-  readonly constantName: string
-  readonly value: number
-}
-
-export interface Abi {
-  readonly messages: AbiMessage[]
-  readonly exitCodes?: readonly AbiExitCode[]
-}
-
-export interface CompilerAbiThrownError {
-  readonly name: string
-  readonly err_code: number
-}
-
-export interface CompilerAbiConstant {
-  readonly name: string
-  readonly description?: string
-}
-
-export interface CompilerAbiEnumMember {
-  readonly name: string
-  readonly description?: string
-}
-
-export type CompilerAbiDeclaration =
-  | {
-      readonly kind: "enum"
-      readonly name: string
-      readonly members: readonly CompilerAbiEnumMember[]
-    }
-  | {
-      readonly kind: string
-      readonly name?: string
-      readonly members?: readonly CompilerAbiEnumMember[]
-    }
-
-export interface CompilerAbi {
-  readonly thrown_errors?: readonly CompilerAbiThrownError[]
-  readonly constants?: readonly CompilerAbiConstant[]
-  readonly declarations?: readonly CompilerAbiDeclaration[]
-}
-
 export interface BackendContractInfo {
   readonly name: string
   readonly code_boc64: string
   readonly source_map: unknown
-  readonly abi?: Abi
-  readonly compiler_abi?: CompilerAbi
+  readonly abi?: ContractABI
 }
 
 export * from "./transaction"

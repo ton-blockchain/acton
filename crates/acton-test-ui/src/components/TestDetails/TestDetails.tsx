@@ -31,6 +31,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  resolveAbiOpcodeName,
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
@@ -365,11 +366,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       if (opcode === undefined) return "empty"
 
       const targetContract = tx.contractName ? backendContracts[tx.contractName] : undefined
-      let opcodeName = targetContract?.abi?.messages.find(it => it.opcode === opcode)?.name
+      let opcodeName = resolveAbiOpcodeName(targetContract?.abi, opcode, "incoming")
 
       if (!opcodeName) {
         for (const contract of allContracts) {
-          const found = contract.abi?.messages.find(it => it.opcode === opcode)?.name
+          const found = resolveAbiOpcodeName(contract.abi, opcode)
           if (found) {
             opcodeName = found
             break
@@ -445,7 +446,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
         address: address,
         letter: String.fromCodePoint(65 + (map.size % 26)),
         abi: backendContract?.abi,
-        compilerAbi: backendContract?.compiler_abi,
       } as ContractData)
     }
 

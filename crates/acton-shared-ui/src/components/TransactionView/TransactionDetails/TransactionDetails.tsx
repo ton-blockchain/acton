@@ -389,7 +389,6 @@ export function TransactionDetails({
                   <ExitCodeChip
                     exitCode={computePhase.exitCode}
                     abi={targetContract?.abi}
-                    compilerAbi={targetContract?.compilerAbi}
                   />
                 </div>
               </div>
@@ -433,7 +432,6 @@ export function TransactionDetails({
                   <ExitCodeChip
                     exitCode={actionPhase.resultCode}
                     abi={targetContract?.abi}
-                    compilerAbi={targetContract?.compilerAbi}
                     phase="action"
                   />
                 </div>

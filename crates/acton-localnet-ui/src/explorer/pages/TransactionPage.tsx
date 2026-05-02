@@ -26,7 +26,7 @@ import {useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {V3Transaction} from "../api/types"
-import {addressKey, buildMessageNamesByOpcodeNumber} from "../api/compilerAbi"
+import {addressKey} from "../api/compilerAbi"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {hashToHex, normalizeAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
@@ -167,9 +167,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const abiByCodeHash = new Map<
             string,
             {
-              readonly compilerAbi: ContractData["compilerAbi"]
-              readonly incoming: ReadonlyMap<number, string>
-              readonly outgoing: ReadonlyMap<number, string>
+              readonly abi: ContractData["abi"]
             }
           >()
           const codeHashes = [...new Set(addressToCodeHash.values())]
@@ -182,11 +180,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               }
             }),
           )
-          for (const [codeHash, compilerAbi] of fetchedAbis) {
+          for (const [codeHash, abi] of fetchedAbis) {
             abiByCodeHash.set(codeHash, {
-              compilerAbi: (compilerAbi as ContractData["compilerAbi"] | undefined) ?? undefined,
-              incoming: buildMessageNamesByOpcodeNumber(compilerAbi, "incoming_messages"),
-              outgoing: buildMessageNamesByOpcodeNumber(compilerAbi, "outgoing_messages"),
+              abi,
             })
           }
 
@@ -201,9 +197,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                 displayName: customName || fmt.formatAddress(displayAddr),
                 address: Address.parse(addr),
                 letter,
-                compilerAbi: contractAbi?.compilerAbi,
-                incomingMessageNamesByOpcode: contractAbi?.incoming,
-                outgoingMessageNamesByOpcode: contractAbi?.outgoing,
+                abi: contractAbi?.abi,
               })
             }),
           )

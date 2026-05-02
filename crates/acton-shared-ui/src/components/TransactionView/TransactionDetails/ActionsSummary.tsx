@@ -194,7 +194,6 @@ const renderActionDetails = (
   const execution = getActionExecutionMeta(executorAction)
   const contract = contracts.get(contractAddress)
   const contractAbi = contract?.abi
-  const contractCompilerAbi = contract?.compilerAbi
 
   switch (action.type) {
     case "sendMsg": {
@@ -326,7 +325,6 @@ const renderActionDetails = (
                   <ExitCodeChip
                     exitCode={execution.failureCode}
                     abi={contractAbi}
-                    compilerAbi={contractCompilerAbi}
                     phase="action"
                   />
                 </span>
@@ -396,7 +394,6 @@ const renderActionDetails = (
                   <ExitCodeChip
                     exitCode={execution.failureCode}
                     abi={contractAbi}
-                    compilerAbi={contractCompilerAbi}
                     phase="action"
                   />
                 </span>
