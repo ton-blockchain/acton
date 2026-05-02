@@ -205,7 +205,7 @@ export default function Home() {
                 <h1 className="max-w-5xl text-[2.3rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-6xl sm:leading-[1.04] lg:text-[4.9rem] xl:text-[5.8rem]">
                   Everything You Need to Build Contracts on <span className="text-[#9AE7FF]">TON</span>
                 </h1>
-                <p className="mt-6 max-w-2xl text-base leading-7 text-[#b8b7af] sm:mt-8 sm:text-xl sm:leading-8">
+                <p className="mt-6 max-w-2xl text-lg leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
                   <span className="font-semibold text-[#9AE7FF]">Acton</span> is the open source development standard for building, testing, debugging, and verifying TON smart contracts.
                   Built for modern Tolk projects with full developer control.
                 </p>
@@ -232,7 +232,7 @@ export default function Home() {
               <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
                 2-minute walkthrough
               </h2>
-              <p className="mt-5 text-lg leading-7 text-[#aaa9a1] sm:mt-6 sm:text-xl sm:leading-8">
+              <p className="mt-5 text-lg leading-7 text-[#c7c6bf] sm:mt-6 sm:text-xl sm:leading-8">
                 Tiny Acton workshop: create a project, launch tests, guide through essential features,
                 airdrop TONs to your wallet, and deploy a contract to TON Blockchain.
               </p>
@@ -282,10 +282,10 @@ export default function Home() {
                         <h3 className="text-3xl font-semibold leading-tight text-[#f4f4ef] sm:text-[2.75rem]">
                           <FeatureTitle title={feature.title} />
                         </h3>
-                        <p className="mt-6 text-base leading-7 text-[#aaa9a1] sm:text-lg sm:leading-8">
+                        <p className="mt-6 text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8">
                           {feature.description}
                         </p>
-                        <p className="mt-5 text-base leading-7 text-[#aaa9a1] sm:text-lg sm:leading-8">
+                        <p className="mt-5 text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8">
                           {feature.description2}
                         </p>
                       </div>
@@ -332,7 +332,7 @@ export default function Home() {
                     <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef]">
                       {feature.title}
                     </h3>
-                    <p className="mt-5 text-base leading-7 text-[#9f9e96]">
+                    <p className="mt-5 text-base leading-7 text-[#c7c6bf]">
                       {feature.description}
                     </p>
                     <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]">
@@ -356,7 +356,7 @@ export default function Home() {
                 <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
                   FunC to Tolk in one click
                 </h2>
-                <p className="mt-5 max-w-xl text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
+                <p className="mt-5 max-w-xl text-base leading-7 text-[#c7c6bf] sm:mt-6 sm:text-lg sm:leading-8">
                   Convert your existing FunC project to Tolk with a single command,
                   and then iteratively refactor it keeping green tests.
                 </p>
@@ -407,7 +407,7 @@ export default function Home() {
                 <h2 className="text-3xl font-semibold text-[#f8f8f4] sm:text-4xl">
                   Ready to build?
                 </h2>
-                <p className="mt-3 text-[#9f9e96]">Install Acton and start from the docs.</p>
+                <p className="mt-3 text-[#c7c6bf]">Install Acton and start from the docs.</p>
               </div>
               <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
                 <InlineInstallationCommand />
@@ -441,11 +441,11 @@ export default function Home() {
               <Link href="/" className="inline-flex items-center gap-3">
                 <span className="text-xl font-semibold text-white">Acton</span>
               </Link>
-              <p className="mt-3 max-w-md text-sm leading-5 text-[#8f8e86]">
+              <p className="mt-3 max-w-md text-sm leading-5 text-[#c7c6bf]">
                 TON toolchain for building, testing, debugging, and verifying smart contracts.
               </p>
             </div>
-            <div className="grid w-full grid-cols-[auto_1fr] items-center gap-4 text-sm text-[#8f8e86] md:flex md:w-auto md:justify-end">
+            <div className="grid w-full grid-cols-[auto_1fr] items-center gap-4 text-sm text-[#c7c6bf] md:flex md:w-auto md:justify-end">
               <div className="flex items-center gap-1">
                 {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
                   <IconLink key={label} href={href} label={label} icon={Icon} />
@@ -591,7 +591,7 @@ function SectionHeader({
       <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
         {title}
       </h2>
-      <p className="mt-5 text-lg leading-7 text-[#aaa9a1] sm:mt-6 sm:text-xl sm:leading-8">
+      <p className="mt-5 text-lg leading-7 text-[#c7c6bf] sm:mt-6 sm:text-xl sm:leading-8">
         {description}
       </p>
     </div>
