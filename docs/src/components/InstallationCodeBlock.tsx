@@ -41,8 +41,8 @@ export function InlineInstallationCommand() {
   };
 
   return (
-    <div className="inline-flex h-11 max-w-full items-center gap-3 rounded-full border border-white/10 bg-white/[0.03] px-4 font-mono text-sm">
-      <code className="truncate">
+    <div className="inline-flex h-11 w-full max-w-full min-w-0 items-center justify-between gap-3 rounded-full border border-white/10 bg-white/[0.03] px-4 font-mono text-sm">
+      <code className="min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <HighlightedInstallCommand />
       </code>
       <button

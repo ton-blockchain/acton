@@ -157,9 +157,9 @@ export default function Home() {
     <div className="home-shell min-h-screen overflow-x-hidden bg-[#050505] text-[#f7f7f2]">
       <SiteHeader />
       <main>
-        <section className="mx-auto max-w-[1500px] px-4 pt-14 md:px-8 lg:px-10">
+        <section className="mx-auto max-w-[1500px] px-3 pt-8 sm:px-4 sm:pt-14 md:px-8 lg:px-10">
           <div className="border-x border-t border-white/10 bg-[#070707]/92">
-            <div className="px-5 pb-12 pt-14 sm:px-8 lg:px-12 lg:pb-14 lg:pt-16">
+            <div className="px-4 py-10 sm:px-8 sm:pb-12 sm:pt-14 lg:px-12 lg:pb-14 lg:pt-16">
                 <Link
                   href="/docs/welcome"
                   className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-teal-400/45 bg-teal-300/10 px-3 py-1.5 text-xs font-medium text-teal-200 transition-colors hover:bg-teal-300/15"
@@ -169,47 +169,49 @@ export default function Home() {
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
 
-                <h1 className="max-w-5xl text-6xl font-semibold leading-[0.95] text-[#f8f8f4] sm:text-7xl lg:text-[5.6rem] xl:text-[6.8rem]">
-                  The Developer-First TON Toolchain
+                <h1 className="max-w-5xl text-[2.3rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-6xl sm:leading-[1.04] lg:text-[4.9rem] xl:text-[5.8rem]">
+                  Everything You Need to Build Contracts on <span className="text-teal-200">TON</span>
                 </h1>
-                <p className="mt-8 max-w-2xl text-lg leading-8 text-[#b8b7af] sm:text-xl">
+                <p className="mt-6 max-w-2xl text-base leading-7 text-[#b8b7af] sm:mt-8 sm:text-xl sm:leading-8">
                   <span className="font-semibold text-teal-200">Acton</span> is the open source development standard for building, testing, debugging, and verifying TON smart contracts.
                   Built for modern Tolk projects with full developer control.
                 </p>
 
-                <div className="mt-10 space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8a82]">
+                <div className="mt-8 space-y-4 sm:mt-10">
+                  <p className="text-xs font-semibold uppercase text-[#8b8a82]">
                     Get started in 30 seconds
                   </p>
-                  <InlineInstallationCommand />
+                  <div className="w-full max-w-[28rem] min-w-0 sm:w-fit">
+                    <InlineInstallationCommand />
+                  </div>
                 </div>
             </div>
 
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-5 py-20 sm:px-8 lg:px-12">
+        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
                 From zero to testnet
               </p>
-              <h2 className="mt-4 text-4xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
+              <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
                 2-minute walkthrough
               </h2>
-              <p className="mt-6 text-lg leading-8 text-[#aaa9a1]">
+              <p className="mt-5 text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
                 Tiny Acton workshop: create a project, launch tests, guide through essential features,
                 airdrop TONs to your wallet, and deploy a contract to TON Blockchain.
               </p>
             </div>
 
-            <div className="mt-10 overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0c0c0c] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-              <div className="flex aspect-video items-center justify-center border-b border-white/8 bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:26px_26px] px-8 text-center">
+            <div className="mt-8 overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#0c0c0c] shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:mt-10 sm:rounded-[1.75rem]">
+              <div className="flex aspect-video items-center justify-center border-b border-white/8 bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:24px_24px] px-4 text-center sm:px-8">
                 <div className="max-w-2xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#77766f]">
                     Placeholder
                   </p>
-                  <h3 className="mt-5 text-3xl font-semibold leading-tight text-[#f4f4ef] md:text-5xl">
+                  <h3 className="mt-4 text-2xl font-semibold leading-tight text-[#f4f4ef] md:text-5xl">
                     I will record this video the next week
                   </h3>
                 </div>
@@ -218,15 +220,15 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-5 py-20 sm:px-8 lg:px-12">
+        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Essential features"
               title="A unified toolchain for TON"
               description="Not another small utility. Not another isolated CLI. A full development environment built as one coherent system around Tolk."
             />
 
-            <div className="mt-14 space-y-px overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/10">
+            <div className="mt-8 space-y-px overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/10 sm:mt-14 sm:rounded-[1.75rem]">
               {VIDEO_FEATURES.map((feature, index) => {
                 const reversed = index % 2 === 1;
 
@@ -236,12 +238,12 @@ export default function Home() {
                     className="grid bg-[#070707] lg:grid-cols-2"
                   >
                     <div
-                      className={`flex min-h-[420px] flex-col justify-center border-white/10 p-6 sm:p-8 lg:p-10 ${
+                      className={`flex flex-col justify-center border-white/10 p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
                         reversed ? 'lg:order-2 lg:border-l' : 'lg:border-r'
                       }`}
                     >
                       <div className={reversed ? 'lg:ml-auto lg:max-w-xl lg:text-right' : 'max-w-xl'}>
-                        <h3 className="text-3xl font-semibold leading-tight text-[#f4f4ef] sm:text-4xl">
+                        <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef] sm:text-4xl">
                           <FeatureTitle title={feature.title} />
                         </h3>
                         <p className="mt-6 text-base leading-7 text-[#aaa9a1] sm:text-lg sm:leading-8">
@@ -254,7 +256,7 @@ export default function Home() {
                     </div>
 
                     <div className={reversed ? 'lg:order-1' : ''}>
-                      <div className="feature-video-panel min-h-[420px]">
+                      <div className="feature-video-panel min-h-[240px] sm:min-h-[380px] lg:min-h-[440px]">
                         <LandingVideo
                           className="feature-video"
                           controls
@@ -275,20 +277,20 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-4 md:px-8 lg:px-10">
-          <div className="border-x border-white/10 bg-[#070707] px-5 py-20 sm:px-8 lg:px-12">
+        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border-x border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Extra depth"
               title="More than the happy path"
               description="Several principle features that allow dive deep into contract development. Focused on security, error prevention, and gas optimization."
             />
 
-            <div className="mt-10 grid gap-px overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/10 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-8 grid gap-px overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/10 sm:mt-10 sm:rounded-[1.75rem] md:grid-cols-2 xl:grid-cols-4">
               {BELOW_FEATURES.map((feature) => (
                 <Link
                   key={feature.title}
                   href={feature.docLink}
-                  className="group min-h-[280px] bg-[#0b0b0b] p-6 text-left transition-colors hover:bg-[#111110] sm:p-7"
+                  className="group min-h-[220px] bg-[#0b0b0b] p-5 text-left transition-colors hover:bg-[#111110] sm:min-h-[280px] sm:p-7"
                 >
                   <div className="flex h-full flex-col">
                     <h3 className="text-xl font-semibold leading-tight text-[#f4f4ef]">
@@ -308,48 +310,72 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-5 py-20 sm:px-8 lg:px-12">
-            <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+            <div className="grid gap-8 sm:gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
                   FunC migration
                 </p>
-                <h2 className="mt-4 text-4xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
+                <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
                   FunC to Tolk in one click
                 </h2>
-                <p className="mt-6 max-w-xl text-lg leading-8 text-[#aaa9a1]">
+                <p className="mt-5 max-w-xl text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
                   Convert your existing FunC project to Tolk with a single command,
                   and then iteratively refactor it keeping green tests.
                 </p>
               </div>
-              <div className="rounded-[1.75rem] border border-white/10 bg-[#0b0b0b] p-5">
-                <div className="flex items-center gap-2 border-b border-white/8 pb-4">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b6b]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#ffd166]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#06d6a0]" />
-                  <span className="ml-3 font-mono text-xs text-[#8b8a82]">acton func2tolk</span>
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-[#050505] shadow-[0_24px_80px_rgba(0,0,0,0.3)] lg:translate-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-4 py-3 sm:px-5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="h-3 w-3 rounded-full bg-[#ff6b6b]" />
+                    <span className="h-3 w-3 rounded-full bg-[#ffd166]" />
+                    <span className="h-3 w-3 rounded-full bg-[#06d6a0]" />
+                  </div>
                 </div>
-                <pre className="overflow-x-auto py-5 font-mono text-sm leading-7 text-[#d8d7cf]">
-                  <code>{`$ acton func2tolk contracts --write\n✓ parsed 14 FunC files\n✓ generated Tolk contracts\n✓ wrappers are still compatible\n✓ test snapshots match`}</code>
-                </pre>
+                <div className="p-4 sm:p-5">
+                  <pre className="overflow-x-auto font-mono text-sm leading-7">
+                    <code>
+                      <span className="text-[#77766f]">$ </span>
+                      <span className="text-teal-200">acton</span>
+                      <span className="text-sky-200"> func2tolk </span>
+                      <span className="text-[#ef8cff]">contracts/</span>
+                      {'\n'}
+                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#d8d7cf]"> parsed </span>
+                      <span className="text-sky-200">14</span>
+                      <span className="text-[#d8d7cf]"> FunC files</span>
+                      {'\n'}
+                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#d8d7cf]"> generated </span>
+                      <span className="text-sky-200">Tolk</span>
+                      <span className="text-[#d8d7cf]"> contracts</span>
+                      {'\n'}
+                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#d8d7cf]"> wrappers are still compatible</span>
+                      {'\n'}
+                      <span className="text-teal-200">✓</span>
+                      <span className="text-[#d8d7cf]"> test snapshots match</span>
+                    </code>
+                  </pre>
+                </div>
               </div>
             </div>
 
           </div>
         </section>
 
-        <section className="mx-auto my-4 max-w-[1500px] px-4 md:px-8 lg:px-10">
-          <div className="border border-white/10 bg-[#070707] px-5 py-10 sm:px-8 lg:px-12">
-            <div className="flex flex-col items-center gap-8 text-center">
+        <section className="mx-auto my-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border border-white/10 bg-[#070707] px-4 py-10 sm:px-8 lg:px-12">
+            <div className="flex flex-col items-center gap-6 text-center sm:gap-8">
               <div className="flex flex-col items-center">
-                <h2 className="text-4xl font-semibold text-[#f8f8f4]">
+                <h2 className="text-3xl font-semibold text-[#f8f8f4] sm:text-4xl">
                   Ready to build?
                 </h2>
                 <p className="mt-3 text-[#9f9e96]">Install Acton and start from the docs.</p>
-                <div className="mt-5">
-                  <InlineInstallationCommand />
-                </div>
+              </div>
+              <div className="w-full max-w-[28rem] min-w-0 sm:w-fit">
+                <InlineInstallationCommand />
               </div>
               <div className="flex flex-wrap justify-center gap-3">
                 <Link
@@ -373,8 +399,8 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="mx-auto max-w-[1500px] px-4 md:px-8 lg:px-10">
-        <div className="border-x border-t border-white/10 bg-[#070707] p-5 sm:p-8 lg:p-10">
+      <footer className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+        <div className="border-x border-t border-white/10 bg-[#070707] p-5 sm:p-7 lg:p-8">
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div>
               <Link href="/" className="inline-flex items-center gap-3">
@@ -384,7 +410,7 @@ export default function Home() {
                 TON toolchain for building, testing, debugging, and verifying smart contracts.
               </p>
             </div>
-            <div className="flex flex-col gap-4 text-sm text-[#8f8e86] sm:flex-row sm:items-center md:justify-end">
+            <div className="flex flex-row items-center gap-4 text-sm text-[#8f8e86] md:justify-end">
               <div className="flex items-center gap-1">
                 {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
                   <IconLink key={label} href={href} label={label} icon={Icon} />
@@ -511,10 +537,10 @@ function SectionHeader({
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
         {eyebrow}
       </p>
-      <h2 className="mt-4 text-4xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
+      <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
         {title}
       </h2>
-      <p className="mt-6 text-lg leading-8 text-[#aaa9a1]">
+      <p className="mt-5 text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
         {description}
       </p>
     </div>

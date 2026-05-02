@@ -45,7 +45,7 @@ code, pre {
     linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     #050505;
-  background-size: 26px 26px;
+  background-size: 24px 24px;
 }
 
 .home-shell::before {
@@ -63,7 +63,7 @@ code, pre {
     linear-gradient(180deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     radial-gradient(circle at 50% 50%, rgba(45, 131, 236, 0.08), transparent 42%),
     #060606;
-  background-size: 26px 26px, 26px 26px, auto, auto;
+  background-size: 24px 24px, 24px 24px, auto, auto;
 }
 
 .feature-video-panel .landing-video-frame,
