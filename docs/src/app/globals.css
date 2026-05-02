@@ -39,6 +39,10 @@ code, pre {
 }
 
 .home-shell {
+  --color-fd-background: #121212;
+  --color-fd-card: #121212;
+  --color-fd-popover: #121212;
+
   position: relative;
   isolation: isolate;
   background:
