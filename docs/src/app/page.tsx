@@ -4,7 +4,14 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BookOpen,
+  Bot,
+  Bug,
+  CodeXml,
+  FileCode,
+  FlaskConical,
   Github,
+  MonitorPlay,
+  Wallet,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { InlineInstallationCommand } from '@/components/InstallationCodeBlock';
@@ -142,6 +149,32 @@ const FEATURE_TITLE_ACCENTS: Record<string, string> = {
   'Test UI: visualize traces': 'Test UI',
 };
 
+const FEATURE_ICONS: Record<string, {
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+}> = {
+  'Native Tolk Tests': {
+    icon: FlaskConical,
+  },
+  'dApp-ready contracts': {
+    icon: CodeXml,
+  },
+  'Friendly for AI agents': {
+    icon: Bot,
+  },
+  'Debugger, done right': {
+    icon: Bug,
+  },
+  'Faucet and deployment': {
+    icon: Wallet,
+  },
+  'IDE integration': {
+    icon: FileCode,
+  },
+  'Test UI: visualize traces': {
+    icon: MonitorPlay,
+  },
+};
+
 const HEADER_ICON_LINKS: {
   href: string;
   label: string;
@@ -199,7 +232,7 @@ export default function Home() {
               <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
                 2-minute walkthrough
               </h2>
-              <p className="mt-5 text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
+              <p className="mt-5 text-lg leading-7 text-[#aaa9a1] sm:mt-6 sm:text-xl sm:leading-8">
                 Tiny Acton workshop: create a project, launch tests, guide through essential features,
                 airdrop TONs to your wallet, and deploy a contract to TON Blockchain.
               </p>
@@ -238,12 +271,15 @@ export default function Home() {
                     className="grid bg-[#070707] lg:grid-cols-2"
                   >
                     <div
-                      className={`flex flex-col justify-center border-white/10 p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
+                      className={`flex flex-col justify-start border-white/10 p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
                         reversed ? 'lg:order-2 lg:border-l' : 'lg:border-r'
                       }`}
                     >
-                      <div className={reversed ? 'lg:ml-auto lg:max-w-xl lg:text-right' : 'max-w-xl'}>
-                        <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef] sm:text-4xl">
+                      <div className={reversed ? 'lg:ml-auto lg:mt-10 lg:max-w-xl lg:text-right' : 'max-w-xl lg:mt-10'}>
+                        <div className={`mb-5 flex ${reversed ? 'lg:justify-end' : ''}`}>
+                          <FeatureIcon title={feature.title} />
+                        </div>
+                        <h3 className="text-3xl font-semibold leading-tight text-[#f4f4ef] sm:text-[2.75rem]">
                           <FeatureTitle title={feature.title} />
                         </h3>
                         <p className="mt-6 text-base leading-7 text-[#aaa9a1] sm:text-lg sm:leading-8">
@@ -293,10 +329,10 @@ export default function Home() {
                   className="group min-h-[220px] bg-[#0b0b0b] p-5 text-left transition-colors hover:bg-[#111110] sm:min-h-[280px] sm:p-7"
                 >
                   <div className="flex h-full flex-col">
-                    <h3 className="text-xl font-semibold leading-tight text-[#f4f4ef]">
+                    <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef]">
                       {feature.title}
                     </h3>
-                    <p className="mt-5 text-sm leading-7 text-[#9f9e96]">
+                    <p className="mt-5 text-base leading-7 text-[#9f9e96]">
                       {feature.description}
                     </p>
                     <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-teal-200">
@@ -310,8 +346,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+        <section className="mx-auto mt-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border border-white/10 bg-[#070707] px-4 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-18 lg:px-12 lg:pb-28 lg:pt-20">
             <div className="grid gap-8 sm:gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200/70">
@@ -361,7 +397,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-
           </div>
         </section>
 
@@ -523,6 +558,22 @@ function FeatureTitle({ title }: { title: string }) {
   );
 }
 
+function FeatureIcon({ title }: { title: string }) {
+  const config = FEATURE_ICONS[title];
+
+  if (!config) {
+    return null;
+  }
+
+  const Icon = config.icon;
+
+  return (
+    <span className="inline-flex text-teal-200">
+      <Icon className="h-9 w-9" strokeWidth={1.8} />
+    </span>
+  );
+}
+
 function SectionHeader({
   eyebrow,
   title,
@@ -540,7 +591,7 @@ function SectionHeader({
       <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
         {title}
       </h2>
-      <p className="mt-5 text-base leading-7 text-[#aaa9a1] sm:mt-6 sm:text-lg sm:leading-8">
+      <p className="mt-5 text-lg leading-7 text-[#aaa9a1] sm:mt-6 sm:text-xl sm:leading-8">
         {description}
       </p>
     </div>
