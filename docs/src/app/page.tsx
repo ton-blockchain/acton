@@ -314,7 +314,7 @@ export default function Home() {
         </section>
 
         <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <div className="border-x border-b border-white/10 bg-[#070707] px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Extra depth"
               title={<><span className="text-[#9AE7FF]">More</span> than the happy path</>}
