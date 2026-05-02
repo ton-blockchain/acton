@@ -1,9 +1,11 @@
+use crate::build_info;
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, default_project_mappings,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, ToolchainConfig,
+    default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
@@ -215,6 +217,9 @@ pub fn new_cmd(
     config.package.name.clone_from(&project_name);
     config.package.description.clone_from(&description);
     config.package.license = Some(license.clone());
+    config.toolchain = Some(ToolchainConfig {
+        acton: Some(build_info::PACKAGE_VERSION.to_owned()),
+    });
 
     std::env::set_current_dir(&project_path)?;
 

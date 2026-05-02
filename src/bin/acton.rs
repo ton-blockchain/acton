@@ -2250,12 +2250,15 @@ fn validate_project_toolchain_version() -> anyhow::Result<()> {
     if expected.is_empty() {
         anyhow::bail!(
             "Acton.toml has empty [toolchain].acton.\n\nSet it to the required Acton CLI version, for example:\n\n[toolchain]\nacton = \"{}\"",
-            acton::build_info::SHORT_VERSION
+            acton::build_info::PACKAGE_VERSION
         );
     }
 
     let installed = acton::build_info::SHORT_VERSION;
     if expected == installed {
+        return Ok(());
+    }
+    if acton::build_info::is_trunk_build() && expected == acton::build_info::PACKAGE_VERSION {
         return Ok(());
     }
 

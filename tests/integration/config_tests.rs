@@ -190,7 +190,7 @@ acton = ""
 
 #[test]
 #[cfg_attr(not(unix), ignore)]
-fn test_toolchain_acton_current_version_allows_project_command() {
+fn test_toolchain_acton_package_version_allows_project_command() {
     let project = ProjectBuilder::new("toolchain-current-version")
         .script_config("hello", "echo toolchain-ok")
         .build();
@@ -203,7 +203,7 @@ fn test_toolchain_acton_current_version_allows_project_command() {
 [toolchain]
 acton = "{}"
 "#,
-        build_info::SHORT_VERSION
+        build_info::PACKAGE_VERSION
     )
     .expect("Append toolchain config");
     fs::write(config_path, toml_content).expect("Write Acton.toml");

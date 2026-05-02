@@ -375,6 +375,11 @@ fn test_new_empty_project_non_interactive() {
     assert!(content.contains(r#"name = "test-project""#));
     assert!(content.contains(r#"description = "test description""#));
     assert!(content.contains(r#"license = "MIT""#));
+    assert!(content.contains(&format!(
+        "[toolchain]\nacton = \"{}\"",
+        acton::build_info::PACKAGE_VERSION
+    )));
+    assert!(!content.contains("-trunk"));
     assert!(content.contains("Check full Acton.toml reference and all available keys"));
     assert!(content.contains("https://ton-blockchain.github.io/acton/docs/acton-toml"));
 

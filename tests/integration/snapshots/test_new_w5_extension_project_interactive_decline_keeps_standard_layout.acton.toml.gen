@@ -4,6 +4,9 @@ description = "interactive w5 extension description"
 version = "0.1.0"
 license = "MIT"
 
+[toolchain]
+acton = "[ACTON_VERSION]"
+
 [contracts.SimpleExtension]
 display-name = "SimpleExtension"
 src = "contracts/SimpleExtension.tolk"
