@@ -472,18 +472,18 @@ export default function Home() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/90 backdrop-blur-xl">
-      <nav className="mx-auto flex h-14 max-w-[1500px] items-center justify-between px-4 md:px-8 lg:px-10">
+      <nav className="mx-auto flex h-[55px] max-w-[1500px] items-center justify-between px-4 md:h-16 md:px-8 lg:px-10">
         <div className="flex items-center gap-5">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 md:-translate-x-px">
             <Image
               src={logoDark}
               alt=""
-              width={28}
-              height={28}
-              className="h-7 w-7 rounded-md"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-md"
               priority
             />
-            <span className="text-base font-semibold text-white">Acton</span>
+            <span className="text-lg font-semibold tracking-tight text-white">Acton</span>
           </Link>
           <span className="hidden h-5 w-px bg-white/14 sm:block" />
           <div className="hidden items-center gap-6 sm:flex">
