@@ -1858,7 +1858,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     ) -> String {
         let executed = retrace::ExecutedActions::from(logs);
 
-        if executed.actions.is_empty() {
+        if executed.actions.is_empty() && !executed.invalid_actions.is_empty() {
             return self.format_invalid_actions_retrace(
                 child_prefix,
                 tx,
@@ -1869,73 +1869,125 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
         let mut action_parts = Vec::new();
 
-        for action in &executed.actions {
-            match action {
-                ExecutedAction::SendMessage {
-                    hash,
-                    remaining_balance,
-                    ..
-                } => {
-                    let message = installed_actions.find_message(hash);
+        if installed_actions.actions.is_empty() {
+            for action in &executed.actions {
+                action_parts.push(self.format_executed_action_retrace_part(action));
+            }
+        } else {
+            let mut used_executed_actions = vec![false; executed.actions.len()];
 
-                    let (loc, formatted) = if let Some(message) = message {
-                        let msg = message.message();
-
-                        let formatted = match msg {
-                            Some(msg) => {
-                                self.format_single_message(&msg, contract_letters, false, None)
+            for installed in &installed_actions.actions {
+                let loc = self.find_source_loc(tx, installed.loc_hash(), installed.loc_offset());
+                let location_part = loc
+                    .map(|l| format!("at {}", l.format()))
+                    .unwrap_or_default();
+                let matched =
+                    executed
+                        .actions
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, executed_action)| {
+                            if used_executed_actions[index]
+                                || !installed.matches_executed_action(executed_action)
+                            {
+                                return None;
                             }
-                            None => hash.clone(),
-                        };
 
-                        (
-                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
-                            formatted,
-                        )
-                    } else {
-                        (None, "msg: ".to_owned() + hash)
-                    };
+                            used_executed_actions[index] = true;
+                            Some(executed_action)
+                        });
 
-                    let message_part = formatted;
-                    let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
-                    let location_part = loc
-                        .map(|l| format!("at {}", l.format()))
-                        .unwrap_or_default();
+                match (installed, matched) {
+                    (
+                        InstalledAction::Message(message),
+                        Some(ExecutedAction::SendMessage {
+                            remaining_balance, ..
+                        }),
+                    ) => {
+                        let message_part = message.message().map_or_else(
+                            || message.msg_hash.clone(),
+                            |msg| self.format_single_message(&msg, contract_letters, false, None),
+                        );
+                        let balance_part =
+                            format!("balance: {}", self.format_ton(remaining_balance));
 
-                    action_parts.push((message_part, balance_part, location_part));
-                }
-                ExecutedAction::ReserveCurrency {
-                    mode,
-                    reserve,
-                    changed_remaining_balance,
-                    ..
-                } => {
-                    let reserve_action = installed_actions.find_reserve(*mode, reserve);
+                        action_parts.push((message_part, balance_part, location_part));
+                    }
+                    (
+                        InstalledAction::Reserve(reserve),
+                        Some(ExecutedAction::ReserveCurrency {
+                            changed_remaining_balance,
+                            ..
+                        }),
+                    ) => {
+                        let mode_flags = ReserveCurrencyFlags::from_bits(reserve.mode as u8)
+                            .unwrap_or(ReserveCurrencyFlags::empty());
+                        let message_part = format!(
+                            "{} {} {}",
+                            "reserve".blue(),
+                            self.format_ton(&reserve.amount),
+                            Self::format_reserve_currency_flags(mode_flags).dimmed()
+                        );
+                        let balance_part =
+                            format!("balance: {}", self.format_ton(changed_remaining_balance));
 
-                    let loc = if let Some(action) = reserve_action {
-                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
-                    } else {
-                        None
-                    };
-
-                    let mode_flags = ReserveCurrencyFlags::from_bits(*mode as u8)
-                        .unwrap_or(ReserveCurrencyFlags::empty());
-
-                    let message_part = format!(
-                        "{} {} {}",
-                        "reserve".blue(),
-                        self.format_ton(reserve),
-                        Self::format_reserve_currency_flags(mode_flags).dimmed()
-                    );
-                    let balance_part =
-                        format!("balance: {}", self.format_ton(changed_remaining_balance));
-                    let location_part = loc
-                        .map(|l| format!("at {}", l.format()))
-                        .unwrap_or_default();
-
-                    action_parts.push((message_part, balance_part, location_part));
+                        action_parts.push((message_part, balance_part, location_part));
+                    }
+                    (InstalledAction::Message(message), _) => {
+                        let message_part = message.message().map_or_else(
+                            || message.msg_hash.clone(),
+                            |msg| self.format_single_message(&msg, contract_letters, false, None),
+                        );
+                        action_parts.push((
+                            message_part,
+                            "balance: 0 TON".to_owned(),
+                            location_part,
+                        ));
+                    }
+                    (InstalledAction::Reserve(reserve), _) => {
+                        let mode_flags = ReserveCurrencyFlags::from_bits(reserve.mode as u8)
+                            .unwrap_or(ReserveCurrencyFlags::empty());
+                        let message_part = format!(
+                            "{} {} {}",
+                            "reserve".blue(),
+                            self.format_ton(&reserve.amount),
+                            Self::format_reserve_currency_flags(mode_flags).dimmed()
+                        );
+                        action_parts.push((
+                            message_part,
+                            "balance: 0 TON".to_owned(),
+                            location_part,
+                        ));
+                    }
+                    (InstalledAction::SetCode(_), _) => {
+                        action_parts.push((
+                            "set code".magenta().to_string(),
+                            String::new(),
+                            location_part,
+                        ));
+                    }
+                    (InstalledAction::ChangeLibrary(change), _) => {
+                        let message_part = format!(
+                            "{} {}",
+                            "change library".cyan(),
+                            Self::format_change_library_mode(change.mode).dimmed()
+                        );
+                        action_parts.push((message_part, String::new(), location_part));
+                    }
                 }
             }
+
+            for (index, action) in executed.actions.iter().enumerate() {
+                if used_executed_actions[index] {
+                    continue;
+                }
+
+                action_parts.push(self.format_executed_action_retrace_part(action));
+            }
+        }
+
+        if action_parts.is_empty() {
+            return String::new();
         }
 
         let mut max_message_width = 0;
@@ -1950,7 +2002,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         result.push_str("Executed actions:\n");
 
         for (idx, (message, balance, location)) in action_parts.iter().enumerate() {
-            if idx == executed.actions.len() - 1 {
+            if idx == action_parts.len() - 1 {
                 let _ = write!(result, "{}    {} ", child_prefix, "└──".dimmed());
             } else {
                 let _ = write!(result, "{}    {} ", child_prefix, "├──".dimmed());
@@ -1976,6 +2028,92 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         }
 
         result.trim_end().to_string()
+    }
+
+    fn format_executed_action_retrace_part(
+        &self,
+        action: &ExecutedAction,
+    ) -> (String, String, String) {
+        match action {
+            ExecutedAction::SendMessage {
+                hash,
+                remaining_balance,
+                ..
+            } => {
+                let message_part = "msg: ".to_owned() + hash;
+                let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
+
+                (message_part, balance_part, String::new())
+            }
+            ExecutedAction::ReserveCurrency {
+                mode,
+                reserve,
+                changed_remaining_balance,
+                ..
+            } => {
+                let mode_flags = ReserveCurrencyFlags::from_bits(*mode as u8)
+                    .unwrap_or(ReserveCurrencyFlags::empty());
+
+                let message_part = format!(
+                    "{} {} {}",
+                    "reserve".blue(),
+                    self.format_ton(reserve),
+                    Self::format_reserve_currency_flags(mode_flags).dimmed()
+                );
+                let balance_part =
+                    format!("balance: {}", self.format_ton(changed_remaining_balance));
+
+                (message_part, balance_part, String::new())
+            }
+            ExecutedAction::SetCode { .. } => (
+                "set code".magenta().to_string(),
+                String::new(),
+                String::new(),
+            ),
+            ExecutedAction::ChangeLibrary { mode, .. } => {
+                let message_part = format!(
+                    "{} {}",
+                    "change library".cyan(),
+                    Self::format_change_library_mode(*mode).dimmed()
+                );
+                (message_part, String::new(), String::new())
+            }
+        }
+    }
+
+    fn format_change_library_mode(mode: i32) -> String {
+        if mode < 0 {
+            return mode.to_string();
+        }
+
+        let mode = mode as u32;
+        let mut parts = Vec::new();
+
+        match mode & 0b11 {
+            0 => parts.push("REMOVE".to_owned()),
+            1 => parts.push("ADD_PRIVATE".to_owned()),
+            2 => parts.push("ADD_PUBLIC".to_owned()),
+            3 => {
+                parts.push("ADD_PRIVATE".to_owned());
+                parts.push("ADD_PUBLIC".to_owned());
+            }
+            _ => {}
+        }
+
+        if mode & 0b10000 != 0 {
+            parts.push("BOUNCE_ON_ERROR".to_owned());
+        }
+
+        let unknown = mode & !(0b11 | 0b10000);
+        if unknown != 0 {
+            parts.push(format!("0x{unknown:02x}"));
+        }
+
+        if parts.is_empty() {
+            "0".to_owned()
+        } else {
+            parts.join(" | ")
+        }
     }
 
     fn format_invalid_actions_retrace(
@@ -2037,14 +2175,8 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         installed_actions: &InstalledActions,
         action_index: usize,
     ) -> Option<SourceLocation> {
-        match installed_actions.find_by_index(action_index)? {
-            InstalledAction::Message(action) => {
-                self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
-            }
-            InstalledAction::Reserve(action) => {
-                self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
-            }
-        }
+        let action = installed_actions.find_by_index(action_index)?;
+        self.find_source_loc(tx, action.loc_hash(), action.loc_offset())
     }
 
     fn find_source_loc(

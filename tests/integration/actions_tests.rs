@@ -141,6 +141,68 @@ fn test_invalid_action_fail_without_backtrace_verbose() {
         );
 }
 
+#[test]
+fn test_action_tree_shows_set_code_and_change_library_sources() {
+    let project = ProjectBuilder::new("action-tree-code-and-library-sources")
+        .contract(
+            "simple",
+            r#"
+                fun contract.setLibraryCode(code: cell, mode: int): void
+                    asm "SETLIBCODE"
+
+                fun onInternalMessage(in: InMessage) {
+                    contract.setCodePostponed(beginCell().storeUint(0xCA, 8).endCell());
+                    contract.setLibraryCode(beginCell().storeUint(0xFE, 8).endCell(), 2);
+                    reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+                }
+
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+
+            get fun `test action metadata includes code and library updates`() {
+                val deployer = testing.treasury("deployer");
+
+                val addr = AutoDeployAddress {
+                    stateInit: ContractState {
+                        code: build("simple"),
+                        data: createEmptyCell(),
+                    },
+                };
+
+                val triggerMsg = createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: addr,
+                });
+
+                val res = net.send(deployer.address, triggerMsg);
+                println(res);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_action_tree_shows_set_code_and_change_library_sources.stdout.txt",
+        );
+}
+
 fn invalid_action_fail_project(project_name: &str) -> ProjectBuilder {
     ProjectBuilder::new(project_name)
         .contract(

@@ -122,7 +122,8 @@ const renderExternalDestination = (
 }
 
 const isActionFailed = (action: BackendExecutorAction): boolean => {
-  return action.failure_code !== undefined || action.failure_reason !== undefined
+  const failureReason = "failure_reason" in action ? action.failure_reason : undefined
+  return action.failure_code !== undefined || failureReason !== undefined
 }
 
 const formatNanoTon = (value: string): string => {
@@ -156,22 +157,20 @@ const mapExecutorActionsByType = (
   let cursor = 0
 
   for (const action of actions) {
-    if (action.type !== "sendMsg" && action.type !== "reserve") {
-      mapped.push(undefined)
-      continue
-    }
-
     let matched: BackendExecutorAction | undefined
-    while (cursor < executorActions.length) {
-      const candidate = executorActions[cursor]
+    if (cursor < executorActions.length) {
+      const candidate = executorActions[cursor]!
       cursor += 1
       const typeMatches =
         (action.type === "sendMsg" && candidate.type === "send_message") ||
-        (action.type === "reserve" && candidate.type === "reserve_currency")
+        (action.type === "reserve" && candidate.type === "reserve_currency") ||
+        (action.type === "setCode" && candidate.type === "set_code") ||
+        (action.type === "changeLibrary" && candidate.type === "change_library")
 
       if (typeMatches) {
         matched = candidate
-        break
+      } else {
+        cursor -= 1
       }
     }
 
@@ -186,7 +185,11 @@ const getActionExecutionMeta = (
 ): ActionExecutionMeta => ({
   isFailed: executorAction ? isActionFailed(executorAction) : false,
   failureCode: executorAction?.failure_code,
-  failureReasonText: formatFailureReason(executorAction?.failure_reason),
+  failureReasonText: formatFailureReason(
+    executorAction && "failure_reason" in executorAction
+      ? executorAction.failure_reason
+      : undefined,
+  ),
 })
 
 const formatSourceLocation = (location: SourceLocation): string => {
@@ -388,6 +391,18 @@ const renderActionDetails = (
               </span>
             </div>
             <DisasmSection bocHex={newCodeBocHex} />
+            {execution.failureCode !== undefined && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailValue}>
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    phase="action"
+                  />
+                </span>
+              </div>
+            )}
             {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
@@ -476,6 +491,18 @@ const renderActionDetails = (
             </div>
             {isEmbeddedLibrary && embeddedLibraryBocHex && (
               <DisasmSection bocHex={embeddedLibraryBocHex} title="Library Disassembly" />
+            )}
+            {execution.failureCode !== undefined && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailValue}>
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    phase="action"
+                  />
+                </span>
+              </div>
             )}
             {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>

@@ -98,6 +98,16 @@ export type BackendExecutorAction =
       readonly failure_reason?: BackendExecutorActionFailureReason
       readonly failure_code?: number
     }
+  | {
+      readonly type: "set_code"
+      readonly location?: SourceLocation
+      readonly failure_code?: number
+    }
+  | {
+      readonly type: "change_library"
+      readonly location?: SourceLocation
+      readonly failure_code?: number
+    }
 
 export interface TransactionList {
   readonly name?: string
