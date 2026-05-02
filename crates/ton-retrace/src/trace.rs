@@ -45,7 +45,7 @@ use std::fmt::{Display, Formatter};
 use tvm_logs::executor_parser::{ExecutorLine, parse_executor_lines};
 use tvm_logs::parser::{CellLike, VmLine, VmStack, VmStackValue};
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
+use tycho_types::cell::{Cell, CellBuilder};
 use tycho_types::models::RelaxedMessage;
 
 /// A single step or event in the TVM execution trace.
@@ -645,9 +645,37 @@ fn decode_stack_cell(
             let boc = registered_cell_bocs
                 .get(cell.as_str())
                 .map_or(cell.as_str(), String::as_str);
-            Boc::decode_hex(boc).ok()
+            Boc::decode_hex(boc)
+                .ok()
+                .or_else(|| raw_cell_from_hex_data(cell))
         }
         CellLike::Builder(_) => None,
+    }
+}
+
+fn raw_cell_from_hex_data(hex: &str) -> Option<Cell> {
+    let bit_len = u16::try_from(hex.len().checked_mul(4)?).ok()?;
+    let mut bytes = Vec::with_capacity(hex.len().div_ceil(2));
+    for chunk in hex.as_bytes().chunks(2) {
+        let high = hex_nibble(chunk[0])?;
+        let low = match chunk.get(1) {
+            Some(byte) => hex_nibble(*byte)?,
+            None => 0,
+        };
+        bytes.push((high << 4) | low);
+    }
+
+    let mut builder = CellBuilder::new();
+    builder.store_raw(&bytes, bit_len).ok()?;
+    builder.build().ok()
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -1042,6 +1070,41 @@ gas remaining: 997
         );
         let mismatched = ExecutedActions::from(&mismatched_executor_logs);
         assert!(!actions.actions[1].matches_executed_action(&mismatched.actions[0]));
+    }
+
+    #[test]
+    fn installed_actions_match_compact_stack_cells_to_executor_hashes() {
+        let logs = r"
+stack: [ C{CA} ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 10
+execute SETCODE
+gas remaining: 999
+stack: [ C{FE} 2 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 20
+execute SETLIBCODE
+gas remaining: 998
+        ";
+
+        let set_code_hash = raw_cell_from_hex_data("CA")
+            .expect("test cell should decode")
+            .repr_hash()
+            .to_string();
+        let set_library_hash = raw_cell_from_hex_data("FE")
+            .expect("test cell should decode")
+            .repr_hash()
+            .to_string();
+        let executor_logs = format!(
+            "[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2269]\tprocess set code {set_code_hash}
+[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 2, lib_hash={set_library_hash}, lib_ref=cell"
+        );
+
+        let actions = Trace::new(logs, None).actions();
+        let executed = ExecutedActions::from(&executor_logs);
+
+        assert_eq!(actions.actions.len(), 2);
+        assert_eq!(executed.actions.len(), 2);
+        assert!(actions.actions[0].matches_executed_action(&executed.actions[0]));
+        assert!(actions.actions[1].matches_executed_action(&executed.actions[1]));
     }
 }
 

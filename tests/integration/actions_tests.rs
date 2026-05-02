@@ -143,7 +143,78 @@ fn test_invalid_action_fail_without_backtrace_verbose() {
 
 #[test]
 fn test_action_tree_shows_set_code_and_change_library_sources() {
-    let project = ProjectBuilder::new("action-tree-code-and-library-sources")
+    let project =
+        code_and_library_action_failure_project("action-tree-code-and-library-sources").build();
+
+    project
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_action_tree_shows_set_code_and_change_library_sources.stdout.txt",
+        );
+}
+
+#[test]
+fn test_action_tree_hides_code_and_library_actions_without_logs() {
+    let project =
+        code_and_library_action_failure_project("action-tree-code-and-library-sources-no-logs")
+            .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_action_tree_hides_code_and_library_actions_without_logs.stdout.txt",
+        );
+}
+
+#[test]
+fn test_action_tree_shows_code_and_library_actions_without_locations_on_verbose() {
+    let project =
+        code_and_library_action_failure_project("action-tree-code-and-library-sources-verbose")
+            .build();
+
+    project
+        .acton()
+        .test()
+        .verbose()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_action_tree_shows_code_and_library_actions_without_locations_on_verbose.stdout.txt",
+        );
+}
+
+#[test]
+fn test_action_tree_shows_code_and_library_action_locations_on_coverage() {
+    let project =
+        code_and_library_action_failure_project("action-tree-code-and-library-sources-coverage")
+            .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("action-coverage.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_action_tree_shows_code_and_library_action_locations_on_coverage.stdout.txt",
+        );
+}
+
+fn code_and_library_action_failure_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
         .contract(
             "simple",
             r#"
@@ -189,18 +260,6 @@ fn test_action_tree_shows_set_code_and_change_library_sources() {
             }
         "#,
         )
-        .build();
-
-    project
-        .acton()
-        .test()
-        .with_backtrace("full")
-        .run()
-        .success()
-        .assert_passed(1)
-        .assert_snapshot_matches(
-            "integration/snapshots/test_action_tree_shows_set_code_and_change_library_sources.stdout.txt",
-        );
 }
 
 fn invalid_action_fail_project(project_name: &str) -> ProjectBuilder {
