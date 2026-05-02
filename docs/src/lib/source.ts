@@ -18,7 +18,8 @@ export const source = loader({
 });
 
 export const llmSource = loader({
-    baseUrl: 'llms.mdx/docs',
+    baseUrl: '/llms.mdx/docs',
+    url: (slugs) => `/llms.mdx/docs/${slugs.join('/')}.md`,
     source: docs.toFumadocsSource(),
 });
 
