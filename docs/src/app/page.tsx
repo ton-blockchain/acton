@@ -214,7 +214,7 @@ export default function Home() {
                   <p className="text-xs font-semibold uppercase text-[#8b8a82]">
                     Get started in 30 seconds
                   </p>
-                  <div className="w-full max-w-[28rem] min-w-0 sm:w-fit">
+                  <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
                     <InlineInstallationCommand />
                   </div>
                 </div>
@@ -409,7 +409,7 @@ export default function Home() {
                 </h2>
                 <p className="mt-3 text-[#9f9e96]">Install Acton and start from the docs.</p>
               </div>
-              <div className="w-full max-w-[28rem] min-w-0 sm:w-fit">
+              <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
                 <InlineInstallationCommand />
               </div>
               <div className="flex flex-wrap justify-center gap-3">
@@ -445,13 +445,13 @@ export default function Home() {
                 TON toolchain for building, testing, debugging, and verifying smart contracts.
               </p>
             </div>
-            <div className="flex flex-row items-center gap-4 text-sm text-[#8f8e86] md:justify-end">
+            <div className="grid w-full grid-cols-[auto_1fr] items-center gap-4 text-sm text-[#8f8e86] md:flex md:w-auto md:justify-end">
               <div className="flex items-center gap-1">
                 {HEADER_ICON_LINKS.map(({ href, label, icon: Icon }) => (
                   <IconLink key={label} href={href} label={label} icon={Icon} />
                 ))}
               </div>
-              <div>
+              <div className="justify-self-end text-right">
                 Built by{' '}
                 <Link
                   href="https://t.me/toncore"
