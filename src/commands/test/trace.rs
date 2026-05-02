@@ -117,6 +117,9 @@ pub(crate) fn parse_executor_actions(
     installed_actions: &InstalledActions,
     source_map: Option<&SourceMap>,
 ) -> Vec<ExecutorActionInfo> {
+    let source_location =
+        |loc_hash: &str, loc_offset| retrace::find_source_loc(source_map?, loc_hash, loc_offset);
+
     let executed = ExecutedActions::from(logs);
     executed
         .actions
@@ -128,13 +131,9 @@ pub(crate) fn parse_executor_actions(
                 failure_reason,
                 failure_code,
             } => ExecutorActionInfo::SendMessage {
-                location: installed_actions.find_message(&hash).and_then(|action| {
-                    let loc_hash = &action.loc_hash;
-                    let loc_offset = action.loc_offset;
-                    source_map.and_then(|source_map| {
-                        retrace::find_source_loc(source_map, loc_hash, loc_offset)
-                    })
-                }),
+                location: installed_actions
+                    .find_message(&hash)
+                    .and_then(|action| source_location(&action.loc_hash, action.loc_offset)),
                 hash,
                 remaining_balance: remaining_balance.to_string(),
                 failure_reason: failure_reason.map(convert_failure_reason),
@@ -158,13 +157,7 @@ pub(crate) fn parse_executor_actions(
                 changed_reserved_balance: changed_reserved_balance.to_string(),
                 location: installed_actions
                     .find_reserve(mode, &reserve)
-                    .and_then(|action| {
-                        let loc_hash = &action.loc_hash;
-                        let loc_offset = action.loc_offset;
-                        source_map.and_then(|source_map| {
-                            retrace::find_source_loc(source_map, loc_hash, loc_offset)
-                        })
-                    }),
+                    .and_then(|action| source_location(&action.loc_hash, action.loc_offset)),
                 failure_reason: failure_reason.map(convert_failure_reason),
                 failure_code,
             },
@@ -199,12 +192,23 @@ fn build_result_for_transaction(
     shard_account: &ShardAccount,
     tx: &Transaction,
 ) -> Option<CompilationResult> {
-    resolve_compilation_result(ctx, tx_code.cloned())
-        .or_else(|| resolve_compilation_result(ctx, shard_account_code(shard_account)))
-        .or_else(|| {
-            let addr = transaction_destination(tx).unwrap_or_else(|| StdAddr::new(0, tx.account));
-            resolve_compilation_result(ctx, account_code(ctx, &addr))
-        })
+    let account_code = {
+        let addr = transaction_destination(tx).unwrap_or_else(|| StdAddr::new(0, tx.account));
+        ctx.chain
+            .world_state
+            .get_accounts()
+            .get(&addr)
+            .and_then(shard_account_code)
+    };
+
+    [
+        tx_code.cloned(),
+        shard_account_code(shard_account),
+        account_code,
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(|code| compilation_result_for_code(ctx, Some(&code), true).map(|(_, result)| result))
 }
 
 #[must_use]
@@ -217,32 +221,17 @@ fn shard_account_code(shard_account: &ShardAccount) -> Option<Cell> {
 }
 
 #[must_use]
-fn account_code(ctx: &Context<'_>, addr: &StdAddr) -> Option<Cell> {
-    ctx.chain
-        .world_state
-        .get_accounts()
-        .get(addr)
-        .and_then(shard_account_code)
-}
-
-#[must_use]
-fn resolve_compilation_result(ctx: &Context<'_>, code: Option<Cell>) -> Option<CompilationResult> {
-    let code = code?;
-    compilation_result_for_code(ctx, Some(&code), true).map(|(_, result)| result)
-}
-
-#[must_use]
 fn transaction_destination(tx: &Transaction) -> Option<StdAddr> {
-    match &tx.load_in_msg().ok()??.info {
-        MsgInfo::Int(info) => match &info.dst {
-            IntAddr::Std(addr) => Some(addr.clone()),
-            IntAddr::Var(_) => None,
-        },
-        MsgInfo::ExtIn(info) => match &info.dst {
-            IntAddr::Std(addr) => Some(addr.clone()),
-            IntAddr::Var(_) => None,
-        },
+    let in_msg = tx.load_in_msg().ok()??;
+    let dst = match &in_msg.info {
+        MsgInfo::Int(info) => Some(&info.dst),
+        MsgInfo::ExtIn(info) => Some(&info.dst),
         MsgInfo::ExtOut(_) => None,
+    }?;
+
+    match dst {
+        IntAddr::Std(addr) => Some(addr.clone()),
+        IntAddr::Var(_) => None,
     }
 }
 
@@ -280,15 +269,16 @@ pub(super) fn dump_test_transactions(
                         source_map: (*info.source_map).clone(),
                         abi: info.abi,
                     });
-                    if let Some(info) = &contract_info {
-                        known_contracts.insert(info.name.clone(), info.clone());
+                    let dest_contract_info = contract_info.as_ref().map(|info| info.name.clone());
+                    if let Some(info) = contract_info {
+                        known_contracts.insert(info.name.clone(), info);
                     }
 
                     TransactionInfo {
                         lt: tx.transaction.lt.to_string(),
                         raw_transaction: tx.raw_transaction.clone(),
                         parent_transaction: tx.parent_transaction.map(|lt| lt.to_string()),
-                        dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
+                        dest_contract_info,
                         child_transactions: tx
                             .child_transactions
                             .iter()
