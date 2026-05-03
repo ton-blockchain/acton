@@ -33,6 +33,32 @@ fn env_slice_returns_raw_and_empty_values_and_null_when_missing() {
 }
 
 #[test]
+fn env_slice_to_equal_string_reports_typed_mismatch() {
+    ProjectBuilder::new("bp-stdlib-env-slice-string-typed-mismatch")
+        .test_file(
+            "env_slice_string_mismatch",
+            r#"
+            import "../../lib/env"
+            import "../../lib/testing/expect"
+
+            get fun `test bp stdlib env slice string typed mismatch`() {
+                expect(env<slice>("BP_ENV_SLICE_TEXT")).toEqual("slice-value");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .env("BP_ENV_SLICE_TEXT", "slice-value")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/env_slice_returns_raw_and_empty_values_and_null_when_missing/env_slice_to_equal_string_reports_typed_mismatch.stdout.txt",
+        );
+}
+
+#[test]
 fn env_or_string_uses_missing_fallback_and_preserves_present_values() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/bp_env_or_string_missing_fallback.test.tolk";

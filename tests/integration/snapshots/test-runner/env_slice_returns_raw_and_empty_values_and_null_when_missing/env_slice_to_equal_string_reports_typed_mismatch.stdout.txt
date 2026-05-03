@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
+depends = []
+
+See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/env_slice_string_mismatch.test.tolk (1 test)
+  ✗ bp stdlib env slice string typed mismatch [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        [BOC_HEX] != slice-value
+      └─ at tests/env_slice_string_mismatch.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

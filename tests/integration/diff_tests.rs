@@ -291,6 +291,63 @@ fn test_diff_for_structs_with_nullable_struct_and_union_fields() {
 }
 
 #[test]
+fn test_diff_for_top_level_unions() {
+    let project = ProjectBuilder::new("diff-top-level-unions")
+        .contract("simple", "fun main() {}")
+        .test_file(
+            "simple",
+            r#"
+            import "../../lib/testing/expect"
+
+            struct Point {
+                x: int
+                y: int
+            }
+
+            struct LeftChoice {
+                point: Point
+                code: int
+            }
+
+            struct RightChoice {
+                value: int
+            }
+
+            struct EmptyChoice {}
+
+            type Choice = LeftChoice | RightChoice | EmptyChoice
+
+            fun point(x: int, y: int): Point {
+                return Point { x, y };
+            }
+
+            fun leftChoice(x: int, y: int, code: int): LeftChoice {
+                return LeftChoice {
+                    point: point(x, y),
+                    code,
+                };
+            }
+
+            get fun `test diff same top level union variant`() {
+                expect(leftChoice(5, 6, 7) as Choice).toEqual(leftChoice(5, 9, 7) as Choice)
+            }
+
+            get fun `test diff different top level union variants`() {
+                expect(RightChoice { value: 7 } as Choice).toEqual(EmptyChoice {} as Choice)
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_diff_for_top_level_unions.stdout.txt");
+}
+
+#[test]
 fn test_diff_for_addresses() {
     let project = ProjectBuilder::new("diff-addresses")
         .contract("simple", "fun main() {}")
