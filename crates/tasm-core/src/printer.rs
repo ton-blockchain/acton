@@ -82,6 +82,14 @@ impl Instruction {
             return builder.trim_end().to_string();
         }
 
+        if let Instruction::Slice(instr) = self {
+            state.last_source_location = None;
+            builder.push_str(&indent);
+            builder.push_str("embed ");
+            builder.push_str(&format_cell(&instr.cell));
+            return builder.trim_end().to_string();
+        }
+
         let Instruction::Plain(instr) = self else {
             return builder;
         };
@@ -91,7 +99,14 @@ impl Instruction {
         builder.push(' ');
 
         for (i, arg) in instr.args.iter().enumerate() {
-            builder.push_str(&format_arg(arg, depth, opts, offset_width));
+            builder.push_str(&format_instruction_arg(
+                &instr.name,
+                i,
+                arg,
+                depth,
+                opts,
+                offset_width,
+            ));
             if i < instr.args.len() - 1 {
                 builder.push(' ');
             }
@@ -466,6 +481,24 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions, offset_width: 
     }
 }
 
+fn format_instruction_arg(
+    instruction_name: &str,
+    index: usize,
+    arg: &ArgValue,
+    depth: usize,
+    opts: &FormatOptions,
+    offset_width: usize,
+) -> String {
+    if instruction_name == "BLKPUSH"
+        && index == 1
+        && let ArgValue::StackRegister(register) = arg
+    {
+        return register.idx.to_string();
+    }
+
+    format_arg(arg, depth, opts, offset_width)
+}
+
 fn format_cell(s: &Cell) -> String {
     let slice = s.as_slice_allow_exotic();
     format_slice(&slice)
@@ -473,7 +506,7 @@ fn format_cell(s: &Cell) -> String {
 
 fn format_slice(slice: &CellSlice<'_>) -> String {
     if slice.size_refs() == 0 {
-        format!("x{{{}}}", slice.display_data())
+        format!("x{{{:X}}}", slice.display_data())
     } else {
         let mut builder = CellBuilder::new();
         builder.store_slice(slice).ok();

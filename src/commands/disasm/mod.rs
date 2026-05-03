@@ -293,7 +293,7 @@ impl<'a> DisasmBlockCollector<'a> {
                 }
             }
             Instruction::Ref(instr) => self.collect_arg(&instr.code, location.as_ref()),
-            Instruction::ExoticCell(_) => {}
+            Instruction::ExoticCell(_) | Instruction::Slice(_) => {}
         }
     }
 
@@ -394,6 +394,9 @@ fn instruction_source_location(
         Instruction::ExoticCell(instr) => {
             cell_source_location(source_map, instr.source_cell.as_ref(), offset)
         }
+        Instruction::Slice(instr) => {
+            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
+        }
     }
 }
 
@@ -434,6 +437,6 @@ fn extract_library_hash_from_instruction(instruction: &Instruction) -> Option<Ha
 
             None
         }
-        Instruction::Plain(_) | Instruction::Ref(_) => None,
+        Instruction::Plain(_) | Instruction::Ref(_) | Instruction::Slice(_) => None,
     }
 }

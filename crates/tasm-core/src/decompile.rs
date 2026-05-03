@@ -1,7 +1,7 @@
 use crate::spec::{Arg, SliceArg, SpecInstruction, load_tvm_specification};
 use crate::types::{
     ArgValue, Code, CodeDictionary, Control, ExoticCellInstruction, Instruction, Method,
-    PlainInstruction, RefInstruction, StackRegister,
+    PlainInstruction, RefInstruction, SliceInstruction, StackRegister,
 };
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, BigUint};
@@ -78,6 +78,12 @@ impl Disassembler {
 
     pub fn load_instruction(&self, slice: &mut CellSlice<'_>) -> anyhow::Result<Instruction> {
         let bits = std::cmp::min(slice.size_bits(), MAX_OPCODE_BITS);
+        if bits < 8 {
+            return Err(anyhow!(
+                "invalid opcode, not enough bits, expected at least 8 bits, but got {bits}"
+            ));
+        }
+
         let opcode = slice.get_uint(0, bits)? << (MAX_OPCODE_BITS - bits);
 
         let instr_idx = self
@@ -103,27 +109,9 @@ impl Disassembler {
         // process DICTPUSHCONST-like instructions with separate logic
         if layout.args.0.len() == 2 && matches!(&layout.args.0[0], Arg::InlineDictArg(_)) {
             let key_length = slice.load_uint(10)?;
-            let mut dict_slice = slice.load_reference()?.as_slice()?;
-            let dict = RawDict::<19>::load_from_root_ext(&mut dict_slice, Cell::empty_context())?;
-
-            let methods = dict
-                .iter()
-                .flatten()
-                .filter_map(|(key, mut value)| {
-                    let mut key_slice = key.as_data_slice();
-                    let id = key_slice.load_uint(key_length as u16).ok()?;
-                    let code = self.decompile_slice(&mut value, None).ok()?;
-                    Some(Method {
-                        id,
-                        source: dyn_cell_to_cell(value.cell()),
-                        instructions: code.instructions,
-                        offsets: code.offsets,
-                    })
-                })
-                .collect();
-
+            let dict_cell = dyn_cell_to_cell(slice.load_reference()?);
             args.push(ArgValue::UInt(BigUint::from(key_length)));
-            args.push(ArgValue::CodeDictionary(CodeDictionary { methods }));
+            args.push(self.decompile_code_dictionary(key_length, &dict_cell));
         } else {
             for child in &layout.args.0 {
                 self.process_arg(child, slice, &mut args)?;
@@ -154,11 +142,32 @@ impl Disassembler {
     }
 
     pub fn decompile_dyn_cell(&self, cell: &DynCell) -> anyhow::Result<Code> {
-        let mut slice = cell.as_slice()?;
-        self.decompile_slice(&mut slice, None)
+        self.decompile_cell(&dyn_cell_to_cell(cell))
     }
 
     pub fn decompile_slice(
+        &self,
+        slice: &mut CellSlice<'_>,
+        start_offset: Option<u16>,
+    ) -> anyhow::Result<Code> {
+        let original = *slice;
+        match self.decompile_slice_strict(slice, start_offset) {
+            Ok(code) => Ok(code),
+            Err(_) => {
+                let offset = start_offset.unwrap_or(0) + original.offset_bits();
+                let cell = cell_from_slice(&original)?;
+                Ok(Code {
+                    instructions: vec![Instruction::Slice(SliceInstruction {
+                        source_cell: Some(cell.clone()),
+                        cell,
+                    })],
+                    offsets: Some(vec![offset]),
+                })
+            }
+        }
+    }
+
+    fn decompile_slice_strict(
         &self,
         slice: &mut CellSlice<'_>,
         start_offset: Option<u16>,
@@ -199,6 +208,46 @@ impl Disassembler {
             instructions: result,
             offsets: Some(offsets),
         })
+    }
+
+    fn decompile_code_dictionary(&self, key_length: u64, dict_cell: &Cell) -> ArgValue {
+        let Some(methods) = self.try_decompile_code_dictionary(key_length, dict_cell) else {
+            return ArgValue::Cell(dict_cell.clone());
+        };
+
+        ArgValue::CodeDictionary(CodeDictionary { methods })
+    }
+
+    fn try_decompile_code_dictionary(
+        &self,
+        key_length: u64,
+        dict_cell: &Cell,
+    ) -> Option<Vec<Method>> {
+        if dict_cell.bit_len() == 0 {
+            return None;
+        }
+
+        let mut dict_slice = dict_cell.as_slice().ok()?;
+        let dict =
+            RawDict::<19>::load_from_root_ext(&mut dict_slice, Cell::empty_context()).ok()?;
+        let key_bits = u16::try_from(key_length).ok()?;
+        let mut methods = Vec::new();
+
+        for item in dict.iter() {
+            let (key, mut value) = item.ok()?;
+            let mut key_slice = key.as_data_slice();
+            let id = key_slice.load_uint(key_bits).ok()?;
+            let source = dyn_cell_to_cell(value.cell());
+            let code = self.decompile_slice_strict(&mut value, None).ok()?;
+            methods.push(Method {
+                id,
+                source,
+                instructions: code.instructions,
+                offsets: code.offsets,
+            });
+        }
+
+        Some(methods)
     }
 
     fn process_arg(
@@ -262,12 +311,28 @@ impl Disassembler {
             }
             Arg::RefCodeSliceArg(_) => {
                 let val = slice.load_reference()?;
-                let code = self.decompile_dyn_cell(val)?;
-                args.push(ArgValue::Code {
-                    code: Box::new(code),
-                    source: dyn_cell_to_cell(val),
-                    offset: 0,
-                });
+                let source = dyn_cell_to_cell(val);
+                let mut code_slice = match source.as_slice() {
+                    Ok(code_slice) => code_slice,
+                    Err(_) if source.is_exotic() => {
+                        let code = self.decompile_cell(&source)?;
+                        args.push(ArgValue::Code {
+                            code: Box::new(code),
+                            source,
+                            offset: 0,
+                        });
+                        return Ok(());
+                    }
+                    Err(err) => return Err(err.into()),
+                };
+                match self.decompile_slice_strict(&mut code_slice, None) {
+                    Ok(code) => args.push(ArgValue::Code {
+                        code: Box::new(code),
+                        source,
+                        offset: 0,
+                    }),
+                    Err(_) => args.push(ArgValue::Cell(source)),
+                }
             }
             Arg::InlineCodeSliceArg(inline_code) => {
                 let Arg::UintArg(bits) = &*inline_code.bits else {
@@ -277,12 +342,16 @@ impl Disassembler {
                 let y = slice.load_uint(bits.len as u16)?;
                 let real_length = y * 8;
                 let mut r = slice.load_prefix(real_length as u16, 0)?;
-                let code = self.decompile_slice(&mut r, None)?;
-                args.push(ArgValue::Code {
-                    code: Box::new(code),
-                    source: dyn_cell_to_cell(slice.cell()),
-                    offset,
-                });
+                let raw_code = cell_from_slice(&r)?;
+                let source = dyn_cell_to_cell(slice.cell());
+                match self.decompile_slice_strict(&mut r, None) {
+                    Ok(code) => args.push(ArgValue::Code {
+                        code: Box::new(code),
+                        source,
+                        offset,
+                    }),
+                    Err(_) => args.push(ArgValue::Cell(raw_code)),
+                }
             }
             Arg::CodeSliceArg(code_slice) => {
                 let Arg::UintArg(bits) = &*code_slice.bits else {
@@ -300,12 +369,16 @@ impl Disassembler {
 
                 if count_refs == 0 {
                     // optimization to not build a cell
-                    let code = self.decompile_slice(&mut r, None)?;
-                    args.push(ArgValue::Code {
-                        code: Box::new(code),
-                        source: dyn_cell_to_cell(slice.cell()),
-                        offset,
-                    });
+                    let raw_code = cell_from_slice(&r)?;
+                    let source = dyn_cell_to_cell(slice.cell());
+                    match self.decompile_slice_strict(&mut r, None) {
+                        Ok(code) => args.push(ArgValue::Code {
+                            code: Box::new(code),
+                            source,
+                            offset,
+                        }),
+                        Err(_) => args.push(ArgValue::Cell(raw_code)),
+                    }
                     return Ok(());
                 }
 
@@ -317,12 +390,15 @@ impl Disassembler {
                 let code_cell = builder.build()?;
                 let mut code_slice = code_cell.as_slice()?;
 
-                let code = self.decompile_slice(&mut code_slice, Some(r.offset_bits()))?;
-                args.push(ArgValue::Code {
-                    code: Box::new(code),
-                    source: dyn_cell_to_cell(slice.cell()),
-                    offset,
-                });
+                let source = dyn_cell_to_cell(slice.cell());
+                match self.decompile_slice_strict(&mut code_slice, Some(r.offset_bits())) {
+                    Ok(code) => args.push(ArgValue::Code {
+                        code: Box::new(code),
+                        source,
+                        offset,
+                    }),
+                    Err(_) => args.push(ArgValue::Cell(code_cell)),
+                }
             }
             Arg::SliceArg(slice_arg) => {
                 let slice_val = Self::load_slice(slice, slice_arg)?;
@@ -362,13 +438,10 @@ impl Disassembler {
         // Find the position of the last set bit (MSB) to determine actual data length
         let mut length = 0usize;
         for i in (0..real_length).rev() {
-            let byte_idx = i / 8;
-            let Ok(data_byte) = r.get_u8(byte_idx) else {
+            let Ok(bit) = r.get_bit(i) else {
                 break;
             };
-            let bit_shift = u32::from(i % 8);
-            let bit = data_byte & (1 << (7 - bit_shift));
-            if bit == 0 {
+            if !bit {
                 continue;
             }
             length = i as usize;
@@ -403,6 +476,12 @@ fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
     builder.build().expect("Cannot build cell from builder")
 }
 
+fn cell_from_slice(slice: &CellSlice<'_>) -> anyhow::Result<Cell> {
+    let mut builder = CellBuilder::new();
+    builder.store_slice(*slice)?;
+    Ok(builder.build()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,6 +498,21 @@ mod tests {
             .expect("Failed to decompile cell");
 
         let res = code.print(&FormatOptions::default());
-        assert_eq!(res.len(), 132_511);
+        assert!(res.contains("BLKPUSH 4 1"));
+        assert!(res.contains("STSLICECONST x{6_}"));
+        assert!(res.contains("STSLICECONST x{1002_}"));
+        assert!(res.contains("STSLICECONST x{8D_}"));
+    }
+
+    #[test]
+    fn test_invalid_opcode_falls_back_to_embed_slice() {
+        let mut builder = CellBuilder::new();
+        builder.store_uint(0, 4).unwrap();
+        let cell = builder.build().unwrap();
+        let disassembler = Disassembler::new();
+
+        let code = disassembler.decompile_cell(&cell).unwrap();
+
+        assert_eq!(code.print(&FormatOptions::default()), "embed x{0}\n");
     }
 }
