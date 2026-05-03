@@ -314,7 +314,7 @@ fn execute_script(
             config: &config,
             project_root: current_project_root,
             abi: abi.clone(),
-            source_map: Some(source_map.clone()),
+            source_map: source_map.clone(),
             show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),

@@ -274,7 +274,7 @@ fn execute_script(
             config: &config,
             project_root: project_root.to_path_buf(),
             abi: abi.clone(),
-            source_map: Some(source_map.clone()),
+            source_map: source_map.clone(),
             show_bodies: false,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),

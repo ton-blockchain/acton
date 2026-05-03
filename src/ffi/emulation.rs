@@ -2374,13 +2374,11 @@ fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) -> anyhow::Re
 extension!(type_name_by_opcode in (Context) with (id: BigInt) using type_name_by_opcode_impl);
 fn type_name_by_opcode_impl(ctx: &mut Context, stk: &mut Tuple, id: BigInt) -> anyhow::Result<()> {
     let id = u32::try_from(&id).context("ID is too big for uint32 opcode")?;
-    let Some(type_name) = ctx.env.source_map.as_deref().and_then(|source_map| {
-        ContractABI::find_message_name_by_opcode_with_symbols(
-            source_map,
-            ctx.env.abi.as_deref(),
-            id,
-        )
-    }) else {
+    let Some(type_name) = ContractABI::find_message_name_by_opcode_with_symbols(
+        &ctx.env.source_map,
+        ctx.env.abi.as_deref(),
+        id,
+    ) else {
         stk.push(TupleItem::Null);
         return Ok(());
     };

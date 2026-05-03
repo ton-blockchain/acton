@@ -3,7 +3,7 @@ use crate::context::{BuildCache, Context, to_cell};
 use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
 use crate::formatter::FormatterContext;
 use acton_debug::render_tuple_item_as_tolk_type;
-use anyhow::{Context as AnyhowContext, anyhow, bail};
+use anyhow::{Context as AnyhowContext, bail};
 use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
@@ -387,14 +387,12 @@ fn format_reflected_arg(
         return Ok(format_send_result_list(ctx, formatter, &item));
     }
 
-    let source_map = ctx
-        .env
-        .source_map
-        .as_ref()
-        .ok_or_else(|| anyhow!("symbol types are required to format `{}`", arg.ty))?;
-
     Ok(render_with_source_map(
-        source_map, formatter, &item, &arg.ty, colorize,
+        &ctx.env.source_map,
+        formatter,
+        &item,
+        &arg.ty,
+        colorize,
     ))
 }
 

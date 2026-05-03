@@ -5,6 +5,7 @@ use crate::context::{
     AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
     KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
+use crate::ffi::assert::{rendered_values_equal, union_case_payload};
 use crate::retrace::{
     self, ExecutedAction, InstalledAction, InstalledActions, InvalidAction, TolkBacktraceFrame,
 };
@@ -2272,7 +2273,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         source_map: &SourceMap,
         indent: usize,
     ) -> String {
-        let rendered = self.render_assert_value(tuple, ty, source_map);
+        let rendered = render_tuple_as_tolk_type(source_map, tuple, ty);
         let formatted = self.format_rendered_assert_value(&rendered, Some(ty));
 
         if !formatted.contains('\n') {
@@ -2284,10 +2285,6 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         let mut result = lines[0].to_string() + "\n";
         result += &Self::add_indent_to_lines(&lines[1..].join("\n"), indent);
         result
-    }
-
-    fn render_assert_value(&self, tuple: &Tuple, ty: &Ty, source_map: &SourceMap) -> RenderedValue {
-        render_tuple_as_tolk_type(source_map, tuple, ty)
     }
 
     fn format_rendered_assert_value(
@@ -2394,8 +2391,8 @@ impl FormatterContext<'_> {
         right_ty: &Ty,
         source_map: &SourceMap,
     ) -> String {
-        let left_rendered = self.render_assert_value(left, left_ty, source_map);
-        let right_rendered = self.render_assert_value(right, right_ty, source_map);
+        let left_rendered = render_tuple_as_tolk_type(source_map, left, left_ty);
+        let right_rendered = render_tuple_as_tolk_type(source_map, right, right_ty);
 
         if !Self::same_compiler_ty(left_ty, right_ty) {
             return format!(
@@ -2412,18 +2409,13 @@ impl FormatterContext<'_> {
         serde_json::to_string(left).ok() == serde_json::to_string(right).ok()
     }
 
-    fn rendered_values_equal(&self, left: &RenderedValue, right: &RenderedValue) -> bool {
-        self.format_rendered_assert_value(left, None)
-            == self.format_rendered_assert_value(right, None)
-    }
-
     fn format_rendered_diff(
         &self,
         left: &RenderedValue,
         right: &RenderedValue,
         top_level_ty: Option<&Ty>,
     ) -> String {
-        if self.rendered_values_equal(left, right) {
+        if rendered_values_equal(left, right) {
             return self.format_rendered_assert_value(left, top_level_ty);
         }
 
@@ -2456,7 +2448,37 @@ impl FormatterContext<'_> {
                     items: right_items, ..
                 },
             ) => self.format_collection_diff(left_items, right_items, '[', ']'),
+            (
+                RenderedValue::UnionCase {
+                    variant_name: left_variant,
+                    fields: left_fields,
+                    ..
+                },
+                RenderedValue::UnionCase {
+                    variant_name: right_variant,
+                    fields: right_fields,
+                    ..
+                },
+            ) if left_variant == right_variant => {
+                self.format_union_case_diff(left, right, left_fields, right_fields)
+            }
             _ => self.format_leaf_diff(left, right, top_level_ty),
+        }
+    }
+
+    fn format_union_case_diff(
+        &self,
+        left: &RenderedValue,
+        right: &RenderedValue,
+        left_fields: &[(String, RenderedValue)],
+        right_fields: &[(String, RenderedValue)],
+    ) -> String {
+        let left_value = union_case_payload(left_fields);
+        let right_value = union_case_payload(right_fields);
+
+        match (left_value, right_value) {
+            (Some(left), Some(right)) => self.format_rendered_diff(left, right, None),
+            _ => self.format_leaf_diff(left, right, None),
         }
     }
 
@@ -2489,7 +2511,7 @@ impl FormatterContext<'_> {
                 .map(|(_, value)| value);
 
             match (left_value, right_value) {
-                (Some(left), Some(right)) if self.rendered_values_equal(left, right) => {
+                (Some(left), Some(right)) if rendered_values_equal(left, right) => {
                     self.write_equal_struct_field(&mut f, field_name, left, is_last);
                 }
                 (Some(left), Some(right)) if Self::can_diff_inline(left, right) => {
@@ -2587,7 +2609,7 @@ impl FormatterContext<'_> {
         for i in 0..max_len {
             let is_last = i + 1 == max_len;
             match (left_items.get(i), right_items.get(i)) {
-                (Some(left), Some(right)) if self.rendered_values_equal(left, right) => {
+                (Some(left), Some(right)) if rendered_values_equal(left, right) => {
                     self.write_collection_value(
                         &mut result,
                         &self
@@ -2661,20 +2683,50 @@ impl FormatterContext<'_> {
         right: &RenderedValue,
         top_level_ty: Option<&Ty>,
     ) -> String {
-        format!(
-            "(\n    {},\n    {}\n)",
-            self.format_rendered_assert_value(left, top_level_ty).red(),
-            self.format_rendered_assert_value(right, top_level_ty)
-                .green()
-        )
+        let left = Self::add_indent_to_lines_except_first(
+            &self.format_leaf_diff_value(left, top_level_ty),
+            4,
+        );
+        let right = Self::add_indent_to_lines_except_first(
+            &self.format_leaf_diff_value(right, top_level_ty),
+            4,
+        );
+        format!("(\n    {},\n    {}\n)", left.red(), right.green())
+    }
+
+    fn format_leaf_diff_value(&self, value: &RenderedValue, top_level_ty: Option<&Ty>) -> String {
+        if let RenderedValue::UnionCase {
+            variant_name,
+            fields,
+            ..
+        } = value
+            && let Some(
+                payload @ RenderedValue::Struct {
+                    type_name: payload_type,
+                    ..
+                },
+            ) = union_case_payload(fields)
+            && payload_type == variant_name
+        {
+            return self.format_rendered_assert_value(payload, None);
+        }
+
+        self.format_rendered_assert_value(value, top_level_ty)
     }
 
     const fn can_diff_inline(left: &RenderedValue, right: &RenderedValue) -> bool {
         !matches!(
-            (left, right),
-            (RenderedValue::Struct { .. }, RenderedValue::Struct { .. })
-                | (RenderedValue::Tensor { .. }, RenderedValue::Tensor { .. })
-                | (RenderedValue::ArrayOf { .. }, RenderedValue::ArrayOf { .. })
+            left,
+            RenderedValue::Struct { .. }
+                | RenderedValue::Tensor { .. }
+                | RenderedValue::ArrayOf { .. }
+                | RenderedValue::UnionCase { .. }
+        ) && !matches!(
+            right,
+            RenderedValue::Struct { .. }
+                | RenderedValue::Tensor { .. }
+                | RenderedValue::ArrayOf { .. }
+                | RenderedValue::UnionCase { .. }
         )
     }
 

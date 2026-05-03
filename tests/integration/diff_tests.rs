@@ -185,6 +185,112 @@ fn test_diff_for_nested_structs() {
 }
 
 #[test]
+fn test_diff_for_structs_with_nullable_struct_and_union_fields() {
+    let project = ProjectBuilder::new("diff-structs-nullable-union-fields")
+        .contract("simple", "fun main() {}")
+        .test_file(
+            "simple",
+            r#"
+            import "../../lib/testing/expect"
+
+            struct Point {
+                x: int
+                y: int
+            }
+
+            struct LeftChoice {
+                point: Point?
+                code: int
+            }
+
+            struct RightChoice {
+                value: int
+            }
+
+            struct EmptyChoice {}
+
+            type Choice = LeftChoice | RightChoice | EmptyChoice
+
+            struct Record {
+                id: int
+                samePoint: Point?
+                changedPoint: Point?
+                missingPoint: Point?
+                sameChoice: Choice
+                changedChoice: Choice
+                sameInt: int
+                changedInt: int
+            }
+
+            fun point(x: int, y: int): Point {
+                return Point { x, y };
+            }
+
+            fun leftChoice(x: int, y: int, code: int): LeftChoice {
+                return LeftChoice {
+                    point: point(x, y),
+                    code,
+                };
+            }
+
+            get fun `test diff nullable struct and same union variant fields`() {
+                expect(Record {
+                    id: 1,
+                    samePoint: point(10, 20),
+                    changedPoint: point(30, 40),
+                    missingPoint: null,
+                    sameChoice: EmptyChoice {} as Choice,
+                    changedChoice: leftChoice(5, 6, 7) as Choice,
+                    sameInt: 99,
+                    changedInt: 100,
+                }).toEqual(Record {
+                    id: 1,
+                    samePoint: point(10, 20),
+                    changedPoint: point(30, 41),
+                    missingPoint: point(50, 60),
+                    sameChoice: EmptyChoice {} as Choice,
+                    changedChoice: leftChoice(5, 9, 7) as Choice,
+                    sameInt: 99,
+                    changedInt: 101,
+                })
+            }
+
+            get fun `test diff nullable struct and different union variant fields`() {
+                expect(Record {
+                    id: 2,
+                    samePoint: null,
+                    changedPoint: point(70, 80),
+                    missingPoint: point(90, 100),
+                    sameChoice: EmptyChoice {} as Choice,
+                    changedChoice: RightChoice { value: 7 } as Choice,
+                    sameInt: 199,
+                    changedInt: 200,
+                }).toEqual(Record {
+                    id: 2,
+                    samePoint: null,
+                    changedPoint: null,
+                    missingPoint: point(90, 101),
+                    sameChoice: EmptyChoice {} as Choice,
+                    changedChoice: EmptyChoice {} as Choice,
+                    sameInt: 199,
+                    changedInt: 201,
+                })
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_diff_for_structs_with_nullable_struct_and_union_fields.stdout.txt",
+        );
+}
+
+#[test]
 fn test_diff_for_addresses() {
     let project = ProjectBuilder::new("diff-addresses")
         .contract("simple", "fun main() {}")

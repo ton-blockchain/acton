@@ -2,7 +2,8 @@ use crate::context::{
     AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, FailAssertFailure,
     TransactionGenericAssertFailure, TransactionNotFoundParams, WalletNotFoundFailure,
 };
-use anyhow::{Context as ErrorContext, anyhow};
+use acton_debug::{RenderedValue, render_tuple_as_tolk_type};
+use anyhow::Context as ErrorContext;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use tolk_compiler::abi::Ty;
@@ -62,13 +63,21 @@ fn assert_bin_impl(
     let left_ty: Ty = serde_json::from_str(&left_ty_json)?;
     let right_ty: Ty = serde_json::from_str(&right_ty_json)?;
 
-    if operator == "==" && left.equal_to(&right) {
-        stack.push_bool(true);
-        return Ok(());
-    }
-    if operator == "!=" && !left.equal_to(&right) {
-        stack.push_bool(true);
-        return Ok(());
+    if operator == "==" || operator == "!=" {
+        let source_map = &ctx.env.source_map;
+
+        let left_rendered = render_tuple_as_tolk_type(source_map, &left, &left_ty);
+        let right_rendered = render_tuple_as_tolk_type(source_map, &right, &right_ty);
+        let values_equal = rendered_values_equal(&left_rendered, &right_rendered);
+
+        if operator == "==" && values_equal {
+            stack.push_bool(true);
+            return Ok(());
+        }
+        if operator == "!=" && !values_equal {
+            stack.push_bool(true);
+            return Ok(());
+        }
     }
 
     if (operator == "<" || operator == ">" || operator == "<=" || operator == ">=")
@@ -84,19 +93,16 @@ fn assert_bin_impl(
             return Ok(());
         }
 
-        *ctx.asserts.assert_failure =
-            Some(AssertFailure::Bin(AssertBinFailure {
-                operator,
-                left,
-                right,
-                left_ty,
-                right_ty,
-                source_map: ctx.env.source_map.clone().ok_or_else(|| {
-                    anyhow!("symbol types are required to format assertion values")
-                })?,
-                message: Some(message),
-                location: SourceLocation::parse(&location)?,
-            }));
+        *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
+            operator,
+            left,
+            right,
+            left_ty,
+            right_ty,
+            source_map: ctx.env.source_map.clone(),
+            message: Some(message),
+            location: SourceLocation::parse(&location)?,
+        }));
         stack.push_bool(false);
         return Ok(());
     }
@@ -107,16 +113,200 @@ fn assert_bin_impl(
         right,
         left_ty,
         right_ty,
-        source_map: ctx
-            .env
-            .source_map
-            .clone()
-            .ok_or_else(|| anyhow!("symbol types are required to format assertion values"))?,
+        source_map: ctx.env.source_map.clone(),
         message: Some(message),
         location: SourceLocation::parse(&location)?,
     }));
     stack.push_bool(false);
     Ok(())
+}
+
+pub(crate) fn rendered_values_equal(left: &RenderedValue, right: &RenderedValue) -> bool {
+    match (left, right) {
+        (RenderedValue::LastSeen { inner }, right) => rendered_values_equal(inner, right),
+        (left, RenderedValue::LastSeen { inner }) => rendered_values_equal(left, inner),
+        (RenderedValue::LazyNotYetLoaded { preview }, right) => {
+            rendered_values_equal(preview, right)
+        }
+        (left, RenderedValue::LazyNotYetLoaded { preview }) => rendered_values_equal(left, preview),
+        (
+            RenderedValue::UnionCase {
+                variant_name: left_variant,
+                fields: left_fields,
+                ..
+            },
+            RenderedValue::UnionCase {
+                variant_name: right_variant,
+                fields: right_fields,
+                ..
+            },
+        ) => {
+            if left_variant != right_variant {
+                return false;
+            }
+
+            match (
+                union_case_payload(left_fields),
+                union_case_payload(right_fields),
+            ) {
+                (Some(left), Some(right)) => rendered_values_equal(left, right),
+                (None, None) => true,
+                _ => false,
+            }
+        }
+        (
+            RenderedValue::UnionCase {
+                variant_name,
+                fields,
+                ..
+            },
+            right,
+        ) => union_case_equal_to_value(variant_name, fields, right),
+        (
+            left,
+            RenderedValue::UnionCase {
+                variant_name,
+                fields,
+                ..
+            },
+        ) => union_case_equal_to_value(variant_name, fields, left),
+        (
+            RenderedValue::Leaf {
+                value: left_value, ..
+            },
+            RenderedValue::Leaf {
+                value: right_value, ..
+            },
+        )
+        | (
+            RenderedValue::Address {
+                value: left_value, ..
+            },
+            RenderedValue::Address {
+                value: right_value, ..
+            },
+        ) => left_value == right_value,
+        (
+            RenderedValue::CellLike {
+                type_name: left_type,
+                value: left_value,
+                ..
+            },
+            RenderedValue::CellLike {
+                type_name: right_type,
+                value: right_value,
+                ..
+            },
+        )
+        | (
+            RenderedValue::CellOf {
+                type_name: left_type,
+                value: left_value,
+                ..
+            },
+            RenderedValue::CellOf {
+                type_name: right_type,
+                value: right_value,
+                ..
+            },
+        )
+        | (
+            RenderedValue::EnumValue {
+                type_name: left_type,
+                value: left_value,
+                ..
+            },
+            RenderedValue::EnumValue {
+                type_name: right_type,
+                value: right_value,
+                ..
+            },
+        ) => left_type == right_type && left_value == right_value,
+        (
+            RenderedValue::Struct {
+                type_name: left_type,
+                fields: left_fields,
+            },
+            RenderedValue::Struct {
+                type_name: right_type,
+                fields: right_fields,
+            },
+        ) => left_type == right_type && rendered_fields_equal(left_fields, right_fields),
+        (
+            RenderedValue::Tensor {
+                items: left_items, ..
+            },
+            RenderedValue::Tensor {
+                items: right_items, ..
+            },
+        )
+        | (
+            RenderedValue::ArrayOf {
+                items: left_items, ..
+            },
+            RenderedValue::ArrayOf {
+                items: right_items, ..
+            },
+        ) => rendered_items_equal(left_items, right_items),
+        (RenderedValue::OptimizedOut, RenderedValue::OptimizedOut)
+        | (RenderedValue::LazyCantParseSlice, RenderedValue::LazyCantParseSlice) => true,
+        (
+            RenderedValue::LazyUnresolved {
+                type_name: left_type,
+            },
+            RenderedValue::LazyUnresolved {
+                type_name: right_type,
+            },
+        ) => left_type == right_type,
+        _ => false,
+    }
+}
+
+pub(crate) fn union_case_payload(fields: &[(String, RenderedValue)]) -> Option<&RenderedValue> {
+    fields
+        .iter()
+        .find_map(|(name, value)| (name == "value").then_some(value))
+}
+
+fn union_case_equal_to_value(
+    variant_name: &str,
+    fields: &[(String, RenderedValue)],
+    value: &RenderedValue,
+) -> bool {
+    if let Some(payload) = union_case_payload(fields) {
+        return rendered_values_equal(payload, value);
+    }
+
+    match value {
+        RenderedValue::Leaf {
+            value: leaf_value, ..
+        } => leaf_value == variant_name,
+        RenderedValue::Struct { type_name, fields } => {
+            fields.is_empty() && type_name == variant_name
+        }
+        _ => false,
+    }
+}
+
+fn rendered_items_equal(left: &[RenderedValue], right: &[RenderedValue]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| rendered_values_equal(left, right))
+}
+
+fn rendered_fields_equal(
+    left: &[(String, RenderedValue)],
+    right: &[(String, RenderedValue)],
+) -> bool {
+    left.len() == right.len()
+        && left.iter().all(|(left_name, left_value)| {
+            right
+                .iter()
+                .find(|(right_name, _)| right_name == left_name)
+                .is_some_and(|(_, right_value)| rendered_values_equal(left_value, right_value))
+        })
 }
 
 fn format_decimal(value: &BigInt, decimals: u32) -> String {

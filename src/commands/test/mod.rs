@@ -319,7 +319,7 @@ impl<'a> TestRunner<'a> {
                 config: &self.acton_config,
                 project_root: self.project_root.clone(),
                 abi: abi.clone(),
-                source_map: Some(source_map.clone()),
+                source_map: source_map.clone(),
                 show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),

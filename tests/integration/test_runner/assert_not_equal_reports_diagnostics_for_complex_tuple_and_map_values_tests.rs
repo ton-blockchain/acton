@@ -47,3 +47,79 @@ get fun `test ej stdlib assert not equal complex map diagnostic`() {{
             "integration/snapshots/test-runner/assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values/assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values.stdout.txt",
         );
 }
+
+#[test]
+fn assert_not_equal_reports_nullable_struct_matching_non_nullable_struct_as_equal() {
+    let source = format!(
+        r#"{ASSERT_IMPORTS}
+struct NullablePoint {{
+    x: int
+    y: int
+}}
+
+get fun `test ej stdlib assert not equal nullable struct diagnostic`() {{
+    val actual: NullablePoint? = NullablePoint {{
+        x: 10,
+        y: 20,
+    }};
+
+    Assert.notEqual(
+        actual,
+        NullablePoint {{
+            x: 10,
+            y: 20,
+        }},
+        "ej Assert.notEqual nullable struct compares by rendered Tolk value",
+    );
+}}
+"#
+    );
+
+    ProjectBuilder::new("ej-stdlib-assert-not-equal-nullable-struct")
+        .test_file("assert_not_equal_nullable_struct", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("ej Assert.notEqual nullable struct compares by rendered Tolk value")
+        .assert_contains("Values are equal but expected to be different")
+        .assert_contains("NullablePoint")
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values/assert_not_equal_reports_nullable_struct_matching_non_nullable_struct_as_equal.stdout.txt",
+        );
+}
+
+#[test]
+fn assert_not_equal_reports_union_scalar_matching_plain_scalar_as_equal() {
+    let source = format!(
+        r#"{ASSERT_IMPORTS}
+fun assertUnionScalarNotEqual(actual: int | bool): void {{
+    Assert.notEqual(
+        actual,
+        10,
+        "ej Assert.notEqual union scalar compares by rendered Tolk value",
+    );
+}}
+
+get fun `test ej stdlib assert not equal union scalar diagnostic`() {{
+    assertUnionScalarNotEqual(10 as int | bool);
+}}
+"#
+    );
+
+    ProjectBuilder::new("ej-stdlib-assert-not-equal-union-scalar")
+        .test_file("assert_not_equal_union_scalar", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("ej Assert.notEqual union scalar compares by rendered Tolk value")
+        .assert_contains("Values are equal but expected to be different")
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values/assert_not_equal_reports_union_scalar_matching_plain_scalar_as_equal.stdout.txt",
+        );
+}

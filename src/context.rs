@@ -705,7 +705,7 @@ pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
     pub abi: Option<Arc<ContractABI>>,
-    pub source_map: Option<Arc<SourceMap>>,
+    pub source_map: Arc<SourceMap>,
     pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
