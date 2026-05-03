@@ -13,7 +13,7 @@ import "@wrappers/utils"
 const JETTON_DEFAULT_NAME = "Acton Sample Jetton"
 const JETTON_DEFAULT_SYMBOL = "ACTON"
 const JETTON_DEFAULT_DESCRIPTION = "Sample jetton deployed from acton-contracts scripts"
-const JETTON_DEFAULT_IMAGE = "https://ton.org/download/ton_symbol.png"
+const JETTON_DEFAULT_IMAGE = "https://ton-blockchain.github.io/acton/logo.png"
 const JETTON_DEFAULT_DECIMALS = "9"
 const JETTON_DEFAULT_UPDATED_DESCRIPTION = "Sample jetton (metadata updated from acton-contracts scripts)"
 
