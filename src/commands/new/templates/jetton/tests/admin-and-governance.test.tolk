@@ -3,6 +3,7 @@ import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "@acton/types/transaction"
+
 import "@contracts/errors"
 import "@contracts/messages"
 import "@contracts/sharding"
@@ -10,25 +11,8 @@ import "@contracts/storage"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
-
-fun extractUriString(contentCell: cell): string? {
-    val metadata = OnchainMetadataReply.fromCell(contentCell);
-    val uriCell = metadata.contentDict.get("uri".sha256());
-    if (!uriCell.isFound) {
-        return null;
-    }
-    val prefixed = uriCell.loadValue();
-    var s = (prefixed as unknown as cell).beginParse();
-    s.loadUint(8);
-    return s.loadString();
-}
-
-fun assertSameShardPrefix(owner: address, wallet: address) {
-    val (_, ownerHash) = owner.getWorkchainAndHash();
-    val (_, walletHash) = wallet.getWorkchainAndHash();
-    expect(ownerHash >> (256 - SHARD_DEPTH)).toEqual(walletHash >> (256 - SHARD_DEPTH));
-}
 
 get fun `test admin: deploy should create minter without bounce`() {
     val deployer = testing.treasury("deployer-manual-deploy");
@@ -430,4 +414,22 @@ get fun `test shard: wallet address should keep owner shard prefix in get/discov
 
         prefix += 1;
     }
+}
+
+fun extractUriString(contentCell: cell): string? {
+    val metadata = OnchainMetadataReply.fromCell(contentCell);
+    val uriCell = metadata.contentDict.get("uri".sha256());
+    if (!uriCell.isFound) {
+        return null;
+    }
+    val prefixed = uriCell.loadValue();
+    var s = (prefixed as unknown as cell).beginParse();
+    s.loadUint(8);
+    return s.loadString();
+}
+
+fun assertSameShardPrefix(owner: address, wallet: address) {
+    val (_, ownerHash) = owner.getWorkchainAndHash();
+    val (_, walletHash) = wallet.getWorkchainAndHash();
+    expect(ownerHash >> (256 - SHARD_DEPTH)).toEqual(walletHash >> (256 - SHARD_DEPTH));
 }

@@ -2,10 +2,12 @@ import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "@acton/types/transaction"
+
 import "@contracts/errors"
 import "@contracts/messages"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
 
 get fun `test wallet: owner can send jettons`() {
