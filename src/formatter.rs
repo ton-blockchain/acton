@@ -2394,7 +2394,7 @@ impl FormatterContext<'_> {
         let left_rendered = render_tuple_as_tolk_type(source_map, left, left_ty);
         let right_rendered = render_tuple_as_tolk_type(source_map, right, right_ty);
 
-        if !Self::same_compiler_ty(left_ty, right_ty) {
+        if left_ty != right_ty {
             return format!(
                 "{} != {}",
                 self.format_rendered_assert_value(&left_rendered, Some(left_ty)),
@@ -2403,10 +2403,6 @@ impl FormatterContext<'_> {
         }
 
         self.format_rendered_diff(&left_rendered, &right_rendered, Some(left_ty))
-    }
-
-    fn same_compiler_ty(left: &Ty, right: &Ty) -> bool {
-        serde_json::to_string(left).ok() == serde_json::to_string(right).ok()
     }
 
     fn format_rendered_diff(
@@ -2715,14 +2711,12 @@ impl FormatterContext<'_> {
     }
 
     const fn can_diff_inline(left: &RenderedValue, right: &RenderedValue) -> bool {
-        !matches!(
-            left,
-            RenderedValue::Struct { .. }
-                | RenderedValue::Tensor { .. }
-                | RenderedValue::ArrayOf { .. }
-                | RenderedValue::UnionCase { .. }
-        ) && !matches!(
-            right,
+        !Self::needs_block_diff(left) && !Self::needs_block_diff(right)
+    }
+
+    const fn needs_block_diff(value: &RenderedValue) -> bool {
+        matches!(
+            value,
             RenderedValue::Struct { .. }
                 | RenderedValue::Tensor { .. }
                 | RenderedValue::ArrayOf { .. }

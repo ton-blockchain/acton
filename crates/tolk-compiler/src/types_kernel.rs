@@ -4,7 +4,7 @@ use std::fmt;
 
 /// ABI type that fully reflects the type system in Tolk.
 /// Mirrors TypeScript implementation `abi-types.ts`.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "kind")]
 pub enum Ty {
     // primitives
@@ -197,7 +197,7 @@ impl fmt::Display for Ty {
 /// For binary serialization, a union should have a prefix tree,
 /// which is either defined explicitly with struct prefixes: `struct (0x12345678) CounterIncrement`,
 /// or auto-generated (implicit), e.g. `int8 | int16 | int32` is serialized as '00'+int8 / '01'+int16 / '10'+int32.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UnionVariant {
     pub variant_ty: Ty,
     pub prefix_str: String,

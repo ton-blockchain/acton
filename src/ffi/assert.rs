@@ -83,27 +83,12 @@ fn assert_bin_impl(
     if (operator == "<" || operator == ">" || operator == "<=" || operator == ">=")
         && let Some(TupleItem::Int(left_int)) = left.0.first()
         && let Some(TupleItem::Int(right_int)) = right.0.first()
-    {
-        if operator == "<" && left_int < right_int
+        && (operator == "<" && left_int < right_int
             || operator == ">" && left_int > right_int
             || operator == "<=" && left_int <= right_int
-            || operator == ">=" && left_int >= right_int
-        {
-            stack.push_bool(true);
-            return Ok(());
-        }
-
-        *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
-            operator,
-            left,
-            right,
-            left_ty,
-            right_ty,
-            source_map: ctx.env.source_map.clone(),
-            message: Some(message),
-            location: SourceLocation::parse(&location)?,
-        }));
-        stack.push_bool(false);
+            || operator == ">=" && left_int >= right_int)
+    {
+        stack.push_bool(true);
         return Ok(());
     }
 
@@ -122,13 +107,10 @@ fn assert_bin_impl(
 }
 
 pub(crate) fn rendered_values_equal(left: &RenderedValue, right: &RenderedValue) -> bool {
+    let left = visible_rendered_value(left);
+    let right = visible_rendered_value(right);
+
     match (left, right) {
-        (RenderedValue::LastSeen { inner }, right) => rendered_values_equal(inner, right),
-        (left, RenderedValue::LastSeen { inner }) => rendered_values_equal(left, inner),
-        (RenderedValue::LazyNotYetLoaded { preview }, right) => {
-            rendered_values_equal(preview, right)
-        }
-        (left, RenderedValue::LazyNotYetLoaded { preview }) => rendered_values_equal(left, preview),
         (
             RenderedValue::UnionCase {
                 variant_name: left_variant,
@@ -259,6 +241,16 @@ pub(crate) fn rendered_values_equal(left: &RenderedValue, right: &RenderedValue)
             },
         ) => left_type == right_type,
         _ => false,
+    }
+}
+
+fn visible_rendered_value(mut value: &RenderedValue) -> &RenderedValue {
+    loop {
+        match value {
+            RenderedValue::LastSeen { inner } => value = inner,
+            RenderedValue::LazyNotYetLoaded { preview } => value = preview,
+            _ => return value,
+        }
     }
 }
 
