@@ -2,13 +2,15 @@ import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "@acton/types/message"
+
 import "@contracts/messages"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
 
-get fun `test minter restores supply on internal_transfer bounce`() {
+get fun `test bounce: minter restores supply on internal_transfer bounce`() {
     val (minter, deployer, _) = setupTest();
     val supplyBefore = minter.getTotalSupply();
     val mintAmount = ton("2");
@@ -54,7 +56,7 @@ get fun `test minter restores supply on internal_transfer bounce`() {
     expect(minter.getTotalSupply()).toEqual(supplyBefore);
 }
 
-get fun `test wallet restores balance on internal_transfer bounce`() {
+get fun `test bounce: wallet restores balance on internal_transfer bounce`() {
     val (minter, deployer, notDeployer) = setupTest();
     val senderWallet = mintTo(minter, deployer, deployer.address, ton("5"));
     val balanceBefore = senderWallet.getJettonBalance();
@@ -96,7 +98,7 @@ get fun `test wallet restores balance on internal_transfer bounce`() {
     expect(senderWallet.getJettonBalance()).toEqual(balanceBefore);
 }
 
-get fun `test wallet restores balance on burn_notification bounce`() {
+get fun `test bounce: wallet restores balance on burn_notification bounce`() {
     val (minter, deployer, _) = setupTest();
     val wallet = mintTo(minter, deployer, deployer.address, ton("4"));
     val balanceBefore = wallet.getJettonBalance();

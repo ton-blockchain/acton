@@ -3,11 +3,13 @@ import "@acton/emulation/config"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
+
 import "@contracts/errors"
 import "@contracts/fees-management"
 import "@contracts/messages"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
 
 get fun `test gas: transfer minimal value edge`() {

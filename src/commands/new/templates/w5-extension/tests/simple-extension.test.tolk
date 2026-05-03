@@ -13,7 +13,7 @@ const SUBSCRIPTION_AMOUNT = ton("0.25")
 const PAYMENT_INTERVAL = 3600
 const TEST_START_TIME = 1000
 
-get fun `test simple extension installs into wallet v5`() {
+get fun `test extension: installs into wallet v5`() {
     val (wallet, _, extension) = setupInstalledExtension();
 
     val extensions = wallet.getExtensions();
@@ -29,7 +29,7 @@ get fun `test simple extension installs into wallet v5`() {
     expect(info.paymentTimeInterval).toEqual(PAYMENT_INTERVAL);
 }
 
-get fun `test simple extension collects payment from installed wallet`() {
+get fun `test extension: collects payment from installed wallet`() {
     val (wallet, _, extension) = setupInstalledExtension();
 
     val receipt = collectPayment(extension, 7)!;
@@ -48,7 +48,7 @@ get fun `test simple extension collects payment from installed wallet`() {
     expect(info.lastPaymentTime == null).toEqual(false);
 }
 
-get fun `test simple extension enforces payment interval`() {
+get fun `test extension: enforces payment interval`() {
     val (_, _, extension) = setupInstalledExtension();
 
     val firstReceipt = collectPayment(extension, 1)!;
@@ -69,7 +69,7 @@ get fun `test simple extension enforces payment interval`() {
     });
 }
 
-get fun `test admin can cancel subscription and remove extension from wallet`() {
+get fun `test admin: cancels subscription and removes extension from wallet`() {
     val (wallet, admin, extension) = setupInstalledExtension();
 
     val receipt = extension.sendCancelSubscription(admin.address, 11, { value: ton("0.1") });
