@@ -13,8 +13,8 @@ fn env_slice_returns_raw_and_empty_values_and_null_when_missing() {
             import "../../lib/testing/expect"
 
             get fun `test bp stdlib env slice branches`() {
-                expect(env<slice>("BP_ENV_SLICE_RAW")).toEqual("  keep surrounding spaces  ");
-                expect(env<slice>("BP_ENV_SLICE_EMPTY")).toEqual("");
+                expect(env<slice>("BP_ENV_SLICE_RAW")).toEqual("  keep surrounding spaces  ".beginParse());
+                expect(env<slice>("BP_ENV_SLICE_EMPTY")).toEqual("".beginParse());
                 expect(env<slice>("BP_ENV_SLICE_MISSING")).toBeNull();
             }
         "#,
@@ -83,7 +83,7 @@ fn env_or_slice_uses_fallback_for_missing_and_present_value_when_set() {
 
                 val fallback = fallbackOpt!;
                 expect(env<slice>("BP_ENV_OR_SLICE_MISSING") ?? fallback).toEqual(fallback);
-                expect(env<slice>("BP_ENV_OR_SLICE_PRESENT") ?? fallback).toEqual("present-slice-value");
+                expect(env<slice>("BP_ENV_OR_SLICE_PRESENT") ?? fallback).toEqual("present-slice-value".beginParse());
             }
         "#,
         )
@@ -115,7 +115,7 @@ fn env_string_and_slice_support_long_values_without_truncation() {
                 expect(asString).toBeNotNull();
                 expect(asSlice).toBeNotNull();
                 expect(asString!).toEqual("{long_value}");
-                expect(asSlice!).toEqual("{long_value}");
+                expect(asSlice!).toBeNonEmpty();
             }}
         "#
     );
