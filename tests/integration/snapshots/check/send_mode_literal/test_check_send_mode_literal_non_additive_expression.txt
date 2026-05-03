@@ -1,7 +1,7 @@
 warning[E012]: send mode should use SEND_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
-8 |                 deployMessage.send(1 | 2);
+8 |                 deployMessage.send(1 * 2);
   |                                    ^^^^^ numeric send mode literal is used here
   |
   = replace numeric mode literals with `SEND_MODE_*` constants

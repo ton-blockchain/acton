@@ -80,6 +80,25 @@ fn test_check_send_mode_literal_non_additive_expression() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
+                deployMessage.send(1 * 2);
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_send_mode_literal_bit_or_expression() {
+    run_simple_test(
+        "send_mode_literal",
+        r#"
+            fun onInternalMessage(in: InMessage) {
+                val deployMessage = createMessage({
+                    bounce: false,
+                    value: ton("0.1"),
+                    dest: in.senderAddress,
+                });
                 deployMessage.send(1 | 2);
             }
         "#,
@@ -118,7 +137,7 @@ fn test_check_send_mode_literal_constants_only() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         "#,
         function_name!(),
@@ -146,7 +165,7 @@ fn test_fix_send_mode_literal_single_number() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         "#,
         function_name!(),
@@ -174,7 +193,7 @@ fn test_fix_send_mode_literal_addition() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         "#,
         function_name!(),
@@ -220,6 +239,34 @@ fn test_fix_send_mode_literal_non_additive_expression() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
+                deployMessage.send(1 * 2);
+            }
+        "#,
+        r#"
+            fun onInternalMessage(in: InMessage) {
+                val deployMessage = createMessage({
+                    bounce: false,
+                    value: ton("0.1"),
+                    dest: in.senderAddress,
+                });
+                deployMessage.send(1 * 2);
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_fix_send_mode_literal_bit_or_expression() {
+    run_fix_test(
+        r#"
+            fun onInternalMessage(in: InMessage) {
+                val deployMessage = createMessage({
+                    bounce: false,
+                    value: ton("0.1"),
+                    dest: in.senderAddress,
+                });
                 deployMessage.send(1 | 2);
             }
         "#,
@@ -230,7 +277,7 @@ fn test_fix_send_mode_literal_non_additive_expression() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(1 | 2);
+                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         "#,
         function_name!(),
@@ -324,7 +371,7 @@ fn test_fix_send_mode_literal_mixed_constant_and_literal_left_const() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(SEND_MODE_IGNORE_ERRORS + SEND_MODE_PAY_FEES_SEPARATELY);
+                deployMessage.send(SEND_MODE_IGNORE_ERRORS | SEND_MODE_PAY_FEES_SEPARATELY);
             }
         "#,
         function_name!(),
@@ -352,7 +399,7 @@ fn test_fix_send_mode_literal_mixed_constant_and_literal_right_const() {
                     value: ton("0.1"),
                     dest: in.senderAddress,
                 });
-                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+                deployMessage.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         "#,
         function_name!(),
@@ -384,7 +431,7 @@ fn test_fix_send_mode_literal_send_raw_message() {
         ",
         r"
             fun onInternalMessage(_: InMessage) {
-                sendRawMessage(beginCell().endCell(), SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+                sendRawMessage(beginCell().endCell(), SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
             }
         ",
         function_name!(),

@@ -25,7 +25,7 @@ use tolk_ty::InferenceResult;
 ///
 /// Use instead:
 /// ```tolk
-/// reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST);
+/// reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]

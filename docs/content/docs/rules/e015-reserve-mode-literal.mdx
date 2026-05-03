@@ -30,7 +30,7 @@ reserveToncoinsOnBalance(ton("0.1"), 3);
 
 Use instead:
 ```tolk
-reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST);
+reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/reserve_mode_literal.rs#L30" />
