@@ -58,7 +58,15 @@ fn normalize_output_internal(
 }
 
 fn normalize_dynamic_output(content: String) -> String {
-    normalize_dynamic_mutation_output(normalize_up_snapshot_text(content))
+    normalize_dynamic_slice_output(normalize_dynamic_mutation_output(
+        normalize_up_snapshot_text(content),
+    ))
+}
+
+fn normalize_dynamic_slice_output(content: String) -> String {
+    regex!(r"slice\{[0-9a-fA-F]{64,}_?\}")
+        .replace_all(&content, "slice{[HEX]}")
+        .into_owned()
 }
 
 fn normalize_dynamic_mutation_output(content: String) -> String {

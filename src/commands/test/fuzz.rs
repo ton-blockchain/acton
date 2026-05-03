@@ -8,6 +8,7 @@ use rand::{Rng, RngCore, SeedableRng};
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
+use tolk_compiler::types_kernel::TyIdx;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
@@ -373,16 +374,20 @@ pub(super) fn attach_test_parameter_metadata(
     mut tests: Vec<TestDescriptor>,
     abi: Option<&ContractABI>,
 ) -> Vec<TestDescriptor> {
+    let Some(abi) = abi else {
+        return tests;
+    };
+
     for test in &mut tests {
-        if let Some(method) = abi.and_then(|abi| {
-            abi.get_methods
-                .iter()
-                .find(|method| method.tvm_method_id == test.id || method.name == test.name.as_ref())
-        }) {
+        if let Some(method) = abi
+            .get_methods
+            .iter()
+            .find(|method| method.tvm_method_id == test.id || method.name == test.name.as_ref())
+        {
             test.parameters = method
                 .parameters
                 .iter()
-                .map(map_compiler_parameter)
+                .map(|parameter| map_compiler_parameter(abi, parameter))
                 .collect();
         }
     }
@@ -390,15 +395,18 @@ pub(super) fn attach_test_parameter_metadata(
     tests
 }
 
-fn map_compiler_parameter(parameter: &ABIFunctionParameter) -> FuzzParameter {
+fn map_compiler_parameter(abi: &ContractABI, parameter: &ABIFunctionParameter) -> FuzzParameter {
     FuzzParameter {
         name: parameter.name.clone(),
-        type_name: parameter.ty.render_type(),
-        kind: map_compiler_type(&parameter.ty),
+        type_name: abi.render_type(parameter.ty_idx),
+        kind: map_compiler_type(abi, parameter.ty_idx),
     }
 }
 
-fn map_compiler_type(ty: &Ty) -> FuzzParameterKind {
+fn map_compiler_type(abi: &ContractABI, ty_idx: TyIdx) -> FuzzParameterKind {
+    let Some(ty) = abi.ty_by_idx(ty_idx) else {
+        return FuzzParameterKind::Unsupported;
+    };
     match ty {
         Ty::Int => FuzzParameterKind::Int {
             signed: true,
@@ -435,7 +443,7 @@ fn map_compiler_type(ty: &Ty) -> FuzzParameterKind {
         Ty::Address => FuzzParameterKind::Address,
         Ty::AddressAny => FuzzParameterKind::AnyAddress,
         Ty::AddressOpt => FuzzParameterKind::Nullable(Box::new(FuzzParameterKind::Address)),
-        Ty::Nullable { inner, .. } => match map_compiler_type(inner) {
+        Ty::Nullable { inner_ty_idx, .. } => match map_compiler_type(abi, *inner_ty_idx) {
             FuzzParameterKind::Unsupported => FuzzParameterKind::Unsupported,
             inner => FuzzParameterKind::Nullable(Box::new(inner)),
         },

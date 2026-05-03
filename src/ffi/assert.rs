@@ -3,10 +3,9 @@ use crate::context::{
     TransactionGenericAssertFailure, TransactionNotFoundParams, WalletNotFoundFailure,
 };
 use acton_debug::{RenderedValue, render_tuple_as_tolk_type};
-use anyhow::Context as ErrorContext;
+use anyhow::{Context as ErrorContext, anyhow};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use tolk_compiler::abi::Ty;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_source_map::SourceLocation;
@@ -45,7 +44,7 @@ fn assume_reject_impl(
     Ok(())
 }
 
-extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_ty_json: String, left: Tuple, left_ty_json: String, operator: String) using assert_bin_impl);
+extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_ty_idx: BigInt, left: Tuple, left_ty_idx: BigInt, operator: String) using assert_bin_impl);
 #[allow(clippy::too_many_arguments)]
 fn assert_bin_impl(
     ctx: &mut Context,
@@ -53,21 +52,24 @@ fn assert_bin_impl(
     location: String,
     message: String,
     right: Tuple,
-    right_ty_json: String,
+    right_ty_idx: BigInt,
     left: Tuple,
-    left_ty_json: String,
+    left_ty_idx: BigInt,
     operator: String,
 ) -> anyhow::Result<()> {
     let left = left.unwrap_single();
     let right = right.unwrap_single();
-    let left_ty: Ty = serde_json::from_str(&left_ty_json)?;
-    let right_ty: Ty = serde_json::from_str(&right_ty_json)?;
+    let source_map = ctx.env.source_map.clone();
+    let left_ty_idx = left_ty_idx
+        .to_usize()
+        .ok_or_else(|| anyhow!("ty_idx=`{left_ty_idx}` does not fit into usize"))?;
+    let right_ty_idx = right_ty_idx
+        .to_usize()
+        .ok_or_else(|| anyhow!("ty_idx=`{right_ty_idx}` does not fit into usize"))?;
 
     if operator == "==" || operator == "!=" {
-        let source_map = &ctx.env.source_map;
-
-        let left_rendered = render_tuple_as_tolk_type(source_map, &left, &left_ty);
-        let right_rendered = render_tuple_as_tolk_type(source_map, &right, &right_ty);
+        let left_rendered = render_tuple_as_tolk_type(&source_map, &left, left_ty_idx);
+        let right_rendered = render_tuple_as_tolk_type(&source_map, &right, right_ty_idx);
         let values_equal = rendered_values_equal(&left_rendered, &right_rendered);
 
         if operator == "==" && values_equal {
@@ -96,9 +98,9 @@ fn assert_bin_impl(
         operator,
         left,
         right,
-        left_ty,
-        right_ty,
-        source_map: ctx.env.source_map.clone(),
+        left_ty_idx,
+        right_ty_idx,
+        source_map,
         message: Some(message),
         location: SourceLocation::parse(&location)?,
     }));

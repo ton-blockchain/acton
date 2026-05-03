@@ -1,6 +1,7 @@
 {
   "abi": {
     "abi_schema_version": "1.0",
+    "alias_instantiations": [],
     "compiler_name": "tolk",
     "compiler_version": "1.3.0",
     "contract_name": "",
@@ -11,11 +12,55 @@
     "incoming_messages": [],
     "outgoing_messages": [],
     "storage": {},
-    "thrown_errors": []
+    "struct_instantiations": [],
+    "thrown_errors": [],
+    "unique_types": [
+      {
+        "kind": "void"
+      },
+      {
+        "kind": "int"
+      },
+      {
+        "kind": "slice"
+      },
+      {
+        "kind": "cell"
+      },
+      {
+        "kind": "builder"
+      },
+      {
+        "kind": "bool"
+      },
+      {
+        "kind": "coins"
+      },
+      {
+        "kind": "address"
+      },
+      {
+        "kind": "intN",
+        "n": 32
+      },
+      {
+        "kind": "uintN",
+        "n": 32
+      },
+      {
+        "kind": "intN",
+        "n": 64
+      },
+      {
+        "kind": "uintN",
+        "n": 64
+      }
+    ]
   },
   "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
   "name": "simple",
   "source_map": {
+    "alias_instantiations": [],
     "debug_marks": [],
     "declarations": [],
     "files": [
@@ -67,82 +112,47 @@
         "return_ty_idx": 0
       }
     ],
-    "unique_ty": [
+    "struct_instantiations": [],
+    "unique_types": [
       {
-        "ty": {
-          "kind": "void"
-        },
-        "ty_idx": 0
+        "kind": "void"
       },
       {
-        "ty": {
-          "kind": "int"
-        },
-        "ty_idx": 1
+        "kind": "int"
       },
       {
-        "ty": {
-          "kind": "slice"
-        },
-        "ty_idx": 2
+        "kind": "slice"
       },
       {
-        "ty": {
-          "kind": "cell"
-        },
-        "ty_idx": 3
+        "kind": "cell"
       },
       {
-        "ty": {
-          "kind": "builder"
-        },
-        "ty_idx": 4
+        "kind": "builder"
       },
       {
-        "ty": {
-          "kind": "bool"
-        },
-        "ty_idx": 5
+        "kind": "bool"
       },
       {
-        "ty": {
-          "kind": "coins"
-        },
-        "ty_idx": 6
+        "kind": "coins"
       },
       {
-        "ty": {
-          "kind": "address"
-        },
-        "ty_idx": 7
+        "kind": "address"
       },
       {
-        "ty": {
-          "kind": "intN",
-          "n": 32
-        },
-        "ty_idx": 8
+        "kind": "intN",
+        "n": 32
       },
       {
-        "ty": {
-          "kind": "uintN",
-          "n": 32
-        },
-        "ty_idx": 9
+        "kind": "uintN",
+        "n": 32
       },
       {
-        "ty": {
-          "kind": "intN",
-          "n": 64
-        },
-        "ty_idx": 10
+        "kind": "intN",
+        "n": 64
       },
       {
-        "ty": {
-          "kind": "uintN",
-          "n": 64
-        },
-        "ty_idx": 11
+        "kind": "uintN",
+        "n": 64
       }
     ]
   }

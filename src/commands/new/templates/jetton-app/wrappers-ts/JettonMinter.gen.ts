@@ -257,54 +257,39 @@ export const InternalTransferStep = {
 }
 
 /**
- > struct (0x642b7d07) MintNewJettons {
+ > struct (0xd53276db) ReturnExcessesBack {
  >     queryId: uint64
- >     mintRecipient: address
- >     tonAmount: coins
- >     internalTransferMsg: Cell<InternalTransferStep>
  > }
  */
-export interface MintNewJettons {
-    readonly $: 'MintNewJettons'
+export interface ReturnExcessesBack {
+    readonly $: 'ReturnExcessesBack'
     queryId: uint64
-    mintRecipient: c.Address
-    tonAmount: coins
-    internalTransferMsg: CellRef<InternalTransferStep>
 }
 
-export const MintNewJettons = {
-    PREFIX: 0x642b7d07,
+export const ReturnExcessesBack = {
+    PREFIX: 0xd53276db,
 
     create(args: {
         queryId: uint64
-        mintRecipient: c.Address
-        tonAmount: coins
-        internalTransferMsg: CellRef<InternalTransferStep>
-    }): MintNewJettons {
+    }): ReturnExcessesBack {
         return {
-            $: 'MintNewJettons',
+            $: 'ReturnExcessesBack',
             ...args
         }
     },
-    fromSlice(s: c.Slice): MintNewJettons {
-        loadAndCheckPrefix32(s, 0x642b7d07, 'MintNewJettons');
+    fromSlice(s: c.Slice): ReturnExcessesBack {
+        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
         return {
-            $: 'MintNewJettons',
+            $: 'ReturnExcessesBack',
             queryId: s.loadUintBig(64),
-            mintRecipient: s.loadAddress(),
-            tonAmount: s.loadCoins(),
-            internalTransferMsg: loadCellRef<InternalTransferStep>(s, InternalTransferStep.fromSlice),
         }
     },
-    store(self: MintNewJettons, b: c.Builder): void {
-        b.storeUint(0x642b7d07, 32);
+    store(self: ReturnExcessesBack, b: c.Builder): void {
+        b.storeUint(0xd53276db, 32);
         b.storeUint(self.queryId, 64);
-        b.storeAddress(self.mintRecipient);
-        b.storeCoins(self.tonAmount);
-        storeCellRef<InternalTransferStep>(self.internalTransferMsg, b, InternalTransferStep.store);
     },
-    toCell(self: MintNewJettons): c.Cell {
-        return makeCellFrom<MintNewJettons>(self, MintNewJettons.store);
+    toCell(self: ReturnExcessesBack): c.Cell {
+        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
     }
 }
 
@@ -404,6 +389,111 @@ export const RequestWalletAddress = {
     },
     toCell(self: RequestWalletAddress): c.Cell {
         return makeCellFrom<RequestWalletAddress>(self, RequestWalletAddress.store);
+    }
+}
+
+/**
+ > struct (0xd1735400) ResponseWalletAddress {
+ >     queryId: uint64
+ >     jettonWalletAddress: address?
+ >     ownerAddress: Cell<address>?
+ > }
+ */
+export interface ResponseWalletAddress {
+    readonly $: 'ResponseWalletAddress'
+    queryId: uint64
+    jettonWalletAddress: c.Address | null
+    ownerAddress: CellRef<c.Address> | null
+}
+
+export const ResponseWalletAddress = {
+    PREFIX: 0xd1735400,
+
+    create(args: {
+        queryId: uint64
+        jettonWalletAddress: c.Address | null
+        ownerAddress: CellRef<c.Address> | null
+    }): ResponseWalletAddress {
+        return {
+            $: 'ResponseWalletAddress',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ResponseWalletAddress {
+        loadAndCheckPrefix32(s, 0xd1735400, 'ResponseWalletAddress');
+        return {
+            $: 'ResponseWalletAddress',
+            queryId: s.loadUintBig(64),
+            jettonWalletAddress: s.loadMaybeAddress(),
+            ownerAddress: s.loadBoolean() ? loadCellRef<c.Address>(s,
+                (s) => s.loadAddress()
+            ) : null,
+        }
+    },
+    store(self: ResponseWalletAddress, b: c.Builder): void {
+        b.storeUint(0xd1735400, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeAddress(self.jettonWalletAddress);
+        storeTolkNullable<CellRef<c.Address>>(self.ownerAddress, b,
+            (v,b) => { storeCellRef<c.Address>(v, b,
+                (v,b) => b.storeAddress(v)
+            ); }
+        );
+    },
+    toCell(self: ResponseWalletAddress): c.Cell {
+        return makeCellFrom<ResponseWalletAddress>(self, ResponseWalletAddress.store);
+    }
+}
+
+/**
+ > struct (0x642b7d07) MintNewJettons {
+ >     queryId: uint64
+ >     mintRecipient: address
+ >     tonAmount: coins
+ >     internalTransferMsg: Cell<InternalTransferStep>
+ > }
+ */
+export interface MintNewJettons {
+    readonly $: 'MintNewJettons'
+    queryId: uint64
+    mintRecipient: c.Address
+    tonAmount: coins
+    internalTransferMsg: CellRef<InternalTransferStep>
+}
+
+export const MintNewJettons = {
+    PREFIX: 0x642b7d07,
+
+    create(args: {
+        queryId: uint64
+        mintRecipient: c.Address
+        tonAmount: coins
+        internalTransferMsg: CellRef<InternalTransferStep>
+    }): MintNewJettons {
+        return {
+            $: 'MintNewJettons',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): MintNewJettons {
+        loadAndCheckPrefix32(s, 0x642b7d07, 'MintNewJettons');
+        return {
+            $: 'MintNewJettons',
+            queryId: s.loadUintBig(64),
+            mintRecipient: s.loadAddress(),
+            tonAmount: s.loadCoins(),
+            internalTransferMsg: loadCellRef<InternalTransferStep>(s, InternalTransferStep.fromSlice),
+        }
+    },
+    store(self: MintNewJettons, b: c.Builder): void {
+        b.storeUint(0x642b7d07, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeAddress(self.mintRecipient);
+        b.storeCoins(self.tonAmount);
+        storeCellRef<InternalTransferStep>(self.internalTransferMsg, b, InternalTransferStep.store);
+    },
+    toCell(self: MintNewJettons): c.Cell {
+        return makeCellFrom<MintNewJettons>(self, MintNewJettons.store);
     }
 }
 
@@ -524,48 +614,6 @@ export const DropMinterAdmin = {
 }
 
 /**
- > struct (0xcb862902) ChangeMinterMetadata {
- >     queryId: uint64
- >     newMetadata: cell
- > }
- */
-export interface ChangeMinterMetadata {
-    readonly $: 'ChangeMinterMetadata'
-    queryId: uint64
-    newMetadata: c.Cell
-}
-
-export const ChangeMinterMetadata = {
-    PREFIX: 0xcb862902,
-
-    create(args: {
-        queryId: uint64
-        newMetadata: c.Cell
-    }): ChangeMinterMetadata {
-        return {
-            $: 'ChangeMinterMetadata',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ChangeMinterMetadata {
-        loadAndCheckPrefix32(s, 0xcb862902, 'ChangeMinterMetadata');
-        return {
-            $: 'ChangeMinterMetadata',
-            queryId: s.loadUintBig(64),
-            newMetadata: s.loadRef(),
-        }
-    },
-    store(self: ChangeMinterMetadata, b: c.Builder): void {
-        b.storeUint(0xcb862902, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeRef(self.newMetadata);
-    },
-    toCell(self: ChangeMinterMetadata): c.Cell {
-        return makeCellFrom<ChangeMinterMetadata>(self, ChangeMinterMetadata.store);
-    }
-}
-
-/**
  > struct (0x2508d66a) UpgradeMinterCode {
  >     queryId: uint64
  >     newData: cell
@@ -609,6 +657,48 @@ export const UpgradeMinterCode = {
     },
     toCell(self: UpgradeMinterCode): c.Cell {
         return makeCellFrom<UpgradeMinterCode>(self, UpgradeMinterCode.store);
+    }
+}
+
+/**
+ > struct (0xcb862902) ChangeMinterMetadata {
+ >     queryId: uint64
+ >     newMetadata: cell
+ > }
+ */
+export interface ChangeMinterMetadata {
+    readonly $: 'ChangeMinterMetadata'
+    queryId: uint64
+    newMetadata: c.Cell
+}
+
+export const ChangeMinterMetadata = {
+    PREFIX: 0xcb862902,
+
+    create(args: {
+        queryId: uint64
+        newMetadata: c.Cell
+    }): ChangeMinterMetadata {
+        return {
+            $: 'ChangeMinterMetadata',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ChangeMinterMetadata {
+        loadAndCheckPrefix32(s, 0xcb862902, 'ChangeMinterMetadata');
+        return {
+            $: 'ChangeMinterMetadata',
+            queryId: s.loadUintBig(64),
+            newMetadata: s.loadRef(),
+        }
+    },
+    store(self: ChangeMinterMetadata, b: c.Builder): void {
+        b.storeUint(0xcb862902, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeRef(self.newMetadata);
+    },
+    toCell(self: ChangeMinterMetadata): c.Cell {
+        return makeCellFrom<ChangeMinterMetadata>(self, ChangeMinterMetadata.store);
     }
 }
 
@@ -691,109 +781,44 @@ export const MinterStorage = {
 }
 
 /**
- > struct (0xd53276db) ReturnExcessesBack {
- >     queryId: uint64
+ > struct JettonDataReply {
+ >     totalSupply: int
+ >     mintable: bool
+ >     adminAddress: address?
+ >     jettonContent: Cell<OnchainMetadataReply>
+ >     jettonWalletCode: cell
  > }
  */
-export interface ReturnExcessesBack {
-    readonly $: 'ReturnExcessesBack'
-    queryId: uint64
+export interface JettonDataReply {
+    readonly $: 'JettonDataReply'
+    totalSupply: bigint
+    mintable: boolean
+    adminAddress: c.Address | null
+    jettonContent: CellRef<OnchainMetadataReply>
+    jettonWalletCode: c.Cell
 }
 
-export const ReturnExcessesBack = {
-    PREFIX: 0xd53276db,
-
+export const JettonDataReply = {
     create(args: {
-        queryId: uint64
-    }): ReturnExcessesBack {
+        totalSupply: bigint
+        mintable: boolean
+        adminAddress: c.Address | null
+        jettonContent: CellRef<OnchainMetadataReply>
+        jettonWalletCode: c.Cell
+    }): JettonDataReply {
         return {
-            $: 'ReturnExcessesBack',
+            $: 'JettonDataReply',
             ...args
         }
     },
-    fromSlice(s: c.Slice): ReturnExcessesBack {
-        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
-        return {
-            $: 'ReturnExcessesBack',
-            queryId: s.loadUintBig(64),
-        }
+    fromSlice(s: c.Slice): JettonDataReply {
+        throw new Error(`Can't unpack 'JettonDataReply' from cell, because 'JettonDataReply.totalSupply' is 'int' (not int32/uint64/etc.)`);
     },
-    store(self: ReturnExcessesBack, b: c.Builder): void {
-        b.storeUint(0xd53276db, 32);
-        b.storeUint(self.queryId, 64);
+    store(self: JettonDataReply, b: c.Builder): void {
+        throw new Error(`Can't pack 'JettonDataReply' to cell, because 'self.totalSupply' is 'int' (not int32/uint64/etc.)`);
     },
-    toCell(self: ReturnExcessesBack): c.Cell {
-        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
-    }
-}
-
-/**
- > struct (0xd1735400) ResponseWalletAddress {
- >     queryId: uint64
- >     jettonWalletAddress: address?
- >     ownerAddress: Cell<address>?
- > }
- */
-export interface ResponseWalletAddress {
-    readonly $: 'ResponseWalletAddress'
-    queryId: uint64
-    jettonWalletAddress: c.Address | null
-    ownerAddress: CellRef<c.Address> | null
-}
-
-export const ResponseWalletAddress = {
-    PREFIX: 0xd1735400,
-
-    create(args: {
-        queryId: uint64
-        jettonWalletAddress: c.Address | null
-        ownerAddress: CellRef<c.Address> | null
-    }): ResponseWalletAddress {
-        return {
-            $: 'ResponseWalletAddress',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ResponseWalletAddress {
-        loadAndCheckPrefix32(s, 0xd1735400, 'ResponseWalletAddress');
-        return {
-            $: 'ResponseWalletAddress',
-            queryId: s.loadUintBig(64),
-            jettonWalletAddress: s.loadMaybeAddress(),
-            ownerAddress: s.loadBoolean() ? loadCellRef<c.Address>(s,
-                (s) => s.loadAddress()
-            ) : null,
-        }
-    },
-    store(self: ResponseWalletAddress, b: c.Builder): void {
-        b.storeUint(0xd1735400, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeAddress(self.jettonWalletAddress);
-        storeTolkNullable<CellRef<c.Address>>(self.ownerAddress, b,
-            (v,b) => { storeCellRef<c.Address>(v, b,
-                (v,b) => b.storeAddress(v)
-            ); }
-        );
-    },
-    toCell(self: ResponseWalletAddress): c.Cell {
-        return makeCellFrom<ResponseWalletAddress>(self, ResponseWalletAddress.store);
-    }
-}
-
-/**
- > type string_prefixed0x = string
- */
-export type string_prefixed0x = string
-
-export const string_prefixed0x = {
-    fromSlice(s: c.Slice): string_prefixed0x {
-        return s.loadStringRefTail();
-    },
-    store(self: string_prefixed0x, b: c.Builder): void {
-        b.storeStringRefTail(self);
-    },
-    toCell(self: string_prefixed0x): c.Cell {
-        return makeCellFrom<string_prefixed0x>(self, string_prefixed0x.store);
+    toCell(self: JettonDataReply): c.Cell {
+        return makeCellFrom<JettonDataReply>(self, JettonDataReply.store);
     }
 }
 
@@ -835,44 +860,19 @@ export const OnchainMetadataReply = {
 }
 
 /**
- > struct JettonDataReply {
- >     totalSupply: int
- >     mintable: bool
- >     adminAddress: address?
- >     jettonContent: Cell<OnchainMetadataReply>
- >     jettonWalletCode: cell
- > }
+ > type string_prefixed0x = string
  */
-export interface JettonDataReply {
-    readonly $: 'JettonDataReply'
-    totalSupply: bigint
-    mintable: boolean
-    adminAddress: c.Address | null
-    jettonContent: CellRef<OnchainMetadataReply>
-    jettonWalletCode: c.Cell
-}
+export type string_prefixed0x = string
 
-export const JettonDataReply = {
-    create(args: {
-        totalSupply: bigint
-        mintable: boolean
-        adminAddress: c.Address | null
-        jettonContent: CellRef<OnchainMetadataReply>
-        jettonWalletCode: c.Cell
-    }): JettonDataReply {
-        return {
-            $: 'JettonDataReply',
-            ...args
-        }
+export const string_prefixed0x = {
+    fromSlice(s: c.Slice): string_prefixed0x {
+        return s.loadStringRefTail();
     },
-    fromSlice(s: c.Slice): JettonDataReply {
-        throw new Error(`Can't unpack 'JettonDataReply' from cell, because 'JettonDataReply.totalSupply' is 'int' (not int32/uint64/etc.)`);
+    store(self: string_prefixed0x, b: c.Builder): void {
+        b.storeStringRefTail(self);
     },
-    store(self: JettonDataReply, b: c.Builder): void {
-        throw new Error(`Can't pack 'JettonDataReply' to cell, because 'self.totalSupply' is 'int' (not int32/uint64/etc.)`);
-    },
-    toCell(self: JettonDataReply): c.Cell {
-        return makeCellFrom<JettonDataReply>(self, JettonDataReply.store);
+    toCell(self: string_prefixed0x): c.Cell {
+        return makeCellFrom<string_prefixed0x>(self, string_prefixed0x.store);
     }
 }
 

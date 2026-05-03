@@ -126,43 +126,6 @@ type uint32 = bigint
 type uint256 = bigint
 
 /**
- > struct (0x2ce05111) ChangeOwner {
- >     newOwner: address
- > }
- */
-export interface ChangeOwner {
-    readonly $: 'ChangeOwner'
-    newOwner: c.Address
-}
-
-export const ChangeOwner = {
-    PREFIX: 0x2ce05111,
-
-    create(args: {
-        newOwner: c.Address
-    }): ChangeOwner {
-        return {
-            $: 'ChangeOwner',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ChangeOwner {
-        loadAndCheckPrefix32(s, 0x2ce05111, 'ChangeOwner');
-        return {
-            $: 'ChangeOwner',
-            newOwner: s.loadAddress(),
-        }
-    },
-    store(self: ChangeOwner, b: c.Builder): void {
-        b.storeUint(0x2ce05111, 32);
-        b.storeAddress(self.newOwner);
-    },
-    toCell(self: ChangeOwner): c.Cell {
-        return makeCellFrom<ChangeOwner>(self, ChangeOwner.store);
-    }
-}
-
-/**
  > type AllowedMessage = ChangeOwner
  */
 export type AllowedMessage = ChangeOwner
@@ -209,6 +172,43 @@ export const Storage = {
     },
     toCell(self: Storage): c.Cell {
         return makeCellFrom<Storage>(self, Storage.store);
+    }
+}
+
+/**
+ > struct (0x2ce05111) ChangeOwner {
+ >     newOwner: address
+ > }
+ */
+export interface ChangeOwner {
+    readonly $: 'ChangeOwner'
+    newOwner: c.Address
+}
+
+export const ChangeOwner = {
+    PREFIX: 0x2ce05111,
+
+    create(args: {
+        newOwner: c.Address
+    }): ChangeOwner {
+        return {
+            $: 'ChangeOwner',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ChangeOwner {
+        loadAndCheckPrefix32(s, 0x2ce05111, 'ChangeOwner');
+        return {
+            $: 'ChangeOwner',
+            newOwner: s.loadAddress(),
+        }
+    },
+    store(self: ChangeOwner, b: c.Builder): void {
+        b.storeUint(0x2ce05111, 32);
+        b.storeAddress(self.newOwner);
+    },
+    toCell(self: ChangeOwner): c.Cell {
+        return makeCellFrom<ChangeOwner>(self, ChangeOwner.store);
     }
 }
 

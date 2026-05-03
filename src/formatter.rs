@@ -24,6 +24,7 @@ use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIDeclaration, ContractABI, Ty};
 use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
+use tolk_compiler::types_kernel::TyIdx;
 use ton_api::Network;
 use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -974,8 +975,10 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         let abi = build.abi.as_ref()?;
         self.try_decode_message_body_types(
             in_msg.body,
-            build.source_map.as_ref(),
-            abi.incoming_external.iter().map(|message| &message.body_ty),
+            abi,
+            abi.incoming_external
+                .iter()
+                .map(|message| message.body_ty_idx),
             0,
         )
     }
@@ -989,8 +992,8 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         let abi = build.abi.as_ref()?;
         self.try_decode_message_body_types(
             msg.body,
-            build.source_map.as_ref(),
-            abi.emitted_events.iter().map(|message| &message.body_ty),
+            abi,
+            abi.emitted_events.iter().map(|message| message.body_ty_idx),
             0,
         )
     }
@@ -1066,8 +1069,8 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             let candidates = Self::compiler_message_candidates(abi, direction, opcode);
             if let Some(decoded) = self.try_decode_message_body_types(
                 body,
-                build.source_map.as_ref(),
-                candidates.iter(),
+                abi,
+                candidates,
                 if bounced { 32 } else { 0 },
             ) {
                 return Some(decoded);
@@ -1081,7 +1084,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         abi: &ContractABI,
         direction: MessageBodyDirection,
         opcode: Option<u32>,
-    ) -> Vec<Ty> {
+    ) -> Vec<TyIdx> {
         let mut candidates = Vec::new();
         let mut seen = HashSet::new();
 
@@ -1091,7 +1094,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                     Self::push_compiler_message_candidate(
                         &mut candidates,
                         &mut seen,
-                        message.body_ty.clone(),
+                        message.body_ty_idx,
                     );
                 }
             }
@@ -1100,7 +1103,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                     Self::push_compiler_message_candidate(
                         &mut candidates,
                         &mut seen,
-                        message.body_ty.clone(),
+                        message.body_ty_idx,
                     );
                 }
             }
@@ -1114,21 +1117,22 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     }
 
     fn push_compiler_message_candidate(
-        candidates: &mut Vec<Ty>,
-        seen: &mut HashSet<String>,
-        candidate: Ty,
+        candidates: &mut Vec<TyIdx>,
+        seen: &mut HashSet<TyIdx>,
+        candidate: TyIdx,
     ) {
-        if seen.insert(Self::compiler_body_type_key(&candidate)) {
+        if seen.insert(candidate) {
             candidates.push(candidate);
         }
     }
 
-    fn declaration_message_candidates(abi: &ContractABI, opcode: Option<u32>) -> Vec<(u8, Ty)> {
+    fn declaration_message_candidates(abi: &ContractABI, opcode: Option<u32>) -> Vec<(u8, TyIdx)> {
         let mut candidates = Vec::new();
         for declaration in &abi.declarations {
             match declaration {
                 ABIDeclaration::Struct {
-                    name,
+                    name: _,
+                    ty_idx,
                     type_params,
                     prefix,
                     ..
@@ -1142,8 +1146,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
                     let matches_opcode = opcode.is_some_and(|opcode| {
                         prefix.as_ref().is_some_and(|prefix| {
-                            prefix.prefix_len == 32
-                                && Self::parse_abi_prefix_number(&prefix.prefix_str) == Some(opcode)
+                            prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
                         })
                     });
                     let priority = if matches_opcode {
@@ -1153,16 +1156,12 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                     } else {
                         2
                     };
-                    candidates.push((
-                        priority,
-                        Ty::StructRef {
-                            struct_name: name.clone(),
-                            type_args: None,
-                        },
-                    ));
+                    candidates.push((priority, *ty_idx));
                 }
                 ABIDeclaration::Alias {
-                    name, type_params, ..
+                    ty_idx,
+                    type_params,
+                    ..
                 } => {
                     if type_params
                         .as_ref()
@@ -1171,42 +1170,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
                         continue;
                     }
 
-                    candidates.push((
-                        3,
-                        Ty::AliasRef {
-                            alias_name: name.clone(),
-                            type_args: None,
-                        },
-                    ));
+                    candidates.push((3, *ty_idx));
                 }
-                ABIDeclaration::Enum { name, .. } => {
-                    candidates.push((
-                        4,
-                        Ty::EnumRef {
-                            enum_name: name.clone(),
-                        },
-                    ));
+                ABIDeclaration::Enum { ty_idx, .. } => {
+                    candidates.push((4, *ty_idx));
                 }
             }
         }
         candidates.sort_by_key(|(priority, _)| *priority);
         candidates
-    }
-
-    fn parse_abi_prefix_number(prefix: &str) -> Option<u32> {
-        let prefix = prefix.trim();
-        if prefix.is_empty() {
-            return None;
-        }
-        let parsed = if let Some(hex) = prefix
-            .strip_prefix("0x")
-            .or_else(|| prefix.strip_prefix("0X"))
-        {
-            u64::from_str_radix(hex, 16).ok()?
-        } else {
-            prefix.parse::<u64>().ok()?
-        };
-        u32::try_from(parsed).ok()
     }
 
     fn opcode_after_bounce_prefix(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
@@ -1217,23 +1189,24 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         parser.load_u32().ok()
     }
 
-    fn try_decode_message_body_types<'ty, I>(
+    fn try_decode_message_body_types<I>(
         &self,
         body: CellSlice<'_>,
-        symbols: &SourceMap,
+        abi: &ContractABI,
         candidates: I,
         prefix_to_skip: u16,
     ) -> Option<DecodedMessageBody>
     where
-        I: IntoIterator<Item = &'ty Ty>,
+        I: IntoIterator<Item = TyIdx>,
     {
-        for body_ty in candidates {
+        for body_ty_idx in candidates {
             let mut parser = body;
             if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
                 continue;
             }
 
-            let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, symbols, body_ty) else {
+            let Ok(data) = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, body_ty_idx)
+            else {
                 continue;
             };
             if parser.size_bits() != 0 || parser.size_refs() != 0 {
@@ -1241,7 +1214,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             }
 
             return Some(DecodedMessageBody {
-                name: Self::compiler_body_type_name(body_ty),
+                name: Self::compiler_body_type_name(abi, body_ty_idx),
                 data,
             });
         }
@@ -1249,21 +1222,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         None
     }
 
-    fn compiler_body_type_name(body_ty: &Ty) -> String {
-        match body_ty {
-            Ty::StructRef { struct_name, .. } => struct_name.clone(),
-            Ty::AliasRef { alias_name, .. } => alias_name.clone(),
-            Ty::EnumRef { enum_name } => enum_name.clone(),
-            _ => body_ty.render_type(),
-        }
-    }
-
-    fn compiler_body_type_key(body_ty: &Ty) -> String {
-        match body_ty {
-            Ty::StructRef { struct_name, .. } => format!("StructRef:{struct_name}"),
-            Ty::AliasRef { alias_name, .. } => format!("AliasRef:{alias_name}"),
-            Ty::EnumRef { enum_name } => format!("EnumRef:{enum_name}"),
-            _ => body_ty.render_type(),
+    fn compiler_body_type_name(abi: &ContractABI, body_ty_idx: TyIdx) -> String {
+        match abi.ty_by_idx(body_ty_idx) {
+            Some(body_ty) => match body_ty {
+                Ty::StructRef { struct_name, .. } => struct_name.clone(),
+                Ty::AliasRef { alias_name, .. } => alias_name.clone(),
+                Ty::EnumRef { enum_name } => enum_name.clone(),
+                _ => abi.render_type(body_ty_idx),
+            },
+            None => format!("ty#{body_ty_idx}"),
         }
     }
 
@@ -2269,12 +2236,15 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
     pub fn format_tuple_value(
         &self,
         tuple: &Tuple,
-        ty: &Ty,
+        ty_idx: TyIdx,
         source_map: &SourceMap,
         indent: usize,
     ) -> String {
-        let rendered = render_tuple_as_tolk_type(source_map, tuple, ty);
-        let formatted = self.format_rendered_assert_value(&rendered, Some(ty));
+        let rendered = self.render_assert_value(tuple, ty_idx, source_map);
+        let formatted = self.format_rendered_assert_value(
+            &rendered,
+            Self::is_string_like_ty_idx(source_map, ty_idx),
+        );
 
         if !formatted.contains('\n') {
             // Fast path for values with single line
@@ -2287,25 +2257,30 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         result
     }
 
+    fn render_assert_value(
+        &self,
+        tuple: &Tuple,
+        ty_idx: TyIdx,
+        source_map: &SourceMap,
+    ) -> RenderedValue {
+        render_tuple_as_tolk_type(source_map, tuple, ty_idx)
+    }
+
     fn format_rendered_assert_value(
         &self,
         value: &RenderedValue,
-        top_level_ty: Option<&Ty>,
+        top_level_is_string: bool,
     ) -> String {
         let formatted = value.to_pretty_string(self.pretty_render_options());
-        if top_level_ty.is_some_and(Self::is_string_like_ty) {
+        if top_level_is_string {
             Self::strip_top_level_string_quotes(formatted)
         } else {
             formatted
         }
     }
 
-    fn is_string_like_ty(ty: &Ty) -> bool {
-        match ty {
-            Ty::String => true,
-            Ty::Nullable { inner, .. } => Self::is_string_like_ty(inner),
-            _ => false,
-        }
+    fn is_string_like_ty_idx(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
+        matches!(source_map.ty_by_idx(ty_idx), Some(Ty::String))
     }
 
     fn strip_top_level_string_quotes(formatted: String) -> String {
@@ -2387,32 +2362,39 @@ impl FormatterContext<'_> {
         &self,
         left: &Tuple,
         right: &Tuple,
-        left_ty: &Ty,
-        right_ty: &Ty,
+        left_ty_idx: TyIdx,
+        right_ty_idx: TyIdx,
         source_map: &SourceMap,
     ) -> String {
-        let left_rendered = render_tuple_as_tolk_type(source_map, left, left_ty);
-        let right_rendered = render_tuple_as_tolk_type(source_map, right, right_ty);
+        let left_rendered = self.render_assert_value(left, left_ty_idx, source_map);
+        let right_rendered = self.render_assert_value(right, right_ty_idx, source_map);
+        let left_is_string = Self::is_string_like_ty_idx(source_map, left_ty_idx);
+        let right_is_string = Self::is_string_like_ty_idx(source_map, right_ty_idx);
 
-        if left_ty != right_ty {
+        if left_ty_idx != right_ty_idx {
             return format!(
                 "{} != {}",
-                self.format_rendered_assert_value(&left_rendered, Some(left_ty)),
-                self.format_rendered_assert_value(&right_rendered, Some(right_ty))
+                self.format_rendered_assert_value(&left_rendered, left_is_string),
+                self.format_rendered_assert_value(&right_rendered, right_is_string)
             );
         }
 
-        self.format_rendered_diff(&left_rendered, &right_rendered, Some(left_ty))
+        self.format_rendered_diff(&left_rendered, &right_rendered, left_is_string)
+    }
+
+    fn rendered_values_equal(&self, left: &RenderedValue, right: &RenderedValue) -> bool {
+        self.format_rendered_assert_value(left, false)
+            == self.format_rendered_assert_value(right, false)
     }
 
     fn format_rendered_diff(
         &self,
         left: &RenderedValue,
         right: &RenderedValue,
-        top_level_ty: Option<&Ty>,
+        top_level_is_string: bool,
     ) -> String {
-        if rendered_values_equal(left, right) {
-            return self.format_rendered_assert_value(left, top_level_ty);
+        if self.rendered_values_equal(left, right) {
+            return self.format_rendered_assert_value(left, top_level_is_string);
         }
 
         match (left, right) {
@@ -2458,7 +2440,7 @@ impl FormatterContext<'_> {
             ) if left_variant == right_variant => {
                 self.format_union_case_diff(left, right, left_fields, right_fields)
             }
-            _ => self.format_leaf_diff(left, right, top_level_ty),
+            _ => self.format_leaf_diff(left, right, top_level_is_string),
         }
     }
 
@@ -2473,8 +2455,8 @@ impl FormatterContext<'_> {
         let right_value = union_case_payload(right_fields);
 
         match (left_value, right_value) {
-            (Some(left), Some(right)) => self.format_rendered_diff(left, right, None),
-            _ => self.format_leaf_diff(left, right, None),
+            (Some(left), Some(right)) => self.format_rendered_diff(left, right, false),
+            _ => self.format_leaf_diff(left, right, false),
         }
     }
 
@@ -2511,8 +2493,8 @@ impl FormatterContext<'_> {
                     self.write_equal_struct_field(&mut f, field_name, left, is_last);
                 }
                 (Some(left), Some(right)) if Self::can_diff_inline(left, right) => {
-                    let left_value = self.format_rendered_assert_value(left, None);
-                    let right_value = self.format_rendered_assert_value(right, None);
+                    let left_value = self.format_rendered_assert_value(left, false);
+                    let right_value = self.format_rendered_assert_value(right, false);
                     writeln!(f, "    {field_name}: {}", left_value.red()).ok();
                     write!(
                         f,
@@ -2528,7 +2510,7 @@ impl FormatterContext<'_> {
                     writeln!(f).ok();
                 }
                 (Some(left), Some(right)) => {
-                    let diff = self.format_rendered_diff(left, right, None);
+                    let diff = self.format_rendered_diff(left, right, false);
                     let diff = Self::add_indent_to_lines_except_first(&diff, 4);
                     write!(f, "    {field_name}: {diff}").ok();
                     if !is_last {
@@ -2537,7 +2519,7 @@ impl FormatterContext<'_> {
                     writeln!(f).ok();
                 }
                 (Some(left), None) => {
-                    let value = self.format_rendered_assert_value(left, None);
+                    let value = self.format_rendered_assert_value(left, false);
                     write!(f, "    {field_name}: {}", value.red()).ok();
                     if !is_last {
                         write!(f, "{}", ",".dimmed()).ok();
@@ -2545,7 +2527,7 @@ impl FormatterContext<'_> {
                     writeln!(f).ok();
                 }
                 (None, Some(right)) => {
-                    let value = self.format_rendered_assert_value(right, None);
+                    let value = self.format_rendered_assert_value(right, false);
                     writeln!(f, "    {}:", field_name.yellow()).ok();
                     write!(
                         f,
@@ -2575,7 +2557,7 @@ impl FormatterContext<'_> {
         value: &RenderedValue,
         is_last: bool,
     ) {
-        let value = self.format_rendered_assert_value(value, None);
+        let value = self.format_rendered_assert_value(value, false);
         let value = Self::add_indent_to_lines_except_first(&value, 4);
         write!(
             f,
@@ -2609,7 +2591,7 @@ impl FormatterContext<'_> {
                     self.write_collection_value(
                         &mut result,
                         &self
-                            .format_rendered_assert_value(left, None)
+                            .format_rendered_assert_value(left, false)
                             .dimmed()
                             .to_string(),
                         is_last,
@@ -2619,7 +2601,7 @@ impl FormatterContext<'_> {
                     self.write_collection_value(
                         &mut result,
                         &self
-                            .format_rendered_assert_value(left, None)
+                            .format_rendered_assert_value(left, false)
                             .red()
                             .to_string(),
                         false,
@@ -2627,21 +2609,21 @@ impl FormatterContext<'_> {
                     self.write_collection_value(
                         &mut result,
                         &self
-                            .format_rendered_assert_value(right, None)
+                            .format_rendered_assert_value(right, false)
                             .green()
                             .to_string(),
                         is_last,
                     );
                 }
                 (Some(left), Some(right)) => {
-                    let diff = self.format_rendered_diff(left, right, None);
+                    let diff = self.format_rendered_diff(left, right, false);
                     self.write_collection_value(&mut result, &diff, is_last);
                 }
                 (Some(left), None) => {
                     self.write_collection_value(
                         &mut result,
                         &self
-                            .format_rendered_assert_value(left, None)
+                            .format_rendered_assert_value(left, false)
                             .red()
                             .to_string(),
                         is_last,
@@ -2651,7 +2633,7 @@ impl FormatterContext<'_> {
                     self.write_collection_value(
                         &mut result,
                         &self
-                            .format_rendered_assert_value(right, None)
+                            .format_rendered_assert_value(right, false)
                             .green()
                             .to_string(),
                         is_last,
@@ -2677,20 +2659,20 @@ impl FormatterContext<'_> {
         &self,
         left: &RenderedValue,
         right: &RenderedValue,
-        top_level_ty: Option<&Ty>,
+        top_level_is_string: bool,
     ) -> String {
         let left = Self::add_indent_to_lines_except_first(
-            &self.format_leaf_diff_value(left, top_level_ty),
+            &self.format_leaf_diff_value(left, top_level_is_string),
             4,
         );
         let right = Self::add_indent_to_lines_except_first(
-            &self.format_leaf_diff_value(right, top_level_ty),
+            &self.format_leaf_diff_value(right, top_level_is_string),
             4,
         );
         format!("(\n    {},\n    {}\n)", left.red(), right.green())
     }
 
-    fn format_leaf_diff_value(&self, value: &RenderedValue, top_level_ty: Option<&Ty>) -> String {
+    fn format_leaf_diff_value(&self, value: &RenderedValue, top_level_is_string: bool) -> String {
         if let RenderedValue::UnionCase {
             variant_name,
             fields,
@@ -2704,10 +2686,10 @@ impl FormatterContext<'_> {
             ) = union_case_payload(fields)
             && payload_type == variant_name
         {
-            return self.format_rendered_assert_value(payload, None);
+            return self.format_rendered_assert_value(payload, false);
         }
 
-        self.format_rendered_assert_value(value, top_level_ty)
+        self.format_rendered_assert_value(value, top_level_is_string)
     }
 
     const fn can_diff_inline(left: &RenderedValue, right: &RenderedValue) -> bool {
@@ -3134,8 +3116,8 @@ impl FormatterContext<'_> {
                 let diff = self.format_tuple_diff(
                     &bin_failure.left,
                     &bin_failure.right,
-                    &bin_failure.left_ty,
-                    &bin_failure.right_ty,
+                    bin_failure.left_ty_idx,
+                    bin_failure.right_ty_idx,
                     &bin_failure.source_map,
                 );
                 writeln!(result, "{diff}").ok();
@@ -3143,7 +3125,7 @@ impl FormatterContext<'_> {
             AssertFailure::Bin(bin_failure) if bin_failure.operator == "!=" => {
                 let value = self.format_tuple_value(
                     &bin_failure.left,
-                    &bin_failure.left_ty,
+                    bin_failure.left_ty_idx,
                     &bin_failure.source_map,
                     0,
                 );
@@ -3153,13 +3135,13 @@ impl FormatterContext<'_> {
             AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
                 let left = self.format_tuple_value(
                     &bin_failure.left,
-                    &bin_failure.left_ty,
+                    bin_failure.left_ty_idx,
                     &bin_failure.source_map,
                     0,
                 );
                 let right = self.format_tuple_value(
                     &bin_failure.right,
-                    &bin_failure.right_ty,
+                    bin_failure.right_ty_idx,
                     &bin_failure.source_map,
                     0,
                 );

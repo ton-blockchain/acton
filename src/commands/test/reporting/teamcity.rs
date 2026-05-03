@@ -48,13 +48,13 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_ty,
+                                bin_failure.right_ty_idx,
                                 &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_ty,
+                                bin_failure.left_ty_idx,
                                 &bin_failure.source_map,
                                 0,
                             ));
@@ -65,13 +65,13 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_ty,
+                                bin_failure.right_ty_idx,
                                 &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_ty,
+                                bin_failure.left_ty_idx,
                                 &bin_failure.source_map,
                                 0,
                             ));

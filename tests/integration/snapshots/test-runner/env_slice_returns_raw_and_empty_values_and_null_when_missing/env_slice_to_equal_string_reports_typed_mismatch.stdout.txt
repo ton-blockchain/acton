@@ -16,7 +16,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
  > tests/env_slice_string_mismatch.test.tolk (1 test)
   ✗ bp stdlib env slice string typed mismatch [TIME]
     └─ Error: expect(actual).toEqual(expected)
-        [BOC_HEX] != slice-value
+        slice{736c6963652d76616c7565} != slice-value
       └─ at tests/env_slice_string_mismatch.test[LINE]
 
  ✗ 1 failed in 1 file

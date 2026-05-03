@@ -126,6 +126,49 @@ type uint32 = bigint
 type uint256 = bigint
 
 /**
+ > struct Storage {
+ >     id: uint32
+ >     owner: address
+ >     counter: uint32
+ > }
+ */
+export interface Storage {
+    readonly $: 'Storage'
+    id: uint32
+    owner: c.Address
+    counter: uint32
+}
+
+export const Storage = {
+    create(args: {
+        id: uint32
+        owner: c.Address
+        counter: uint32
+    }): Storage {
+        return {
+            $: 'Storage',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): Storage {
+        return {
+            $: 'Storage',
+            id: s.loadUintBig(32),
+            owner: s.loadAddress(),
+            counter: s.loadUintBig(32),
+        }
+    },
+    store(self: Storage, b: c.Builder): void {
+        b.storeUint(self.id, 32);
+        b.storeAddress(self.owner);
+        b.storeUint(self.counter, 32);
+    },
+    toCell(self: Storage): c.Cell {
+        return makeCellFrom<Storage>(self, Storage.store);
+    }
+}
+
+/**
  > struct (0x7e8764ef) IncreaseCounter {
  >     increaseBy: uint32
  > }
@@ -226,49 +269,6 @@ export const ResetCounter = {
     },
     toCell(self: ResetCounter): c.Cell {
         return makeCellFrom<ResetCounter>(self, ResetCounter.store);
-    }
-}
-
-/**
- > struct Storage {
- >     id: uint32
- >     owner: address
- >     counter: uint32
- > }
- */
-export interface Storage {
-    readonly $: 'Storage'
-    id: uint32
-    owner: c.Address
-    counter: uint32
-}
-
-export const Storage = {
-    create(args: {
-        id: uint32
-        owner: c.Address
-        counter: uint32
-    }): Storage {
-        return {
-            $: 'Storage',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): Storage {
-        return {
-            $: 'Storage',
-            id: s.loadUintBig(32),
-            owner: s.loadAddress(),
-            counter: s.loadUintBig(32),
-        }
-    },
-    store(self: Storage, b: c.Builder): void {
-        b.storeUint(self.id, 32);
-        b.storeAddress(self.owner);
-        b.storeUint(self.counter, 32);
-    },
-    toCell(self: Storage): c.Cell {
-        return makeCellFrom<Storage>(self, Storage.store);
     }
 }
 

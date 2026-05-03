@@ -13,7 +13,8 @@ use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
-use tolk_compiler::abi::{ContractABI, Ty};
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::types_kernel::TyIdx;
 use ton::ton_wallet::TonWallet;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -46,9 +47,9 @@ pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
 pub struct AssertBinFailure {
     pub operator: String,
     pub left: Tuple,
-    pub left_ty: Ty,
+    pub left_ty_idx: TyIdx,
     pub right: Tuple,
-    pub right_ty: Ty,
+    pub right_ty_idx: TyIdx,
     pub source_map: Arc<SourceMap>,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,

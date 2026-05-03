@@ -7,7 +7,7 @@ use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
 use tolk_compiler::source_map::AbiStruct;
-use tolk_compiler::types_kernel::{Ty, calc_width_on_stack, instantiate_generics};
+use tolk_compiler::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
@@ -274,15 +274,6 @@ impl RenderedValue {
         }
     }
 
-    pub(crate) fn raw_cell_like(&self) -> Option<&CellLike> {
-        match self {
-            RenderedValue::CellLike { raw: Some(raw), .. }
-            | RenderedValue::CellOf { raw: Some(raw), .. } => Some(raw),
-            RenderedValue::LastSeen { inner } => inner.raw_cell_like(),
-            _ => None,
-        }
-    }
-
     #[must_use]
     pub fn to_pretty_string(&self, options: PrettyRenderOptions) -> String {
         let mut out = String::new();
@@ -305,11 +296,13 @@ impl RenderedValue {
                     pretty_leaf_value(value, type_field.as_deref(), options)
                 )
             }
-            RenderedValue::CellLike { value, raw, .. } => {
+            RenderedValue::CellLike {
+                value, fields, raw, ..
+            } => {
                 write!(
                     out,
                     "{}",
-                    pretty_cell_like_value(value, raw.as_ref(), options)
+                    pretty_cell_like_value(value, raw.as_ref(), fields, options)
                 )
             }
             RenderedValue::EnumValue { value, .. } => {
@@ -328,7 +321,7 @@ impl RenderedValue {
                 out,
                 "{} {}",
                 pretty_magenta(type_name, options),
-                pretty_cell_like_value(value, raw.as_ref(), options)
+                pretty_cell_like_value(value, raw.as_ref(), &[], options)
             ),
             RenderedValue::UnionCase {
                 variant_name,
@@ -453,7 +446,7 @@ fn pretty_leaf_value(
         return pretty_cyan(value, options);
     }
     if type_is_cell_like(type_field) {
-        return pretty_cell_like_value(value, None, options);
+        return pretty_cell_like_value(value, None, &[], options);
     }
 
     value.to_owned()
@@ -474,7 +467,7 @@ fn pretty_map_key(type_name: &str, key: &str, options: &PrettyRenderOptions) -> 
         return pretty_cyan(key, options);
     }
     if type_is_cell_like(key_ty) {
-        return pretty_cell_like_value(key, None, options);
+        return pretty_cell_like_value(key, None, &[], options);
     }
 
     key.to_owned()
@@ -572,9 +565,13 @@ fn pretty_dimmed(value: &str, options: &PrettyRenderOptions) -> String {
 fn pretty_cell_like_value(
     value: &str,
     raw: Option<&CellLike>,
+    fields: &[(String, RenderedValue)],
     options: &PrettyRenderOptions,
 ) -> String {
-    let value = raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex);
+    let value = slice_raw_field(fields).map_or_else(
+        || raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex),
+        Cow::Borrowed,
+    );
     pretty_dimmed(&value, options)
 }
 
@@ -582,6 +579,18 @@ fn raw_cell_like_hex(raw: &CellLike) -> Cow<'_, str> {
     match raw {
         CellLike::Cell(hex) | CellLike::Builder(hex) => Cow::Borrowed(hex),
     }
+}
+
+fn slice_raw_field(fields: &[(String, RenderedValue)]) -> Option<&str> {
+    fields.iter().find_map(|(name, value)| {
+        if name != "raw" {
+            return None;
+        }
+        let RenderedValue::Leaf { value, .. } = value else {
+            return None;
+        };
+        value.starts_with("slice{").then_some(value.as_str())
+    })
 }
 
 fn compact_cell_like_text(value: &str) -> Cow<'_, str> {
@@ -1200,7 +1209,7 @@ fn slice_as_cell_like(cs: &CellSlice) -> Option<CellLike> {
 }
 
 fn render_openable_cell_like(
-    ty: &Ty,
+    type_name: impl Into<String>,
     value: impl Into<String>,
     bits: Option<usize>,
     refs: Option<usize>,
@@ -1211,7 +1220,30 @@ fn render_openable_cell_like(
     let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
 
     RenderedValue::CellLike {
-        type_name: ty.to_string(),
+        type_name: type_name.into(),
+        value: if summarize_value {
+            render_cell_summary(bits, refs, hash.as_deref())
+        } else {
+            raw_value.clone()
+        },
+        fields: render_cell_fields(bits, refs, hash, summarize_value.then_some(raw_value)),
+        raw,
+    }
+}
+
+fn render_openable_cell_like_name(
+    type_name: impl Into<String>,
+    value: impl Into<String>,
+    bits: Option<usize>,
+    refs: Option<usize>,
+    hash: Option<String>,
+    raw: Option<CellLike>,
+) -> RenderedValue {
+    let raw_value = value.into();
+    let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
+
+    RenderedValue::CellLike {
+        type_name: type_name.into(),
         value: if summarize_value {
             render_cell_summary(bits, refs, hash.as_deref())
         } else {
@@ -1233,7 +1265,7 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
         VmStackValue::Cell(cell) => {
             let (bits, refs, hash) = cell_like_meta(cell);
             render_openable_cell_like(
-                &Ty::Cell,
+                "cell",
                 render_cell_like(cell),
                 bits,
                 refs,
@@ -1245,7 +1277,7 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
             let cell_like = CellLike::Builder(builder_hex.clone());
             let (bits, refs, hash) = cell_like_meta(&cell_like);
             render_openable_cell_like(
-                &Ty::Builder,
+                "builder",
                 render_builder(builder_hex),
                 bits,
                 refs,
@@ -1256,7 +1288,7 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
         VmStackValue::CellSlice(slice) => {
             let (bits, refs, hash) = slice_meta(slice);
             render_openable_cell_like(
-                &Ty::Slice,
+                "slice",
                 render_slice(slice),
                 bits,
                 refs,
@@ -1272,7 +1304,7 @@ pub(crate) fn render_runtime_vm_value(value: &VmStackValue) -> RenderedValue {
 }
 
 fn render_union_case(
-    ty: &Ty,
+    type_name: impl Into<String>,
     variant_name: impl Into<String>,
     value: Option<RenderedValue>,
 ) -> RenderedValue {
@@ -1281,22 +1313,34 @@ fn render_union_case(
         fields.push(("value".to_owned(), value));
     }
     RenderedValue::UnionCase {
-        type_name: ty.to_string(),
+        type_name: type_name.into(),
         variant_name: variant_name.into(),
         fields,
     }
 }
 
-fn render_enum_value(ty: &Ty, value: impl Into<String>, raw_value: RenderedValue) -> RenderedValue {
+fn render_enum_value(
+    type_name: impl Into<String>,
+    value: impl Into<String>,
+    raw_value: RenderedValue,
+) -> RenderedValue {
     RenderedValue::EnumValue {
-        type_name: ty.to_string(),
+        type_name: type_name.into(),
         value: value.into(),
         fields: vec![("value".to_owned(), raw_value)],
     }
 }
 
-fn map_type_name(k: &Ty, v: &Ty) -> String {
-    format!("map<{k}, {v}>")
+fn render_enum_value_name(
+    type_name: String,
+    value: impl Into<String>,
+    raw_value: RenderedValue,
+) -> RenderedValue {
+    RenderedValue::EnumValue {
+        type_name,
+        value: value.into(),
+        fields: vec![("value".to_owned(), raw_value)],
+    }
 }
 
 fn render_map_raw(type_name: String, root: Option<&Cell>) -> RenderedValue {
@@ -1424,9 +1468,9 @@ fn format_map_raw_value(slice: TyCellSlice<'_>) -> Result<String, String> {
 fn decode_abi_data(
     symbols: &SourceMap,
     parser: &mut TyCellSlice<'_>,
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> Option<UnpackedValue> {
-    let data = dynamic_unpack::unpack_from_slice(parser, symbols, ty).ok()?;
+    let data = dynamic_unpack::unpack_from_slice(parser, symbols, ty_idx).ok()?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         // there are remaining data
         return None;
@@ -1437,42 +1481,50 @@ fn decode_abi_data(
 fn render_map_value_with_symbols(
     symbols: &SourceMap,
     value_slice: TyCellSlice<'_>,
-    value_ty: &Ty,
+    value_ty_idx: TyIdx,
 ) -> Option<RenderedValue> {
     let mut parser = value_slice;
-    let data = decode_abi_data(symbols, &mut parser, value_ty)?;
-    Some(render_abi_data(symbols, data, value_ty))
+    let data = decode_abi_data(symbols, &mut parser, value_ty_idx)?;
+    Some(render_abi_data(symbols, data, value_ty_idx))
 }
 
-fn render_typed_cell(symbols: &SourceMap, ty: &Ty, inner: &Ty, cell: &CellLike) -> RenderedValue {
+fn render_typed_cell(
+    symbols: &SourceMap,
+    type_name: String,
+    inner_ty_idx: TyIdx,
+    cell: &CellLike,
+) -> RenderedValue {
     let decoded = if let Some(cell) = decode_cell_like(cell) {
         let mut parser = cell.as_slice_allow_exotic();
-        decode_abi_data(symbols, &mut parser, inner).map(|data| (inner, data))
+        decode_abi_data(symbols, &mut parser, inner_ty_idx).map(|data| (inner_ty_idx, data))
     } else {
         None
     };
-    render_typed_cell_with_decoded_data(symbols, ty, cell, decoded)
+    render_typed_cell_with_decoded_data(symbols, type_name, cell, decoded)
 }
 
 fn render_typed_cell_with_decoded_data(
     symbols: &SourceMap,
-    ty: &Ty,
+    type_name: String,
     cell: &CellLike,
-    decoded: Option<(&Ty, UnpackedValue)>,
+    decoded: Option<(TyIdx, UnpackedValue)>,
 ) -> RenderedValue {
     let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
     let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(value));
 
-    if let Some((inner, data)) = decoded {
+    if let Some((inner_ty_idx, data)) = decoded {
         fields.insert(
             0,
-            ("decoded".to_owned(), render_abi_data(symbols, data, inner)),
+            (
+                "decoded".to_owned(),
+                render_abi_data(symbols, data, inner_ty_idx),
+            ),
         );
     }
 
     RenderedValue::CellOf {
-        type_name: ty.to_string(),
+        type_name,
         value: render_cell_summary(bits, refs, hash.as_deref()),
         fields,
         raw: Some(cell.clone()),
@@ -1491,24 +1543,19 @@ pub(crate) fn render_runtime_storage_with_abi(
     let decoded_cell = decode_cell_like(cell)?;
 
     // Try deployment storage first and then default one
-    for storage_ty in abi
+    for storage_ty_idx in abi
         .storage
-        .storage_at_deployment_ty
-        .as_ref()
+        .storage_at_deployment_ty_idx
         .into_iter()
-        .chain(abi.storage.storage_ty.as_ref())
+        .chain(abi.storage.storage_ty_idx)
     {
         let mut parser = decoded_cell.as_slice_allow_exotic();
-        if let Some(data) = decode_abi_data(symbols, &mut parser, storage_ty) {
-            let cell_ty = Ty::CellOf {
-                inner: Box::new(storage_ty.clone()),
-            };
-
+        if let Some(data) = decode_abi_data(symbols, &mut parser, storage_ty_idx) {
             return Some(render_typed_cell_with_decoded_data(
                 symbols,
-                &cell_ty,
+                format!("Cell<{}>", render_ty(symbols, storage_ty_idx)),
                 cell,
-                Some((storage_ty, data)),
+                Some((storage_ty_idx, data)),
             ));
         }
     }
@@ -1516,159 +1563,84 @@ pub(crate) fn render_runtime_storage_with_abi(
     None
 }
 
-fn decode_abi_data_result(
-    symbols: &SourceMap,
-    parser: &mut TyCellSlice<'_>,
-    ty: &Ty,
-) -> Result<UnpackedValue, String> {
-    let data =
-        dynamic_unpack::unpack_from_slice(parser, symbols, ty).map_err(|err| err.to_string())?;
-    if parser.size_bits() != 0 || parser.size_refs() != 0 {
-        return Err(format!(
-            "remaining bits/refs after decode: {} bits, {} refs",
-            parser.size_bits(),
-            parser.size_refs()
-        ));
-    }
-    Ok(data)
-}
-
-pub(crate) fn render_cell_like_as_type(
-    symbols: &SourceMap,
-    value: &RenderedValue,
-    ty: &Ty,
-) -> Result<RenderedValue, String> {
-    let cell_like = value.raw_cell_like().ok_or_else(|| {
-        format!(
-            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
-            debugger_value_kind(value)
-        )
-    })?;
-    let CellLike::Cell(_) = cell_like else {
-        return Err(format!(
-            "Expression must evaluate to a `cell` or `slice` to decode as `{ty}`, got {}",
-            debugger_value_kind(value)
-        ));
-    };
-
-    let Ty::CellOf { inner } = ty else {
-        return Err(format!(
-            "Debugger evaluate only supports casts to Cell<T>, got `{ty}`"
-        ));
-    };
-
-    let decoded_cell = decode_cell_like(cell_like).ok_or_else(|| {
-        format!(
-            "Failed to materialize {} as a TVM cell while decoding `{ty}`",
-            debugger_value_kind(value)
-        )
-    })?;
-    let mut parser = decoded_cell.as_slice_allow_exotic();
-    let data = decode_abi_data_result(symbols, &mut parser, inner.as_ref())?;
-
-    Ok(render_typed_cell_with_decoded_data(
-        symbols,
-        ty,
-        cell_like,
-        Some((inner.as_ref(), data)),
-    ))
-}
-
-fn debugger_value_kind(value: &RenderedValue) -> String {
-    match value {
-        RenderedValue::Leaf {
-            value,
-            type_field: Some(type_field),
-        } => format!("`{type_field}` (`{value}`)"),
-        RenderedValue::Leaf { value, .. } => format!("`{value}`"),
-        RenderedValue::CellLike { type_name, .. }
-        | RenderedValue::CellOf { type_name, .. }
-        | RenderedValue::EnumValue { type_name, .. }
-        | RenderedValue::UnionCase { type_name, .. }
-        | RenderedValue::Struct { type_name, .. }
-        | RenderedValue::Address { type_name, .. }
-        | RenderedValue::Tensor { type_name, .. }
-        | RenderedValue::ArrayOf { type_name, .. }
-        | RenderedValue::LazyUnresolved { type_name } => format!("`{type_name}`"),
-        RenderedValue::LastSeen { inner } => debugger_value_kind(inner),
-        RenderedValue::OptimizedOut => "<optimized out>".to_owned(),
-        RenderedValue::LazyNotYetLoaded { preview } => debugger_value_kind(preview),
-        RenderedValue::LazyCantParseSlice => "<not loaded>".to_owned(),
-    }
-}
-
-fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty: &Ty) -> RenderedValue {
+fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> RenderedValue {
+    let type_name = render_ty(symbols, ty_idx);
     match data {
-        UnpackedValue::Object { name, fields } if abi_object_is_enum(symbols, ty) => {
+        UnpackedValue::Object { name, fields } if abi_object_is_enum(symbols, ty_idx) => {
             let mut fields = fields.into_iter();
             match fields.next() {
                 Some((_, value)) => {
-                    let enum_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
-                    let raw_ty = enum_raw_value_ty(symbols, &enum_ty).unwrap_or(Ty::Unknown);
-                    render_enum_value(ty, name, render_abi_data(symbols, value, &raw_ty))
+                    let enum_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
+                    let raw_ty_idx = enum_raw_value_ty(symbols, enum_ty_idx).unwrap_or(ty_idx);
+                    render_enum_value_name(
+                        type_name,
+                        name,
+                        render_abi_data(symbols, value, raw_ty_idx),
+                    )
                 }
-                None => typed_leaf_for_ty(ty, name),
+                None => typed_leaf(type_name, name),
             }
         }
         UnpackedValue::Object { name, fields } => {
-            let object_ty = abi_object_context_ty(symbols, &name, ty).unwrap_or_else(|| ty.clone());
+            let object_ty_idx = abi_object_context_ty(symbols, &name, ty_idx).unwrap_or(ty_idx);
             RenderedValue::Struct {
                 type_name: name.clone(),
                 fields: fields
                     .into_iter()
                     .map(|(field_name, value)| {
-                        let field_ty = abi_object_field_ty(symbols, &object_ty, &name, &field_name)
-                            .unwrap_or(Ty::Unknown);
-                        (field_name, render_abi_data(symbols, value, &field_ty))
+                        let field_ty_idx =
+                            abi_object_field_ty(symbols, object_ty_idx, &name, &field_name)
+                                .unwrap_or(object_ty_idx);
+                        (field_name, render_abi_data(symbols, value, field_ty_idx))
                     })
                     .collect(),
             }
         }
         UnpackedValue::Array(items) => RenderedValue::ArrayOf {
-            type_name: ty.to_string(),
-            items: render_abi_array_items(symbols, items, ty),
+            type_name,
+            items: render_abi_array_items(symbols, items, ty_idx),
         },
-        UnpackedValue::Map(entries) => render_abi_map(symbols, entries, ty),
+        UnpackedValue::Map(entries) => render_abi_map(symbols, entries, ty_idx),
         UnpackedValue::Address(IntAddr::Std(addr)) => {
-            render_std_address(ty.to_string(), addr.to_string(), &addr)
+            render_std_address(type_name, addr.to_string(), &addr)
         }
-        UnpackedValue::Address(addr) => render_int_address(ty.to_string(), &addr),
-        UnpackedValue::ExtAddress(addr) => typed_leaf_for_ty(ty, addr.to_string()),
+        UnpackedValue::Address(addr) => render_int_address(type_name, &addr),
+        UnpackedValue::ExtAddress(addr) => typed_leaf(type_name, addr.to_string()),
         UnpackedValue::Cell(cell) | UnpackedValue::RemainingBitsAndRefs(cell) => {
-            typed_leaf_for_ty(ty, Boc::encode_hex(&cell))
+            typed_leaf(type_name, Boc::encode_hex(&cell))
         }
         UnpackedValue::Bits((bytes, bit_len)) => {
-            typed_leaf_for_ty(ty, format_abi_bits(&bytes, bit_len))
+            typed_leaf(type_name, format_abi_bits(&bytes, bit_len))
         }
-        UnpackedValue::Null => typed_leaf_for_ty(ty, "null"),
-        UnpackedValue::Number(value) => typed_leaf_for_ty(ty, value.to_string()),
-        UnpackedValue::Bool(value) => typed_leaf_for_ty(ty, value.to_string()),
-        UnpackedValue::String(value) => typed_leaf_for_ty(ty, format!("\"{value}\"")),
+        UnpackedValue::Null => typed_leaf(type_name, "null"),
+        UnpackedValue::Number(value) => typed_leaf(type_name, value.to_string()),
+        UnpackedValue::Bool(value) => typed_leaf(type_name, value.to_string()),
+        UnpackedValue::String(value) => typed_leaf(type_name, format!("\"{value}\"")),
     }
 }
 
 fn render_abi_array_items(
     symbols: &SourceMap,
     items: Vec<UnpackedValue>,
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> Vec<RenderedValue> {
-    let shape_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
-    match &shape_ty {
-        Ty::ArrayOf { inner } => items
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
+    match symbols.ty_by_idx(shape_ty_idx).unwrap_or(&Ty::Unknown) {
+        Ty::ArrayOf { inner_ty_idx } => items
             .into_iter()
-            .map(|item| render_abi_data(symbols, item, inner.as_ref()))
+            .map(|item| render_abi_data(symbols, item, *inner_ty_idx))
             .collect(),
-        Ty::Tensor { items: item_types } | Ty::ShapedTuple { items: item_types } => items
+        Ty::Tensor { items_ty_idx } | Ty::ShapedTuple { items_ty_idx } => items
             .into_iter()
             .enumerate()
             .map(|(index, item)| {
-                let item_ty = item_types.get(index).cloned().unwrap_or(Ty::Unknown);
-                render_abi_data(symbols, item, &item_ty)
+                let item_ty_idx = items_ty_idx.get(index).copied().unwrap_or(shape_ty_idx);
+                render_abi_data(symbols, item, item_ty_idx)
             })
             .collect(),
         _ => items
             .into_iter()
-            .map(|item| render_abi_data(symbols, item, &Ty::Unknown))
+            .map(|item| render_abi_data(symbols, item, ty_idx))
             .collect(),
     }
 }
@@ -1676,13 +1648,16 @@ fn render_abi_array_items(
 fn render_abi_map(
     symbols: &SourceMap,
     entries: Vec<(UnpackedValue, UnpackedValue)>,
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> RenderedValue {
-    let type_name = ty.to_string();
-    let shape_ty = resolve_alias_shape_ty(symbols, ty).unwrap_or_else(|| ty.clone());
-    let (key_ty, value_ty) = match &shape_ty {
-        Ty::MapKV { k, v } => (k.as_ref().clone(), v.as_ref().clone()),
-        _ => (Ty::Unknown, Ty::Unknown),
+    let type_name = render_ty(symbols, ty_idx);
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
+    let (key_ty, value_ty) = match symbols.ty_by_idx(shape_ty_idx).unwrap_or(&Ty::Unknown) {
+        Ty::MapKV {
+            key_ty_idx,
+            value_ty_idx,
+        } => (*key_ty_idx, *value_ty_idx),
+        _ => (ty_idx, ty_idx),
     };
 
     RenderedValue::Struct {
@@ -1691,21 +1666,23 @@ fn render_abi_map(
             .into_iter()
             .map(|(key, value)| {
                 (
-                    format_abi_map_key(symbols, &key, &key_ty),
-                    render_abi_data(symbols, value, &value_ty),
+                    format_abi_map_key(symbols, &key, key_ty),
+                    render_abi_data(symbols, value, value_ty),
                 )
             })
             .collect(),
     }
 }
 
-fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty: &Ty) -> String {
+fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty_idx: TyIdx) -> String {
     match data {
         UnpackedValue::Null => "null".to_owned(),
         UnpackedValue::Number(value) => value.to_string(),
         UnpackedValue::Bool(value) => value.to_string(),
         UnpackedValue::String(value) => format!("\"{value}\""),
-        UnpackedValue::Object { name, .. } if abi_object_is_enum(symbols, key_ty) => name.clone(),
+        UnpackedValue::Object { name, .. } if abi_object_is_enum(symbols, key_ty_idx) => {
+            name.clone()
+        }
         UnpackedValue::Address(value) => value.to_string(),
         UnpackedValue::ExtAddress(value) => value.to_string(),
         UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
@@ -1713,40 +1690,33 @@ fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty: &Ty) ->
         }
         UnpackedValue::Bits((bytes, bit_len)) => format_abi_bits(bytes, *bit_len),
         UnpackedValue::Object { .. } | UnpackedValue::Array(_) | UnpackedValue::Map(_) => {
-            typed_leaf_for_ty(key_ty, "<key>").dap_value()
+            typed_leaf(render_ty(symbols, key_ty_idx), "<key>").dap_value()
         }
     }
 }
 
-fn abi_object_is_enum(symbols: &SourceMap, ty: &Ty) -> bool {
+fn abi_object_is_enum(symbols: &SourceMap, ty_idx: TyIdx) -> bool {
     matches!(
-        resolve_alias_shape_ty(symbols, ty).as_ref().unwrap_or(ty),
+        symbols
+            .ty_by_idx(resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx))
+            .unwrap_or(&Ty::Unknown),
         Ty::EnumRef { .. }
     )
 }
 
-fn enum_raw_value_ty(symbols: &SourceMap, ty: &Ty) -> Option<Ty> {
-    match ty {
-        Ty::EnumRef { enum_name } => Some(symbols.get_enum(enum_name).encoded_as.clone()),
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
-            enum_raw_value_ty(symbols, &target)
-        }
+fn enum_raw_value_ty(symbols: &SourceMap, ty_idx: TyIdx) -> Option<TyIdx> {
+    match symbols.ty_by_idx(ty_idx)? {
+        Ty::EnumRef { enum_name } => Some(symbols.get_enum(enum_name).encoded_as_ty_idx),
+        Ty::AliasRef { .. } => enum_raw_value_ty(symbols, symbols.alias_target_of(ty_idx)?),
         _ => None,
     }
 }
 
-fn abi_object_context_ty(symbols: &SourceMap, object_name: &str, ty: &Ty) -> Option<Ty> {
-    match ty {
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
-            abi_object_context_ty(symbols, object_name, &target).or(Some(target))
+fn abi_object_context_ty(symbols: &SourceMap, object_name: &str, ty_idx: TyIdx) -> Option<TyIdx> {
+    match symbols.ty_by_idx(ty_idx)? {
+        Ty::AliasRef { .. } => {
+            let target = symbols.alias_target_of(ty_idx)?;
+            abi_object_context_ty(symbols, object_name, target).or(Some(target))
         }
         Ty::Union { variants, .. } => resolve_union_object_ty(symbols, variants, object_name),
         _ => None,
@@ -1755,56 +1725,46 @@ fn abi_object_context_ty(symbols: &SourceMap, object_name: &str, ty: &Ty) -> Opt
 
 fn abi_object_field_ty(
     symbols: &SourceMap,
-    ty: &Ty,
+    ty_idx: TyIdx,
     object_name: &str,
     field_name: &str,
-) -> Option<Ty> {
-    match ty {
-        Ty::StructRef {
-            struct_name,
-            type_args,
-        } => {
-            let struct_ref = symbols.get_struct(struct_name);
-            let type_args = type_args.as_deref().unwrap_or(&[]);
-            struct_ref
-                .fields
-                .iter()
-                .find(|field| field.name == field_name)
-                .map(|field| {
-                    instantiate_generics(
-                        &field.ty,
-                        struct_ref.type_params.as_deref().unwrap_or(&[]),
-                        type_args,
-                    )
-                })
-        }
+) -> Option<TyIdx> {
+    match symbols.ty_by_idx(ty_idx)? {
+        Ty::StructRef { struct_name: _, .. } => symbols
+            .struct_fields_of(ty_idx)?
+            .into_iter()
+            .find(|field| field.name == field_name)
+            .map(|field| field.ty_idx),
         Ty::EnumRef { enum_name } if field_name == "value" => {
-            Some(symbols.get_enum(enum_name).encoded_as.clone())
+            Some(symbols.get_enum(enum_name).encoded_as_ty_idx)
         }
-        Ty::CellOf { inner } if object_name == "Cell" && field_name == "ref" => {
-            Some(inner.as_ref().clone())
+        Ty::CellOf { inner_ty_idx } if object_name == "Cell" && field_name == "ref" => {
+            Some(*inner_ty_idx)
         }
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
-            abi_object_field_ty(symbols, &target, object_name, field_name)
+        Ty::AliasRef { .. } => {
+            let target = symbols.alias_target_of(ty_idx)?;
+            abi_object_field_ty(symbols, target, object_name, field_name)
         }
         Ty::Union { variants, .. } => {
             for (variant, label) in variants.iter().zip(union_variant_labels(symbols, variants)) {
                 if label.as_deref() == Some(object_name) {
                     return if field_name == "value" {
-                        Some(variant.variant_ty.clone())
+                        Some(variant.variant_ty_idx)
                     } else {
-                        abi_object_field_ty(symbols, &variant.variant_ty, object_name, field_name)
+                        abi_object_field_ty(
+                            symbols,
+                            variant.variant_ty_idx,
+                            object_name,
+                            field_name,
+                        )
                     };
                 }
-                if union_label_simple(symbols, &variant.variant_ty).as_deref() == Some(object_name)
+                if union_label_simple(symbols, variant.variant_ty_idx).as_deref()
+                    == Some(object_name)
                 {
                     return abi_object_field_ty(
                         symbols,
-                        &variant.variant_ty,
+                        variant.variant_ty_idx,
                         object_name,
                         field_name,
                     );
@@ -1816,43 +1776,24 @@ fn abi_object_field_ty(
     }
 }
 
-fn resolve_alias_shape_ty(symbols: &SourceMap, ty: &Ty) -> Option<Ty> {
-    match ty {
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => resolve_alias_target_ty(symbols, alias_name, type_args.as_deref()),
+fn resolve_alias_shape_ty(symbols: &SourceMap, ty_idx: TyIdx) -> Option<TyIdx> {
+    match symbols.ty_by_idx(ty_idx)? {
+        Ty::AliasRef { .. } => symbols.alias_target_of(ty_idx),
         _ => None,
     }
-}
-
-fn resolve_alias_target_ty(
-    symbols: &SourceMap,
-    alias_name: &str,
-    type_args: Option<&[Ty]>,
-) -> Option<Ty> {
-    let alias_ref = symbols.get_alias(alias_name);
-    Some(match type_args {
-        Some(type_args) => instantiate_generics(
-            &alias_ref.target_ty,
-            alias_ref.type_params.as_deref().unwrap_or(&[]),
-            type_args,
-        ),
-        None => alias_ref.target_ty.clone(),
-    })
 }
 
 fn resolve_union_object_ty(
     symbols: &SourceMap,
     variants: &[tolk_compiler::types_kernel::UnionVariant],
     object_name: &str,
-) -> Option<Ty> {
+) -> Option<TyIdx> {
     let labels = union_variant_labels(symbols, variants);
     variants.iter().zip(labels).find_map(|(variant, label)| {
         if label.as_deref() == Some(object_name)
-            || union_label_simple(symbols, &variant.variant_ty).as_deref() == Some(object_name)
+            || union_label_simple(symbols, variant.variant_ty_idx).as_deref() == Some(object_name)
         {
-            Some(variant.variant_ty.clone())
+            Some(variant.variant_ty_idx)
         } else {
             None
         }
@@ -1865,7 +1806,7 @@ fn union_variant_labels(
 ) -> Vec<Option<String>> {
     let simple_labels = variants
         .iter()
-        .map(|variant| union_label_simple(symbols, &variant.variant_ty))
+        .map(|variant| union_label_simple(symbols, variant.variant_ty_idx))
         .collect::<Vec<_>>();
     let has_duplicates = simple_labels.iter().enumerate().any(|(idx, label)| {
         label.is_some() && simple_labels[..idx].iter().any(|prev| prev == label)
@@ -1875,10 +1816,13 @@ fn union_variant_labels(
         .iter()
         .zip(simple_labels)
         .map(|(variant, simple_label)| {
-            if matches!(variant.variant_ty, Ty::NullLiteral) {
+            if matches!(
+                symbols.ty_by_idx(variant.variant_ty_idx),
+                Some(Ty::NullLiteral)
+            ) {
                 Some(String::new())
             } else if has_duplicates {
-                Some(variant.variant_ty.render_type())
+                Some(render_ty(symbols, variant.variant_ty_idx))
             } else {
                 simple_label
             }
@@ -1886,7 +1830,8 @@ fn union_variant_labels(
         .collect()
 }
 
-fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> Option<String> {
+fn union_label_simple(symbols: &SourceMap, ty_idx: TyIdx) -> Option<String> {
+    let ty = symbols.ty_by_idx(ty_idx)?;
     Some(match ty {
         Ty::Int => "int".to_owned(),
         Ty::IntN { n } => format!("int{n}"),
@@ -1907,23 +1852,19 @@ fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> Option<String> {
         Ty::NullLiteral => "null".to_owned(),
         Ty::Callable => "callable".to_owned(),
         Ty::Void => "void".to_owned(),
-        Ty::Nullable { inner, .. } => format!("{}?", union_label_simple(symbols, inner)?),
+        Ty::Nullable { inner_ty_idx, .. } => {
+            format!("{}?", union_label_simple(symbols, *inner_ty_idx)?)
+        }
         Ty::CellOf { .. } => "Cell".to_owned(),
         Ty::Tensor { .. } | Ty::ShapedTuple { .. } => "tensor".to_owned(),
         Ty::MapKV { .. } => "map".to_owned(),
         Ty::EnumRef { enum_name } => enum_name.clone(),
         Ty::StructRef { struct_name, .. } => struct_name.clone(),
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let target = resolve_alias_target_ty(symbols, alias_name, type_args.as_deref())?;
-            union_label_simple(symbols, &target)?
-        }
+        Ty::AliasRef { .. } => union_label_simple(symbols, symbols.alias_target_of(ty_idx)?)?,
         Ty::GenericT { name_t } => name_t.clone(),
         Ty::Union { variants, .. } => variants
             .iter()
-            .filter_map(|variant| union_label_simple(symbols, &variant.variant_ty))
+            .filter_map(|variant| union_label_simple(symbols, variant.variant_ty_idx))
             .collect::<Vec<_>>()
             .join("|"),
         Ty::ArrayOf { .. } => "array".to_owned(),
@@ -1949,8 +1890,9 @@ fn format_abi_bits(bytes: &[u8], bit_len: usize) -> String {
 fn render_map_value(
     symbols: &SourceMap,
     value_slice: TyCellSlice<'_>,
-    value_ty: &Ty,
+    value_ty_idx: TyIdx,
 ) -> RenderedValue {
+    let value_ty = symbols.ty_by_idx(value_ty_idx).unwrap_or(&Ty::Unknown);
     let scalar_type = parse_map_value_type(value_ty);
     let allow_raw_value_fallback =
         scalar_type.is_none() && !matches!(value_ty, Ty::Nullable { .. } | Ty::MapKV { .. });
@@ -1958,39 +1900,44 @@ fn render_map_value(
     let mut value_slice = value_slice;
     if matches!(scalar_type, Some(MapScalarType::Address)) {
         return match IntAddr::load_from(&mut value_slice) {
-            Ok(addr) => render_int_address(value_ty.to_string(), &addr),
-            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+            Ok(addr) => render_int_address(render_ty(symbols, value_ty_idx), &addr),
+            Err(err) => typed_leaf_for_ty(symbols, value_ty_idx, format!("<value: {err}>")),
         };
     }
 
     if let Some(scalar_type) = scalar_type {
         return match format_map_scalar(&mut value_slice, scalar_type) {
-            Ok(value) => typed_leaf_for_ty(value_ty, value),
-            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+            Ok(value) => typed_leaf_for_ty(symbols, value_ty_idx, value),
+            Err(err) => typed_leaf_for_ty(symbols, value_ty_idx, format!("<value: {err}>")),
         };
     }
 
-    if let Some(value) = render_map_value_with_symbols(symbols, value_slice, value_ty) {
+    if let Some(value) = render_map_value_with_symbols(symbols, value_slice, value_ty_idx) {
         return value;
     }
 
     if allow_raw_value_fallback {
         return match format_map_raw_value(value_slice) {
-            Ok(value) => typed_leaf_for_ty(value_ty, value),
-            Err(err) => typed_leaf_for_ty(value_ty, format!("<value: {err}>")),
+            Ok(value) => typed_leaf_for_ty(symbols, value_ty_idx, value),
+            Err(err) => typed_leaf_for_ty(symbols, value_ty_idx, format!("<value: {err}>")),
         };
     }
 
-    typed_leaf_for_ty(value_ty, "<value>")
+    typed_leaf_for_ty(symbols, value_ty_idx, "<value>")
 }
 
 fn render_map_dict(
     symbols: &SourceMap,
     root: Option<Cell>,
-    key_ty: &Ty,
-    value_ty: &Ty,
+    key_ty_idx: TyIdx,
+    value_ty_idx: TyIdx,
 ) -> RenderedValue {
-    let type_name = map_type_name(key_ty, value_ty);
+    let type_name = format!(
+        "map<{}, {}>",
+        render_ty(symbols, key_ty_idx),
+        render_ty(symbols, value_ty_idx)
+    );
+    let key_ty = symbols.ty_by_idx(key_ty_idx).unwrap_or(&Ty::Unknown);
 
     let Some(key_type) = parse_map_key_type(key_ty) else {
         return render_map_raw(type_name, root.as_ref());
@@ -2006,7 +1953,7 @@ fn render_map_dict(
             let mut key_slice = key_data.as_data_slice();
             format_map_scalar(&mut key_slice, key_type).unwrap_or_else(|_| "<key>".to_string())
         };
-        let value = render_map_value(symbols, value_slice, value_ty);
+        let value = render_map_value(symbols, value_slice, value_ty_idx);
         fields.push((key, value));
     }
 
@@ -2056,6 +2003,12 @@ fn refs_suffix(ref_count: usize) -> String {
 /// Render a `CellSlice` as `slice{HEX}`, extracting only the bits in `start..end`.
 /// Appends `+ N refs` when the slice carries cell references.
 fn render_slice(cs: &CellSlice) -> String {
+    if let Some(cell) = exact_slice_cell(cs)
+        && let Some(rendered) = render_exact_slice_cell(&cell)
+    {
+        return rendered;
+    }
+
     let ref_count = cs
         .refs
         .as_ref()
@@ -2083,6 +2036,24 @@ fn render_slice(cs: &CellSlice) -> String {
         &cs.value
     };
     format!("slice{{{data_hex}}}{r_suf}")
+}
+
+fn render_exact_slice_cell(cell: &Cell) -> Option<String> {
+    let mut slice = cell.as_slice_allow_exotic();
+    let bit_len = slice.size_bits();
+    let bit_count = bit_len as usize;
+    let ref_count = slice.size_refs() as usize;
+    let mut raw_bits = vec![0u8; bit_count.div_ceil(8)];
+    slice.load_raw(&mut raw_bits, bit_len).ok()?;
+
+    let mut data_hex = String::with_capacity(raw_bits.len() * 2);
+    for byte in raw_bits {
+        write!(data_hex, "{byte:02x}").ok()?;
+    }
+
+    let nibbles = hex_to_nibbles(&data_hex);
+    let rendered = bits_to_hex(&nibbles, 0, bit_count);
+    Some(format!("slice{{{rendered}}}{}", refs_suffix(ref_count)))
 }
 
 /// Render a Builder (BC{hex}) as `builder{DATA_HEX}`, stripping descriptor bytes.
@@ -2144,8 +2115,16 @@ fn flatten_lisp_list(items: &[VmStackValue]) -> Vec<&VmStackValue> {
     }
 }
 
-fn typed_leaf_for_ty(ty: &Ty, value: impl Into<String>) -> RenderedValue {
-    RenderedValue::typed_leaf(value, ty.to_string())
+fn typed_leaf_for_ty(
+    symbols: &SourceMap,
+    ty_idx: TyIdx,
+    value: impl Into<String>,
+) -> RenderedValue {
+    RenderedValue::typed_leaf(value, render_ty(symbols, ty_idx))
+}
+
+fn typed_leaf(type_name: impl Into<String>, value: impl Into<String>) -> RenderedValue {
+    RenderedValue::typed_leaf(value, type_name)
 }
 
 // ---------------------------------------------------------------------------
@@ -2158,10 +2137,12 @@ fn typed_leaf_for_ty(ty: &Ty, value: impl Into<String>) -> RenderedValue {
 fn debug_format(
     symbols: &SourceMap,
     r: &mut StackReader,
-    ty: &Ty,
+    ty_idx: TyIdx,
     un_tuple_if_w: bool,
 ) -> RenderedValue {
-    let width = calc_width_on_stack(symbols, ty);
+    let ty = symbols.ty_by_idx(ty_idx).unwrap_or(&Ty::Unknown);
+    let ty_name = render_ty(symbols, ty_idx);
+    let width = calc_width_on_stack(symbols, ty_idx);
 
     if width > 0 && r.peek_n_all_optimized_out(width) {
         r.skip(width);
@@ -2176,7 +2157,7 @@ fn debug_format(
             .collect();
         r.skip(width);
         let mut sub = StackReader::new(&as_live);
-        let inner = debug_format(symbols, &mut sub, ty, un_tuple_if_w);
+        let inner = debug_format(symbols, &mut sub, ty_idx, un_tuple_if_w);
         return RenderedValue::LastSeen {
             inner: Box::new(inner),
         };
@@ -2188,7 +2169,7 @@ fn debug_format(
     {
         let as_live: Vec<SlotValue> = t.iter().map(SlotValue::Live).collect();
         let mut sub = StackReader::new(&as_live);
-        return debug_format(symbols, &mut sub, ty, false);
+        return debug_format(symbols, &mut sub, ty_idx, false);
     }
 
     match ty {
@@ -2198,29 +2179,31 @@ fn debug_format(
         | Ty::VarintN { .. }
         | Ty::VaruintN { .. }
         | Ty::Coins => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Integer(s)) => typed_leaf_for_ty(ty, s.clone()),
-            SlotValue::Live(VmStackValue::NaN) => typed_leaf_for_ty(ty, "NaN"),
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM int"),
+            SlotValue::Live(VmStackValue::Integer(s)) => {
+                typed_leaf_for_ty(symbols, ty_idx, s.clone())
+            }
+            SlotValue::Live(VmStackValue::NaN) => typed_leaf_for_ty(symbols, ty_idx, "NaN"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM int"),
         },
 
         Ty::Bool => match r.read_slot() {
             SlotValue::Live(VmStackValue::Integer(s)) => {
                 if s == "0" {
-                    typed_leaf_for_ty(ty, "false")
+                    typed_leaf_for_ty(symbols, ty_idx, "false")
                 } else {
-                    typed_leaf_for_ty(ty, "true")
+                    typed_leaf_for_ty(symbols, ty_idx, "true")
                 }
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM int"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM int"),
         },
 
         Ty::Cell => match r.read_slot() {
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 let (bits, refs, hash) = cell_like_meta(cell);
                 render_openable_cell_like(
-                    ty,
+                    ty_name,
                     render_cell_like(cell),
                     bits,
                     refs,
@@ -2228,49 +2211,53 @@ fn debug_format(
                     Some(cell.clone()),
                 )
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell"),
         },
 
-        Ty::CellOf { inner } => match r.read_slot() {
+        Ty::CellOf { inner_ty_idx } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Cell(cell)) => {
-                render_typed_cell(symbols, ty, inner, cell)
+                render_typed_cell(symbols, ty_name, *inner_ty_idx, cell)
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell"),
         },
 
         Ty::String => match r.read_slot() {
-            SlotValue::Live(VmStackValue::String(s)) => typed_leaf_for_ty(ty, format!("\"{s}\"")),
+            SlotValue::Live(VmStackValue::String(s)) => {
+                typed_leaf_for_ty(symbols, ty_idx, format!("\"{s}\""))
+            }
             SlotValue::Live(VmStackValue::Cell(cell)) => typed_leaf_for_ty(
-                ty,
+                symbols,
+                ty_idx,
                 try_parse_string_cell_like(cell)
                     .map_or_else(|| render_cell_like(cell), |string| format!("\"{string}\"")),
             ),
             SlotValue::Live(VmStackValue::CellSlice(cs)) => typed_leaf_for_ty(
-                ty,
+                symbols,
+                ty_idx,
                 try_parse_string_slice(cs)
                     .map_or_else(|| render_slice(cs), |string| format!("\"{string}\"")),
             ),
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell"),
         },
 
         Ty::Builder => match r.read_slot() {
             SlotValue::Live(VmStackValue::Builder(b)) => {
                 let cell = CellLike::Builder(b.clone());
                 let (bits, refs, hash) = cell_like_meta(&cell);
-                render_openable_cell_like(ty, render_builder(b), bits, refs, hash, Some(cell))
+                render_openable_cell_like(ty_name, render_builder(b), bits, refs, hash, Some(cell))
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM builder"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM builder"),
         },
 
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => {
                 let (bits, refs, hash) = slice_meta(cs);
                 render_openable_cell_like(
-                    ty,
+                    ty_name,
                     render_slice(cs),
                     bits,
                     refs,
@@ -2278,11 +2265,11 @@ fn debug_format(
                     slice_as_cell_like(cs),
                 )
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM slice"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM slice"),
         },
 
-        Ty::ArrayOf { inner } => {
+        Ty::ArrayOf { inner_ty_idx } => {
             // array len N => N sub-items => N calls to inner debug_format
             match r.read_slot() {
                 SlotValue::Live(VmStackValue::Tuple(t)) => {
@@ -2290,77 +2277,86 @@ fn debug_format(
                     let mut sub = StackReader::new(&as_live);
                     let items: Vec<RenderedValue> = as_live
                         .iter()
-                        .map(|_| debug_format(symbols, &mut sub, inner, true))
+                        .map(|_| debug_format(symbols, &mut sub, *inner_ty_idx, true))
                         .collect();
                     RenderedValue::ArrayOf {
-                        type_name: ty.to_string(),
+                        type_name: ty_name,
                         items,
                     }
                 }
-                SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-                _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
+                SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+                _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM tuple"),
             }
         }
 
-        Ty::LispListOf { inner } => match r.read_slot() {
+        Ty::LispListOf { inner_ty_idx } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Tuple(t)) => {
                 let elements = flatten_lisp_list(t);
                 let as_live: Vec<SlotValue> = elements.iter().map(|v| SlotValue::Live(v)).collect();
                 let n = as_live.len();
                 let mut sub = StackReader::new(&as_live);
                 let items: Vec<RenderedValue> = (0..n)
-                    .map(|_| debug_format(symbols, &mut sub, inner, true))
+                    .map(|_| debug_format(symbols, &mut sub, *inner_ty_idx, true))
                     .collect();
                 RenderedValue::ArrayOf {
-                    type_name: ty.to_string(),
+                    type_name: ty_name,
                     items,
                 }
             }
             SlotValue::Live(VmStackValue::Null) => RenderedValue::ArrayOf {
-                type_name: ty.to_string(),
+                type_name: ty_name,
                 items: vec![],
             },
-            _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM tuple"),
         },
 
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
             SlotValue::Live(VmStackValue::CellSlice(cs)) => match try_parse_address(cs) {
                 Some(raw) => match raw.parse::<StdAddr>() {
-                    Ok(addr) => render_std_address(ty.to_string(), addr.to_string(), &addr),
-                    Err(_) => typed_leaf_for_ty(ty, raw),
+                    Ok(addr) => render_std_address(ty_name, addr.to_string(), &addr),
+                    Err(_) => typed_leaf_for_ty(symbols, ty_idx, raw),
                 },
-                None => typed_leaf_for_ty(ty, render_slice(cs)),
+                None => typed_leaf_for_ty(symbols, ty_idx, render_slice(cs)),
             },
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM slice"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM slice"),
         },
 
-        Ty::MapKV { k, v } => match r.read_slot() {
+        Ty::MapKV {
+            key_ty_idx,
+            value_ty_idx,
+        } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Null) => RenderedValue::Struct {
-                type_name: map_type_name(k, v),
+                type_name: format!(
+                    "map<{}, {}>",
+                    render_ty(symbols, *key_ty_idx),
+                    render_ty(symbols, *value_ty_idx)
+                ),
                 fields: vec![],
             },
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 if let Some(root) = decode_cell_like(cell) {
-                    render_map_dict(symbols, Some(root), k, v)
+                    render_map_dict(symbols, Some(root), *key_ty_idx, *value_ty_idx)
                 } else {
-                    typed_leaf_for_ty(ty, "not a TVM cell")
+                    typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell")
                 }
             }
-            _ => typed_leaf_for_ty(ty, "not a TVM cell"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell"),
         },
 
         Ty::NullLiteral => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM null"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM null"),
         },
 
-        Ty::Void => typed_leaf_for_ty(ty, "(void)"),
+        Ty::Void => typed_leaf_for_ty(symbols, ty_idx, "(void)"),
 
         Ty::Callable => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Continuation(_)) => typed_leaf_for_ty(ty, "continuation"),
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM continuation"),
+            SlotValue::Live(VmStackValue::Continuation(_)) => {
+                typed_leaf_for_ty(symbols, ty_idx, "continuation")
+            }
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM continuation"),
         },
         Ty::Unknown => match r.read_slot() {
             SlotValue::Live(any) => RenderedValue::leaf(any.to_string()),
@@ -2368,7 +2364,9 @@ fn debug_format(
         },
 
         Ty::Nullable {
-            inner, stack_width, ..
+            inner_ty_idx,
+            stack_width,
+            ..
         } => {
             if let Some(sw) = stack_width {
                 // read wide nullable: [null, null, ... 0] or [smth, smth, ... type_id]
@@ -2378,17 +2376,17 @@ fn debug_format(
                     SlotValue::Live(VmStackValue::Integer(type_id))
                     | SlotValue::LastSeen(VmStackValue::Integer(type_id)) => {
                         if type_id == "0" {
-                            typed_leaf_for_ty(ty, "null")
+                            typed_leaf(ty_name, "null")
                         } else {
                             let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
-                            debug_format(symbols, &mut sub, inner, false)
+                            debug_format(symbols, &mut sub, *inner_ty_idx, false)
                         }
                     }
                     SlotValue::OptimizedOut => {
                         let mut sub = StackReader::new(&nullable_slots[..sw - 1]);
-                        debug_format(symbols, &mut sub, inner, false)
+                        debug_format(symbols, &mut sub, *inner_ty_idx, false)
                     }
-                    _ => typed_leaf_for_ty(ty, "corrupted stack for nullable"),
+                    _ => typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for nullable"),
                 }
             } else {
                 // read a primitive one-slot nullable: either TVM null or a value of type inner
@@ -2396,67 +2394,30 @@ fn debug_format(
                     SlotValue::Live(VmStackValue::Null)
                     | SlotValue::LastSeen(VmStackValue::Null) => {
                         r.read_slot();
-                        typed_leaf_for_ty(ty, "null")
+                        typed_leaf(ty_name, "null")
                     }
-                    _ => debug_format(symbols, r, inner, false),
+                    _ => debug_format(symbols, r, *inner_ty_idx, false),
                 }
             }
         }
 
-        Ty::StructRef {
-            struct_name,
-            type_args,
-        } => {
-            let struct_ref = symbols.get_struct(struct_name);
-            let struct_name = match type_args {
-                None => struct_name.clone(),
-                Some(type_args) => format!(
-                    "{}<{}>",
-                    struct_name,
-                    type_args
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-            };
+        Ty::StructRef { .. } => {
             let mut fields: Vec<(String, RenderedValue)> = Vec::new();
-            for f in &struct_ref.fields {
-                let field_val = match type_args {
-                    Some(type_args) => {
-                        let f_ty = instantiate_generics(
-                            &f.ty,
-                            struct_ref.type_params.as_deref().unwrap_or(&[]),
-                            type_args,
-                        );
-                        debug_format(symbols, r, &f_ty, false)
-                    }
-                    None => debug_format(symbols, r, &f.ty, false),
-                };
+            for f in symbols.struct_fields_of(ty_idx).unwrap_or_default() {
+                let field_val = debug_format(symbols, r, f.ty_idx, false);
                 fields.push((f.name.clone(), field_val));
             }
             RenderedValue::Struct {
-                type_name: struct_name,
+                type_name: ty_name,
                 fields,
             }
         }
 
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let alias_ref = symbols.get_alias(alias_name);
-            match type_args {
-                Some(type_args) => {
-                    let target_ty = instantiate_generics(
-                        &alias_ref.target_ty,
-                        alias_ref.type_params.as_deref().unwrap_or(&[]),
-                        type_args,
-                    );
-                    debug_format(symbols, r, &target_ty, false)
-                }
-                None => debug_format(symbols, r, &alias_ref.target_ty, false),
-            }
+        Ty::AliasRef { .. } => {
+            let Some(target_ty_idx) = symbols.alias_target_of(ty_idx) else {
+                return typed_leaf_for_ty(symbols, ty_idx, "unresolved alias");
+            };
+            debug_format(symbols, r, target_ty_idx, false)
         }
 
         Ty::EnumRef { enum_name } => match r.read_slot() {
@@ -2469,39 +2430,39 @@ fn debug_format(
                 let slot = VmStackValue::Integer(s.clone());
                 let slots = [SlotValue::Live(&slot)];
                 let mut sub = StackReader::new(&slots);
-                let raw_value = debug_format(symbols, &mut sub, &enum_ref.encoded_as, false);
-                render_enum_value(ty, text, raw_value)
+                let raw_value = debug_format(symbols, &mut sub, enum_ref.encoded_as_ty_idx, false);
+                render_enum_value(ty_name, text, raw_value)
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM int"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM int"),
         },
 
-        Ty::Tensor { items } => {
-            let items: Vec<RenderedValue> = items
+        Ty::Tensor { items_ty_idx } => {
+            let items: Vec<RenderedValue> = items_ty_idx
                 .iter()
-                .map(|item| debug_format(symbols, r, item, false))
+                .map(|&item| debug_format(symbols, r, item, false))
                 .collect();
             RenderedValue::Tensor {
-                type_name: ty.to_string(),
+                type_name: ty_name,
                 items,
             }
         }
 
-        Ty::ShapedTuple { items } => match r.read_slot() {
+        Ty::ShapedTuple { items_ty_idx } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Tuple(t)) => {
                 let as_live: Vec<SlotValue> = t.iter().map(SlotValue::Live).collect();
                 let mut sub = StackReader::new(&as_live);
-                let items: Vec<RenderedValue> = items
+                let items: Vec<RenderedValue> = items_ty_idx
                     .iter()
-                    .map(|item| debug_format(symbols, &mut sub, item, true))
+                    .map(|&item| debug_format(symbols, &mut sub, item, true))
                     .collect();
                 RenderedValue::ArrayOf {
-                    type_name: ty.to_string(),
+                    type_name: ty_name,
                     items,
                 }
             }
-            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(ty, "null"),
-            _ => typed_leaf_for_ty(ty, "not a TVM tuple"),
+            SlotValue::Live(VmStackValue::Null) => typed_leaf_for_ty(symbols, ty_idx, "null"),
+            _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM tuple"),
         },
 
         Ty::Union {
@@ -2521,33 +2482,42 @@ fn debug_format(
                     {
                         let variant_width = variant.stack_width.unwrap_or(0);
                         let Some(variant_start) = stack_width.checked_sub(1 + variant_width) else {
-                            return typed_leaf_for_ty(ty, "corrupted stack for union");
+                            return typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for union");
                         };
                         let value = if variant_width == 0 {
                             None
                         } else {
                             let mut sub =
                                 StackReader::new(&union_slots[variant_start..stack_width - 1]);
-                            Some(debug_format(symbols, &mut sub, &variant.variant_ty, false))
+                            Some(debug_format(
+                                symbols,
+                                &mut sub,
+                                variant.variant_ty_idx,
+                                false,
+                            ))
                         };
-                        render_union_case(ty, variant.variant_ty.to_string(), value)
+                        render_union_case(
+                            ty_name,
+                            render_ty(symbols, variant.variant_ty_idx),
+                            value,
+                        )
                     } else {
                         // corrupted stack, type_id on a stack mismatches all variants
-                        typed_leaf_for_ty(ty, "union with unknown variant")
+                        typed_leaf_for_ty(symbols, ty_idx, "union with unknown variant")
                     }
                 }
                 SlotValue::OptimizedOut => {
                     // this should not happen in practice, because if UTag for a union was erased during compilation,
                     // a union was definitely smart cast, and its type is narrowed, not Ty::Union
-                    typed_leaf_for_ty(ty, "union with unknown variant")
+                    typed_leaf_for_ty(symbols, ty_idx, "union with unknown variant")
                 }
-                _ => typed_leaf_for_ty(ty, "corrupted stack for union"),
+                _ => typed_leaf_for_ty(symbols, ty_idx, "corrupted stack for union"),
             }
         }
 
         Ty::Union { .. } => {
             r.read_n_slots(width);
-            typed_leaf_for_ty(ty, "union with unresolved layout")
+            typed_leaf(ty_name, "union with unresolved layout")
         }
 
         Ty::GenericT { name_t } => {
@@ -2559,10 +2529,10 @@ fn debug_format(
 pub(crate) fn debug_print_from_stack(
     symbols: &SourceMap,
     slots: &[SlotValue],
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> RenderedValue {
     let mut r = StackReader::new(slots);
-    debug_format(symbols, &mut r, ty, false)
+    debug_format(symbols, &mut r, ty_idx, false)
 }
 
 fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
@@ -2586,54 +2556,54 @@ fn tuple_items_to_vm_stack_values(tuple: &Tuple) -> Vec<VmStackValue> {
     tuple.iter().map(tuple_item_to_vm_stack_value).collect()
 }
 
-pub fn render_tuple_as_tolk_type(symbols: &SourceMap, tuple: &Tuple, ty: &Ty) -> RenderedValue {
+pub fn render_tuple_as_tolk_type(
+    symbols: &SourceMap,
+    tuple: &Tuple,
+    ty_idx: TyIdx,
+) -> RenderedValue {
     let stack_values = tuple_items_to_vm_stack_values(tuple);
     let slots: Vec<SlotValue<'_>> = stack_values.iter().map(SlotValue::Live).collect();
-    debug_print_from_stack(symbols, &slots, ty)
+    debug_print_from_stack(symbols, &slots, ty_idx)
 }
 
 pub fn render_tuple_item_as_tolk_type(
     symbols: &SourceMap,
     item: &TupleItem,
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> RenderedValue {
     match item {
-        TupleItem::Tuple(tuple) if top_level_tuple_is_stack_frame(symbols, ty) => {
-            render_tuple_as_tolk_type(symbols, tuple, ty)
+        TupleItem::Tuple(tuple) if top_level_tuple_is_stack_frame(symbols, ty_idx) => {
+            render_tuple_as_tolk_type(symbols, tuple, ty_idx)
         }
         _ => {
             let stack_value = tuple_item_to_vm_stack_value(item);
             let slots = [SlotValue::Live(&stack_value)];
-            debug_print_from_stack(symbols, &slots, ty)
+            debug_print_from_stack(symbols, &slots, ty_idx)
         }
     }
 }
 
-fn top_level_tuple_is_stack_frame(symbols: &SourceMap, ty: &Ty) -> bool {
+fn top_level_tuple_is_stack_frame(symbols: &SourceMap, ty_idx: TyIdx) -> bool {
+    let Some(ty) = symbols.ty_by_idx(ty_idx) else {
+        return false;
+    };
     match ty {
         Ty::Tensor { .. } | Ty::StructRef { .. } => true,
         Ty::Nullable {
-            inner, stack_width, ..
-        } => stack_width.is_some_and(|w| w != 1) || top_level_tuple_is_stack_frame(symbols, inner),
+            inner_ty_idx,
+            stack_width,
+            ..
+        } => {
+            stack_width.is_some_and(|w| w != 1)
+                || top_level_tuple_is_stack_frame(symbols, *inner_ty_idx)
+        }
         Ty::Union {
             stack_width: Some(stack_width),
             ..
         } => *stack_width != 1,
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let alias_ref = symbols.get_alias(alias_name);
-            let target_ty = match type_args {
-                Some(type_args) => instantiate_generics(
-                    &alias_ref.target_ty,
-                    alias_ref.type_params.as_deref().unwrap_or(&[]),
-                    type_args,
-                ),
-                None => alias_ref.target_ty.clone(),
-            };
-            top_level_tuple_is_stack_frame(symbols, &target_ty)
-        }
+        Ty::AliasRef { .. } => symbols
+            .alias_target_of(ty_idx)
+            .is_some_and(|target_ty_idx| top_level_tuple_is_stack_frame(symbols, target_ty_idx)),
         _ => false,
     }
 }
@@ -2641,7 +2611,7 @@ fn top_level_tuple_is_stack_frame(symbols: &SourceMap, ty: &Ty) -> bool {
 fn render_lazy_struct_fields(
     symbols: &SourceMap,
     struct_ref: &AbiStruct,
-    type_args: Option<&[Ty]>,
+    struct_ty_idx: TyIdx,
     slot_values: &[SlotValue],
     ir_slots: &[usize],
     last_seen: &HashMap<usize, VmStackValue>,
@@ -2657,23 +2627,18 @@ fn render_lazy_struct_fields(
 
     let mut fields = Vec::new();
     let mut offset = 0;
-    for f in &struct_ref.fields {
-        let f_ty = match type_args {
-            Some(type_args) => instantiate_generics(
-                &f.ty,
-                struct_ref.type_params.as_deref().unwrap_or(&[]),
-                type_args,
-            ),
-            None => f.ty.clone(),
-        };
-        let f_width = calc_width_on_stack(symbols, &f_ty);
+    let fields_to_render = symbols
+        .struct_fields_of(struct_ty_idx)
+        .unwrap_or_else(|| struct_ref.fields.clone());
+    for f in &fields_to_render {
+        let f_width = calc_width_on_stack(symbols, f.ty_idx);
         let field_ir_slots = &ir_slots[offset..offset + f_width];
         let field_ever_seen = field_ir_slots.iter().any(|s| last_seen.contains_key(s));
 
         let preview = match lazy_s.as_mut() {
             Some(lazy_s) => {
-                if let Ok(parsed) = dynamic_unpack::unpack_from_slice(lazy_s, symbols, &f_ty) {
-                    Some(render_abi_data(symbols, parsed, &f_ty))
+                if let Ok(parsed) = dynamic_unpack::unpack_from_slice(lazy_s, symbols, f.ty_idx) {
+                    Some(render_abi_data(symbols, parsed, f.ty_idx))
                 } else {
                     None
                 }
@@ -2684,7 +2649,7 @@ fn render_lazy_struct_fields(
         let field_val = if field_ever_seen {
             let field_slot_values = &slot_values[offset..offset + f_width];
             let mut r = StackReader::new(field_slot_values);
-            debug_format(symbols, &mut r, &f_ty, false)
+            debug_format(symbols, &mut r, f.ty_idx, false)
         } else {
             match preview {
                 None => RenderedValue::LazyCantParseSlice,
@@ -2710,31 +2675,25 @@ pub(crate) fn debug_format_lazy(
     symbols: &SourceMap,
     slot_values: &[SlotValue],
     ir_slots: &[usize],
-    ty: &Ty,
+    ty_idx: TyIdx,
     last_seen: &HashMap<usize, VmStackValue>,
     lazy_original_slice: &VmStackValue,
 ) -> RenderedValue {
+    let ty = symbols.ty_by_idx(ty_idx).unwrap_or(&Ty::Unknown);
     match ty {
         Ty::Union { .. } => {
             // when a lazy var is still Ty::Union, DEBUG_SMART_CAST not appeared, it's still unresolved
-            let type_name = format!("{ty}");
+            let type_name = render_ty(symbols, ty_idx);
             RenderedValue::LazyUnresolved { type_name }
         }
 
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let alias_ref = symbols.get_alias(alias_name);
-            let resolved = match type_args {
-                Some(type_args) => instantiate_generics(
-                    &alias_ref.target_ty,
-                    alias_ref.type_params.as_deref().unwrap_or(&[]),
-                    type_args,
-                ),
-                None => alias_ref.target_ty.clone(),
+        Ty::AliasRef { alias_name, .. } => {
+            let Some(resolved_ty_idx) = symbols.alias_target_of(ty_idx) else {
+                return RenderedValue::LazyUnresolved {
+                    type_name: alias_name.clone(),
+                };
             };
-            if matches!(&resolved, Ty::Union { .. }) {
+            if matches!(symbols.ty_by_idx(resolved_ty_idx), Some(Ty::Union { .. })) {
                 return RenderedValue::LazyUnresolved {
                     type_name: alias_name.clone(),
                 };
@@ -2743,28 +2702,24 @@ pub(crate) fn debug_format_lazy(
                 symbols,
                 slot_values,
                 ir_slots,
-                &resolved,
+                resolved_ty_idx,
                 last_seen,
                 lazy_original_slice,
             )
         }
 
-        Ty::StructRef {
-            struct_name,
-            type_args,
-        } => {
+        Ty::StructRef { struct_name, .. } => {
             let struct_ref = symbols.get_struct(struct_name);
             let slice_as_cell = match lazy_original_slice {
                 VmStackValue::CellSlice(cs) => exact_slice_cell(cs),
                 _ => None,
             };
 
-            let ty_args = type_args.as_deref();
             let fields = match &slice_as_cell {
                 Some(cell) => render_lazy_struct_fields(
                     symbols,
                     struct_ref,
-                    ty_args,
+                    ty_idx,
                     slot_values,
                     ir_slots,
                     last_seen,
@@ -2773,7 +2728,7 @@ pub(crate) fn debug_format_lazy(
                 None => render_lazy_struct_fields(
                     symbols,
                     struct_ref,
-                    ty_args,
+                    ty_idx,
                     slot_values,
                     ir_slots,
                     last_seen,
@@ -2789,7 +2744,7 @@ pub(crate) fn debug_format_lazy(
 
         _ => {
             let mut r = StackReader::new(slot_values);
-            debug_format(symbols, &mut r, ty, false)
+            debug_format(symbols, &mut r, ty_idx, false)
         }
     }
 }
@@ -3022,13 +2977,15 @@ fn resolve_send_message_body_meta(
         RelaxedMsgInfo::Int(_) => try_resolve_message_body(
             body,
             symbols,
-            abi.outgoing_messages.iter().map(|message| &message.body_ty),
+            abi.outgoing_messages
+                .iter()
+                .map(|message| message.body_ty_idx),
             prefix_to_skip,
         ),
         RelaxedMsgInfo::ExtOut(_) => try_resolve_message_body(
             body,
             symbols,
-            abi.emitted_events.iter().map(|message| &message.body_ty),
+            abi.emitted_events.iter().map(|message| message.body_ty_idx),
             prefix_to_skip,
         ),
     });
@@ -3052,42 +3009,42 @@ struct ResolvedDecodedMessageBody {
     decoded: RenderedValue,
 }
 
-fn try_resolve_message_body<'a, I>(
-    body: TyCellSlice<'a>,
+fn try_resolve_message_body<I>(
+    body: TyCellSlice,
     symbols: &SourceMap,
     candidates: I,
     prefix_to_skip: u16,
 ) -> Option<ResolvedDecodedMessageBody>
 where
-    I: IntoIterator<Item = &'a Ty>,
+    I: IntoIterator<Item = TyIdx>,
 {
-    for body_ty in candidates {
+    for body_ty_idx in candidates {
         let mut parser = body;
         if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
             continue;
         }
 
-        let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, symbols, body_ty) else {
+        let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, symbols, body_ty_idx) else {
             continue;
         };
         if parser.size_bits() != 0 || parser.size_refs() != 0 {
             continue;
         }
 
-        let Some(type_name) = compiler_body_type_name(body_ty) else {
+        let Some(type_name) = compiler_body_type_name(symbols, body_ty_idx) else {
             continue;
         };
         return Some(ResolvedDecodedMessageBody {
             type_name,
-            decoded: render_abi_data(symbols, data, body_ty),
+            decoded: render_abi_data(symbols, data, body_ty_idx),
         });
     }
 
     None
 }
 
-fn compiler_body_type_name(body_ty: &Ty) -> Option<String> {
-    match body_ty {
+fn compiler_body_type_name(symbols: &SourceMap, body_ty_idx: TyIdx) -> Option<String> {
+    match symbols.ty_by_idx(body_ty_idx)? {
         Ty::StructRef { struct_name, .. } => Some(struct_name.clone()),
         Ty::AliasRef { alias_name, .. } => Some(alias_name.clone()),
         _ => None,
@@ -3487,13 +3444,9 @@ fn render_runtime_uint_field(value: &VmStackValue, ty: &str) -> RenderedValue {
 fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue {
     match value {
         VmStackValue::Cell(cell) => {
-            let ty = Ty::MapKV {
-                k: Box::new(Ty::IntN { n: 32 }),
-                v: Box::new(Ty::VaruintN { n: 32 }),
-            };
             let (bits, refs, hash) = cell_like_meta(cell);
-            render_openable_cell_like(
-                &ty,
+            render_openable_cell_like_name(
+                "map<int32, varuint32>",
                 render_cell_like(cell),
                 bits,
                 refs,
@@ -3523,18 +3476,40 @@ mod tests {
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
     use tycho_types::models::{ReserveCurrencyFlags, StdAddr};
 
-    fn source_map_with_declarations(declarations: Vec<Declaration>) -> SourceMap {
+    fn source_map_with_declarations_and_types(
+        declarations: Vec<Declaration>,
+        unique_types: Vec<Ty>,
+    ) -> SourceMap {
         serde_json::from_value(serde_json::json!({
             "files": [],
             "declarations": declarations,
-            "unique_ty": [],
+            "unique_types": unique_types,
+            "struct_instantiations": [],
+            "alias_instantiations": [],
             "functions": [],
         }))
         .unwrap()
     }
 
+    fn source_map_with_declarations(declarations: Vec<Declaration>) -> SourceMap {
+        source_map_with_declarations_and_types(declarations, Vec::new())
+    }
+
+    fn source_map_with_types(unique_types: Vec<Ty>) -> SourceMap {
+        source_map_with_declarations_and_types(Vec::new(), unique_types)
+    }
+
     fn empty_symbols() -> SourceMap {
         source_map_with_declarations(Vec::new())
+    }
+
+    fn add_ty(unique_types: &mut Vec<Ty>, ty: Ty) -> TyIdx {
+        if let Some(idx) = unique_types.iter().position(|existing| existing == &ty) {
+            return idx;
+        }
+        let idx = unique_types.len();
+        unique_types.push(ty);
+        idx
     }
 
     fn loc() -> SrcRange {
@@ -3543,27 +3518,37 @@ mod tests {
 
     #[test]
     fn render_abi_data_uses_field_type_for_object_fields() {
-        let symbols = source_map_with_declarations(vec![Declaration::Struct(AbiStruct {
-            name: "Payload".to_owned(),
-            ident_loc: loc(),
-            type_params: None,
-            prefix: None,
-            fields: vec![FieldInfo {
-                name: "flag".to_owned(),
-                ty: Ty::Bool,
-            }],
-            custom_pack_unpack: None,
-        })]);
+        let mut unique_types = Vec::new();
+        let bool_ty_idx = add_ty(&mut unique_types, Ty::Bool);
+        let payload_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::StructRef {
+                struct_name: "Payload".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let symbols = source_map_with_declarations_and_types(
+            vec![Declaration::Struct(AbiStruct {
+                name: "Payload".to_owned(),
+                ty_idx: payload_ty_idx,
+                ident_loc: loc(),
+                type_params: None,
+                prefix: None,
+                fields: vec![FieldInfo {
+                    name: "flag".to_owned(),
+                    ty_idx: bool_ty_idx,
+                }],
+                custom_pack_unpack: None,
+            })],
+            unique_types,
+        );
         let rendered = render_abi_data(
             &symbols,
             UnpackedValue::Object {
                 name: "Payload".to_owned(),
                 fields: vec![("flag".to_owned(), UnpackedValue::Bool(true))],
             },
-            &Ty::StructRef {
-                struct_name: "Payload".to_owned(),
-                type_args: None,
-            },
+            payload_ty_idx,
         );
 
         let RenderedValue::Struct { fields, .. } = rendered else {
@@ -3575,15 +3560,22 @@ mod tests {
 
     #[test]
     fn render_abi_data_uses_container_types_for_tensor_items() {
+        let mut unique_types = Vec::new();
+        let bool_ty_idx = add_ty(&mut unique_types, Ty::Bool);
+        let uint32_ty_idx = add_ty(&mut unique_types, Ty::UintN { n: 32 });
+        let tensor_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::Tensor {
+                items_ty_idx: vec![bool_ty_idx, uint32_ty_idx],
+            },
+        );
         let rendered = render_abi_data(
-            &empty_symbols(),
+            &source_map_with_types(unique_types),
             UnpackedValue::Array(vec![
                 UnpackedValue::Bool(true),
                 UnpackedValue::Number(7.into()),
             ]),
-            &Ty::Tensor {
-                items: vec![Ty::Bool, Ty::UintN { n: 32 }],
-            },
+            tensor_ty_idx,
         );
 
         let RenderedValue::ArrayOf { items, .. } = rendered else {
@@ -3595,25 +3587,35 @@ mod tests {
 
     #[test]
     fn render_abi_enum_value_exposes_raw_value_field() {
-        let symbols = source_map_with_declarations(vec![Declaration::Enum(AbiEnum {
-            name: "Color".to_owned(),
-            ident_loc: loc(),
-            encoded_as: Ty::UintN { n: 8 },
-            members: vec![EnumMemberInfo {
-                name: "Blue".to_owned(),
-                value: "2".to_owned(),
-            }],
-            custom_pack_unpack: None,
-        })]);
+        let mut unique_types = Vec::new();
+        let uint8_ty_idx = add_ty(&mut unique_types, Ty::UintN { n: 8 });
+        let color_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::EnumRef {
+                enum_name: "Color".to_owned(),
+            },
+        );
+        let symbols = source_map_with_declarations_and_types(
+            vec![Declaration::Enum(AbiEnum {
+                name: "Color".to_owned(),
+                ty_idx: color_ty_idx,
+                ident_loc: loc(),
+                encoded_as_ty_idx: uint8_ty_idx,
+                members: vec![EnumMemberInfo {
+                    name: "Blue".to_owned(),
+                    value: "2".to_owned(),
+                }],
+                custom_pack_unpack: None,
+            })],
+            unique_types,
+        );
         let rendered = render_abi_data(
             &symbols,
             UnpackedValue::Object {
                 name: "Color.Blue".to_owned(),
                 fields: vec![("value".to_owned(), UnpackedValue::Number(2.into()))],
             },
-            &Ty::EnumRef {
-                enum_name: "Color".to_owned(),
-            },
+            color_ty_idx,
         );
 
         let RenderedValue::EnumValue {
@@ -3642,7 +3644,7 @@ mod tests {
 
         let (bits, refs, hash) = cell_like_meta(&CellLike::Cell(Boc::encode_hex(&cell)));
         let rendered = render_openable_cell_like(
-            &Ty::Cell,
+            "cell",
             render_cell_like(&CellLike::Cell(Boc::encode_hex(&cell))),
             bits,
             refs,
@@ -3737,39 +3739,63 @@ mod tests {
 
     #[test]
     fn render_runtime_storage_chooses_storage_type_that_decodes_cell() {
-        let symbols = source_map_with_declarations(vec![
-            Declaration::Struct(AbiStruct {
-                name: "Storage".to_owned(),
-                ident_loc: loc(),
-                type_params: None,
-                prefix: None,
-                fields: vec![FieldInfo {
-                    name: "count".to_owned(),
-                    ty: Ty::UintN { n: 32 },
-                }],
-                custom_pack_unpack: None,
-            }),
-            Declaration::Struct(AbiStruct {
-                name: "DeploymentStorage".to_owned(),
-                ident_loc: loc(),
-                type_params: None,
-                prefix: None,
-                fields: vec![FieldInfo {
-                    name: "ready".to_owned(),
-                    ty: Ty::Bool,
-                }],
-                custom_pack_unpack: None,
-            }),
-        ]);
+        let mut unique_types = Vec::new();
+        let storage_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::StructRef {
+                struct_name: "Storage".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let deployment_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::StructRef {
+                struct_name: "DeploymentStorage".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let count_ty_idx = add_ty(&mut unique_types, Ty::UintN { n: 32 });
+        let ready_ty_idx = add_ty(&mut unique_types, Ty::Bool);
+        let symbols = source_map_with_declarations_and_types(
+            vec![
+                Declaration::Struct(AbiStruct {
+                    name: "Storage".to_owned(),
+                    ty_idx: storage_ty_idx,
+                    ident_loc: loc(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![FieldInfo {
+                        name: "count".to_owned(),
+                        ty_idx: count_ty_idx,
+                    }],
+                    custom_pack_unpack: None,
+                }),
+                Declaration::Struct(AbiStruct {
+                    name: "DeploymentStorage".to_owned(),
+                    ty_idx: deployment_ty_idx,
+                    ident_loc: loc(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![FieldInfo {
+                        name: "ready".to_owned(),
+                        ty_idx: ready_ty_idx,
+                    }],
+                    custom_pack_unpack: None,
+                }),
+            ],
+            unique_types.clone(),
+        );
         let abi = ContractABI {
+            unique_types,
             declarations: vec![
                 ABIDeclaration::Struct {
                     name: "Storage".to_owned(),
+                    ty_idx: storage_ty_idx,
                     type_params: None,
                     prefix: None,
                     fields: vec![ABIStructField {
                         name: "count".to_owned(),
-                        ty: Ty::UintN { n: 32 },
+                        ty_idx: count_ty_idx,
                         default_value: None,
                         description: String::new(),
                     }],
@@ -3778,11 +3804,12 @@ mod tests {
                 },
                 ABIDeclaration::Struct {
                     name: "DeploymentStorage".to_owned(),
+                    ty_idx: deployment_ty_idx,
                     type_params: None,
                     prefix: None,
                     fields: vec![ABIStructField {
                         name: "ready".to_owned(),
-                        ty: Ty::Bool,
+                        ty_idx: ready_ty_idx,
                         default_value: None,
                         description: String::new(),
                     }],
@@ -3791,14 +3818,8 @@ mod tests {
                 },
             ],
             storage: ABIStorage {
-                storage_ty: Some(Ty::StructRef {
-                    struct_name: "Storage".to_owned(),
-                    type_args: None,
-                }),
-                storage_at_deployment_ty: Some(Ty::StructRef {
-                    struct_name: "DeploymentStorage".to_owned(),
-                    type_args: None,
-                }),
+                storage_ty_idx: Some(storage_ty_idx),
+                storage_at_deployment_ty_idx: Some(deployment_ty_idx),
                 description: String::new(),
             },
             ..Default::default()
@@ -3936,7 +3957,7 @@ mod tests {
         })];
         let slots = [SlotValue::Live(&stack_values[0])];
 
-        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &Ty::Address);
+        let rendered = debug_print_from_stack(&source_map_with_types(vec![Ty::Address]), &slots, 0);
 
         let RenderedValue::Address {
             legacy_value,
@@ -3960,13 +3981,19 @@ mod tests {
                 "kind": "enum",
                 "name": "Color",
                 "ident_loc": [0, 0, 0, 0, 0],
-                "encoded_as": {"kind": "uintN", "n": 8},
+                "ty_idx": 1,
+                "encoded_as_ty_idx": 0,
                 "members": [
                     {"name": "Red", "value": "1"},
                     {"name": "Blue", "value": "2"}
                 ]
             }],
-            "unique_ty": [],
+            "unique_types": [
+                {"kind": "uintN", "n": 8},
+                {"kind": "EnumRef", "enum_name": "Color"}
+            ],
+            "struct_instantiations": [],
+            "alias_instantiations": [],
             "functions": [],
             "debug_marks": []
         });
@@ -3974,13 +4001,7 @@ mod tests {
 
         let stack_values = [VmStackValue::Integer("2".to_owned())];
         let slots = [SlotValue::Live(&stack_values[0])];
-        let rendered = debug_print_from_stack(
-            &symbols,
-            &slots,
-            &Ty::EnumRef {
-                enum_name: "Color".to_owned(),
-            },
-        );
+        let rendered = debug_print_from_stack(&symbols, &slots, 1);
 
         let RenderedValue::EnumValue {
             type_name,
@@ -4001,27 +4022,31 @@ mod tests {
     #[test]
     fn render_union_case_preserves_inner_children() {
         let cell = CellBuilder::new().build().unwrap();
-        let union_ty = Ty::Union {
-            variants: vec![
-                UnionVariant {
-                    variant_ty: Ty::Cell,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(1),
-                    stack_width: Some(1),
-                },
-                UnionVariant {
-                    variant_ty: Ty::Int,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(2),
-                    stack_width: Some(1),
-                },
-            ],
-            stack_width: Some(2),
-        };
+        let unique_types = vec![
+            Ty::Cell,
+            Ty::Int,
+            Ty::Union {
+                variants: vec![
+                    UnionVariant {
+                        variant_ty_idx: 0,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(1),
+                        stack_width: Some(1),
+                    },
+                    UnionVariant {
+                        variant_ty_idx: 1,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(2),
+                        stack_width: Some(1),
+                    },
+                ],
+                stack_width: Some(2),
+            },
+        ];
         let stack_values = [
             VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
             VmStackValue::Integer("1".to_owned()),
@@ -4031,7 +4056,7 @@ mod tests {
             SlotValue::Live(&stack_values[1]),
         ];
 
-        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
+        let rendered = debug_print_from_stack(&source_map_with_types(unique_types), &slots, 2);
         let (dap_value, dap_type) = rendered.dap_parts();
 
         let RenderedValue::UnionCase {
@@ -4058,34 +4083,38 @@ mod tests {
 
     #[test]
     fn render_null_union_variant_has_no_value_field() {
-        let union_ty = Ty::Union {
-            variants: vec![
-                UnionVariant {
-                    variant_ty: Ty::NullLiteral,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(0),
-                    stack_width: Some(0),
-                },
-                UnionVariant {
-                    variant_ty: Ty::Bool,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(1),
-                    stack_width: Some(1),
-                },
-            ],
-            stack_width: Some(2),
-        };
+        let unique_types = vec![
+            Ty::NullLiteral,
+            Ty::Bool,
+            Ty::Union {
+                variants: vec![
+                    UnionVariant {
+                        variant_ty_idx: 0,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(0),
+                        stack_width: Some(0),
+                    },
+                    UnionVariant {
+                        variant_ty_idx: 1,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(1),
+                        stack_width: Some(1),
+                    },
+                ],
+                stack_width: Some(2),
+            },
+        ];
         let stack_values = [VmStackValue::Null, VmStackValue::Integer("0".to_owned())];
         let slots = [
             SlotValue::Live(&stack_values[0]),
             SlotValue::Live(&stack_values[1]),
         ];
 
-        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
+        let rendered = debug_print_from_stack(&source_map_with_types(unique_types), &slots, 2);
 
         let RenderedValue::UnionCase {
             variant_name,
@@ -4101,20 +4130,24 @@ mod tests {
 
     #[test]
     fn render_top_level_nullable_map_unpacks_tuple_as_stack_frame() {
-        let nullable_map_ty = Ty::Nullable {
-            inner: Box::new(Ty::MapKV {
-                k: Box::new(Ty::IntN { n: 32 }),
-                v: Box::new(Ty::IntN { n: 32 }),
-            }),
-            stack_type_id: Some(1),
-            stack_width: Some(2),
-        };
+        let unique_types = vec![
+            Ty::IntN { n: 32 },
+            Ty::MapKV {
+                key_ty_idx: 0,
+                value_ty_idx: 0,
+            },
+            Ty::Nullable {
+                inner_ty_idx: 1,
+                stack_type_id: Some(1),
+                stack_width: Some(2),
+            },
+        ];
         let present_empty_map =
             TupleItem::Tuple(Tuple(vec![TupleItem::Null, TupleItem::Int(1.into())]));
         let rendered = render_tuple_item_as_tolk_type(
-            &SourceMap::default(),
+            &source_map_with_types(unique_types),
             &present_empty_map,
-            &nullable_map_ty,
+            2,
         );
 
         let RenderedValue::Struct { type_name, fields } = rendered else {
@@ -4126,17 +4159,21 @@ mod tests {
 
     #[test]
     fn render_top_level_nullable_map_uses_zero_tag_for_null() {
-        let nullable_map_ty = Ty::Nullable {
-            inner: Box::new(Ty::MapKV {
-                k: Box::new(Ty::IntN { n: 32 }),
-                v: Box::new(Ty::IntN { n: 32 }),
-            }),
-            stack_type_id: Some(1),
-            stack_width: Some(2),
-        };
+        let unique_types = vec![
+            Ty::IntN { n: 32 },
+            Ty::MapKV {
+                key_ty_idx: 0,
+                value_ty_idx: 0,
+            },
+            Ty::Nullable {
+                inner_ty_idx: 1,
+                stack_type_id: Some(1),
+                stack_width: Some(2),
+            },
+        ];
         let null_map = TupleItem::Tuple(Tuple(vec![TupleItem::Null, TupleItem::Int(0.into())]));
         let rendered =
-            render_tuple_item_as_tolk_type(&SourceMap::default(), &null_map, &nullable_map_ty);
+            render_tuple_item_as_tolk_type(&source_map_with_types(unique_types), &null_map, 2);
 
         assert_eq!(rendered.dap_parts().0, "null");
         assert_eq!(
@@ -4147,8 +4184,11 @@ mod tests {
 
     #[test]
     fn render_nan_as_int_like_value() {
-        let rendered =
-            render_tuple_item_as_tolk_type(&SourceMap::default(), &TupleItem::Nan, &Ty::Int);
+        let rendered = render_tuple_item_as_tolk_type(
+            &source_map_with_types(vec![Ty::Int]),
+            &TupleItem::Nan,
+            0,
+        );
 
         assert_eq!(rendered.dap_parts().0, "NaN");
         assert_eq!(rendered.dap_parts().1.as_deref(), Some("int"));
@@ -4156,31 +4196,35 @@ mod tests {
 
     #[test]
     fn render_union_without_stack_width_falls_back_without_panic() {
-        let union_ty = Ty::Union {
-            variants: vec![
-                UnionVariant {
-                    variant_ty: Ty::Int,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(1),
-                    stack_width: Some(1),
-                },
-                UnionVariant {
-                    variant_ty: Ty::Cell,
-                    prefix_str: String::new(),
-                    prefix_len: 0,
-                    is_prefix_implicit: None,
-                    stack_type_id: Some(2),
-                    stack_width: Some(1),
-                },
-            ],
-            stack_width: None,
-        };
+        let unique_types = vec![
+            Ty::Int,
+            Ty::Cell,
+            Ty::Union {
+                variants: vec![
+                    UnionVariant {
+                        variant_ty_idx: 0,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(1),
+                        stack_width: Some(1),
+                    },
+                    UnionVariant {
+                        variant_ty_idx: 1,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: None,
+                        stack_type_id: Some(2),
+                        stack_width: Some(1),
+                    },
+                ],
+                stack_width: None,
+            },
+        ];
         let stack_values = [VmStackValue::Integer("7".to_owned())];
         let slots = [SlotValue::Live(&stack_values[0])];
 
-        let rendered = debug_print_from_stack(&SourceMap::default(), &slots, &union_ty);
+        let rendered = debug_print_from_stack(&source_map_with_types(unique_types), &slots, 2);
 
         assert_eq!(rendered.dap_parts().0, "union with unresolved layout");
         assert_eq!(rendered.dap_parts().1.as_deref(), Some("int | cell"));
@@ -4193,7 +4237,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let hash = render_cell_hash(&cell);
         let rendered = render_openable_cell_like(
-            &Ty::Slice,
+            "slice",
             "slice{abcd}",
             Some(16),
             Some(0),
@@ -4230,7 +4274,7 @@ mod tests {
         let (bits, refs, hash) = cell_like_meta(&cell_like);
 
         let rendered = render_openable_cell_like(
-            &Ty::Builder,
+            "builder",
             render_builder(&builder_hex),
             bits,
             refs,
@@ -4312,23 +4356,34 @@ mod tests {
 
     #[test]
     fn render_runtime_out_actions_decodes_send_msg() {
-        let symbols = source_map_with_declarations(vec![Declaration::Struct(AbiStruct {
-            name: "Transfer".to_owned(),
-            ident_loc: loc(),
-            type_params: None,
-            prefix: Some(PrefixInfo {
-                prefix_str: "0xfeedbeef".to_owned(),
-                prefix_len: 32,
-            }),
-            fields: vec![],
-            custom_pack_unpack: None,
-        })]);
+        let transfer_ty_idx = 0;
+        let unique_types = vec![Ty::StructRef {
+            struct_name: "Transfer".to_owned(),
+            type_args_ty_idx: None,
+        }];
+        let symbols = source_map_with_declarations_and_types(
+            vec![Declaration::Struct(AbiStruct {
+                name: "Transfer".to_owned(),
+                ty_idx: transfer_ty_idx,
+                ident_loc: loc(),
+                type_params: None,
+                prefix: Some(PrefixInfo {
+                    prefix_num: 0xfeedbeef,
+                    prefix_len: 32,
+                }),
+                fields: vec![],
+                custom_pack_unpack: None,
+            })],
+            unique_types.clone(),
+        );
         let abi = ContractABI {
+            unique_types,
             declarations: vec![ABIDeclaration::Struct {
                 name: "Transfer".to_owned(),
+                ty_idx: transfer_ty_idx,
                 type_params: None,
                 prefix: Some(ABIOpcode {
-                    prefix_str: "0xfeedbeef".to_owned(),
+                    prefix_num: 0xfeedbeef,
                     prefix_len: 32,
                 }),
                 fields: vec![],
@@ -4336,10 +4391,7 @@ mod tests {
                 overrides_client_type: false,
             }],
             outgoing_messages: vec![ABIOutgoingMessage {
-                body_ty: Ty::StructRef {
-                    struct_name: "Transfer".to_owned(),
-                    type_args: None,
-                },
+                body_ty_idx: transfer_ty_idx,
                 description: String::new(),
             }],
             ..Default::default()

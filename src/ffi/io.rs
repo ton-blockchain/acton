@@ -3,7 +3,7 @@ use crate::context::{BuildCache, Context, to_cell};
 use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
 use crate::formatter::FormatterContext;
 use acton_debug::render_tuple_item_as_tolk_type;
-use anyhow::{Context as AnyhowContext, bail};
+use anyhow::{Context as AnyhowContext, anyhow, bail};
 use inquire::validator::{ErrorMessage, Validation};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
@@ -13,41 +13,46 @@ use std::collections::HashSet;
 use std::io::{IsTerminal, stdin};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::Ty;
+use tolk_compiler::types_kernel::{TyIdx, render_ty};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
-extension!(println in (Context) with (arg6: TupleItem, type6: String, arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String) using println_impl);
+extension!(println in (Context) with (arg6: TupleItem, type6: BigInt, arg5: TupleItem, type5: BigInt, arg4: TupleItem, type4: BigInt, arg3: TupleItem, type3: BigInt, arg2: TupleItem, type2: BigInt, arg1: TupleItem, type1: BigInt) using println_impl);
 #[allow(clippy::too_many_arguments)]
 fn println_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     arg6: TupleItem,
-    type6: String,
+    type6: BigInt,
     arg5: TupleItem,
-    type5: String,
+    type5: BigInt,
     arg4: TupleItem,
-    type4: String,
+    type4: BigInt,
     arg3: TupleItem,
-    type3: String,
+    type3: BigInt,
     arg2: TupleItem,
-    type2: String,
+    type2: BigInt,
     arg1: TupleItem,
-    type1: String,
+    type1: BigInt,
 ) -> anyhow::Result<()> {
-    let args = collect_non_void_args([
-        (type1, arg1),
-        (type2, arg2),
-        (type3, arg3),
-        (type4, arg4),
-        (type5, arg5),
-        (type6, arg6),
-    ])?;
+    let args = collect_non_void_args(
+        ctx,
+        [
+            (type1, arg1),
+            (type2, arg2),
+            (type3, arg3),
+            (type4, arg4),
+            (type5, arg5),
+            (type6, arg6),
+        ],
+    )?;
     let formatter = FormatterContext::from_context(ctx);
+    let source_map = ctx.env.source_map.as_ref();
     let (mut formatted, tail) = if let Some(arg) = args.first()
-        && is_string_type(&arg.ty)
+        && is_top_level_string_ty_idx(source_map, arg.ty_idx)
         && let Ok(fmt) = String::from_item(arg.arg.clone().unwrap_single())
         && let Ok((rendered, consumed)) = format_args(ctx, &formatter, &fmt, &args[1..], true)
     {
@@ -83,30 +88,33 @@ fn eprintln_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) -> anyhow::Re
     Ok(())
 }
 
-extension!(format in (Context) with (arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format_impl);
+extension!(format in (Context) with (arg5: TupleItem, type5: BigInt, arg4: TupleItem, type4: BigInt, arg3: TupleItem, type3: BigInt, arg2: TupleItem, type2: BigInt, arg1: TupleItem, type1: BigInt, fmt: String) using format_impl);
 #[allow(clippy::too_many_arguments)]
 fn format_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
     arg5: TupleItem,
-    type5: String,
+    type5: BigInt,
     arg4: TupleItem,
-    type4: String,
+    type4: BigInt,
     arg3: TupleItem,
-    type3: String,
+    type3: BigInt,
     arg2: TupleItem,
-    type2: String,
+    type2: BigInt,
     arg1: TupleItem,
-    type1: String,
+    type1: BigInt,
     fmt: String,
 ) -> anyhow::Result<()> {
-    let args = collect_non_void_args([
-        (type1, arg1),
-        (type2, arg2),
-        (type3, arg3),
-        (type4, arg4),
-        (type5, arg5),
-    ])?;
+    let args = collect_non_void_args(
+        ctx,
+        [
+            (type1, arg1),
+            (type2, arg2),
+            (type3, arg3),
+            (type4, arg4),
+            (type5, arg5),
+        ],
+    )?;
     let formatter = FormatterContext::from_context(ctx);
     let (result, _) = format_args(ctx, &formatter, &fmt, &args, false)?;
     stack.push_string(&result);
@@ -115,7 +123,7 @@ fn format_impl(
 
 #[derive(Clone)]
 struct ReflectedArg {
-    ty: Ty,
+    ty_idx: TyIdx,
     arg: TupleItem,
 }
 
@@ -222,26 +230,18 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
 fn format_default(
     ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
-    ty: &Ty,
+    ty_idx: TyIdx,
     arg: TupleItem,
     colorize: bool,
 ) -> anyhow::Result<String> {
-    format_reflected_arg(
-        ctx,
-        formatter,
-        &ReflectedArg {
-            ty: ty.clone(),
-            arg,
-        },
-        colorize,
-    )
+    format_reflected_arg(ctx, formatter, &ReflectedArg { ty_idx, arg }, colorize)
 }
 
 fn format_single_arg(
     ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
     kind: PlaceholderKind,
-    ty: &Ty,
+    ty_idx: TyIdx,
     arg: TupleItem,
     colorize: bool,
 ) -> anyhow::Result<String> {
@@ -253,7 +253,7 @@ fn format_single_arg(
             {
                 return Ok(format!("{value:x}"));
             }
-            format_default(ctx, formatter, ty, arg, colorize)
+            format_default(ctx, formatter, ty_idx, arg, colorize)
         }
         PlaceholderKind::Ton => {
             if let TupleItem::Tuple(items) = &arg
@@ -263,22 +263,29 @@ fn format_single_arg(
                 let amount = value.to_f64().unwrap_or(0.0) / 1e9;
                 return Ok(format!("{amount} TON"));
             }
-            format_default(ctx, formatter, ty, arg, colorize)
+            format_default(ctx, formatter, ty_idx, arg, colorize)
         }
-        PlaceholderKind::Plain => format_default(ctx, formatter, ty, arg, colorize),
+        PlaceholderKind::Plain => format_default(ctx, formatter, ty_idx, arg, colorize),
     }
 }
 
 fn collect_non_void_args<const N: usize>(
-    args: [(String, TupleItem); N],
+    ctx: &Context<'_>,
+    args: [(BigInt, TupleItem); N],
 ) -> anyhow::Result<Vec<ReflectedArg>> {
     let mut collected = Vec::with_capacity(N);
-    for (type_desc, arg) in args {
-        let ty: Ty = serde_json::from_str(&type_desc)?;
+    let source_map = ctx.env.source_map.as_ref();
+    for (type_idx, arg) in args {
+        let ty_idx = type_idx
+            .to_usize()
+            .ok_or_else(|| anyhow!("ty_idx=`{type_idx}` does not fit into usize"))?;
+        let Some(ty) = source_map.ty_by_idx(ty_idx) else {
+            continue;
+        };
         if matches!(ty, Ty::Void) {
             break;
         }
-        collected.push(ReflectedArg { ty, arg });
+        collected.push(ReflectedArg { ty_idx, arg });
     }
     Ok(collected)
 }
@@ -342,7 +349,7 @@ fn format_args(
                         ctx,
                         formatter,
                         kind,
-                        &arg.ty,
+                        arg.ty_idx,
                         arg.arg.clone(),
                         colorize,
                     )?;
@@ -358,18 +365,6 @@ fn format_args(
     Ok((out, consumed))
 }
 
-const fn is_string_type(ty: &Ty) -> bool {
-    matches!(ty, Ty::String)
-}
-
-fn is_top_level_string_type(ty: &Ty) -> bool {
-    match ty {
-        Ty::String => true,
-        Ty::Nullable { inner, .. } => is_top_level_string_type(inner),
-        _ => false,
-    }
-}
-
 fn format_reflected_arg(
     ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
@@ -377,21 +372,23 @@ fn format_reflected_arg(
     colorize: bool,
 ) -> anyhow::Result<String> {
     let item = arg.arg.clone().unwrap_single();
-    if is_top_level_string_type(&arg.ty)
+    let source_map = ctx.env.source_map.as_ref();
+
+    if is_top_level_string_ty_idx(source_map, arg.ty_idx)
         && let Ok(value) = String::from_item(item.clone())
     {
         return Ok(value);
     }
 
-    if is_send_result_list_type(&arg.ty) {
+    if is_send_result_list_type(source_map, arg.ty_idx) {
         return Ok(format_send_result_list(ctx, formatter, &item));
     }
 
     Ok(render_with_source_map(
-        &ctx.env.source_map,
+        ctx.env.source_map.as_ref(),
         formatter,
         &item,
-        &arg.ty,
+        arg.ty_idx,
         colorize,
     ))
 }
@@ -400,7 +397,7 @@ fn render_with_source_map(
     symbols: &SourceMap,
     formatter: &FormatterContext<'_>,
     item: &TupleItem,
-    ty: &Ty,
+    ty_idx: TyIdx,
     colorize: bool,
 ) -> String {
     let options = if colorize {
@@ -408,31 +405,42 @@ fn render_with_source_map(
     } else {
         formatter.pretty_render_options()
     };
-    render_tuple_item_as_tolk_type(symbols, item, ty).to_pretty_string(options)
+    render_tuple_item_as_tolk_type(symbols, item, ty_idx).to_pretty_string(options)
 }
 
-fn is_send_result_list_type(ty: &Ty) -> bool {
-    match ty {
-        Ty::AliasRef {
-            alias_name,
-            type_args: _,
-        } if alias_name == "SendResultList" => true,
-        Ty::AliasRef {
-            alias_name,
-            type_args: Some(type_args),
-        } if alias_name == "BigArray" => type_args.first().is_some_and(is_send_result_type),
-        Ty::Nullable { inner, .. } => is_send_result_list_type(inner),
-        _ => ty.to_string() == "SendResultList",
+fn is_top_level_string_ty_idx(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
+    match source_map.ty_by_idx(ty_idx) {
+        Some(Ty::String) => true,
+        Some(Ty::Nullable { inner_ty_idx, .. }) => {
+            is_top_level_string_ty_idx(source_map, *inner_ty_idx)
+        }
+        _ => false,
     }
 }
 
-fn is_send_result_type(ty: &Ty) -> bool {
+fn is_send_result_list_type(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
+    match source_map.ty_by_idx(ty_idx) {
+        Some(Ty::AliasRef { alias_name, .. }) if alias_name == "SendResultList" => true,
+        Some(Ty::AliasRef {
+            alias_name,
+            type_args_ty_idx: Some(type_args),
+        }) if alias_name == "BigArray" => type_args
+            .first()
+            .is_some_and(|&item_ty_idx| is_send_result_type(source_map, item_ty_idx)),
+        Some(Ty::Nullable { inner_ty_idx, .. }) => {
+            is_send_result_list_type(source_map, *inner_ty_idx)
+        }
+        _ => render_ty(source_map, ty_idx) == "SendResultList",
+    }
+}
+
+fn is_send_result_type(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
     matches!(
-        ty,
-        Ty::StructRef {
+        source_map.ty_by_idx(ty_idx),
+        Some(Ty::StructRef {
             struct_name,
-            type_args: _
-        } if struct_name == "SendResult"
+            ..
+        }) if struct_name == "SendResult"
     )
 }
 

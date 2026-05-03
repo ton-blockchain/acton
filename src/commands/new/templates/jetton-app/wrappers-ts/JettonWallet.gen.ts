@@ -228,56 +228,54 @@ export const AskToTransfer = {
 }
 
 /**
- > struct (0x595f07bc) AskToBurn {
+ > struct (0x7362d09c) TransferNotificationForRecipient {
  >     queryId: uint64
  >     jettonAmount: coins
- >     sendExcessesTo: address?
- >     customPayload: cell?
+ >     transferInitiator: address?
+ >     forwardPayload: ForwardPayloadRemainder
  > }
  */
-export interface AskToBurn {
-    readonly $: 'AskToBurn'
+export interface TransferNotificationForRecipient {
+    readonly $: 'TransferNotificationForRecipient'
     queryId: uint64
     jettonAmount: coins
-    sendExcessesTo: c.Address | null
-    customPayload: c.Cell | null
+    transferInitiator: c.Address | null
+    forwardPayload: ForwardPayloadRemainder
 }
 
-export const AskToBurn = {
-    PREFIX: 0x595f07bc,
+export const TransferNotificationForRecipient = {
+    PREFIX: 0x7362d09c,
 
     create(args: {
         queryId: uint64
         jettonAmount: coins
-        sendExcessesTo: c.Address | null
-        customPayload: c.Cell | null
-    }): AskToBurn {
+        transferInitiator: c.Address | null
+        forwardPayload: ForwardPayloadRemainder
+    }): TransferNotificationForRecipient {
         return {
-            $: 'AskToBurn',
+            $: 'TransferNotificationForRecipient',
             ...args
         }
     },
-    fromSlice(s: c.Slice): AskToBurn {
-        loadAndCheckPrefix32(s, 0x595f07bc, 'AskToBurn');
+    fromSlice(s: c.Slice): TransferNotificationForRecipient {
+        loadAndCheckPrefix32(s, 0x7362d09c, 'TransferNotificationForRecipient');
         return {
-            $: 'AskToBurn',
+            $: 'TransferNotificationForRecipient',
             queryId: s.loadUintBig(64),
             jettonAmount: s.loadCoins(),
-            sendExcessesTo: s.loadMaybeAddress(),
-            customPayload: s.loadBoolean() ? s.loadRef() : null,
+            transferInitiator: s.loadMaybeAddress(),
+            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
         }
     },
-    store(self: AskToBurn, b: c.Builder): void {
-        b.storeUint(0x595f07bc, 32);
+    store(self: TransferNotificationForRecipient, b: c.Builder): void {
+        b.storeUint(0x7362d09c, 32);
         b.storeUint(self.queryId, 64);
         b.storeCoins(self.jettonAmount);
-        b.storeAddress(self.sendExcessesTo);
-        storeTolkNullable<c.Cell>(self.customPayload, b,
-            (v,b) => b.storeRef(v)
-        );
+        b.storeAddress(self.transferInitiator);
+        ForwardPayloadRemainder.store(self.forwardPayload, b);
     },
-    toCell(self: AskToBurn): c.Cell {
-        return makeCellFrom<AskToBurn>(self, AskToBurn.store);
+    toCell(self: TransferNotificationForRecipient): c.Cell {
+        return makeCellFrom<TransferNotificationForRecipient>(self, TransferNotificationForRecipient.store);
     }
 }
 
@@ -340,6 +338,149 @@ export const InternalTransferStep = {
     },
     toCell(self: InternalTransferStep): c.Cell {
         return makeCellFrom<InternalTransferStep>(self, InternalTransferStep.store);
+    }
+}
+
+/**
+ > struct (0xd53276db) ReturnExcessesBack {
+ >     queryId: uint64
+ > }
+ */
+export interface ReturnExcessesBack {
+    readonly $: 'ReturnExcessesBack'
+    queryId: uint64
+}
+
+export const ReturnExcessesBack = {
+    PREFIX: 0xd53276db,
+
+    create(args: {
+        queryId: uint64
+    }): ReturnExcessesBack {
+        return {
+            $: 'ReturnExcessesBack',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ReturnExcessesBack {
+        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
+        return {
+            $: 'ReturnExcessesBack',
+            queryId: s.loadUintBig(64),
+        }
+    },
+    store(self: ReturnExcessesBack, b: c.Builder): void {
+        b.storeUint(0xd53276db, 32);
+        b.storeUint(self.queryId, 64);
+    },
+    toCell(self: ReturnExcessesBack): c.Cell {
+        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
+    }
+}
+
+/**
+ > struct (0x595f07bc) AskToBurn {
+ >     queryId: uint64
+ >     jettonAmount: coins
+ >     sendExcessesTo: address?
+ >     customPayload: cell?
+ > }
+ */
+export interface AskToBurn {
+    readonly $: 'AskToBurn'
+    queryId: uint64
+    jettonAmount: coins
+    sendExcessesTo: c.Address | null
+    customPayload: c.Cell | null
+}
+
+export const AskToBurn = {
+    PREFIX: 0x595f07bc,
+
+    create(args: {
+        queryId: uint64
+        jettonAmount: coins
+        sendExcessesTo: c.Address | null
+        customPayload: c.Cell | null
+    }): AskToBurn {
+        return {
+            $: 'AskToBurn',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): AskToBurn {
+        loadAndCheckPrefix32(s, 0x595f07bc, 'AskToBurn');
+        return {
+            $: 'AskToBurn',
+            queryId: s.loadUintBig(64),
+            jettonAmount: s.loadCoins(),
+            sendExcessesTo: s.loadMaybeAddress(),
+            customPayload: s.loadBoolean() ? s.loadRef() : null,
+        }
+    },
+    store(self: AskToBurn, b: c.Builder): void {
+        b.storeUint(0x595f07bc, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeCoins(self.jettonAmount);
+        b.storeAddress(self.sendExcessesTo);
+        storeTolkNullable<c.Cell>(self.customPayload, b,
+            (v,b) => b.storeRef(v)
+        );
+    },
+    toCell(self: AskToBurn): c.Cell {
+        return makeCellFrom<AskToBurn>(self, AskToBurn.store);
+    }
+}
+
+/**
+ > struct (0x7bdd97de) BurnNotificationForMinter {
+ >     queryId: uint64
+ >     jettonAmount: coins
+ >     burnInitiator: address
+ >     sendExcessesTo: address?
+ > }
+ */
+export interface BurnNotificationForMinter {
+    readonly $: 'BurnNotificationForMinter'
+    queryId: uint64
+    jettonAmount: coins
+    burnInitiator: c.Address
+    sendExcessesTo: c.Address | null
+}
+
+export const BurnNotificationForMinter = {
+    PREFIX: 0x7bdd97de,
+
+    create(args: {
+        queryId: uint64
+        jettonAmount: coins
+        burnInitiator: c.Address
+        sendExcessesTo: c.Address | null
+    }): BurnNotificationForMinter {
+        return {
+            $: 'BurnNotificationForMinter',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): BurnNotificationForMinter {
+        loadAndCheckPrefix32(s, 0x7bdd97de, 'BurnNotificationForMinter');
+        return {
+            $: 'BurnNotificationForMinter',
+            queryId: s.loadUintBig(64),
+            jettonAmount: s.loadCoins(),
+            burnInitiator: s.loadAddress(),
+            sendExcessesTo: s.loadMaybeAddress(),
+        }
+    },
+    store(self: BurnNotificationForMinter, b: c.Builder): void {
+        b.storeUint(0x7bdd97de, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeCoins(self.jettonAmount);
+        b.storeAddress(self.burnInitiator);
+        b.storeAddress(self.sendExcessesTo);
+    },
+    toCell(self: BurnNotificationForMinter): c.Cell {
+        return makeCellFrom<BurnNotificationForMinter>(self, BurnNotificationForMinter.store);
     }
 }
 
@@ -413,147 +554,6 @@ export const WalletStorage = {
     },
     toCell(self: WalletStorage): c.Cell {
         return makeCellFrom<WalletStorage>(self, WalletStorage.store);
-    }
-}
-
-/**
- > struct (0x7362d09c) TransferNotificationForRecipient {
- >     queryId: uint64
- >     jettonAmount: coins
- >     transferInitiator: address?
- >     forwardPayload: ForwardPayloadRemainder
- > }
- */
-export interface TransferNotificationForRecipient {
-    readonly $: 'TransferNotificationForRecipient'
-    queryId: uint64
-    jettonAmount: coins
-    transferInitiator: c.Address | null
-    forwardPayload: ForwardPayloadRemainder
-}
-
-export const TransferNotificationForRecipient = {
-    PREFIX: 0x7362d09c,
-
-    create(args: {
-        queryId: uint64
-        jettonAmount: coins
-        transferInitiator: c.Address | null
-        forwardPayload: ForwardPayloadRemainder
-    }): TransferNotificationForRecipient {
-        return {
-            $: 'TransferNotificationForRecipient',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): TransferNotificationForRecipient {
-        loadAndCheckPrefix32(s, 0x7362d09c, 'TransferNotificationForRecipient');
-        return {
-            $: 'TransferNotificationForRecipient',
-            queryId: s.loadUintBig(64),
-            jettonAmount: s.loadCoins(),
-            transferInitiator: s.loadMaybeAddress(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
-        }
-    },
-    store(self: TransferNotificationForRecipient, b: c.Builder): void {
-        b.storeUint(0x7362d09c, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeCoins(self.jettonAmount);
-        b.storeAddress(self.transferInitiator);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
-    },
-    toCell(self: TransferNotificationForRecipient): c.Cell {
-        return makeCellFrom<TransferNotificationForRecipient>(self, TransferNotificationForRecipient.store);
-    }
-}
-
-/**
- > struct (0xd53276db) ReturnExcessesBack {
- >     queryId: uint64
- > }
- */
-export interface ReturnExcessesBack {
-    readonly $: 'ReturnExcessesBack'
-    queryId: uint64
-}
-
-export const ReturnExcessesBack = {
-    PREFIX: 0xd53276db,
-
-    create(args: {
-        queryId: uint64
-    }): ReturnExcessesBack {
-        return {
-            $: 'ReturnExcessesBack',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ReturnExcessesBack {
-        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
-        return {
-            $: 'ReturnExcessesBack',
-            queryId: s.loadUintBig(64),
-        }
-    },
-    store(self: ReturnExcessesBack, b: c.Builder): void {
-        b.storeUint(0xd53276db, 32);
-        b.storeUint(self.queryId, 64);
-    },
-    toCell(self: ReturnExcessesBack): c.Cell {
-        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
-    }
-}
-
-/**
- > struct (0x7bdd97de) BurnNotificationForMinter {
- >     queryId: uint64
- >     jettonAmount: coins
- >     burnInitiator: address
- >     sendExcessesTo: address?
- > }
- */
-export interface BurnNotificationForMinter {
-    readonly $: 'BurnNotificationForMinter'
-    queryId: uint64
-    jettonAmount: coins
-    burnInitiator: c.Address
-    sendExcessesTo: c.Address | null
-}
-
-export const BurnNotificationForMinter = {
-    PREFIX: 0x7bdd97de,
-
-    create(args: {
-        queryId: uint64
-        jettonAmount: coins
-        burnInitiator: c.Address
-        sendExcessesTo: c.Address | null
-    }): BurnNotificationForMinter {
-        return {
-            $: 'BurnNotificationForMinter',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): BurnNotificationForMinter {
-        loadAndCheckPrefix32(s, 0x7bdd97de, 'BurnNotificationForMinter');
-        return {
-            $: 'BurnNotificationForMinter',
-            queryId: s.loadUintBig(64),
-            jettonAmount: s.loadCoins(),
-            burnInitiator: s.loadAddress(),
-            sendExcessesTo: s.loadMaybeAddress(),
-        }
-    },
-    store(self: BurnNotificationForMinter, b: c.Builder): void {
-        b.storeUint(0x7bdd97de, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeCoins(self.jettonAmount);
-        b.storeAddress(self.burnInitiator);
-        b.storeAddress(self.sendExcessesTo);
-    },
-    toCell(self: BurnNotificationForMinter): c.Cell {
-        return makeCellFrom<BurnNotificationForMinter>(self, BurnNotificationForMinter.store);
     }
 }
 

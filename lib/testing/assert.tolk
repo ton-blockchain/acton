@@ -155,9 +155,9 @@ fun Assert.equalDecimal<T>(
 
 fun ffi.assertBin<V1, V2>(
     op: string,
-    leftTyJson: string,
+    leftTyIdx: int,
     left: V1,
-    rightTyJson: string,
+    rightTyIdx: int,
     right: V2,
     message: string,
     location: string,
@@ -174,9 +174,9 @@ fun ffi.assertComparison<V1, V2>(
     assert (
         ffi.assertBin(
             op,
-            reflect.typeAbiJsonOfObject(left),
+            reflect.typeUniqueIdxOfObject(left),
             left.toTuple(),
-            reflect.typeAbiJsonOfObject(right),
+            reflect.typeUniqueIdxOfObject(right),
             right.toTuple(),
             message,
             location,
