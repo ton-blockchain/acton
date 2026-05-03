@@ -10,7 +10,7 @@ help: replace with RESERVE_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 reserveToncoinsOnBalance(ton("0.1"), 1 + 2);
-  |                                                      ^^^^^ RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST
+  |                                                      ^^^^^ RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST
 
 
 1 issue can be fixed automatically, rerun with --fix flag.

@@ -60,6 +60,20 @@ fn test_check_reserve_mode_literal_non_additive_expression() {
         "reserve_mode_literal",
         r#"
             fun onInternalMessage(_: InMessage) {
+                reserveToncoinsOnBalance(ton("0.1"), 1 * 2);
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_reserve_mode_literal_bit_or_expression() {
+    run_simple_test(
+        "reserve_mode_literal",
+        r#"
+            fun onInternalMessage(_: InMessage) {
                 reserveToncoinsOnBalance(ton("0.1"), 1 | 2);
             }
         "#,
@@ -76,7 +90,7 @@ fn test_check_reserve_mode_literal_constants_only() {
             fun onInternalMessage(_: InMessage) {
                 reserveToncoinsOnBalance(
                     ton("0.1"),
-                    RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST
+                    RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST
                 );
             }
         "#,
@@ -109,7 +123,7 @@ fn test_fix_reserve_mode_literal_single_number() {
         "#,
         r#"
             fun onInternalMessage(_: InMessage) {
-                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST);
+                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
             }
         "#,
         function_name!(),
@@ -145,7 +159,7 @@ fn test_fix_reserve_mode_literal_addition() {
         "#,
         r#"
             fun onInternalMessage(_: InMessage) {
-                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST);
+                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
             }
         "#,
         function_name!(),
@@ -176,12 +190,30 @@ fn test_fix_reserve_mode_literal_non_additive_expression() {
     run_fix_test(
         r#"
             fun onInternalMessage(_: InMessage) {
+                reserveToncoinsOnBalance(ton("0.1"), 1 * 2);
+            }
+        "#,
+        r#"
+            fun onInternalMessage(_: InMessage) {
+                reserveToncoinsOnBalance(ton("0.1"), 1 * 2);
+            }
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_fix_reserve_mode_literal_bit_or_expression() {
+    run_fix_test(
+        r#"
+            fun onInternalMessage(_: InMessage) {
                 reserveToncoinsOnBalance(ton("0.1"), 1 | 2);
             }
         "#,
         r#"
             fun onInternalMessage(_: InMessage) {
-                reserveToncoinsOnBalance(ton("0.1"), 1 | 2);
+                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
             }
         "#,
         function_name!(),
@@ -199,7 +231,7 @@ fn test_fix_reserve_mode_literal_mixed_constant_and_literal() {
         "#,
         r#"
             fun onInternalMessage(_: InMessage) {
-                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_AT_MOST + RESERVE_MODE_ALL_BUT_AMOUNT);
+                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_AT_MOST | RESERVE_MODE_ALL_BUT_AMOUNT);
             }
         "#,
         function_name!(),
@@ -217,7 +249,7 @@ fn test_fix_reserve_mode_literal_reserve_extra_currencies() {
         "#,
         r#"
             fun onInternalMessage(_: InMessage) {
-                reserveExtraCurrenciesOnBalance(ton("0.1"), null, RESERVE_MODE_ALL_BUT_AMOUNT + RESERVE_MODE_AT_MOST);
+                reserveExtraCurrenciesOnBalance(ton("0.1"), null, RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
             }
         "#,
         function_name!(),

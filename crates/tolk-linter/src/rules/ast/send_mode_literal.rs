@@ -25,7 +25,7 @@ use tolk_ty::InferenceResult;
 ///
 /// Use instead:
 /// ```tolk
-/// outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS);
+/// outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]

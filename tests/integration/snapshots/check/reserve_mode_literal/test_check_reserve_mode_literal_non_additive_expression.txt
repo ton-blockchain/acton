@@ -1,7 +1,7 @@
 warning[E015]: reserve mode should use RESERVE_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
-3 |                 reserveToncoinsOnBalance(ton("0.1"), 1 | 2);
+3 |                 reserveToncoinsOnBalance(ton("0.1"), 1 * 2);
   |                                                      ^^^^^ numeric reserve mode literal is used here
   |
   = replace numeric mode literals with `RESERVE_MODE_*` constants

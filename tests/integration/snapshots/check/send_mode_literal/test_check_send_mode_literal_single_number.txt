@@ -10,7 +10,7 @@ help: replace with SEND_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 deployMessage.send(3);
-  |                                    ^ SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS
+  |                                    ^ SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS
 
 
 1 issue can be fixed automatically, rerun with --fix flag.
