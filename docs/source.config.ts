@@ -10,10 +10,15 @@ import actonCliGrammarRaw from "./grammars/grammar-acton-cli.json"
 import actonTraceGrammarRaw from "./grammars/grammar-acton-trace.json"
 import lastModified from "fumadocs-mdx/plugins/last-modified"
 import {tolkTwoslasher} from "@/lib/tolk-twoslash"
+import {pageSchema} from "fumadocs-core/source/schema"
+import {z} from "zod"
 
 export const docs = defineDocs({
   dir: "content/docs",
   docs: {
+    schema: pageSchema.extend({
+      description: z.string(),
+    }),
     postprocess: {
       includeProcessedMarkdown: true,
     },
