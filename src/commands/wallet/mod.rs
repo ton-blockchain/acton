@@ -9,6 +9,7 @@ use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -102,6 +103,7 @@ const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
+const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -424,6 +426,7 @@ fn perform_testnet_airdrop(
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))
         .user_agent(crate::build_info::user_agent())
+        .default_headers(airdrop_headers())
         .build()
         .context("Failed to build HTTP client")?;
 
@@ -478,7 +481,7 @@ fn perform_testnet_airdrop(
     let claim_payload = serde_json::json!({
         "address": address,
         "challenge": challenge_data.challenge,
-        "nonce": nonce
+        "nonce": nonce,
     });
     let response = send_with_retry(
         || client.post(claim_url.clone()).json(&claim_payload).send(),
@@ -656,6 +659,24 @@ fn parse_faucet_base_url(faucet_url: &str) -> anyhow::Result<reqwest::Url> {
         anyhow::bail!("Faucet URL must not contain query parameters or fragments");
     }
     Ok(url)
+}
+
+fn wallet_device_uid() -> String {
+    machine_uid::get().unwrap_or_else(|_| "default".to_string())
+}
+
+fn airdrop_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    let device_uid = wallet_device_uid();
+    let device_uid = HeaderValue::from_str(device_uid.trim())
+        .unwrap_or_else(|_| HeaderValue::from_static("default"));
+    headers.insert(
+        HeaderName::from_static(WALLET_DEVICE_UID_HEADER),
+        device_uid,
+    );
+
+    headers
 }
 
 fn solve_challenge(challenge: &str, difficulty: u32) -> anyhow::Result<u64> {
@@ -2078,6 +2099,12 @@ mod wallet_name_tests {
 
         let fallback = new_wallet_airdrop_faucet_url(None);
         assert_eq!(fallback, DEFAULT_FAUCET_URL);
+    }
+
+    #[test]
+    fn test_wallet_device_uid_is_non_empty() {
+        let device_uid = wallet_device_uid();
+        assert!(!device_uid.trim().is_empty());
     }
 
     #[test]

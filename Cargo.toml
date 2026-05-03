@@ -126,6 +126,7 @@ reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
 urlencoding = "2.1"
 base64 = "0.22.1"
 rand = "0.8"
+machine-uid = "0.5.4"
 
 tempfile = "3.10.1" # testing
 dotenvy = "0.15.7"
@@ -261,6 +262,7 @@ quick-junit = { workspace = true } # junit format for tests
 reqwest = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
+machine-uid = { workspace = true }
 
 tempfile = { workspace = true } # testing
 dotenvy = { workspace = true }
