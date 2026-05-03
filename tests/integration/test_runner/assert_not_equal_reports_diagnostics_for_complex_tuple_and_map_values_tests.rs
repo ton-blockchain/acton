@@ -49,6 +49,92 @@ get fun `test ej stdlib assert not equal complex map diagnostic`() {{
 }
 
 #[test]
+fn assert_not_equal_passes_for_rendered_unequal_nullable_structs_and_unions() {
+    let source = format!(
+        r#"{ASSERT_IMPORTS}
+struct NotEqualPoint {{
+    x: int
+    y: int
+}}
+
+struct NotEqualEventPoint {{
+    point: NotEqualPoint?
+    queryId: int
+}}
+
+struct NotEqualEventCode {{
+    code: int
+}}
+
+struct NotEqualNone {{}}
+
+type NotEqualEvent = NotEqualEventPoint | NotEqualEventCode | NotEqualNone
+
+fun notEqualPoint(x: int, y: int): NotEqualPoint {{
+    return NotEqualPoint {{ x, y }};
+}}
+
+fun notEqualEventPoint(x: int, y: int, queryId: int): NotEqualEventPoint {{
+    return NotEqualEventPoint {{
+        point: notEqualPoint(x, y),
+        queryId,
+    }};
+}}
+
+get fun `test ej stdlib assert not equal pass nullable struct value differs`() {{
+    val actual: NotEqualPoint? = notEqualPoint(1, 2);
+    Assert.notEqual(
+        actual,
+        notEqualPoint(1, 3),
+        "ej Assert.notEqual nullable struct detects rendered difference",
+    );
+}}
+
+get fun `test ej stdlib assert not equal pass nullable struct differs from null`() {{
+    val actual: NotEqualPoint? = notEqualPoint(4, 5);
+    Assert.notEqual(
+        actual,
+        null,
+        "ej Assert.notEqual nullable struct detects null difference",
+    );
+}}
+
+get fun `test ej stdlib assert not equal pass same union variant payload differs`() {{
+    val left: NotEqualEvent = notEqualEventPoint(6, 7, 8) as NotEqualEvent;
+    val right: NotEqualEvent = notEqualEventPoint(6, 9, 8) as NotEqualEvent;
+    Assert.notEqual(
+        left,
+        right,
+        "ej Assert.notEqual same union variant detects payload difference",
+    );
+}}
+
+get fun `test ej stdlib assert not equal pass different union variants`() {{
+    val left: NotEqualEvent = NotEqualEventCode {{ code: 10 }} as NotEqualEvent;
+    val right: NotEqualEvent = NotEqualNone {{}} as NotEqualEvent;
+    Assert.notEqual(
+        left,
+        right,
+        "ej Assert.notEqual detects different union variants",
+    );
+}}
+"#
+    );
+
+    ProjectBuilder::new("ej-stdlib-assert-not-equal-rendered-unequal")
+        .test_file("assert_not_equal_rendered_unequal", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(4)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values/assert_not_equal_passes_for_rendered_unequal_nullable_structs_and_unions.stdout.txt",
+        );
+}
+
+#[test]
 fn assert_not_equal_reports_nullable_struct_matching_non_nullable_struct_as_equal() {
     let source = format!(
         r#"{ASSERT_IMPORTS}
