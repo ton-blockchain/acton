@@ -1,7 +1,12 @@
 import {Address, Builder, Cell, Dictionary, Slice, loadShardAccount} from "@ton/core"
 import type {Message, MessageRelaxed} from "@ton/core"
-import type {ContractABI, Ty} from "gen-typescript-from-tolk-dev"
-import {DynamicCtx, renderTy, unpackFromSliceDynamic} from "gen-typescript-from-tolk-dev"
+import type {ContractABI, SymTable, Ty} from "gen-typescript-from-tolk-dev"
+import {
+  DynamicCtx,
+  SymTable as CompilerSymTable,
+  renderTy,
+  unpackFromSliceDynamic,
+} from "gen-typescript-from-tolk-dev"
 
 import type {BackendContractInfo} from "@/types"
 import type {
@@ -13,11 +18,11 @@ import type {
 } from "@/types/transaction"
 
 interface MessageCandidate {
-  readonly body_ty: Ty
+  readonly body_ty_idx: number
 }
 
 interface DeclarationCandidate {
-  readonly body_ty: Ty
+  readonly body_ty_idx: number
   readonly priority: number
 }
 
@@ -29,59 +34,32 @@ interface ParsableMessage {
 const BOUNCED_BODY_PREFIX = 0xff_ff_ff_ff
 const RICH_BOUNCE_BODY_PREFIX = 0xff_ff_ff_fe
 
-const getBodyTypeName = (bodyTy: Ty): string => {
-  switch (bodyTy.kind) {
-    case "StructRef": {
-      return bodyTy.struct_name
-    }
-    case "AliasRef": {
-      return bodyTy.alias_name
-    }
-    case "EnumRef": {
-      return bodyTy.enum_name
-    }
-    default: {
-      return renderTy(bodyTy)
-    }
-  }
+const getBodyTypeName = (symbols: SymTable, bodyTyIdx: number): string => {
+  return renderTy(symbols, bodyTyIdx)
 }
 
-const getBodyTypeKey = (bodyTy: Ty): string => {
-  switch (bodyTy.kind) {
-    case "StructRef": {
-      return `StructRef:${bodyTy.struct_name}`
-    }
-    case "AliasRef": {
-      return `AliasRef:${bodyTy.alias_name}`
-    }
-    case "EnumRef": {
-      return `EnumRef:${bodyTy.enum_name}`
-    }
-    default: {
-      return renderTy(bodyTy)
-    }
-  }
+const getBodyTypeKey = (bodyTyIdx: number): string => {
+  return `ty#${bodyTyIdx}`
 }
 
-const parsePrefixNumber = (prefixStr: string): number | undefined => {
-  try {
-    return Number(BigInt(prefixStr))
-  } catch {
-    return undefined
-  }
-}
+type AbiDeclaration = Readonly<ContractABI["declarations"][number]>
 
-const getDeclarationOpcode = (declaration: ContractABI["declarations"][number]): number | undefined => {
-  if (declaration.kind === "struct" && declaration.prefix?.prefix_len === 32) {
-    return parsePrefixNumber(declaration.prefix.prefix_str)
+const createSymTable = (abi: ContractABI): SymTable =>
+  new CompilerSymTable(
+    abi.declarations,
+    abi.unique_types,
+    abi.struct_instantiations,
+    abi.alias_instantiations,
+  )
+
+const getDeclarationOpcode = (declaration: AbiDeclaration | undefined): number | undefined => {
+  if (declaration?.kind === "struct" && declaration.prefix?.prefix_len === 32) {
+    return declaration.prefix.prefix_num
   }
   return undefined
 }
 
-const findDeclaration = (
-  abi: ContractABI,
-  bodyTy: Ty,
-): ContractABI["declarations"][number] | undefined => {
+const findDeclaration = (abi: ContractABI, bodyTy: Ty): AbiDeclaration | undefined => {
   switch (bodyTy.kind) {
     case "StructRef": {
       return abi.declarations.find(
@@ -106,13 +84,27 @@ const findDeclaration = (
 
 const resolveOpcodeNameFromBodyType = (
   abi: ContractABI,
-  bodyTy: Ty,
+  symbols: SymTable,
+  bodyTyIdx: number,
   opcode: number,
+  visitedTyIdx = new Set<number>(),
 ): string | undefined => {
+  if (visitedTyIdx.has(bodyTyIdx)) {
+    return undefined
+  }
+  visitedTyIdx.add(bodyTyIdx)
+
+  let bodyTy: Ty
+  try {
+    bodyTy = symbols.tyByIdx(bodyTyIdx)
+  } catch {
+    return undefined
+  }
+
   if (bodyTy.kind === "union") {
     for (const variant of bodyTy.variants) {
-      if (variant.prefix_len === 32 && parsePrefixNumber(variant.prefix_str) === opcode) {
-        return getBodyTypeName(variant.variant_ty)
+      if (variant.prefix_len === 32 && variant.prefix_num === opcode) {
+        return getBodyTypeName(symbols, variant.variant_ty_idx)
       }
     }
   }
@@ -127,7 +119,13 @@ const resolveOpcodeNameFromBodyType = (
   }
 
   if (declaration.kind === "alias") {
-    return resolveOpcodeNameFromBodyType(abi, declaration.target_ty, opcode)
+    let targetTyIdx = declaration.target_ty_idx
+    try {
+      targetTyIdx = symbols.aliasTargetOf(bodyTyIdx).ty_idx
+    } catch {
+      // Non-AliasRef ty_idx can still reach an alias declaration only for malformed ABI.
+    }
+    return resolveOpcodeNameFromBodyType(abi, symbols, targetTyIdx, opcode, visitedTyIdx)
   }
 
   if (declaration.kind === "enum") {
@@ -145,6 +143,7 @@ export const resolveAbiOpcodeName = (
   if (!abi) {
     return undefined
   }
+  const symbols = createSymTable(abi)
 
   const messages =
     direction === "outgoing"
@@ -154,7 +153,7 @@ export const resolveAbiOpcodeName = (
         : [...abi.incoming_messages, ...abi.incoming_external, ...abi.outgoing_messages]
 
   for (const message of messages) {
-    const name = resolveOpcodeNameFromBodyType(abi, message.body_ty, opcode)
+    const name = resolveOpcodeNameFromBodyType(abi, symbols, message.body_ty_idx, opcode)
     if (name) {
       return name
     }
@@ -179,10 +178,10 @@ const getDeclarationCandidates = (
         const matchesOpcode =
           opcode !== undefined &&
           declaration.prefix?.prefix_len === 32 &&
-          parsePrefixNumber(declaration.prefix.prefix_str) === opcode
+          declaration.prefix.prefix_num === opcode
 
         candidates.push({
-          body_ty: {kind: "StructRef", struct_name: declaration.name},
+          body_ty_idx: declaration.ty_idx,
           priority: matchesOpcode ? 0 : declaration.prefix ? 1 : 2,
         })
         break
@@ -193,14 +192,14 @@ const getDeclarationCandidates = (
         }
 
         candidates.push({
-          body_ty: {kind: "AliasRef", alias_name: declaration.name},
+          body_ty_idx: declaration.ty_idx,
           priority: 3,
         })
         break
       }
       case "enum": {
         candidates.push({
-          body_ty: {kind: "EnumRef", enum_name: declaration.name},
+          body_ty_idx: declaration.ty_idx,
           priority: 4,
         })
         break
@@ -216,22 +215,20 @@ const getIncomingCandidates = (
   isInternal: boolean,
   opcode: number | undefined,
 ): readonly MessageCandidate[] => {
-  const directCandidates = isInternal
-    ? abi.incoming_messages
-    : abi.incoming_external
+  const directCandidates = isInternal ? abi.incoming_messages : abi.incoming_external
   if (!isInternal) {
     return directCandidates
   }
 
   const deduped = new Map<string, MessageCandidate>()
   for (const candidate of directCandidates) {
-    deduped.set(getBodyTypeKey(candidate.body_ty), candidate)
+    deduped.set(getBodyTypeKey(candidate.body_ty_idx), candidate)
   }
 
   for (const candidate of getDeclarationCandidates(abi, opcode)) {
-    const key = getBodyTypeKey(candidate.body_ty)
+    const key = getBodyTypeKey(candidate.body_ty_idx)
     if (!deduped.has(key)) {
-      deduped.set(key, {body_ty: candidate.body_ty})
+      deduped.set(key, {body_ty_idx: candidate.body_ty_idx})
     }
   }
 
@@ -245,13 +242,13 @@ const getOutgoingCandidates = (
   const deduped = new Map<string, MessageCandidate>()
 
   for (const candidate of abi.outgoing_messages) {
-    deduped.set(getBodyTypeKey(candidate.body_ty), candidate)
+    deduped.set(getBodyTypeKey(candidate.body_ty_idx), candidate)
   }
 
   for (const candidate of getDeclarationCandidates(abi, opcode)) {
-    const key = getBodyTypeKey(candidate.body_ty)
+    const key = getBodyTypeKey(candidate.body_ty_idx)
     if (!deduped.has(key)) {
-      deduped.set(key, {body_ty: candidate.body_ty})
+      deduped.set(key, {body_ty_idx: candidate.body_ty_idx})
     }
   }
 
@@ -423,13 +420,13 @@ const tryDecodeMessageWithCandidates = (
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
     try {
-      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty, parser) as unknown
+      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty_idx, parser) as unknown
       if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
         continue
       }
 
       return {
-        name: getBodyTypeName(candidate.body_ty),
+        name: getBodyTypeName(ctx.symbols, candidate.body_ty_idx),
         value: toParsedValue(decoded),
       }
     } catch {
@@ -458,10 +455,16 @@ const tryDecodeOutgoingMessageWithAbi = (
   return tryDecodeMessageWithCandidates(message, abi, candidates)
 }
 
-const getStorageCandidates = (abi: ContractABI): readonly Ty[] => {
-  const candidates = [abi.storage.storage_ty, abi.storage.storage_at_deployment_ty]
-    .filter((ty): ty is Ty => ty !== undefined && ty.kind !== "nullLiteral")
-    .map(ty => [getBodyTypeKey(ty), ty] as const)
+const getStorageCandidates = (compilerAbi: ContractABI): readonly number[] => {
+  const candidates = [
+    compilerAbi.storage.storage_ty_idx,
+    compilerAbi.storage.storage_at_deployment_ty_idx,
+  ]
+    .filter(
+      (tyIdx): tyIdx is number =>
+        tyIdx !== undefined && compilerAbi.unique_types[tyIdx]?.kind !== "nullLiteral",
+    )
+    .map(tyIdx => [getBodyTypeKey(tyIdx), tyIdx] as const)
 
   return [...new Map(candidates).values()]
 }
@@ -500,7 +503,7 @@ const tryDecodeStorageSliceWithAbi = (
       }
 
       return {
-        name: getBodyTypeName(candidate),
+        name: getBodyTypeName(ctx.symbols, candidate),
         value: toParsedValue(decoded),
       }
     } catch {

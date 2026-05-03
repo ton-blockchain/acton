@@ -440,8 +440,8 @@ fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &For
         let diff_output = fmt.format_tuple_diff(
             &failure.left,
             &failure.right,
-            &failure.left_ty,
-            &failure.right_ty,
+            failure.left_ty_idx,
+            failure.right_ty_idx,
             &failure.source_map,
         );
 
@@ -453,7 +453,8 @@ fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &For
     if let AssertFailure::Bin(failure) = &failure
         && failure.operator == "!="
     {
-        let value = fmt.format_tuple_value(&failure.left, &failure.left_ty, &failure.source_map, 8);
+        let value =
+            fmt.format_tuple_value(&failure.left, failure.left_ty_idx, &failure.source_map, 8);
         println!("       Values are equal but expected to be different:");
         println!("         {}", value.dimmed());
     }
@@ -461,9 +462,10 @@ fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &For
     if let AssertFailure::Bin(failure) = &failure
         && failure.is_ord()
     {
-        let left = fmt.format_tuple_value(&failure.left, &failure.left_ty, &failure.source_map, 8);
+        let left =
+            fmt.format_tuple_value(&failure.left, failure.left_ty_idx, &failure.source_map, 8);
         let right =
-            fmt.format_tuple_value(&failure.right, &failure.right_ty, &failure.source_map, 8);
+            fmt.format_tuple_value(&failure.right, failure.right_ty_idx, &failure.source_map, 8);
 
         println!("        Actual:   {}", left.red());
         println!("        Expected: {}", right.green());

@@ -122,12 +122,11 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
         .flatten();
 
     let decoded_storage = match (&data, matched_contract.as_ref()) {
-        (Some(data), Some(contract)) => match (&contract.abi, &contract.source_map) {
-            (Some(abi), Some(source_map)) => {
-                Some(decode_storage_json(data, source_map, abi, &network)?)
-            }
-            _ => None,
-        },
+        (Some(data), Some(contract)) => contract
+            .abi
+            .as_ref()
+            .map(|abi| decode_storage_json(data, abi, &network))
+            .transpose()?,
         _ => None,
     };
 
@@ -249,7 +248,6 @@ struct LocalContractMatch {
     contract_id: String,
     contract_name: String,
     abi: Option<Arc<ContractABI>>,
-    source_map: Option<Arc<SourceMap>>,
 }
 
 fn find_local_contract_match(
@@ -262,7 +260,6 @@ fn find_local_contract_match(
                 contract_id: candidate.contract_id,
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
-                source_map: candidate.source_map,
             }));
         }
     }
@@ -380,19 +377,17 @@ fn load_local_contract_candidate(
 
 fn decode_storage_json(
     data: &Cell,
-    source_map: &SourceMap,
     abi: &ContractABI,
     network: &Network,
 ) -> anyhow::Result<serde_json::Value> {
-    let storage_ty = abi
+    let storage_ty_idx = abi
         .storage
-        .storage_at_deployment_ty
-        .as_ref()
-        .or(abi.storage.storage_ty.as_ref())
+        .storage_at_deployment_ty_idx
+        .or(abi.storage.storage_ty_idx)
         .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
     let mut parser = data.as_slice_allow_exotic();
-    let decoded = dynamic_unpack::unpack_from_slice(&mut parser, source_map, storage_ty)
-        .context("Failed to decode storage with compiler symbols")?;
+    let decoded = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, storage_ty_idx)
+        .context("Failed to decode storage with compiler ABI")?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         anyhow::bail!(
             "Storage cell has {} extra bits and {} extra refs after type decode",

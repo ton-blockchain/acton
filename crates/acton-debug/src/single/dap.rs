@@ -210,7 +210,7 @@ impl DapState {
         expression: &str,
     ) -> anyhow::Result<RenderedValue> {
         let Some(replayer) = self.replayer.as_ref() else {
-            return evaluate_expression(&[], None, expression);
+            return evaluate_expression(&[], expression);
         };
 
         let locals = match frame_id {
@@ -225,7 +225,7 @@ impl DapState {
             None => replayer.locals_for_frame(0),
         };
 
-        evaluate_expression(&locals, Some(replayer.source_map()), expression)
+        evaluate_expression(&locals, expression)
     }
 }
 

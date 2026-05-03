@@ -130,20 +130,6 @@ class StackReader {
         }
         return readFn_T(this);
     }
-
-    readWideNullable<T>(stackW: number, readFn_T: (r: StackReader) => T): T | null {
-        const slotTypeId = this.tuple[stackW - 1];
-        if (slotTypeId?.type !== 'int') {
-            throw new Error(`not 'int' on a stack`);
-        }
-        if (slotTypeId.value === 0n) {
-            this.tuple = this.tuple.slice(stackW);
-            return null;
-        }
-        const valueT = readFn_T(this);
-        this.tuple.shift();
-        return valueT;
-    }
 }
 
 // ————————————————————————————————————————————
@@ -164,99 +150,57 @@ type uint64 = bigint
 type uint256 = bigint
 
 /**
- > struct (0x43c7641f) TopUp {
+ > struct ExtensionStorage {
+ >     walletAddress: address
+ >     admin: address
+ >     subscriptionAmount: coins
+ >     lastPaymentTime: uint32?
+ >     paymentTimeInterval: uint32
  > }
  */
-export interface TopUp {
-    readonly $: 'TopUp'
+export interface ExtensionStorage {
+    readonly $: 'ExtensionStorage'
+    walletAddress: c.Address
+    admin: c.Address
+    subscriptionAmount: coins
+    lastPaymentTime: uint32 | null
+    paymentTimeInterval: uint32
 }
 
-export const TopUp = {
-    PREFIX: 0x43c7641f,
-
-    create(): TopUp {
-        return {
-            $: 'TopUp',
-        }
-    },
-    fromSlice(s: c.Slice): TopUp {
-        loadAndCheckPrefix32(s, 0x43c7641f, 'TopUp');
-        return {
-            $: 'TopUp',
-        }
-    },
-    store(self: TopUp, b: c.Builder): void {
-        b.storeUint(0x43c7641f, 32);
-    },
-    toCell(self: TopUp): c.Cell {
-        return makeCellFrom<TopUp>(self, TopUp.store);
-    }
-}
-
-/**
- > struct (0x283b4c3f) CancelSubscription {
- >     queryId: uint64
- > }
- */
-export interface CancelSubscription {
-    readonly $: 'CancelSubscription'
-    queryId: uint64
-}
-
-export const CancelSubscription = {
-    PREFIX: 0x283b4c3f,
-
+export const ExtensionStorage = {
     create(args: {
-        queryId: uint64
-    }): CancelSubscription {
+        walletAddress: c.Address
+        admin: c.Address
+        subscriptionAmount: coins
+        lastPaymentTime: uint32 | null
+        paymentTimeInterval: uint32
+    }): ExtensionStorage {
         return {
-            $: 'CancelSubscription',
+            $: 'ExtensionStorage',
             ...args
         }
     },
-    fromSlice(s: c.Slice): CancelSubscription {
-        loadAndCheckPrefix32(s, 0x283b4c3f, 'CancelSubscription');
+    fromSlice(s: c.Slice): ExtensionStorage {
         return {
-            $: 'CancelSubscription',
-            queryId: s.loadUintBig(64),
+            $: 'ExtensionStorage',
+            walletAddress: s.loadAddress(),
+            admin: s.loadAddress(),
+            subscriptionAmount: s.loadCoins(),
+            lastPaymentTime: s.loadBoolean() ? s.loadUintBig(32) : null,
+            paymentTimeInterval: s.loadUintBig(32),
         }
     },
-    store(self: CancelSubscription, b: c.Builder): void {
-        b.storeUint(0x283b4c3f, 32);
-        b.storeUint(self.queryId, 64);
+    store(self: ExtensionStorage, b: c.Builder): void {
+        b.storeAddress(self.walletAddress);
+        b.storeAddress(self.admin);
+        b.storeCoins(self.subscriptionAmount);
+        storeTolkNullable<uint32>(self.lastPaymentTime, b,
+            (v,b) => b.storeUint(v, 32)
+        );
+        b.storeUint(self.paymentTimeInterval, 32);
     },
-    toCell(self: CancelSubscription): c.Cell {
-        return makeCellFrom<CancelSubscription>(self, CancelSubscription.store);
-    }
-}
-
-/**
- > struct (0xc28364ef) ReceivePaymentFromWallet {
- > }
- */
-export interface ReceivePaymentFromWallet {
-    readonly $: 'ReceivePaymentFromWallet'
-}
-
-export const ReceivePaymentFromWallet = {
-    PREFIX: 0xc28364ef,
-
-    create(): ReceivePaymentFromWallet {
-        return {
-            $: 'ReceivePaymentFromWallet',
-        }
-    },
-    fromSlice(s: c.Slice): ReceivePaymentFromWallet {
-        loadAndCheckPrefix32(s, 0xc28364ef, 'ReceivePaymentFromWallet');
-        return {
-            $: 'ReceivePaymentFromWallet',
-        }
-    },
-    store(self: ReceivePaymentFromWallet, b: c.Builder): void {
-        b.storeUint(0xc28364ef, 32);
-    },
-    toCell(self: ReceivePaymentFromWallet): c.Cell {
-        return makeCellFrom<ReceivePaymentFromWallet>(self, ReceivePaymentFromWallet.store);
+    toCell(self: ExtensionStorage): c.Cell {
+        return makeCellFrom<ExtensionStorage>(self, ExtensionStorage.store);
     }
 }
 
@@ -328,57 +272,99 @@ export const WithdrawExtensionBalance = {
 }
 
 /**
- > struct ExtensionStorage {
- >     walletAddress: address
- >     admin: address
- >     subscriptionAmount: coins
- >     lastPaymentTime: uint32?
- >     paymentTimeInterval: uint32
+ > struct (0x283b4c3f) CancelSubscription {
+ >     queryId: uint64
  > }
  */
-export interface ExtensionStorage {
-    readonly $: 'ExtensionStorage'
-    walletAddress: c.Address
-    admin: c.Address
-    subscriptionAmount: coins
-    lastPaymentTime: uint32 | null
-    paymentTimeInterval: uint32
+export interface CancelSubscription {
+    readonly $: 'CancelSubscription'
+    queryId: uint64
 }
 
-export const ExtensionStorage = {
+export const CancelSubscription = {
+    PREFIX: 0x283b4c3f,
+
     create(args: {
-        walletAddress: c.Address
-        admin: c.Address
-        subscriptionAmount: coins
-        lastPaymentTime: uint32 | null
-        paymentTimeInterval: uint32
-    }): ExtensionStorage {
+        queryId: uint64
+    }): CancelSubscription {
         return {
-            $: 'ExtensionStorage',
+            $: 'CancelSubscription',
             ...args
         }
     },
-    fromSlice(s: c.Slice): ExtensionStorage {
+    fromSlice(s: c.Slice): CancelSubscription {
+        loadAndCheckPrefix32(s, 0x283b4c3f, 'CancelSubscription');
         return {
-            $: 'ExtensionStorage',
-            walletAddress: s.loadAddress(),
-            admin: s.loadAddress(),
-            subscriptionAmount: s.loadCoins(),
-            lastPaymentTime: s.loadBoolean() ? s.loadUintBig(32) : null,
-            paymentTimeInterval: s.loadUintBig(32),
+            $: 'CancelSubscription',
+            queryId: s.loadUintBig(64),
         }
     },
-    store(self: ExtensionStorage, b: c.Builder): void {
-        b.storeAddress(self.walletAddress);
-        b.storeAddress(self.admin);
-        b.storeCoins(self.subscriptionAmount);
-        storeTolkNullable<uint32>(self.lastPaymentTime, b,
-            (v,b) => b.storeUint(v, 32)
-        );
-        b.storeUint(self.paymentTimeInterval, 32);
+    store(self: CancelSubscription, b: c.Builder): void {
+        b.storeUint(0x283b4c3f, 32);
+        b.storeUint(self.queryId, 64);
     },
-    toCell(self: ExtensionStorage): c.Cell {
-        return makeCellFrom<ExtensionStorage>(self, ExtensionStorage.store);
+    toCell(self: CancelSubscription): c.Cell {
+        return makeCellFrom<CancelSubscription>(self, CancelSubscription.store);
+    }
+}
+
+/**
+ > struct (0xc28364ef) ReceivePaymentFromWallet {
+ > }
+ */
+export interface ReceivePaymentFromWallet {
+    readonly $: 'ReceivePaymentFromWallet'
+}
+
+export const ReceivePaymentFromWallet = {
+    PREFIX: 0xc28364ef,
+
+    create(): ReceivePaymentFromWallet {
+        return {
+            $: 'ReceivePaymentFromWallet',
+        }
+    },
+    fromSlice(s: c.Slice): ReceivePaymentFromWallet {
+        loadAndCheckPrefix32(s, 0xc28364ef, 'ReceivePaymentFromWallet');
+        return {
+            $: 'ReceivePaymentFromWallet',
+        }
+    },
+    store(self: ReceivePaymentFromWallet, b: c.Builder): void {
+        b.storeUint(0xc28364ef, 32);
+    },
+    toCell(self: ReceivePaymentFromWallet): c.Cell {
+        return makeCellFrom<ReceivePaymentFromWallet>(self, ReceivePaymentFromWallet.store);
+    }
+}
+
+/**
+ > struct (0x43c7641f) TopUp {
+ > }
+ */
+export interface TopUp {
+    readonly $: 'TopUp'
+}
+
+export const TopUp = {
+    PREFIX: 0x43c7641f,
+
+    create(): TopUp {
+        return {
+            $: 'TopUp',
+        }
+    },
+    fromSlice(s: c.Slice): TopUp {
+        loadAndCheckPrefix32(s, 0x43c7641f, 'TopUp');
+        return {
+            $: 'TopUp',
+        }
+    },
+    store(self: TopUp, b: c.Builder): void {
+        b.storeUint(0x43c7641f, 32);
+    },
+    toCell(self: TopUp): c.Cell {
+        return makeCellFrom<TopUp>(self, TopUp.store);
     }
 }
 

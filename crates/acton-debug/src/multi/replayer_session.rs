@@ -267,35 +267,25 @@ impl ReplayerDebugSession {
                 .cloned()
                 .ok_or_else(|| anyhow!("Unknown frame id {frame_id}"))?;
             if let Some(locals) = locator.snapshot_locals {
-                let source_map_context = self
-                    .contexts
-                    .get(locator.context_idx)
-                    .and_then(|ctx| ctx.try_borrow().ok());
-                return evaluate_expression(
-                    &locals,
-                    source_map_context
-                        .as_ref()
-                        .map(|ctx| ctx.replayer.source_map()),
-                    expression,
-                );
+                return evaluate_expression(&locals, expression);
             }
             let Some(ctx) = self.contexts.get(locator.context_idx) else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let Ok(ctx) = ctx.try_borrow() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let locals = ctx.replayer.locals_for_frame(locator.depth_from_top);
-            evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            evaluate_expression(&locals, expression)
         } else {
             let Some(ctx) = self.active_context() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let Ok(ctx) = ctx.try_borrow() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let locals = ctx.replayer.locals_for_frame(0);
-            evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            evaluate_expression(&locals, expression)
         }
     }
 

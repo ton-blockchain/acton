@@ -51,25 +51,25 @@ debug.printString(reflect.typeNameOfObject(42));   // "int"
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/reflection.tolk#L27" />
 
-## `reflect.typeAbiJsonOf`
+## `reflect.typeUniqueIdxOf`
 
 ```tolk
 @pure
-fun reflect.typeAbiJsonOf<T>(): string
+fun reflect.typeUniqueIdxOf<T>(): int
 ```
 
-Get ABI-JSON type description of any T for compile-time reflection.
+Get unique ty_idx (from `out.symbolTypes.json`) of any type T.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/reflection.tolk#L32" />
 
-## `reflect.typeAbiJsonOfObject`
+## `reflect.typeUniqueIdxOfObject`
 
 ```tolk
 @pure
-fun reflect.typeAbiJsonOfObject<T>(anyVariable: T): string
+fun reflect.typeUniqueIdxOfObject<T>(anyVariable: T): int
 ```
 
-Get ABI-JSON type description of any object for compile-time reflection.
+Get unique ty_idx (from `out.symbolTypes.json`) of any object.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/reflection.tolk#L37" />
 

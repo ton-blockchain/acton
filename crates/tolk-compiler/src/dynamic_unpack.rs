@@ -1,8 +1,6 @@
-use crate::abi::{ABICustomPackUnpack, Ty, UnionVariant};
-use crate::source_map::{
-    AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SourceMap,
-};
-use crate::types_kernel::instantiate_generics;
+use crate::abi::{ABICustomPackUnpack, ABIDeclaration, ContractABI, Ty, UnionVariant};
+use crate::source_map::{Declaration, SourceMap};
+use crate::types_kernel::{TyIdx, TyResolver, render_ty};
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
@@ -28,19 +26,205 @@ pub enum UnpackedValue {
     },
 }
 
+#[derive(Clone, Copy)]
+struct SchemaPrefix {
+    prefix_num: u64,
+    prefix_len: i32,
+}
+
+struct SchemaStructDecl<'a> {
+    prefix: Option<SchemaPrefix>,
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
+
+struct SchemaAliasDecl<'a> {
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
+
+struct SchemaEnumDecl<'a> {
+    encoded_as_ty_idx: TyIdx,
+    members: Vec<SchemaEnumMember>,
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
+
+#[derive(Clone)]
+struct SchemaField {
+    name: String,
+    ty_idx: TyIdx,
+}
+
+#[derive(Clone)]
+struct SchemaEnumMember {
+    name: String,
+    value: String,
+}
+
+trait UnpackSchema: TyResolver {
+    fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>>;
+    fn alias_decl_info(&self, target_name: &str) -> Option<SchemaAliasDecl<'_>>;
+    fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>>;
+    fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>>;
+    fn alias_target_for(&self, ty_idx: TyIdx) -> Option<TyIdx>;
+}
+
+impl UnpackSchema for SourceMap {
+    fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>> {
+        self.declarations().iter().find_map(|decl| match decl {
+            Declaration::Struct(struct_decl) if struct_decl.name == target_name => {
+                Some(SchemaStructDecl {
+                    prefix: struct_decl.prefix.as_ref().map(|prefix| SchemaPrefix {
+                        prefix_num: prefix.prefix_num,
+                        prefix_len: prefix.prefix_len,
+                    }),
+                    custom_pack_unpack: struct_decl.custom_pack_unpack.as_ref(),
+                })
+            }
+            _ => None,
+        })
+    }
+
+    fn alias_decl_info(&self, target_name: &str) -> Option<SchemaAliasDecl<'_>> {
+        self.declarations().iter().find_map(|decl| match decl {
+            Declaration::Alias(alias_decl) if alias_decl.name == target_name => {
+                Some(SchemaAliasDecl {
+                    custom_pack_unpack: alias_decl.custom_pack_unpack.as_ref(),
+                })
+            }
+            _ => None,
+        })
+    }
+
+    fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>> {
+        self.declarations().iter().find_map(|decl| match decl {
+            Declaration::Enum(enum_decl) if enum_decl.name == target_name => Some(SchemaEnumDecl {
+                encoded_as_ty_idx: enum_decl.encoded_as_ty_idx,
+                members: enum_decl
+                    .members
+                    .iter()
+                    .map(|member| SchemaEnumMember {
+                        name: member.name.clone(),
+                        value: member.value.clone(),
+                    })
+                    .collect(),
+                custom_pack_unpack: enum_decl.custom_pack_unpack.as_ref(),
+            }),
+            _ => None,
+        })
+    }
+
+    fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>> {
+        self.struct_fields_of(ty_idx).map(|fields| {
+            fields
+                .into_iter()
+                .map(|field| SchemaField {
+                    name: field.name,
+                    ty_idx: field.ty_idx,
+                })
+                .collect()
+        })
+    }
+
+    fn alias_target_for(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        self.alias_target_of(ty_idx)
+    }
+}
+
+impl UnpackSchema for ContractABI {
+    fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>> {
+        self.declarations.iter().find_map(|decl| match decl {
+            ABIDeclaration::Struct {
+                name,
+                prefix,
+                custom_pack_unpack,
+                ..
+            } if name == target_name => Some(SchemaStructDecl {
+                prefix: prefix.as_ref().map(|prefix| SchemaPrefix {
+                    prefix_num: prefix.prefix_num,
+                    prefix_len: prefix.prefix_len,
+                }),
+                custom_pack_unpack: custom_pack_unpack.as_ref(),
+            }),
+            _ => None,
+        })
+    }
+
+    fn alias_decl_info(&self, target_name: &str) -> Option<SchemaAliasDecl<'_>> {
+        self.declarations.iter().find_map(|decl| match decl {
+            ABIDeclaration::Alias {
+                name,
+                custom_pack_unpack,
+                ..
+            } if name == target_name => Some(SchemaAliasDecl {
+                custom_pack_unpack: custom_pack_unpack.as_ref(),
+            }),
+            _ => None,
+        })
+    }
+
+    fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>> {
+        self.declarations.iter().find_map(|decl| match decl {
+            ABIDeclaration::Enum {
+                name,
+                encoded_as_ty_idx,
+                members,
+                custom_pack_unpack,
+                ..
+            } if name == target_name => Some(SchemaEnumDecl {
+                encoded_as_ty_idx: *encoded_as_ty_idx,
+                members: members
+                    .iter()
+                    .map(|member| SchemaEnumMember {
+                        name: member.name.clone(),
+                        value: member.value.clone(),
+                    })
+                    .collect(),
+                custom_pack_unpack: custom_pack_unpack.as_ref(),
+            }),
+            _ => None,
+        })
+    }
+
+    fn struct_fields_for(&self, ty_idx: TyIdx) -> Option<Vec<SchemaField>> {
+        self.struct_fields_of(ty_idx).ok().map(|fields| {
+            fields
+                .into_iter()
+                .map(|field| SchemaField {
+                    name: field.name,
+                    ty_idx: field.ty_idx,
+                })
+                .collect()
+        })
+    }
+
+    fn alias_target_for(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        self.alias_target_of(ty_idx).ok()
+    }
+}
+
 pub fn unpack_from_slice(
     data: &mut CellSlice<'_>,
     symbols: &SourceMap,
-    ty: &Ty,
+    ty_idx: TyIdx,
 ) -> anyhow::Result<UnpackedValue> {
-    unpack_type(data, symbols, ty)
+    unpack_type(data, symbols, ty_idx)
 }
 
-fn unpack_type(
+pub fn unpack_from_abi_slice(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
-    ty: &Ty,
+    abi: &ContractABI,
+    ty_idx: TyIdx,
 ) -> anyhow::Result<UnpackedValue> {
+    unpack_type(data, abi, ty_idx)
+}
+
+fn unpack_type<S: UnpackSchema + ?Sized>(
+    data: &mut CellSlice<'_>,
+    symbols: &S,
+    ty_idx: TyIdx,
+) -> anyhow::Result<UnpackedValue> {
+    let ty = symbols
+        .ty_by_idx(ty_idx)
+        .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     match ty {
         Ty::Int => unsupported_type("int"),
         Ty::Bool => Ok(UnpackedValue::Bool(data.load_bit()?)),
@@ -87,40 +271,24 @@ fn unpack_type(
         }
         Ty::BitsN { n } => Ok(UnpackedValue::Bits(load_bits(data, *n)?)),
         Ty::ArrayOf { .. } => unsupported_type("arrayOf"),
-        Ty::Tensor { items } | Ty::ShapedTuple { items } => {
-            let mut values = Vec::with_capacity(items.len());
-            for item in items {
-                values.push(unpack_type(data, symbols, item)?);
+        Ty::Tensor { items_ty_idx } | Ty::ShapedTuple { items_ty_idx } => {
+            let mut values = Vec::with_capacity(items_ty_idx.len());
+            for &item_ty_idx in items_ty_idx {
+                values.push(unpack_type(data, symbols, item_ty_idx)?);
             }
             Ok(UnpackedValue::Array(values))
         }
         Ty::NullLiteral => Ok(UnpackedValue::Null),
         Ty::GenericT { name_t } => anyhow::bail!("unresolved generic type {name_t}"),
-        Ty::StructRef {
-            struct_name,
-            type_args,
-        } => unpack_struct(
-            data,
-            symbols,
-            struct_name,
-            type_args.as_deref().unwrap_or(&[]),
-        ),
+        Ty::StructRef { struct_name, .. } => unpack_struct(data, symbols, ty_idx, struct_name),
         Ty::EnumRef { enum_name } => unpack_enum(data, symbols, enum_name),
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => unpack_alias(
-            data,
-            symbols,
-            alias_name,
-            type_args.as_deref().unwrap_or(&[]),
-        ),
+        Ty::AliasRef { alias_name, .. } => unpack_alias(data, symbols, ty_idx, alias_name),
         Ty::Remaining => Ok(UnpackedValue::RemainingBitsAndRefs(remaining_as_cell(
             data,
         )?)),
-        Ty::CellOf { inner } => {
+        Ty::CellOf { inner_ty_idx } => {
             let mut ref_slice = data.load_reference_as_slice()?;
-            let value = unpack_type(&mut ref_slice, symbols, inner)?;
+            let value = unpack_type(&mut ref_slice, symbols, *inner_ty_idx)?;
             ensure_fully_consumed(&ref_slice, "Cell<T> payload")?;
             Ok(UnpackedValue::Object {
                 name: "Cell".to_owned(),
@@ -129,36 +297,41 @@ fn unpack_type(
         }
         Ty::LispListOf { .. } => unsupported_type("lispListOf"),
         Ty::Union { variants, .. } => unpack_union(data, symbols, variants),
-        Ty::Nullable { inner, .. } => {
+        Ty::Nullable { inner_ty_idx, .. } => {
             if !data.load_bit()? {
                 return Ok(UnpackedValue::Null);
             }
-            unpack_type(data, symbols, inner)
+            unpack_type(data, symbols, *inner_ty_idx)
         }
-        Ty::MapKV { k, v } => unpack_map(data, symbols, k, v),
+        Ty::MapKV {
+            key_ty_idx,
+            value_ty_idx,
+        } => unpack_map(data, symbols, *key_ty_idx, *value_ty_idx),
         Ty::Unknown => unsupported_type("unknown"),
     }
 }
 
-fn unpack_struct(
+fn unpack_struct<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
+    symbols: &S,
+    ty_idx: TyIdx,
     struct_name: &str,
-    type_args: &[Ty],
 ) -> anyhow::Result<UnpackedValue> {
-    let decl = find_struct_decl(symbols, struct_name)
+    let decl = symbols
+        .struct_decl_info(struct_name)
         .ok_or_else(|| anyhow!("struct {struct_name} referenced by type was not found"))?;
     ensure_standard_layout(struct_name, decl.custom_pack_unpack)?;
 
     if let Some(prefix) = decl.prefix {
-        check_prefix(data, &prefix.prefix_str, prefix.prefix_len, struct_name)?;
+        check_prefix(data, prefix.prefix_num, prefix.prefix_len, struct_name)?;
     }
 
-    let type_params = validate_type_args(struct_name, decl.type_params, type_args)?;
-    let mut fields = Vec::with_capacity(decl.fields.len());
-    for field in decl.fields {
-        let field_ty = instantiate_generics(&field.ty, type_params, type_args);
-        let value = unpack_type(data, symbols, &field_ty)
+    let struct_fields = symbols
+        .struct_fields_for(ty_idx)
+        .ok_or_else(|| anyhow!("failed to resolve fields for {struct_name}"))?;
+    let mut fields = Vec::with_capacity(struct_fields.len());
+    for field in &struct_fields {
+        let value = unpack_type(data, symbols, field.ty_idx)
             .with_context(|| format!("failed to decode field {struct_name}.{}", field.name))?;
         fields.push((field.name.clone(), value));
     }
@@ -169,32 +342,35 @@ fn unpack_struct(
     })
 }
 
-fn unpack_alias(
+fn unpack_alias<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
+    symbols: &S,
+    ty_idx: TyIdx,
     alias_name: &str,
-    type_args: &[Ty],
 ) -> anyhow::Result<UnpackedValue> {
-    let decl = find_alias_decl(symbols, alias_name)
+    let decl = symbols
+        .alias_decl_info(alias_name)
         .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
     ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
-    let type_params = validate_type_args(alias_name, decl.type_params, type_args)?;
-    let target_ty = instantiate_generics(decl.target_ty, type_params, type_args);
-    unpack_type(data, symbols, &target_ty)
+    let target_ty_idx = symbols
+        .alias_target_for(ty_idx)
+        .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
+    unpack_type(data, symbols, target_ty_idx)
 }
 
-fn unpack_enum(
+fn unpack_enum<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
+    symbols: &S,
     enum_name: &str,
 ) -> anyhow::Result<UnpackedValue> {
-    let decl = find_enum_decl(symbols, enum_name)
+    let decl = symbols
+        .enum_decl_info(enum_name)
         .ok_or_else(|| anyhow!("enum {enum_name} referenced by type was not found"))?;
     ensure_standard_layout(enum_name, decl.custom_pack_unpack)?;
 
-    let encoded_ty = parse_enum_encoded_as(decl.encoded_as)?;
-    let value = unpack_type(data, symbols, encoded_ty)?;
-    let label = find_enum_member_name(&value, decl.members).map_or_else(
+    let encoded_ty_idx = parse_enum_encoded_as(symbols, decl.encoded_as_ty_idx)?;
+    let value = unpack_type(data, symbols, encoded_ty_idx)?;
+    let label = find_enum_member_name(&value, &decl.members).map_or_else(
         || format!("{enum_name}({})", format_enum_encoded_value(&value)),
         |member_name| format!("{enum_name}.{member_name}"),
     );
@@ -213,14 +389,14 @@ fn format_enum_encoded_value(value: &UnpackedValue) -> String {
     }
 }
 
-fn unpack_union(
+fn unpack_union<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
+    symbols: &S,
     variants: &[UnionVariant],
 ) -> anyhow::Result<UnpackedValue> {
     let variants = resolve_union_variants(symbols, variants)?;
     for variant in variants {
-        if !matches_prefix(data, &variant.prefix_str, variant.prefix_len)? {
+        if !matches_prefix(data, variant.prefix_num, variant.prefix_len)? {
             continue;
         }
 
@@ -231,7 +407,7 @@ fn unpack_union(
             )?;
         }
 
-        let value = unpack_type(data, symbols, &variant.variant_ty)?;
+        let value = unpack_type(data, symbols, variant.variant_ty_idx)?;
         if !variant.has_value_field {
             return Ok(value);
         }
@@ -245,50 +421,27 @@ fn unpack_union(
     anyhow::bail!("none of union prefixes matched")
 }
 
-fn unpack_map(
+fn unpack_map<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
-    key_ty: &Ty,
-    value_ty: &Ty,
+    symbols: &S,
+    key_ty_idx: TyIdx,
+    value_ty_idx: TyIdx,
 ) -> anyhow::Result<UnpackedValue> {
-    let key_bits = map_key_bit_len(symbols, key_ty)?;
+    let key_bits = map_key_bit_len(symbols, key_ty_idx)?;
     let dict = Option::<Cell>::load_from(data)?;
 
     let mut entries = Vec::new();
     for entry in dict::RawIter::new(&dict, key_bits) {
         let (key_data, mut value_slice) = entry?;
-        let key = unpack_type(&mut key_data.as_data_slice(), symbols, key_ty)
+        let key = unpack_type(&mut key_data.as_data_slice(), symbols, key_ty_idx)
             .context("failed to decode map key")?;
-        let value = unpack_type(&mut value_slice, symbols, value_ty)
+        let value = unpack_type(&mut value_slice, symbols, value_ty_idx)
             .context("failed to decode map value")?;
         ensure_fully_consumed(&value_slice, "map value")?;
         entries.push((key, value));
     }
 
     Ok(UnpackedValue::Map(entries))
-}
-
-fn validate_type_args<'a>(
-    type_name: &str,
-    type_params: Option<&'a [String]>,
-    type_args: &[Ty],
-) -> anyhow::Result<&'a [String]> {
-    let Some(type_params) = type_params else {
-        if type_args.is_empty() {
-            return Ok(&[]);
-        }
-        anyhow::bail!("{type_name} does not accept type arguments");
-    };
-
-    if type_params.len() != type_args.len() {
-        anyhow::bail!(
-            "{type_name} expected {} type arguments, got {}",
-            type_params.len(),
-            type_args.len()
-        );
-    }
-
-    Ok(type_params)
 }
 
 fn ensure_standard_layout(
@@ -303,16 +456,15 @@ fn ensure_standard_layout(
 
 fn check_prefix(
     data: &mut CellSlice<'_>,
-    prefix_str: &str,
+    prefix_num: u64,
     prefix_len: i32,
     type_name: &str,
 ) -> anyhow::Result<()> {
     let prefix_len = u16::try_from(prefix_len).context("negative prefix length")?;
-    let expected = parse_prefix(prefix_str)?;
     let actual = data.load_uint(prefix_len)?;
-    if actual != expected {
+    if actual != prefix_num {
         anyhow::bail!(
-            "incorrect prefix for '{type_name}': expected {prefix_str}, got 0x{actual:x}"
+            "incorrect prefix for '{type_name}': expected 0x{prefix_num:x}, got 0x{actual:x}"
         );
     }
     Ok(())
@@ -320,28 +472,14 @@ fn check_prefix(
 
 fn matches_prefix(
     data: &CellSlice<'_>,
-    prefix_str: &str,
+    prefix_num: u64,
     prefix_len: usize,
 ) -> anyhow::Result<bool> {
     let prefix_len = u16::try_from(prefix_len).context("union prefix length exceeds u16")?;
     if !data.has_remaining(prefix_len, 0) {
         return Ok(false);
     }
-    Ok(data.get_uint(0, prefix_len)? == parse_prefix(prefix_str)?)
-}
-
-fn parse_prefix(prefix_str: &str) -> anyhow::Result<u64> {
-    if let Some(hex) = prefix_str.strip_prefix("0x") {
-        return u64::from_str_radix(hex, 16)
-            .with_context(|| format!("failed to parse hex prefix {prefix_str}"));
-    }
-    if let Some(bits) = prefix_str.strip_prefix("0b") {
-        return u64::from_str_radix(bits, 2)
-            .with_context(|| format!("failed to parse binary prefix {prefix_str}"));
-    }
-    prefix_str
-        .parse::<u64>()
-        .with_context(|| format!("failed to parse decimal prefix {prefix_str}"))
+    Ok(data.get_uint(0, prefix_len)? == prefix_num)
 }
 
 fn varint_len_bits(n: u32) -> anyhow::Result<u16> {
@@ -376,21 +514,30 @@ fn unsupported_type(name: &str) -> anyhow::Result<UnpackedValue> {
     anyhow::bail!("cannot decode unsupported Tolk type {name}")
 }
 
-fn parse_enum_encoded_as(encoded_as: &Ty) -> anyhow::Result<&Ty> {
+fn parse_enum_encoded_as<S: UnpackSchema + ?Sized>(
+    symbols: &S,
+    encoded_as_ty_idx: TyIdx,
+) -> anyhow::Result<TyIdx> {
+    let encoded_as = symbols
+        .ty_by_idx(encoded_as_ty_idx)
+        .ok_or_else(|| anyhow!("ABI ty_idx {encoded_as_ty_idx} was not found"))?;
     match encoded_as {
         Ty::Bool
         | Ty::Coins
         | Ty::UintN { .. }
         | Ty::IntN { .. }
         | Ty::VaruintN { .. }
-        | Ty::VarintN { .. } => Ok(encoded_as),
-        other => anyhow::bail!("unsupported enum encoding {}", other.render_type()),
+        | Ty::VarintN { .. } => Ok(encoded_as_ty_idx),
+        _ => anyhow::bail!(
+            "unsupported enum encoding {}",
+            render_ty(symbols, encoded_as_ty_idx)
+        ),
     }
 }
 
 fn find_enum_member_name<'a>(
     value: &UnpackedValue,
-    members: &'a [EnumMemberInfo],
+    members: &'a [SchemaEnumMember],
 ) -> Option<&'a str> {
     members.iter().find_map(|member| match value {
         UnpackedValue::Number(number) => member
@@ -438,53 +585,57 @@ fn parse_snake_bytes_slice(parser: &mut CellSlice<'_>) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-fn map_key_bit_len(symbols: &SourceMap, ty: &Ty) -> anyhow::Result<u16> {
+fn map_key_bit_len<S: UnpackSchema + ?Sized>(symbols: &S, ty_idx: TyIdx) -> anyhow::Result<u16> {
+    let ty = symbols
+        .ty_by_idx(ty_idx)
+        .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     match ty {
         Ty::Bool => Ok(1),
         Ty::IntN { n } | Ty::UintN { n } => u16::try_from(*n).context("map key width exceeds u16"),
         Ty::Address => Ok(StdAddr::BITS_WITHOUT_ANYCAST),
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let decl = find_alias_decl(symbols, alias_name)
+        Ty::AliasRef { alias_name, .. } => {
+            let decl = symbols
+                .alias_decl_info(alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
             ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
-            let type_args = type_args.as_deref().unwrap_or(&[]);
-            let type_params = validate_type_args(alias_name, decl.type_params, type_args)?;
-            let target_ty = instantiate_generics(decl.target_ty, type_params, type_args);
-            map_key_bit_len(symbols, &target_ty)
+            let target_ty_idx = symbols
+                .alias_target_for(ty_idx)
+                .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
+            map_key_bit_len(symbols, target_ty_idx)
         }
         Ty::EnumRef { enum_name } => {
-            let decl = find_enum_decl(symbols, enum_name)
+            let decl = symbols
+                .enum_decl_info(enum_name)
                 .ok_or_else(|| anyhow!("enum {enum_name} referenced by type was not found"))?;
             ensure_standard_layout(enum_name, decl.custom_pack_unpack)?;
-            map_key_bit_len(symbols, parse_enum_encoded_as(decl.encoded_as)?)
+            map_key_bit_len(
+                symbols,
+                parse_enum_encoded_as(symbols, decl.encoded_as_ty_idx)?,
+            )
         }
-        _ => anyhow::bail!("unsupported map key type {}", ty.render_type()),
+        _ => anyhow::bail!("unsupported map key type {}", render_ty(symbols, ty_idx)),
     }
 }
 
 #[derive(Clone)]
 struct ResolvedUnionVariant {
-    variant_ty: Ty,
-    prefix_str: String,
+    variant_ty_idx: TyIdx,
+    prefix_num: u64,
     prefix_len: usize,
     prefix_eat_in_place: bool,
     label: String,
     has_value_field: bool,
 }
 
-fn resolve_union_variants(
-    symbols: &SourceMap,
+fn resolve_union_variants<S: UnpackSchema + ?Sized>(
+    symbols: &S,
     variants: &[UnionVariant],
 ) -> anyhow::Result<Vec<ResolvedUnionVariant>> {
     let mut simple_labels = Vec::with_capacity(variants.len());
     let mut concrete_variants = Vec::with_capacity(variants.len());
     for variant in variants {
-        let concrete = variant.variant_ty.clone();
-        simple_labels.push(union_label_simple(symbols, &concrete)?);
-        concrete_variants.push(concrete);
+        simple_labels.push(union_label_simple(symbols, variant.variant_ty_idx)?);
+        concrete_variants.push(variant.variant_ty_idx);
     }
 
     let has_duplicates = simple_labels
@@ -496,28 +647,34 @@ fn resolve_union_variants(
         .iter()
         .zip(concrete_variants)
         .zip(simple_labels)
-        .map(|((variant, concrete), simple_label)| {
-            let is_null = matches!(concrete, Ty::NullLiteral);
+        .map(|((variant, concrete_ty_idx), simple_label)| {
+            let is_null = matches!(symbols.ty_by_idx(concrete_ty_idx), Some(Ty::NullLiteral));
             Ok(ResolvedUnionVariant {
-                variant_ty: concrete.clone(),
-                prefix_str: variant.prefix_str.clone(),
+                variant_ty_idx: concrete_ty_idx,
+                prefix_num: variant.prefix_num,
                 prefix_len: variant.prefix_len,
                 prefix_eat_in_place: variant.is_prefix_implicit.unwrap_or(false),
                 label: if is_null {
                     String::new()
                 } else if has_duplicates {
-                    concrete.render_type()
+                    render_ty(symbols, concrete_ty_idx)
                 } else {
                     simple_label
                 },
                 has_value_field: !is_null
-                    && (has_duplicates || !type_has_own_label(symbols, &concrete)?),
+                    && (has_duplicates || !type_has_own_label(symbols, concrete_ty_idx)?),
             })
         })
         .collect()
 }
 
-fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> anyhow::Result<String> {
+fn union_label_simple<S: UnpackSchema + ?Sized>(
+    symbols: &S,
+    ty_idx: TyIdx,
+) -> anyhow::Result<String> {
+    let ty = symbols
+        .ty_by_idx(ty_idx)
+        .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     Ok(match ty {
         Ty::Int => "int".to_owned(),
         Ty::IntN { n } => format!("int{n}"),
@@ -538,28 +695,28 @@ fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> anyhow::Result<String> {
         Ty::NullLiteral => "null".to_owned(),
         Ty::Callable => "callable".to_owned(),
         Ty::Void => "void".to_owned(),
-        Ty::Nullable { inner, .. } => format!("{}?", union_label_simple(symbols, inner)?),
+        Ty::Nullable { inner_ty_idx, .. } => {
+            format!("{}?", union_label_simple(symbols, *inner_ty_idx)?)
+        }
         Ty::CellOf { .. } => "Cell".to_owned(),
         Ty::Tensor { .. } | Ty::ShapedTuple { .. } => "tensor".to_owned(),
         Ty::MapKV { .. } => "map".to_owned(),
         Ty::EnumRef { enum_name } => enum_name.clone(),
         Ty::StructRef { struct_name, .. } => struct_name.clone(),
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let decl = find_alias_decl(symbols, alias_name)
+        Ty::AliasRef { alias_name, .. } => {
+            let decl = symbols
+                .alias_decl_info(alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
             ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
-            let type_args = type_args.as_deref().unwrap_or(&[]);
-            let type_params = validate_type_args(alias_name, decl.type_params, type_args)?;
-            let target_ty = instantiate_generics(decl.target_ty, type_params, type_args);
-            union_label_simple(symbols, &target_ty)?
+            let target_ty_idx = symbols
+                .alias_target_for(ty_idx)
+                .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
+            union_label_simple(symbols, target_ty_idx)?
         }
         Ty::GenericT { name_t } => name_t.clone(),
         Ty::Union { variants, .. } => variants
             .iter()
-            .map(|variant| union_label_simple(symbols, &variant.variant_ty))
+            .map(|variant| union_label_simple(symbols, variant.variant_ty_idx))
             .collect::<anyhow::Result<Vec<_>>>()?
             .join("|"),
         Ty::ArrayOf { .. } => "array".to_owned(),
@@ -569,94 +726,26 @@ fn union_label_simple(symbols: &SourceMap, ty: &Ty) -> anyhow::Result<String> {
     })
 }
 
-fn type_has_own_label(symbols: &SourceMap, ty: &Ty) -> anyhow::Result<bool> {
+fn type_has_own_label<S: UnpackSchema + ?Sized>(
+    symbols: &S,
+    ty_idx: TyIdx,
+) -> anyhow::Result<bool> {
+    let ty = symbols
+        .ty_by_idx(ty_idx)
+        .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     Ok(match ty {
         Ty::StructRef { .. } => true,
-        Ty::AliasRef {
-            alias_name,
-            type_args,
-        } => {
-            let decl = find_alias_decl(symbols, alias_name)
+        Ty::AliasRef { alias_name, .. } => {
+            let decl = symbols
+                .alias_decl_info(alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by type was not found"))?;
             ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
-            let type_args = type_args.as_deref().unwrap_or(&[]);
-            let type_params = validate_type_args(alias_name, decl.type_params, type_args)?;
-            let target_ty = instantiate_generics(decl.target_ty, type_params, type_args);
-            type_has_own_label(symbols, &target_ty)?
+            let target_ty_idx = symbols
+                .alias_target_for(ty_idx)
+                .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
+            type_has_own_label(symbols, target_ty_idx)?
         }
         _ => false,
-    })
-}
-
-struct StructDeclRef<'a> {
-    type_params: Option<&'a [String]>,
-    prefix: Option<&'a PrefixInfo>,
-    fields: &'a [FieldInfo],
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
-}
-
-struct AliasDeclRef<'a> {
-    type_params: Option<&'a [String]>,
-    target_ty: &'a Ty,
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
-}
-
-struct EnumDeclRef<'a> {
-    encoded_as: &'a Ty,
-    members: &'a [EnumMemberInfo],
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
-}
-
-fn find_struct_decl<'a>(symbols: &'a SourceMap, target_name: &str) -> Option<StructDeclRef<'a>> {
-    symbols.declarations().iter().find_map(|decl| match decl {
-        Declaration::Struct(AbiStruct {
-            name,
-            type_params,
-            prefix,
-            fields,
-            custom_pack_unpack,
-            ..
-        }) if name == target_name => Some(StructDeclRef {
-            type_params: type_params.as_deref(),
-            prefix: prefix.as_ref(),
-            fields: fields.as_slice(),
-            custom_pack_unpack: custom_pack_unpack.as_ref(),
-        }),
-        _ => None,
-    })
-}
-
-fn find_alias_decl<'a>(symbols: &'a SourceMap, target_name: &str) -> Option<AliasDeclRef<'a>> {
-    symbols.declarations().iter().find_map(|decl| match decl {
-        Declaration::Alias(AbiAlias {
-            name,
-            target_ty,
-            type_params,
-            custom_pack_unpack,
-            ..
-        }) if name == target_name => Some(AliasDeclRef {
-            type_params: type_params.as_deref(),
-            target_ty,
-            custom_pack_unpack: custom_pack_unpack.as_ref(),
-        }),
-        _ => None,
-    })
-}
-
-fn find_enum_decl<'a>(symbols: &'a SourceMap, target_name: &str) -> Option<EnumDeclRef<'a>> {
-    symbols.declarations().iter().find_map(|decl| match decl {
-        Declaration::Enum(AbiEnum {
-            name,
-            encoded_as,
-            members,
-            custom_pack_unpack,
-            ..
-        }) if name == target_name => Some(EnumDeclRef {
-            encoded_as,
-            members: members.as_slice(),
-            custom_pack_unpack: custom_pack_unpack.as_ref(),
-        }),
-        _ => None,
     })
 }
 
@@ -665,10 +754,7 @@ mod tests {
     use super::*;
     use crate::abi::{
         ABIDeclaration, ABIEnumMember, ABIInternalMessage, ABIOpcode, ABIStorage, ABIStructField,
-        ContractABI, UnionVariant,
-    };
-    use crate::source_map::{
-        AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
+        ContractABI, StructInstantiation, UnionVariant,
     };
     use tycho_types::cell::{CellBuilder, CellFamily, Store};
     use tycho_types::models::{AnyAddr, ExtAddr, StdAddr};
@@ -680,14 +766,17 @@ mod tests {
             author: String::new(),
             version: String::new(),
             description: String::new(),
+            unique_types: Vec::new(),
+            struct_instantiations: Vec::new(),
+            alias_instantiations: Vec::new(),
             declarations: Vec::new(),
             incoming_messages: Vec::new(),
             incoming_external: Vec::new(),
             outgoing_messages: Vec::new(),
             emitted_events: Vec::new(),
             storage: ABIStorage {
-                storage_ty: None,
-                storage_at_deployment_ty: None,
+                storage_ty_idx: None,
+                storage_at_deployment_ty_idx: None,
                 description: String::new(),
             },
             get_methods: Vec::new(),
@@ -697,79 +786,32 @@ mod tests {
         }
     }
 
-    fn symbols_from_abi(abi: &ContractABI) -> SourceMap {
-        let declarations = abi
-            .declarations
-            .iter()
-            .map(|decl| match decl {
-                ABIDeclaration::Struct {
-                    name,
-                    type_params,
-                    prefix,
-                    fields,
-                    custom_pack_unpack,
-                    overrides_client_type: _,
-                } => Declaration::Struct(AbiStruct {
-                    name: name.clone(),
-                    ident_loc: loc(),
-                    type_params: type_params.clone(),
-                    prefix: prefix.as_ref().map(|prefix| PrefixInfo {
-                        prefix_str: prefix.prefix_str.clone(),
-                        prefix_len: prefix.prefix_len,
-                    }),
-                    fields: fields
-                        .iter()
-                        .map(|field| FieldInfo {
-                            name: field.name.clone(),
-                            ty: field.ty.clone(),
-                        })
-                        .collect(),
-                    custom_pack_unpack: custom_pack_unpack.clone(),
-                }),
-                ABIDeclaration::Alias {
-                    name,
-                    target_ty,
-                    type_params,
-                    custom_pack_unpack,
-                } => Declaration::Alias(AbiAlias {
-                    name: name.clone(),
-                    ident_loc: loc(),
-                    target_ty: target_ty.clone(),
-                    type_params: type_params.clone(),
-                    custom_pack_unpack: custom_pack_unpack.clone(),
-                }),
-                ABIDeclaration::Enum {
-                    name,
-                    encoded_as,
-                    members,
-                    custom_pack_unpack,
-                } => Declaration::Enum(AbiEnum {
-                    name: name.clone(),
-                    ident_loc: loc(),
-                    encoded_as: encoded_as.clone(),
-                    members: members
-                        .iter()
-                        .map(|member| EnumMemberInfo {
-                            name: member.name.clone(),
-                            value: member.value.clone(),
-                        })
-                        .collect(),
-                    custom_pack_unpack: custom_pack_unpack.clone(),
-                }),
-            })
-            .collect::<Vec<_>>();
-
-        serde_json::from_value(serde_json::json!({
-            "files": [],
-            "declarations": declarations,
-            "unique_ty": [],
-            "functions": [],
-        }))
-        .unwrap()
+    fn add_ty(abi: &mut ContractABI, ty: Ty) -> TyIdx {
+        if let Some(idx) = abi.unique_types.iter().position(|existing| existing == &ty) {
+            return idx;
+        }
+        let idx = abi.unique_types.len();
+        abi.unique_types.push(ty);
+        idx
     }
 
-    fn loc() -> SrcRange {
-        SrcRange(vec![0, 0, 0, 0, 0])
+    fn struct_ref(abi: &mut ContractABI, struct_name: &str) -> TyIdx {
+        add_ty(
+            abi,
+            Ty::StructRef {
+                struct_name: struct_name.to_owned(),
+                type_args_ty_idx: None,
+            },
+        )
+    }
+
+    fn enum_ref(abi: &mut ContractABI, enum_name: &str) -> TyIdx {
+        add_ty(
+            abi,
+            Ty::EnumRef {
+                enum_name: enum_name.to_owned(),
+            },
+        )
     }
 
     fn build_snake_bytes_cell(bytes: &[u8]) -> Cell {
@@ -804,23 +846,27 @@ mod tests {
     #[test]
     fn decodes_struct_with_prefix_and_fields() {
         let mut abi = empty_abi();
+        let body_ty_idx = struct_ref(&mut abi, "MyMessage");
+        let query_ty_idx = add_ty(&mut abi, Ty::UintN { n: 64 });
+        let flag_ty_idx = add_ty(&mut abi, Ty::Bool);
         abi.declarations = vec![ABIDeclaration::Struct {
             name: "MyMessage".to_owned(),
+            ty_idx: body_ty_idx,
             type_params: None,
             prefix: Some(ABIOpcode {
-                prefix_str: "0x12345678".to_owned(),
+                prefix_num: 0x12345678,
                 prefix_len: 32,
             }),
             fields: vec![
                 ABIStructField {
                     name: "queryId".to_owned(),
-                    ty: Ty::UintN { n: 64 },
+                    ty_idx: query_ty_idx,
                     default_value: None,
                     description: String::new(),
                 },
                 ABIStructField {
                     name: "flag".to_owned(),
-                    ty: Ty::Bool,
+                    ty_idx: flag_ty_idx,
                     default_value: None,
                     description: String::new(),
                 },
@@ -829,10 +875,7 @@ mod tests {
             overrides_client_type: false,
         }];
         abi.incoming_messages = vec![ABIInternalMessage {
-            body_ty: Ty::StructRef {
-                struct_name: "MyMessage".to_owned(),
-                type_args: None,
-            },
+            body_ty_idx,
             description: String::new(),
         }];
 
@@ -842,17 +885,8 @@ mod tests {
         builder.store_bit(true).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
 
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::StructRef {
-                struct_name: "MyMessage".to_owned(),
-                type_args: None,
-            },
-        )
-        .unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, body_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -869,23 +903,32 @@ mod tests {
     #[test]
     fn decodes_address_any_and_map() {
         let mut abi = empty_abi();
+        let payload_ty_idx = struct_ref(&mut abi, "Payload");
+        let owner_ty_idx = add_ty(&mut abi, Ty::AddressAny);
+        let key_ty_idx = add_ty(&mut abi, Ty::UintN { n: 8 });
+        let value_ty_idx = add_ty(&mut abi, Ty::Bool);
+        let map_ty_idx = add_ty(
+            &mut abi,
+            Ty::MapKV {
+                key_ty_idx,
+                value_ty_idx,
+            },
+        );
         abi.declarations = vec![ABIDeclaration::Struct {
             name: "Payload".to_owned(),
+            ty_idx: payload_ty_idx,
             type_params: None,
             prefix: None,
             fields: vec![
                 ABIStructField {
                     name: "owner".to_owned(),
-                    ty: Ty::AddressAny,
+                    ty_idx: owner_ty_idx,
                     default_value: None,
                     description: String::new(),
                 },
                 ABIStructField {
                     name: "items".to_owned(),
-                    ty: Ty::MapKV {
-                        k: Box::new(Ty::UintN { n: 8 }),
-                        v: Box::new(Ty::Bool),
-                    },
+                    ty_idx: map_ty_idx,
                     default_value: None,
                     description: String::new(),
                 },
@@ -906,47 +949,32 @@ mod tests {
         map.store_into(&mut builder, Cell::empty_context()).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
 
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::StructRef {
-                struct_name: "Payload".to_owned(),
-                type_args: None,
-            },
-        )
-        .unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, payload_ty_idx).unwrap();
 
         assert!(matches!(data, UnpackedValue::Object { .. }));
     }
 
     #[test]
     fn decodes_auto_prefixed_union() {
-        let abi = empty_abi();
-        let mut builder = CellBuilder::new();
-        builder.store_bit(true).unwrap();
-        builder.store_uint(99, 16).unwrap();
-        let cell = builder.build().unwrap();
-        let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
-
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::Union {
+        let mut abi = empty_abi();
+        let uint8_ty_idx = add_ty(&mut abi, Ty::UintN { n: 8 });
+        let uint16_ty_idx = add_ty(&mut abi, Ty::UintN { n: 16 });
+        let union_ty_idx = add_ty(
+            &mut abi,
+            Ty::Union {
                 variants: vec![
                     UnionVariant {
-                        variant_ty: Ty::UintN { n: 8 },
-                        prefix_str: "0".to_owned(),
+                        variant_ty_idx: uint8_ty_idx,
+                        prefix_num: 0,
                         prefix_len: 1,
                         is_prefix_implicit: Some(true),
                         stack_type_id: None,
                         stack_width: None,
                     },
                     UnionVariant {
-                        variant_ty: Ty::UintN { n: 16 },
-                        prefix_str: "1".to_owned(),
+                        variant_ty_idx: uint16_ty_idx,
+                        prefix_num: 1,
                         prefix_len: 1,
                         is_prefix_implicit: Some(true),
                         stack_type_id: None,
@@ -955,8 +983,14 @@ mod tests {
                 ],
                 stack_width: None,
             },
-        )
-        .unwrap();
+        );
+        let mut builder = CellBuilder::new();
+        builder.store_bit(true).unwrap();
+        builder.store_uint(99, 16).unwrap();
+        let cell = builder.build().unwrap();
+        let mut slice = cell.as_slice_allow_exotic();
+
+        let data = unpack_from_abi_slice(&mut slice, &abi, union_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -970,15 +1004,40 @@ mod tests {
     #[test]
     fn decodes_generic_struct_fields_with_instantiated_types() {
         let mut abi = empty_abi();
+        let generic_ty_idx = add_ty(
+            &mut abi,
+            Ty::GenericT {
+                name_t: "T".to_owned(),
+            },
+        );
+        let boxed_generic_ty_idx = add_ty(
+            &mut abi,
+            Ty::StructRef {
+                struct_name: "Boxed".to_owned(),
+                type_args_ty_idx: Some(vec![generic_ty_idx]),
+            },
+        );
+        let value_ty_idx = add_ty(&mut abi, Ty::UintN { n: 32 });
+        let boxed_uint_ty_idx = add_ty(
+            &mut abi,
+            Ty::StructRef {
+                struct_name: "Boxed".to_owned(),
+                type_args_ty_idx: Some(vec![value_ty_idx]),
+            },
+        );
+        abi.struct_instantiations.push(StructInstantiation {
+            ty_idx: boxed_uint_ty_idx,
+            struct_name: "Boxed".to_owned(),
+            monomorphic_fields_ty_idx: vec![value_ty_idx],
+        });
         abi.declarations = vec![ABIDeclaration::Struct {
             name: "Boxed".to_owned(),
+            ty_idx: boxed_generic_ty_idx,
             type_params: Some(vec!["T".to_owned()]),
             prefix: None,
             fields: vec![ABIStructField {
                 name: "value".to_owned(),
-                ty: Ty::GenericT {
-                    name_t: "T".to_owned(),
-                },
+                ty_idx: generic_ty_idx,
                 default_value: None,
                 description: String::new(),
             }],
@@ -990,17 +1049,8 @@ mod tests {
         builder.store_uint(7, 32).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
 
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::StructRef {
-                struct_name: "Boxed".to_owned(),
-                type_args: Some(vec![Ty::UintN { n: 32 }]),
-            },
-        )
-        .unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, boxed_uint_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1014,9 +1064,12 @@ mod tests {
     #[test]
     fn decodes_enum_to_object_with_raw_value() {
         let mut abi = empty_abi();
+        let enum_ty_idx = enum_ref(&mut abi, "Color");
+        let encoded_as_ty_idx = add_ty(&mut abi, Ty::UintN { n: 8 });
         abi.declarations = vec![ABIDeclaration::Enum {
             name: "Color".to_owned(),
-            encoded_as: Ty::UintN { n: 8 },
+            ty_idx: enum_ty_idx,
+            encoded_as_ty_idx,
             members: vec![
                 ABIEnumMember {
                     name: "Red".to_owned(),
@@ -1036,16 +1089,8 @@ mod tests {
         builder.store_uint(2, 8).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
 
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::EnumRef {
-                enum_name: "Color".to_owned(),
-            },
-        )
-        .unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, enum_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1059,9 +1104,12 @@ mod tests {
     #[test]
     fn decodes_bool_encoded_enum_to_object_with_raw_value() {
         let mut abi = empty_abi();
+        let enum_ty_idx = enum_ref(&mut abi, "Toggle");
+        let encoded_as_ty_idx = add_ty(&mut abi, Ty::Bool);
         abi.declarations = vec![ABIDeclaration::Enum {
             name: "Toggle".to_owned(),
-            encoded_as: Ty::Bool,
+            ty_idx: enum_ty_idx,
+            encoded_as_ty_idx,
             members: vec![
                 ABIEnumMember {
                     name: "Off".to_owned(),
@@ -1081,16 +1129,8 @@ mod tests {
         builder.store_bit(true).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
-        let symbols = symbols_from_abi(&abi);
 
-        let data = unpack_from_slice(
-            &mut slice,
-            &symbols,
-            &Ty::EnumRef {
-                enum_name: "Toggle".to_owned(),
-            },
-        )
-        .unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, enum_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1103,20 +1143,21 @@ mod tests {
 
     #[test]
     fn decodes_address_opt_none() {
-        let abi = empty_abi();
+        let mut abi = empty_abi();
+        let ty_idx = add_ty(&mut abi, Ty::AddressOpt);
         let mut builder = CellBuilder::new();
         builder.store_uint(0, 2).unwrap();
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let symbols = symbols_from_abi(&abi);
-        let data = unpack_from_slice(&mut slice, &symbols, &Ty::AddressOpt).unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::Null));
     }
 
     #[test]
     fn decodes_internal_address_any() {
-        let abi = empty_abi();
+        let mut abi = empty_abi();
+        let ty_idx = add_ty(&mut abi, Ty::AddressAny);
         let mut builder = CellBuilder::new();
         StdAddr::new(0, Default::default())
             .store_into(&mut builder, Cell::empty_context())
@@ -1124,14 +1165,14 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let symbols = symbols_from_abi(&abi);
-        let data = unpack_from_slice(&mut slice, &symbols, &Ty::AddressAny).unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::Address(_)));
     }
 
     #[test]
     fn decodes_string_from_ref_cell() {
-        let abi = empty_abi();
+        let mut abi = empty_abi();
+        let ty_idx = add_ty(&mut abi, Ty::String);
         let string_cell = build_snake_bytes_cell(b"hello");
 
         let mut builder = CellBuilder::new();
@@ -1139,8 +1180,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let symbols = symbols_from_abi(&abi);
-        let data = unpack_from_slice(&mut slice, &symbols, &Ty::String).unwrap();
+        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::String(value) if value == "hello"));
     }
 }

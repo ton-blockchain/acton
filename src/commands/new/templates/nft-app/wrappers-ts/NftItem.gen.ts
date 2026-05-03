@@ -145,20 +145,6 @@ class StackReader {
         }
         return readFn_T(this);
     }
-
-    readWideNullable<T>(stackW: number, readFn_T: (r: StackReader) => T): T | null {
-        const slotTypeId = this.tuple[stackW - 1];
-        if (slotTypeId?.type !== 'int') {
-            throw new Error(`not 'int' on a stack`);
-        }
-        if (slotTypeId.value === 0n) {
-            this.tuple = this.tuple.slice(stackW);
-            return null;
-        }
-        const valueT = readFn_T(this);
-        this.tuple.shift();
-        return valueT;
-    }
 }
 
 // ————————————————————————————————————————————
@@ -177,6 +163,90 @@ type uint16 = bigint
 type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
+
+/**
+ > struct (0x2fcb26a2) RequestStaticData {
+ >     queryId: uint64
+ > }
+ */
+export interface RequestStaticData {
+    readonly $: 'RequestStaticData'
+    queryId: uint64
+}
+
+export const RequestStaticData = {
+    PREFIX: 0x2fcb26a2,
+
+    create(args: {
+        queryId: uint64
+    }): RequestStaticData {
+        return {
+            $: 'RequestStaticData',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): RequestStaticData {
+        loadAndCheckPrefix32(s, 0x2fcb26a2, 'RequestStaticData');
+        return {
+            $: 'RequestStaticData',
+            queryId: s.loadUintBig(64),
+        }
+    },
+    store(self: RequestStaticData, b: c.Builder): void {
+        b.storeUint(0x2fcb26a2, 32);
+        b.storeUint(self.queryId, 64);
+    },
+    toCell(self: RequestStaticData): c.Cell {
+        return makeCellFrom<RequestStaticData>(self, RequestStaticData.store);
+    }
+}
+
+/**
+ > struct (0x8b771735) ResponseStaticData {
+ >     queryId: uint64
+ >     itemIndex: uint256
+ >     collectionAddress: address
+ > }
+ */
+export interface ResponseStaticData {
+    readonly $: 'ResponseStaticData'
+    queryId: uint64
+    itemIndex: uint256
+    collectionAddress: c.Address
+}
+
+export const ResponseStaticData = {
+    PREFIX: 0x8b771735,
+
+    create(args: {
+        queryId: uint64
+        itemIndex: uint256
+        collectionAddress: c.Address
+    }): ResponseStaticData {
+        return {
+            $: 'ResponseStaticData',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ResponseStaticData {
+        loadAndCheckPrefix32(s, 0x8b771735, 'ResponseStaticData');
+        return {
+            $: 'ResponseStaticData',
+            queryId: s.loadUintBig(64),
+            itemIndex: s.loadUintBig(256),
+            collectionAddress: s.loadAddress(),
+        }
+    },
+    store(self: ResponseStaticData, b: c.Builder): void {
+        b.storeUint(0x8b771735, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeUint(self.itemIndex, 256);
+        b.storeAddress(self.collectionAddress);
+    },
+    toCell(self: ResponseStaticData): c.Cell {
+        return makeCellFrom<ResponseStaticData>(self, ResponseStaticData.store);
+    }
+}
 
 /**
  > struct (0b0) PayloadInline {
@@ -279,6 +349,90 @@ export const Payload = {
 }
 
 /**
+ > struct (0x05138d91) NotificationForNewOwner {
+ >     queryId: uint64
+ >     oldOwnerAddress: address
+ >     payload: Payload
+ > }
+ */
+export interface NotificationForNewOwner {
+    readonly $: 'NotificationForNewOwner'
+    queryId: uint64
+    oldOwnerAddress: c.Address
+    payload: Payload
+}
+
+export const NotificationForNewOwner = {
+    PREFIX: 0x05138d91,
+
+    create(args: {
+        queryId: uint64
+        oldOwnerAddress: c.Address
+        payload: Payload
+    }): NotificationForNewOwner {
+        return {
+            $: 'NotificationForNewOwner',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): NotificationForNewOwner {
+        loadAndCheckPrefix32(s, 0x05138d91, 'NotificationForNewOwner');
+        return {
+            $: 'NotificationForNewOwner',
+            queryId: s.loadUintBig(64),
+            oldOwnerAddress: s.loadAddress(),
+            payload: Payload.fromSlice(s),
+        }
+    },
+    store(self: NotificationForNewOwner, b: c.Builder): void {
+        b.storeUint(0x05138d91, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeAddress(self.oldOwnerAddress);
+        Payload.store(self.payload, b);
+    },
+    toCell(self: NotificationForNewOwner): c.Cell {
+        return makeCellFrom<NotificationForNewOwner>(self, NotificationForNewOwner.store);
+    }
+}
+
+/**
+ > struct (0xd53276db) ReturnExcessesBack {
+ >     queryId: uint64
+ > }
+ */
+export interface ReturnExcessesBack {
+    readonly $: 'ReturnExcessesBack'
+    queryId: uint64
+}
+
+export const ReturnExcessesBack = {
+    PREFIX: 0xd53276db,
+
+    create(args: {
+        queryId: uint64
+    }): ReturnExcessesBack {
+        return {
+            $: 'ReturnExcessesBack',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ReturnExcessesBack {
+        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
+        return {
+            $: 'ReturnExcessesBack',
+            queryId: s.loadUintBig(64),
+        }
+    },
+    store(self: ReturnExcessesBack, b: c.Builder): void {
+        b.storeUint(0xd53276db, 32);
+        b.storeUint(self.queryId, 64);
+    },
+    toCell(self: ReturnExcessesBack): c.Cell {
+        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
+    }
+}
+
+/**
  > struct (0x5fcc3d14) AskToChangeOwnership {
  >     queryId: uint64
  >     newOwnerAddress: address
@@ -339,43 +493,6 @@ export const AskToChangeOwnership = {
     },
     toCell(self: AskToChangeOwnership): c.Cell {
         return makeCellFrom<AskToChangeOwnership>(self, AskToChangeOwnership.store);
-    }
-}
-
-/**
- > struct (0x2fcb26a2) RequestStaticData {
- >     queryId: uint64
- > }
- */
-export interface RequestStaticData {
-    readonly $: 'RequestStaticData'
-    queryId: uint64
-}
-
-export const RequestStaticData = {
-    PREFIX: 0x2fcb26a2,
-
-    create(args: {
-        queryId: uint64
-    }): RequestStaticData {
-        return {
-            $: 'RequestStaticData',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): RequestStaticData {
-        loadAndCheckPrefix32(s, 0x2fcb26a2, 'RequestStaticData');
-        return {
-            $: 'RequestStaticData',
-            queryId: s.loadUintBig(64),
-        }
-    },
-    store(self: RequestStaticData, b: c.Builder): void {
-        b.storeUint(0x2fcb26a2, 32);
-        b.storeUint(self.queryId, 64);
-    },
-    toCell(self: RequestStaticData): c.Cell {
-        return makeCellFrom<RequestStaticData>(self, RequestStaticData.store);
     }
 }
 
@@ -462,137 +579,6 @@ export const NftItemStorageNotInitialized = {
     },
     toCell(self: NftItemStorageNotInitialized): c.Cell {
         return makeCellFrom<NftItemStorageNotInitialized>(self, NftItemStorageNotInitialized.store);
-    }
-}
-
-/**
- > struct (0x05138d91) NotificationForNewOwner {
- >     queryId: uint64
- >     oldOwnerAddress: address
- >     payload: Payload
- > }
- */
-export interface NotificationForNewOwner {
-    readonly $: 'NotificationForNewOwner'
-    queryId: uint64
-    oldOwnerAddress: c.Address
-    payload: Payload
-}
-
-export const NotificationForNewOwner = {
-    PREFIX: 0x05138d91,
-
-    create(args: {
-        queryId: uint64
-        oldOwnerAddress: c.Address
-        payload: Payload
-    }): NotificationForNewOwner {
-        return {
-            $: 'NotificationForNewOwner',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): NotificationForNewOwner {
-        loadAndCheckPrefix32(s, 0x05138d91, 'NotificationForNewOwner');
-        return {
-            $: 'NotificationForNewOwner',
-            queryId: s.loadUintBig(64),
-            oldOwnerAddress: s.loadAddress(),
-            payload: Payload.fromSlice(s),
-        }
-    },
-    store(self: NotificationForNewOwner, b: c.Builder): void {
-        b.storeUint(0x05138d91, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeAddress(self.oldOwnerAddress);
-        Payload.store(self.payload, b);
-    },
-    toCell(self: NotificationForNewOwner): c.Cell {
-        return makeCellFrom<NotificationForNewOwner>(self, NotificationForNewOwner.store);
-    }
-}
-
-/**
- > struct (0xd53276db) ReturnExcessesBack {
- >     queryId: uint64
- > }
- */
-export interface ReturnExcessesBack {
-    readonly $: 'ReturnExcessesBack'
-    queryId: uint64
-}
-
-export const ReturnExcessesBack = {
-    PREFIX: 0xd53276db,
-
-    create(args: {
-        queryId: uint64
-    }): ReturnExcessesBack {
-        return {
-            $: 'ReturnExcessesBack',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ReturnExcessesBack {
-        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
-        return {
-            $: 'ReturnExcessesBack',
-            queryId: s.loadUintBig(64),
-        }
-    },
-    store(self: ReturnExcessesBack, b: c.Builder): void {
-        b.storeUint(0xd53276db, 32);
-        b.storeUint(self.queryId, 64);
-    },
-    toCell(self: ReturnExcessesBack): c.Cell {
-        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
-    }
-}
-
-/**
- > struct (0x8b771735) ResponseStaticData {
- >     queryId: uint64
- >     itemIndex: uint256
- >     collectionAddress: address
- > }
- */
-export interface ResponseStaticData {
-    readonly $: 'ResponseStaticData'
-    queryId: uint64
-    itemIndex: uint256
-    collectionAddress: c.Address
-}
-
-export const ResponseStaticData = {
-    PREFIX: 0x8b771735,
-
-    create(args: {
-        queryId: uint64
-        itemIndex: uint256
-        collectionAddress: c.Address
-    }): ResponseStaticData {
-        return {
-            $: 'ResponseStaticData',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ResponseStaticData {
-        loadAndCheckPrefix32(s, 0x8b771735, 'ResponseStaticData');
-        return {
-            $: 'ResponseStaticData',
-            queryId: s.loadUintBig(64),
-            itemIndex: s.loadUintBig(256),
-            collectionAddress: s.loadAddress(),
-        }
-    },
-    store(self: ResponseStaticData, b: c.Builder): void {
-        b.storeUint(0x8b771735, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeUint(self.itemIndex, 256);
-        b.storeAddress(self.collectionAddress);
-    },
-    toCell(self: ResponseStaticData): c.Cell {
-        return makeCellFrom<ResponseStaticData>(self, ResponseStaticData.store);
     }
 }
 

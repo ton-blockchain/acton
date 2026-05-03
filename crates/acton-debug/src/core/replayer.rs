@@ -17,7 +17,7 @@ use std::sync::{Arc, OnceLock};
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::debug_marks_dict::DebugMarksDict;
 use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
-use tolk_compiler::types_kernel::Ty;
+use tolk_compiler::types_kernel::{Ty, TyIdx, render_ty};
 use tvm_logs::parser::{VmLine, VmStack, VmStackValue};
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ pub trait RuntimeEventSource {
 #[derive(Debug, Clone)]
 struct LocalVarInScope {
     name: String,
-    ty_idx: usize,
+    ty_idx: TyIdx,
     ir_slots: Vec<usize>,
     // None = not lazy; Some((ir_slot, slice)) = lazy, with the original CellSlice for field preview
     lazy_info: Option<(usize, VmStackValue)>,
@@ -481,19 +481,19 @@ pub enum Tick {
     },
     LocalVar {
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
         is_parameter: bool,
         ir_lazy_slice: Option<usize>,
     },
     SmartCast {
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     SetGlob {
         glob_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     ScopeStart {
@@ -1152,7 +1152,7 @@ impl TolkReplayer {
                 let is_void = self
                     .source_map
                     .get_function_by_idx(f_idx)
-                    .and_then(|f| self.source_map.resolve_ty(f.return_ty_idx))
+                    .and_then(|f| self.source_map.ty_by_idx(f.return_ty_idx))
                     .is_some_and(|ty| matches!(ty, Ty::Void));
                 if let Some(frame) = self.call_stack.last_mut() {
                     frame.pending_ir_return = Some(ir_return);
@@ -1425,14 +1425,12 @@ impl TolkReplayer {
             })
             .collect();
 
-        let return_ty = self
-            .source_map
-            .get_function_by_idx(f_idx)
-            .and_then(|f| self.source_map.resolve_ty(f.return_ty_idx));
-
-        match return_ty {
-            Some(ty) => debug_print_from_stack(&self.source_map, &values, ty),
-            None => RenderedValue::leaf("return type not found"),
+        let leaving_f = self.source_map.get_function_by_idx(f_idx);
+        match leaving_f {
+            Some(leaving_f) => {
+                debug_print_from_stack(&self.source_map, &values, leaving_f.return_ty_idx)
+            }
+            None => RenderedValue::leaf("leaving_f not found"),
         }
     }
 
@@ -1480,22 +1478,16 @@ impl TolkReplayer {
                 .collect();
 
             let debug_val = if let Some((_, ref slice)) = var.lazy_info {
-                match self.source_map.resolve_ty(var.ty_idx) {
-                    Some(ty) => debug_format_lazy(
-                        &self.source_map,
-                        &slot_values,
-                        &var.ir_slots,
-                        ty,
-                        last_seen,
-                        slice,
-                    ),
-                    None => RenderedValue::leaf("var.ty_idx not found"),
-                }
+                debug_format_lazy(
+                    &self.source_map,
+                    &slot_values,
+                    &var.ir_slots,
+                    var.ty_idx,
+                    last_seen,
+                    slice,
+                )
             } else {
-                match self.source_map.resolve_ty(var.ty_idx) {
-                    Some(ty) => debug_print_from_stack(&self.source_map, &slot_values, ty),
-                    None => RenderedValue::leaf("var.ty_idx not found"),
-                }
+                debug_print_from_stack(&self.source_map, &slot_values, var.ty_idx)
             };
             result.push(LocalVarRendered {
                 var_name: var.name.clone(),
@@ -1527,13 +1519,10 @@ impl TolkReplayer {
 
         for (name, (ty_idx, values)) in &self.global_var_values {
             let slot_values: Vec<SlotValue> = values.iter().map(SlotValue::Live).collect();
-            let debug_val = match self.source_map.resolve_ty(*ty_idx) {
-                Some(ty) => debug_print_from_stack(&self.source_map, &slot_values, ty),
-                None => RenderedValue::leaf("var.ty_idx not found"),
-            };
+            let rendered_g = debug_print_from_stack(&self.source_map, &slot_values, *ty_idx);
             result.push(LocalVarRendered {
                 var_name: format!("global {name}"),
-                value: debug_val,
+                value: rendered_g,
             });
         }
 
@@ -1652,8 +1641,10 @@ impl TolkReplayer {
     }
 
     #[must_use]
-    pub fn type_name(&self, ty_idx: usize) -> Option<String> {
-        self.source_map.resolve_ty(ty_idx).map(ToString::to_string)
+    pub fn type_name(&self, ty_idx: TyIdx) -> Option<String> {
+        self.source_map
+            .ty_by_idx(ty_idx)
+            .map(|_| render_ty(&self.source_map, ty_idx))
     }
 
     #[must_use]

@@ -4,7 +4,7 @@
 
 use crate::abi::ABICustomPackUnpack;
 use crate::debug_marks_dict::DebugMarksDict;
-use crate::types_kernel::Ty;
+use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -19,8 +19,10 @@ type BigintAsString = String;
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SourceMap {
     files: Vec<SrcFileInfo>,
+    unique_types: Vec<Ty>,
+    struct_instantiations: Vec<StructInstantiation>,
+    alias_instantiations: Vec<AliasInstantiation>,
     declarations: Vec<Declaration>,
-    unique_ty: Vec<UniqueTy>,
     functions: Vec<FunctionInfo>,
 
     #[serde(default)]
@@ -35,8 +37,10 @@ pub struct SourceMap {
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SymbolTypesJson {
     files: Vec<SrcFileInfo>,
+    unique_types: Vec<Ty>,
+    struct_instantiations: Vec<StructInstantiation>,
+    alias_instantiations: Vec<AliasInstantiation>,
     declarations: Vec<Declaration>,
-    unique_ty: Vec<UniqueTy>,
     functions: Vec<FunctionInfo>,
 }
 
@@ -50,7 +54,9 @@ impl SourceMap {
         SourceMap {
             files: symbol_types.files,
             declarations: symbol_types.declarations,
-            unique_ty: symbol_types.unique_ty,
+            unique_types: symbol_types.unique_types,
+            struct_instantiations: symbol_types.struct_instantiations,
+            alias_instantiations: symbol_types.alias_instantiations,
             functions: symbol_types.functions,
             debug_marks,
             marks_dict,
@@ -144,7 +150,7 @@ impl SourceMap {
             }
 
             let matches_opcode = struct_decl.prefix.as_ref().is_some_and(|prefix| {
-                prefix.prefix_len == 32 && parse_prefix_number(&prefix.prefix_str) == Some(opcode)
+                prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
             });
             matches_opcode.then_some(struct_decl.name.as_str())
         })
@@ -190,6 +196,46 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn struct_fields_of(&self, ty_idx: TyIdx) -> Option<Vec<FieldInfo>> {
+        let Ty::StructRef { struct_name, .. } = self.ty_by_idx(ty_idx)? else {
+            return None;
+        };
+        if let Some(inst) = self
+            .struct_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+        {
+            let fields = &self.get_struct(struct_name).fields;
+            if fields.len() != inst.monomorphic_fields_ty_idx.len() {
+                return None;
+            }
+            return Some(
+                fields
+                    .iter()
+                    .zip(&inst.monomorphic_fields_ty_idx)
+                    .map(|(field, &field_ty_idx)| FieldInfo {
+                        ty_idx: field_ty_idx,
+                        ..field.clone()
+                    })
+                    .collect(),
+            );
+        }
+        Some(self.get_struct(struct_name).fields.clone())
+    }
+
+    #[must_use]
+    pub fn alias_target_of(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        let Ty::AliasRef { alias_name, .. } = self.ty_by_idx(ty_idx)? else {
+            return None;
+        };
+        self.alias_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+            .map(|inst| inst.monomorphic_target_ty_idx)
+            .or_else(|| Some(self.get_alias(alias_name).target_ty_idx))
+    }
+
+    #[must_use]
     pub fn resolve_file_name(&self, file_id: usize) -> &str {
         for f in &self.files {
             if f.file_id == file_id {
@@ -223,11 +269,8 @@ impl SourceMap {
     }
 
     #[must_use]
-    pub fn resolve_ty(&self, ty_idx: usize) -> Option<&Ty> {
-        self.unique_ty
-            .iter()
-            .find(|u| u.ty_idx == ty_idx)
-            .map(|u| &u.ty)
+    pub fn ty_by_idx(&self, ty_idx: TyIdx) -> Option<&Ty> {
+        self.unique_types.get(ty_idx)
     }
 
     /// Collect all source lines that have a stoppable debug mark (LOC,
@@ -357,6 +400,21 @@ impl SourceMap {
     }
 }
 
+impl TyResolver for SourceMap {
+    fn ty_by_idx(&self, ty_idx: TyIdx) -> Option<&Ty> {
+        SourceMap::ty_by_idx(self, ty_idx)
+    }
+
+    fn struct_field_ty_indices(&self, ty_idx: TyIdx) -> Option<Vec<TyIdx>> {
+        self.struct_fields_of(ty_idx)
+            .map(|fields| fields.into_iter().map(|field| field.ty_idx).collect())
+    }
+
+    fn alias_target_ty_idx(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        self.alias_target_of(ty_idx)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 struct DeclarationIndex {
     structs: HashMap<String, usize>,
@@ -430,6 +488,7 @@ pub struct SrcFileInfo {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiStruct {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
@@ -443,8 +502,9 @@ pub struct AbiStruct {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiAlias {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
-    pub target_ty: Ty,
+    pub target_ty_idx: TyIdx,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
     #[serde(default)]
@@ -454,8 +514,9 @@ pub struct AbiAlias {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiEnum {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
-    pub encoded_as: Ty,
+    pub encoded_as_ty_idx: TyIdx,
     pub members: Vec<EnumMemberInfo>,
     #[serde(default)]
     pub custom_pack_unpack: Option<ABICustomPackUnpack>,
@@ -474,46 +535,20 @@ pub enum Declaration {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PrefixInfo {
-    pub prefix_str: String,
+    pub prefix_num: u64,
     pub prefix_len: i32,
-}
-
-fn parse_prefix_number(prefix: &str) -> Option<u32> {
-    let prefix = prefix.trim();
-    if prefix.is_empty() {
-        return None;
-    }
-    let parsed = if let Some(hex) = prefix
-        .strip_prefix("0x")
-        .or_else(|| prefix.strip_prefix("0X"))
-    {
-        u64::from_str_radix(hex, 16).ok()?
-    } else {
-        prefix.parse::<u64>().ok()?
-    };
-    u32::try_from(parsed).ok()
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FieldInfo {
     pub name: String,
-    pub ty: Ty,
+    pub ty_idx: TyIdx,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EnumMemberInfo {
     pub name: String,
     pub value: BigintAsString,
-}
-
-// ---------------------------------------------------------------------------
-// Unique type table (ty_idx -> Ty)
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct UniqueTy {
-    pub ty_idx: usize,
-    pub ty: Ty,
 }
 
 // ---------------------------------------------------------------------------
@@ -524,7 +559,7 @@ pub struct UniqueTy {
 pub struct FunctionInfo {
     pub f_idx: usize,
     pub name: String,
-    pub return_ty_idx: usize,
+    pub return_ty_idx: TyIdx,
     pub num_params: usize,
     pub ident_loc: SrcRange,
     pub end_loc: SrcRange,
@@ -566,7 +601,7 @@ pub enum DebugMark {
         mark_id: usize,
         var_name: String,
         is_parameter: bool,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
         #[serde(default)]
         ir_lazy_slice: Option<usize>,
@@ -579,14 +614,14 @@ pub enum DebugMark {
     SmartCast {
         mark_id: usize,
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     #[serde(rename = "set_glob")]
     SetGlob {
         mark_id: usize,
         glob_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
 }

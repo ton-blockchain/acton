@@ -31,6 +31,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
+use tolk_compiler::types_kernel::TyIdx;
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -607,21 +608,25 @@ fn parse_script_stack_args(abi: Option<&ContractABI>, args: &[String]) -> anyhow
 
     let mut items = Vec::with_capacity(args.len());
     for (param, arg) in main.parameters.iter().zip(args) {
-        items.push(parse_script_parameter(param, arg)?);
+        items.push(parse_script_parameter(abi, param, arg)?);
     }
 
     Ok(Tuple(items))
 }
 
-fn parse_script_parameter(param: &ABIFunctionParameter, raw: &str) -> anyhow::Result<TupleItem> {
-    validate_script_arg_ty(&param.ty)
-        .and_then(|()| parse_script_value(&param.ty, raw))
+fn parse_script_parameter(
+    abi: &ContractABI,
+    param: &ABIFunctionParameter,
+    raw: &str,
+) -> anyhow::Result<TupleItem> {
+    validate_script_arg_ty(abi, param.ty_idx)
+        .and_then(|()| parse_script_value(abi, param.ty_idx, raw))
         .map_err(|err| match err {
             ScriptArgParseError::Invalid => {
                 anyhow!(
                     "Cannot parse argument {} as {}: {}",
                     param.name.yellow(),
-                    param.ty.to_string().yellow(),
+                    abi.render_type(param.ty_idx).yellow(),
                     format_arg_value(raw).yellow()
                 )
             }
@@ -651,9 +656,17 @@ enum ScriptArgParseError {
     Unsupported { kind: &'static str, ty: String },
 }
 
-fn validate_script_arg_ty(ty: &Ty) -> Result<(), ScriptArgParseError> {
+fn validate_script_arg_ty(abi: &ContractABI, ty_idx: TyIdx) -> Result<(), ScriptArgParseError> {
+    let Some(ty) = abi.ty_by_idx(ty_idx) else {
+        return Err(ScriptArgParseError::Unsupported {
+            kind: "argument",
+            ty: format!("ty#{ty_idx}"),
+        });
+    };
     match ty {
-        Ty::Nullable { inner, .. } | Ty::ArrayOf { inner } => validate_script_arg_ty(inner),
+        Ty::Nullable { inner_ty_idx, .. } | Ty::ArrayOf { inner_ty_idx } => {
+            validate_script_arg_ty(abi, *inner_ty_idx)
+        }
         Ty::Int
         | Ty::IntN { .. }
         | Ty::UintN { .. }
@@ -670,19 +683,29 @@ fn validate_script_arg_ty(ty: &Ty) -> Result<(), ScriptArgParseError> {
         | Ty::AddressExt
         | Ty::AddressOpt
         | Ty::NullLiteral => Ok(()),
-        _ => Err(unsupported_ty(ty)),
+        _ => Err(unsupported_ty(abi, ty_idx)),
     }
 }
 
-fn parse_script_value(ty: &Ty, raw: &str) -> Result<TupleItem, ScriptArgParseError> {
+fn parse_script_value(
+    abi: &ContractABI,
+    ty_idx: TyIdx,
+    raw: &str,
+) -> Result<TupleItem, ScriptArgParseError> {
+    let Some(ty) = abi.ty_by_idx(ty_idx) else {
+        return Err(ScriptArgParseError::Unsupported {
+            kind: "argument",
+            ty: format!("ty#{ty_idx}"),
+        });
+    };
     let trimmed = raw.trim();
     match ty {
         Ty::String if !trimmed.starts_with('"') => string_tuple_item(raw),
         Ty::Nullable { .. } if trimmed == "null" => Ok(TupleItem::Null),
-        Ty::Nullable { inner, .. } => parse_script_value(inner, raw),
+        Ty::Nullable { inner_ty_idx, .. } => parse_script_value(abi, *inner_ty_idx, raw),
         _ => {
-            let mut parser = ScriptArgParser::new(raw);
-            let item = parser.parse_value(ty)?;
+            let mut parser = ScriptArgParser::new(abi, raw);
+            let item = parser.parse_value(ty_idx)?;
             parser.skip_ws();
             if parser.is_eof() {
                 Ok(item)
@@ -694,13 +717,14 @@ fn parse_script_value(ty: &Ty, raw: &str) -> Result<TupleItem, ScriptArgParseErr
 }
 
 struct ScriptArgParser<'a> {
+    abi: &'a ContractABI,
     input: &'a str,
     pos: usize,
 }
 
 impl<'a> ScriptArgParser<'a> {
-    const fn new(input: &'a str) -> Self {
-        Self { input, pos: 0 }
+    const fn new(abi: &'a ContractABI, input: &'a str) -> Self {
+        Self { abi, input, pos: 0 }
     }
 
     const fn is_eof(&self) -> bool {
@@ -728,8 +752,14 @@ impl<'a> ScriptArgParser<'a> {
         }
     }
 
-    fn parse_value(&mut self, ty: &Ty) -> Result<TupleItem, ScriptArgParseError> {
+    fn parse_value(&mut self, ty_idx: TyIdx) -> Result<TupleItem, ScriptArgParseError> {
         self.skip_ws();
+        let Some(ty) = self.abi.ty_by_idx(ty_idx) else {
+            return Err(ScriptArgParseError::Unsupported {
+                kind: "argument",
+                ty: format!("ty#{ty_idx}"),
+            });
+        };
         match ty {
             Ty::Int
             | Ty::IntN { .. }
@@ -756,8 +786,8 @@ impl<'a> ScriptArgParser<'a> {
                     Err(ScriptArgParseError::Invalid)
                 }
             }
-            Ty::ArrayOf { inner } => self.parse_array(inner),
-            _ => Err(unsupported_ty(ty)),
+            Ty::ArrayOf { inner_ty_idx } => self.parse_array(*inner_ty_idx),
+            _ => Err(unsupported_ty(self.abi, ty_idx)),
         }
     }
 
@@ -799,7 +829,7 @@ impl<'a> ScriptArgParser<'a> {
         address_tuple_item(token)
     }
 
-    fn parse_array(&mut self, inner: &Ty) -> Result<TupleItem, ScriptArgParseError> {
+    fn parse_array(&mut self, inner_ty_idx: TyIdx) -> Result<TupleItem, ScriptArgParseError> {
         if !self.consume_byte(b'[') {
             return Err(ScriptArgParseError::Invalid);
         }
@@ -814,7 +844,7 @@ impl<'a> ScriptArgParser<'a> {
                 return Err(ScriptArgParseError::Invalid);
             }
 
-            items.push(self.parse_value(inner)?);
+            items.push(self.parse_value(inner_ty_idx)?);
 
             self.skip_ws();
             self.consume_byte(b',');
@@ -918,10 +948,12 @@ fn address_tuple_item(value: &str) -> Result<TupleItem, ScriptArgParseError> {
         .map_err(|_| ScriptArgParseError::Invalid)
 }
 
-fn unsupported_ty(ty: &Ty) -> ScriptArgParseError {
+fn unsupported_ty(abi: &ContractABI, ty_idx: TyIdx) -> ScriptArgParseError {
     ScriptArgParseError::Unsupported {
-        kind: unsupported_ty_kind(ty),
-        ty: ty.to_string(),
+        kind: abi
+            .ty_by_idx(ty_idx)
+            .map_or("argument", unsupported_ty_kind),
+        ty: abi.render_type(ty_idx),
     }
 }
 

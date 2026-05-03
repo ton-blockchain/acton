@@ -76,17 +76,17 @@ fun println<
     value6: T6,
 ): void {
     ffi.println(
-        reflect.typeAbiJsonOfObject(value1),
+        reflect.typeUniqueIdxOfObject(value1),
         value1.toTuple(),
-        reflect.typeAbiJsonOfObject(value2),
+        reflect.typeUniqueIdxOfObject(value2),
         value2.toTuple(),
-        reflect.typeAbiJsonOfObject(value3),
+        reflect.typeUniqueIdxOfObject(value3),
         value3.toTuple(),
-        reflect.typeAbiJsonOfObject(value4),
+        reflect.typeUniqueIdxOfObject(value4),
         value4.toTuple(),
-        reflect.typeAbiJsonOfObject(value5),
+        reflect.typeUniqueIdxOfObject(value5),
         value5.toTuple(),
-        reflect.typeAbiJsonOfObject(value6),
+        reflect.typeUniqueIdxOfObject(value6),
         value6.toTuple(),
     );
 }
@@ -102,17 +102,17 @@ fun eprintln(str: string): void {
 }
 
 fun ffi.println(
-    type1: string,
+    type1: int,
     arg1: tuple,
-    type2: string,
+    type2: int,
     arg2: tuple,
-    type3: string,
+    type3: int,
     arg3: tuple,
-    type4: string,
+    type4: int,
     arg4: tuple,
-    type5: string,
+    type5: int,
     arg5: tuple,
-    type6: string,
+    type6: int,
     arg6: tuple,
 ): void
     asm "1 EXTCALL"

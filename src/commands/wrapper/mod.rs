@@ -10,11 +10,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
-use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
+use tolk_compiler::abi::{ABIGetMethod, ABIOpcode, ABIResolvedStruct, ContractABI};
 use tolk_compiler::source_map::Declaration;
 use tolk_compiler::{CompilerResult, SourceMap};
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.2.4";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.1";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
@@ -38,7 +38,6 @@ struct WrapperModel {
 struct TypescriptGeneratorAbi {
     #[serde(flatten)]
     abi: ContractABI,
-    #[serde(rename = "codeBoc64")]
     code_boc64: String,
 }
 
@@ -586,7 +585,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push('\n');
 
     for message in &model.incoming_messages {
-        code.push_str(&generate_send_method(contract, message));
+        code.push_str(&generate_send_method(contract, &model.abi, message));
         code.push('\n');
     }
 
@@ -594,7 +593,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push('\n');
 
     for get_method in &model.abi.get_methods {
-        code.push_str(&generate_get_method(contract, get_method));
+        code.push_str(&generate_get_method(contract, &model.abi, get_method));
         code.push('\n');
     }
 
@@ -685,7 +684,11 @@ fn generate_deploy(contract_name: &str) -> String {
     code
 }
 
-fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -> String {
+fn generate_send_method(
+    contract_name: &str,
+    abi: &ContractABI,
+    message_type: &ABIResolvedStruct,
+) -> String {
     let mut code = String::new();
     let method_name = format!("send{}", message_type.name);
 
@@ -694,7 +697,7 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
     let params = fields
         .iter()
         .map(|f| {
-            let type_name = f.ty.render_param_type();
+            let type_name = abi.render_param_type(f.ty_idx);
             let name = normalize_param_name(&f.name);
             format!("{name}: {type_name}")
         })
@@ -722,12 +725,13 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
         if let Some(prefix) = prefix {
             chain.push(format!(
                 ".storeUint({}, {})",
-                prefix.prefix_str, prefix.prefix_len
+                format_prefix_literal(prefix),
+                prefix.prefix_len
             ));
         }
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
-            let value = if field.ty.is_typed_cell() {
+            let value = if abi.is_typed_cell(field.ty_idx) {
                 format!("{param_name}.toCell()")
             } else {
                 param_name
@@ -765,7 +769,7 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
             for field in &fields {
                 let param_name = normalize_param_name(&field.name);
 
-                if field.ty.is_typed_cell() {
+                if abi.is_typed_cell(field.ty_idx) {
                     let _ = writeln!(code, "            {}: {}.toCell(),", field.name, param_name);
                 } else if field.name == param_name {
                     let _ = writeln!(code, "            {},", field.name);
@@ -782,6 +786,15 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
     code.push_str("}\n");
 
     code
+}
+
+fn format_prefix_literal(prefix: &ABIOpcode) -> String {
+    let prefix_len = usize::try_from(prefix.prefix_len.max(0)).unwrap_or(0);
+    if prefix_len % 4 == 0 {
+        format!("0x{:0width$x}", prefix.prefix_num, width = prefix_len / 4)
+    } else {
+        format!("0b{:0width$b}", prefix.prefix_num, width = prefix_len)
+    }
 }
 
 fn normalize_param_name(name: &str) -> String {
@@ -812,7 +825,11 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code
 }
 
-fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String {
+fn generate_get_method(
+    contract_name: &str,
+    abi: &ContractABI,
+    get_method: &ABIGetMethod,
+) -> String {
     let mut code = String::new();
     let method_name = normalize_get_method_name(&get_method.name);
     let tvm_method_name = &get_method.name;
@@ -820,7 +837,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .parameters
         .iter()
         .map(|p| {
-            let type_name = p.ty.render_param_type();
+            let type_name = abi.render_param_type(p.ty_idx);
             let param_name = normalize_get_param_name(&p.name);
             format!("{param_name}: {type_name}")
         })
@@ -832,7 +849,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .iter()
         .map(|p| {
             let param_name = normalize_get_param_name(&p.name);
-            if p.ty.is_typed_cell() {
+            if abi.is_typed_cell(p.ty_idx) {
                 format!("{param_name}.toCell()")
             } else {
                 param_name
@@ -840,7 +857,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         })
         .collect::<Vec<_>>();
 
-    let return_type = get_method.return_ty.render_type();
+    let return_type = abi.render_type(get_method.return_ty_idx);
 
     if params.is_empty() {
         let _ = writeln!(
@@ -1042,10 +1059,10 @@ fn generate_setup_test(
             .fields
             .iter()
             .map(|f| {
-                if let Some(default_value) = f.ty.typed_cell_payload_default_value(abi) {
+                if let Some(default_value) = abi.typed_cell_payload_default_value(f.ty_idx) {
                     format!(" {}: {default_value}.toCell()", f.name)
                 } else {
-                    format!(" {}: {}", f.name, f.ty.default_value(abi))
+                    format!(" {}: {}", f.name, abi.default_value(f.ty_idx))
                 }
             })
             .collect::<Vec<_>>()

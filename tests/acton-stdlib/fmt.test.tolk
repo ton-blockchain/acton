@@ -121,7 +121,6 @@ get fun `test format message`() {
         var loaded = inMsg.value.load();
         loaded.info.createdLt = 0;
         loaded.info.createdAt = 0;
-        // todo "union with unresolved layout" below, to be fixed later (need to reconsider instantated generics, now they do not carry stack layout)
         expect(
             format("{}", loaded),
         ).toEqual("""TlbMessageRelaxedGeneric {
@@ -140,8 +139,8 @@ get fun `test format message`() {
         createdLt: 0,
         createdAt: 0,
     },
-    init: union with unresolved layout,
-    body: null,
+    init: TlbNone,
+    body: slice{4_},
 }""");
     }
 }

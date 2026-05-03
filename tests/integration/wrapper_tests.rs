@@ -210,7 +210,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
     assert_eq!(abi_json["contract_name"], "MyContract");
     assert_eq!(abi_json["compiler_name"], "tolk");
     assert!(
-        abi_json["codeBoc64"]
+        abi_json["code_boc64"]
             .as_str()
             .is_some_and(|value| !value.is_empty())
     );
