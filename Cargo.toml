@@ -39,7 +39,6 @@ acton-debug = { path = "crates/acton-debug" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
-ton-abi = { path = "crates/ton-abi" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
@@ -200,7 +199,6 @@ acton-config = { workspace = true }
 acton-debug = { workspace = true }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
-ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
 tolk-syntax = { workspace = true }

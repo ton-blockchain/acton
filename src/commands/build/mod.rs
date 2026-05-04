@@ -9,7 +9,7 @@ use acton_config::config::{
 use anyhow::anyhow;
 use heck::ToLowerCamelCase;
 use log::debug;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -154,6 +154,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
     }
 
     let mut compiled_contracts: HashMap<String, String> = HashMap::new();
+    let mut rebuilt_contracts: HashSet<String> = HashSet::new();
     let mut compile_errors = BTreeMap::new();
     let mut artifact_errors = BTreeMap::<String, Vec<String>>::new();
     let mut build_info = Vec::new();
@@ -166,7 +167,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
         let contract_source_key = contract_path.to_string_lossy().to_string();
         let contract_source_display = contract_config.src.as_str();
 
-        generate_dependency_files(
+        let dependency_files_changed = generate_dependency_files(
             &parent_contract,
             contract_config,
             &compiled_contracts,
@@ -175,8 +176,11 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             &gen_dir,
             project_root,
         )?;
+        let dependency_rebuilt =
+            has_rebuilt_contract_dependency(contract_config, &rebuilt_contracts);
+        let force_recompile = dependency_files_changed || dependency_rebuilt;
 
-        let (code_boc64, code_hash, fift_code, abi) = match process_contract(
+        let processed_contract = match process_contract(
             &mut file_cache,
             &parent_contract,
             contract_config,
@@ -185,16 +189,27 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             &contract_path,
             &config,
             output_fift_dir.is_some(),
+            force_recompile,
         ) {
-            Ok((code, hash, fift_code, abi)) => (code, hash, fift_code, abi),
+            Ok(processed_contract) => processed_contract,
             Err(err) => {
                 error_count += 1;
                 compile_errors.insert(parent_contract.clone(), err);
                 continue;
             }
         };
+        let ProcessedContract {
+            code_boc64,
+            code_hash,
+            fift_code,
+            abi,
+            compiled_from_source,
+        } = processed_contract;
 
         compiled_contracts.insert(parent_contract.clone(), code_boc64.clone());
+        if compiled_from_source {
+            rebuilt_contracts.insert(parent_contract.clone());
+        }
 
         if show_info {
             build_info.push((
@@ -299,6 +314,25 @@ fn record_contract_error(
         .push(error.to_string());
 }
 
+fn has_rebuilt_contract_dependency(
+    config: &ContractConfig,
+    rebuilt_contracts: &HashSet<String>,
+) -> bool {
+    config.depends.as_ref().is_some_and(|depends| {
+        depends
+            .iter()
+            .any(|dependency| rebuilt_contracts.contains(dependency.name()))
+    })
+}
+
+struct ProcessedContract {
+    code_boc64: String,
+    code_hash: String,
+    fift_code: Option<String>,
+    abi: Option<ContractABI>,
+    compiled_from_source: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_contract(
     file_cache: &mut FileBuildCache,
@@ -309,76 +343,77 @@ fn process_contract(
     contract_path: &Path,
     acton_config: &ActonConfig,
     with_fift: bool,
-) -> anyhow::Result<(String, String, Option<String>, Option<ContractABI>)> {
-    let (code_boc64, code_hash, fift_code, abi) = if contract_src_display.ends_with(".boc") {
+    force_recompile: bool,
+) -> anyhow::Result<ProcessedContract> {
+    if contract_src_display.ends_with(".boc") {
         debug!("Loading BoC file: {}", contract_path.display());
-        match fs::read(contract_path) {
-            Ok(boc_data) => match Boc::decode(&boc_data) {
-                Ok(boc) => {
-                    let code_boc64 = Boc::encode_base64(&boc);
-                    (code_boc64, boc.repr_hash().to_string(), None, None)
-                }
-                Err(e) => {
-                    anyhow::bail!("Failed to decode BoC file {contract_src_display}: {e}");
-                }
-            },
-            Err(e) => {
-                anyhow::bail!("Failed to read BoC file {contract_src_display}: {e}");
-            }
-        }
+        let boc_data = fs::read(contract_path)
+            .map_err(|e| anyhow!("Failed to read BoC file {contract_src_display}: {e}"))?;
+        let boc = Boc::decode(&boc_data)
+            .map_err(|e| anyhow!("Failed to decode BoC file {contract_src_display}: {e}"))?;
+        return Ok(ProcessedContract {
+            code_boc64: Boc::encode_base64(&boc),
+            code_hash: boc.repr_hash().to_string(),
+            fift_code: None,
+            abi: None,
+            compiled_from_source: false,
+        });
+    }
+
+    let cached_result = if force_recompile {
+        debug!("Cache bypass for '{contract_cache_key}' because dependency changed");
+        None
     } else {
-        let cached_result = file_cache.get(contract_cache_key, false, with_fift, 2, "1.3");
-
-        if let Some(cached_result) = cached_result {
-            debug!("Cache hit, use cached result for '{contract_cache_key}'");
-            (
-                cached_result.code_boc64,
-                cached_result.code_hash_hex,
-                cached_result.fift_code,
-                cached_result.abi,
-            )
-        } else {
-            debug!("Cache miss, recompile '{}'", contract_path.display());
-            let compile_start = Instant::now();
-            let display_name = contract_config.display_name(contract_id);
-            println!("   {} {}", "Compiling".green().bold(), display_name);
-
-            let mappings = acton_config.mappings();
-            let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-            let compilation_result = compiler.compile(contract_path, false);
-            let compile_time = compile_start.elapsed();
-
-            match compilation_result {
-                tolk_compiler::CompilerResult::Success(result) => {
-                    if let Err(e) =
-                        file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.3")
-                    {
-                        eprintln!(
-                            "Warning: Failed to cache compilation result for {display_name}: {e}"
-                        );
-                    }
-
-                    println!("    {} in {:?}", "Finished".green(), compile_time);
-
-                    (
-                        result.code_boc64,
-                        result.code_hash_hex,
-                        with_fift.then_some(result.fift_code),
-                        result.abi,
-                    )
-                }
-                tolk_compiler::CompilerResult::Error(error) => {
-                    let message = rewrite_compiler_error_paths_for_display(
-                        &error.message,
-                        contract_src_display,
-                        contract_path,
-                    );
-                    anyhow::bail!(message);
-                }
-            }
-        }
+        file_cache.get(contract_cache_key, false, with_fift, 2, "1.3")
     };
-    Ok((code_boc64, code_hash, fift_code, abi))
+
+    if let Some(cached_result) = cached_result {
+        debug!("Cache hit, use cached result for '{contract_cache_key}'");
+        return Ok(ProcessedContract {
+            code_boc64: cached_result.code_boc64,
+            code_hash: cached_result.code_hash_hex,
+            fift_code: cached_result.fift_code,
+            abi: cached_result.abi,
+            compiled_from_source: false,
+        });
+    }
+
+    debug!("Cache miss, recompile '{}'", contract_path.display());
+    let compile_start = Instant::now();
+    let display_name = contract_config.display_name(contract_id);
+    println!("   {} {}", "Compiling".green().bold(), display_name);
+
+    let mappings = acton_config.mappings();
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+    let compilation_result = compiler.compile(contract_path, false);
+    let compile_time = compile_start.elapsed();
+
+    match compilation_result {
+        tolk_compiler::CompilerResult::Success(result) => {
+            if let Err(e) = file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.3")
+            {
+                eprintln!("Warning: Failed to cache compilation result for {display_name}: {e}");
+            }
+
+            println!("    {} in {:?}", "Finished".green(), compile_time);
+
+            Ok(ProcessedContract {
+                code_boc64: result.code_boc64,
+                code_hash: result.code_hash_hex,
+                fift_code: with_fift.then_some(result.fift_code),
+                abi: result.abi,
+                compiled_from_source: true,
+            })
+        }
+        tolk_compiler::CompilerResult::Error(error) => {
+            let message = rewrite_compiler_error_paths_for_display(
+                &error.message,
+                contract_src_display,
+                contract_path,
+            );
+            anyhow::bail!(message);
+        }
+    }
 }
 
 fn save_boc_file(
@@ -518,16 +553,17 @@ pub(crate) fn generate_dependency_files(
     acton_config: &ActonConfig,
     gen_dir: &Path,
     project_root: &Path,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let Some(depends) = &config.depends else {
-        return Ok(());
+        return Ok(false);
     };
     if depends.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
 
+    let mut any_changed = false;
     for dep in depends {
-        generate_single_dependency_file(
+        any_changed |= generate_single_dependency_file(
             parent_contract,
             dep,
             compiled_contracts,
@@ -538,7 +574,7 @@ pub(crate) fn generate_dependency_files(
         )?;
     }
 
-    Ok(())
+    Ok(any_changed)
 }
 
 fn create_gen_dir(gen_dir: &Path) -> anyhow::Result<()> {
@@ -556,13 +592,13 @@ fn generate_single_dependency_file(
     acton_config: &ActonConfig,
     gen_dir: &Path,
     project_root: &Path,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     create_gen_dir(gen_dir)?;
     let dependency_contract = dependency.name();
 
     if failed_contracts.get(dependency_contract).is_some() {
         // contract depends on other contract with compilation error, don't do anything
-        return Ok(());
+        return Ok(false);
     }
 
     let boc_base64 = compiled_contracts.get(dependency_contract).ok_or_else(|| {
@@ -597,9 +633,13 @@ fn generate_single_dependency_file(
         fs::create_dir_all(dir)?;
     }
 
+    if fs::read_to_string(&output_path).is_ok_and(|existing| existing == content) {
+        return Ok(false);
+    }
+
     fs::write(output_path, content)?;
 
-    Ok(())
+    Ok(true)
 }
 
 fn non_empty_path(path: Option<String>) -> Option<String> {

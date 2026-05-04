@@ -69,10 +69,13 @@ pub fn verify_cmd(
     let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
     let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
-    let code_boc64 = match compilation_result {
+    let (code_boc64, source_map) = match compilation_result {
         tolk_compiler::CompilerResult::Success(result) => {
             println!("  {} Compiled successfully", "✓".green().bold());
-            result.code_boc64
+            let source_map = result
+                .source_map
+                .ok_or_else(|| anyhow!("Compiler did not produce symbol types for verification"))?;
+            (result.code_boc64, source_map)
         }
         tolk_compiler::CompilerResult::Error(error) => {
             anyhow::bail!(
@@ -152,11 +155,7 @@ pub fn verify_cmd(
     }
 
     println!("  {} Collecting source files", "→".blue().bold());
-    let source_files = ton_abi::get_file_dependencies(
-        contract_path.to_string_lossy().as_ref(),
-        true,
-        config.mappings.as_ref(),
-    )?;
+    let source_files = source_files_from_source_map(&source_map);
     println!(
         "  {} Collected {} source file{}",
         "✓".green().bold(),
@@ -170,16 +169,16 @@ pub fn verify_cmd(
 
     let project_root = acton_config::config::project_root();
     let mut upload_parts: Vec<UploadPart> = Vec::new();
-    let mut normalized_source_paths: Vec<String> = Vec::new();
+    let mut normalized_source_paths: Vec<(String, bool)> = Vec::new();
 
-    for path in &source_files {
-        let path = PathBuf::from(path);
+    for (path, is_entrypoint) in &source_files {
+        let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
         let file_content = fs::read(&path).context("Failed to read source file")?;
         let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
             anyhow::bail!("Failed to get filename from path: {}", path.display());
         };
         let source_path = normalize_source_path_for_verifier(&path, project_root);
-        normalized_source_paths.push(source_path.clone());
+        normalized_source_paths.push((source_path.clone(), *is_entrypoint));
 
         upload_parts.push(UploadPart {
             field_name: source_path,
@@ -190,10 +189,9 @@ pub fn verify_cmd(
 
     let sources_meta: Vec<SourceObject> = normalized_source_paths
         .iter()
-        .enumerate()
-        .map(|(idx, path)| SourceObject {
+        .map(|(path, is_entrypoint)| SourceObject {
             include_in_command: true,
-            is_entrypoint: idx == normalized_source_paths.len() - 1,
+            is_entrypoint: *is_entrypoint,
             is_stdlib: false,
             has_include_directives: true,
             folder: source_folder_for_verifier(path),
@@ -251,8 +249,8 @@ pub fn verify_cmd(
             "→".dimmed(),
             if source_files.len() == 1 { "" } else { "s" }
         );
-        for file in &source_files {
-            println!("      {}", file.dimmed());
+        for (file, _) in &source_files {
+            println!("      {}", file.display().dimmed());
         }
         if let Some(backend_override) = &backend_override {
             println!(
@@ -818,6 +816,22 @@ fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
 fn normalize_source_path_for_verifier(path: &Path, project_root: &Path) -> String {
     let relative = path.strip_prefix(project_root).unwrap_or(path);
     relative.to_string_lossy().replace('\\', "/")
+}
+
+fn source_files_from_source_map(source_map: &tolk_compiler::SourceMap) -> Vec<(PathBuf, bool)> {
+    source_map
+        .files()
+        .iter()
+        .filter_map(|file| {
+            let path = file.file_name.as_str();
+            if path.starts_with("@stdlib/") || path.starts_with("@fiftlib/") {
+                None
+            } else {
+                // in symbol-types, file_id=0 is common.tolk, file_id=1 is main (entrypoint) file
+                Some((PathBuf::from(path), file.file_id == 1))
+            }
+        })
+        .collect()
 }
 
 fn source_folder_for_verifier(path: &str) -> String {
