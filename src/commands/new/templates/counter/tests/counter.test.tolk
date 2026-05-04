@@ -68,7 +68,7 @@ get fun `test decrease counter fails on underflow`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: Errors.CounterUnderflow as int,
+        exitCode: Errors.CounterUnderflow,
     });
 }
 
@@ -85,7 +85,7 @@ get fun `test decrease counter fails on overflow`() {
     expect(res2).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: Errors.CounterUnderflow as int,
+        exitCode: Errors.CounterUnderflow,
     });
 
     expect(contract.currentCounter()).toEqual(1);
@@ -98,7 +98,7 @@ get fun `test non-owner cannot change counter`() {
     expect(res).toHaveFailedTx({
         from: notDeployer.address,
         to: contract.address,
-        exitCode: Errors.NotOwner as int,
+        exitCode: Errors.NotOwner,
     });
 
     expect(contract.currentCounter()).toEqual(0);
@@ -111,7 +111,7 @@ get fun `test unknown message`() {
     expect(res).toHaveFailedTx({
         from: deployer.address,
         to: contract.address,
-        exitCode: Errors.InvalidMessage as int,
+        exitCode: Errors.InvalidMessage,
     });
 
     val res2 = contract.sendAny(deployer.address, createEmptyCell());
@@ -123,7 +123,7 @@ get fun `test unknown message`() {
 
 fun setupTest(): (Counter, Treasury, Treasury) {
     val deployer = testing.treasury("deployer");
-    val notDeployer = testing.treasury("not_deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
     val contract = Counter.fromStorage({ id: 0, owner: deployer.address, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });

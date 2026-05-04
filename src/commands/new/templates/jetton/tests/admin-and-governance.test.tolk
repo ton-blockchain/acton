@@ -17,7 +17,7 @@ import "test-utils"
 get fun `test admin: deploy should create minter without bounce`() {
     val deployer = testing.treasury("deployer-manual-deploy");
 
-    val minter = JettonMinter.fromStorage(MinterStorage {
+    val minter = JettonMinter.fromStorage({
         totalSupply: 0,
         adminAddress: deployer.address,
         metadata: buildTestMetadata("link"),

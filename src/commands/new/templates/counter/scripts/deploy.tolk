@@ -7,7 +7,7 @@ import "@wrappers/Counter.gen"
 fun main() {
     val deployer = scripts.wallet("deployer");
 
-    val counter = Counter.fromStorage(Storage {
+    val counter = Counter.fromStorage({
         id: 0,
         owner: deployer.address,
         counter: 0,

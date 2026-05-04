@@ -323,43 +323,17 @@ export const PayloadInRef = {
 }
 
 /**
- > type Payload = PayloadInline | PayloadInRef
- */
-export type Payload =
-    | PayloadInline
-    | PayloadInRef
-
-export const Payload = {
-    fromSlice(s: c.Slice): Payload {
-        return s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s);
-    },
-    store(self: Payload, b: c.Builder): void {
-        switch (self.$) {
-            case 'PayloadInline':
-                PayloadInline.store(self, b);
-                break;
-            case 'PayloadInRef':
-                PayloadInRef.store(self, b);
-                break;
-        }
-    },
-    toCell(self: Payload): c.Cell {
-        return makeCellFrom<Payload>(self, Payload.store);
-    }
-}
-
-/**
  > struct (0x05138d91) NotificationForNewOwner {
  >     queryId: uint64
  >     oldOwnerAddress: address
- >     payload: Payload
+ >     payload: PayloadInline | PayloadInRef
  > }
  */
 export interface NotificationForNewOwner {
     readonly $: 'NotificationForNewOwner'
     queryId: uint64
     oldOwnerAddress: c.Address
-    payload: Payload
+    payload: PayloadInline | PayloadInRef
 }
 
 export const NotificationForNewOwner = {
@@ -368,7 +342,7 @@ export const NotificationForNewOwner = {
     create(args: {
         queryId: uint64
         oldOwnerAddress: c.Address
-        payload: Payload
+        payload: PayloadInline | PayloadInRef
     }): NotificationForNewOwner {
         return {
             $: 'NotificationForNewOwner',
@@ -381,14 +355,21 @@ export const NotificationForNewOwner = {
             $: 'NotificationForNewOwner',
             queryId: s.loadUintBig(64),
             oldOwnerAddress: s.loadAddress(),
-            payload: Payload.fromSlice(s),
+            payload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: NotificationForNewOwner, b: c.Builder): void {
         b.storeUint(0x05138d91, 32);
         b.storeUint(self.queryId, 64);
         b.storeAddress(self.oldOwnerAddress);
-        Payload.store(self.payload, b);
+        switch (self.payload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.payload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.payload, b);
+                break;
+        }
     },
     toCell(self: NotificationForNewOwner): c.Cell {
         return makeCellFrom<NotificationForNewOwner>(self, NotificationForNewOwner.store);
@@ -439,7 +420,7 @@ export const ReturnExcessesBack = {
  >     sendExcessesTo: address?
  >     customPayload: cell?
  >     forwardTonAmount: coins
- >     forwardPayload: Payload
+ >     forwardPayload: PayloadInline | PayloadInRef
  > }
  */
 export interface AskToChangeOwnership {
@@ -449,7 +430,7 @@ export interface AskToChangeOwnership {
     sendExcessesTo: c.Address | null
     customPayload: c.Cell | null
     forwardTonAmount: coins
-    forwardPayload: Payload
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const AskToChangeOwnership = {
@@ -461,7 +442,7 @@ export const AskToChangeOwnership = {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: Payload
+        forwardPayload: PayloadInline | PayloadInRef
     }): AskToChangeOwnership {
         return {
             $: 'AskToChangeOwnership',
@@ -477,7 +458,7 @@ export const AskToChangeOwnership = {
             sendExcessesTo: s.loadMaybeAddress(),
             customPayload: s.loadBoolean() ? s.loadRef() : null,
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: Payload.fromSlice(s),
+            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: AskToChangeOwnership, b: c.Builder): void {
@@ -489,7 +470,14 @@ export const AskToChangeOwnership = {
             (v,b) => b.storeRef(v)
         );
         b.storeCoins(self.forwardTonAmount);
-        Payload.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: AskToChangeOwnership): c.Cell {
         return makeCellFrom<AskToChangeOwnership>(self, AskToChangeOwnership.store);
@@ -705,7 +693,7 @@ export class NftItem implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: Payload
+        forwardPayload: PayloadInline | PayloadInRef
     }) {
         return AskToChangeOwnership.toCell(AskToChangeOwnership.create(body));
     }
@@ -730,7 +718,7 @@ export class NftItem implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: Payload
+        forwardPayload: PayloadInline | PayloadInRef
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,

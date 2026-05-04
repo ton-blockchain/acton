@@ -206,9 +206,9 @@ fun hasSetCodeAction(res: SendResultList, account: address): bool {
 
 fun setupTest(initialSupply: int = 0): (JettonMinter, Treasury, Treasury) {
     val deployer = testing.treasury("deployer");
-    val notDeployer = testing.treasury("not-deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
-    val minter = JettonMinter.fromStorage(MinterStorage {
+    val minter = JettonMinter.fromStorage({
         totalSupply: initialSupply,
         adminAddress: deployer.address,
         metadata: buildTestMetadata("link"),

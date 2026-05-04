@@ -54,12 +54,10 @@ struct (0b1) PayloadInRef {
     value: Cell<RemainingBitsAndRefs>
 }
 
-type Payload = PayloadInline | PayloadInRef
-
 struct (0x05138d91) NotificationForNewOwner {
     queryId: uint64
     oldOwnerAddress: address
-    @abi.clientType(Payload)
+    @abi.clientType(PayloadInline | PayloadInRef)
     payload: RemainingBitsAndRefs
 }
 
@@ -73,6 +71,6 @@ struct (0x5fcc3d14) AskToChangeOwnership {
     sendExcessesTo: address?
     customPayload: cell?
     forwardTonAmount: coins
-    @abi.clientType(Payload)
+    @abi.clientType(PayloadInline | PayloadInRef)
     forwardPayload: RemainingBitsAndRefs
 }
