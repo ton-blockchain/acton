@@ -13,10 +13,10 @@ deploy, install, and remove the extension.
   define storage, messages, errors, and W5 action types used by the extension.
 - `contracts/walletv5/` vendors the upstream Wallet V5 contract and its
   supporting modules so the extension can be tested against a real wallet.
-- `wrappers/SimpleExtension.gen.tolk` is the generated wrapper used by tests
-  and scripts.
-- `wrappers/WalletV5Contract.tolk` is a hand-written wrapper that drives the
-  vendored Wallet V5 from tests and scripts.
+- `wrappers/SimpleExtension.gen.tolk` and `wrappers/WalletV5.gen.tolk` are
+  generated wrappers used by tests and scripts.
+- `wrappers/utils.tolk` is a hand-written companion to `WalletV5.gen.tolk`
+  that adds testing helpers (signed bodies, deploy helpers, action packing).
 - `tests/simple-extension.test.tolk` covers install, payment collection,
   payment interval enforcement, and admin-driven cancellation flows.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on

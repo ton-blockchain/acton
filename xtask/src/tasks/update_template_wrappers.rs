@@ -28,6 +28,10 @@ const TEMPLATES: &[Template] = &[
         name: "nft",
         contracts: &["NftCollection", "NftItem"],
     },
+    Template {
+        name: "w5-extension",
+        contracts: &["SimpleExtension", "WalletV5"],
+    },
 ];
 
 pub(crate) fn run() -> Result<()> {

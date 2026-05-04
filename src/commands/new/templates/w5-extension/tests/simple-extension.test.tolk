@@ -6,7 +6,8 @@ import "@acton/testing/expect"
 import "@contracts/types"
 import "@contracts/w5-types"
 import "@wrappers/SimpleExtension.gen"
-import "@wrappers/WalletV5Contract"
+import "@wrappers/WalletV5.gen"
+import "@wrappers/utils"
 
 const EXTENSION_DEPLOY_VALUE = ton("1")
 const SUBSCRIPTION_AMOUNT = ton("0.25")
@@ -88,7 +89,7 @@ get fun `test admin: cancels subscription and removes extension from wallet`() {
     expect(extensions.exists(extensionHash)).toEqual(false);
 }
 
-fun setupInstalledExtension(): (WalletV5Contract, Treasury, SimpleExtension) {
+fun setupInstalledExtension(): (WalletV5, Treasury, SimpleExtension) {
     testing.setNow(TEST_START_TIME);
 
     val keyPair = crypto.generateKeyPair();

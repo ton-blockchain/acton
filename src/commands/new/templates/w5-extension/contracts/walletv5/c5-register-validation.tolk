@@ -3,10 +3,7 @@
 // This file is dedicated to parsing and validating out actions.
 
 import "errors"
-
-/// "OutActionList" is what's pushed to c5
-/// see block.tlb: https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L378
-type OutActionsCell = cell
+import "messages"
 
 /// For instance, it contains "send message" actions (the only we allow)
 /// see block.tlb: https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/block/block.tlb#L380
