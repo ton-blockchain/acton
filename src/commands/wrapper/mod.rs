@@ -1037,7 +1037,7 @@ fn generate_setup_test(
     code.push_str(
         "/// Initializes the test environment, creating a fresh instance of the contract.\n",
     );
-    code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).\n");
+    code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).\n");
     let _ = writeln!(
         code,
         "fun setupTest(): ({contract_name}, Treasury, Treasury) {{"
@@ -1048,7 +1048,7 @@ fn generate_setup_test(
     code.push_str(
         "    // Create another treasury account for testing interactions from other users\n",
     );
-    code.push_str("    val not_deployer = testing.treasury(\"not_deployer\");\n");
+    code.push_str("    val notDeployer = testing.treasury(\"notDeployer\");\n");
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 
@@ -1077,7 +1077,7 @@ fn generate_setup_test(
     code.push_str("    val res = contract.deploy(deployer.address, { value: ton(\"1\") });\n");
     code.push_str("    expect(res).toHaveSuccessfulDeploy({ to: contract.address });\n");
     code.push('\n');
-    code.push_str("    return (contract, deployer, not_deployer)\n");
+    code.push_str("    return (contract, deployer, notDeployer)\n");
     code.push_str("}\n");
 
     code
@@ -1088,7 +1088,7 @@ fn generate_example_test(_contract_name: &str) -> String {
 
     code.push_str("/// Example test case demonstrating the basic flow\n");
     code.push_str("get fun `test basic flow`() {\n");
-    code.push_str("    val (contract, deployer, not_deployer) = setupTest();\n");
+    code.push_str("    val (contract, deployer, notDeployer) = setupTest();\n");
     code.push('\n');
     code.push_str("    // TODO: Implement your test logic here\n");
     code.push_str("    // Example:\n");

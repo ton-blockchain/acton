@@ -95,7 +95,7 @@ fun setupInstalledExtension(): (WalletV5, Treasury, SimpleExtension) {
     val keyPair = crypto.generateKeyPair();
     val (wallet, admin) = deployWalletWithKey(keyPair);
 
-    val extension = SimpleExtension.fromStorage(ExtensionStorage {
+    val extension = SimpleExtension.fromStorage({
         walletAddress: wallet.address,
         admin: admin.address,
         subscriptionAmount: SUBSCRIPTION_AMOUNT,
