@@ -741,8 +741,12 @@ impl ProjectBuilder {
             );
         }
 
+        let isolated_home = self.temp_dir.path().join(".acton-test-home");
+        fs::create_dir_all(&isolated_home).expect("Failed to create isolated home dir");
+
         Project {
             path: project_path,
+            isolated_home,
             _temp_dir: self.temp_dir,
         }
     }
@@ -1078,6 +1082,7 @@ version = "0.1.0"
 
 pub(crate) struct Project {
     path: PathBuf,
+    isolated_home: PathBuf,
     _temp_dir: TempDir,
 }
 
@@ -1086,6 +1091,8 @@ impl Project {
     pub(crate) fn acton(&self) -> ActonCommand {
         let cmd = ProcessCommandBuilder::new(acton_exe())
             .env("PATH", acton_path_env())
+            .env("HOME", &self.isolated_home)
+            .env("USERPROFILE", &self.isolated_home)
             .env("ACTON_LOG_DIR", self.path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
@@ -1134,6 +1141,11 @@ impl Project {
 
     pub(crate) fn path(&self) -> &Path {
         &self.path
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn isolated_home(&self) -> &Path {
+        &self.isolated_home
     }
 }
 
