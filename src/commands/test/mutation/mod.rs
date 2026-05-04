@@ -875,8 +875,6 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
     } else {
         main_path.clone()
     };
-    let main_path_str = main_path.to_string_lossy().to_string();
-
     sources.push(MutationSource {
         path: main_path,
         relative_path: main_relative_path,
@@ -885,8 +883,24 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
     });
 
     let mappings = acton_config.mappings();
-    let dependencies = ton_abi::get_file_dependencies(&main_path_str, true, mappings.as_ref())?;
-    for dep_path_str in &dependencies {
+    let compiler = tolk_compiler::Compiler::new(0).with_mappings(&mappings);
+    let source_map = match compiler.compile(&sources[0].path, false) {
+        tolk_compiler::CompilerResult::Success(result) => result
+            .source_map
+            .ok_or_else(|| anyhow!("Compiler did not produce symbol types for mutation testing"))?,
+        tolk_compiler::CompilerResult::Error(error) => {
+            anyhow::bail!(
+                "Failed to collect source files for mutation testing: {}",
+                error.message
+            )
+        }
+    };
+    for source_file in source_map.files() {
+        let dep_path_str = source_file.file_name.as_str();
+        if dep_path_str.starts_with("@stdlib/") || dep_path_str.starts_with("@fiftlib/") {
+            continue;
+        }
+
         let dep_path = Path::new(dep_path_str)
             .absolutize_from(&project_root)
             .unwrap_or_else(|_| Path::new(dep_path_str).into())

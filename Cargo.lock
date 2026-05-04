@@ -90,7 +90,6 @@ dependencies = [
  "toml",
  "toml_edit 0.24.0+spec-1.1.0",
  "ton",
- "ton-abi",
  "ton-api",
  "ton-emulator",
  "ton-executor",
@@ -5194,16 +5193,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-abi"
-version = "0.3.2"
-dependencies = [
- "anyhow",
- "dunce",
- "path-absolutize",
- "tycho-types",
-]
-
-[[package]]
 name = "ton-api"
 version = "0.3.2"
 dependencies = [
@@ -5729,7 +5718,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "ton-abi",
  "tycho-types",
 ]
 

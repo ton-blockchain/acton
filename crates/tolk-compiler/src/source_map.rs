@@ -130,6 +130,11 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn files(&self) -> &[SrcFileInfo] {
+        &self.files
+    }
+
+    #[must_use]
     pub fn declarations(&self) -> &[Declaration] {
         &self.declarations
     }
@@ -479,6 +484,7 @@ pub struct SrcFileInfo {
     pub file_id: usize,
     pub file_name: String,
     pub size_chars: u64,
+    pub imports: Vec<usize>,
 }
 
 // ---------------------------------------------------------------------------

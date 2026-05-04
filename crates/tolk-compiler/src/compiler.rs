@@ -494,11 +494,13 @@ pub struct CompilerErrorRange {
 pub static TOLK_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/tolk-stdlib");
 static FIFT_STDLIB_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/fift-stdlib");
 
-fn read_stdlib_file(path: &str) -> Option<&'static str> {
+#[must_use]
+pub fn read_stdlib_file(path: &str) -> Option<&'static str> {
     TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
 }
 
-fn read_fift_stdlib_file(path: &str) -> Option<&'static str> {
+#[must_use]
+pub fn read_fift_stdlib_file(path: &str) -> Option<&'static str> {
     FIFT_STDLIB_DIR.get_file(path)?.contents_utf8()
 }
 
