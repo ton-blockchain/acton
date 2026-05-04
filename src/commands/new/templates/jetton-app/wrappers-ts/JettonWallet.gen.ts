@@ -31,6 +31,17 @@ function loadAndCheckPrefix32(s: c.Slice, expected: number, structName: string):
     }
 }
 
+function formatPrefix(prefixNum: number, prefixLen: number): string {
+    return prefixLen % 4 ? `0b${prefixNum.toString(2).padStart(prefixLen, '0')}` : `0x${prefixNum.toString(16).padStart(prefixLen / 4, '0')}`;
+}
+
+function loadAndCheckPrefix(s: c.Slice, expected: number, prefixLen: number, structName: string): void {
+    let prefix = s.loadUint(prefixLen);
+    if (prefix !== expected) {
+        throw new Error(`Incorrect prefix for '${structName}': expected ${formatPrefix(expected, prefixLen)}, got ${formatPrefix(prefix, prefixLen)}`);
+    }
+}
+
 function lookupPrefix(s: c.Slice, expected: number, prefixLen: number): boolean {
     return s.remainingBits >= prefixLen && s.preloadUint(prefixLen) === expected;
 }
@@ -159,6 +170,80 @@ export const ForwardPayloadRemainder = {
 }
 
 /**
+ > struct (0b0) PayloadInline {
+ >     value: RemainingBitsAndRefs
+ > }
+ */
+export interface PayloadInline {
+    readonly $: 'PayloadInline'
+    value: RemainingBitsAndRefs
+}
+
+export const PayloadInline = {
+    PREFIX: 0b0,
+
+    create(args: {
+        value: RemainingBitsAndRefs
+    }): PayloadInline {
+        return {
+            $: 'PayloadInline',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInline {
+        loadAndCheckPrefix(s, 0b0, 1, 'PayloadInline');
+        return {
+            $: 'PayloadInline',
+            value: loadTolkRemaining(s),
+        }
+    },
+    store(self: PayloadInline, b: c.Builder): void {
+        b.storeUint(0b0, 1);
+        storeTolkRemaining(self.value, b);
+    },
+    toCell(self: PayloadInline): c.Cell {
+        return makeCellFrom<PayloadInline>(self, PayloadInline.store);
+    }
+}
+
+/**
+ > struct (0b1) PayloadInRef {
+ >     value: Cell<RemainingBitsAndRefs>
+ > }
+ */
+export interface PayloadInRef {
+    readonly $: 'PayloadInRef'
+    value: CellRef<RemainingBitsAndRefs>
+}
+
+export const PayloadInRef = {
+    PREFIX: 0b1,
+
+    create(args: {
+        value: CellRef<RemainingBitsAndRefs>
+    }): PayloadInRef {
+        return {
+            $: 'PayloadInRef',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInRef {
+        loadAndCheckPrefix(s, 0b1, 1, 'PayloadInRef');
+        return {
+            $: 'PayloadInRef',
+            value: loadCellRef<RemainingBitsAndRefs>(s, loadTolkRemaining),
+        }
+    },
+    store(self: PayloadInRef, b: c.Builder): void {
+        b.storeUint(0b1, 1);
+        storeCellRef<RemainingBitsAndRefs>(self.value, b, storeTolkRemaining);
+    },
+    toCell(self: PayloadInRef): c.Cell {
+        return makeCellFrom<PayloadInRef>(self, PayloadInRef.store);
+    }
+}
+
+/**
  > struct (0x0f8a7ea5) AskToTransfer {
  >     queryId: uint64
  >     jettonAmount: coins
@@ -166,7 +251,7 @@ export const ForwardPayloadRemainder = {
  >     sendExcessesTo: address?
  >     customPayload: cell?
  >     forwardTonAmount: coins
- >     forwardPayload: ForwardPayloadRemainder
+ >     forwardPayload: PayloadInline | PayloadInRef
  > }
  */
 export interface AskToTransfer {
@@ -177,7 +262,7 @@ export interface AskToTransfer {
     sendExcessesTo: c.Address | null
     customPayload: c.Cell | null
     forwardTonAmount: coins
-    forwardPayload: ForwardPayloadRemainder
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const AskToTransfer = {
@@ -190,7 +275,7 @@ export const AskToTransfer = {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }): AskToTransfer {
         return {
             $: 'AskToTransfer',
@@ -207,7 +292,7 @@ export const AskToTransfer = {
             sendExcessesTo: s.loadMaybeAddress(),
             customPayload: s.loadBoolean() ? s.loadRef() : null,
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
+            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: AskToTransfer, b: c.Builder): void {
@@ -220,7 +305,14 @@ export const AskToTransfer = {
             (v,b) => b.storeRef(v)
         );
         b.storeCoins(self.forwardTonAmount);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: AskToTransfer): c.Cell {
         return makeCellFrom<AskToTransfer>(self, AskToTransfer.store);
@@ -232,7 +324,7 @@ export const AskToTransfer = {
  >     queryId: uint64
  >     jettonAmount: coins
  >     transferInitiator: address?
- >     forwardPayload: ForwardPayloadRemainder
+ >     forwardPayload: PayloadInline | PayloadInRef
  > }
  */
 export interface TransferNotificationForRecipient {
@@ -240,7 +332,7 @@ export interface TransferNotificationForRecipient {
     queryId: uint64
     jettonAmount: coins
     transferInitiator: c.Address | null
-    forwardPayload: ForwardPayloadRemainder
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const TransferNotificationForRecipient = {
@@ -250,7 +342,7 @@ export const TransferNotificationForRecipient = {
         queryId: uint64
         jettonAmount: coins
         transferInitiator: c.Address | null
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }): TransferNotificationForRecipient {
         return {
             $: 'TransferNotificationForRecipient',
@@ -264,7 +356,7 @@ export const TransferNotificationForRecipient = {
             queryId: s.loadUintBig(64),
             jettonAmount: s.loadCoins(),
             transferInitiator: s.loadMaybeAddress(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
+            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: TransferNotificationForRecipient, b: c.Builder): void {
@@ -272,7 +364,14 @@ export const TransferNotificationForRecipient = {
         b.storeUint(self.queryId, 64);
         b.storeCoins(self.jettonAmount);
         b.storeAddress(self.transferInitiator);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: TransferNotificationForRecipient): c.Cell {
         return makeCellFrom<TransferNotificationForRecipient>(self, TransferNotificationForRecipient.store);
@@ -286,7 +385,7 @@ export const TransferNotificationForRecipient = {
  >     transferInitiator: address?
  >     sendExcessesTo: address?
  >     forwardTonAmount: coins
- >     forwardPayload: ForwardPayloadRemainder
+ >     forwardPayload: PayloadInline | PayloadInRef
  > }
  */
 export interface InternalTransferStep {
@@ -296,7 +395,7 @@ export interface InternalTransferStep {
     transferInitiator: c.Address | null
     sendExcessesTo: c.Address | null
     forwardTonAmount: coins
-    forwardPayload: ForwardPayloadRemainder
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const InternalTransferStep = {
@@ -308,7 +407,7 @@ export const InternalTransferStep = {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }): InternalTransferStep {
         return {
             $: 'InternalTransferStep',
@@ -324,7 +423,7 @@ export const InternalTransferStep = {
             transferInitiator: s.loadMaybeAddress(),
             sendExcessesTo: s.loadMaybeAddress(),
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
+            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: InternalTransferStep, b: c.Builder): void {
@@ -334,7 +433,14 @@ export const InternalTransferStep = {
         b.storeAddress(self.transferInitiator);
         b.storeAddress(self.sendExcessesTo);
         b.storeCoins(self.forwardTonAmount);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: InternalTransferStep): c.Cell {
         return makeCellFrom<InternalTransferStep>(self, InternalTransferStep.store);
@@ -686,7 +792,7 @@ export class JettonWallet implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }) {
         return AskToTransfer.toCell(AskToTransfer.create(body));
     }
@@ -706,7 +812,7 @@ export class JettonWallet implements c.Contract {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }) {
         return InternalTransferStep.toCell(InternalTransferStep.create(body));
     }
@@ -731,7 +837,7 @@ export class JettonWallet implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
@@ -759,7 +865,7 @@ export class JettonWallet implements c.Contract {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,

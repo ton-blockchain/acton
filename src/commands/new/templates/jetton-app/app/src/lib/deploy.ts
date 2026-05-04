@@ -5,6 +5,8 @@ import {
   InternalTransferStep,
   ChangeMinterAdmin,
   ChangeMinterMetadata,
+  PayloadInline,
+  PayloadInRef,
 } from '@wrappers/JettonMinter.gen';
 import { AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
 import { buildOnchainMetadata, type JettonMetadata } from './jettonContent';
@@ -70,7 +72,9 @@ export function buildMintBody(params: {
           transferInitiator: null,
           sendExcessesTo: null,
           forwardTonAmount,
-          forwardPayload: beginCell().storeUint(0, 1).asSlice(),
+          forwardPayload: PayloadInline.create({
+            value: beginCell().asSlice(),
+          }),
         }),
       },
     }),
@@ -125,13 +129,9 @@ export function buildTransferBody(params: {
     queryId = 0n,
   } = params;
 
-  const payloadSlice = forwardPayload
-    ? beginCell()
-        .storeUint(1, 1)
-        .storeRef(forwardPayload)
-        .endCell()
-        .beginParse()
-    : beginCell().storeUint(0, 1).asSlice();
+  const payload = forwardPayload
+    ? PayloadInRef.create({ value: { ref: forwardPayload.beginParse() } })
+    : PayloadInline.create({ value: beginCell().asSlice() });
 
   return AskToTransfer.toCell(
     AskToTransfer.create({
@@ -141,7 +141,7 @@ export function buildTransferBody(params: {
       sendExcessesTo: responseAddress,
       customPayload: null,
       forwardTonAmount,
-      forwardPayload: payloadSlice,
+      forwardPayload: payload,
     }),
   );
 }

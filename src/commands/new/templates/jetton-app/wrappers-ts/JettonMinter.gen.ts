@@ -195,13 +195,87 @@ export const ForwardPayloadRemainder = {
 }
 
 /**
+ > struct (0b0) PayloadInline {
+ >     value: RemainingBitsAndRefs
+ > }
+ */
+export interface PayloadInline {
+    readonly $: 'PayloadInline'
+    value: RemainingBitsAndRefs
+}
+
+export const PayloadInline = {
+    PREFIX: 0b0,
+
+    create(args: {
+        value: RemainingBitsAndRefs
+    }): PayloadInline {
+        return {
+            $: 'PayloadInline',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInline {
+        loadAndCheckPrefix(s, 0b0, 1, 'PayloadInline');
+        return {
+            $: 'PayloadInline',
+            value: loadTolkRemaining(s),
+        }
+    },
+    store(self: PayloadInline, b: c.Builder): void {
+        b.storeUint(0b0, 1);
+        storeTolkRemaining(self.value, b);
+    },
+    toCell(self: PayloadInline): c.Cell {
+        return makeCellFrom<PayloadInline>(self, PayloadInline.store);
+    }
+}
+
+/**
+ > struct (0b1) PayloadInRef {
+ >     value: Cell<RemainingBitsAndRefs>
+ > }
+ */
+export interface PayloadInRef {
+    readonly $: 'PayloadInRef'
+    value: CellRef<RemainingBitsAndRefs>
+}
+
+export const PayloadInRef = {
+    PREFIX: 0b1,
+
+    create(args: {
+        value: CellRef<RemainingBitsAndRefs>
+    }): PayloadInRef {
+        return {
+            $: 'PayloadInRef',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInRef {
+        loadAndCheckPrefix(s, 0b1, 1, 'PayloadInRef');
+        return {
+            $: 'PayloadInRef',
+            value: loadCellRef<RemainingBitsAndRefs>(s, loadTolkRemaining),
+        }
+    },
+    store(self: PayloadInRef, b: c.Builder): void {
+        b.storeUint(0b1, 1);
+        storeCellRef<RemainingBitsAndRefs>(self.value, b, storeTolkRemaining);
+    },
+    toCell(self: PayloadInRef): c.Cell {
+        return makeCellFrom<PayloadInRef>(self, PayloadInRef.store);
+    }
+}
+
+/**
  > struct (0x178d4519) InternalTransferStep {
  >     queryId: uint64
  >     jettonAmount: coins
  >     transferInitiator: address?
  >     sendExcessesTo: address?
  >     forwardTonAmount: coins
- >     forwardPayload: ForwardPayloadRemainder
+ >     forwardPayload: PayloadInline | PayloadInRef
  > }
  */
 export interface InternalTransferStep {
@@ -211,7 +285,7 @@ export interface InternalTransferStep {
     transferInitiator: c.Address | null
     sendExcessesTo: c.Address | null
     forwardTonAmount: coins
-    forwardPayload: ForwardPayloadRemainder
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const InternalTransferStep = {
@@ -223,7 +297,7 @@ export const InternalTransferStep = {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }): InternalTransferStep {
         return {
             $: 'InternalTransferStep',
@@ -239,7 +313,7 @@ export const InternalTransferStep = {
             transferInitiator: s.loadMaybeAddress(),
             sendExcessesTo: s.loadMaybeAddress(),
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
+            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
         }
     },
     store(self: InternalTransferStep, b: c.Builder): void {
@@ -249,7 +323,14 @@ export const InternalTransferStep = {
         b.storeAddress(self.transferInitiator);
         b.storeAddress(self.sendExcessesTo);
         b.storeCoins(self.forwardTonAmount);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: InternalTransferStep): c.Cell {
         return makeCellFrom<InternalTransferStep>(self, InternalTransferStep.store);
