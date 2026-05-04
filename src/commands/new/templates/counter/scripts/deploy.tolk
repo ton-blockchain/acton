@@ -13,9 +13,7 @@ fun main() {
         counter: 0,
     });
     val res = counter.deploy(deployer.address, { value: ton("0.005") });
-    if (res.waitForFirstTransaction() == null) {
-        return;
-    }
+    println(res.waitForTrace());
 
     println("Deployed counter to {}", counter.address);
     println("Counter owner is {}", counter.owner());
