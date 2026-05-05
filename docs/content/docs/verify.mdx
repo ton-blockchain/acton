@@ -14,14 +14,11 @@ Prepare these inputs before running `acton verify`:
 
 - a [wallet configured in Acton](/docs/wallets)
 - a deployed `.tolk` contract that is defined in `Acton.toml`
-- the deployed contract address
-- enough TON in that wallet to cover the final verification transaction when not using `--dry-run`
+- [at least 1 Toncoin on the wallet](/docs/wallets#fund-a-wallet-on-testnet) to cover the final verification transaction when not using `--dry-run`
 
-Only `.tolk` contracts can be verified. Precompiled `.boc` contracts are not supported by the verifier flow.
+Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
 
-<Callout type="warn" title="Use the exact deployment sources">
-  Verification fails if the current local sources do not compile to the same bytecode as the deployed contract. Run verification from the same source revision and compiler configuration used for deployment.
-</Callout>
+Verification fails if the current local sources do not compile to the same bytecode as the deployed contract. Run verification from the same source revision and compiler configuration used for deployment.
 
 ## Verify on testnet
 
@@ -49,8 +46,6 @@ Pass `--net mainnet` to target a mainnet deployment:
 ```bash
 acton verify Counter --address UQDt7LL... --net mainnet
 ```
-
-Acton reads `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY` automatically. Acton also loads `.env`, so keeping the API key there works for regular project use.
 
 ## Choose the wallet for the verification transaction
 
@@ -81,14 +76,10 @@ Use this mode to confirm that the verifier backend accepts the source package be
 If the deployed contract was built with a specific Tolk compiler version, pass that version explicitly:
 
 ```bash
-acton verify Counter --address EQDt7LL... --compiler-version 1.2.0
+acton verify Counter --address EQDt7LL... --compiler-version <TOLK_VERSION>
 ```
 
-Acton's current verifier-side default is `1.2.0`.
-
-<Callout type="info" title="Why compiler version matters">
-  Verification compares the deployed code with the bytecode produced from the submitted sources and compiler settings. A different compiler version can produce a different result even when the source files are unchanged.
-</Callout>
+Verification compares the deployed code with the bytecode produced from the submitted sources and compiler settings. A different compiler version can produce a different result even when the source files are unchanged.
 
 ## Troubleshoot verification failures
 
