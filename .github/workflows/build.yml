@@ -111,6 +111,7 @@ jobs:
           acton --help
 
       - name: Run tests
+        if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'CI:SKIP_TEST')
         run: |
           just test
 
@@ -321,6 +322,7 @@ jobs:
           acton --help
 
       - name: Run tests
+        if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'CI:SKIP_TEST')
         run: |
           just test
 
