@@ -139,7 +139,7 @@ acton script deploy.tolk --net testnet
 
 Without `--net`, `scripts.wallet()` creates a local test wallet with the same name. This makes it easy to exercise the script logic before broadcasting.
 
-To use a wallet from an external wallet service such as Tonkeeper, pass `--tonconnect` to connect to it through the TON Connect protocol:
+To use a wallet from an external wallet service such as Tonkeeper, pass `--tonconnect` to connect to it through the TON Connect protocol. This way, connected wallets override locally configured ones and are injected into the `scripts.wallet()` selection:
 
 ```bash
 acton script deploy.tolk --net testnet --tonconnect
