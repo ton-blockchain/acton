@@ -126,7 +126,7 @@ import "@acton/io"
 import "@acton/prompts"
 
 fun main() {
-    val deployer = scripts.wallet(promptWallet());
+    val deployer = scripts.wallet(promptWallet("Select a wallet:"));
     println("Deployer address: {}", deployer.address);
 }
 ```
