@@ -30,9 +30,9 @@ A deployment script usually does at least four things:
 - loads the deployer wallet
 - builds the contract state
 - sends the deployment transaction
-- waits for the first transaction to go through or for the trace to form
+- waits for the first transaction to go through or for the complete trace to form
 
-To wait for a single transaction, use `.waitForFirstTransaction()`. Alternatively, use `.waitForTrace()` when the deployment can produce a transaction chain and the script needs the full trace. Both functions return `null` if Acton cannot fetch the transaction or the trace within the retry budget.
+To wait until the external message reaches the wallet, use `.waitForFirstTransaction()`. To await the complete transaction chain, use `.waitForTrace()`. Both functions return `null` if Acton cannot fetch the transaction or the trace within the retry budget.
 
 <Callout>
   Each retry is a distinct API call when broadcasting to the testnet or mainnet.
