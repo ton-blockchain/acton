@@ -1,4 +1,4 @@
-warning[E018]: import path can use mappings
+warning[S007]: import path can use mappings
   --> [ROOT]/contracts/main[LINE]
   |
 2 |             import "../libs/math.tolk";
@@ -16,4 +16,4 @@ help: replace import path with mapping
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E018
+For example: acton check --explain S007

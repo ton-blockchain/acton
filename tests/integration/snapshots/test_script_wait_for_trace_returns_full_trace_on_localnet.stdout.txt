@@ -1,4 +1,11 @@
   Installing standard library [ACTON_VERSION]
+TRACE_OUTPUT_BEGIN
+N/A -> external
+└── [EXT_IN_OPCODE] -> EQBRPs..l6nHTG A                                       gas=0
+    └── TriggerForward 0.4 TON -> EQDnzm..T3h1OM B                              gas=0
+        └── empty 0.2 TON -> EQCwEV..w/D2xp C                                   gas=0
+
+TRACE_OUTPUT_END
 TRACE_READY=true
 RECEIVER_COUNT=2
 FORWARDER_CONTRACT=[WALLET_ADDRESS_BASE]

@@ -1,4 +1,4 @@
-warning[E002]: variable is unused
+warning[E001]: variable is unused
   --> [ROOT]/contracts/beta[LINE]
   |
 3 |                 val x = 1;
@@ -14,4 +14,4 @@ help: prefix with underscore: `_x`
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E002
+For example: acton check --explain E001

@@ -1,0 +1,9 @@
+  Installing standard library [ACTON_VERSION]
+int: 42
+bool: true
+string: hello
+"world"
+address: [WALLET_ADDRESS_BASE]
+cell: 123
+slice: 456
+nullable: null

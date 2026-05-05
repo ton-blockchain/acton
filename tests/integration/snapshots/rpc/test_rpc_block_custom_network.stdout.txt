@@ -1,0 +1,12 @@
+{
+  "result": {
+    "last": {
+      "@type": "ton.blockIdExt",
+      "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "seqno": 123456,
+      "shard": "-9223372036854775808",
+      "workchain": -1
+    }
+  }
+}

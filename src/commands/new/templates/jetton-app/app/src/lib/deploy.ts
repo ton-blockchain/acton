@@ -1,13 +1,14 @@
 import { Address, beginCell, Cell, toNano } from '@ton/core';
 import {
   JettonMinter,
-  MinterStorage,
   MintNewJettons,
   InternalTransferStep,
   ChangeMinterAdmin,
   ChangeMinterMetadata,
+  PayloadInline,
+  PayloadInRef,
 } from '@wrappers/JettonMinter.gen';
-import { JettonWallet, AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
+import { AskToBurn, AskToTransfer } from '@wrappers/JettonWallet.gen';
 import { buildOnchainMetadata, type JettonMetadata } from './jettonContent';
 
 export function parseUnits(amount: string, decimals: number): bigint {
@@ -51,7 +52,13 @@ export function buildMintBody(params: {
   totalTonAmount: bigint;
   queryId?: bigint;
 }): Cell {
-  const { toAddress, jettonAmount, forwardTonAmount, totalTonAmount, queryId = 0n } = params;
+  const {
+    toAddress,
+    jettonAmount,
+    forwardTonAmount,
+    totalTonAmount,
+    queryId = 0n,
+  } = params;
 
   return MintNewJettons.toCell(
     MintNewJettons.create({
@@ -65,7 +72,9 @@ export function buildMintBody(params: {
           transferInitiator: null,
           sendExcessesTo: null,
           forwardTonAmount,
-          forwardPayload: beginCell().storeUint(0, 1).asSlice(),
+          forwardPayload: PayloadInline.create({
+            value: beginCell().asSlice(),
+          }),
         }),
       },
     }),
@@ -73,7 +82,9 @@ export function buildMintBody(params: {
 }
 
 export function buildChangeAdminBody(newAdmin: Address, queryId = 0n): Cell {
-  return ChangeMinterAdmin.toCell(ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }));
+  return ChangeMinterAdmin.toCell(
+    ChangeMinterAdmin.create({ queryId, newAdminAddress: newAdmin }),
+  );
 }
 
 export async function buildChangeContentBody(
@@ -86,7 +97,11 @@ export async function buildChangeContentBody(
   );
 }
 
-export function buildBurnBody(amount: bigint, responseAddress: Address, queryId = 0n): Cell {
+export function buildBurnBody(
+  amount: bigint,
+  responseAddress: Address,
+  queryId = 0n,
+): Cell {
   return AskToBurn.toCell(
     AskToBurn.create({
       queryId,
@@ -114,9 +129,9 @@ export function buildTransferBody(params: {
     queryId = 0n,
   } = params;
 
-  const payloadSlice = forwardPayload
-    ? beginCell().storeUint(1, 1).storeRef(forwardPayload).endCell().beginParse()
-    : beginCell().storeUint(0, 1).asSlice();
+  const payload = forwardPayload
+    ? PayloadInRef.create({ value: { ref: forwardPayload.beginParse() } })
+    : PayloadInline.create({ value: beginCell().asSlice() });
 
   return AskToTransfer.toCell(
     AskToTransfer.create({
@@ -126,7 +141,7 @@ export function buildTransferBody(params: {
       sendExcessesTo: responseAddress,
       customPayload: null,
       forwardTonAmount,
-      forwardPayload: payloadSlice,
+      forwardPayload: payload,
     }),
   );
 }

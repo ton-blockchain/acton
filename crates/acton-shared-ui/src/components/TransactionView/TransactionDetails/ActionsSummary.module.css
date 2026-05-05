@@ -210,6 +210,10 @@
   word-break: break-all;
 }
 
+.sourceLocationValue {
+  word-break: break-word;
+}
+
 .externalDestination {
   display: inline-block;
   max-width: 100%;

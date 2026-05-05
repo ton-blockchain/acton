@@ -21,6 +21,7 @@ rustc-hash = { workspace = true }
 dunce = { workspace = true }
 anyhow = { workspace = true }
 tycho-types = { workspace = true }
+num-bigint = { workspace = true }
 
 [lints]
 workspace = true

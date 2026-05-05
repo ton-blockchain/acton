@@ -10,6 +10,7 @@ import {VscCode} from "react-icons/vsc"
 import {
   type TestReport,
   type TestExecutionLogs,
+  type SourceLocation,
   TestStatus,
   type Trace,
   ContractData,
@@ -31,6 +32,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  resolveAbiOpcodeName,
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
@@ -83,6 +85,11 @@ const MISSING_VM_LOG_HINT = [
   "No VM logs were collected for this trace.",
   "Re-run with --verbose flag",
 ].join("\n")
+
+const toIdeSourcePosition = (location: SourceLocation): Pick<TestReport, "row" | "column"> => ({
+  row: Math.max(0, location.line - 1),
+  column: Math.max(0, location.column - 2),
+})
 
 const hasNonEmptyLog = (value: string | undefined): boolean => (value ?? "").trim().length > 0
 
@@ -302,6 +309,26 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     return path
   }
 
+  const renderSourceLocation = (location: SourceLocation) => {
+    const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
+    const idePosition = toIdeSourcePosition(location)
+
+    return (
+      <a
+        href={selectedIde.getUrl({
+          ...test,
+          file_path: location.file,
+          row: idePosition.row,
+          column: idePosition.column,
+        })}
+        className={styles.sourceLocationLink}
+        title={`Open ${label} in ${selectedIde.name}`}
+      >
+        {label}
+      </a>
+    )
+  }
+
   const formatDuration = (duration: {secs: number; nanos: number}) => {
     const ms = duration.secs * 1000 + duration.nanos / 1_000_000
     if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
@@ -365,11 +392,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       if (opcode === undefined) return "empty"
 
       const targetContract = tx.contractName ? backendContracts[tx.contractName] : undefined
-      let opcodeName = targetContract?.abi?.messages.find(it => it.opcode === opcode)?.name
+      let opcodeName = resolveAbiOpcodeName(targetContract?.abi, opcode, "incoming")
 
       if (!opcodeName) {
         for (const contract of allContracts) {
-          const found = contract.abi?.messages.find(it => it.opcode === opcode)?.name
+          const found = resolveAbiOpcodeName(contract.abi, opcode)
           if (found) {
             opcodeName = found
             break
@@ -442,11 +469,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       const backendContract = name ? backendContracts[name] : undefined
       map.set(addrStr, {
         displayName: name ?? fmt.formatAddress(addrStr),
-        address: address,
+        address,
         letter: String.fromCodePoint(65 + (map.size % 26)),
         abi: backendContract?.abi,
-        compilerAbi: backendContract?.compiler_abi,
-      } as ContractData)
+      })
     }
 
     if (trace?.wallets) {
@@ -683,6 +709,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
                     transactions={failedTransactions}
                     contracts={contracts}
                     allContracts={allContracts}
+                    renderSourceLocation={renderSourceLocation}
                   />
                 </div>
               )}
@@ -910,6 +937,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
               transactions={parsedTransactions}
               contracts={contracts}
               allContracts={allContracts}
+              renderSourceLocation={renderSourceLocation}
             />
           </div>
           {failedMessages.length > 0 && <div>{renderFailedMessages(failedMessages)}</div>}

@@ -42,6 +42,37 @@ fn println_and_println1_support_hex_and_ton_formatters() {
 }
 
 #[test]
+fn println_supports_cell_tree_formatter() {
+    run_stdlib_io_case(
+        "v-stdlib-println-cell-tree-formatter",
+        r#"
+        struct TreePayload {
+            value: uint16,
+            child: Cell<uint8>,
+        }
+
+        get fun `test println cell tree formatter`() {
+            val child = beginCell().storeUint(0xAB, 8).endCell();
+            val typedChild = child as Cell<uint8>;
+            val root = beginCell()
+                .storeUint(0xCAFE, 16)
+                .storeRef(child)
+                .endCell();
+            val typedRoot: Cell<TreePayload> = TreePayload {
+                value: 0xCAFE,
+                child: typedChild,
+            }.toCell();
+
+            println("cell:\n{:cell-tree}", root);
+            println("typed:\n{:cell-tree}", typedRoot);
+            println("missing {:cell-tree}");
+        }
+        "#,
+        "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println_supports_cell_tree_formatter.stdout.txt",
+    );
+}
+
+#[test]
 fn println2_to_println5_support_multi_argument_formatters() {
     run_stdlib_io_case(
         "v-stdlib-println2-to-println5-formatters",

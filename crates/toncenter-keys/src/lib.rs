@@ -1,14 +1,14 @@
-//! TonCenter API key resolution shared across Acton crates.
+//! `TonCenter` API key resolution shared across Acton crates.
 
 use ton_networks::Network;
 
-/// Environment variable for the mainnet TonCenter API key.
+/// Environment variable for the mainnet `TonCenter` API key.
 pub const TONCENTER_MAINNET_API_KEY_ENV: &str = "TONCENTER_MAINNET_API_KEY";
 
-/// Environment variable for the testnet TonCenter API key.
+/// Environment variable for the testnet `TonCenter` API key.
 pub const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
 
-/// Returns the TonCenter API key env var name for the selected network.
+/// Returns the `TonCenter` API key env var name for the selected network.
 #[must_use]
 pub fn env_var_name(network: &Network) -> Option<String> {
     match network {
@@ -19,7 +19,7 @@ pub fn env_var_name(network: &Network) -> Option<String> {
     }
 }
 
-/// Resolves the TonCenter API key for the selected network from the process environment.
+/// Resolves the `TonCenter` API key for the selected network from the process environment.
 #[must_use]
 pub fn api_key(network: &Network) -> Option<String> {
     api_key_with(network, |name| std::env::var(name).ok())

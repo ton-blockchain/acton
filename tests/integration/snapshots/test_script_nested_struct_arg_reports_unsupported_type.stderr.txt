@@ -1,0 +1,1 @@
+Error: Argument arg has unsupported struct type Outer

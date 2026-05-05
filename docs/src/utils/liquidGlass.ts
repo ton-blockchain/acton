@@ -1,20 +1,20 @@
 type DisplacementOptions = {
-  height: number;
-  width: number;
-  radius: number;
-  depth: number;
-  strength?: number;
-  chromaticAberration?: number;
-};
+  height: number
+  width: number
+  radius: number
+  depth: number
+  strength?: number
+  chromaticAberration?: number
+}
 
 export function getDisplacementMap({
   height,
   width,
   radius,
   depth,
-}: Omit<DisplacementOptions, 'chromaticAberration' | 'strength'>) {
+}: Omit<DisplacementOptions, "chromaticAberration" | "strength">) {
   return (
-    'data:image/svg+xml;utf8,' +
+    "data:image/svg+xml;utf8," +
     encodeURIComponent(
       `<svg height="${height}" width="${width}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <style>
@@ -49,7 +49,7 @@ export function getDisplacementMap({
         </g>
       </svg>`,
     )
-  );
+  )
 }
 
 export function getDisplacementFilter({
@@ -61,7 +61,7 @@ export function getDisplacementFilter({
   chromaticAberration = 0,
 }: DisplacementOptions) {
   return (
-    'data:image/svg+xml;utf8,' +
+    "data:image/svg+xml;utf8," +
     encodeURIComponent(
       `<svg height="${height}" width="${width}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -71,7 +71,7 @@ export function getDisplacementFilter({
               y="0"
               height="${height}"
               width="${width}"
-              href="${getDisplacementMap({ height, width, radius, depth })}"
+              href="${getDisplacementMap({height, width, radius, depth})}"
               result="displacementMap"
             />
             <feDisplacementMap
@@ -126,6 +126,6 @@ export function getDisplacementFilter({
         </defs>
       </svg>`,
     ) +
-    '#displace'
-  );
+    "#displace"
+  )
 }

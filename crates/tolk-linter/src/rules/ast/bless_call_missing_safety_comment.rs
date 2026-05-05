@@ -23,7 +23,7 @@ use tolk_ty::InferenceResult;
 /// ```tolk twoslash
 /// fun convert(code: slice): continuation {
 ///     return transformSliceToContinuation(code);
-///     //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E023: converting slice to continuation requires safety comment
+///     //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E017: converting slice to continuation requires safety comment
 /// }
 /// ```
 ///

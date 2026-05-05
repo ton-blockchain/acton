@@ -1,10 +1,24 @@
 import { useState, type FormEvent } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { Address, toNano, beginCell, storeStateInit } from '@ton/core';
-import { CheckCircle, ExternalLink, Copy, AlertCircle, Info, CheckCircle2 } from 'lucide-react';
+import {
+  CheckCircle,
+  ExternalLink,
+  Copy,
+  AlertCircle,
+  Info,
+  CheckCircle2,
+} from 'lucide-react';
 import { buildDeployMessage, parseUnits } from '../lib/deploy';
+import { getErrorMessage, isCancelledTransactionError } from '../lib/errors';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -24,7 +38,9 @@ export function DeployPage({ network }: Props) {
   const [name, setName] = useState('Acton Token');
   const [symbol, setSymbol] = useState('ACT');
   const [decimals, setDecimals] = useState('9');
-  const [description, setDescription] = useState('A sample token on the TON blockchain');
+  const [description, setDescription] = useState(
+    'A sample token on the TON blockchain',
+  );
   const [imageUrl, setImageUrl] = useState('');
   const [mintAmount, setMintAmount] = useState('1000000');
 
@@ -35,7 +51,9 @@ export function DeployPage({ network }: Props) {
   } | null>(null);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
 
-  const ownerAddress = wallet?.account?.address ? Address.parse(wallet.account.address) : null;
+  const ownerAddress = wallet?.account?.address
+    ? Address.parse(wallet.account.address)
+    : null;
 
   const isConnected = !!wallet;
 
@@ -56,7 +74,10 @@ export function DeployPage({ network }: Props) {
 
     const dec = parseInt(decimals);
     if (isNaN(dec) || dec < 0 || dec > 18) {
-      setStatus({ type: 'error', message: 'Decimals must be between 0 and 18' });
+      setStatus({
+        type: 'error',
+        message: 'Decimals must be between 0 and 18',
+      });
       return;
     }
 
@@ -72,19 +93,24 @@ export function DeployPage({ network }: Props) {
     try {
       const mintAmountNano = parseUnits(mintAmount.trim(), dec);
 
-      const { contractAddress, stateInit, mintBody } = await buildDeployMessage({
-        metadata: {
-          name: name.trim(),
-          symbol: symbol.trim(),
-          decimals: decimals,
-          description: description.trim() || undefined,
-          image: imageUrl.trim() || undefined,
+      const { contractAddress, stateInit, mintBody } = await buildDeployMessage(
+        {
+          metadata: {
+            name: name.trim(),
+            symbol: symbol.trim(),
+            decimals: decimals,
+            description: description.trim() || undefined,
+            image: imageUrl.trim() || undefined,
+          },
+          ownerAddress,
+          mintAmount: mintAmountNano,
         },
-        ownerAddress,
-        mintAmount: mintAmountNano,
-      });
+      );
 
-      setStatus({ type: 'info', message: 'Confirm the transaction in your wallet...' });
+      setStatus({
+        type: 'info',
+        message: 'Confirm the transaction in your wallet...',
+      });
 
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -109,18 +135,14 @@ export function DeployPage({ network }: Props) {
       });
       setDeployedAddress(friendlyAddr);
       setStatus({ type: 'success', message: 'Jetton deployed successfully!' });
-    } catch (err: any) {
-      const msg = err?.message || String(err) || '';
-      if (
-        msg.includes('Interrupted') ||
-        msg.includes('cancel') ||
-        msg.includes('reject') ||
-        msg.includes('Cancelled') ||
-        msg.includes('closed')
-      ) {
+    } catch (err) {
+      if (isCancelledTransactionError(err)) {
         setStatus({ type: 'error', message: 'Transaction cancelled' });
       } else {
-        setStatus({ type: 'error', message: msg || 'Deployment failed' });
+        setStatus({
+          type: 'error',
+          message: getErrorMessage(err) || 'Deployment failed',
+        });
       }
     } finally {
       setLoading(false);
@@ -136,9 +158,12 @@ export function DeployPage({ network }: Props) {
       <div className="space-y-4.5">
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl tracking-tight">Deploy New Jetton</CardTitle>
+            <CardTitle className="text-xl tracking-tight">
+              Deploy New Jetton
+            </CardTitle>
             <CardDescription>
-              Create a new Jetton token on {network === 'mainnet' ? 'TON Mainnet' : 'TON Testnet'}
+              Create a new Jetton token on{' '}
+              {network === 'mainnet' ? 'TON Mainnet' : 'TON Testnet'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -192,7 +217,9 @@ export function DeployPage({ network }: Props) {
                     onChange={(e) => setMintAmount(e.target.value)}
                     disabled={loading}
                   />
-                  <p className="text-xs text-muted-foreground">Minted to your wallet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Minted to your wallet
+                  </p>
                 </div>
               </div>
 
@@ -219,10 +246,15 @@ export function DeployPage({ network }: Props) {
                   onChange={(e) => setImageUrl(e.target.value)}
                   disabled={loading}
                 />
-                <p className="text-xs text-muted-foreground">PNG recommended, 256x256px</p>
+                <p className="text-xs text-muted-foreground">
+                  PNG recommended, 256x256px
+                </p>
               </div>
 
-              <Button className="w-full h-12 rounded-full text-[15px] font-bold" disabled={loading}>
+              <Button
+                className="w-full h-12 rounded-full text-[15px] font-bold"
+                disabled={loading}
+              >
                 {loading ? (
                   <>
                     <span className="spinner" /> Deploying...
@@ -236,12 +268,18 @@ export function DeployPage({ network }: Props) {
             </form>
 
             {status && !deployedAddress && (
-              <StatusAlert type={status.type} message={status.message} className="mt-4" />
+              <StatusAlert
+                type={status.type}
+                message={status.message}
+                className="mt-4"
+              />
             )}
           </CardContent>
         </Card>
 
-        {deployedAddress && <DeployedCard address={deployedAddress} network={network} />}
+        {deployedAddress && (
+          <DeployedCard address={deployedAddress} network={network} />
+        )}
       </div>
 
       <TokenPreview
@@ -266,8 +304,10 @@ export function StatusAlert({
   message: string;
   className?: string;
 }) {
-  const variant = type === 'error' ? 'destructive' : type === 'success' ? 'success' : 'info';
-  const Icon = type === 'error' ? AlertCircle : type === 'success' ? CheckCircle2 : Info;
+  const variant =
+    type === 'error' ? 'destructive' : type === 'success' ? 'success' : 'info';
+  const Icon =
+    type === 'error' ? AlertCircle : type === 'success' ? CheckCircle2 : Info;
   return (
     <Alert variant={variant} className={className}>
       <Icon className="size-4" />
@@ -276,23 +316,40 @@ export function StatusAlert({
   );
 }
 
-function DeployedCard({ address, network }: { address: string; network: 'mainnet' | 'testnet' }) {
+function DeployedCard({
+  address,
+  network,
+}: {
+  address: string;
+  network: 'mainnet' | 'testnet';
+}) {
   const [copied, setCopied] = useState(false);
-  const base = network === 'testnet' ? 'https://testnet.tonviewer.com' : 'https://tonviewer.com';
+  const base =
+    network === 'testnet'
+      ? 'https://testnet.tonviewer.com'
+      : 'https://tonviewer.com';
 
   return (
     <Card>
       <CardContent className="text-center py-5">
-        <div className="mb-3.5 flex justify-center" style={{ color: 'var(--success)' }}>
+        <div
+          className="mb-3.5 flex justify-center"
+          style={{ color: 'var(--success)' }}
+        >
           <CheckCircle className="size-9" strokeWidth={1.5} />
         </div>
         <div className="text-base font-bold mb-1.5">Jetton Deployed</div>
         <p className="text-sm text-muted-foreground mb-4.5">
-          Your contract is live on {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+          Your contract is live on{' '}
+          {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
         </p>
         <div className="flex items-center justify-center gap-2.5 flex-wrap">
           <Button asChild className="rounded-full h-10">
-            <a href={`${base}/${address}`} target="_blank" rel="noopener noreferrer">
+            <a
+              href={`${base}/${address}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <ExternalLink className="size-4" />
               View on Tonviewer
             </a>
@@ -310,7 +367,9 @@ function DeployedCard({ address, network }: { address: string; network: 'mainnet
             {copied ? 'Copied!' : 'Copy Address'}
           </Button>
         </div>
-        <p className="mt-3.5 font-mono text-xs text-muted-foreground break-all">{address}</p>
+        <p className="mt-3.5 font-mono text-xs text-muted-foreground break-all">
+          {address}
+        </p>
       </CardContent>
     </Card>
   );
@@ -348,15 +407,23 @@ function TokenPreview({
         <div className="flex items-center gap-3.5 mb-5">
           <Avatar className="size-14 border-2 border-border">
             {imageUrl.trim() && !imgError ? (
-              <AvatarImage src={imageUrl.trim()} alt={name} onError={() => setImgError(true)} />
+              <AvatarImage
+                src={imageUrl.trim()}
+                alt={name}
+                onError={() => setImgError(true)}
+              />
             ) : null}
             <AvatarFallback className="bg-[#0098EA] text-white text-xl font-extrabold">
               {initial}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <div className="text-lg font-bold tracking-tight truncate">{name}</div>
-            <div className="font-mono text-[13px] font-semibold text-[#0098EA]">${symbol}</div>
+            <div className="text-lg font-bold tracking-tight truncate">
+              {name}
+            </div>
+            <div className="font-mono text-[13px] font-semibold text-[#0098EA]">
+              ${symbol}
+            </div>
           </div>
         </div>
 
@@ -365,7 +432,11 @@ function TokenPreview({
         <PreviewRow label="Supply" value={`${formattedSupply} ${symbol}`} />
         <PreviewRow label="Decimals" value={String(dec)} />
         <PreviewRow label="Standard" value="TEP-74 Jetton" />
-        <PreviewRow label="Mintable" value="Yes" valueClassName="text-[var(--success)]" />
+        <PreviewRow
+          label="Mintable"
+          value="Yes"
+          valueClassName="text-[var(--success)]"
+        />
 
         {description.trim() && (
           <>
@@ -421,7 +492,8 @@ export function NetworkBadge({ network }: { network: 'mainnet' | 'testnet' }) {
       <span
         className="size-1.5 rounded-full"
         style={{
-          background: network === 'mainnet' ? 'var(--success)' : 'var(--warning)',
+          background:
+            network === 'mainnet' ? 'var(--success)' : 'var(--warning)',
         }}
       />
       {network === 'mainnet' ? 'Mainnet' : 'Testnet'}

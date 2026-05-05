@@ -1,0 +1,311 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Acton Lint JSON Report Schema",
+  "description": "JSON report emitted by `acton check --output-format json`.",
+  "type": "object",
+  "required": [
+    "diagnostics",
+    "success"
+  ],
+  "properties": {
+    "diagnostics": {
+      "description": "Diagnostics emitted by the lint run.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/LintJsonDiagnostic"
+      }
+    },
+    "success": {
+      "description": "Whether the lint run completed without errors or warning-limit failures.",
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "LintJsonAnnotation": {
+      "description": "A source annotation attached to a lint diagnostic.",
+      "type": "object",
+      "required": [
+        "is_primary",
+        "range"
+      ],
+      "properties": {
+        "is_primary": {
+          "description": "Whether this is the primary annotation.",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "Human-readable annotation text when provided by the diagnostic.",
+          "type": "string"
+        },
+        "range": {
+          "description": "0-based source range for the annotation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonRange"
+            }
+          ]
+        },
+        "tags": {
+          "description": "Optional annotation tags such as `deprecated`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LintJsonAnnotationTag"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonAnnotationTag": {
+      "description": "Additional metadata attached to an annotation.",
+      "oneOf": [
+        {
+          "description": "Marks code that can be removed.",
+          "type": "string",
+          "enum": [
+            "unnecessary"
+          ]
+        },
+        {
+          "description": "Marks deprecated code usage.",
+          "type": "string",
+          "enum": [
+            "deprecated"
+          ]
+        }
+      ]
+    },
+    "LintJsonDiagnostic": {
+      "description": "A single lint diagnostic entry in the JSON report.",
+      "type": "object",
+      "required": [
+        "annotations",
+        "file",
+        "fixes",
+        "message",
+        "name",
+        "severity",
+        "source"
+      ],
+      "properties": {
+        "annotations": {
+          "description": "Related source annotations for the diagnostic.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LintJsonAnnotation"
+          }
+        },
+        "code": {
+          "description": "Stable lint rule code when available.",
+          "type": "string"
+        },
+        "file": {
+          "description": "Absolute path to the file where the diagnostic was reported.",
+          "type": "string"
+        },
+        "fixes": {
+          "description": "Available fixes for the diagnostic.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LintJsonFix"
+          }
+        },
+        "help": {
+          "description": "Optional help text.",
+          "type": "string"
+        },
+        "message": {
+          "description": "Primary human-readable message.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Stable lint rule name.",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Normalized severity used in JSON output.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonSeverity"
+            }
+          ]
+        },
+        "source": {
+          "description": "Diagnostic source identifier.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonSource"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonFix": {
+      "description": "A suggested fix for a lint diagnostic.",
+      "type": "object",
+      "required": [
+        "applicability",
+        "edits",
+        "message"
+      ],
+      "properties": {
+        "applicability": {
+          "description": "Whether the fix can be applied automatically.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonFixApplicability"
+            }
+          ]
+        },
+        "edits": {
+          "description": "Text edits that implement the fix.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LintJsonFixEdit"
+          }
+        },
+        "message": {
+          "description": "Human-readable fix summary.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonFixApplicability": {
+      "description": "Whether a fix can be applied automatically.",
+      "oneOf": [
+        {
+          "description": "Safe to apply automatically.",
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        },
+        {
+          "description": "Requires manual review or application.",
+          "type": "string",
+          "enum": [
+            "manual"
+          ]
+        }
+      ]
+    },
+    "LintJsonFixEdit": {
+      "description": "A single edit inside a suggested fix.",
+      "type": "object",
+      "required": [
+        "file",
+        "newText",
+        "range"
+      ],
+      "properties": {
+        "file": {
+          "description": "Absolute path to the file that should be edited.",
+          "type": "string"
+        },
+        "newText": {
+          "description": "Replacement text for the source range.",
+          "type": "string"
+        },
+        "range": {
+          "description": "0-based source range to replace.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonRange"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonPosition": {
+      "description": "A 0-based line/character position.",
+      "type": "object",
+      "required": [
+        "character",
+        "line"
+      ],
+      "properties": {
+        "character": {
+          "description": "0-based UTF-8 column offset.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "line": {
+          "description": "0-based line number.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonRange": {
+      "description": "A 0-based source range.",
+      "type": "object",
+      "required": [
+        "end",
+        "start"
+      ],
+      "properties": {
+        "end": {
+          "description": "Exclusive end position.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonPosition"
+            }
+          ]
+        },
+        "start": {
+          "description": "Inclusive start position.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintJsonPosition"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LintJsonSeverity": {
+      "description": "Normalized diagnostic severity used in JSON output.",
+      "oneOf": [
+        {
+          "description": "Warning-level diagnostic.",
+          "type": "string",
+          "enum": [
+            "warning"
+          ]
+        },
+        {
+          "description": "Error-level diagnostic.",
+          "type": "string",
+          "enum": [
+            "error"
+          ]
+        },
+        {
+          "description": "Informational diagnostic.",
+          "type": "string",
+          "enum": [
+            "info"
+          ]
+        }
+      ]
+    },
+    "LintJsonSource": {
+      "description": "Diagnostic source identifier.",
+      "oneOf": [
+        {
+          "description": "The Tolk linter emitted this diagnostic.",
+          "type": "string",
+          "enum": [
+            "tolk"
+          ]
+        }
+      ]
+    }
+  }
+}

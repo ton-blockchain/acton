@@ -425,7 +425,8 @@ bun run build
 
 ## Schema workflow
 
-`acton.schema.json` is generated, not hand-maintained.
+`crates/acton-config/schemas/acton.schema.json` is generated, not
+hand-maintained.
 
 Useful commands:
 

@@ -389,7 +389,7 @@ fn native_optional_string(
     if ptr.is_null() {
         return Ok(None);
     }
-    native_required_utf8(ptr, len, field, |value| value.to_owned()).map(Some)
+    native_required_utf8(ptr, len, field, ToOwned::to_owned).map(Some)
 }
 
 fn native_lossy_string(ptr: *const c_char, len: usize) -> String {

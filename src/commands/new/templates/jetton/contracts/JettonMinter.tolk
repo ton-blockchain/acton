@@ -106,7 +106,7 @@ fun onInternalMessage(in: InMessage) {
 
             val internalTransferMsg = lazy msg
                 .internalTransferMsg
-                .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp as int32 });
+                .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp });
             val forwardTonAmount = internalTransferMsg.forwardTonAmount;
             internalTransferMsg.forwardPayload.checkIsCorrectTlbEither();
 

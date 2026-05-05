@@ -11,7 +11,8 @@ Scripts can use all the functions that are used in tests, which means that withi
 it is possible to deploy a contract to a local blockchain, send messages, and call get methods.
 
 The main difference between scripts and tests is that scripts define a `main()` function which
-becomes the entry point. The `main()` function can optionally accept arguments passed from the command line.
+becomes the entry point. The `main()` function can optionally accept arguments passed from the command line,
+and those arguments are parsed against the ABI for `main()`.
 
 Each script is a regular smart contract, so, for example, sending a message through `msg.send()`
 will update the `c5` register.
@@ -59,7 +60,7 @@ fun main(libraryCode: cell, duration: int) {
 To run it, you need to pass the library code as a cell and the duration in seconds:
 
 ```bash
-acton script storage_fee_calculator.tolk C{b5ee9c72010101010006000008000003e7} 3600
+acton script storage_fee_calculator.tolk b5ee9c72010101010006000008000003e7 3600
 
 # Storage fee: 0.002140812 TON
 ```

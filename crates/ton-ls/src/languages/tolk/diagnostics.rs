@@ -1,7 +1,7 @@
 use crate::backend::Backend;
 use crate::backend::utils::{FileInfoExt, SpanExt};
 use diagnostic::Severity;
-use lsp_types::*;
+use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use tolk_linter::diagnostic::{self, DiagnosticTag};
@@ -9,6 +9,7 @@ use tolk_resolver::file_db::FileInfo;
 use tower_lsp::lsp_types::Url;
 
 impl Backend {
+    #[must_use]
     pub fn convert_linter_diagnostics_to_lsp(
         &self,
         diagnostics: &[diagnostic::Diagnostic],

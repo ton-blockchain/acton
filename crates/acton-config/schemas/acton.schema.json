@@ -1,0 +1,897 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Acton Configuration Schema",
+  "description": "JSON schema for Acton.toml configuration file",
+  "type": "object",
+  "required": [
+    "package"
+  ],
+  "properties": {
+    "build": {
+      "description": "Default settings for the build command",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BuildSettings"
+        }
+      ]
+    },
+    "contracts": {
+      "description": "Definition of contracts in the project",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ContractsConfig"
+        }
+      ]
+    },
+    "fmt": {
+      "description": "Settings for the Tolk code formatter",
+      "allOf": [
+        {
+          "$ref": "#/definitions/FmtSettings"
+        }
+      ]
+    },
+    "import-mappings": {
+      "description": "Import path mappings for Tolk compiler imports, for example mapping `\"core\" = \"./foo/core\"` so imports can use `@core/...`",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "lint": {
+      "description": "Linter configuration for the project",
+      "allOf": [
+        {
+          "$ref": "#/definitions/LintConfig"
+        }
+      ]
+    },
+    "localnet": {
+      "description": "Default settings for `acton localnet` commands",
+      "allOf": [
+        {
+          "$ref": "#/definitions/LocalnetSettings"
+        }
+      ]
+    },
+    "networks": {
+      "description": "Custom network configurations",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/CustomNetworkConfig"
+      }
+    },
+    "package": {
+      "description": "Package metadata for the Acton project",
+      "allOf": [
+        {
+          "$ref": "#/definitions/PackageConfig"
+        }
+      ]
+    },
+    "scripts": {
+      "description": "Custom scripts that can be run with `acton run`",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "test": {
+      "description": "Default settings for the test runner",
+      "allOf": [
+        {
+          "$ref": "#/definitions/TestSettings"
+        }
+      ]
+    },
+    "toolchain": {
+      "description": "Required versions for project-level tooling",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ToolchainConfig"
+        }
+      ]
+    },
+    "wrappers": {
+      "description": "Default settings for wrapper generation",
+      "allOf": [
+        {
+          "$ref": "#/definitions/WrappersConfig"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "BacktraceMode": {
+      "description": "Backtrace verbosity for failed tests",
+      "oneOf": [
+        {
+          "description": "Emit the full execution backtrace",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        }
+      ]
+    },
+    "BuildSettings": {
+      "description": "Default settings for the build command",
+      "type": "object",
+      "properties": {
+        "gen-dir": {
+          "description": "Directory where generated dependency files are saved",
+          "type": "string"
+        },
+        "out-dir": {
+          "description": "Directory where JSON build artifacts are saved",
+          "type": "string"
+        },
+        "output-abi": {
+          "description": "Directory where per-contract ABI JSON files are saved",
+          "type": "string"
+        },
+        "output-fift": {
+          "description": "Directory where per-contract compiled Fift files are saved",
+          "type": "string"
+        }
+      }
+    },
+    "CheckOutputFormat": {
+      "description": "Output format for `acton check` diagnostics",
+      "oneOf": [
+        {
+          "description": "Human-readable plain output",
+          "type": "string",
+          "enum": [
+            "plain"
+          ]
+        },
+        {
+          "description": "Structured JSON output",
+          "type": "string",
+          "enum": [
+            "json"
+          ]
+        },
+        {
+          "description": "SARIF output for code scanning tools",
+          "type": "string",
+          "enum": [
+            "sarif"
+          ]
+        },
+        {
+          "description": "GitHub workflow command output",
+          "type": "string",
+          "enum": [
+            "github"
+          ]
+        },
+        {
+          "description": "GitLab code quality output",
+          "type": "string",
+          "enum": [
+            "gitlab"
+          ]
+        }
+      ]
+    },
+    "ContractConfig": {
+      "description": "Definition of a contract in the project",
+      "type": "object",
+      "required": [
+        "src"
+      ],
+      "properties": {
+        "depends": {
+          "description": "Dependencies of this contract",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContractDependency"
+          }
+        },
+        "display-name": {
+          "description": "Human-readable display name of the contract",
+          "type": "string"
+        },
+        "output": {
+          "description": "Path where the compiled `.boc` should be saved",
+          "type": "string"
+        },
+        "src": {
+          "description": "Path to the contract source (`.tolk`) or precompiled (`.boc`) file",
+          "type": "string"
+        }
+      }
+    },
+    "ContractDependency": {
+      "description": "Dependency declaration for a contract",
+      "anyOf": [
+        {
+          "description": "Name of the contract to depend on in the simple form",
+          "type": "string"
+        },
+        {
+          "description": "Detailed dependency configuration",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "function": {
+              "description": "Custom name for the generated code function",
+              "type": "string"
+            },
+            "kind": {
+              "description": "Dependency type",
+              "default": "embed_code",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/DependencyKind"
+                }
+              ]
+            },
+            "name": {
+              "description": "Name of the contract to depend on",
+              "type": "string"
+            },
+            "path": {
+              "description": "Custom output path for the generated code file",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "ContractsConfig": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/ContractConfig"
+      }
+    },
+    "CoverageFormat": {
+      "description": "Coverage output formats supported by `acton test`",
+      "oneOf": [
+        {
+          "description": "LCOV coverage report",
+          "type": "string",
+          "enum": [
+            "lcov"
+          ]
+        },
+        {
+          "description": "Plain-text coverage summary",
+          "type": "string",
+          "enum": [
+            "text"
+          ]
+        }
+      ]
+    },
+    "CustomNetworkApiConfig": {
+      "description": "`TonCenter` API endpoints for a custom network",
+      "type": "object",
+      "properties": {
+        "v2": {
+          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<localnet.port>/api/v2` with `5411` as the fallback port",
+          "type": "string"
+        },
+        "v3": {
+          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<localnet.port>/api/v3` with `5411` as the fallback port",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomNetworkConfig": {
+      "description": "Custom network configuration",
+      "type": "object",
+      "properties": {
+        "api": {
+          "description": "`TonCenter` API endpoints for this network",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CustomNetworkApiConfig"
+            }
+          ]
+        },
+        "explorer": {
+          "description": "Base URL used to build transaction links for this network. Acton appends `/tx/<hash>` automatically and derives links from `api.v2` when omitted",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DependencyKind": {
+      "description": "How a compiled dependency is linked into a contract",
+      "oneOf": [
+        {
+          "description": "Embed dependency code directly into the output",
+          "type": "string",
+          "enum": [
+            "embed_code"
+          ]
+        },
+        {
+          "description": "Reference the dependency as an on-chain library",
+          "type": "string",
+          "enum": [
+            "library_ref"
+          ]
+        }
+      ]
+    },
+    "FmtSettings": {
+      "description": "Settings for the Tolk code formatter",
+      "type": "object",
+      "properties": {
+        "ignore": {
+          "description": "Glob patterns to ignore from formatting",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "separate-import-groups": {
+          "description": "Insert an empty line between import groups (`@stdlib`, `@acton`, `@<other>`, `../`, `./`)",
+          "default": false,
+          "type": "boolean"
+        },
+        "width": {
+          "description": "Maximum line width for formatting",
+          "default": 100,
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "LintConfig": {
+      "description": "Linter configuration for the project",
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "Glob patterns for files to exclude from lint diagnostics",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max-warnings": {
+          "description": "Maximum allowed warning count before `acton check` exits with a non-zero code",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "output-format": {
+          "description": "Output format for `acton check` diagnostics",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CheckOutputFormat"
+            }
+          ]
+        },
+        "rules": {
+          "description": "Lint rules and contract-specific overrides",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintRules"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "LintEntry": {
+      "description": "Lint rule configuration, either a global level or contract-specific overrides",
+      "anyOf": [
+        {
+          "description": "Global lint level for a rule",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LintLevel"
+            }
+          ]
+        },
+        {
+          "description": "Contract-specific lint overrides",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LintLevel"
+          }
+        }
+      ]
+    },
+    "LintLevel": {
+      "description": "Lint severity level",
+      "oneOf": [
+        {
+          "description": "Disable the rule",
+          "type": "string",
+          "enum": [
+            "allow"
+          ]
+        },
+        {
+          "description": "Emit warnings for the rule",
+          "type": "string",
+          "enum": [
+            "warn"
+          ]
+        },
+        {
+          "description": "Treat the rule as an error",
+          "type": "string",
+          "enum": [
+            "deny"
+          ]
+        }
+      ]
+    },
+    "LintRules": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/LintEntry"
+      }
+    },
+    "LocalnetSettings": {
+      "description": "Default settings for `acton localnet` commands",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton localnet start`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fork-block-number": {
+          "description": "Block sequence number used by `acton localnet start` when forking from historical state",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "fork-net": {
+          "description": "Network to fork from used by `acton localnet start`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Network"
+            }
+          ]
+        },
+        "port": {
+          "description": "Localnet port used by `acton localnet` commands",
+          "default": 3000,
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535.0,
+          "minimum": 0.0
+        },
+        "rate-limit": {
+          "description": "Maximum number of API requests per second served by `Localnet` `/api` endpoints",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      }
+    },
+    "MutationConfig": {
+      "description": "Configuration for mutation testing",
+      "type": "object",
+      "properties": {
+        "diff": {
+          "description": "Diff scope used to limit mutation testing to changed lines",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MutationDiffMode"
+            }
+          ]
+        },
+        "diff-ref": {
+          "description": "Base ref used by diff-based mutation testing modes",
+          "type": "string"
+        },
+        "disable-rules": {
+          "description": "List of mutation rules to disable",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "minimum-percent": {
+          "description": "Minimum mutation score percentage required for the run to succeed",
+          "type": "number",
+          "format": "double"
+        },
+        "mutation-levels": {
+          "description": "List of mutation levels to run",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MutationLevel"
+          }
+        },
+        "rules-file": {
+          "description": "Path to a JSON file with custom query-based mutation rules",
+          "type": "string"
+        }
+      }
+    },
+    "MutationDiffMode": {
+      "description": "Diff scopes supported by mutation testing filters",
+      "oneOf": [
+        {
+          "description": "Mutate only lines changed in the current worktree compared to HEAD",
+          "type": "string",
+          "enum": [
+            "worktree"
+          ]
+        },
+        {
+          "description": "Mutate only lines changed compared to a specific ref or commit",
+          "type": "string",
+          "enum": [
+            "ref"
+          ]
+        },
+        {
+          "description": "Mutate only lines changed on the current branch since its merge-base",
+          "type": "string",
+          "enum": [
+            "branch"
+          ]
+        }
+      ]
+    },
+    "MutationLevel": {
+      "description": "Mutation levels supported by mutation testing filters",
+      "oneOf": [
+        {
+          "description": "Security-sensitive control-flow, persistence, and upgrade mutations",
+          "type": "string",
+          "enum": [
+            "critical"
+          ]
+        },
+        {
+          "description": "High-signal behavioral mutations such as arithmetic and comparisons",
+          "type": "string",
+          "enum": [
+            "major"
+          ]
+        },
+        {
+          "description": "Broader low-priority mutations such as bitwise variants",
+          "type": "string",
+          "enum": [
+            "minor"
+          ]
+        }
+      ]
+    },
+    "Network": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "testnet",
+            "localnet"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "custom"
+          ],
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PackageConfig": {
+      "description": "Package metadata for the Acton project",
+      "type": "object",
+      "required": [
+        "description",
+        "name",
+        "version"
+      ],
+      "properties": {
+        "description": {
+          "description": "A short description of the project",
+          "type": "string"
+        },
+        "license": {
+          "description": "The project's license identifier",
+          "type": "string"
+        },
+        "name": {
+          "description": "The name of the project",
+          "type": "string"
+        },
+        "repository": {
+          "description": "The URL of the project's repository",
+          "type": "string"
+        },
+        "version": {
+          "description": "The current version of the project",
+          "type": "string"
+        }
+      }
+    },
+    "ReportFormat": {
+      "description": "Output formats supported by `acton test`",
+      "oneOf": [
+        {
+          "description": "Human-readable console output",
+          "type": "string",
+          "enum": [
+            "console"
+          ]
+        },
+        {
+          "description": "`TeamCity` service messages",
+          "type": "string",
+          "enum": [
+            "teamcity"
+          ]
+        },
+        {
+          "description": "`JUnit` XML report",
+          "type": "string",
+          "enum": [
+            "junit"
+          ]
+        },
+        {
+          "description": "Compact dot-progress output",
+          "type": "string",
+          "enum": [
+            "dot"
+          ]
+        }
+      ]
+    },
+    "TestCoverageSettings": {
+      "description": "Coverage settings for the test runner",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable code coverage reporting",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Format for coverage reports",
+          "default": "lcov",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CoverageFormat"
+            }
+          ]
+        },
+        "include-tests": {
+          "description": "Include `.test.tolk` files in coverage reports",
+          "type": "boolean"
+        },
+        "include-wrappers": {
+          "description": "Include files from the `@wrappers` mapping in coverage reports",
+          "type": "boolean"
+        },
+        "minimum-percent": {
+          "description": "Minimum total line coverage percentage required for a non-UI coverage run",
+          "type": "number",
+          "format": "double"
+        },
+        "output-file": {
+          "description": "Path to save the coverage report",
+          "type": "string"
+        }
+      }
+    },
+    "TestFuzzSettings": {
+      "description": "Fuzz settings for parameterized tests marked with dotted `@test.fuzz` annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`",
+      "type": "object",
+      "properties": {
+        "max-test-rejects": {
+          "description": "Maximum number of rejected inputs from `assume(...)` before the test fails",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "runs": {
+          "description": "Number of accepted fuzz cases to execute for each fuzz test",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "seed": {
+          "description": "Seed used for reproducible fuzz input generation",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "TestSettings": {
+      "description": "Default settings for the test runner",
+      "type": "object",
+      "properties": {
+        "backtrace": {
+          "description": "Enable stack traces for failed tests",
+          "allOf": [
+            {
+              "$ref": "#/definitions/BacktraceMode"
+            }
+          ]
+        },
+        "coverage": {
+          "description": "Coverage settings for test runs",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TestCoverageSettings"
+            }
+          ]
+        },
+        "debug": {
+          "description": "Enable debug mode for tests",
+          "type": "boolean"
+        },
+        "debug-port": {
+          "description": "Port for the debug server",
+          "default": 12345,
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535.0,
+          "minimum": 0.0
+        },
+        "exclude": {
+          "description": "Glob patterns to exclude from testing",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fail-fast": {
+          "description": "Stop test execution after the first failure",
+          "type": "boolean"
+        },
+        "fail-on-diff": {
+          "description": "Exit with a non-zero code when profiling differs from baseline",
+          "type": "boolean"
+        },
+        "filter": {
+          "description": "Regex pattern to filter test names",
+          "type": "string"
+        },
+        "fork-block-number": {
+          "description": "Specific block number to fork from",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "fork-net": {
+          "description": "Network to fork for testing",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Network"
+            }
+          ]
+        },
+        "fuzz": {
+          "description": "Default fuzz settings for parameterized tests",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TestFuzzSettings"
+            }
+          ]
+        },
+        "include": {
+          "description": "Glob patterns to include in testing",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "junit-merge": {
+          "description": "Merge all test suites into a single `JUnit` file",
+          "type": "boolean"
+        },
+        "junit-path": {
+          "description": "Directory for `JUnit` XML reports",
+          "type": "string"
+        },
+        "mutation": {
+          "description": "Configuration for mutation testing",
+          "allOf": [
+            {
+              "$ref": "#/definitions/MutationConfig"
+            }
+          ]
+        },
+        "reporter": {
+          "description": "List of test reporters to use",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportFormat"
+          }
+        },
+        "ui": {
+          "description": "Enable the test UI server",
+          "type": "boolean"
+        },
+        "ui-port": {
+          "description": "Port for the test UI server",
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535.0,
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": true
+    },
+    "TolkWrapperSettings": {
+      "description": "Default settings for Tolk wrapper generation",
+      "type": "object",
+      "properties": {
+        "generate-test": {
+          "description": "Generate a Tolk test stub by default for `acton wrapper`",
+          "type": "boolean"
+        },
+        "output-dir": {
+          "description": "Directory where `acton wrapper` writes generated Tolk wrappers by default",
+          "type": "string"
+        },
+        "test-output-dir": {
+          "description": "Directory where generated Tolk test stubs are written by default",
+          "type": "string"
+        }
+      }
+    },
+    "ToolchainConfig": {
+      "description": "Required versions for project-level tooling",
+      "type": "object",
+      "properties": {
+        "acton": {
+          "description": "Acton CLI version required by this project",
+          "type": "string"
+        }
+      }
+    },
+    "TypescriptWrapperSettings": {
+      "description": "Default settings for TypeScript wrapper generation",
+      "type": "object",
+      "properties": {
+        "output-dir": {
+          "description": "Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default",
+          "type": "string"
+        }
+      }
+    },
+    "WrappersConfig": {
+      "description": "Default settings for wrapper generation",
+      "type": "object",
+      "properties": {
+        "tolk": {
+          "description": "Default settings for Tolk wrapper generation",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TolkWrapperSettings"
+            }
+          ]
+        },
+        "typescript": {
+          "description": "Default settings for TypeScript wrapper generation",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TypescriptWrapperSettings"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

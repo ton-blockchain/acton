@@ -25,6 +25,14 @@ OPTIONS
 
            In this mode Acton prints diffs for mismatches and exits non-zero.
 
+       --range startLine:startChar-endLine:endChar
+           Format only the specified zero-based source range.
+
+           This is intended for editor integrations that format a selected
+           region. Lines are zero-based, and startChar / endChar are zero-based
+           UTF-8 byte columns. Editor integrations that expose Unicode scalar
+           or UTF-16 positions need to convert them before invoking Acton.
+
    Display Options
        --color when
            Control when to use colored output.
@@ -62,6 +70,11 @@ BEHAVIOR
 
        o  --check prints a unified diff with three lines of context for each
           changed file
+
+       o  --range keeps nodes outside the specified range unchanged and
+          disables import reordering for that invocation
+
+       o  --range can only be used with one explicit .tolk file path
 
 CONFIGURATION
        acton fmt reads defaults from [fmt] in Acton.toml:
@@ -123,6 +136,10 @@ EXAMPLES
        5. Check import grouping after enabling blank lines between groups:
 
               acton fmt contracts/main.tolk --check
+
+       6. Format only a selected source range:
+
+              acton fmt contracts/main.tolk --range 2:4-5:1
 
 SEE ALSO
        o  acton help check

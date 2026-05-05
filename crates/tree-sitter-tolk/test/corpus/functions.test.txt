@@ -225,9 +225,31 @@ fun foo() {}
       (annotation
         name: (annotation_name)
         arguments: (annotation_arguments
-          (number_literal)))
+          values: (number_literal)))
       (annotation
         name: (annotation_name)))
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block_statement)))
+
+========================================================================
+Function with type annotation argument
+========================================================================
+
+@abi.clientType(PayloadInline | PayloadRef)
+fun foo() {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    annotations: (annotation_list
+      (annotation
+        name: (annotation_name)
+        arguments: (annotation_arguments
+          type: (union_type
+            lhs: (type_identifier)
+            rhs: (type_identifier)))))
     name: (identifier)
     parameters: (parameter_list)
     body: (block_statement)))
@@ -258,7 +280,7 @@ fun f(a: Container<int>, b: Message<Container<never>>) {}
             (type_instantiatedTs
               (type_identifier)
               (instantiationT_list
-              (type_identifier)))))))
+                (type_identifier)))))))
     (block_statement)))
 
 ========================================================================

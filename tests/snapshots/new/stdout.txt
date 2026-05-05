@@ -28,7 +28,7 @@ Options:
       --template <TEMPLATE>
           Project template
           
-          [possible values: empty, counter, jetton, nft]
+          [possible values: empty, counter, jetton, nft, w5-extension]
 
       --license <LICENSE>
           License

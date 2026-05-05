@@ -1,17 +1,17 @@
-error[E003]: variable can be immutable
+error[E002]: variable can be immutable
   --> [ROOT]/contracts/main[LINE]
   |
-4 |                 var x = 1; // E003
+4 |                 var x = 1; // E002
   |                     ^ can be made val
 
 help: use `val` instead
   --> [ROOT]/contracts/main[LINE]
   |
-4 |                 var x = 1; // E003
+4 |                 var x = 1; // E002
   |                 ^^^ val
 
 
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E003
+For example: acton check --explain E002

@@ -1,0 +1,10 @@
+✓ Created TypeScript app scaffold
+  Directory: frontend
+
+Next steps:
+
+  # Install app dependencies
+  cd frontend
+  npm ci
+  # Start the TypeScript app
+  npm run dev

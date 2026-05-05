@@ -7,9 +7,14 @@
 acton\-wrapper \[em] Generate Tolk or TypeScript wrappers for a contract
 .SH "SYNOPSIS"
 \fBacton wrapper\fR [\fIoptions\fR] \fIcontract\-name\fR
+.sp
+\fBacton wrapper\fR [\fIoptions\fR] \fB\-\-all\fR
 .SH "DESCRIPTION"
 Generate a wrapper for the contract identified by \fB_contract\-name_\fR from
 \fBActon.toml\fR\&.
+.sp
+Use \fB\-\-all\fR to generate wrappers for every contract defined in \fBActon.toml\fR
+without picking a single one.
 .sp
 Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
 contract header is the source of truth for typed storage accessors, incoming
@@ -25,14 +30,23 @@ run is not required.
 .sp
 \fIcontract\-name\fR
 .RS 4
-Contract name from \fBActon.toml\fR to generate the wrapper for.
+Contract name from \fBActon.toml\fR to generate the wrapper for. Required unless
+\fB\-\-all\fR is given.
+.RE
+.sp
+\fB\-\-all\fR
+.RS 4
+Generate wrappers for every contract defined in \fBActon.toml\fR\&.
+.sp
+Conflicts with \fIcontract\-name\fR, \fB\-\-output\fR, and \fB\-\-test\-output\fR (which
+designate a single output file).
 .RE
 .sp
 \fB\-o\fR, \fB\-\-output\fR \fIpath\fR
 .RS 4
 Write the generated wrapper to an exact path.
 .sp
-Conflicts with \fB\-\-output\-dir\fR\&.
+Conflicts with \fB\-\-output\-dir\fR and \fB\-\-all\fR\&.
 .RE
 .sp
 \fB\-\-output\-dir\fR \fIdir\fR
@@ -52,7 +66,7 @@ Generate a stub test file together with the wrapper.
 .RS 4
 Write the generated test file to an exact path.
 .sp
-Requires \fB\-\-test\fR\&.
+Requires \fB\-\-test\fR\&. Conflicts with \fB\-\-all\fR\&.
 .RE
 .sp
 \fB\-\-test\-output\-dir\fR \fIdir\fR
@@ -203,6 +217,18 @@ acton wrapper Counter \-\-ts \-\-output\-dir wrappers\-ts
 .RS 4
 .nf
 acton wrapper Counter \-\-ts \-\-output\-dir app/src/wrappers\-ts
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Generate wrappers for every contract in \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+acton wrapper \-\-all
+acton wrapper \-\-all \-\-ts
+acton wrapper \-\-all \-\-output\-dir wrappers/generated
 .fi
 .RE
 .RE

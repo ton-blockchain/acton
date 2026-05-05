@@ -175,6 +175,38 @@ fun onBouncedMessage(_: InMessageBounced) {}
 }
 
 #[test]
+fn test_build_graph_creates_missing_parent_directories() {
+    let project = ProjectBuilder::new("build-cmd-graph-missing-parent")
+        .contract(
+            "parent",
+            r"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract_with_deps(
+            "child",
+            r"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+            vec!["parent"],
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_graph(Some("graphs/deps.dot"))
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/build_graph_creates_missing_parent_directories.stdout.txt",
+        )
+        .assert_file_exists("graphs/deps.dot");
+}
+
+#[test]
 fn test_build_graph_output_is_deterministic_between_runs() {
     let project = ProjectBuilder::new("build-cmd-graph-deterministic")
         .contract(

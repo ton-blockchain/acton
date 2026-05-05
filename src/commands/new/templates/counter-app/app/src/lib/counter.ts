@@ -1,19 +1,8 @@
 import { Address, beginCell, storeStateInit, toNano } from '@ton/core';
-import { TonClient } from '@ton/ton';
-import type { SendTransactionParameters } from '@ton/appkit-react';
+import type { SendTransactionRequest } from '@tonconnect/ui-react';
 
 import { Counter } from '../../../wrappers-ts/Counter.gen';
-import {
-  IS_TESTNET,
-  TONCENTER_API_KEY,
-  TONCENTER_RPC_URL,
-  TON_NETWORK,
-} from './ton';
-
-const tonClient = new TonClient({
-  endpoint: TONCENTER_RPC_URL,
-  apiKey: TONCENTER_API_KEY,
-});
+import { IS_TESTNET, TON_CHAIN, tonClient } from './ton';
 
 const UINT32_MAX = 4_294_967_295n;
 const TRANSACTION_TTL_SECONDS = 5 * 60;
@@ -164,7 +153,7 @@ export function buildDeployTransaction(
   ownerAddressValue: string,
 ): {
   address: string;
-  request: SendTransactionParameters;
+  request: SendTransactionRequest;
   preview: CounterPreview;
 } {
   const preview = getCounterPreview(counterIdValue, ownerAddressValue);
@@ -174,7 +163,7 @@ export function buildDeployTransaction(
     address: preview.address,
     preview,
     request: {
-      network: TON_NETWORK,
+      network: TON_CHAIN,
       validUntil: transactionExpiry(),
       messages: [
         {
@@ -192,7 +181,7 @@ export function buildCounterActionTransaction(options: {
   addressValue: string;
   messageValue: string;
   stepValue: string;
-}): { address: string; request: SendTransactionParameters } {
+}): { address: string; request: SendTransactionRequest } {
   const address = Address.parse(options.addressValue);
   const normalizedAddress = formatAddress(address);
   const amount = parseTonAmount(options.messageValue, 'Message value');
@@ -201,7 +190,7 @@ export function buildCounterActionTransaction(options: {
   return {
     address: normalizedAddress,
     request: {
-      network: TON_NETWORK,
+      network: TON_CHAIN,
       validUntil: transactionExpiry(),
       messages: [
         {

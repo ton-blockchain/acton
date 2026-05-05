@@ -54,6 +54,41 @@ struct Container<T> {
         (type_identifier)))))
 
 ========================================================================
+Struct fields with annotations
+========================================================================
+
+struct Foo {
+    @abi.clientType(PayloadInline | PayloadRef)
+    private payload: cell
+    @serde.skip
+    value: int
+}
+
+------------------------------------------------------------------------
+
+(source_file
+  (struct_declaration
+    name: (identifier)
+    body: (struct_body
+      (struct_field_declaration
+        annotations: (annotation_list
+          (annotation
+            name: (annotation_name)
+            arguments: (annotation_arguments
+              type: (union_type
+                lhs: (type_identifier)
+                rhs: (type_identifier)))))
+        modifiers: (struct_field_modifiers)
+        name: (identifier)
+        type: (type_identifier))
+      (struct_field_declaration
+        annotations: (annotation_list
+          (annotation
+            name: (annotation_name)))
+        name: (identifier)
+        type: (type_identifier)))))
+
+========================================================================
 Generic struct with default T
 ========================================================================
 

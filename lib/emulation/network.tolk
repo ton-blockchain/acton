@@ -164,7 +164,19 @@ fun SendResult.allOutActions(self): OutActionList {
 
 /// Represents a list of send results obtained from [net.send] method.
 ///
-/// This list represent all transactions produced by a [net.send] call.
+/// This list represents all transactions produced by a [net.send] call.
+///
+/// You can print the whole list with [println] to inspect the transaction tree produced by
+/// the send call.
+///
+/// Example output:
+/// ```acton-trace
+/// N/A -> sender A
+/// └── AskToTransfer 0.3 TON -> JettonWallet B                                  gas=5158
+///     └── InternalTransferStep 0.19 TON -> JettonWallet C                      gas=6974
+///         ├── TransferNotificationForRecipient 0.05 TON -> receiver D          gas=1234
+///         └── ReturnExcessesBack 0.13 TON -> sender A                          gas=4321
+/// ```
 ///
 /// To get a single send result, use [SendResultList.at] method.
 type SendResultList = BigArray<SendResult>
@@ -323,13 +335,13 @@ struct SearchParams {
     /// Predicate example:
     /// ```
     /// expect(txs).toHaveTx({
-    ///     state_init: fun(rawStateInit) {
-    ///         val actual = (rawStateInit as Cell<StateInit?>).load();
+    ///     state_init: fun(rawStateInit: Cell<StateInit?>): bool {
+    ///         val actual = rawStateInit.load();
     ///         // ...
     ///     },
     /// });
     /// ```
-    state_init: (cell -> bool) | cell | null = null
+    state_init: (Cell<StateInit?> -> bool) | Cell<StateInit?> | null = null
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
@@ -543,6 +555,8 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///
 /// In broadcast mode (with `--net`), sending to the real network is attempted only when `from`
 /// matches one of the wallets opened at script startup.
+/// With `--tonconnect`, `scripts.wallet("name")` resolves to the connected TON Connect wallet
+/// and matching sends are approved in that wallet instead of signed by local keys.
 /// If `from` is not an opened wallet address, this method falls back to normal
 /// emulator execution, even when [net.isBroadcasting] is `true`.
 ///
@@ -790,7 +804,6 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
         code,
         methodId,
         methodName,
-        reflect.typeNameOf<Ret>(),
         args,
     );
     if (res == null) {
@@ -1238,7 +1251,6 @@ fun ffi.runGetMethod(
     code: cell,
     methodId: int,
     methodName: string,
-    returnType: string,
     args: tuple,
 ): tuple?
     asm "8 EXTCALL"

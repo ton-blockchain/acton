@@ -15,7 +15,20 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
 
  > tests/wallet_missing.test.tolk (1 test)
   ✗ bw wallet missing no wallets config [TIME]
-    └─
+    └─ Error: Wallet bw_missing_wallet not found in wallets.toml or global.wallets.toml. Wallets are not configured yet.
+
+      To add wallets, run acton wallet new or add the following section to your wallets.toml:
+
+      # Example wallet configuration
+      [wallets.bw_missing_wallet]
+      type = "v4r2"
+      workchain = 0
+      keys = { mnemonic-env = "WALLET_MNEMONIC" }
+
+      [wallets.deployer.expected]
+      [WALLET_ADDRESS_TESTNET]
+
+      See [ACTON_DOCS_URL]/tutorial/setup-wallets for more information
 
  ✗ 1 failed in 1 file
 

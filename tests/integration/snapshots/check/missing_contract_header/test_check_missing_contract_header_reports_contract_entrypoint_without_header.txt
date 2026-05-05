@@ -1,4 +1,4 @@
-warning[E031]: contract defines entrypoints but is missing a `contract` header
+warning[E025]: contract defines entrypoints but is missing a `contract` header
   --> [ROOT]/contracts/main[LINE]
   |
 6 |             fun onInternalMessage(in: InMessage) {
@@ -8,4 +8,4 @@ warning[E031]: contract defines entrypoints but is missing a `contract` header
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E031
+For example: acton check --explain E025

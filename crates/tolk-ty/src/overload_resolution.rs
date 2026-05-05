@@ -4,6 +4,7 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::types::TyData;
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
+use std::fmt::Write as _;
 use tolk_resolver::SymbolKind;
 use tolk_resolver::file_index::SymbolId;
 /*
@@ -310,7 +311,7 @@ pub(crate) fn choose_only_method_to_call(
             .resolve_symbol(candidate.method_id)
             .map_or_else(|| "unknown".into(), |s| s.name.clone());
 
-        msg.push_str(&format!("candidate function: `{method_name}`"));
+        let _ = write!(msg, "candidate function: `{method_name}`");
 
         if candidate.is_generic(type_db.intrn) {
             // TODO: format substitutions nicely

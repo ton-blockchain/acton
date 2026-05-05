@@ -1,0 +1,5 @@
+{
+  "success": true,
+  "assembly": "SETCP 0/nDICTPUSHCONST 19 [/n    0 => {/n        DROP/n        INMSG_BOUNCED/n        IFRET/n    }/n]/nDICTIGETJMPZ/nTHROWARG 11/n",
+  "blocks": []
+}

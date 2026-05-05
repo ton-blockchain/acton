@@ -284,6 +284,33 @@ fn test_junit_reporter_with_fuzz_failure_includes_seed_and_inputs() {
 }
 
 #[test]
+fn test_junit_reporter_includes_captured_stdout_and_stderr() {
+    ProjectBuilder::new("junit_captured_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test junit captured output`() {
+                println("junit stdout <&>");
+                eprintln("junit stderr <&>");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            "test-results/TEST-output.test.tolk.xml",
+            "integration/snapshots/test_junit_reporter_includes_captured_stdout_and_stderr.xml.gen",
+        );
+}
+
+#[test]
 fn test_multiple_reporters_console_and_teamcity() {
     FixtureProject::load("basic")
         .acton()
@@ -347,11 +374,50 @@ fn test_teamcity_reporter_multiple_files() {
 }
 
 #[test]
+fn test_teamcity_reporter_with_skipped_and_todo_tests() {
+    ProjectBuilder::new("teamcity_skip_todo")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "skip_todo",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test.skip("skip | ' []")
+            get fun `test teamcity skipped`() {
+                expect(1).toEqual(2);
+            }
+
+            @test.todo("todo | ' []")
+            get fun `test teamcity todo`() {
+                expect(1).toEqual(2);
+            }
+
+            get fun `test teamcity passes`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .success()
+        .assert_skipped(1)
+        .assert_todo(1)
+        .assert_contains("##teamcity[testIgnored")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_with_skipped_and_todo_tests.stdout.txt",
+        );
+}
+
+#[test]
 fn test_teamcity_reporter_escapes_location_hint_special_chars() {
     let project = ProjectBuilder::new("teamcity_location_hint_escape")
         .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "escape",
+        .raw_file(
+            "tests/teamcity '[] .test.tolk",
             r"
             get fun `test teamcity '|[]`() {
             }

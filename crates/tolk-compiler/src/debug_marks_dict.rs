@@ -19,6 +19,7 @@
 //
 // The result is: HashMap<cell_hash, Vec<(offset, mark_id)>> in TVM-visible coordinates.
 
+use anyhow::anyhow;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -33,12 +34,20 @@ pub type MarkEntry = (i32, i32);
 /// `cell_hash` (uppercase hex, 64 chars) -> sorted list of mark entries.
 pub type DebugMarksDict = HashMap<String, Vec<MarkEntry>>;
 
-/// Parse debug marks and code BOCs (base64-encoded) and produce a mapping
+/// Parse debug marks and code BOCs and produce a mapping
 /// from TVM-visible cell hashes to debug mark positions.
-#[must_use]
-pub fn parse_debug_marks(marks_boc: &[u8], code_boc: &[u8]) -> DebugMarksDict {
-    let code_cell = Boc::decode(code_boc).unwrap();
-    let marks_cell = Boc::decode(marks_boc).unwrap();
+pub fn parse_debug_marks(
+    marks_boc64: Option<&str>,
+    code_boc64: &str,
+) -> anyhow::Result<DebugMarksDict> {
+    let Some(marks_boc64) = marks_boc64.filter(|boc| !boc.is_empty()) else {
+        return Ok(DebugMarksDict::new());
+    };
+
+    let code_cell =
+        Boc::decode_base64(code_boc64).map_err(|e| anyhow!("code is not valid BoC: {e}"))?;
+    let marks_cell = Boc::decode_base64(marks_boc64)
+        .map_err(|e| anyhow!("debug marks is not valid BoC: {e}"))?;
 
     let hash_remap = build_hash_remap(&code_cell);
 
@@ -85,7 +94,7 @@ pub fn parse_debug_marks(marks_boc: &[u8], code_boc: &[u8]) -> DebugMarksDict {
     for entries in result.values_mut() {
         entries.sort_unstable();
     }
-    result
+    Ok(result)
 }
 
 /// Load base64 content from a file, trimming whitespace.

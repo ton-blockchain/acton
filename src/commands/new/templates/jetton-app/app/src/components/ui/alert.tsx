@@ -12,7 +12,9 @@ const alertVariants = cva(
         destructive:
           'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
         success:
-          'text-emerald-500 bg-card border-emerald-500/20 [&>svg]:text-current *:data-[slot=alert-description]:text-emerald-500/90',
+          'text-success bg-card border-success/20 [&>svg]:text-current *:data-[slot=alert-description]:text-success/90',
+        warning:
+          'text-warning bg-card border-warning/20 [&>svg]:text-current *:data-[slot=alert-description]:text-warning/90',
         info: 'text-blue-500 bg-card border-blue-500/20 [&>svg]:text-current *:data-[slot=alert-description]:text-blue-500/90',
       },
     },
@@ -41,17 +43,26 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="alert-title"
-      className={cn('col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight', className)}
+      className={cn(
+        'col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight',
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) {
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="alert-description"
-      className={cn('text-muted-foreground col-start-2 text-sm [&_p]:leading-relaxed', className)}
+      className={cn(
+        'text-muted-foreground col-start-2 text-sm [&_p]:leading-relaxed',
+        className,
+      )}
       {...props}
     />
   );

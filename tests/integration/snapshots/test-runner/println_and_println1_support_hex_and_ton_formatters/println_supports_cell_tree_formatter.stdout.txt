@@ -1,0 +1,31 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
+depends = []
+
+See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/stdlib_io.test.tolk (1 test)
+  ✓ println cell tree formatter [TIME]
+    └─ Test output:
+       cell:
+       Ordinary: cafe
+       bits:   16, refs: 1, l: 000, depth: 1, hash: 04403b1989fb730b4ffdc45c0c3731d6edcada158ddeec1494d4b4564eca4d23
+         Ordinary: ab
+         bits:    8, refs: 0, l: 000, depth: 0, hash: 57c2a1a13baa2762109ed68be0c396f2303ce17e3dde7917d0e74b4072b1dbc7
+       typed:
+       Ordinary: cafe
+       bits:   16, refs: 1, l: 000, depth: 1, hash: 04403b1989fb730b4ffdc45c0c3731d6edcada158ddeec1494d4b4564eca4d23
+         Ordinary: ab
+         bits:    8, refs: 0, l: 000, depth: 0, hash: 57c2a1a13baa2762109ed68be0c396f2303ce17e3dde7917d0e74b4072b1dbc7
+       missing {:cell-tree}
+
+ ✓ 1 passed in 1 file

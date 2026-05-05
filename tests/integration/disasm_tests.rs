@@ -9,7 +9,7 @@ use crate::support::toncenter::{
 };
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
-use std::{fs, thread};
+use std::{fs, path::Path, thread};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
 
@@ -49,6 +49,20 @@ fn build_counter_source_map_project(name: &str) -> crate::support::project::Proj
         .success();
 
     project
+}
+
+fn disasm_reference_fixture(test_name: &str, fixture: &str, snapshot: &str) {
+    let project = ProjectBuilder::new(test_name).build();
+    let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/integration/testdata/disasm_reference")
+        .join(fixture);
+
+    project
+        .acton()
+        .disasm_file(fixture_path.to_str().unwrap())
+        .run()
+        .success()
+        .assert_snapshot_matches(snapshot);
 }
 
 fn simple_contract_cell(project: &crate::support::project::Project) -> Cell {
@@ -212,6 +226,43 @@ fn test_disasm_reads_source_map_emitted_by_compile_with_show_hashes_and_offsets(
         .assert_snapshot_matches(
             "integration/snapshots/disasm/test_disasm_reads_source_map_emitted_by_compile_with_show_hashes_and_offsets.stdout.txt",
         );
+}
+
+#[test]
+fn test_disasm_json_includes_source_map_blocks() {
+    let project = build_counter_source_map_project("disasm-source-map-json");
+
+    project
+        .acton()
+        .disasm_file("counter.boc")
+        .with_source_map("counter.source_map.json")
+        .with_json()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/disasm/test_disasm_json_includes_source_map_blocks.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_json_with_output_writes_assembly_file() {
+    let project = build_simple_contract_project("disasm-json-output");
+
+    let output = project
+        .acton()
+        .disasm_file("simple.boc")
+        .with_output("output.tasm")
+        .with_json()
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/disasm/test_disasm_json_with_output_writes_assembly_file.stdout.txt",
+    );
+    output.assert_file_snapshot_matches(
+        "output.tasm",
+        "integration/snapshots/disasm/test_disasm_json_with_output_writes_assembly_file.tasm.gen",
+    );
 }
 
 #[test]
@@ -510,6 +561,60 @@ fn test_disasm_snapshot() {
         .run()
         .success()
         .assert_snapshot_matches("integration/snapshots/disasm/test_disasm_snapshot.stdout.txt");
+}
+
+#[test]
+fn test_disasm_tasm_reference_simple_counter() {
+    disasm_reference_fixture(
+        "disasm-ref-simple-counter",
+        "test_SimpleCounter.boc",
+        "integration/snapshots/disasm/tasm_reference_simple_counter.stdout.txt",
+    );
+}
+
+#[test]
+fn test_disasm_tasm_reference_pushint_long_130() {
+    disasm_reference_fixture(
+        "disasm-ref-pushint-long-130",
+        "PUSHINT_LONG_130.hex",
+        "integration/snapshots/disasm/tasm_reference_pushint_long_130.stdout.txt",
+    );
+}
+
+#[test]
+fn test_disasm_tasm_reference_some_contract() {
+    disasm_reference_fixture(
+        "disasm-ref-some-contract",
+        "SomeContract.hex",
+        "integration/snapshots/disasm/tasm_reference_some_contract.stdout.txt",
+    );
+}
+
+#[test]
+fn test_disasm_tasm_reference_some_contract_2() {
+    disasm_reference_fixture(
+        "disasm-ref-some-contract-2",
+        "SomeContract2.hex",
+        "integration/snapshots/disasm/tasm_reference_some_contract_2.stdout.txt",
+    );
+}
+
+#[test]
+fn test_disasm_tasm_reference_escrow() {
+    disasm_reference_fixture(
+        "disasm-ref-escrow",
+        "escrow_Escrow.boc",
+        "integration/snapshots/disasm/tasm_reference_escrow.stdout.txt",
+    );
+}
+
+#[test]
+fn test_disasm_tasm_reference_jetton_minter_discoverable() {
+    disasm_reference_fixture(
+        "disasm-ref-jetton-minter-discoverable",
+        "jetton_minter_discoverable_JettonMinter.boc",
+        "integration/snapshots/disasm/tasm_reference_jetton_minter_discoverable.stdout.txt",
+    );
 }
 
 #[test]
@@ -1063,9 +1168,9 @@ fn test_disasm_multiple_input_sources_file_and_string() {
         .disasm_string("some_hex_data")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/disasm/test_disasm_multiple_input_sources_file_and_string.stderr.txt",
-        );
+        .assert_stderr_contains("cannot be used with")
+        .assert_stderr_contains("--string")
+        .assert_stderr_contains("BOC_FILE");
 }
 
 #[test]

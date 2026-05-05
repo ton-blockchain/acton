@@ -1,0 +1,13 @@
+Trace Summary
+  Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Root Tx Hash:      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace Complete:    true
+  Total Txs:         3
+  Total Messages:    3
+
+Trace Tree
+N/A -> EQAzMz..MzM7SN A
+└── IncreaseCounter 0.1 TON -> counter B                                        gas=123
+    ├── empty 0.000000001 TON -> EQAzMz..MzM7SN A                               gas=123
+    └── ReturnExcessesBack 0.000000002 TON -> counter B                         gas=123

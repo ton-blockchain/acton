@@ -483,6 +483,9 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     }
 
     fn walk_struct_field(&mut self, node: &StructField<'tree>) -> Self::Result {
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
         if let Some(typ) = node.typ() {
             self.visit_type(&typ);
         }

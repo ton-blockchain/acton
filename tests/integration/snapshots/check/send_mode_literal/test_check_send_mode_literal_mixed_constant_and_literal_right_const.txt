@@ -1,4 +1,4 @@
-warning[E016]: send mode should use SEND_MODE_* constants
+warning[E012]: send mode should use SEND_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 deployMessage.send(1 + SEND_MODE_IGNORE_ERRORS);
@@ -10,10 +10,10 @@ help: replace with SEND_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 deployMessage.send(1 + SEND_MODE_IGNORE_ERRORS);
-  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS
+  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS
 
 
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E016
+For example: acton check --explain E012

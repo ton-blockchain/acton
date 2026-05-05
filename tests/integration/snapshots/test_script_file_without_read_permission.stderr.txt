@@ -1,1 +1,1 @@
-Error: Cannot access scripts/secret.tolk: Permission denied ([OS_ERROR])
+Error: Cannot compile script file Failed to read [ROOT]/scripts/secret.tolk: Permission denied ([OS_ERROR])

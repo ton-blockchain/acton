@@ -1,4 +1,4 @@
-warning[E017]: possible storage write without admin sender check
+warning[E013]: possible storage write without admin sender check
   --> [ROOT]/contracts/alpha[LINE]
   |
 2 |             fun onInternalMessage(in: InMessage) {
@@ -11,4 +11,4 @@ warning[E017]: possible storage write without admin sender check
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E017
+For example: acton check --explain E013

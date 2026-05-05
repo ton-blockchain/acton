@@ -42,7 +42,7 @@ pub fn apply_lsp_changes(
                 });
             }
         } else {
-            text = change.text.clone();
+            text.clone_from(&change.text);
             text_index = TextIndex::new(&text);
             can_apply_incremental = false;
             incremental_edits.clear();

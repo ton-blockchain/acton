@@ -19,7 +19,7 @@ use tolk_syntax::{VarDeclLhs, match_parents};
 /// ```tolk twoslash
 /// fun main() {
 ///     var x = 1;
-/// //  ^^^ E003: variable can be immutable
+/// //  ^^^ E002: variable can be immutable
 ///     println(x);
 /// }
 /// ```

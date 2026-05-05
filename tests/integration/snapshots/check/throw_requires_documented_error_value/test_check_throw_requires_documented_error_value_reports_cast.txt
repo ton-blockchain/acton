@@ -1,4 +1,4 @@
-warning[E036]: enum value used as throw code should be documented
+warning[E030]: enum value used as throw code should be documented
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 NotFromAdmin = 401
@@ -11,4 +11,4 @@ warning[E036]: enum value used as throw code should be documented
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E036
+For example: acton check --explain E030

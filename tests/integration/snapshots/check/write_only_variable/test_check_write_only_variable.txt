@@ -1,4 +1,4 @@
-warning[E005]: variable is only written to but never read
+warning[E004]: variable is only written to but never read
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 var counter = 0;
@@ -8,4 +8,4 @@ warning[E005]: variable is only written to but never read
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E005
+For example: acton check --explain E004

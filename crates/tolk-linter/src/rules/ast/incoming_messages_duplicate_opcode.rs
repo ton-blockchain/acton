@@ -22,7 +22,7 @@ use tolk_syntax::{
 /// ```tolk twoslash
 /// struct (0x1000) MsgA {}
 /// struct (0x1000) MsgB {}
-/// //      ^^^^^^ E029: incomingMessages contains message variants with duplicate opcode
+/// //      ^^^^^^ E023: incomingMessages contains message variants with duplicate opcode
 ///
 /// contract Wallet {
 ///     incomingMessages: MsgA | MsgB,

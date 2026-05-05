@@ -1,5 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{ProjectBuilder, TestConfig};
+use acton::build_info;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
 
@@ -132,6 +134,117 @@ fn test_filter_via_config() {
         .assert_contains("unit 1")
         .assert_contains("unit 2")
         .assert_not_contains("other");
+}
+
+#[test]
+fn test_toolchain_acton_version_mismatch_fails_before_project_command() {
+    let project = ProjectBuilder::new("toolchain-version-mismatch")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "0.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_toolchain_acton_version_mismatch.stderr.txt",
+        );
+}
+
+#[test]
+fn test_toolchain_acton_empty_version_fails_with_setup_hint() {
+    let project = ProjectBuilder::new("toolchain-empty-version")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = ""
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_toolchain_acton_empty_version.stderr.txt",
+        );
+}
+
+#[test]
+#[cfg_attr(not(unix), ignore)]
+fn test_toolchain_acton_package_version_allows_project_command() {
+    let project = ProjectBuilder::new("toolchain-current-version")
+        .script_config("hello", "echo toolchain-ok")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    write!(
+        toml_content,
+        r#"
+[toolchain]
+acton = "{}"
+"#,
+        build_info::PACKAGE_VERSION
+    )
+    .expect("Append toolchain config");
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_toolchain_acton_current_version.stdout.txt",
+        );
+}
+
+#[test]
+fn test_toolchain_acton_v_prefixed_current_version_is_rejected() {
+    let project = ProjectBuilder::new("toolchain-v-prefixed-current-version")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    write!(
+        toml_content,
+        r#"
+[toolchain]
+acton = "v{}"
+"#,
+        build_info::SHORT_VERSION
+    )
+    .expect("Append toolchain config");
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
+        );
 }
 
 #[test]

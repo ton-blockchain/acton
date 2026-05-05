@@ -43,11 +43,18 @@ fun onInternalMessage(in: InMessage) {
         AskToChangeOwnership => {
             assert (in.senderAddress == storage.ownerAddress) throw Errors.NotFromOwner;
 
+            // validate Either format: bit 0 = inline (any payload follows),
+            // bit 1 = ref (must be exactly 1 bit + 1 ref)
+            val (fwdBits, fwdRefs) = msg.forwardPayload.remainingBitsAndRefsCount();
+            assert (fwdBits != 0) throw Errors.IncorrectForwardPayload;
+            if (msg.forwardPayload.preloadUint(1) != 0) {
+                assert (fwdBits == 1 && fwdRefs == 1) throw Errors.IncorrectForwardPayload;
+            }
             assert (msg.newOwnerAddress.getWorkchain() == BASECHAIN) throw Errors.InvalidWorkchain;
 
             val fwdFee = in.originalForwardFee;
             var restAmount = contract.getOriginalBalance() - MIN_TONS_FOR_STORAGE;
-            if (msg.forwardTonAmount) {
+            if (msg.forwardTonAmount != 0) {
                 restAmount -= (msg.forwardTonAmount + fwdFee);
             }
             if (msg.sendExcessesTo != null) {
@@ -60,7 +67,7 @@ fun onInternalMessage(in: InMessage) {
             // base nft spends fixed amount of gas, will not check for response
             assert (restAmount >= 0) throw Errors.TooSmallRestAmount;
 
-            if (msg.forwardTonAmount) {
+            if (msg.forwardTonAmount != 0) {
                 val ownershipMsg = createMessage({
                     bounce: BounceMode.NoBounce,
                     dest: msg.newOwnerAddress,
