@@ -12,6 +12,6 @@
   → Using backend: [LOCALHOST_URL]/source
   ↻ Backend returned 500 Internal Server Error (HTTP/1.1, cf-ray=retry-please) on attempt 1/8, retrying...
 
-  Warning: Contract with the hash 5n[TIME]O9SBx5EMh6Bh5gylCegu3Wh6DhyL8bQ35t4+aXM= has already been verified previously, no further action is required
+  Warning: Contract with the hash 5n7sO9SBx5EMh6Bh5gylCegu3Wh6DhyL8bQ35t4+aXM= has already been verified previously, no further action is required
 
 View at: https://verifier.ton.org/[WALLET_ADDRESS_BASE]

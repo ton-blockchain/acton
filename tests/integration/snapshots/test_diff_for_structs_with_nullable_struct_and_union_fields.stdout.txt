@@ -1,0 +1,77 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/simple.test.tolk (2 tests)
+  ✗ diff nullable struct and same union variant fields [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        Record {
+            id: 1,
+            samePoint: Point {
+                x: 10,
+                y: 20,
+            },
+            changedPoint: Point {
+                x: 30,
+                y: 40
+                   41
+            },
+            missingPoint: (
+                null,
+                Point {
+                    x: 50,
+                    y: 60,
+                }
+            ),
+            sameChoice: EmptyChoice,
+            changedChoice: LeftChoice {
+                point: Point {
+                    x: 5,
+                    y: 6
+                       9
+                },
+                code: 7
+            },
+            sameInt: 99,
+            changedInt: 100
+                        101
+        }
+      └─ at tests/simple.test[LINE]
+  ✗ diff nullable struct and different union variant fields [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        Record {
+            id: 2,
+            samePoint: null,
+            changedPoint: (
+                Point {
+                    x: 70,
+                    y: 80,
+                },
+                null
+            ),
+            missingPoint: Point {
+                x: 90,
+                y: 100
+                   101
+            },
+            sameChoice: EmptyChoice,
+            changedChoice: (
+                RightChoice {
+                    value: 7,
+                },
+                EmptyChoice
+            ),
+            sameInt: 199,
+            changedInt: 200
+                        201
+        }
+      └─ at tests/simple.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

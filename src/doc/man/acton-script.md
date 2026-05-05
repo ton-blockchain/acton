@@ -27,7 +27,7 @@ Path to the script file to execute.
 {{/option}}
 
 {{#option "_args_..." }}
-Arguments passed through to the script.
+Arguments parsed against the `main()` ABI and passed to the script.
 {{/option}}
 
 {{#option "`--verbose`" }}
@@ -95,6 +95,24 @@ Broadcast to the selected network. If omitted, the script runs in emulation
 mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{/option}}
 
+{{#option "`--tonconnect`" }}
+Use TON Connect wallet approval for broadcast messages.
+
+This opens a local browser page, connects a wallet, and sends `net.send(...)`
+messages through that wallet instead of loading local wallet mnemonics.
+The TON Connect session is saved under `build/sessions/tonconnect/<network>.json` and
+reused by later runs in the same project. Currently supported only with
+`--net mainnet` or `--net testnet`.
+{{/option}}
+
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port. Defaults to `52258`.
+
+Acton keeps this port stable so injected wallets can recognize the same local
+dApp on later runs. If the default port is busy, pass another port explicitly
+and keep using the same value for that project.
+{{/option}}
+
 {{#option "`--explorer` _name_" }}
 Explorer to use for transaction links.
 
@@ -129,10 +147,15 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
 - `--net` sends real transactions using configured wallets
+- `--net ... --tonconnect` sends real transactions through the connected TON Connect wallet
 
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
-`global.wallets.toml` on name conflicts.
+`global.wallets.toml` on name conflicts. With `--tonconnect`, any
+`scripts.wallet("name")` call resolves to the connected wallet address.
+Acton saves the TON Connect session in `build/sessions/tonconnect/<network>.json`, so
+the next script run can restore the wallet connection without asking the user
+to connect again.
 
 ## Argument Forwarding
 
@@ -144,6 +167,20 @@ the script arguments:
 ```bash
 acton script scripts/query.tolk -- --net-like-value
 ```
+
+## Script Arguments
+
+Forwarded arguments are parsed against the ABI for `main()`.
+
+- the number of CLI arguments must exactly match the `main()` parameters
+- integers use Tolk integer literal syntax such as `42`, `-1`, `0xff`, and `0b1010`
+- `bool` accepts `true` and `false`
+- nullable supported types accept `null`
+- `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- arrays accept `[item1, item2]`
+
+Unsupported parameter types currently include `structs`, `tuple`, `map`,
+`dict`, `builder`, `any_address` and other complex types.
 
 ## Side Effects
 
@@ -199,6 +236,12 @@ When a script can affect on-chain state, the usual safe sequence is:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
+   ```
+
+6. Broadcast through TON Connect instead of local wallet keys:
+
+   ```bash
+   acton script scripts/deploy.tolk --net testnet --tonconnect
    ```
 
 ## TonCenter API Keys

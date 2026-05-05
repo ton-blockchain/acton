@@ -5,15 +5,16 @@ use anyhow::{Context, anyhow};
 use heck::ToLowerCamelCase;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
-use tolk_compiler::CompilerResult;
-use tolk_compiler::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
-use ton_abi::ContractAbi as LegacyContractAbi;
+use tempfile::TempDir;
+use tolk_compiler::abi::{ABIGetMethod, ABIOpcode, ABIResolvedStruct, ContractABI};
+use tolk_compiler::source_map::Declaration;
+use tolk_compiler::{CompilerResult, SourceMap};
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.1";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
@@ -37,7 +38,6 @@ struct WrapperModel {
 struct TypescriptGeneratorAbi {
     #[serde(flatten)]
     abi: ContractABI,
-    #[serde(rename = "codeBoc64")]
     code_boc64: String,
 }
 
@@ -59,6 +59,7 @@ fn build_model(
         tolk_fmt::FormatOptions {
             width,
             separate_import_groups,
+            ..Default::default()
         }
     };
     let project_root = project_root().to_path_buf();
@@ -78,19 +79,20 @@ fn build_model(
         );
     }
 
-    let content: Arc<str> = fs::read_to_string(&contract_path)
-        .map_err(|e| anyhow!("Failed to read contract file: {e}"))?
-        .into();
-
-    let contract_path_str = contract_path.to_str().unwrap_or_default();
     let mappings = config.mappings();
     let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-    let (abi, code_boc64) = match compiler.compile(&contract_path, false) {
+    let (abi, code_boc64, source_map) = match compiler.compile(&contract_path, false) {
         CompilerResult::Success(result) => (
             result.abi.ok_or_else(|| {
                 anyhow!("Compiler did not produce ABI for {}", contract_id.yellow())
             })?,
             result.code_boc64,
+            result.source_map.ok_or_else(|| {
+                anyhow!(
+                    "Compiler did not produce symbol types for {}",
+                    contract_id.yellow()
+                )
+            })?,
         ),
         CompilerResult::Error(error) => {
             anyhow::bail!(
@@ -100,7 +102,6 @@ fn build_model(
             );
         }
     };
-    let fallback_abi = ton_abi::contract_abi(content, contract_path_str, &mappings);
 
     let file_stem = contract_path
         .file_stem()
@@ -121,10 +122,10 @@ fn build_model(
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let storage_path = storage
         .iter()
-        .find_map(|storage| find_type_path(&fallback_abi, &storage.name));
+        .find_map(|storage| find_type_path(&source_map, &storage.name));
     let message_paths = incoming_messages
         .iter()
-        .filter_map(|message| find_type_path(&fallback_abi, &message.name))
+        .filter_map(|message| find_type_path(&source_map, &message.name))
         .collect::<BTreeSet<_>>();
 
     let wrapper_path = resolve_wrapper_path(
@@ -194,8 +195,10 @@ fn generated_wrapper_header(contract_name: &str) -> String {
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn wrapper_cmd(
-    contract_id: &str,
+    contract_id: Option<&str>,
+    all: bool,
     wrapper_output: Option<String>,
     wrapper_output_dir: Option<String>,
     test_output: Option<String>,
@@ -218,8 +221,54 @@ pub fn wrapper_cmd(
     let generate_test_stub =
         !generate_typescript && (explicit_test_request || config.tolk_wrapper_generate_test());
 
+    if all {
+        let contracts = config
+            .contracts()
+            .filter(|c| !c.is_empty())
+            .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?;
+        for contract_id in contracts.keys() {
+            generate_for_contract(
+                &config,
+                contract_id,
+                None,
+                wrapper_output_dir.clone(),
+                None,
+                test_output_dir.clone(),
+                generate_test_stub,
+                generate_typescript,
+            )?;
+        }
+    } else {
+        let contract_id =
+            contract_id.ok_or_else(|| anyhow!("contract_id is required when --all is not set"))?;
+        generate_for_contract(
+            &config,
+            contract_id,
+            wrapper_output,
+            wrapper_output_dir,
+            test_output,
+            test_output_dir,
+            generate_test_stub,
+            generate_typescript,
+        )?;
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn generate_for_contract(
+    config: &ActonConfig,
+    contract_id: &str,
+    wrapper_output: Option<String>,
+    wrapper_output_dir: Option<String>,
+    test_output: Option<String>,
+    test_output_dir: Option<String>,
+    generate_test_stub: bool,
+    generate_typescript: bool,
+) -> anyhow::Result<()> {
     let model = build_model(
-        &config,
+        config,
         contract_id,
         wrapper_output,
         wrapper_output_dir,
@@ -389,8 +438,11 @@ fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
 
 fn generate_typescript_wrapper(model: &WrapperModel) -> anyhow::Result<String> {
     let abi_json = serialize_typescript_abi(model)?;
+    let npm_cache_dir =
+        TempDir::new().context("Failed to create a temporary npm cache directory")?;
 
     let output = Command::new("npx")
+        .env("npm_config_cache", npm_cache_dir.path())
         .env("npm_config_update_notifier", "false")
         .arg("--yes")
         .arg(TYPESCRIPT_WRAPPER_PACKAGE)
@@ -424,7 +476,7 @@ fn generate_typescript_wrapper(model: &WrapperModel) -> anyhow::Result<String> {
 fn serialize_typescript_abi(model: &WrapperModel) -> anyhow::Result<String> {
     let mut abi = model.abi.clone();
     if abi.contract_name.is_empty() {
-        abi.contract_name = model.contract_name.clone();
+        abi.contract_name.clone_from(&model.contract_name);
     }
 
     serde_json::to_string(&TypescriptGeneratorAbi {
@@ -434,12 +486,20 @@ fn serialize_typescript_abi(model: &WrapperModel) -> anyhow::Result<String> {
     .context("Failed to encode ABI JSON for TypeScript wrapper generation")
 }
 
-fn find_type_path(fallback_abi: &LegacyContractAbi, type_name: &str) -> Option<PathBuf> {
-    fallback_abi
-        .types
-        .iter()
-        .find(|typ| typ.name == type_name)
-        .map(|typ| PathBuf::from(&typ.pos.uri))
+fn find_type_path(source_map: &SourceMap, type_name: &str) -> Option<PathBuf> {
+    source_map.declarations().iter().find_map(|declaration| {
+        let Declaration::Struct(struct_decl) = declaration else {
+            return None;
+        };
+
+        if struct_decl.name != type_name {
+            return None;
+        }
+
+        source_map
+            .resolve_file_full_path(struct_decl.ident_loc.file_id())
+            .map(PathBuf::from)
+    })
 }
 
 fn to_pascal_case(s: &str) -> String {
@@ -477,7 +537,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push_str(&import_stdlib("testing/assert"));
 
     if let Some(storage_path) = &model.storage_path {
-        let storage_import = get_import_path(proot, root, storage_path, mappings);
+        let storage_import = get_import_path(proot, root, storage_path, mappings.as_ref());
         code.push_str(&gen_import_path(storage_import));
     }
 
@@ -487,22 +547,23 @@ fn generate_wrapper(model: &WrapperModel) -> String {
             continue;
         }
 
-        let types_import = get_import_path(proot, root, messages_path, mappings);
+        let types_import = get_import_path(proot, root, messages_path, mappings.as_ref());
         code.push_str(&gen_import_path(types_import));
     }
 
     code.push('\n');
 
     if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path) {
-        let import_path = get_import_path(proot, root, storage_path, mappings);
+        let import_path = get_import_path(proot, root, storage_path, mappings.as_ref());
         let display = import_path.display().to_string();
         let display = display.trim_start_matches("./").trim_end_matches(".tolk");
-        code.push_str(&format!(
-            "/// Storage `{}` is defined in `{display}`\n",
+        let _ = writeln!(
+            code,
+            "/// Storage `{}` is defined in `{display}`",
             storage.name
-        ));
+        );
     }
-    code.push_str(&format!("struct {contract} {{\n"));
+    let _ = writeln!(code, "struct {contract} {{");
     code.push_str("    address: address\n");
     code.push_str("    stateInit: ContractState? = null\n");
     code.push_str("}\n\n");
@@ -524,7 +585,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push('\n');
 
     for message in &model.incoming_messages {
-        code.push_str(&generate_send_method(contract, message));
+        code.push_str(&generate_send_method(contract, &model.abi, message));
         code.push('\n');
     }
 
@@ -532,7 +593,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push('\n');
 
     for get_method in &model.abi.get_methods {
-        code.push_str(&generate_get_method(contract, get_method));
+        code.push_str(&generate_get_method(contract, &model.abi, get_method));
         code.push('\n');
     }
 
@@ -547,21 +608,18 @@ fn generate_from_storage(
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
-    code.push_str(&format!(
-        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null): {contract_name} {{\n",
-    ));
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null): {contract_name} {{"
+    );
     code.push_str("    val stateInit = ContractState {\n");
-    code.push_str(&format!(
-        "        code: build(\"{contract_build_name}\"),\n",
-    ));
+    let _ = writeln!(code, "        code: build(\"{contract_build_name}\"),");
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
     code.push_str(
         "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
     );
-    code.push_str(&format!(
-        "    return {contract_name} {{ address, stateInit }}\n",
-    ));
+    let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
     code.push_str("}\n");
 
     code
@@ -571,10 +629,11 @@ fn generate_from_address(contract_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the address\n");
-    code.push_str(&format!(
-        "fun {contract_name}.fromAddress(address: address): {contract_name} {{\n"
-    ));
-    code.push_str(&format!("    return {contract_name} {{ address }}\n",));
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.fromAddress(address: address): {contract_name} {{"
+    );
+    let _ = writeln!(code, "    return {contract_name} {{ address }}");
     code.push_str("}\n");
 
     code
@@ -584,21 +643,18 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
-    code.push_str(&format!(
-        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null): {contract_name} {{\n"
-    ));
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null): {contract_name} {{"
+    );
     code.push_str("    val stateInit = ContractState {\n");
-    code.push_str(&format!(
-        "        code: build(\"{contract_build_name}\"),\n"
-    ));
+    let _ = writeln!(code, "        code: build(\"{contract_build_name}\"),");
     code.push_str("        data: createEmptyCell(),\n");
     code.push_str("    };\n");
     code.push_str(
         "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
     );
-    code.push_str(&format!(
-        "    return {contract_name} {{ address, stateInit }}\n"
-    ));
+    let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
     code.push_str("}\n");
 
     code
@@ -608,9 +664,10 @@ fn generate_deploy(contract_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Deploys the contract to the blockchain\n");
-    code.push_str(&format!(
-        "fun {contract_name}.deploy(self, from: address, config: SendParams = {{}}): SendResultList {{\n",
-    ));
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.deploy(self, from: address, config: SendParams = {{}}): SendResultList {{"
+    );
     code.push_str("    if (self.stateInit == null) {\n");
     code.push_str("        Assert.fail(\"Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment\");\n");
     code.push_str("    }\n");
@@ -627,7 +684,11 @@ fn generate_deploy(contract_name: &str) -> String {
     code
 }
 
-fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -> String {
+fn generate_send_method(
+    contract_name: &str,
+    abi: &ContractABI,
+    message_type: &ABIResolvedStruct,
+) -> String {
     let mut code = String::new();
     let method_name = format!("send{}", message_type.name);
 
@@ -636,7 +697,7 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
     let params = fields
         .iter()
         .map(|f| {
-            let type_name = f.ty.render_param_type();
+            let type_name = abi.render_param_type(f.ty_idx);
             let name = normalize_param_name(&f.name);
             format!("{name}: {type_name}")
         })
@@ -649,40 +710,91 @@ fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -
         format!("{params}, ")
     };
 
-    code.push_str(&format!(
-        "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{\n",
-    ));
-    code.push_str("    val genericMsg = createMessage({\n");
-    code.push_str("        bounce: config.bounce,\n");
-    code.push_str("        value: config.value,\n");
-    code.push_str("        dest: self.address,\n");
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{"
+    );
 
-    if fields.is_empty() {
-        code.push_str(&format!("        body: {} {{}},\n", message_type.name));
-    } else {
-        code.push_str(&format!("        body: {} {{\n", message_type.name));
+    if message_type.overrides_client_type {
+        let prefix = message_type.prefix.as_ref();
+        code.push_str(
+            "    // build body cell manually, because some fields have @abi.clientType\n",
+        );
+        code.push_str("    val bodyB = beginCell()\n");
+        let mut chain: Vec<String> = Vec::new();
+        if let Some(prefix) = prefix {
+            chain.push(format!(
+                ".storeUint({}, {})",
+                format_prefix_literal(prefix),
+                prefix.prefix_len
+            ));
+        }
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
-
-            if field.ty.is_typed_cell() {
-                code.push_str(&format!(
-                    "            {}: {}.toCell(),\n",
-                    field.name, param_name
-                ));
-            } else if field.name == param_name {
-                code.push_str(&format!("            {},\n", field.name));
+            let value = if abi.is_typed_cell(field.ty_idx) {
+                format!("{param_name}.toCell()")
             } else {
-                code.push_str(&format!("            {}: {},\n", field.name, param_name));
+                param_name
+            };
+            chain.push(format!(".storeAny({value})"));
+        }
+        if chain.is_empty() {
+            code.push_str("        ;\n");
+        } else {
+            let last = chain.len() - 1;
+            for (idx, call) in chain.iter().enumerate() {
+                let suffix = if idx == last { ";" } else { "" };
+                let _ = writeln!(code, "        {call}{suffix}");
             }
         }
-        code.push_str("        },\n");
-    }
+        code.push_str("    val genericMsg = createMessage({\n");
+        code.push_str("        bounce: config.bounce,\n");
+        code.push_str("        value: config.value,\n");
+        code.push_str("        dest: self.address,\n");
+        let _ = writeln!(
+            code,
+            "        body: {}.fromSlice(bodyB.toSlice()),",
+            message_type.name
+        );
+    } else {
+        code.push_str("    val genericMsg = createMessage({\n");
+        code.push_str("        bounce: config.bounce,\n");
+        code.push_str("        value: config.value,\n");
+        code.push_str("        dest: self.address,\n");
 
+        if fields.is_empty() {
+            let _ = writeln!(code, "        body: {} {{}},", message_type.name);
+        } else {
+            let _ = writeln!(code, "        body: {} {{", message_type.name);
+            for field in &fields {
+                let param_name = normalize_param_name(&field.name);
+
+                if abi.is_typed_cell(field.ty_idx) {
+                    let _ = writeln!(code, "            {}: {}.toCell(),", field.name, param_name);
+                } else if field.name == param_name {
+                    let _ = writeln!(code, "            {},", field.name);
+                } else {
+                    let _ = writeln!(code, "            {}: {},", field.name, param_name);
+                }
+            }
+            code.push_str("        },\n");
+        }
+    }
     code.push_str("    });\n");
+
     code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
 
     code
+}
+
+fn format_prefix_literal(prefix: &ABIOpcode) -> String {
+    let prefix_len = usize::try_from(prefix.prefix_len.max(0)).unwrap_or(0);
+    if prefix_len % 4 == 0 {
+        format!("0x{:0width$x}", prefix.prefix_num, width = prefix_len / 4)
+    } else {
+        format!("0b{:0width$b}", prefix.prefix_num, width = prefix_len)
+    }
 }
 
 fn normalize_param_name(name: &str) -> String {
@@ -697,9 +809,10 @@ fn generate_send_any_method(contract_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Send message to the contract with a custom body cell\n");
-    code.push_str(&format!(
-        "fun {contract_name}.sendAny(self, from: address, body: cell, config: SendParams = {{}}): SendResultList {{\n",
-    ));
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.sendAny(self, from: address, body: cell, config: SendParams = {{}}): SendResultList {{"
+    );
     code.push_str("    val genericMsg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
@@ -712,7 +825,11 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code
 }
 
-fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String {
+fn generate_get_method(
+    contract_name: &str,
+    abi: &ContractABI,
+    get_method: &ABIGetMethod,
+) -> String {
     let mut code = String::new();
     let method_name = normalize_get_method_name(&get_method.name);
     let tvm_method_name = &get_method.name;
@@ -720,7 +837,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .parameters
         .iter()
         .map(|p| {
-            let type_name = p.ty.render_param_type();
+            let type_name = abi.render_param_type(p.ty_idx);
             let param_name = normalize_get_param_name(&p.name);
             format!("{param_name}: {type_name}")
         })
@@ -732,7 +849,7 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         .iter()
         .map(|p| {
             let param_name = normalize_get_param_name(&p.name);
-            if p.ty.is_typed_cell() {
+            if abi.is_typed_cell(p.ty_idx) {
                 format!("{param_name}.toCell()")
             } else {
                 param_name
@@ -740,28 +857,32 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
         })
         .collect::<Vec<_>>();
 
-    let return_type = get_method.return_ty.render_type();
+    let return_type = abi.render_type(get_method.return_ty_idx);
 
     if params.is_empty() {
-        code.push_str(&format!(
-            "fun {contract_name}.{method_name}(self): {return_type} {{\n"
-        ));
+        let _ = writeln!(
+            code,
+            "fun {contract_name}.{method_name}(self): {return_type} {{"
+        );
     } else {
-        code.push_str(&format!(
-            "fun {contract_name}.{method_name}(self, {params}): {return_type} {{\n"
-        ));
+        let _ = writeln!(
+            code,
+            "fun {contract_name}.{method_name}(self, {params}): {return_type} {{"
+        );
     }
 
     if args.is_empty() {
-        code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
-        ));
+        let _ = writeln!(
+            code,
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")"
+        );
     } else {
         let args = args.join(", ");
 
-        code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}])\n"
-        ));
+        let _ = writeln!(
+            code,
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}])"
+        );
     }
 
     code.push_str("}\n");
@@ -796,11 +917,11 @@ fn generate_test(model: &WrapperModel) -> String {
     code.push_str(&import_stdlib("testing/expect"));
 
     for messages_path in &model.message_paths {
-        let types_import = get_import_path(proot, root, messages_path, mappings);
+        let types_import = get_import_path(proot, root, messages_path, mappings.as_ref());
         code.push_str(&gen_import_path(types_import));
     }
 
-    let wrapper_import = get_import_path(proot, root, &model.wrapper_path, mappings);
+    let wrapper_import = get_import_path(proot, root, &model.wrapper_path, mappings.as_ref());
     code.push_str(&gen_import_path(wrapper_import));
     code.push('\n');
 
@@ -843,7 +964,7 @@ fn get_import_path(
     project_root: &Path,
     where_: &Path,
     what: &Path,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> PathBuf {
     if let Some(mapped_import) = resolve_mapped_import(project_root, what, mappings) {
         return mapped_import;
@@ -855,9 +976,9 @@ fn get_import_path(
 fn resolve_mapped_import(
     project_root: &Path,
     what: &Path,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
 ) -> Option<PathBuf> {
-    let mappings = mappings.as_ref()?;
+    let mappings = mappings?;
     let what_abs = normalize_abs_path(project_root, what);
 
     let mut best_match = None;
@@ -916,33 +1037,32 @@ fn generate_setup_test(
     code.push_str(
         "/// Initializes the test environment, creating a fresh instance of the contract.\n",
     );
-    code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).\n");
-    code.push_str(&format!(
-        "fun setupTest(): ({contract_name}, Treasury, Treasury) {{\n"
-    ));
+    code.push_str("/// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).\n");
+    let _ = writeln!(
+        code,
+        "fun setupTest(): ({contract_name}, Treasury, Treasury) {{"
+    );
 
     code.push_str("    // Create a treasury account for deployment (typically the owner)\n");
     code.push_str("    val deployer = testing.treasury(\"deployer\");\n");
     code.push_str(
         "    // Create another treasury account for testing interactions from other users\n",
     );
-    code.push_str("    val not_deployer = testing.treasury(\"not_deployer\");\n");
+    code.push_str("    val notDeployer = testing.treasury(\"notDeployer\");\n");
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 
     if let Some(storage) = storage {
-        code.push_str(&format!(
-            "    val contract = {contract_name}.fromStorage({{"
-        ));
+        let _ = write!(code, "    val contract = {contract_name}.fromStorage({{");
 
         let storage_fields = storage
             .fields
             .iter()
             .map(|f| {
-                if let Some(default_value) = f.ty.typed_cell_payload_default_value(abi) {
+                if let Some(default_value) = abi.typed_cell_payload_default_value(f.ty_idx) {
                     format!(" {}: {default_value}.toCell()", f.name)
                 } else {
-                    format!(" {}: {}", f.name, f.ty.default_value(abi))
+                    format!(" {}: {}", f.name, abi.default_value(f.ty_idx))
                 }
             })
             .collect::<Vec<_>>()
@@ -951,15 +1071,13 @@ fn generate_setup_test(
         code.push_str(&storage_fields);
         code.push_str(" });\n");
     } else {
-        code.push_str(&format!(
-            "    val contract = {contract_name}.fromStorage();\n"
-        ));
+        let _ = writeln!(code, "    val contract = {contract_name}.fromStorage();");
     }
 
     code.push_str("    val res = contract.deploy(deployer.address, { value: ton(\"1\") });\n");
     code.push_str("    expect(res).toHaveSuccessfulDeploy({ to: contract.address });\n");
     code.push('\n');
-    code.push_str("    return (contract, deployer, not_deployer)\n");
+    code.push_str("    return (contract, deployer, notDeployer)\n");
     code.push_str("}\n");
 
     code
@@ -970,7 +1088,7 @@ fn generate_example_test(_contract_name: &str) -> String {
 
     code.push_str("/// Example test case demonstrating the basic flow\n");
     code.push_str("get fun `test basic flow`() {\n");
-    code.push_str("    val (contract, deployer, not_deployer) = setupTest();\n");
+    code.push_str("    val (contract, deployer, notDeployer) = setupTest();\n");
     code.push('\n');
     code.push_str("    // TODO: Implement your test logic here\n");
     code.push_str("    // Example:\n");

@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "docs/**"
   push:
     branches:
       - master
@@ -25,7 +27,7 @@ jobs:
     strategy: &runner_linux_strategy
       matrix:
         include:
-          - runner: ubicloud-standard-8-ubuntu-2204
+          - runner: ubicloud-standard-16-ubuntu-2204
             arch: x86_64
             vendor: unknown
             sys: linux

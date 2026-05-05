@@ -1,4 +1,4 @@
-warning[E027]: conditional branches are identical
+warning[E021]: conditional branches are identical
   --> [ROOT]/contracts/main[LINE]
   |
 7 |                 return id(flag ? value : value);
@@ -10,4 +10,4 @@ warning[E027]: conditional branches are identical
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E027
+For example: acton check --explain E021

@@ -2,7 +2,11 @@ import type {OutAction} from "@ton/core"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
 
-import type {BackendExecutorAction, BackendExecutorActionFailureReason} from "@/types"
+import type {
+  BackendExecutorAction,
+  BackendExecutorActionFailureReason,
+  SourceLocation,
+} from "@/types"
 import type {ContractData} from "@/types/transaction"
 import {fmt, DataBlock} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
@@ -25,6 +29,7 @@ interface ActionsSummaryProps {
   readonly contracts: Map<string, ContractData>
   readonly contractAddress: string
   readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
 interface ActionExecutionMeta {
@@ -117,7 +122,8 @@ const renderExternalDestination = (
 }
 
 const isActionFailed = (action: BackendExecutorAction): boolean => {
-  return action.failure_code !== undefined || action.failure_reason !== undefined
+  const failureReason = "failure_reason" in action ? action.failure_reason : undefined
+  return action.failure_code !== undefined || failureReason !== undefined
 }
 
 const formatNanoTon = (value: string): string => {
@@ -151,22 +157,20 @@ const mapExecutorActionsByType = (
   let cursor = 0
 
   for (const action of actions) {
-    if (action.type !== "sendMsg" && action.type !== "reserve") {
-      mapped.push(undefined)
-      continue
-    }
-
     let matched: BackendExecutorAction | undefined
-    while (cursor < executorActions.length) {
+    if (cursor < executorActions.length) {
       const candidate = executorActions[cursor]
       cursor += 1
       const typeMatches =
         (action.type === "sendMsg" && candidate.type === "send_message") ||
-        (action.type === "reserve" && candidate.type === "reserve_currency")
+        (action.type === "reserve" && candidate.type === "reserve_currency") ||
+        (action.type === "setCode" && candidate.type === "set_code") ||
+        (action.type === "changeLibrary" && candidate.type === "change_library")
 
       if (typeMatches) {
         matched = candidate
-        break
+      } else {
+        cursor -= 1
       }
     }
 
@@ -181,8 +185,37 @@ const getActionExecutionMeta = (
 ): ActionExecutionMeta => ({
   isFailed: executorAction ? isActionFailed(executorAction) : false,
   failureCode: executorAction?.failure_code,
-  failureReasonText: formatFailureReason(executorAction?.failure_reason),
+  failureReasonText: formatFailureReason(
+    executorAction && "failure_reason" in executorAction
+      ? executorAction.failure_reason
+      : undefined,
+  ),
 })
+
+const formatSourceLocation = (location: SourceLocation): string => {
+  const parts = location.file.split("/")
+  const file = parts.length > 3 ? `.../${parts.slice(-3).join("/")}` : location.file
+  return `${file}:${location.line}:${location.column}`
+}
+
+const renderActionSourceLocation = (
+  executorAction: BackendExecutorAction | undefined,
+  renderSourceLocation: ((location: SourceLocation) => React.ReactNode) | undefined,
+): React.JSX.Element | undefined => {
+  const location = executorAction?.location
+  if (!location) {
+    return undefined
+  }
+
+  return (
+    <div className={styles.detailRow}>
+      <span className={styles.detailLabel}>Source:</span>
+      <span className={`${styles.detailValue} ${styles.sourceLocationValue}`}>
+        {renderSourceLocation ? renderSourceLocation(location) : formatSourceLocation(location)}
+      </span>
+    </div>
+  )
+}
 
 const renderActionDetails = (
   action: OutAction,
@@ -190,11 +223,11 @@ const renderActionDetails = (
   contractAddress: string,
   contracts: Map<string, ContractData>,
   onContractClick?: (address: string) => void,
+  renderSourceLocation?: (location: SourceLocation) => React.ReactNode,
 ): React.JSX.Element | undefined => {
   const execution = getActionExecutionMeta(executorAction)
   const contract = contracts.get(contractAddress)
   const contractAbi = contract?.abi
-  const contractCompilerAbi = contract?.compilerAbi
 
   switch (action.type) {
     case "sendMsg": {
@@ -326,12 +359,12 @@ const renderActionDetails = (
                   <ExitCodeChip
                     exitCode={execution.failureCode}
                     abi={contractAbi}
-                    compilerAbi={contractCompilerAbi}
                     phase="action"
                   />
                 </span>
               </div>
             )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -358,6 +391,19 @@ const renderActionDetails = (
               </span>
             </div>
             <DisasmSection bocHex={newCodeBocHex} />
+            {execution.failureCode !== undefined && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailValue}>
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    phase="action"
+                  />
+                </span>
+              </div>
+            )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -396,12 +442,12 @@ const renderActionDetails = (
                   <ExitCodeChip
                     exitCode={execution.failureCode}
                     abi={contractAbi}
-                    compilerAbi={contractCompilerAbi}
                     phase="action"
                   />
                 </span>
               </div>
             )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -446,6 +492,19 @@ const renderActionDetails = (
             {isEmbeddedLibrary && embeddedLibraryBocHex && (
               <DisasmSection bocHex={embeddedLibraryBocHex} title="Library Disassembly" />
             )}
+            {execution.failureCode !== undefined && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Exit Code:</span>
+                <span className={styles.detailValue}>
+                  <ExitCodeChip
+                    exitCode={execution.failureCode}
+                    abi={contractAbi}
+                    phase="action"
+                  />
+                </span>
+              </div>
+            )}
+            {renderActionSourceLocation(executorAction, renderSourceLocation)}
           </div>
         </div>
       )
@@ -461,6 +520,7 @@ export function ActionsSummary({
   contracts,
   contractAddress,
   onContractClick,
+  renderSourceLocation,
 }: ActionsSummaryProps): React.JSX.Element {
   const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>()
   const mappedExecutorActions = mapExecutorActionsByType(actions, executorActions)
@@ -603,6 +663,7 @@ export function ActionsSummary({
             contractAddress,
             contracts,
             onContractClick,
+            renderSourceLocation,
           )}
         </div>
       )}

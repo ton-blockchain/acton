@@ -1,6 +1,6 @@
 use crate::backend::Backend;
 use crate::backend::utils::{FileInfoExt, offset_to_range};
-use lsp_types::*;
+use lsp_types::{Location, SymbolInformation, SymbolKind, WorkspaceSymbolParams};
 use tower_lsp::jsonrpc::Result as LspResult;
 
 impl Backend {
@@ -53,6 +53,7 @@ impl Backend {
         Ok(Some(symbols))
     }
 
+    #[must_use]
     pub fn to_lsp_symbol_kind(&self, kind: &tolk_resolver::file_index::SymbolKind) -> SymbolKind {
         match kind {
             tolk_resolver::file_index::SymbolKind::GlobalVariable => SymbolKind::VARIABLE,

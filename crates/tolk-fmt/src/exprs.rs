@@ -1,11 +1,21 @@
 use crate::comments::has_inline_line_comment_in_subtree;
 use crate::pretty::RcDoc;
 use crate::{Context, comments, common, stmts, types};
-use tolk_syntax::*;
+use tolk_syntax::{
+    ArgumentList, AsCast, Assign, AstNode, Bin, Call, CallArgument, DotAccess, DotAccessField,
+    Expr, HasName, Ident, InstanceArg, Instantiation, IsType, Lambda, Lazy, Match, MatchArm,
+    MatchArmBody, MatchBody, MatchPattern, NotNull, ObjectLit, Paren, SetAssign, Tensor, Ternary,
+    Tuple, Type, Unary, VarDeclLhs, VarDeclPattern,
+};
 use tree_sitter::Node;
 
 #[must_use]
 pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
+    let node = expr.syntax();
+    if !common::should_format_node(ctx, &node) {
+        return Some(common::print_original_node_text_inline(ctx, &node));
+    }
+
     // TODO: other literals as well
     if let Expr::NumberLit(lit) = expr {
         let kind = lit.0.parent()?.kind();
@@ -18,7 +28,6 @@ pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>>
         }
     }
 
-    let node = expr.syntax();
     let comments = ctx.comments.get(&node);
 
     if comments.is_none() {
@@ -380,7 +389,7 @@ fn print_tensor_tuple_pattern<'a>(
         ctx,
         vars,
         print_var_declaration_pattern,
-        |v| v.syntax(),
+        AstNode::syntax,
         |_| vec![],
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
@@ -681,6 +690,7 @@ pub fn print_call_argument<'a>(ctx: &Context<'_>, arg: &CallArgument) -> Option<
     Some(RcDoc::concat(parts))
 }
 
+#[must_use]
 pub fn print_generic_instantiation<'a>(
     ctx: &Context,
     instantiation: &Instantiation,
@@ -801,10 +811,7 @@ pub fn print_object_literal_body<'a>(
                 (usize::MAX, args.len() + 1)
             }
         } else {
-            (
-                object_literal_multiline_threshold(ctx, &args, has_type_name),
-                0,
-            )
+            (object_literal_multiline_threshold(&args, has_type_name), 0)
         };
 
     common::print_list(
@@ -823,11 +830,7 @@ pub fn print_object_literal_body<'a>(
     )
 }
 
-fn object_literal_multiline_threshold(
-    ctx: &Context<'_>,
-    args: &[InstanceArg],
-    has_type_name: bool,
-) -> usize {
+fn object_literal_multiline_threshold(args: &[InstanceArg], has_type_name: bool) -> usize {
     if !has_type_name {
         return 2;
     }
@@ -836,10 +839,7 @@ fn object_literal_multiline_threshold(
         return 2;
     }
 
-    if args
-        .iter()
-        .all(|arg| is_shorthand_instance_argument(ctx, arg))
-    {
+    if args.iter().all(is_shorthand_instance_argument) {
         // Keep compact form when it fits into line width.
         usize::MAX
     } else {
@@ -861,19 +861,8 @@ fn is_single_typeless_object_call_argument(node: Node<'_>, has_type_name: bool) 
         .is_some_and(|args| args.arguments().count() == 1)
 }
 
-fn is_shorthand_instance_argument(ctx: &Context<'_>, arg: &InstanceArg) -> bool {
-    let Some(name) = arg.name() else {
-        return false;
-    };
-
-    let Some(val) = arg.value() else {
-        // Defensive fallback: no explicit value means no `:`.
-        return true;
-    };
-
-    let name_text = name.text(ctx.code.as_ref().as_ref()).to_string();
-    let val_text = val.text(ctx.code.as_ref().as_ref());
-    val_text == name_text
+fn is_shorthand_instance_argument(arg: &InstanceArg) -> bool {
+    arg.value().is_none()
 }
 
 #[must_use]
@@ -883,7 +872,7 @@ pub fn print_instance_argument<'a>(ctx: &Context<'_>, arg: &InstanceArg) -> Opti
 
     let mut parts = vec![name_doc];
 
-    if !is_shorthand_instance_argument(ctx, arg)
+    if !is_shorthand_instance_argument(arg)
         && let Some(val) = arg.value()
     {
         let val_doc = print_expression(ctx, &val)?;

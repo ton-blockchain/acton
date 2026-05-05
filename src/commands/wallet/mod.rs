@@ -9,6 +9,7 @@ use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -96,12 +97,13 @@ const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
 const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
 const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
-const DEFAULT_FAUCET_URL: &str = "https://acton.monster/faucet/";
+const DEFAULT_FAUCET_URL: &str = "https://faucet.ton.org/";
 const DEFAULT_LOCALNET_PORT: u16 = 5411;
 const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
+const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -142,7 +144,7 @@ pub enum WalletCommand {
         name: Option<String>,
         #[arg(long, help = "Version of the wallet (prompts if not provided)")]
         version: Option<WalletVersionArg>,
-        #[arg(long, help = "Save wallet to global global.wallets.toml")]
+        #[arg(long, help = "Save wallet to global.wallets.toml")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,
@@ -178,7 +180,7 @@ pub enum WalletCommand {
         mnemonics: Vec<String>,
         #[arg(long, help = "Version of the wallet (prompts if not provided)")]
         version: Option<WalletVersionArg>,
-        #[arg(long, help = "Save wallet to global global.wallets.toml")]
+        #[arg(long, help = "Save wallet to global.wallets.toml")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,
@@ -420,10 +422,11 @@ fn perform_testnet_airdrop(
         .join("claim")
         .with_context(|| format!("Failed to build claim URL from faucet base URL {faucet_base}"))?;
 
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))
         .user_agent(crate::build_info::user_agent())
+        .default_headers(airdrop_headers())
         .build()
         .context("Failed to build HTTP client")?;
 
@@ -478,7 +481,7 @@ fn perform_testnet_airdrop(
     let claim_payload = serde_json::json!({
         "address": address,
         "challenge": challenge_data.challenge,
-        "nonce": nonce
+        "nonce": nonce,
     });
     let response = send_with_retry(
         || client.post(claim_url.clone()).json(&claim_payload).send(),
@@ -521,7 +524,7 @@ fn perform_localnet_airdrop(
     amount_ton: f64,
     port: u16,
 ) -> anyhow::Result<AirdropResult> {
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::http::blocking_client_builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
         .user_agent(crate::build_info::user_agent())
@@ -656,6 +659,24 @@ fn parse_faucet_base_url(faucet_url: &str) -> anyhow::Result<reqwest::Url> {
         anyhow::bail!("Faucet URL must not contain query parameters or fragments");
     }
     Ok(url)
+}
+
+fn wallet_device_uid() -> String {
+    machine_uid::get().unwrap_or_else(|_| "default".to_string())
+}
+
+fn airdrop_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    let device_uid = wallet_device_uid();
+    let device_uid = HeaderValue::from_str(device_uid.trim())
+        .unwrap_or_else(|_| HeaderValue::from_static("default"));
+    headers.insert(
+        HeaderName::from_static(WALLET_DEVICE_UID_HEADER),
+        device_uid,
+    );
+
+    headers
 }
 
 fn solve_challenge(challenge: &str, difficulty: u32) -> anyhow::Result<u64> {
@@ -950,7 +971,7 @@ fn remove_wallet_with_merged_precedence(name: &str, config: &ActonConfig) -> any
 }
 
 fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
-    let config = ActonConfig::load()?;
+    let wallets_config = ActonConfig::load_wallets()?;
 
     let mut wallets_info = Vec::new();
 
@@ -968,9 +989,7 @@ fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
         Default::default()
     };
 
-    let wallets = config
-        .wallets()
-        .ok_or_else(|| anyhow!(error_fmt::no_wallets_found()))?;
+    let wallets = &wallets_config.wallets;
 
     if wallets.is_empty() {
         if json {
@@ -2080,6 +2099,12 @@ mod wallet_name_tests {
 
         let fallback = new_wallet_airdrop_faucet_url(None);
         assert_eq!(fallback, DEFAULT_FAUCET_URL);
+    }
+
+    #[test]
+    fn test_wallet_device_uid_is_non_empty() {
+        let device_uid = wallet_device_uid();
+        assert!(!device_uid.trim().is_empty());
     }
 
     #[test]

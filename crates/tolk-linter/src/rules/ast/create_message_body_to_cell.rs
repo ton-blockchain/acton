@@ -28,7 +28,7 @@ use tree_sitter::Node;
 ///         value: ton("0.1"),
 ///         dest,
 ///         body: Transfer { amount: 1 }.toCell(),
-///         //                          ^^^^^^^^^ E035: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
+///         //                          ^^^^^^^^^ E029: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
 ///     });
 /// }
 /// ```

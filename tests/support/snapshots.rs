@@ -58,7 +58,15 @@ fn normalize_output_internal(
 }
 
 fn normalize_dynamic_output(content: String) -> String {
-    normalize_dynamic_mutation_output(normalize_up_snapshot_text(content))
+    normalize_dynamic_slice_output(normalize_dynamic_mutation_output(
+        normalize_up_snapshot_text(content),
+    ))
+}
+
+fn normalize_dynamic_slice_output(content: String) -> String {
+    regex!(r"slice\{[0-9a-fA-F]{64,}_?\}")
+        .replace_all(&content, "slice{[HEX]}")
+        .into_owned()
 }
 
 fn normalize_dynamic_mutation_output(content: String) -> String {
@@ -109,6 +117,7 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     let tmp_dir_unix_escaped = tmp_dir_unix.replace('\\', "\\\\");
 
     let current_version = env!("CARGO_PKG_VERSION");
+    let current_short_version = build_info::SHORT_VERSION;
 
     redactions.insert("[ROOT]", tmp_dir_raw.clone()).unwrap();
     redactions.insert("[ROOT]", tmp_dir_unix.clone()).unwrap();
@@ -204,6 +213,17 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     redactions
         .insert("[ACTON_VERSION]", format!("v{current_version}"))
         .unwrap();
+    redactions
+        .insert("[ACTON_VERSION]", current_version.to_owned())
+        .unwrap();
+    if current_short_version != current_version {
+        redactions
+            .insert("[ACTON_VERSION]", format!("v{current_short_version}"))
+            .unwrap();
+        redactions
+            .insert("[ACTON_VERSION]", current_short_version.to_owned())
+            .unwrap();
+    }
     redactions
         .insert(
             "[ACTON_DOCS_URL]",

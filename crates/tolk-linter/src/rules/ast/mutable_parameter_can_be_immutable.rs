@@ -17,7 +17,7 @@ use tolk_syntax::{LambdaParameter, Parameter, TryFromNode};
 /// ### Example
 /// ```tolk twoslash
 /// fun increment(mutate value: int): int {
-/// //            ^^^^^^ E013: parameter can be immutable
+/// //            ^^^^^^ E009: parameter can be immutable
 ///     return value + 1;
 /// }
 /// ```

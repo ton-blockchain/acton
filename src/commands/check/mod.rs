@@ -155,8 +155,22 @@ pub fn check_cmd(
         })
         .unwrap_or(CheckOutputFormat::Plain);
     let is_plain_report = output_format == CheckOutputFormat::Plain;
+    if fix && !is_plain_report {
+        anyhow::bail!(
+            "{} can only be used with plain output format; pass {} {} or remove {}",
+            "--fix".yellow(),
+            "--output-format".yellow(),
+            "plain".green(),
+            "--fix".yellow()
+        )
+    }
     if is_plain_report && output_file.is_some() {
-        anyhow::bail!("output_file cannot be used with plain output format")
+        anyhow::bail!(
+            "{} cannot be used with plain output format; pass {} {}",
+            "--output-file".yellow(),
+            "--output-format".yellow(),
+            "json|sarif|github|gitlab".green()
+        )
     }
 
     let max_warnings = config

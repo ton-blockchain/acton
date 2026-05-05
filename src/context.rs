@@ -1,5 +1,6 @@
 use crate::file_build_cache::FileBuildCache;
 use crate::retrace::TolkTraceInfo;
+use crate::tonconnect::TonConnectContext;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
@@ -9,12 +10,12 @@ use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::types_kernel::TyIdx;
 use ton::ton_wallet::TonWallet;
-use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
@@ -37,6 +38,7 @@ impl std::fmt::Display for DebugStopRequested {
 
 impl std::error::Error for DebugStopRequested {}
 
+#[must_use]
 pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
     err.downcast_ref::<DebugStopRequested>().is_some()
 }
@@ -45,9 +47,10 @@ pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
 pub struct AssertBinFailure {
     pub operator: String,
     pub left: Tuple,
-    pub left_type: String,
+    pub left_ty_idx: TyIdx,
     pub right: Tuple,
-    pub right_type: String,
+    pub right_ty_idx: TyIdx,
+    pub source_map: Arc<SourceMap>,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
 }
@@ -82,9 +85,8 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
-    pub source_map: Arc<TolkSourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
@@ -147,7 +149,7 @@ pub struct ParsedSearchParams {
 pub struct TransactionGenericAssertFailure {
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
-    pub txs: TupleItem,
+    pub txs: Vec<TupleItem>,
     pub parsed_txs: Vec<Transaction>,
     pub params: TransactionNotFoundParams,
 }
@@ -218,16 +220,14 @@ impl BuildCache {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn memoize(
         &mut self,
         name: &str,
         path: &Path,
         code: &str,
         code_hash: HashBytes,
-        source_map: Arc<TolkSourceMap>,
-        abi: Option<Arc<ContractAbi>>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
+        source_map: Arc<SourceMap>,
+        abi: Option<Arc<ContractABI>>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -237,7 +237,6 @@ impl BuildCache {
                 code_hash,
                 source_map,
                 abi,
-                compiler_abi,
             },
         );
     }
@@ -258,9 +257,8 @@ pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: HashBytes,
-    pub source_map: Arc<TolkSourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractABI>>,
 }
 
 #[derive(Debug, Clone)]
@@ -707,15 +705,18 @@ impl Wallet {
 pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
-    pub abi: Arc<ContractAbi>,
+    pub abi: Option<Arc<ContractABI>>,
+    pub source_map: Arc<SourceMap>,
     pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
+    pub tonconnect: Option<TonConnectContext>,
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
     pub running_id: Arc<str>,
+    pub execution_mode: ExecutionMode,
     /// The compiled code of the currently running test contract (for c3 in `run_continuation`).
     pub test_code: Option<Cell>,
 }
@@ -731,6 +732,12 @@ pub struct Context<'a> {
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,
     pub network: Option<Network>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ExecutionMode {
+    Test,
+    Script,
 }
 
 #[derive(Debug, Clone)]
@@ -775,6 +782,53 @@ impl Context<'_> {
             .unwrap_or(&Network::Testnet)
             .clone()
     }
+
+    #[must_use]
+    pub fn can_broadcast_to_network(&self) -> bool {
+        self.env.execution_mode == ExecutionMode::Script && self.is_broadcasting
+    }
+
+    #[must_use]
+    pub fn resolve_project_read_path(&self, path: &str) -> Option<PathBuf> {
+        let path = self.resolve_project_relative_path(path)?;
+        let project_root = dunce::canonicalize(&self.env.project_root).ok()?;
+        let canonical_path = dunce::canonicalize(path).ok()?;
+        canonical_path
+            .starts_with(project_root)
+            .then_some(canonical_path)
+    }
+
+    #[must_use]
+    pub fn resolve_project_write_path(&self, path: &str) -> Option<PathBuf> {
+        let path = self.resolve_project_relative_path(path)?;
+        let project_root = dunce::canonicalize(&self.env.project_root).ok()?;
+
+        if let Ok(canonical_path) = dunce::canonicalize(&path) {
+            return canonical_path.starts_with(&project_root).then_some(path);
+        }
+
+        let parent = path.parent()?;
+        let canonical_parent = dunce::canonicalize(parent).ok()?;
+        canonical_parent.starts_with(&project_root).then_some(path)
+    }
+
+    fn resolve_project_relative_path(&self, path: &str) -> Option<PathBuf> {
+        let mut relative_path = PathBuf::new();
+        for component in Path::new(path).components() {
+            match component {
+                Component::CurDir => {}
+                Component::Normal(part) => relative_path.push(part),
+                Component::ParentDir => {
+                    if !relative_path.pop() {
+                        return None;
+                    }
+                }
+                Component::Prefix(_) | Component::RootDir => return None,
+            }
+        }
+
+        Some(self.env.project_root.join(relative_path))
+    }
 }
 
 impl Env<'_> {
@@ -792,6 +846,13 @@ impl Env<'_> {
             .find(|(_, wallet)| &wallet.address() == addr)?;
 
         Some(found.1.clone())
+    }
+
+    #[must_use]
+    pub fn find_tonconnect_by_address(&self, addr: &StdAddr) -> Option<&TonConnectContext> {
+        self.tonconnect
+            .as_ref()
+            .filter(|tonconnect| tonconnect.wallet.address == *addr)
     }
 
     #[must_use]

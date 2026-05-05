@@ -1,82 +1,76 @@
-import {
-  Children,
-  isValidElement,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import {Children, isValidElement, type ReactElement, type ReactNode} from "react"
 
-type TitleSegmentKind = 'code' | 'em' | 'text';
+type TitleSegmentKind = "code" | "em" | "text"
 
 interface TitleSegment {
-  kind: TitleSegmentKind;
-  text: string;
+  kind: TitleSegmentKind
+  text: string
 }
 
 function normalizeInlineText(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
+  return value.replace(/\s+/g, " ").trim()
 }
 
 function collectTitleSegments(
   node: ReactNode,
-  inheritedKind: TitleSegmentKind = 'text',
+  inheritedKind: TitleSegmentKind = "text",
 ): TitleSegment[] {
-  const segments: TitleSegment[] = [];
+  const segments: TitleSegment[] = []
 
   for (const child of Children.toArray(node)) {
-    if (typeof child === 'string' || typeof child === 'number') {
-      const text = String(child);
+    if (typeof child === "string" || typeof child === "number") {
+      const text = String(child)
       if (text.trim().length === 0) {
-        continue;
+        continue
       }
 
       segments.push({
         kind: inheritedKind,
         text,
-      });
-      continue;
+      })
+      continue
     }
 
-    if (!isValidElement<{ children?: ReactNode }>(child)) {
-      continue;
+    if (!isValidElement<{children?: ReactNode}>(child)) {
+      continue
     }
 
-    const element = child as ReactElement<{ children?: ReactNode }>;
-    const tagName = typeof element.type === 'string' ? element.type : null;
-    const nextKind =
-      tagName === 'code' ? 'code' : tagName === 'em' ? 'em' : inheritedKind;
+    const element = child as ReactElement<{children?: ReactNode}>
+    const tagName = typeof element.type === "string" ? element.type : null
+    const nextKind = tagName === "code" ? "code" : tagName === "em" ? "em" : inheritedKind
 
-    segments.push(...collectTitleSegments(element.props.children, nextKind));
+    segments.push(...collectTitleSegments(element.props.children, nextKind))
   }
 
-  const merged: TitleSegment[] = [];
+  const merged: TitleSegment[] = []
 
   for (const segment of segments) {
-    if (segment.kind === 'text') {
-      const text = segment.text.replace(/\s+/g, ' ').trim();
+    if (segment.kind === "text") {
+      const text = segment.text.replace(/\s+/g, " ").trim()
       if (text.length === 0) {
-        continue;
+        continue
       }
 
-      const previous = merged[merged.length - 1];
-      if (previous?.kind === 'text') {
-        previous.text = `${previous.text} ${text}`.trim();
+      const previous = merged[merged.length - 1]
+      if (previous?.kind === "text") {
+        previous.text = `${previous.text} ${text}`.trim()
       } else {
-        merged.push({ ...segment, text });
+        merged.push({...segment, text})
       }
-      continue;
+      continue
     }
 
     merged.push({
       ...segment,
       text: normalizeInlineText(segment.text),
-    });
+    })
   }
 
-  return merged;
+  return merged
 }
 
 function renderTitleSegment(segment: TitleSegment, index: number) {
-  if (segment.kind === 'code') {
+  if (segment.kind === "code") {
     return (
       <span
         key={`code-${index}-${segment.text}`}
@@ -84,10 +78,10 @@ function renderTitleSegment(segment: TitleSegment, index: number) {
       >
         {segment.text}
       </span>
-    );
+    )
   }
 
-  if (segment.kind === 'em') {
+  if (segment.kind === "em") {
     return (
       <span
         key={`em-${index}-${segment.text}`}
@@ -95,32 +89,32 @@ function renderTitleSegment(segment: TitleSegment, index: number) {
       >
         {`<${segment.text}>`}
       </span>
-    );
+    )
   }
 
-  const compactText = normalizeInlineText(segment.text);
-  const isSeparator = compactText === ',' || compactText === '|' || compactText === '/';
-  const isBracket = compactText === '[' || compactText === ']' || compactText === '...';
+  const compactText = normalizeInlineText(segment.text)
+  const isSeparator = compactText === "," || compactText === "|" || compactText === "/"
+  const isBracket = compactText === "[" || compactText === "]" || compactText === "..."
 
   return (
     <span
       key={`text-${index}-${compactText}`}
       className={
         isSeparator || isBracket
-          ? 'text-sm font-medium text-fd-muted-foreground/80'
-          : 'text-sm font-medium text-fd-muted-foreground'
+          ? "text-sm font-medium text-fd-muted-foreground/80"
+          : "text-sm font-medium text-fd-muted-foreground"
       }
     >
       {compactText}
     </span>
-  );
+  )
 }
 
-export function CommandOptions({ children }: { children: ReactNode }) {
-  return <div className="my-6 flex flex-col">{children}</div>;
+export function CommandOptions({children}: {children: ReactNode}) {
+  return <div className="my-6 flex flex-col">{children}</div>
 }
 
-export function CommandOption({ children }: { children: ReactNode }) {
+export function CommandOption({children}: {children: ReactNode}) {
   return (
     <div className="relative py-5 first:pt-1 last:pb-1">
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-fd-primary/25 to-transparent last:hidden" />
@@ -128,11 +122,11 @@ export function CommandOption({ children }: { children: ReactNode }) {
         {children}
       </div>
     </div>
-  );
+  )
 }
 
-export function CommandOptionTitle({ children }: { children: ReactNode }) {
-  const segments = collectTitleSegments(children);
+export function CommandOptionTitle({children}: {children: ReactNode}) {
+  const segments = collectTitleSegments(children)
 
   return (
     <div className="mb-1 flex flex-col gap-2">
@@ -144,24 +138,16 @@ export function CommandOptionTitle({ children }: { children: ReactNode }) {
         )}
       </div>
     </div>
-  );
+  )
 }
 
-export function CommandOptionMeta({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+export function CommandOptionMeta({label, children}: {label: string; children: ReactNode}) {
   return (
     <div className="flex items-start gap-1.5 rounded-xl bg-fd-primary/5 py-1.5">
-      <span className="text-sm leading-6 font-semibold text-fd-primary">
-        {label}:
-      </span>
+      <span className="text-sm leading-6 font-semibold text-fd-primary">{label}:</span>
       <div className="min-w-0 flex-1 text-sm leading-6 text-fd-foreground/85 [&_p]:m-0 [&_code]:rounded-md [&_code]:border-fd-primary/15 [&_code]:bg-fd-background">
         {children}
       </div>
     </div>
-  );
+  )
 }

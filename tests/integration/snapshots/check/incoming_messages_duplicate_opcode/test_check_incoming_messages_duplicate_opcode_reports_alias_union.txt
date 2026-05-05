@@ -1,4 +1,4 @@
-warning[E029]: incomingMessages contains message variants with duplicate opcode
+warning[E023]: incomingMessages contains message variants with duplicate opcode
    --> [ROOT]/contracts/main[LINE]
    |
 13 |                 incomingMessages: Incoming,
@@ -8,4 +8,4 @@ warning[E029]: incomingMessages contains message variants with duplicate opcode
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E029
+For example: acton check --explain E023

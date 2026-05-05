@@ -1,0 +1,7 @@
+// file header
+// second header line
+
+fun onInternalMessage(in: InMessage) {
+    val x = 1;
+    val   y   =   2;
+}

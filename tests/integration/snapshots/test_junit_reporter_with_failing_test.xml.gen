@@ -5,10 +5,30 @@
             <property name="file.path" value="[ROOT]/tests/counter.test.tolk"/>
         </properties>
         <testcase name="test should increase counter" classname="counter.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]</failure>
+            <failure message="expect(&lt;actual&gt;).toHaveSuccessfulTx(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]
+expect(actual).toHaveSuccessfulTx(expected)
+N/A -&gt; deployer A
+└── IncreaseCounter 0.1 TON -&gt; Counter B                                        gas=1513 exit_code=10 aborted
+    └── Compute phase failed: Dictionary error
+
+Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+with:
+    success=true
+    exit_code=0
+at tests/counter.test[LINE]</failure>
         </testcase>
         <testcase name="test should reset counter" classname="counter.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]</failure>
+            <failure message="expect(&lt;actual&gt;).toHaveSuccessfulTx(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]
+expect(actual).toHaveSuccessfulTx(expected)
+N/A -&gt; deployer A
+└── IncreaseCounter 0.1 TON -&gt; Counter B                                        gas=1513 exit_code=10 aborted
+    └── Compute phase failed: Dictionary error
+
+Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+with:
+    success=true
+    exit_code=0
+at tests/counter.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>

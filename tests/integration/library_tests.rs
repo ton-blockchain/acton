@@ -2083,55 +2083,24 @@ fn test_library_topup_uses_mainnet_env_api_key_for_mainnet() {
 }
 
 #[test]
-fn test_library_publish_local_and_global_flags_prefer_global_storage() {
+fn test_library_publish_rejects_local_and_global_flags_together() {
     let project = ProjectBuilder::new("library-publish-local-global-precedence").build();
-    write_deployer_wallets(project.path());
-    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
-
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_seqno_ok_response(),
-        toncenter_v2_send_boc_ok_response(),
-    ]);
-    append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
         .acton()
-        .env(
-            "HOME",
-            home_temp.path().to_str().expect("home path should be utf8"),
-        )
         .library()
         .publish()
         .with_code("te6cckEBAQEAAgAAAEysuc0=")
         .with_duration("1d")
         .wallet("deployer")
-        .arg("--net")
-        .arg("custom:mock-v2")
-        .arg("--amount")
-        .arg("1")
         .arg("--yes")
         .arg("--local")
         .arg("--global")
         .run()
-        .success()
-        .assert_contains("Library info saved");
-
-    mock_handle.join().expect("mock toncenter v2 must finish");
-    assert!(
-        !project.path().join("libraries.toml").exists(),
-        "local metadata file should not be created when both --local and --global are set"
-    );
-
-    let global_path = home_temp
-        .path()
-        .join(".config")
-        .join("acton")
-        .join("libraries")
-        .join("global.libraries.toml");
-    assert!(
-        global_path.exists(),
-        "global metadata should win when both --local and --global are set"
-    );
+        .failure()
+        .assert_stderr_contains("cannot be used with")
+        .assert_stderr_contains("--local")
+        .assert_stderr_contains("--global");
 }
 
 #[cfg(unix)]
@@ -2955,16 +2924,19 @@ cells = 4
 }
 
 fn append_custom_network(project_path: &Path, network_name: &str, v2_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with custom network");
 }
@@ -2980,16 +2952,19 @@ fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 

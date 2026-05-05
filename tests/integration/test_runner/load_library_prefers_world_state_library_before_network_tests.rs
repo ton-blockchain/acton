@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::append_custom_network;
 use tycho_types::cell::CellBuilder;
 
 const IMPORTS: &str = r#"
@@ -45,10 +46,17 @@ get fun `test load library prefers world state library before network`() {{
 "#
     );
 
-    ProjectBuilder::new("stdlib-load-library-prefers-world-state-before-network")
+    let project = ProjectBuilder::new("stdlib-load-library-prefers-world-state-before-network")
         .contract("dummy", DUMMY_CONTRACT)
         .test_file("load_library_prefers_world_state", &source)
-        .build()
+        .build();
+    append_custom_network(
+        project.path(),
+        "bm-missing-net",
+        "http://127.0.0.1:1/api/v2",
+    );
+
+    project
         .acton()
         .test()
         .fork_net("custom:bm-missing-net")

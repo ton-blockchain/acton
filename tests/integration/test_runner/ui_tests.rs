@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{Project, ProjectBuilder};
+use std::fs;
 use std::net::TcpListener;
 
 const SIMPLE_CONTRACT: &str = r"
@@ -55,6 +56,14 @@ fn reserve_ui_port() -> (Option<TcpListener>, String) {
     (None, "1".to_string())
 }
 
+fn append_acton_toml(project: &Project, content: &str) {
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("should read generated Acton.toml");
+    acton_toml.push_str(content);
+    fs::write(&acton_toml_path, acton_toml).expect("should update generated Acton.toml");
+}
+
 #[test]
 fn ui_bind_failure_is_reported_before_tests_run_and_skips_default_traces() {
     let project = ProjectBuilder::new("f-ui-default-trace")
@@ -91,6 +100,40 @@ fn ui_bind_failure_is_reported_before_tests_run_and_skips_default_traces() {
         "UI bind failure must happen before default trace creation: {}",
         trace_dir.display()
     );
+}
+
+#[test]
+fn ui_port_config_is_used_when_cli_port_is_absent() {
+    let project = ProjectBuilder::new("f-ui-config-port")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("ui", &ui_deploy_test_source("test-ui-config-port"))
+        .build();
+
+    let (listener, port) = reserve_ui_port();
+    append_acton_toml(
+        &project,
+        &format!(
+            r"
+[test]
+ui = true
+ui-port = {port}
+"
+        ),
+    );
+
+    let output = project.acton().test().run().failure();
+
+    output
+        .assert_not_contains("Starting UI server at")
+        .assert_stderr_contains("Failed to start UI server on 127.0.0.1:")
+        .assert_stderr_contains("Choose another port with --ui-port")
+        .assert_stderr_contains("Or stop the process currently listening on that port");
+
+    if listener.is_some() {
+        output.assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_ui/ui_bind_failure.stderr.txt",
+        );
+    }
 }
 
 #[test]

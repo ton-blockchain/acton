@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+size: 3
+first: 10
+second: 20
+sum: 60

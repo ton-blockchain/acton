@@ -1,0 +1,7 @@
+error: unexpected argument '-r' found
+
+  tip: to pass '-r' as a value, use '-- -r'
+
+Usage: acton fmt [OPTIONS] [PATHS]...
+
+For more information, try '--help'.

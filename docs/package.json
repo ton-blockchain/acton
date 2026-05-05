@@ -7,8 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
     "generated-source": "bunx fumadocs-mdx",
-    "lint:links": "bun ./scripts/validate-link.ts"
+    "lint:links": "bun run lint:links:internal && bun run lint:links:external",
+    "lint:links:internal": "bun ./scripts/validate-links-internal.ts",
+    "lint:links:external": "bun ./scripts/validate-links-external.ts",
+    "lint:navigation": "bun ./scripts/validate-navigation.ts",
+    "docs-lint": "bun run lint:links && bun run lint:navigation"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
@@ -29,7 +35,8 @@
     "remark-directive-rehype": "^0.4.2",
     "tailwind-merge": "^3.4.0",
     "twoslash": "^0.3.8",
-    "unist-util-visit": "^5.0.0"
+    "unist-util-visit": "^5.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
@@ -41,7 +48,8 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
-    "next-validate-link": "^1.6.4",
+    "next-validate-link": "^1.6.6",
+    "prettier": "3.4.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
   }

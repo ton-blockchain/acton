@@ -18,9 +18,18 @@ if [ "${1:-}" = "--yes" ]; then
     shift
 fi
 
-if [ "${1:-}" != "gen-typescript-from-tolk" ] && [ "${1:-}" != "gen-typescript-from-tolk-dev" ]; then
-    echo "unexpected package: ${1:-}" >&2
+package="${1:-}"
+package_name="${package%%@*}"
+if [ "$package_name" != "gen-typescript-from-tolk" ] && [ "$package_name" != "gen-typescript-from-tolk-dev" ]; then
+    echo "unexpected package: ${package}" >&2
     exit 1
+fi
+
+if [ "${ACTON_TS_WRAPPER_REQUIRE_CACHE:-0}" = "1" ]; then
+    if [ -z "${npm_config_cache:-}" ] || [ ! -d "${npm_config_cache}" ]; then
+        echo "missing npm_config_cache" >&2
+        exit 1
+    fi
 fi
 
 printf '%s' "${2:-}" > "$ACTON_TS_WRAPPER_CAPTURE"
@@ -179,6 +188,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
         .wrapper("my_contract")
         .generate_typescript_wrapper()
         .env("PATH", &path_env)
+        .env("ACTON_TS_WRAPPER_REQUIRE_CACHE", "1")
         .env(
             "ACTON_TS_WRAPPER_CAPTURE",
             capture_path.to_str().expect("capture path"),
@@ -200,7 +210,7 @@ fn test_wrapper_generation_typescript_defaults_to_wrapper_ts_dir() {
     assert_eq!(abi_json["contract_name"], "MyContract");
     assert_eq!(abi_json["compiler_name"], "tolk");
     assert!(
-        abi_json["codeBoc64"]
+        abi_json["code_boc64"]
             .as_str()
             .is_some_and(|value| !value.is_empty())
     );

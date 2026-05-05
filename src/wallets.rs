@@ -288,7 +288,7 @@ pub fn open_wallets(
                     .address_testnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.clone())),
-                _ => None,
+                Network::Custom(_) => None,
             };
 
             if let Some(expected_addr) = expected_address {
@@ -312,7 +312,7 @@ pub fn open_wallets(
                             Network::Testnet | Network::Localnet => {
                                 expected.address_testnet.as_deref()
                             }
-                            _ => None,
+                            Network::Custom(_) => None,
                         }
                         .unwrap_or("<unknown>");
                         anyhow::bail!(

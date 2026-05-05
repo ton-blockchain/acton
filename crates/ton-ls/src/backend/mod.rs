@@ -1,5 +1,18 @@
 use dashmap::DashMap;
-use lsp_types::*;
+use lsp_types::{
+    CodeActionParams, CodeActionProviderCapability, CodeActionResponse, CodeLens, CodeLensOptions,
+    CodeLensParams, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentFilter, ExecuteCommandOptions, ExecuteCommandParams,
+    FoldingRange, FoldingRangeParams, FoldingRangeProviderCapability, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, InlayHint, InlayHintParams, Location, MessageType, OneOf,
+    ReferenceParams, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, StaticRegistrationOptions,
+    SymbolInformation, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
+    TextDocumentSyncKind, WorkDoneProgressOptions, WorkspaceSymbolParams,
+};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -139,7 +152,7 @@ impl LanguageServer for Backend {
         let text = params.text_document.text;
         let language = detect_language(&uri);
 
-        log::info!("Notification: did_open for {}", uri);
+        log::info!("Notification: did_open for {uri}");
 
         if language.is_self_contained() {
             if let Err(error) = self.registry.did_open(language, &uri, version, &text) {
@@ -357,6 +370,7 @@ impl Backend {
         self.update_document(&uri, applied.text);
     }
 
+    #[must_use]
     pub fn get_file_url(&self, file_info: &tolk_resolver::file_db::FileInfo) -> Option<Url> {
         use crate::backend::utils::FileInfoExt;
         let url = self

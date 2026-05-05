@@ -642,6 +642,63 @@ fn test_test_invalid_include_pattern() {
 }
 
 #[test]
+fn test_empty_selection_no_test_files_fails() {
+    ProjectBuilder::new("empty-selection-no-test-files")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_empty_selection_no_test_files.stdout.txt",
+        );
+}
+
+#[test]
+fn test_empty_selection_include_matches_no_test_files_fails() {
+    ProjectBuilder::new("empty-selection-include-no-files")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r"
+                get fun `test foo`() {}
+            ",
+        )
+        .build()
+        .acton()
+        .test()
+        .include_pattern("tests/missing/**")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_empty_selection_include_matches_no_test_files.stdout.txt",
+        );
+}
+
+#[test]
+fn test_empty_selection_test_file_without_tests_fails() {
+    ProjectBuilder::new("empty-selection-file-without-tests")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            // No test functions
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_empty_selection_test_file_without_tests.stdout.txt",
+        );
+}
+
+#[test]
 fn test_test_invalid_coverage_format() {
     let project = ProjectBuilder::new("test-invalid-coverage-format")
         .contract("simple", SIMPLE_CONTRACT)

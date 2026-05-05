@@ -1,0 +1,1 @@
+Error: Argument items has unsupported struct type Foo

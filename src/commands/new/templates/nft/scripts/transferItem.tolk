@@ -1,3 +1,4 @@
+import "@acton/io"
 import "@acton/emulation/network"
 import "@wrappers/utils"
 import "utils/common"
@@ -17,7 +18,7 @@ fun main() {
         createEmptySlice(),
         { value: ton("0.05"), bounce: true },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     printNftItemInfo(item, "NFT");
 }

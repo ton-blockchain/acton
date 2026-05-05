@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
@@ -10,21 +11,21 @@ fn write_acton_toml(project_root: &Path, toml_content: &str) {
 fn append_build_output_fift(project_root: &Path, output_fift: &str) {
     let acton_toml_path = project_root.join("Acton.toml");
     let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("read Acton.toml");
-    acton_toml.push_str(&format!("\n[build]\noutput-fift = \"{output_fift}\"\n"));
+    let _ = write!(acton_toml, "\n[build]\noutput-fift = \"{output_fift}\"\n");
     fs::write(acton_toml_path, acton_toml).expect("write Acton.toml with [build] section");
 }
 
 fn append_build_out_dir(project_root: &Path, out_dir: &str) {
     let acton_toml_path = project_root.join("Acton.toml");
     let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("read Acton.toml");
-    acton_toml.push_str(&format!("\n[build]\nout-dir = \"{out_dir}\"\n"));
+    let _ = write!(acton_toml, "\n[build]\nout-dir = \"{out_dir}\"\n");
     fs::write(acton_toml_path, acton_toml).expect("write Acton.toml with [build] section");
 }
 
 fn append_build_gen_dir(project_root: &Path, gen_dir: &str) {
     let acton_toml_path = project_root.join("Acton.toml");
     let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("read Acton.toml");
-    acton_toml.push_str(&format!("\n[build]\ngen-dir = \"{gen_dir}\"\n"));
+    let _ = write!(acton_toml, "\n[build]\ngen-dir = \"{gen_dir}\"\n");
     fs::write(acton_toml_path, acton_toml).expect("write Acton.toml with [build] section");
 }
 

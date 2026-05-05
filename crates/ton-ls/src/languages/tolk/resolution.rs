@@ -3,6 +3,7 @@ use crate::backend::Backend;
 use tolk_resolver::{FileInfo, Resolved, Span};
 
 impl Backend {
+    #[must_use]
     pub fn resolve_symbol_at(
         &self,
         analysis: &AnalysisResult,

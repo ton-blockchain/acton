@@ -1,11 +1,13 @@
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
+
 import "@contracts/errors"
 import "@contracts/messages"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
 
 get fun `test validation: malformed forward payload should be rejected`() {
@@ -122,7 +124,7 @@ get fun `test validation: wallet cannot send to masterchain`() {
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: deployer.address,
         to: wallet.address,
-        exitCode: Errors.WrongWorkchain as int32,
+        exitCode: Errors.WrongWorkchain,
     });
 }
 
@@ -148,7 +150,7 @@ get fun `test validation: wallet should reject internal transfer from unauthoriz
     expect(res).toHaveFailedTx<InternalTransferStep>({
         from: notDeployer.address,
         to: wallet.address,
-        exitCode: Errors.NotValidWallet as int32,
+        exitCode: Errors.NotValidWallet,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 }
@@ -173,7 +175,7 @@ get fun `test validation: minter accepts burn notification only from wallet`() {
     expect(res).toHaveFailedTx<BurnNotificationForMinter>({
         from: wrongSender.address,
         to: minter.address,
-        exitCode: Errors.NotValidWallet as int32,
+        exitCode: Errors.NotValidWallet,
     });
 
     val burn = wallet.sendAskToBurn(
@@ -210,7 +212,7 @@ get fun `test validation: minter cannot force burn tokens`() {
     expect(res).toHaveFailedTx<AskToBurn>({
         from: minter.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 
@@ -252,7 +254,7 @@ get fun `test validation: minter cannot force transfer tokens`() {
     expect(res).toHaveFailedTx<AskToTransfer>({
         from: minter.address,
         to: wallet.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(wallet.getJettonBalance()).toEqual(balanceBefore);
 

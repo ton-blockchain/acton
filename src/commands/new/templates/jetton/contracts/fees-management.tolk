@@ -39,7 +39,7 @@ fun forwardInitStateOverhead(): coins {
 }
 
 fun calcMinimalTransferAmount(forwardTonAmount: int, fwdFee: int): int {
-    val fwdCount = forwardTonAmount ? 2 : 1;
+    val fwdCount = forwardTonAmount != 0 ? 2 : 1;
 
     val jettonWalletGasConsumption = getPrecompiledGasConsumption();
     val sendTransferGasConsumption = (jettonWalletGasConsumption == null)

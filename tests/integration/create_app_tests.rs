@@ -1,82 +1,80 @@
-use crate::common::acton_exe;
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use std::fs;
-use std::process::Command;
 
 #[test]
-fn test_create_app_scaffolds_empty_ui_into_app_directory() {
-    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-    let output = Command::new(acton_exe())
-        .args(["--color", "never", "create-app"])
-        .current_dir(temp_dir.path())
-        .output()
-        .expect("failed to run acton create-app");
+fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
+    let project = ProjectBuilder::new("init-create-app")
+        .without_acton_toml()
+        .build();
 
-    assert!(
-        output.status.success(),
-        "acton create-app failed:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    let output = project.acton().init().arg("--create-dapp").run().success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.stdout.txt",
     );
 
-    let app_dir = temp_dir.path().join("app");
+    let app_dir = project.path().join("app");
+    assert!(!project.path().join("Acton.toml").exists());
     assert!(app_dir.join("package.json").is_file());
     assert!(app_dir.join("package-lock.json").is_file());
     assert!(app_dir.join("vite.config.ts").is_file());
     assert!(app_dir.join("app/src/App.tsx").is_file());
     assert!(app_dir.join("app/src/providers/AppProviders.tsx").is_file());
+    assert!(app_dir.join("app/src/styles.css").is_file());
+    assert!(app_dir.join(".prettierignore").is_file());
     assert!(!app_dir.join("node_modules").exists());
     assert!(!app_dir.join("dist").exists());
     assert!(!app_dir.join(".idea").exists());
 
-    let package_json = fs::read_to_string(app_dir.join("package.json"))
-        .expect("failed to read generated package.json");
-    assert!(package_json.contains("\"name\": \"ton-dapp-template\""));
+    output.assert_file_snapshot_matches(
+        "app/package.json",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.package.json",
+    );
+    output.assert_file_snapshot_matches(
+        "app/README.md",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.readme.md",
+    );
+    output.assert_file_snapshot_matches(
+        "app/.github/workflows/ci.yml",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.ci.yml",
+    );
 }
 
 #[test]
-fn test_create_app_scaffolds_empty_ui_into_custom_directory() {
-    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-    let output = Command::new(acton_exe())
-        .args(["--color", "never", "create-app", "frontend"])
-        .current_dir(temp_dir.path())
-        .output()
-        .expect("failed to run acton create-app frontend");
+fn test_init_create_app_scaffolds_empty_ui_into_custom_directory() {
+    let project = ProjectBuilder::new("init-create-app-custom")
+        .without_acton_toml()
+        .build();
 
-    assert!(
-        output.status.success(),
-        "acton create-app frontend failed:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    let output = project
+        .acton()
+        .init()
+        .arg("--create-dapp=frontend")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_custom_directory.stdout.txt",
     );
 
-    let app_dir = temp_dir.path().join("frontend");
+    let app_dir = project.path().join("frontend");
+    assert!(!project.path().join("Acton.toml").exists());
     assert!(app_dir.join("package.json").is_file());
     assert!(app_dir.join("vite.config.ts").is_file());
     assert!(app_dir.join("app/src/App.tsx").is_file());
-    assert!(!temp_dir.path().join("app").exists());
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("cd frontend"));
+    assert!(!project.path().join("app").exists());
 }
 
 #[test]
-fn test_create_app_rejects_existing_app_directory() {
-    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-    fs::create_dir(temp_dir.path().join("app")).expect("failed to create existing app dir");
+fn test_init_create_app_rejects_existing_app_directory() {
+    let project = ProjectBuilder::new("init-create-app-existing")
+        .without_acton_toml()
+        .build();
+    fs::create_dir(project.path().join("app")).expect("failed to create existing app dir");
 
-    let output = Command::new(acton_exe())
-        .args(["--color", "never", "create-app"])
-        .current_dir(temp_dir.path())
-        .output()
-        .expect("failed to run acton create-app");
-
-    assert!(
-        !output.status.success(),
-        "acton create-app unexpectedly succeeded:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    let output = project.acton().init().arg("--create-dapp").run().failure();
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/create_app/test_init_create_app_rejects_existing_app_directory.stderr.txt",
     );
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Directory app already exists"));
+    assert!(!project.path().join("Acton.toml").exists());
 }

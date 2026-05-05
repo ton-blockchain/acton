@@ -16,7 +16,7 @@ use tolk_syntax::{HasName, Ident, LambdaParameter, Parameter, TryFromNode, VarDe
 /// ```tolk twoslash
 /// fun main() {
 ///     val x = 1;
-///     //  ^ E002: variable is unused
+///     //  ^ E001: variable is unused
 ///     println("hello");
 /// }
 /// ```

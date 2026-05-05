@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ action metadata includes code and library updates [TIME]
+    └─ Test output:
+       N/A -> deployer A
+       └── empty 0.2 TON -> simple B                                                   gas=3018 aborted action_result_code=37
+           ├── account created
+           ├── Action phase failed
+           ├── Description: Not enough Toncoin
+           ├── Re-run with --backtrace full to get actions location
+           └── Executed actions:
+               ├── set code                                             
+               ├── change library ADD_PUBLIC                            
+               └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
+
+ ✓ 1 passed in 1 file

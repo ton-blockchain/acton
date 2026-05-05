@@ -1,4 +1,6 @@
-use acton_config::schema::{ACTON_SCHEMA_JSON, MUTATION_RULES_SCHEMA_JSON};
+use acton_config::schema::{
+    ACTON_SCHEMA_JSON, LINT_REPORT_SCHEMA_JSON, MUTATION_RULES_SCHEMA_JSON,
+};
 use anyhow::Result;
 use clap::ValueEnum;
 use std::io::{self, Write};
@@ -7,6 +9,8 @@ use std::io::{self, Write};
 pub enum BuiltinSchema {
     #[value(name = "acton-toml", alias = "acton")]
     ActonToml,
+    #[value(alias = "lint-json")]
+    LintReport,
     #[value(alias = "custom-mutation-rules")]
     MutationRules,
 }
@@ -15,6 +19,7 @@ impl BuiltinSchema {
     const fn content(self) -> &'static str {
         match self {
             Self::ActonToml => ACTON_SCHEMA_JSON,
+            Self::LintReport => LINT_REPORT_SCHEMA_JSON,
             Self::MutationRules => MUTATION_RULES_SCHEMA_JSON,
         }
     }

@@ -1,4 +1,4 @@
-warning[E010]: identifier marked as unused is used
+warning[E008]: identifier marked as unused is used
   --> [ROOT]/contracts/main[LINE]
   |
 2 |             fun foo(_value: int): int {
@@ -20,4 +20,4 @@ help: rename `_value` to `value`
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E010
+For example: acton check --explain E008

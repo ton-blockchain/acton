@@ -1,6 +1,6 @@
 use crate::type_formatter::TypeFormatter;
 use crate::type_substitutor::TypeSubstitutor;
-use crate::types::*;
+use crate::types::{AddressKind, IntTy, TyData};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use tolk_resolver::file_index::SymbolId;
@@ -652,8 +652,9 @@ impl TypeInterner {
                 ur.iter()
                     .all(|&variant| self.can_rhs_be_assigned(lhs, variant))
             }
-            (TyData::Int(IntTy::IntN { .. }), TyData::Int(IntTy::Int))
-            | (TyData::Int(IntTy::VarIntN { .. }), TyData::Int(IntTy::Int)) => true,
+            (TyData::Int(IntTy::IntN { .. } | IntTy::VarIntN { .. }), TyData::Int(IntTy::Int)) => {
+                true
+            }
             (
                 TyData::Int(IntTy::IntN {
                     size: sl,
@@ -855,7 +856,7 @@ impl TypeInterner {
             // int as Color (all enums are integer)
             // bool as int
             // bool as intN (not uint)
-            (TyData::Int(_), TyData::Int(_))
+            (TyData::Int(_) | TyData::Enum { .. }, TyData::Int(_))
             | (TyData::Int(_), TyData::Enum { .. })
             | (TyData::Bool { .. }, TyData::Int(IntTy::Int))
             | (
@@ -868,13 +869,8 @@ impl TypeInterner {
             // `slice` to `address`
             // `any_address` as `address` and any other casts are ok
             // all enums are integers, they can be `as` cast to each other
-            | (TyData::Slice, TyData::Bits { .. })
-            | (TyData::Slice, TyData::Bytes { .. })
-            | (TyData::Slice, TyData::Address(_))
-            | (TyData::Address(_), TyData::Slice)
-            | (TyData::Address(_), TyData::Bits { .. })
-            | (TyData::Address(_), TyData::Address(_))
-            | (TyData::Enum { .. }, TyData::Int(_))
+            | (TyData::Slice, TyData::Bits { .. } | TyData::Bytes { .. } | TyData::Address(_))
+            | (TyData::Address(_), TyData::Slice | TyData::Bits { .. } | TyData::Address(_))
             | (TyData::Enum { .. }, TyData::Enum { .. })
             // `[int, int]` as `tuple`
             | (TyData::Tuple(_), TyData::UntypedTuple)

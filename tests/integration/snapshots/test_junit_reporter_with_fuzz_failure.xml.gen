@@ -5,11 +5,17 @@
             <property name="file.path" value="[ROOT]/tests/test.test.tolk"/>
         </properties>
         <testcase name="test fuzz fails with inputs" classname="test.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toEqual(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/test.test[LINE]
+            <failure message="expect(&lt;actual&gt;).toEqual(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/test.test[LINE]
 Fuzz seed: 17
 Fuzz runs: 2
 Fuzz case: 1/2
-Inputs: value=0</failure>
+Inputs: value=0
+expect(actual).toEqual(expected)
+(
+    0,
+    1
+)
+at tests/test.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>

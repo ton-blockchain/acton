@@ -1,7 +1,7 @@
 use crate::integration::check::run_rule_test;
 use function_name::named;
 
-const RULE_CODE: &str = "E034";
+const RULE_CODE: &str = "E028";
 
 fn run_simple_test(content: &str, name: &str) {
     run_rule_test("throw_requires_errors_enum", RULE_CODE, content, name);

@@ -19,7 +19,7 @@ use tolk_ty::InferenceResult;
 /// ### Example
 /// ```tolk twoslash
 /// outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
-/// //          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E021: send with dangerous mode requires safety comment
+/// //          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E016: send with dangerous mode requires safety comment
 /// ```
 ///
 /// Use instead:

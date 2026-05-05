@@ -1,0 +1,18 @@
+Error: Baseline test suite failed before mutation testing. Fix failing tests or adjust the mutation test selection.
+
+Running tests
+
+ TEST  [ROOT]
+
+ > tests/mutation.test.tolk (1 test)
+  ✗ baseline fails [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            1,
+            2
+        )
+      └─ at tests/mutation.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -140,7 +140,7 @@ pub struct ReplayerDebugSession {
     stop_requested: bool,
     /// Parent step state must survive nested child VM stepping.
     active_step_start: Option<StepFramePosition>,
-    /// Set after child VM returns when the parent may first land on active_step_start.
+    /// Set after child VM returns when the parent may first land on `active_step_start`.
     skip_active_step_start_once: bool,
 }
 
@@ -267,35 +267,25 @@ impl ReplayerDebugSession {
                 .cloned()
                 .ok_or_else(|| anyhow!("Unknown frame id {frame_id}"))?;
             if let Some(locals) = locator.snapshot_locals {
-                let source_map_context = self
-                    .contexts
-                    .get(locator.context_idx)
-                    .and_then(|ctx| ctx.try_borrow().ok());
-                return evaluate_expression(
-                    &locals,
-                    source_map_context
-                        .as_ref()
-                        .map(|ctx| ctx.replayer.source_map()),
-                    expression,
-                );
+                return evaluate_expression(&locals, expression);
             }
             let Some(ctx) = self.contexts.get(locator.context_idx) else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let Ok(ctx) = ctx.try_borrow() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let locals = ctx.replayer.locals_for_frame(locator.depth_from_top);
-            evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            evaluate_expression(&locals, expression)
         } else {
             let Some(ctx) = self.active_context() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let Ok(ctx) = ctx.try_borrow() else {
-                return evaluate_expression(&[], None, expression);
+                return evaluate_expression(&[], expression);
             };
             let locals = ctx.replayer.locals_for_frame(0);
-            evaluate_expression(&locals, Some(ctx.replayer.source_map()), expression)
+            evaluate_expression(&locals, expression)
         }
     }
 
@@ -546,10 +536,10 @@ impl ReplayerDebugSession {
         let Some(top_frame) = call_stack.last() else {
             return false;
         };
-        let file_id = top_frame.definition_loc.as_ref().map_or_else(
-            || ctx.replayer.current_file_id(),
-            tolk_compiler::source_map::SrcRange::file_id,
-        );
+        let Some(definition_loc) = top_frame.definition_loc.as_ref() else {
+            return true;
+        };
+        let file_id = definition_loc.file_id();
         let Some(path) = ctx.replayer.file_full_path(file_id) else {
             return true;
         };
@@ -1198,7 +1188,7 @@ impl ReplayerDebugSession {
         let Ok(mut replayer) = TolkReplayer::new_live_vm(source_map.as_ref(), spec.executor) else {
             return Ok(false);
         };
-        replayer.set_compiler_abi(spec.compiler_abi);
+        replayer.set_abi(spec.abi);
         replayer.set_exception_breakpoints(self.exception_mode);
 
         // Freeze the currently visible parent frames before switching active context.

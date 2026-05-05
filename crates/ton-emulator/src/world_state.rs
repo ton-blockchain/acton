@@ -5,7 +5,8 @@
 //! TON network (mainnet or testnet).
 
 use acton_config::config::ActonConfig;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
+use base64::Engine;
 use num_traits::cast::ToPrimitive;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,13 @@ impl AccountsState {
         match self {
             Self::Local(r) => r.update(address, account),
             Self::Remote(r) => r.update(address, account),
+        }
+    }
+
+    /// Invalidates cached remote accounts. Local state is left untouched.
+    pub fn invalidate_remote_cache(&mut self) {
+        if let Self::Remote(r) = self {
+            r.invalidate_cache();
         }
     }
 
@@ -177,6 +185,10 @@ impl RemoteSnapshotCache {
     pub fn insert(&self, key: RemoteCacheKey, val: ShardAccount) {
         self.inner.borrow_mut().insert(key, val);
     }
+
+    pub fn clear(&self) {
+        self.inner.borrow_mut().clear();
+    }
 }
 
 /// A state implementation that fetches missing accounts from a remote network.
@@ -216,13 +228,13 @@ impl RemoteAccountState {
             return acc.clone();
         }
 
-        match self.resolve_remote_account(address, current_lt) {
+        match self.resolve_remote_account(address) {
             Ok(acc) => {
                 self.accounts.insert(address.clone(), acc.clone());
                 acc
             }
             Err(err) => {
-                eprintln!("Failed to resolve address {address} for account {current_lt}: {err}");
+                eprintln!("Failed to resolve address {address}: {err}");
 
                 // don't cache account on error
                 ShardAccount {
@@ -239,11 +251,12 @@ impl RemoteAccountState {
         self.accounts.insert(address.clone(), account);
     }
 
-    fn resolve_remote_account(
-        &self,
-        address: &StdAddr,
-        current_lt: u64,
-    ) -> anyhow::Result<ShardAccount> {
+    fn invalidate_cache(&mut self) {
+        self.accounts.clear();
+        self.cache.clear();
+    }
+
+    fn resolve_remote_account(&self, address: &StdAddr) -> anyhow::Result<ShardAccount> {
         // return cached version if it already resolved earlier in current suite
         let cache_key = RemoteCacheKey {
             fork_block_number: self.fork_block_number,
@@ -254,9 +267,19 @@ impl RemoteAccountState {
             return Ok(cached);
         }
 
-        let info = self
-            .api_client()?
-            .get_account_info(self.fork_block_number, &address.to_string())?;
+        let api_client = self.api_client()?;
+        if let Ok(cell) =
+            api_client.get_shard_account_cell(self.fork_block_number, &address.to_string())
+        {
+            let acc = cell
+                .parse::<ShardAccount>()
+                .context("Failed to parse getShardAccountCell response as ShardAccount")?;
+            self.cache.insert(cache_key, acc.clone());
+            return Ok(acc);
+        }
+
+        // Fallback to previous method
+        let info = api_client.get_account_info(self.fork_block_number, &address.to_string())?;
 
         let balance = info
             .balance
@@ -277,16 +300,22 @@ impl RemoteAccountState {
             }
         };
 
+        let last_trans_lt = info.last_transaction_id.lt.parse::<u64>()?;
+        // TonCenter returns the transaction start LT. AccountStorage stores the
+        // end LT, which is not available in v2, so use the minimal valid value.
+        let storage_last_trans_lt = last_trans_lt.saturating_add(1);
+        let last_trans_hash = decode_toncenter_hash(&info.last_transaction_id.hash)?;
+
         let acc = ShardAccount {
             account: Lazy::new(&OptionalAccount(Some(Account {
                 balance: CurrencyCollection::new(balance),
                 address: IntAddr::Std(address.clone()),
-                last_trans_lt: info.last_transaction_id.lt.parse()?,
+                last_trans_lt: storage_last_trans_lt,
                 state: account_state,
                 storage_stat: StorageInfo::default(),
             })))?,
-            last_trans_hash: HashBytes::ZERO,
-            last_trans_lt: current_lt.to_u64().unwrap_or(0),
+            last_trans_hash,
+            last_trans_lt,
         };
         self.cache.insert(cache_key, acc.clone());
         Ok(acc)
@@ -306,6 +335,19 @@ impl RemoteAccountState {
             .get()
             .ok_or_else(|| anyhow!("Failed to initialize Ton API client"))
     }
+}
+
+pub(crate) fn decode_toncenter_hash(hash: &str) -> anyhow::Result<HashBytes> {
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(hash)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(hash))
+        .map_err(|err| anyhow!("Invalid TonCenter transaction hash '{hash}': {err}"))?;
+    let len = decoded.len();
+    let bytes: [u8; 32] = decoded
+        .try_into()
+        .map_err(|_| anyhow!("TonCenter transaction hash must be 32 bytes, got {len}"))?;
+
+    Ok(HashBytes(bytes))
 }
 
 /// The main entry point for interacting with the emulated world state.
@@ -434,12 +476,19 @@ impl WorldState {
 
     /// Retrieves an account by its address, fetching it from the source if necessary.
     pub fn get_account(&mut self, addr: &StdAddr) -> ShardAccount {
-        self.accounts_state.retrieve(addr, self.current_lt)
+        let account = self.accounts_state.retrieve(addr, self.current_lt);
+        self.current_lt = self.current_lt.max(account.last_trans_lt);
+        account
     }
 
     /// Updates an account's data in the world state.
     pub fn update_account(&mut self, addr: &StdAddr, account: &ShardAccount) {
         self.accounts_state.update(addr, account.clone());
+    }
+
+    /// Clears cached remote accounts so subsequent reads refetch live network state.
+    pub fn invalidate_remote_cache(&mut self) {
+        self.accounts_state.invalidate_remote_cache();
     }
 
     /// Increments and returns the current logical time.
@@ -604,5 +653,78 @@ impl WorldState {
             .clone()
             .ok_or_else(|| anyhow!("Config has no root"))?;
         Ok(Cow::Owned(Boc::encode_base64(root)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_address(seed: u8) -> StdAddr {
+        StdAddr {
+            anycast: None,
+            workchain: 0,
+            address: HashBytes([seed; 32]),
+        }
+    }
+
+    fn empty_shard_account() -> ShardAccount {
+        ShardAccount {
+            account: Lazy::new(&OptionalAccount(None)).expect("empty account should serialize"),
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        }
+    }
+
+    #[test]
+    fn get_account_advances_logical_time_past_loaded_account_lt() {
+        let address = test_address(3);
+        let mut account = empty_shard_account();
+        account.last_trans_lt = 74118931000008;
+        let mut state = WorldState::new(
+            AccountsState::Local(LocalAccountsState {
+                accounts: FxHashMap::from_iter([(address.clone(), account)]),
+            }),
+            None,
+        )
+        .unwrap();
+
+        state.get_account(&address);
+
+        assert_eq!(state.get_lt(), 74118932000008);
+    }
+
+    #[test]
+    fn remote_cache_invalidation_clears_local_and_shared_caches() {
+        let cache = RemoteSnapshotCache::new();
+        let address = test_address(1);
+        let account = empty_shard_account();
+        let cache_key = RemoteCacheKey {
+            fork_block_number: None,
+            fork_net: Network::Testnet,
+            address: address.clone(),
+        };
+
+        let mut remote = RemoteAccountState::new(Network::Testnet, None, cache.clone());
+        remote.accounts.insert(address, account.clone());
+        cache.insert(cache_key.clone(), account);
+
+        remote.invalidate_cache();
+
+        assert!(remote.accounts.is_empty());
+        assert!(cache.get(&cache_key).is_none());
+    }
+
+    #[test]
+    fn local_cache_invalidation_keeps_local_accounts() {
+        let address = test_address(2);
+        let account = empty_shard_account();
+        let mut state = AccountsState::Local(LocalAccountsState {
+            accounts: FxHashMap::from_iter([(address.clone(), account)]),
+        });
+
+        state.invalidate_remote_cache();
+
+        assert!(state.accounts().contains_key(&address));
     }
 }

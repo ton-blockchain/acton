@@ -16,7 +16,7 @@ use tolk_syntax::{CONTRACT_ENTRYPOINTS, HasName, TopLevel};
 /// ### Example
 /// ```tolk twoslash
 /// fun onInternalMessage(in: InMessage) {
-/// //  ^^^^^^^^^^^^^^^^^ E031: contract defines entrypoints but is missing a `contract` header
+/// //  ^^^^^^^^^^^^^^^^^ E025: contract defines entrypoints but is missing a `contract` header
 ///     // ...
 /// }
 /// ```

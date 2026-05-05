@@ -9,7 +9,7 @@ DICTPUSHCONST 19 [
         }
         IFJMP
         DUP
-        SDBEGINSQ x{7e8764efa_}
+        SDBEGINSQ x{7E8764EF}
         PUSHCONT {
             NIP
             PUSHCTR c4
@@ -29,7 +29,7 @@ DICTPUSHCONST 19 [
             POPCTR c4
         }
         IFJMP
-        SDBEGINSQ x{3a752f06a_}
+        SDBEGINSQ x{3A752F06}
         NIP
         PUSHCONT {
             DROP
@@ -39,7 +39,7 @@ DICTPUSHCONST 19 [
             DROP
             NEWC
             STSLICE
-            STSLICECONST x{}
+            STSLICECONST x{00000000}
             ENDC
             POPCTR c4
         }

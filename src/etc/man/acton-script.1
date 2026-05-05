@@ -23,7 +23,7 @@ Path to the script file to execute.
 .sp
 \fIargs\fR\[u2026]
 .RS 4
-Arguments passed through to the script.
+Arguments parsed against the \fBmain()\fR ABI and passed to the script.
 .RE
 .sp
 \fB\-\-verbose\fR
@@ -77,6 +77,26 @@ Historical block sequence number to fork from.
 .RS 4
 Broadcast to the selected network. If omitted, the script runs in emulation
 mode. Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
+.RE
+.sp
+\fB\-\-tonconnect\fR
+.RS 4
+Use TON Connect wallet approval for broadcast messages.
+.sp
+This opens a local browser page, connects a wallet, and sends \fBnet.send(...)\fR
+messages through that wallet instead of loading local wallet mnemonics.
+The TON Connect session is saved under \fBbuild/sessions/tonconnect/<network>.json\fR and
+reused by later runs in the same project. Currently supported only with
+\fB\-\-net mainnet\fR or \fB\-\-net testnet\fR\&.
+.RE
+.sp
+\fB\-\-tonconnect\-port\fR \fIport\fR
+.RS 4
+Local TON Connect page port. Defaults to \fB52258\fR\&.
+.sp
+Acton keeps this port stable so injected wallets can recognize the same local
+dApp on later runs. If the default port is busy, pass another port explicitly
+and keep using the same value for that project.
 .RE
 .sp
 \fB\-\-explorer\fR \fIname\fR
@@ -135,9 +155,17 @@ A Tolk script defines a \fBmain()\fR function and runs as an isolated execution.
 \h'-04'\(bu\h'+03'\fB\-\-net\fR sends real transactions using configured wallets
 .RE
 .sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-net ... \-\-tonconnect\fR sends real transactions through the connected TON Connect wallet
+.RE
+.sp
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local \fBwallets.toml\fR entries overriding
-\fBglobal.wallets.toml\fR on name conflicts.
+\fBglobal.wallets.toml\fR on name conflicts. With \fB\-\-tonconnect\fR, any
+\fBscripts.wallet("name")\fR call resolves to the connected wallet address.
+Acton saves the TON Connect session in \fBbuild/sessions/tonconnect/<network>.json\fR, so
+the next script run can restore the wallet connection without asking the user
+to connect again.
 .SH "ARGUMENT FORWARDING"
 Arguments after \fB_path_\fR are passed through to the script runtime.
 .sp
@@ -149,6 +177,35 @@ the script arguments:
 acton script scripts/query.tolk \-\- \-\-net\-like\-value
 .fi
 .RE
+.SH "SCRIPT ARGUMENTS"
+Forwarded arguments are parsed against the ABI for \fBmain()\fR\&.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the number of CLI arguments must exactly match the \fBmain()\fR parameters
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'integers use Tolk integer literal syntax such as \fB42\fR, \fB\-1\fR, \fB0xff\fR, and \fB0b1010\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBbool\fR accepts \fBtrue\fR and \fBfalse\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'nullable supported types accept \fBnull\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcell\fR, \fBslice\fR, and \fBbitsN\fR accept plain BoC hex without \fBC{}\fR or \fBCS{}\fR prefixes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
+.RE
+.sp
+Unsupported parameter types currently include \fBstructs\fR, \fBtuple\fR, \fBmap\fR,
+\fBdict\fR, \fBbuilder\fR, \fBany_address\fR and other complex types.
 .SH "SIDE EFFECTS"
 \fBacton script\fR always compiles and executes the selected script. With
 \fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution
@@ -232,6 +289,16 @@ TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainne
 .RS 4
 .nf
 acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Broadcast through TON Connect instead of local wallet keys:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-net testnet \-\-tonconnect
 .fi
 .RE
 .RE

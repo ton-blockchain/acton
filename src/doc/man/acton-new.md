@@ -14,7 +14,7 @@ Create a new Acton project in the given directory.
 
 The command creates the target directory if it does not exist, copies the
 selected template scaffold, writes starter project files such as `Acton.toml`,
-`.env`, `.editorconfig`, and `.gitignore`, installs the bundled standard
+`.env.example`, `.editorconfig`, and `.gitignore`, installs the bundled standard
 library, and optionally initializes Git hooks and `AGENTS.md` guidance.
 
 If `_path_` already exists as a directory, `acton new` fails instead of trying
@@ -63,11 +63,6 @@ Counter contract template with:
 - CI workflow
 - optional `AGENTS.md`
 
-This template also supports the optional TypeScript app layout with `--app`.
-
-With `--app`, Acton also creates a Vite-based React app, a generated
-TypeScript wrapper, and top-level npm metadata files.
-
 ### jetton
 
 Jetton minter and wallet template with:
@@ -87,6 +82,25 @@ NFT collection and item template with:
 - deployment scripts
 - CI workflow
 - optional `AGENTS.md`
+
+### w5-extension
+
+Wallet V5 extension contract and subscription example template with:
+
+- the extension contract and shared types
+- vendored Wallet V5 sources for end-to-end testing
+- extension and Wallet V5 wrappers
+- integration tests for install, payment, and cancellation flows
+- deploy, install, and delete scripts
+- CI workflow
+- optional `AGENTS.md`
+
+All built-in templates support the optional TypeScript app layout with `--app`:
+`empty`, `counter`, `jetton`, `nft`, and `w5-extension`.
+
+With `--app`, Acton also creates a Vite-based React app and top-level npm
+metadata files. App templates with frontend contract flows also include
+generated TypeScript wrappers.
 
 ## Interactive Mode
 
@@ -119,7 +133,7 @@ The generated project always includes:
 
 - `Acton.toml`
 - `.acton/`
-- `.env`
+- `.env.example`
 - `.editorconfig`
 - `.gitignore`
 
@@ -136,14 +150,16 @@ Depending on the selected template and options, Acton may also generate:
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
 
-## Counter App Layout
+## TypeScript App Layout
 
-When `acton new --template counter --app` is used, the project includes:
+When `--app` is used with a template that supports the app layout, the project
+includes:
 
 - `contracts/src` for contract sources and shared Tolk types
 - `contracts/tests` for tests and generated Tolk wrappers
 - `contracts/scripts` for deployment and utility scripts
-- `wrappers-ts/` for the generated TypeScript wrapper used by the app
+- `wrappers-ts/` for generated TypeScript wrappers in app templates that call
+  contracts from the frontend
 - `app/` for the React + Vite frontend
 - top-level `package.json` and `package-lock.json` for the frontend toolchain
 
@@ -157,13 +173,15 @@ The generated app scaffold is a real frontend workspace, not just static demo
 files. After `npm ci`, use the usual frontend lifecycle commands from the
 generated `package.json` alongside normal Acton contract commands.
 
-Typical commands in that generated app workspace:
+Common commands in that generated app workspace:
 
 - `npm run dev` to start the Vite development server
-- `npm run build` to build both contracts and the frontend bundle
-- `npm run preview` to preview the production bundle locally
+- `npm run build` to build the frontend bundle; contract-aware app templates run
+  `acton build` first
 - `npm run typecheck` for TypeScript checking
-- `npm test` to run the bundled `acton test` command
+- `npm run fmt` and `npm run fmt:check` for frontend formatting
+- `npm test` to run the bundled `acton test` command when the template provides
+  it
 
 ## Side Effects
 
@@ -171,7 +189,8 @@ Typical commands in that generated app workspace:
 `.`, that means the current directory itself, and existing files with the same
 paths as template files can be overwritten.
 
-It also installs `.acton/tolk-stdlib` there, may create `.githooks/` plus an
+It also installs `.acton/tolk-stdlib` there unless
+`ACTON_DISABLE_AUTO_STDLIB=1` is set, may create `.githooks/` plus an
 `AGENTS.md` file when requested, and, when `git` is available, initializes the
 project repository and runs `git add .`, which stages all current-directory
 contents.
@@ -198,10 +217,10 @@ The command does not create a commit and does not modify parent directories.
    acton new my-project --name "My Project" --description "Cool description" --template counter --license MIT
    ```
 
-3. Create the counter template with the TypeScript app layout:
+3. Create a project with the TypeScript app layout:
 
    ```bash
-   acton new my-project --template counter --app
+   acton new my-project --template empty --app
    ```
 
 4. Create a project and include `AGENTS.md` guidance:

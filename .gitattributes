@@ -1,12 +1,17 @@
 * text=auto eol=lf
 
-acton.schema.json linguist-generated=true text=auto eol=lf
+# Generated schema
+crates/acton-config/schemas/*.json linguist-generated=true text=auto eol=lf
+
+# Docs
+docs linguist-documentation
 
 # Generated CLI command docs from `acton docgen`
 docs/content/docs/commands/*.mdx linguist-generated text=auto eol=lf
-docs/content/docs/standard_library/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/rules/*.mdx linguist-generated text=auto eol=lf
 docs/content/docs/standard_library/**/*.mdx linguist-generated text=auto eol=lf
-docs/content/docs/tolk_standard_library/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/standard_library/*.mdx linguist-generated text=auto eol=lf
 docs/content/docs/tolk_standard_library/**/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/tolk_standard_library/*.mdx linguist-generated text=auto eol=lf
 src/doc/man/generated_txt/*.txt linguist-generated text=auto eol=lf
 src/etc/man/*.1 linguist-generated text=auto eol=lf

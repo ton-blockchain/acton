@@ -1,0 +1,1 @@
+Error: Directory app already exists. Delete it before running `acton init --create-dapp`.
