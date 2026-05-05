@@ -8,12 +8,6 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 Use `acton wallet` to create, import, inspect, fund, export, sign with, and remove wallets used by Acton workflows. For the full command surface and every flag, see the [`acton wallet` reference](/docs/commands/wallet).
 
-<Callout type="info">
-  Testnet balance lookups and the post-airdrop balance wait use `TONCENTER_TESTNET_API_KEY`. Acton loads `.env` automatically, so keeping the key there is enough.
-
-  Do not commit `.env` files to a version control system or share it elsewhere.
-</Callout>
-
 ## Create a wallet
 
 Create a new wallet when a project needs a fresh mnemonic:
@@ -66,25 +60,35 @@ Acton merges wallet definitions from `global.wallets.toml` first and then from l
 
 ## Fund a wallet on testnet
 
-New wallets start with zero balance. Request testnet TON during creation:
+New wallets start with zero balance. To request testnet Toncoin, use the faucet provided by Acton. It works by performing a small cryptographic computation locally on device and confirming it with the [remote endpoint](https://faucet.ton.org).
+
+Acton faucet can give 2 testnet Toncoin twice within the 24 hour span for a single IP, device, and a wallet.
+
+<Callout>
+  To avoid local computational work and solve captcha instead, use the [Testgiver TON bot in Telegram](https://t.me/testgiver_ton_bot).
+
+  For larger allocations of up to 5000 Toncoin, submit a [request form](https://ton.org/dev/opportunities/testnet).
+</Callout>
+
+Add `--aidrop` to request testnet Toncoin during creation:
 
 ```bash
 acton wallet new --name deployer --local --airdrop
 ```
 
-Request testnet TON later for an existing wallet:
+Use the `aidrop` subcommand to request testnet Toncoin later for an existing wallet:
 
 ```bash
 acton wallet airdrop deployer --net testnet
 ```
 
-Skip the post-airdrop balance wait when only the faucet request matters:
+Skip the post-airdrop balance wait after a successful faucet airdrop request:
 
 ```bash
 acton wallet airdrop deployer --net testnet --no-wait-airdrop
 ```
 
-If the wallet name is omitted, Acton auto-selects the wallet only when exactly one wallet is configured. Otherwise it prompts on a TTY.
+If the wallet name is omitted, Acton auto-selects the wallet only when exactly one wallet is configured. Otherwise, it interactively prompts.
 
 ## Export a mnemonic
 
@@ -95,22 +99,6 @@ acton wallet export-mnemonic deployer
 ```
 
 This command is interactive-only and asks for confirmation before revealing the mnemonic.
-
-## Sign an external message body
-
-Use `acton wallet sign` to sign an external message body without writing a script:
-
-```bash
-acton wallet sign deployer --body <HEX_OR_BASE64_BOC>
-```
-
-When `--body` is omitted, Acton reads from stdin if input is piped, or prompts interactively otherwise:
-
-```bash
-cat body.boc.base64 | acton wallet sign deployer
-```
-
-Acton auto-detects hex and base64 input and prints the signed external-body BoC in hex by default.
 
 ## Remove a wallet
 
@@ -126,7 +114,7 @@ For non-interactive use, add `-y`:
 acton wallet remove deployer -y
 ```
 
-If the wallet uses keyring storage, Acton also removes the mnemonic from the secure store. If the wallet points to an environment variable or external file, Acton removes only the wallet entry.
+If the wallet uses keyring storage, Acton also removes the mnemonic from the secure store. If the wallet points to an [environment variable or external file](#choose-how-to-store-the-mnemonic), Acton removes only the wallet entry.
 
 ## Use a configured wallet in scripts
 
@@ -135,9 +123,10 @@ Resolve a configured wallet by name from a script:
 ```tolk title="deploy.tolk"
 import "@acton/emulation/scripts"
 import "@acton/io"
+import "@acton/prompts"
 
 fun main() {
-    val deployer = scripts.wallet("deployer");
+    val deployer = scripts.wallet(promptWallet());
     println("Deployer address: {}", deployer.address);
 }
 ```
@@ -150,6 +139,12 @@ acton script deploy.tolk --net testnet
 
 Without `--net`, `scripts.wallet()` creates a local test wallet with the same name. This makes it easy to exercise the script logic before broadcasting.
 
+To use a wallet from an external wallet service such as Tonkeeper, pass `--tonconnect` to connect to it through the TON Connect protocol:
+
+```bash
+acton script deploy.tolk --net testnet --tonconnect
+```
+
 ## Choose local or global storage
 
 Use local wallets for project-specific work and global wallets for identities shared across projects.
@@ -158,7 +153,7 @@ Use local wallets for project-specific work and global wallets for identities sh
 - Global wallets live in `~/.config/acton/wallets/global.wallets.toml`.
 - Local entries override global entries with the same name.
 
-When a project already has access to global wallets, Acton can place a `global.wallets.toml` symlink in the project root.
+When a project already has access to global wallets, Acton places the `global.wallets.toml` symlink in the project root.
 
 ## Choose how to store the mnemonic
 
@@ -225,3 +220,19 @@ address-testnet = "0QD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8ZLd"
 - Prefer `mnemonic-env` or `mnemonic-file` when plain-text config is not acceptable.
 - Avoid reusing the same wallet for unrelated environments.
 - Test scripts locally before using `--net testnet` or `--net mainnet`.
+
+## Sign an external message body
+
+Message bodies composed outside of Acton workflows can be signed via `acton wallet sign` without writing a script:
+
+```bash
+acton wallet sign deployer --body <HEX_OR_BASE64_BOC>
+```
+
+When `--body` is omitted, Acton reads from the standard input if input is piped, or prompts interactively otherwise:
+
+```bash
+cat body.boc.base64 | acton wallet sign deployer
+```
+
+BoC data in Base64 and hex formats always starts with the same sequence of characters, so Acton auto-detects hex and Base64 input, and prints the signed external-body BoC in hex by default.
