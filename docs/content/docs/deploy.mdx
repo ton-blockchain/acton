@@ -55,6 +55,7 @@ fun main() {
     val deployer = scripts.wallet(promptWallet("Select a wallet:"));
 
     val counter = Counter.fromStorage({
+        owner: deployer.address,
         id: 123,
         counter: 0,
     });
@@ -111,7 +112,7 @@ fun main() {
 ```
 
 <Callout>
-  In local emulation environments, calls to `.send()` instead of `.deploy` produce a complete trace.
+  In local emulation environments, transactions are instantaneous, and calls to `.deploy()` and `.send()` produce a complete trace right away.
 </Callout>
 
 Run the deployment script without `--net` to execute it locally:
@@ -130,7 +131,13 @@ Broadcast the deployment script to testnet with `--net testnet`:
 acton script scripts/deploy.tolk --net testnet
 ```
 
-In broadcast mode, `scripts.wallet()` resolves the named wallet from local `wallets.toml` or global `global.wallets.toml` wallet configuration. Select the funded testnet deployer wallet when prompted. When the `--tonconnect` flag is supplied, only the wallets connected through TON Connect can be selected.
+In broadcast mode, `scripts.wallet()` resolves the named wallet from local `wallets.toml` or global `global.wallets.toml` wallet configuration. Select the funded testnet deployer wallet when prompted.
+
+Supply the `--tonconnect` flag to select the wallets connected through TON Connect:
+
+```bash
+acton script scripts/deploy.tolk --net testnet --tonconnect
+```
 
 <Callout type="warn" title="API usage">
   Unlike local emulator runs, testnet and mainnet deployments call TON Center APIs to send external messages with deployment payloads to wallet contracts, call get methods, and confirm transaction and trace statuses.
@@ -146,7 +153,11 @@ Broadcast to mainnet only after the same script succeeds locally and on testnet:
 acton script scripts/deploy.tolk --net mainnet
 ```
 
-Select the mainnet deployer wallet when prompted. When the `--tonconnect` flag is supplied, only the wallets connected through TON Connect can be selected.
+Select the mainnet deployer wallet when prompted. When the `--tonconnect` flag is supplied, only the wallets connected through TON Connect can be selected:
+
+```bash
+acton script scripts/deploy.tolk --net mainnet --tonconnect
+```
 
 <Callout type="warn" title="Mainnet deployment">
   Mainnet deployment transfers real value and publishes the contract state permanently. Confirm the deployer wallet, deployment value, and initialization data before sending the transaction.
