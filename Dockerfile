@@ -7,6 +7,7 @@ RUN apt-get update \
         libgcc-s1 \
         libssl3 \
         libstdc++6 \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY dist/docker/acton /usr/local/bin/acton
