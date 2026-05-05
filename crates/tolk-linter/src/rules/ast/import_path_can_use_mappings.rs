@@ -15,7 +15,7 @@ use tolk_resolver::file_index::{FileId, Span};
 /// ### Example
 /// ```tolk twoslash
 /// import "../libs/math.tolk";
-/// //      ^^^^^^^^^^^^^^^^^ E018: import path can use mappings
+/// //      ^^^^^^^^^^^^^^^^^ S007: import path can use mappings
 /// ```
 ///
 /// Use instead:

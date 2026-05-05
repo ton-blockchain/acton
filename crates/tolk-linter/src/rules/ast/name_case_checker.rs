@@ -116,7 +116,7 @@ fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId
             span: symbol.name_span,
             message: Some(format!("not {case_name}: `{}`", symbol.name)),
             is_primary: true,
-            tags: vec![DiagnosticTag::Unnecessary],
+            tags: vec![],
         }])
         .with_fixes(vec![Fix {
             message: format!("rename to {case_name}: {correct_case}"),

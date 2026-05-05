@@ -27,6 +27,7 @@ struct FaucetMockResponse {
 struct CapturedRequest {
     method: String,
     path: String,
+    headers: Vec<(String, String)>,
     body: String,
 }
 
@@ -136,6 +137,7 @@ fn spawn_http_mock(
             let method = parts.next().unwrap_or_default().to_string();
             let path = parts.next().unwrap_or_default().to_string();
 
+            let mut headers = Vec::new();
             let mut content_length = 0_usize;
             loop {
                 let mut header_line = String::new();
@@ -156,6 +158,10 @@ fn spawn_http_mock(
                         .trim();
                     content_length = len_value.parse().unwrap_or(0);
                 }
+
+                if let Some((name, value)) = header_line.split_once(':') {
+                    headers.push((name.trim().to_string(), value.trim().to_string()));
+                }
             }
 
             let mut request_body = Vec::<u8>::new();
@@ -172,6 +178,7 @@ fn spawn_http_mock(
                 .push(CapturedRequest {
                     method: method.clone(),
                     path: path.clone(),
+                    headers,
                     body: String::from_utf8_lossy(&request_body).into_owned(),
                 });
 
@@ -327,16 +334,19 @@ fn status_text(status: u16) -> &'static str {
 }
 
 fn append_localnet_port(project_path: &Path, port: u16) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r"
 
 [localnet]
 port = {port}
 "
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet port");
 }
 
@@ -378,6 +388,13 @@ fn parse_address_balance(address_information: &Value) -> u128 {
                 serde_json::to_string_pretty(address_information).unwrap_or_default()
             )
         })
+}
+
+fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
 }
 
 #[test]
@@ -1298,6 +1315,16 @@ fn test_wallet_airdrop_claim_request_contains_challenge_nonce_and_address() {
             .as_str()
             .is_some_and(|address| !address.is_empty()),
         "address must be non-empty string"
+    );
+    assert!(claim_body.get("device_uid").is_none());
+    assert!(
+        header_value(&claim_request.headers, "x-device-uid")
+            .is_some_and(|uid| !uid.trim().is_empty()),
+        "x-device-uid header must be a non-empty string"
+    );
+    assert_eq!(
+        header_value(&claim_request.headers, "user-agent"),
+        Some(acton::build_info::user_agent())
     );
 }
 

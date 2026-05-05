@@ -1,12 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   TonConnectButton,
-  useAddress,
-  useAppKitTheme,
-  useBalance,
-  useNetwork,
-  useSendTransaction,
-} from '@ton/appkit-react';
+  THEME,
+  useTonAddress,
+  useTonConnectUI,
+  useTonWallet,
+} from '@tonconnect/ui-react';
 import {
   Calculator,
   Check,
@@ -47,11 +46,12 @@ import {
 import {
   formatAddressForNetwork,
   setTonNetworkMode,
-  TON_NETWORK,
+  TON_CHAIN,
   TON_NETWORK_MODE,
   TONSCAN_ADDRESS_URL,
   type TonNetworkMode,
 } from './lib/ton';
+import { useWalletBalance } from './lib/wallet';
 
 type PendingAction = 'deploy' | 'increase' | 'decrease' | 'fetch' | null;
 type Theme = 'dark' | 'light';
@@ -73,10 +73,12 @@ const initialCounterValueState: CounterValueState = {
 };
 
 export default function App() {
-  const walletAddress = useAddress();
-  const walletBalance = useBalance();
-  const walletNetwork = useNetwork();
-  const [, setAppKitTheme] = useAppKitTheme();
+  const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
+  const walletAddress = useTonAddress(false) || undefined;
+  const walletChain = wallet?.account.chain;
+  const walletBalance = useWalletBalance(walletAddress);
+  const [isWalletPromptOpen, setIsWalletPromptOpen] = useState(false);
 
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem('counter-theme');
@@ -99,8 +101,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('counter-theme', theme);
-    setAppKitTheme(theme);
-  }, [setAppKitTheme, theme]);
+    tonConnectUI.uiOptions = {
+      uiPreferences: {
+        theme: theme === 'light' ? THEME.LIGHT : THEME.DARK,
+      },
+    };
+  }, [theme, tonConnectUI]);
 
   const preview = useMemo(() => {
     if (!walletAddress) {
@@ -129,21 +135,26 @@ export default function App() {
     }
 
     try {
-      return formatAddressForNetwork(
-        walletAddress,
-        walletNetwork?.chainId ?? TON_NETWORK.chainId,
-      );
+      return formatAddressForNetwork(walletAddress, walletChain ?? TON_CHAIN);
     } catch {
       return walletAddress;
     }
-  }, [walletAddress, walletNetwork]);
+  }, [walletAddress, walletChain]);
 
-  const { mutateAsync: sendTransaction, isPending: isWalletPromptOpen } =
-    useSendTransaction();
+  async function sendTransaction(
+    request: Parameters<typeof tonConnectUI.sendTransaction>[0],
+  ) {
+    setIsWalletPromptOpen(true);
+    try {
+      return await tonConnectUI.sendTransaction(request);
+    } finally {
+      setIsWalletPromptOpen(false);
+    }
+  }
+
   const walletReady = Boolean(walletAddress);
   const walletNetworkMismatch =
-    walletNetwork !== undefined &&
-    walletNetwork.chainId !== TON_NETWORK.chainId;
+    walletChain !== undefined && walletChain !== TON_CHAIN;
   const busy = pendingAction !== null || isWalletPromptOpen;
 
   async function fetchCounter(addressValue: string) {
@@ -310,19 +321,6 @@ export default function App() {
             </div>
             Counter dApp
           </div>
-          <nav
-            className="flex gap-0.5 p-[3px] h-10 rounded-full items-center max-sm:h-9"
-            style={{ background: theme === 'light' ? '#F0F1F3' : '#19191B' }}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full px-4 h-[34px] text-[15px] font-bold max-sm:h-[30px] max-sm:px-3.5 max-sm:text-[13px] bg-[#0098EA] text-white hover:bg-[#0098EA] hover:text-white"
-              type="button"
-            >
-              Counter
-            </Button>
-          </nav>
         </div>
 
         <div className="flex items-center gap-2.5">

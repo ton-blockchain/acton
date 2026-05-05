@@ -17,7 +17,7 @@ pub mod analysis;
 /// ```tolk twoslash
 /// fun main(a: int, b: int, c: int): int {
 ///     return a / b * c;
-///     //     ^^^^^^^^^ E025: division before multiplication may cause precision loss
+///     //     ^^^^^^^^^ E019: division before multiplication may cause precision loss
 /// }
 /// ```
 ///

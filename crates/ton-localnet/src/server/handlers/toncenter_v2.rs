@@ -1,7 +1,11 @@
 use super::utils::{get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
-use crate::server::models::*;
+use crate::server::models::{
+    AddressRequest, DetectHashRequest, GetAddressInformationRequest, GetBlockRequest,
+    GetConfigAllRequest, GetConfigParamRequest, GetLibrariesRequest, GetTransactionsRequest,
+    LookupBlockRequest, RunGetMethodRequest, SendBocRequest, TryLocateTxRequest,
+};
 use crate::types::Hash256;
 use axum::{
     Json,
@@ -105,6 +109,17 @@ pub async fn get_extended_address_information(
     handle_result(
         node.get_address_information(payload.address, payload.seqno),
         v2::map_extended_account_state,
+    )
+    .await
+}
+
+pub async fn get_shard_account_cell(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<GetAddressInformationRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.get_shard_account_cell(payload.address, payload.seqno),
+        v2::map_shard_account_cell,
     )
     .await
 }

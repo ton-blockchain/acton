@@ -1,4 +1,4 @@
-Build the specified contract or all contracts
+Build one contract or every contract
 
 Usage: acton[EXE] build [OPTIONS] [CONTRACT_NAME]
 
@@ -13,6 +13,7 @@ Options:
       --out-dir <DIR>         Output directory for build artifacts (default: build/)
       --project-root <PATH>   Path to project root
       --gen-dir <DIR>         Output directory for generated dependency files (default: gen/)
+      --output-abi <DIR>      Directory to save contract ABI JSON files (default: build/abi/)
       --output-fift <DIR>     Directory to save compiled Fift files
       --info                  Show compiled contract info
   -h, --help                  Print help

@@ -29,6 +29,16 @@ Check formatting without rewriting files.
 .sp
 In this mode Acton prints diffs for mismatches and exits non\-zero.
 .RE
+.sp
+\fB\-\-range\fR \fIstartLine:startChar\-endLine:endChar\fR
+.RS 4
+Format only the specified zero\-based source range.
+.sp
+This is intended for editor integrations that format a selected region. Lines
+are zero\-based, and \fBstartChar\fR / \fBendChar\fR are zero\-based UTF\-8 byte columns.
+Editor integrations that expose Unicode scalar or UTF\-16 positions need to
+convert them before invoking Acton.
+.RE
 .SS "Display Options"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -85,6 +95,15 @@ and absolute paths
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-check\fR prints a unified diff with three lines of context for each changed
 file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-range\fR keeps nodes outside the specified range unchanged and disables
+import reordering for that invocation
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-range\fR can only be used with one explicit \fB\&.tolk\fR file path
 .RE
 .SH "CONFIGURATION"
 \fBacton fmt\fR reads defaults from \fB[fmt]\fR in \fBActon.toml\fR:
@@ -198,6 +217,16 @@ acton \-\-project\-root ../my\-project fmt \-\-check
 .RS 4
 .nf
 acton fmt contracts/main.tolk \-\-check
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Format only a selected source range:
+.sp
+.RS 4
+.nf
+acton fmt contracts/main.tolk \-\-range 2:4\-5:1
 .fi
 .RE
 .RE

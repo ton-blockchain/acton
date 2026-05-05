@@ -3,6 +3,7 @@ use crate::support::TestOutputExt;
 use crate::support::compilation::{CompilationOrder, extract_compiled_contracts};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
+use acton::stdlib::DISABLE_AUTO_STDLIB_ENV;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tycho_types::boc::Boc;
@@ -69,6 +70,28 @@ fn test_build_ensure_latest_uses_project_root_from_nested_directory() {
     assert!(
         !nested_stdlib.exists(),
         "stdlib must not be installed in nested cwd"
+    );
+}
+
+#[test]
+fn test_build_respects_disable_auto_stdlib_env() {
+    let project = ProjectBuilder::new("build-disable-auto-stdlib")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let output = project
+        .acton()
+        .build()
+        .env(DISABLE_AUTO_STDLIB_ENV, "1")
+        .run()
+        .success();
+
+    assert!(
+        !project.path().join(".acton").exists(),
+        "build should not create .acton when {DISABLE_AUTO_STDLIB_ENV}=1"
+    );
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_build_respects_disable_auto_stdlib_env.stdout.txt",
     );
 }
 

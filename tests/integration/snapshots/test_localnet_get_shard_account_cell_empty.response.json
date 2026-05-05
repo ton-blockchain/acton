@@ -1,0 +1,26 @@
+{
+  "empty_http": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "@type": "tvm.cell",
+      "bytes": "te6ccgEBAgEALgABUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAFA"
+    }
+  },
+  "empty_json_rpc": {
+    "@extra": "[EXTRA]",
+    "id": "1",
+    "jsonrpc": "2.0",
+    "ok": true,
+    "result": {
+      "@type": "tvm.cell",
+      "bytes": "te6ccgEBAgEALgABUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAFA"
+    }
+  },
+  "invalid_address": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "Invalid address, only standard internal address is allowed",
+    "ok": false
+  }
+}

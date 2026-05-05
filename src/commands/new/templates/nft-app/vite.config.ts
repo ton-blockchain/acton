@@ -10,11 +10,11 @@ export default defineConfig({
   root: 'app',
   envDir: projectRoot,
   envPrefix: ['VITE_', 'TONCENTER_'],
-  plugins: [tailwindcss(), react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(projectRoot, 'app/src'),
       '@wrappers': path.resolve(projectRoot, 'wrappers-ts'),
+      '@': path.resolve(projectRoot, 'app/src'),
     },
   },
   build: {
@@ -23,22 +23,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes('node_modules')) {
-            return undefined;
-          }
-
-          if (id.includes('/react/') || id.includes('/react-dom/')) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('/react/') || id.includes('/react-dom/'))
             return 'react';
-          }
-
-          if (id.includes('/@ton/ton/') || id.includes('/@ton/core/')) {
+          if (id.includes('/@ton/ton/') || id.includes('/@ton/core/'))
             return 'ton-sdk';
-          }
-
-          if (id.includes('/@tonconnect/')) {
-            return 'tonconnect';
-          }
-
+          if (id.includes('/@tonconnect/')) return 'tonconnect';
           return undefined;
         },
       },
@@ -48,7 +38,6 @@ export default defineConfig({
     fs: {
       allow: ['.', path.resolve(projectRoot, 'wrappers-ts')],
     },
-    host: '0.0.0.0',
     port: 5173,
   },
 });

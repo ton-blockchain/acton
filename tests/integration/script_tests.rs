@@ -1,11 +1,13 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
-    spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
+    ToncenterV2MockResponse, append_custom_network, format_captured_requests,
+    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture,
+    toncenter_v2_account_info_ok_response, toncenter_v2_error_response,
     toncenter_v2_seqno_ok_response,
 };
 
+use base64::Engine;
 use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -135,6 +137,10 @@ fun main() {
         return;
     }
 
+    println("TRACE_OUTPUT_BEGIN");
+    println(trace);
+    println("TRACE_OUTPUT_END");
+
     val receiverCount: int = net.runGetMethod(receiverAddress, "received");
     println("TRACE_READY=true");
     println("RECEIVER_COUNT={}", receiverCount);
@@ -213,6 +219,59 @@ fun main() {
     println("RECEIVER_CONTRACT={}", receiverAddress);
 }
 "#;
+
+const FORK_LOCALNET_DEPLOY_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
 const REMOTE_GLOBAL_VERSION: u32 = 777;
 const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
 
@@ -388,6 +447,8 @@ keys = {{ mnemonic-file = "mnemonic.txt" }}
 }
 
 fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let (v2_url, v3_url) = if let Some(root_url) = base_url.strip_suffix("/api/v2") {
         (format!("{root_url}/api/v2"), format!("{root_url}/api/v3"))
     } else {
@@ -396,13 +457,14 @@ fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 
@@ -446,6 +508,104 @@ fn wait_until_address_state_active(
         );
         thread::sleep(Duration::from_millis(200));
     }
+}
+
+fn latest_localnet_seqno(node: &crate::support::localnet::LocalnetHandle) -> u64 {
+    let response = node.get_json("/api/v2/getMasterchainInfo");
+    response["result"]["last"]["seqno"]
+        .as_u64()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected getMasterchainInfo result.last.seqno in response:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            )
+        })
+}
+
+fn fork_localnet_trigger_script(forwarder_address: &str, receiver_address: &str) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: address("__FORWARDER_ADDRESS__"),
+        body: TriggerForward {
+            target: address("__RECEIVER_ADDRESS__"),
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 30, 100);
+    if (trace == null) {
+        println("TRIGGER_TRACE_NULL");
+        return;
+    }
+
+    println("BROADCAST_TRIGGERED=true");
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+}
+
+fn fork_localnet_trace_script(
+    forwarder_address: &str,
+    receiver_address: &str,
+    expected_before: u32,
+    expected_after: u32,
+) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val forwarder = address("__FORWARDER_ADDRESS__");
+    val receiver = address("__RECEIVER_ADDRESS__");
+    val sender = testing.treasury("fork_sender");
+
+    val before: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_BEFORE={}", before);
+    if (before != __EXPECTED_BEFORE__) {
+        throw 9101;
+    }
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarder,
+        body: TriggerForward {
+            target: receiver,
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 3, 1);
+    if (trace == null) {
+        println("FORK_TRACE_NULL");
+        return;
+    }
+
+    println("FORK_TRACE_BEGIN");
+    println(trace);
+    println("FORK_TRACE_END");
+
+    val after: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_AFTER={}", after);
+    if (after != __EXPECTED_AFTER__) {
+        throw 9102;
+    }
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+    .replace("__EXPECTED_BEFORE__", &expected_before.to_string())
+    .replace("__EXPECTED_AFTER__", &expected_after.to_string())
 }
 
 #[test]
@@ -648,6 +808,130 @@ fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
 }
 
 #[test]
+fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract() {
+    let project = ProjectBuilder::new("script-send-result-abi-from-address")
+        .mapping("@acton", "../lib")
+        .file(
+            "contracts/script_remote_messages",
+            r"
+struct (0xF8200001) ScriptRemotePing {
+    queryId: uint64
+}
+",
+        )
+        .contract(
+            "script_remote_sink",
+            r#"
+import "script_remote_messages"
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract ScriptRemoteSink {
+    incomingMessages: ScriptRemotePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptRemotePing.fromSlice(in.body);
+    throw Errors.NotOwner;
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "prepare_remote",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val sender = testing.treasury("remote_prepare_sender");
+    val init = ContractState {
+        code: build("script_remote_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    if (!testing.saveSnapshot("world-state.json")) {
+        println("SAVE_FAILED");
+        return;
+    }
+
+    println("REMOTE_SINK={}", sinkAddress);
+}
+"#,
+        )
+        .script_file(
+            "send_remote",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../wrappers/ScriptRemoteSink.gen"
+
+fun main(sinkAddress: address) {
+    if (!testing.loadSnapshot("world-state.json")) {
+        println("LOAD_FAILED");
+        return;
+    }
+
+    val sender = testing.treasury("remote_call_sender");
+    val sink = ScriptRemoteSink.fromAddress(sinkAddress);
+    val txs = sink.sendScriptRemotePing(sender.address, 7, { value: ton("0.1") });
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("script_remote_sink")
+        .run()
+        .success();
+
+    let prepare_output = project
+        .acton()
+        .script("scripts/prepare_remote.tolk")
+        .run()
+        .success();
+    let remote_address = prepare_output
+        .get_stdout()
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("REMOTE_SINK=")
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .expect("prepare script must print remote sink address");
+
+    project
+        .acton()
+        .script("scripts/send_remote.tolk")
+        .arg(&remote_address)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_file_not_found() {
     let project = ProjectBuilder::new("script-not-found").build();
 
@@ -724,7 +1008,127 @@ fn test_script_with_args() {
 }
 
 #[test]
-fn test_script_missing_args_uses_main_definition_for_backtrace() {
+fn test_script_accepts_hyphenated_trailing_args() {
+    let project = ProjectBuilder::new("script-hyphenated-args")
+        .script_file(
+            "args",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/args.tolk")
+        .arg("--dry-run")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_accepts_hyphenated_trailing_args.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_with_tolk_number_formats() {
+    let project = ProjectBuilder::new("script-number-formats")
+        .script_file(
+            "numbers",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: int, b: int, c: int) {
+                println("sum: {}", a + b + c);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/numbers.tolk")
+        .arg("0xFF_FF")
+        .arg("0b_1010")
+        .arg("1_000")
+        .run()
+        .success()
+        .assert_contains("sum: 66545");
+}
+
+#[test]
+fn test_script_typed_args_print_stdout_snapshot() {
+    let project = ProjectBuilder::new("script-typed-args-output")
+        .script_file(
+            "typed",
+            r#"
+            import "../../lib/io"
+
+            fun main(i: int, flag: bool, text: string, owner: address, state: cell, data: slice, maybe: int?) {
+                println("int: {}", i);
+                println("bool: {}", flag);
+                println("string: {}", text);
+                println("address: {}", owner);
+
+                var stateSlice = state.beginParse();
+                println("cell: {}", stateSlice.loadUint(32));
+                println("slice: {}", data.loadUint(32));
+                println("nullable: {}", maybe);
+            }
+        "#,
+        )
+        .build();
+
+    let mut state_builder = CellBuilder::new();
+    state_builder.store_uint(123, 32).ok();
+    let state_cell = state_builder.build().ok().unwrap_or_default();
+    let state_hex = Boc::encode_hex(state_cell);
+
+    let mut data_builder = CellBuilder::new();
+    data_builder.store_uint(456, 32).ok();
+    let data_cell = data_builder.build().ok().unwrap_or_default();
+    let data_hex = Boc::encode_hex(data_cell);
+
+    project
+        .acton()
+        .script("scripts/typed.tolk")
+        .arg("0x2a")
+        .arg("true")
+        .arg(r#""hello\n\"world\"""#)
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .arg(&state_hex)
+        .arg(&data_hex)
+        .arg("null")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_typed_args_print_stdout_snapshot.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_bool_arg_rejects_numeric_alias() {
+    let project = ProjectBuilder::new("script-bool-numeric-arg")
+        .script_file(
+            "bool",
+            r"
+            fun main(flag: bool) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/bool.tolk")
+        .arg("0")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_missing_args_reports_count_error() {
     let project = ProjectBuilder::new("script-missing-args")
         .script_file(
             "args",
@@ -741,123 +1145,386 @@ fn test_script_missing_args_uses_main_definition_for_backtrace() {
         )
         .build();
 
-    let output = project
+    project
         .acton()
         .script("scripts/args.tolk")
         .with_backtrace("full")
         .run()
-        .failure();
-
-    output
-        .assert_contains("Script finished with exit code 2")
-        .assert_contains("at scripts/args.tolk:")
-        .assert_contains("Backtrace:")
-        .assert_contains("main")
-        .assert_not_contains("unknown-file");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_missing_args_reports_count_error.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_tuple_args() {
-    let project = ProjectBuilder::new("script-tuple-args")
+fn test_script_extra_args_reports_count_error() {
+    let project = ProjectBuilder::new("script-extra-args")
         .script_file(
-            "tuple",
+            "args",
+            r"
+            fun main(a: int, b: int) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/args.tolk")
+        .arg("10")
+        .arg("20")
+        .arg("30")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_extra_args_reports_count_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_arg_type_mismatch_reports_type_error() {
+    let project = ProjectBuilder::new("script-arg-type-mismatch")
+        .script_file(
+            "cell",
+            r"
+            fun main(a: cell) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/cell.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_map_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-map-arg")
+        .script_file(
+            "map",
+            r"
+            fun main(items: map<int32, int32>) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_map_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_dict_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-dict-arg")
+        .script_file(
+            "dict",
+            r"
+            fun main(items: dict) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/dict.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_dict_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_unknown_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-array-args")
+        .script_file(
+            "array",
+            r"
+            fun main(t: array<unknown>) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/array.tolk")
+        .arg("[10 20]")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_arg_print_stdout_snapshot() {
+    let project = ProjectBuilder::new("script-array-output")
+        .script_file(
+            "array",
             r#"
             import "../../lib/io"
 
-            fun main(t: tuple) {
-                val a = t.get(0) as int;
-                val b = t.get(1) as int;
-                println("Tuple A:");
-                println(a);
-                println("Tuple B:");
-                println(b);
+            fun main(items: array<int>) {
+                println("size: {}", items.size());
+                println("first: {}", items.get(0));
+                println("second: {}", items.get(1));
+                println("sum: {}", items.get(0) + items.get(1) + items.get(2));
             }
         "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/array.tolk")
+        .arg("[10 20 30]")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_array_arg_print_stdout_snapshot.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_unknown_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-unknown-cell-arg")
+        .script_file(
+            "unknown",
+            r"
+            fun main(value: unknown) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/unknown.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tuple_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-tuple-arg")
+        .script_file(
+            "tuple",
+            r"
+            fun main(t: tuple) {}
+        ",
         )
         .build();
 
     project
         .acton()
         .script("scripts/tuple.tolk")
-        .arg("[(10 20)]")
+        .arg("[10 20]")
         .run()
-        .success()
-        .assert_contains("Tuple A:")
-        .assert_contains("10")
-        .assert_contains("Tuple B:")
-        .assert_contains("20");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_tensor_args_and_struct() {
-    let project = ProjectBuilder::new("script-tensor-args")
+fn test_script_lisp_list_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-lisp-list-arg")
         .script_file(
-            "tensor",
-            r#"
-            import "../../lib/io"
+            "list",
+            r"
+            fun main(items: lisp_list<int>) {}
+        ",
+        )
+        .build();
 
+    project
+        .acton()
+        .script("scripts/list.tolk")
+        .arg("[1 [2 null]]")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-struct-arg")
+        .script_file(
+            "item",
+            r"
             struct Abc {
                 a: int,
                 b: int,
                 c: int,
             }
 
-            fun main(a: Abc) {
-                println("a: {}", a.a);
-                println("b: {}", a.b);
-                println("c: {}", a.c);
-            }
-
-        "#,
+            fun main(a: Abc) {}
+        ",
         )
         .build();
 
     project
         .acton()
-        .script("scripts/tensor.tolk")
-        .arg("[ 10 20 30 ]")
+        .script("scripts/item.tolk")
+        .arg("10")
         .run()
-        .success()
-        .assert_contains("a: 10")
-        .assert_contains("b: 20")
-        .assert_contains("c: 30");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_struct_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
-fn test_script_with_args_and_struct() {
-    let project = ProjectBuilder::new("script-tensor-args")
+fn test_script_nullable_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-nullable-struct-arg")
         .script_file(
-            "tensor",
-            r#"
-            import "../../lib/io"
+            "item",
+            r"
+            struct Foo {
+                a: int32,
+            }
 
+            fun main(a: Foo?) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/item.tolk")
+        .arg("null")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_array_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-array-struct-arg")
+        .script_file(
+            "item",
+            r"
+            struct Foo {
+                a: int32,
+            }
+
+            fun main(items: array<Foo>) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/item.tolk")
+        .arg("[]")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_struct_flat_args_reports_count_error() {
+    let project = ProjectBuilder::new("script-struct-flat-args")
+        .script_file(
+            "item",
+            r"
             struct Abc {
                 a: int,
                 b: int,
                 c: int,
             }
 
-            fun main(a: Abc) {
-                println("a: {}", a.a);
-                println("b: {}", a.b);
-                println("c: {}", a.c);
-            }
-
-        "#,
+            fun main(a: Abc) {}
+        ",
         )
         .build();
 
     project
         .acton()
-        .script("scripts/tensor.tolk")
+        .script("scripts/item.tolk")
         .arg("10")
         .arg("20")
         .arg("30")
         .run()
-        .success()
-        .assert_contains("a: 10")
-        .assert_contains("b: 20")
-        .assert_contains("c: 30");
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_struct_flat_args_reports_count_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_alias_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-alias-arg")
+        .script_file(
+            "alias",
+            r"
+            type ItemId = int;
+
+            fun main(id: ItemId) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/alias.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_alias_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_nested_struct_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-nested-struct-arg")
+        .script_file(
+            "nested",
+            r"
+            struct Inner {
+                value: int,
+            }
+
+            struct Outer {
+                inner: Inner,
+            }
+
+            fun main(arg: Outer) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/nested.tolk")
+        .arg("10")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
+        );
 }
 
 #[test]
@@ -918,7 +1585,7 @@ fn test_script_with_cell_arg() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("C{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .run()
         .success()
         .assert_contains("a: 999");
@@ -948,14 +1615,121 @@ fn test_script_with_slice_arg() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("CS{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .run()
         .success()
         .assert_contains("a: 999");
 }
 
 #[test]
-#[ignore]
+fn test_script_with_bits_arg() {
+    let project = ProjectBuilder::new("script-bits-args")
+        .script_file(
+            "bits",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: bits12) {
+                var slice = a as slice;
+                println("a: {}", slice.loadUint(12));
+            }
+
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(0xabc, 12).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/bits.tolk")
+        .arg(&cell_hex)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/test_script_with_bits_arg.stdout.txt");
+}
+
+#[test]
+fn test_script_builder_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-builder-args")
+        .script_file(
+            "builder",
+            r"
+            fun main(a: builder) {}
+
+        ",
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(999, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/builder.tolk")
+        .arg(&cell_hex)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_builder_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_any_address_arg_reports_unsupported_type() {
+    let project = ProjectBuilder::new("script-any-address-arg")
+        .script_file(
+            "address",
+            r"
+            fun main(a: any_address) {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/address.tolk")
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_cell_arg_rejects_prefixed_hex() {
+    let project = ProjectBuilder::new("script-cell-prefixed-arg")
+        .script_file(
+            "cell",
+            r"
+            fun main(a: cell) {}
+        ",
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(999, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/cell.tolk")
+        .arg(&format!("C{{{cell_hex}}}"))
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
+        );
+}
+
+#[test]
 fn test_script_with_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(
@@ -963,7 +1737,7 @@ fn test_script_with_string_arg() {
             r#"
             import "../../lib/io"
 
-            fun main(a: slice) {
+            fun main(a: string) {
                 println("a: {}", a);
             }
 
@@ -974,22 +1748,21 @@ fn test_script_with_string_arg() {
     project
         .acton()
         .script("scripts/string.tolk")
-        .arg(r#""hello world""#)
+        .arg("hello world")
         .run()
         .success()
         .assert_contains("a: hello world");
 }
 
 #[test]
-#[ignore]
-fn test_script_with_long_string_arg() {
+fn test_script_with_escaped_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(
             "string",
             r#"
             import "../../lib/io"
 
-            fun main(a: slice) {
+            fun main(a: string) {
                 println("a: {}", a);
             }
 
@@ -997,14 +1770,37 @@ fn test_script_with_long_string_arg() {
         )
         .build();
 
-    let string = "hello world ".repeat(1000);
     project
         .acton()
         .script("scripts/string.tolk")
-        .arg(&format!("\"{string}\""))
+        .arg(r#""hello\n\"world\"\\tail""#)
         .run()
         .success()
-        .assert_contains(&format!("a: {string}"));
+        .assert_contains("a: hello\n\"world\"\\tail");
+}
+
+#[test]
+fn test_script_with_address_arg() {
+    let project = ProjectBuilder::new("script-address-args")
+        .script_file(
+            "address",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: address) {
+                println("a: {}", a);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/address.tolk")
+        .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .run()
+        .success()
+        .assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]
@@ -1065,7 +1861,7 @@ fn test_script_to_calculate_storage_fee() {
     project
         .acton()
         .script("scripts/cell.tolk")
-        .arg(&format!("C{{{cell_hex}}}"))
+        .arg(&cell_hex)
         .arg(&(60 * 60 * 24 * 365).to_string())
         .run()
         .success()
@@ -2040,7 +2836,6 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2")
         .run()
@@ -2069,7 +2864,6 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account")
         .run()
@@ -2098,7 +2892,6 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("localnet")
         .run()
@@ -2229,6 +3022,7 @@ fun main() {
         .success();
     let counter_address = extract_marker_value(&deploy_output.get_stdout(), "COUNTER_ADDRESS=");
     wait_until_address_state_active(&node, &counter_address, Duration::from_secs(12));
+    let fork_block_number = latest_localnet_seqno(&node).to_string();
 
     fs::write(
         project.path().join("scripts/query_counter.tolk"),
@@ -2250,9 +3044,173 @@ fun main() {{
         .acton()
         .script("scripts/query_counter.tolk")
         .verify_network("localnet")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number)
         .run()
         .success()
         .assert_contains("On-chain counter: 7");
+
+    node.stop();
+}
+
+#[test]
+fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
+    let last_hash_bytes = [0x33_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 202, &last_hash_b64),
+    ]);
+
+    let script = r#"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val shard = scripts.fetchShardAccount(address("__REMOTE_ADDRESS__"));
+    if (shard == null) {
+        println("SCRIPT_FORK_SHARD_NULL");
+        return;
+    }
+
+    println("SCRIPT_FORK_LAST_LT={}", shard!.lastTransLt);
+}
+"#
+    .replace(
+        "__REMOTE_ADDRESS__",
+        "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
+    );
+
+    let project = ProjectBuilder::new("script-fork-block-number-forwarded")
+        .script_file("fork_block_query", &script)
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-remote-block",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/fork_block_query.tolk")
+        .fork_net("custom:script-remote-block")
+        .arg("--fork-block-number")
+        .arg("654321")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("script-fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured script fork-block request log");
+    output.assert_file_snapshot_matches(
+        "script-fork-block-requests.txt",
+        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace() {
+    let project = build_localnet_wait_project(
+        "script-fork-localnet-explicit-block-trace",
+        "deploy_fork_targets",
+        FORK_LOCALNET_DEPLOY_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_fork_targets.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    let deploy_stdout = deploy_output.get_stdout();
+    let forwarder_address = extract_marker_value(&deploy_stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&deploy_stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    let deploy_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_deploy_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 1, 2),
+    )
+    .expect("failed to write fork trace script for deploy block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_deploy_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&deploy_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.deploy_block.stdout.txt",
+        );
+
+    fs::write(
+        project.path().join("scripts/broadcast_trigger.tolk"),
+        fork_localnet_trigger_script(&forwarder_address, &receiver_address),
+    )
+    .expect("failed to write broadcast trigger script");
+
+    project
+        .acton()
+        .script("scripts/broadcast_trigger.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .assert_contains("BROADCAST_TRIGGERED=true");
+
+    let triggered_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_triggered_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 2, 3),
+    )
+    .expect("failed to write fork trace script for triggered block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_triggered_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&triggered_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
+        );
 
     node.stop();
 }
@@ -2281,6 +3239,78 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_rejects_non_numeric_fork_block_number() {
+    let project = ProjectBuilder::new("script-invalid-fork-block")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("hello");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--fork-block-number")
+        .arg("not-a-seqno")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_rejects_non_numeric_fork_block_number.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tonconnect_requires_net() {
+    let project = ProjectBuilder::new("script-tonconnect-requires-net")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tonconnect_requires_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tonconnect_rejects_localnet() {
+    let project = ProjectBuilder::new("script-tonconnect-localnet")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .with_net("localnet")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_tonconnect_rejects_localnet.stderr.txt",
         );
 }
 
@@ -2386,7 +3416,6 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account-with-init")
         .run()
@@ -2419,7 +3448,6 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-wallet-rejection-with-init")
         .run()
@@ -3463,7 +4491,6 @@ fun main() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/show_config.tolk")
         .verify_network("custom:mock-v2-config")
         .run()

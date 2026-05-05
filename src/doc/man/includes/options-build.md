@@ -27,6 +27,12 @@ Directory for generated dependency helper files such as
 Defaults to `[build].gen-dir` when configured, otherwise `gen/`.
 {{/option}}
 
+{{#option "`--output-abi` _dir_" }}
+Directory for contract ABI JSON files.
+
+Defaults to `[build].output-abi` when configured, otherwise `build/abi/`.
+{{/option}}
+
 {{#option "`--output-fift` _dir_" }}
 Directory for compiled Fift output for `.tolk` contracts.
 

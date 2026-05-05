@@ -1,4 +1,5 @@
-import type {ContractABI} from "gen-typescript-from-tolk-dev/src/abi"
+import type {ABIStruct, ContractABI, Ty} from "gen-typescript-from-tolk-dev"
+import {SymTable} from "gen-typescript-from-tolk-dev"
 
 import {parseAddress} from "../components/utils"
 
@@ -30,100 +31,62 @@ export function buildMessageNamesByOpcodeNumber(
     return out
   }
 
-  const structDeclarations = new Map<string, Record<string, unknown>>()
-  const aliasDeclarations = new Map<string, Record<string, unknown>>()
-
-  for (const declaration of abi.declarations ?? []) {
-    const item = asRecord(declaration)
-    const kind = typeof item?.kind === "string" ? item.kind : undefined
-    const name = typeof item?.name === "string" ? item.name : undefined
-    if (!item || !kind || !name) {
-      continue
-    }
-    if (kind === "struct") {
-      structDeclarations.set(name, item)
-    } else if (kind === "alias") {
-      aliasDeclarations.set(name, item)
-    }
-  }
+  const symbols = new SymTable(
+    abi.declarations,
+    abi.unique_types,
+    abi.struct_instantiations,
+    abi.alias_instantiations,
+  )
 
   for (const message of abi[messageKey] ?? []) {
-    const bodyTy = asRecord(asRecord(message)?.body_ty)
-    if (!bodyTy) {
-      continue
-    }
-    collectMessageEntries(bodyTy, structDeclarations, aliasDeclarations, out, new Set())
+    collectMessageEntries(message.body_ty_idx, symbols, out, new Set())
   }
 
   return out
 }
 
 function collectMessageEntries(
-  bodyTy: Record<string, unknown>,
-  structDeclarations: Map<string, Record<string, unknown>>,
-  aliasDeclarations: Map<string, Record<string, unknown>>,
+  bodyTyIdx: number,
+  symbols: SymTable,
   out: Map<number, string>,
-  visitedAliases: Set<string>,
+  visitedTyIdx: Set<number>,
 ): void {
-  const kind = typeof bodyTy.kind === "string" ? bodyTy.kind : undefined
-  if (!kind) {
+  if (visitedTyIdx.has(bodyTyIdx)) {
     return
   }
+  visitedTyIdx.add(bodyTyIdx)
+
+  const bodyTy = tryTyByIdx(symbols, bodyTyIdx)
+  const kind = bodyTy?.kind
 
   switch (kind) {
     case "StructRef": {
-      const structName = typeof bodyTy.struct_name === "string" ? bodyTy.struct_name : undefined
-      if (!structName) {
-        return
-      }
-      const declaration = structDeclarations.get(structName)
-      const prefix = asRecord(declaration?.prefix)
+      const declaration = tryGetStruct(symbols, bodyTy.struct_name)
       const opcode = normalizeOpcodePrefix(
-        typeof prefix?.prefix_str === "string" ? prefix.prefix_str : undefined,
-        typeof prefix?.prefix_len === "number" ? prefix.prefix_len : undefined,
+        declaration?.prefix?.prefix_num,
+        declaration?.prefix?.prefix_len,
       )
       if (opcode !== undefined) {
-        out.set(opcode, structName)
+        out.set(opcode, bodyTy.struct_name)
       }
       return
     }
     case "AliasRef": {
-      const aliasName = typeof bodyTy.alias_name === "string" ? bodyTy.alias_name : undefined
-      if (!aliasName || visitedAliases.has(aliasName)) {
+      const targetTyIdx = tryAliasTargetTyIdx(symbols, bodyTyIdx)
+      if (targetTyIdx === undefined) {
         return
       }
-      visitedAliases.add(aliasName)
-      const declaration = aliasDeclarations.get(aliasName)
-      const targetTy = asRecord(declaration?.target_ty)
-      if (declaration && targetTy) {
-          collectMessageEntries(targetTy, structDeclarations, aliasDeclarations, out, visitedAliases)
-        }
-      visitedAliases.delete(aliasName)
+      collectMessageEntries(targetTyIdx, symbols, out, visitedTyIdx)
       return
     }
     case "union": {
-      const variants = Array.isArray(bodyTy.variants) ? bodyTy.variants : []
-      for (const variant of variants) {
-        const item = asRecord(variant)
-        const variantTy = asRecord(item?.variant_ty)
-        if (!item || !variantTy) {
-          continue
-        }
-        const opcode = normalizeOpcodePrefix(
-          typeof item.prefix_str === "string" ? item.prefix_str : undefined,
-          typeof item.prefix_len === "number" ? item.prefix_len : undefined,
-        )
-        const name = resolveMessageTypeName(variantTy, aliasDeclarations, new Set(visitedAliases))
+      for (const variant of bodyTy.variants) {
+        const opcode = normalizeOpcodePrefix(variant.prefix_num, variant.prefix_len)
+        const name = resolveMessageTypeName(variant.variant_ty_idx, symbols, new Set(visitedTyIdx))
         if (opcode !== undefined && name) {
           out.set(opcode, name)
         } else {
-          collectMessageEntries(
-            variantTy,
-            structDeclarations,
-            aliasDeclarations,
-            out,
-            new Set(visitedAliases),
-          )
+          collectMessageEntries(variant.variant_ty_idx, symbols, out, new Set(visitedTyIdx))
         }
       }
       return
@@ -131,17 +94,7 @@ function collectMessageEntries(
     case "nullable":
     case "cellOf":
     case "lispListOf": {
-      const inner = asRecord(bodyTy.inner)
-      if (!inner) {
-        return
-      }
-      collectMessageEntries(
-        inner,
-        structDeclarations,
-        aliasDeclarations,
-        out,
-        visitedAliases,
-      )
+      collectMessageEntries(bodyTy.inner_ty_idx, symbols, out, visitedTyIdx)
       return
     }
     default: {
@@ -151,34 +104,33 @@ function collectMessageEntries(
 }
 
 function resolveMessageTypeName(
-  bodyTy: Record<string, unknown>,
-  aliasDeclarations: Map<string, Record<string, unknown>>,
-  visitedAliases: Set<string>,
+  bodyTyIdx: number,
+  symbols: SymTable,
+  visitedTyIdx: Set<number>,
 ): string | undefined {
-  const kind = typeof bodyTy.kind === "string" ? bodyTy.kind : undefined
-  if (!kind) {
+  if (visitedTyIdx.has(bodyTyIdx)) {
     return undefined
   }
+  visitedTyIdx.add(bodyTyIdx)
+
+  const bodyTy = tryTyByIdx(symbols, bodyTyIdx)
+  const kind = bodyTy?.kind
 
   switch (kind) {
     case "StructRef": {
-      return typeof bodyTy.struct_name === "string" ? bodyTy.struct_name : undefined
+      return bodyTy.struct_name
     }
     case "AliasRef": {
-      const aliasName = typeof bodyTy.alias_name === "string" ? bodyTy.alias_name : undefined
-      if (!aliasName || visitedAliases.has(aliasName)) {
+      const targetTyIdx = tryAliasTargetTyIdx(symbols, bodyTyIdx)
+      if (targetTyIdx === undefined) {
         return undefined
       }
-      visitedAliases.add(aliasName)
-      const declaration = aliasDeclarations.get(aliasName)
-      const targetTy = asRecord(declaration?.target_ty)
-      return targetTy ? resolveMessageTypeName(targetTy, aliasDeclarations, visitedAliases) : undefined
+      return resolveMessageTypeName(targetTyIdx, symbols, visitedTyIdx)
     }
     case "nullable":
     case "cellOf":
     case "lispListOf": {
-      const inner = asRecord(bodyTy.inner)
-      return inner ? resolveMessageTypeName(inner, aliasDeclarations, visitedAliases) : undefined
+      return resolveMessageTypeName(bodyTy.inner_ty_idx, symbols, visitedTyIdx)
     }
     default: {
       return undefined
@@ -186,37 +138,35 @@ function resolveMessageTypeName(
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined
-}
-
-function normalizeOpcodePrefix(prefix?: string, prefixLen?: number): number | undefined {
-  if (!prefix || prefixLen !== 32) {
-    return undefined
-  }
-  return parseOpcode(prefix)
-}
-
-function parseOpcode(opcode: string): number | undefined {
-  const normalized = opcode.trim()
-  if (!normalized) {
-    return undefined
-  }
-
+function tryTyByIdx(symbols: SymTable, tyIdx: number): Ty | undefined {
   try {
-    const value =
-      normalized.startsWith("0x") || normalized.startsWith("0X")
-        ? Number.parseInt(normalized.slice(2), 16)
-        : Number.parseInt(normalized, 10)
-
-    if (!Number.isInteger(value) || value < 0 || value > 0xff_ff_ff_ff) {
-      return undefined
-    }
-
-    return value
+    return symbols.tyByIdx(tyIdx)
   } catch {
     return undefined
   }
+}
+
+function tryGetStruct(symbols: SymTable, structName: string): ABIStruct | undefined {
+  try {
+    return symbols.getStruct(structName)
+  } catch {
+    return undefined
+  }
+}
+
+function tryAliasTargetTyIdx(symbols: SymTable, tyIdx: number): number | undefined {
+  try {
+    return symbols.aliasTargetOf(tyIdx).ty_idx
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeOpcodePrefix(prefixNum?: number, prefixLen?: number): number | undefined {
+  if (prefixLen !== 32 || prefixNum === undefined) {
+    return undefined
+  }
+  return prefixNum
 }
 
 function formatOpcode(opcode: number): string {

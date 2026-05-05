@@ -19,7 +19,7 @@ pub mod analysis;
 /// ```tolk twoslash
 /// fun main() {
 ///     val x = random.uint256();
-///     //      ^^^^^^^^^^^^^^^^ E024: random generator must be initialized before `random.uint256`/`random.range` call
+///     //      ^^^^^^^^^^^^^^^^ E018: random generator must be initialized before `random.uint256`/`random.range` call
 /// }
 /// ```
 ///

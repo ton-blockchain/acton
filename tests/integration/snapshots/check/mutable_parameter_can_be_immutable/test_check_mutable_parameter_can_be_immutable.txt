@@ -1,4 +1,4 @@
-warning[E013]: parameter can be immutable
+warning[E009]: parameter can be immutable
   --> [ROOT]/contracts/main[LINE]
   |
 2 |             fun foo(mutate a: int): int {
@@ -14,4 +14,4 @@ help: remove `mutate`
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E013
+For example: acton check --explain E009

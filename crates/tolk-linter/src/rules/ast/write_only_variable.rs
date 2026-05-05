@@ -16,7 +16,7 @@ use tolk_resolver::resolve_index::LocalDefKind;
 /// ```tolk twoslash
 /// fun main() {
 ///     var x = 1;
-///     //  ^ E005: variable is only written to but never read
+///     //  ^ E004: variable is only written to but never read
 ///     x = 2;
 ///     println("hello");
 /// }

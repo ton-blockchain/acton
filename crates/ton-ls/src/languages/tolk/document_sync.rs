@@ -1,6 +1,6 @@
 use crate::backend::Backend;
-use crate::backend::utils::*;
-use lsp_types::*;
+use crate::backend::utils::{get_byte_offset, get_point, offset_to_lsp_pos};
+use lsp_types::DidChangeTextDocumentParams;
 use tower_lsp::lsp_types::Url;
 use tree_sitter::{InputEdit, Point, Range as TSRange};
 

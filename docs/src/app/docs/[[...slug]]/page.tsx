@@ -1,39 +1,53 @@
-import {getPageImage, source} from '@/lib/source';
+import {generateVisibleParams, getPageImage, source} from "@/lib/source"
 import {
   DocsBody,
   DocsDescription,
   DocsPage,
   PageLastUpdate,
   DocsTitle,
-} from 'fumadocs-ui/layouts/docs/page';
-import {notFound} from 'next/navigation';
-import {getMDXComponents} from '../../../../mdx-components';
-import type {Metadata} from 'next';
-import {createRelativeLink} from 'fumadocs-ui/mdx';
-import {LLMCopyButton, ViewOptions} from "@/components/page-actions";
-import {getLLMText} from "@/lib/get-llm-text";
+} from "fumadocs-ui/layouts/docs/page"
+import {getMDXComponents} from "@/lib/mdx-components"
+import type {Metadata} from "next"
+import {createRelativeLink} from "fumadocs-ui/mdx"
+import {LLMCopyButton, ViewOptions} from "@/components/page-actions"
+import {getLLMText} from "@/lib/get-llm-text"
+import {NotFound} from "@/components/layouts/not-found"
+import {getSuggestions} from "./suggestions"
 
 interface PageProps {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{slug?: string[]}>
 }
 
 export default async function Page(props: PageProps) {
-  const params = await props.params;
-  const page = source.getPage(params.slug);
-  if (!page) notFound();
+  const params = await props.params
+  const page = source.getPage(params.slug)
 
-  const { body: MDX, lastModified } = page.data;
+  if (!page) {
+    return (
+      <NotFound
+        getSuggestions={async () => (params.slug ? getSuggestions(params.slug.join(" ")) : [])}
+      />
+    )
+  }
 
-  const llmText = getLLMText(page);
+  const {body: MDX, lastModified} = page.data
+
+  const llmText = getLLMText(page)
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage
+      toc={page.data.toc}
+      full={page.data.full}
+      tableOfContent={{
+        style: "clerk",
+      }}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-2">{page.data.description}</DocsDescription>
       <div className="flex flex-row flex-wrap gap-2 items-center border-b pb-6">
-        <LLMCopyButton content={llmText}/>
+        <LLMCopyButton content={llmText} />
         <ViewOptions
-          markdownUrl={`${page.url}.mdx`}
+          markdownUrl={`/llms.mdx${page.url}.md`}
           githubUrl={`https://github.com/ton-blockchain/acton/blob/master/docs/content/docs/${page.path}`}
         />
       </div>
@@ -51,29 +65,33 @@ export default async function Page(props: PageProps) {
         </div>
       )}
     </DocsPage>
-  );
+  )
 }
 
 export async function generateStaticParams() {
-  return source.generateParams();
+  return generateVisibleParams()
 }
 
-export async function generateMetadata(
-  props: PageProps,
-): Promise<Metadata> {
-  const params = await props.params;
-  const page = source.getPage(params.slug);
-  if (!page) notFound();
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
+  const params = await props.params
+  const page = source.getPage(params.slug)
+
+  if (!page) {
+    return {
+      title: "Not Found",
+      metadataBase: new URL("https://ton-blockchain.github.io/acton"),
+    }
+  }
 
   return {
     title: page.data.title,
     description: page.data.description,
-    metadataBase: new URL('https://ton-blockchain.github.io/acton'),
+    metadataBase: new URL("https://ton-blockchain.github.io/acton"),
     openGraph: {
       images: getPageImage(page).url,
     },
     twitter: {
       images: getPageImage(page).url,
-    }
-  };
+    },
+  }
 }

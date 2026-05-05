@@ -1,6 +1,6 @@
 use crate::comments::CommentKind;
 use crate::pretty::RcDoc;
-use crate::{Context, comments};
+use crate::{Context, FormatRange, comments};
 use tree_sitter::Node;
 
 pub struct ListOptions<'a> {
@@ -129,6 +129,18 @@ where
                 current_group_start = i;
                 current_group_max_width = 0;
             }
+        }
+
+        if !should_format_node(ctx, &node) {
+            let doc = print_original_node_text_inline(ctx, &node);
+            item_docs_with_info.push(ItemDocInfo {
+                doc,
+                comments,
+                node,
+                ignored: false,
+                group_max_width: 0,
+            });
+            continue;
         }
 
         if comments::has_fmt_ignore(ctx, comments) {
@@ -267,10 +279,25 @@ pub fn print_original_node_text<'a>(ctx: &Context<'_>, node: &Node) -> RcDoc<'a>
 
     comments::print_leading_comments(ctx, &mut docs, comments);
 
+    docs.push(print_original_node_text_inline(ctx, node));
+
+    comments::print_inline_comments(ctx, &mut docs, comments);
+    docs.push(RcDoc::hardline());
+    comments::print_trailing_comments(ctx, &mut docs, comments);
+
+    RcDoc::concat(docs)
+}
+
+#[must_use]
+pub(crate) fn print_original_node_text_inline<'a>(ctx: &Context<'_>, node: &Node) -> RcDoc<'a> {
+    RcDoc::text(original_node_text(ctx, node))
+}
+
+fn original_node_text(ctx: &Context<'_>, node: &Node) -> String {
     let text = node.utf8_text(ctx.code.as_ref().as_ref()).unwrap_or("");
     let mut text = text.to_owned();
 
-    // semicolon is not a part of some nodes in the CST, so we need to add it manually if missing
+    // Semicolon is not a part of some CST nodes, so we need to add it manually if missing.
     let need_semicolon = matches!(
         node.kind(),
         "local_vars_declaration"
@@ -287,13 +314,34 @@ pub fn print_original_node_text<'a>(ctx: &Context<'_>, node: &Node) -> RcDoc<'a>
         text.push(';');
     }
 
-    docs.push(RcDoc::text(text));
+    text
+}
 
-    comments::print_inline_comments(ctx, &mut docs, comments);
-    docs.push(RcDoc::hardline());
-    comments::print_trailing_comments(ctx, &mut docs, comments);
+#[must_use]
+pub(crate) fn should_format_node(ctx: &Context<'_>, node: &Node) -> bool {
+    match ctx.options.range {
+        Some(range) => node_intersects_range(node, range),
+        None => true,
+    }
+}
 
-    RcDoc::concat(docs)
+fn node_intersects_range(node: &Node, range: FormatRange) -> bool {
+    let node_start = node.start_position();
+    let node_end = node.end_position();
+
+    if node_end.row < range.start.line
+        || (node_end.row == range.start.line && node_end.column <= range.start.character)
+    {
+        return false;
+    }
+
+    if node_start.row > range.end.line
+        || (node_start.row == range.end.line && node_start.column >= range.end.character)
+    {
+        return false;
+    }
+
+    true
 }
 
 #[must_use]

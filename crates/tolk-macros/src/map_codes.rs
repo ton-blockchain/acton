@@ -281,6 +281,10 @@ fn generate_iter_impl(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>)
 }
 
 /// Generate the `Rule` enum
+///
+/// ```
+/// // empty doctest
+/// ```
 fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_variants = quote!();
     let mut rule_fixable_match_arms = quote!();

@@ -1,7 +1,7 @@
 ACTON-RPC(1)
 
 NAME
-       acton-rpc — Inspect remote account state and decode contract storage
+       acton-rpc — Inspect remote chain and account state
 
 SYNOPSIS
        acton rpc [options] command
@@ -11,9 +11,15 @@ DESCRIPTION
 
        acton rpc is intended for fast inspection workflows when you want to:
 
+       o  fetch the latest masterchain block number for a network
+
+       o  inspect the latest masterchain block object returned by TonCenter
+
        o  check whether an account is active, frozen, or uninitialized
 
        o  inspect balance, last transaction metadata, and state hashes
+
+       o  render a TonCenter v3 trace as a decoded transaction tree
 
        o  match deployed code against a local Acton project by code_hash
 
@@ -61,6 +67,94 @@ SUBCOMMANDS
 
           If no local ABI match is found, Acton still prints the raw remote
           account information and reports that decoded storage is unavailable.
+
+   acton rpc block
+       Print the latest masterchain block info returned by TonCenter.
+
+      Synopsis
+          acton rpc block [options]
+
+      Options
+          --net network
+              Network to query.
+
+              Defaults to testnet.
+
+              Supported values include mainnet, testnet, localnet, and
+              custom:<name>.
+
+      Output
+          acton rpc block prints the full TonCenter getMasterchainInfo JSON
+          response for the selected network.
+
+   acton rpc block-number
+       Print the latest masterchain block number for a network.
+
+      Synopsis
+          acton rpc block-number [options]
+
+      Options
+          --net network
+              Network to query.
+
+              Defaults to testnet.
+
+              Supported values include mainnet, testnet, localnet, and
+              custom:<name>.
+
+      Output
+          acton rpc block-number prints only the latest masterchain block seqno
+          as a decimal number.
+
+   acton rpc trace
+       Fetch a TonCenter v3 trace by root transaction hash and render it in a
+       stable text format.
+
+      Synopsis
+          acton rpc trace [options] hash
+
+      Options
+          hash
+              Root transaction hash to query through TonCenter v3 /traces.
+
+          --net network
+              Network to query.
+
+              Defaults to testnet.
+
+              Supported values include mainnet, testnet, localnet, and
+              custom:<name>.
+
+          --summary
+              Print only the trace summary.
+
+          --tree
+              Print the trace summary and transaction tree. This is the default
+              mode.
+
+          --verbose
+              Print the summary, tree, and stable per-transaction fields.
+
+          --show-bodies
+              Print decoded message bodies in the transaction tree.
+
+      Output
+          acton rpc trace prints a short summary first:
+
+          o  query hash
+
+          o  trace id
+
+          o  root transaction hash
+
+          o  whether the trace is complete
+
+          o  total transaction and message counts
+
+          Tree and verbose modes then reuse the same transaction tree formatter
+          as Acton tests. When current account code matches a local contract in
+          the project, Acton prints local contract names through the local ABI.
+          Add --show-bodies to print decoded inbound message bodies.
 
 DISPLAY OPTIONS
        --color when
@@ -144,6 +238,18 @@ EXAMPLES
        4. Use a custom network defined in another manifest:
 
               acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
+
+       5. Print the latest mainnet masterchain block JSON:
+
+              acton rpc block --net mainnet
+
+       6. Print the latest mainnet masterchain block number:
+
+              acton rpc block-number --net mainnet
+
+       7. Print a transaction trace from localnet:
+
+              acton rpc trace <tx-hash> --net localnet
 
 SEE ALSO
        o  acton help disasm

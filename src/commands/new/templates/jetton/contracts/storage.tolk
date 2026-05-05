@@ -1,3 +1,5 @@
+import "@stdlib/strings"
+
 struct WalletStorage {
     jettonBalance: coins
     ownerAddress: address
@@ -43,9 +45,5 @@ struct JettonDataReply {
 }
 
 struct (0x00) OnchainMetadataReply {
-    contentDict: map<uint256, Cell<SnakeDataReply>>
-}
-
-struct (0x00) SnakeDataReply {
-    string: string
+    contentDict: map<uint256, string_prefixed0x>
 }

@@ -20,7 +20,7 @@ pub mod analysis;
 /// fun onInternalMessage(in: InMessage) {
 ///     val storage = lazy Storage.fromCell(contract.getData());
 ///     storage.save();
-///     //      ^^^^ E017: possible storage write without admin sender check
+///     //      ^^^^ E013: possible storage write without admin sender check
 /// }
 /// ```
 ///

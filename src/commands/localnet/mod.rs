@@ -191,7 +191,7 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
 }
 
 pub async fn localnet_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> anyhow::Result<()> {
-    let client = reqwest::Client::builder()
+    let client = crate::http::client_builder()
         .user_agent(crate::build_info::user_agent())
         .build()?;
     let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;

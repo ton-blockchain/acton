@@ -29,8 +29,6 @@ npm ci
 ```bash
 acton build
 acton test
-acton wrapper Counter
-acton wrapper Counter --ts
 npm run build
 npm run typecheck
 npm run fmt:check
@@ -44,9 +42,8 @@ npm run dev
 - `acton wrapper Counter --ts` regenerates `wrappers-ts/Counter.gen.ts`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
-- The app uses the same Vite + npm setup and shadcn/Tailwind UI layer as the
-  Jetton template.
-- `.env.example` shows the available env vars. Copy it to `.env` (gitignored)
-  and fill in your keys. Both Acton CLI and the Vite app read
-  `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY`; Vite allows the
-  `TONCENTER_` prefix via `envPrefix` in `vite.config.ts`.
+- The app uses Vite, npm, shadcn-style UI primitives, and Tailwind CSS.
+- Copy `.env.example` to a local `.env` for Toncenter keys. Both Acton CLI and
+  the Vite app read `TONCENTER_MAINNET_API_KEY` and
+  `TONCENTER_TESTNET_API_KEY`; Vite allows the `TONCENTER_` prefix via
+  `envPrefix` in `vite.config.ts`.

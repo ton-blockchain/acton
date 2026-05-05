@@ -14,11 +14,91 @@
 //!         cell("remaining 48 bytes")
 //! ```
 use crate::stack::{Tuple, TupleItem};
-use ton_abi::snake_string::{
-    build_snake_bytes_cell, parse_snake_bytes, parse_snake_bytes_slice, parse_snake_string,
-    parse_snake_string_slice,
-};
-use tycho_types::cell::{Cell, CellSlice};
+use tycho_types::cell::{Cell, CellBuilder, CellSlice};
+
+fn build_snake_bytes_cell(bytes: &[u8]) -> Cell {
+    let total_bits = bytes.len() * 8;
+
+    // Keep some free space in each cell for potential prefixes.
+    if total_bits <= 1015 {
+        let mut builder = CellBuilder::new();
+        builder.store_raw(bytes, total_bits as u16).ok();
+        return builder.build().expect("cannot build cell");
+    }
+
+    let mut remaining_bytes = bytes;
+    let mut cell_data = Vec::new();
+
+    while !remaining_bytes.is_empty() {
+        let chunk_size = std::cmp::min(remaining_bytes.len(), 126);
+        let chunk = &remaining_bytes[..chunk_size];
+        cell_data.push((chunk, chunk.len() * 8));
+        remaining_bytes = &remaining_bytes[chunk_size..];
+    }
+
+    let mut next_cell: Option<Cell> = None;
+    for (chunk, bits) in cell_data.into_iter().rev() {
+        let mut builder = CellBuilder::new();
+        builder.store_raw(chunk, bits as u16).ok();
+
+        if let Some(next) = next_cell {
+            builder.store_reference(next).ok();
+        }
+
+        next_cell = Some(builder.build().expect("cannot build cell"));
+    }
+
+    next_cell.expect("snake string must have at least one cell")
+}
+
+fn parse_snake_bytes_cell(cell: &Cell) -> Option<Vec<u8>> {
+    let mut parser = cell.as_slice_allow_exotic();
+    parse_snake_bytes_from_slice(&mut parser)
+}
+
+fn parse_snake_bytes_from_slice(parser: &mut CellSlice<'_>) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let bits_to_load = parser.size_bits();
+    if !bits_to_load.is_multiple_of(8) {
+        return None;
+    }
+
+    let mut chunk = vec![0u8; bits_to_load.div_ceil(8) as usize];
+    parser.load_raw(&mut chunk, bits_to_load).ok()?;
+    bytes.extend_from_slice(&chunk);
+
+    if parser.size_refs() == 0 {
+        return Some(bytes);
+    }
+
+    let mut next_data_ref = parser.load_reference_cloned().ok()?;
+    loop {
+        let mut parser = next_data_ref.as_slice_allow_exotic();
+        let bits_to_load = parser.size_bits();
+        if !bits_to_load.is_multiple_of(8) {
+            return None;
+        }
+
+        let mut chunk = vec![0u8; bits_to_load.div_ceil(8) as usize];
+        parser.load_raw(&mut chunk, bits_to_load).ok()?;
+        bytes.extend_from_slice(&chunk);
+
+        if parser.size_refs() == 0 {
+            break;
+        }
+
+        next_data_ref = match parser.load_reference_cloned() {
+            Ok(cell) => cell,
+            Err(_) => break,
+        };
+    }
+
+    Some(bytes)
+}
+
+fn parse_snake_string_from_slice(parser: &mut CellSlice<'_>) -> Option<String> {
+    String::from_utf8(parse_snake_bytes_from_slice(parser)?).ok()
+}
 
 impl Tuple {
     /// Parse a snake string from a cell.
@@ -28,7 +108,7 @@ impl Tuple {
     /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
     #[must_use]
     pub fn parse_snake_string(cell: &Cell) -> Option<String> {
-        parse_snake_string(cell)
+        String::from_utf8(parse_snake_bytes_cell(cell)?).ok()
     }
 
     /// Parse a snake bytes from a cell.
@@ -36,7 +116,7 @@ impl Tuple {
     /// If the slice is not a snake bytes, returns `None`.
     #[must_use]
     pub fn parse_snake_bytes(cell: &Cell) -> Option<Vec<u8>> {
-        parse_snake_bytes(cell)
+        parse_snake_bytes_cell(cell)
     }
 
     /// Parse a snake string from a cell slice (parser).
@@ -46,7 +126,7 @@ impl Tuple {
     /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
     #[must_use]
     pub fn parse_snake_string_slice(parser: &mut CellSlice<'_>) -> Option<String> {
-        parse_snake_string_slice(parser)
+        parse_snake_string_from_slice(parser)
     }
 
     /// Parse a snake bytes from a cell slice (parser).
@@ -56,7 +136,7 @@ impl Tuple {
     /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
     #[must_use]
     pub fn parse_snake_bytes_slice(parser: &mut CellSlice<'_>) -> Option<Vec<u8>> {
-        parse_snake_bytes_slice(parser)
+        parse_snake_bytes_from_slice(parser)
     }
 
     /// Push a snake string to the tuple as a TVM slice.
@@ -86,7 +166,6 @@ mod tests {
     use super::*;
     use crate::serde::{parse_tuple, serialize_tuple};
     use crate::stack::Tuple;
-    use tycho_types::cell::CellBuilder;
 
     #[test]
     fn test_string_roundtrip() {

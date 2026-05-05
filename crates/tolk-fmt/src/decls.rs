@@ -72,8 +72,7 @@ fn build_import_items<'tree>(
             let path = import
                 .path()
                 .and_then(|p| p.0.utf8_text(ctx.code.as_ref().as_ref()).ok())
-                .map(strip_import_quotes)
-                .unwrap_or("");
+                .map_or("", strip_import_quotes);
 
             let had_empty_line_after = imports.get(i + 1).is_some_and(|next_import| {
                 common::empty_lines_between(ctx, &import.0, &next_import.0) > 1
@@ -92,6 +91,12 @@ fn build_import_items<'tree>(
 
 #[must_use]
 pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcDoc<'a>> {
+    if ctx.options.range.is_some() {
+        // Full-file formatting intentionally hoists the version/import sections and sorts imports.
+        // Range formatting is used by editors and must keep unrelated top-level nodes untouched.
+        return print_source_file_preserving_order(ctx, file);
+    }
+
     let mut sections = vec![];
 
     // file header section
@@ -237,6 +242,66 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
     }
 
     Some(common::print_sections(sections))
+}
+
+fn print_source_file_preserving_order<'a>(
+    ctx: &Context<'_>,
+    file: &SourceFile,
+) -> Option<RcDoc<'a>> {
+    let raw_top_levels = file.top_levels().collect::<Vec<_>>();
+    let top_levels = raw_top_levels
+        .iter()
+        .filter(|decl| !matches!(decl, TopLevel::Unmapped(node) if node.0.kind() == "comment"))
+        .copied()
+        .collect::<Vec<_>>();
+
+    let mut docs = vec![];
+
+    let file_header_comments = ctx.comments.get(&file.tree.root_node());
+    let has_file_header_comments =
+        file_header_comments.is_some_and(|comments| !comments.is_empty());
+    comments::print_leading_comments(ctx, &mut docs, file_header_comments);
+    if has_file_header_comments && !top_levels.is_empty() {
+        docs.push(RcDoc::hardline());
+    }
+
+    if top_levels.is_empty() {
+        for top_level in raw_top_levels {
+            docs.push(common::print_original_node_text(ctx, &top_level.syntax()));
+        }
+        docs.push(RcDoc::hardline());
+        return Some(RcDoc::concat(docs));
+    }
+
+    for (i, top_level) in top_levels.iter().enumerate() {
+        let node = top_level.syntax();
+        let comments = ctx.comments.get(&node);
+
+        if !common::should_format_node(ctx, &node) || comments::has_fmt_ignore(ctx, comments) {
+            docs.push(common::print_original_node_text(ctx, &node));
+        } else {
+            comments::print_leading_comments(ctx, &mut docs, comments);
+
+            let Some(doc) = print_decl(ctx, top_level) else {
+                continue;
+            };
+            docs.push(doc);
+
+            comments::print_inline_comments(ctx, &mut docs, comments);
+            docs.push(RcDoc::hardline());
+            comments::print_trailing_comments(ctx, &mut docs, comments);
+        }
+
+        if let Some(next_top_level) = top_levels.get(i + 1) {
+            let next_node = next_top_level.syntax();
+            if common::empty_lines_between(ctx, &node, &next_node) > 1 {
+                docs.push(RcDoc::hardline());
+            }
+        }
+    }
+
+    docs.push(RcDoc::hardline());
+    Some(RcDoc::concat(docs))
 }
 
 #[must_use]
@@ -442,6 +507,10 @@ pub fn print_struct_field_declaration<'a>(ctx: &Context, f: &StructField) -> Opt
     let typ = f.typ()?;
 
     let mut parts = vec![];
+    if let Some(annotations) = f.annotations() {
+        parts.push(print_annotation_list(ctx, &annotations)?);
+    }
+
     if let Some(modifiers) = f.modifiers() {
         for modifier in modifiers.modifiers() {
             parts.push(RcDoc::text(modifier.as_str()));
@@ -867,6 +936,17 @@ pub fn print_annotation<'a>(ctx: &Context<'_>, a: &Annotation) -> Option<RcDoc<'
 }
 
 pub fn print_annotation_arguments<'a>(ctx: &Context<'_>, a: &AnnotationArgs) -> Option<RcDoc<'a>> {
+    if let Some(typ) = a.typ() {
+        return common::print_list(
+            ctx,
+            &[typ],
+            types::print_type,
+            Type::syntax,
+            |_| vec![],
+            common::ListOptions::default(),
+        );
+    }
+
     let arguments: Vec<_> = a.args().collect();
     let never_break_if_items_lt = if matches!(arguments.as_slice(), [Expr::StringLit(_)]) {
         2

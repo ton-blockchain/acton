@@ -1,0 +1,10 @@
+✓ Created TypeScript app scaffold
+  Directory: app
+
+Next steps:
+
+  # Install app dependencies
+  cd app
+  npm ci
+  # Start the TypeScript app
+  npm run dev

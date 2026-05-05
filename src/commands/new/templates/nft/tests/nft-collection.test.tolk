@@ -3,6 +3,7 @@ import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "@acton/types/array"
+
 import "@contracts/errors"
 import "@contracts/messages"
 import "@contracts/types"
@@ -113,7 +114,7 @@ get fun `test nft: should not deploy nft with invalid item index`() {
     expect(nftDeployResult).toHaveFailedTx<DeployNft>({
         from: deployer.address,
         to: nftCollection.address,
-        exitCode: Errors.InvalidItemIndex as int32,
+        exitCode: Errors.InvalidItemIndex,
     });
 }
 

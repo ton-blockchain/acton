@@ -2,11 +2,11 @@ use crate::integration::check::run_rule_test;
 use function_name::named;
 
 fn run_message_should_be_named_test(content: &str, name: &str) {
-    run_rule_test("message_entity_naming", "E011", content, name);
+    run_rule_test("message_entity_naming", "S005", content, name);
 }
 
 fn run_create_message_inline_send_test(content: &str, name: &str) {
-    run_rule_test("message_entity_naming", "E012", content, name);
+    run_rule_test("message_entity_naming", "S006", content, name);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-warning[E022]: negated `is` type check can use `!is`
+warning[S008]: negated `is` type check can use `!is`
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val b = !(((a)) is int);
@@ -16,4 +16,4 @@ help: use `!is` operator
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E022
+For example: acton check --explain S008

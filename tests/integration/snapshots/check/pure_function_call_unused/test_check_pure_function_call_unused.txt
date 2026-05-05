@@ -1,4 +1,4 @@
-warning[E007]: result of pure function is not used
+warning[E006]: result of pure function is not used
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 add(1, 2);
@@ -8,4 +8,4 @@ warning[E007]: result of pure function is not used
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E007
+For example: acton check --explain E006

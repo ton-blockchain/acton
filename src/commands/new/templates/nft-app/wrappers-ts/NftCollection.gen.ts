@@ -102,10 +102,18 @@ class StackReader {
 
     private popExpecting<ItemT>(itemType: string): ItemT {
         const item = this.tuple.shift();
-        if (item?.type !== itemType) {
-            throw new Error(`not '${itemType}' on a stack`);
+        if (item?.type === itemType) {
+            return item as ItemT;
         }
-        return item as ItemT;
+        throw new Error(`not '${itemType}' on a stack`);
+    }
+
+    private popCellLike(): c.Cell {
+        const item = this.tuple.shift();
+        if (item && (item.type === 'cell' || item.type === 'slice' || item.type === 'builder')) {
+            return item.cell;
+        }
+        throw new Error(`not cell/slice on a stack`);
     }
 
     readBigInt(): bigint {
@@ -117,11 +125,11 @@ class StackReader {
     }
 
     readCell(): c.Cell {
-        return this.popExpecting<c.TupleItemCell>('cell').cell;
+        return this.popCellLike();
     }
 
     readSlice(): c.Slice {
-        return this.popExpecting<c.TupleItemSlice>('slice').cell.beginParse();
+        return this.popCellLike().beginParse();
     }
 
     readCellRef<T>(loadFn_T: LoadCallback<T>): CellRef<T> {
@@ -145,6 +153,44 @@ type uint16 = bigint
 type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
+
+/**
+ > struct NftItemInitAtDeployment {
+ >     ownerAddress: address
+ >     content: string
+ > }
+ */
+export interface NftItemInitAtDeployment {
+    readonly $: 'NftItemInitAtDeployment'
+    ownerAddress: c.Address
+    content: string
+}
+
+export const NftItemInitAtDeployment = {
+    create(args: {
+        ownerAddress: c.Address
+        content: string
+    }): NftItemInitAtDeployment {
+        return {
+            $: 'NftItemInitAtDeployment',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): NftItemInitAtDeployment {
+        return {
+            $: 'NftItemInitAtDeployment',
+            ownerAddress: s.loadAddress(),
+            content: s.loadStringRefTail(),
+        }
+    },
+    store(self: NftItemInitAtDeployment, b: c.Builder): void {
+        b.storeAddress(self.ownerAddress);
+        b.storeStringRefTail(self.content);
+    },
+    toCell(self: NftItemInitAtDeployment): c.Cell {
+        return makeCellFrom<NftItemInitAtDeployment>(self, NftItemInitAtDeployment.store);
+    }
+}
 
 /**
  > struct (0x693d3950) RequestRoyaltyParams {
@@ -184,40 +230,44 @@ export const RequestRoyaltyParams = {
 }
 
 /**
- > struct NftItemInitAtDeployment {
- >     ownerAddress: address
- >     content: string
+ > struct (0xa8cb00ad) ResponseRoyaltyParams {
+ >     queryId: uint64
+ >     royaltyParams: RoyaltyParams
  > }
  */
-export interface NftItemInitAtDeployment {
-    readonly $: 'NftItemInitAtDeployment'
-    ownerAddress: c.Address
-    content: string
+export interface ResponseRoyaltyParams {
+    readonly $: 'ResponseRoyaltyParams'
+    queryId: uint64
+    royaltyParams: RoyaltyParams
 }
 
-export const NftItemInitAtDeployment = {
+export const ResponseRoyaltyParams = {
+    PREFIX: 0xa8cb00ad,
+
     create(args: {
-        ownerAddress: c.Address
-        content: string
-    }): NftItemInitAtDeployment {
+        queryId: uint64
+        royaltyParams: RoyaltyParams
+    }): ResponseRoyaltyParams {
         return {
-            $: 'NftItemInitAtDeployment',
+            $: 'ResponseRoyaltyParams',
             ...args
         }
     },
-    fromSlice(s: c.Slice): NftItemInitAtDeployment {
+    fromSlice(s: c.Slice): ResponseRoyaltyParams {
+        loadAndCheckPrefix32(s, 0xa8cb00ad, 'ResponseRoyaltyParams');
         return {
-            $: 'NftItemInitAtDeployment',
-            ownerAddress: s.loadAddress(),
-            content: s.loadStringRefTail(),
+            $: 'ResponseRoyaltyParams',
+            queryId: s.loadUintBig(64),
+            royaltyParams: RoyaltyParams.fromSlice(s),
         }
     },
-    store(self: NftItemInitAtDeployment, b: c.Builder): void {
-        b.storeAddress(self.ownerAddress);
-        b.storeStringRefTail(self.content);
+    store(self: ResponseRoyaltyParams, b: c.Builder): void {
+        b.storeUint(0xa8cb00ad, 32);
+        b.storeUint(self.queryId, 64);
+        RoyaltyParams.store(self.royaltyParams, b);
     },
-    toCell(self: NftItemInitAtDeployment): c.Cell {
-        return makeCellFrom<NftItemInitAtDeployment>(self, NftItemInitAtDeployment.store);
+    toCell(self: ResponseRoyaltyParams): c.Cell {
+        return makeCellFrom<ResponseRoyaltyParams>(self, ResponseRoyaltyParams.store);
     }
 }
 
@@ -274,44 +324,6 @@ export const DeployNft = {
 }
 
 /**
- > struct BatchDeployDictItem {
- >     attachTonAmount: coins
- >     initParams: Cell<NftItemInitAtDeployment>
- > }
- */
-export interface BatchDeployDictItem {
-    readonly $: 'BatchDeployDictItem'
-    attachTonAmount: coins
-    initParams: CellRef<NftItemInitAtDeployment>
-}
-
-export const BatchDeployDictItem = {
-    create(args: {
-        attachTonAmount: coins
-        initParams: CellRef<NftItemInitAtDeployment>
-    }): BatchDeployDictItem {
-        return {
-            $: 'BatchDeployDictItem',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): BatchDeployDictItem {
-        return {
-            $: 'BatchDeployDictItem',
-            attachTonAmount: s.loadCoins(),
-            initParams: loadCellRef<NftItemInitAtDeployment>(s, NftItemInitAtDeployment.fromSlice),
-        }
-    },
-    store(self: BatchDeployDictItem, b: c.Builder): void {
-        b.storeCoins(self.attachTonAmount);
-        storeCellRef<NftItemInitAtDeployment>(self.initParams, b, NftItemInitAtDeployment.store);
-    },
-    toCell(self: BatchDeployDictItem): c.Cell {
-        return makeCellFrom<BatchDeployDictItem>(self, BatchDeployDictItem.store);
-    }
-}
-
-/**
  > struct (0x00000002) BatchDeployNfts {
  >     queryId: uint64
  >     deployList: map<uint64, BatchDeployDictItem>
@@ -354,6 +366,44 @@ export const BatchDeployNfts = {
 }
 
 /**
+ > struct BatchDeployDictItem {
+ >     attachTonAmount: coins
+ >     initParams: Cell<NftItemInitAtDeployment>
+ > }
+ */
+export interface BatchDeployDictItem {
+    readonly $: 'BatchDeployDictItem'
+    attachTonAmount: coins
+    initParams: CellRef<NftItemInitAtDeployment>
+}
+
+export const BatchDeployDictItem = {
+    create(args: {
+        attachTonAmount: coins
+        initParams: CellRef<NftItemInitAtDeployment>
+    }): BatchDeployDictItem {
+        return {
+            $: 'BatchDeployDictItem',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): BatchDeployDictItem {
+        return {
+            $: 'BatchDeployDictItem',
+            attachTonAmount: s.loadCoins(),
+            initParams: loadCellRef<NftItemInitAtDeployment>(s, NftItemInitAtDeployment.fromSlice),
+        }
+    },
+    store(self: BatchDeployDictItem, b: c.Builder): void {
+        b.storeCoins(self.attachTonAmount);
+        storeCellRef<NftItemInitAtDeployment>(self.initParams, b, NftItemInitAtDeployment.store);
+    },
+    toCell(self: BatchDeployDictItem): c.Cell {
+        return makeCellFrom<BatchDeployDictItem>(self, BatchDeployDictItem.store);
+    }
+}
+
+/**
  > struct (0x00000003) ChangeCollectionAdmin {
  >     queryId: uint64
  >     newAdminAddress: address
@@ -392,44 +442,6 @@ export const ChangeCollectionAdmin = {
     },
     toCell(self: ChangeCollectionAdmin): c.Cell {
         return makeCellFrom<ChangeCollectionAdmin>(self, ChangeCollectionAdmin.store);
-    }
-}
-
-/**
- > struct CollectionContent {
- >     collectionMetadata: cell
- >     commonContent: string
- > }
- */
-export interface CollectionContent {
-    readonly $: 'CollectionContent'
-    collectionMetadata: c.Cell
-    commonContent: string
-}
-
-export const CollectionContent = {
-    create(args: {
-        collectionMetadata: c.Cell
-        commonContent: string
-    }): CollectionContent {
-        return {
-            $: 'CollectionContent',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): CollectionContent {
-        return {
-            $: 'CollectionContent',
-            collectionMetadata: s.loadRef(),
-            commonContent: s.loadStringRefTail(),
-        }
-    },
-    store(self: CollectionContent, b: c.Builder): void {
-        b.storeRef(self.collectionMetadata);
-        b.storeStringRefTail(self.commonContent);
-    },
-    toCell(self: CollectionContent): c.Cell {
-        return makeCellFrom<CollectionContent>(self, CollectionContent.store);
     }
 }
 
@@ -530,44 +542,40 @@ export const NftCollectionStorage = {
 }
 
 /**
- > struct (0xa8cb00ad) ResponseRoyaltyParams {
- >     queryId: uint64
- >     royaltyParams: RoyaltyParams
+ > struct CollectionContent {
+ >     collectionMetadata: cell
+ >     commonContent: string
  > }
  */
-export interface ResponseRoyaltyParams {
-    readonly $: 'ResponseRoyaltyParams'
-    queryId: uint64
-    royaltyParams: RoyaltyParams
+export interface CollectionContent {
+    readonly $: 'CollectionContent'
+    collectionMetadata: c.Cell
+    commonContent: string
 }
 
-export const ResponseRoyaltyParams = {
-    PREFIX: 0xa8cb00ad,
-
+export const CollectionContent = {
     create(args: {
-        queryId: uint64
-        royaltyParams: RoyaltyParams
-    }): ResponseRoyaltyParams {
+        collectionMetadata: c.Cell
+        commonContent: string
+    }): CollectionContent {
         return {
-            $: 'ResponseRoyaltyParams',
+            $: 'CollectionContent',
             ...args
         }
     },
-    fromSlice(s: c.Slice): ResponseRoyaltyParams {
-        loadAndCheckPrefix32(s, 0xa8cb00ad, 'ResponseRoyaltyParams');
+    fromSlice(s: c.Slice): CollectionContent {
         return {
-            $: 'ResponseRoyaltyParams',
-            queryId: s.loadUintBig(64),
-            royaltyParams: RoyaltyParams.fromSlice(s),
+            $: 'CollectionContent',
+            collectionMetadata: s.loadRef(),
+            commonContent: s.loadStringRefTail(),
         }
     },
-    store(self: ResponseRoyaltyParams, b: c.Builder): void {
-        b.storeUint(0xa8cb00ad, 32);
-        b.storeUint(self.queryId, 64);
-        RoyaltyParams.store(self.royaltyParams, b);
+    store(self: CollectionContent, b: c.Builder): void {
+        b.storeRef(self.collectionMetadata);
+        b.storeStringRefTail(self.commonContent);
     },
-    toCell(self: ResponseRoyaltyParams): c.Cell {
-        return makeCellFrom<ResponseRoyaltyParams>(self, ResponseRoyaltyParams.store);
+    toCell(self: CollectionContent): c.Cell {
+        return makeCellFrom<CollectionContent>(self, CollectionContent.store);
     }
 }
 
@@ -665,14 +673,14 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
         code,
         data,
         splitDepth: options.toShard?.fixedPrefixLength,
-        special: null,          // todo will somebody need special?
-        libraries: null,        // todo will somebody need libraries?
+        special: null,
+        libraries: null,
     })).endCell();
 
     let addrHash = stateInitCell.hash();
     if (options.toShard) {
         const shardDepth = options.toShard.fixedPrefixLength;
-        addrHash = beginCell()  // todo any way to do it better? N bits from closeTo + 256-N from stateInitCell
+        addrHash = beginCell()
             .storeBits(new c.BitString(options.toShard.closeTo.hash, 0, shardDepth))
             .storeBits(new c.BitString(stateInitCell.hash(), shardDepth, 256 - shardDepth))
             .endCell()

@@ -44,7 +44,7 @@ Write output to a file instead of standard output.
 {{/option}}
 
 {{#option "`--enable-only` _code_[,_code_...]_" }}
-Enable only selected lint rules, for example `E001,S001`.
+Enable only selected lint rules, for example `S003,S001`.
 {{/option}}
 
 {{#option "`--explain` _code_" }}
@@ -82,7 +82,7 @@ Print an explanation for a lint rule.
   `.claude`
 - contracts with non-`.tolk` sources such as precompiled `.boc` entries are not
   lint roots
-- single-file mode relaxes `E014 (acton-import-in-contract)`
+- single-file mode relaxes `E010 (acton-import-in-contract)`
 - targets ending with `.tolk` are treated as file paths; other targets are
   resolved as contract names from `Acton.toml`
 - use an explicit `.tolk` path such as `./contracts/Counter.tolk` when a name
@@ -98,7 +98,7 @@ Print an explanation for a lint rule.
   configured severity, selected rules that were `allow` are re-enabled at the
   default severity, and every unselected rule is forced to `allow`
 - `--enable-only` selectors must resolve to exactly one rule; in practice, use
-  full rule codes such as `E003` for stability
+  full rule codes such as `E002` for stability
 - excluded files still participate in import/type resolution, but lint
   diagnostics for excluded non-root files are filtered out
 - explicit targets still run even if they match `[lint].exclude`
@@ -145,7 +145,7 @@ Print an explanation for a lint rule.
 5. Run only selected rules:
 
    ```bash
-   acton check --enable-only E001,S001
+   acton check --enable-only S003,S001
    ```
 
 6. List rule metadata as JSON:
@@ -169,5 +169,5 @@ Print an explanation for a lint rule.
 ## See Also
 
 - `acton help fmt`
-- [Linting guide](https://ton-blockchain.github.io/acton/docs/linting/overview)
+- [Linting guide](https://ton-blockchain.github.io/acton/docs/lint)
 - [Linter rules](https://ton-blockchain.github.io/acton/docs/rules/overview)

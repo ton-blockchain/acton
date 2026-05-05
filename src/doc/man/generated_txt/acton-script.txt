@@ -20,7 +20,7 @@ OPTIONS
            Path to the script file to execute.
 
        args…
-           Arguments passed through to the script.
+           Arguments parsed against the main() ABI and passed to the script.
 
        --verbose
            Enable executor debug logs at verbosity level 1.
@@ -59,6 +59,24 @@ OPTIONS
            Broadcast to the selected network. If omitted, the script runs in
            emulation mode. Conflicting --net and --fork-net values are
            rejected.
+
+       --tonconnect
+           Use TON Connect wallet approval for broadcast messages.
+
+           This opens a local browser page, connects a wallet, and sends
+           net.send(...) messages through that wallet instead of loading local
+           wallet mnemonics. The TON Connect session is saved under
+           build/sessions/tonconnect/<network>.json and reused by later runs in
+           the same project. Currently supported only with --net mainnet or
+           --net testnet.
+
+       --tonconnect-port port
+           Local TON Connect page port. Defaults to 52258.
+
+           Acton keeps this port stable so injected wallets can recognize the
+           same local dApp on later runs. If the default port is busy, pass
+           another port explicitly and keep using the same value for that
+           project.
 
        --explorer name
            Explorer to use for transaction links.
@@ -101,9 +119,16 @@ SCRIPT MODEL
 
        o  --net sends real transactions using configured wallets
 
+       o  --net ... --tonconnect sends real transactions through the connected
+          TON Connect wallet
+
        Wallet names referenced by the script are resolved from the merged
        wallet configuration, with local wallets.toml entries overriding
-       global.wallets.toml on name conflicts.
+       global.wallets.toml on name conflicts. With --tonconnect, any
+       scripts.wallet("name") call resolves to the connected wallet address.
+       Acton saves the TON Connect session in
+       build/sessions/tonconnect/<network>.json, so the next script run can
+       restore the wallet connection without asking the user to connect again.
 
 ARGUMENT FORWARDING
        Arguments after _path_ are passed through to the script runtime.
@@ -112,6 +137,26 @@ ARGUMENT FORWARDING
        before the script arguments:
 
            acton script scripts/query.tolk -- --net-like-value
+
+SCRIPT ARGUMENTS
+       Forwarded arguments are parsed against the ABI for main().
+
+       o  the number of CLI arguments must exactly match the main() parameters
+
+       o  integers use Tolk integer literal syntax such as 42, -1, 0xff, and
+          0b1010
+
+       o  bool accepts true and false
+
+       o  nullable supported types accept null
+
+       o  cell, slice, and bitsN accept plain BoC hex without C{} or CS{}
+          prefixes
+
+       o  arrays accept [item1, item2]
+
+       Unsupported parameter types currently include structs, tuple, map, dict,
+       builder, any_address and other complex types.
 
 SIDE EFFECTS
        acton script always compiles and executes the selected script. With
@@ -159,6 +204,10 @@ EXAMPLES
        5. Broadcast a deploy flow and print explorer links:
 
               acton script scripts/deploy.tolk --net testnet --explorer tonscan
+
+       6. Broadcast through TON Connect instead of local wallet keys:
+
+              acton script scripts/deploy.tolk --net testnet --tonconnect
 
 TONCENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or

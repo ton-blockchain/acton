@@ -10,10 +10,11 @@ use path_absolutize::Absolutize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::{Path, PathBuf};
+use tolk_fmt::{FormatPosition, FormatRange};
 use tree_sitter::Point;
 use walkdir::WalkDir;
 
-pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
+pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result<()> {
     let config = ActonConfig::load()
         .map_err(|e| {
             eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
@@ -28,6 +29,11 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let separate_import_groups = fmt_settings
         .and_then(|s| s.separate_import_groups)
         .unwrap_or(false);
+    let range = range.as_deref().map(parse_range).transpose()?;
+    let has_range = range.is_some();
+    if has_range && paths.len() != 1 {
+        anyhow::bail!("--range can only be used with a single .tolk file");
+    }
 
     let mut ignore_builder = GlobSetBuilder::new();
     for p in [
@@ -49,6 +55,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
 
     let mut files_to_format = Vec::new();
 
+    let has_explicit_paths = !paths.is_empty();
     let search_paths = if paths.is_empty() {
         vec![project_root.to_path_buf()]
     } else {
@@ -59,8 +66,17 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         if path.is_file() {
             if path.extension().is_some_and(|ext| ext == "tolk") {
                 files_to_format.push(path);
+            } else if has_explicit_paths {
+                anyhow::bail!(
+                    "Cannot format {}: expected a .tolk file",
+                    path.display().to_string().yellow()
+                );
             }
         } else if path.is_dir() {
+            if has_range {
+                anyhow::bail!("--range can only be used with a single .tolk file");
+            }
+
             let iter = WalkDir::new(&path)
                 .into_iter()
                 .filter_entry(|entry| {
@@ -106,6 +122,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
             tolk_fmt::FormatOptions {
                 width,
                 separate_import_groups,
+                range,
             },
         ) {
             Ok(formatted) => {
@@ -180,6 +197,40 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn parse_range(raw: &str) -> Result<FormatRange> {
+    let (start, end) = raw.split_once('-').ok_or_else(|| {
+        anyhow::anyhow!(
+            "Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)"
+        )
+    })?;
+    let start = parse_position(start)?;
+    let end = parse_position(end)?;
+
+    if start.line > end.line || (start.line == end.line && start.character > end.character) {
+        anyhow::bail!(
+            "Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)"
+        );
+    }
+
+    Ok(FormatRange { start, end })
+}
+
+fn parse_position(raw: &str) -> Result<FormatPosition> {
+    let (line, character) = raw.split_once(':').ok_or_else(|| {
+        anyhow::anyhow!(
+            "Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)"
+        )
+    })?;
+    Ok(FormatPosition {
+        line: line
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)"))?,
+        character: character
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)"))?,
+    })
 }
 
 fn emit_parse_errors_if_any(file_path: &Path, source: &str) -> Result<bool> {

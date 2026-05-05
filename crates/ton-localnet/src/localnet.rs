@@ -182,6 +182,11 @@ pub(crate) enum Request {
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LocalnetAccountState>>,
     },
+    GetShardAccountCell {
+        address: Addr,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
     GetTransactions {
         address: Addr,
         limit: usize,
@@ -384,6 +389,23 @@ impl Localnet {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressInformation {
+                address,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_shard_account_cell(
+        &self,
+        address_str: String,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<BocBytes> {
+        let address = Self::parse_addr(&address_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetShardAccountCell {
                 address,
                 seqno,
                 resp,
@@ -903,6 +925,14 @@ fn process_loop_request(node: &mut Node, req: Request) {
             resp,
         } => {
             let res = handle_get_address_info(node, address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetShardAccountCell {
+            address,
+            seqno,
+            resp,
+        } => {
+            let res = node.get_shard_account_at_block(&address, seqno);
             let _ = resp.send(res);
         }
         Request::GetTransactions {

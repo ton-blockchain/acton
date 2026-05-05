@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use ton_emulator::WorldStateSnapshot;
+use ton_executor::DEFAULT_CONFIG;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/build"
@@ -341,6 +342,10 @@ fn run_snapshot_test(project: &Project, test_file_stem: &str, snapshot_name: &st
         .assert_snapshot_matches(&snapshot_path);
 }
 
+fn to_tolk_string_literal(value: &str) -> String {
+    serde_json::to_string(value).expect("string literal must serialize")
+}
+
 #[test]
 fn world_state_snapshot_can_be_saved_and_loaded_across_test_runs() {
     let project =
@@ -647,4 +652,62 @@ fn world_state_snapshot_save_reports_path_failures_without_poisoning_future_save
             .exists(),
         "failed save should not create files in missing directories"
     );
+}
+
+#[test]
+fn world_state_snapshot_helpers_reject_absolute_and_parent_escape_paths() {
+    let absolute_outside = tempfile::NamedTempFile::new().expect("failed to create outside file");
+    let outside_snapshot = WorldStateSnapshot {
+        version: 1,
+        current_lt: 0,
+        current_now: 123,
+        config_boc64: DEFAULT_CONFIG.to_owned(),
+        libraries_boc64: Vec::new(),
+        accounts: Vec::new(),
+    };
+    write_world_state_snapshot(absolute_outside.path(), &outside_snapshot);
+    let absolute_outside_literal =
+        to_tolk_string_literal(&absolute_outside.path().to_string_lossy());
+
+    let source = format!(
+        r#"
+{NETWORK_IMPORTS}
+
+get fun `test world state snapshot rejects path escapes`() {{
+    val absoluteOutside = {absolute_outside_literal};
+
+    testing.setNow(321);
+
+    expect(testing.loadSnapshot("../outside-valid-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot(absoluteOutside)).toBeFalse();
+    expect(testing.getNow()).toEqual(321);
+
+    expect(testing.saveSnapshot("../escaped-world-state.json")).toBeFalse();
+    expect(testing.saveSnapshot(absoluteOutside)).toBeFalse();
+}}
+"#
+    );
+
+    let project = ProjectBuilder::new("r-lib-world-state-snapshot-rejects-path-escapes")
+        .test_file("snapshot_path_sandbox", &source)
+        .build();
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("project must have parent directory");
+    let parent_snapshot_path = project_parent.join("outside-valid-world-state.json");
+    write_world_state_snapshot(&parent_snapshot_path, &outside_snapshot);
+
+    run_snapshot_test(
+        &project,
+        "snapshot_path_sandbox",
+        "world_state_snapshot_helpers_reject_absolute_and_parent_escape_paths",
+    );
+
+    let absolute_snapshot = read_world_state_snapshot(absolute_outside.path());
+    assert_eq!(absolute_snapshot.current_now, 123);
+    let parent_snapshot = read_world_state_snapshot(&parent_snapshot_path);
+    assert_eq!(parent_snapshot.current_now, 123);
+    assert!(!project_parent.join("escaped-world-state.json").exists());
 }

@@ -1,63 +1,101 @@
-// Parsing of the source map JSON produced by the Tolk compiler.
-// The JSON contains type declarations, function metadata, and debug marks
-// that map IR variables and stack positions back to the original Tolk source.
+// Parsing of the symbol-types and debug-marks JSON produced by the Tolk compiler.
+// Symbol types contain type declarations and function metadata; debug marks map
+// IR variables and stack positions back to the original Tolk source.
 
-use crate::types_kernel::Ty;
-use serde::{Deserialize, Deserializer, Serialize};
+use crate::abi::ABICustomPackUnpack;
+use crate::debug_marks_dict::DebugMarksDict;
+use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use std::fs;
-use std::path::Path;
+use std::sync::OnceLock;
+use ton_source_map::SourceLocation;
 // ---------------------------------------------------------------------------
 // Top-level structure
 // ---------------------------------------------------------------------------
 
 type BigintAsString = String;
 
-#[derive(Clone, Serialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SourceMap {
     files: Vec<SrcFileInfo>,
+    unique_types: Vec<Ty>,
+    struct_instantiations: Vec<StructInstantiation>,
+    alias_instantiations: Vec<AliasInstantiation>,
     declarations: Vec<Declaration>,
-    unique_ty: Vec<UniqueTy>,
     functions: Vec<FunctionInfo>,
+
+    #[serde(default)]
     debug_marks: Vec<DebugMark>,
+    #[serde(default, skip_serializing_if = "DebugMarksDict::is_empty")]
+    marks_dict: DebugMarksDict,
 
     #[serde(skip)]
-    structs: HashMap<String, AbiStruct>,
-    #[serde(skip)]
-    aliases: HashMap<String, AbiAlias>,
-    #[serde(skip)]
-    enums: HashMap<String, AbiEnum>,
+    decl_index: OnceLock<DeclarationIndex>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct SymbolTypesJson {
+    files: Vec<SrcFileInfo>,
+    unique_types: Vec<Ty>,
+    struct_instantiations: Vec<StructInstantiation>,
+    alias_instantiations: Vec<AliasInstantiation>,
+    declarations: Vec<Declaration>,
+    functions: Vec<FunctionInfo>,
 }
 
 impl SourceMap {
-    pub fn from_json_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let text = fs::read_to_string(path)?;
-        Self::from_json_str(&text)
-    }
-
-    pub fn from_json_str(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(serde_json::from_str(json)?)
-    }
-
-    fn index_declarations(&mut self) {
-        self.structs.clear();
-        self.aliases.clear();
-        self.enums.clear();
-
-        for decl in &self.declarations {
-            match decl {
-                Declaration::Struct(s) => {
-                    self.structs.insert(s.name.clone(), s.clone());
-                }
-                Declaration::Alias(a) => {
-                    self.aliases.insert(a.name.clone(), a.clone());
-                }
-                Declaration::Enum(e) => {
-                    self.enums.insert(e.name.clone(), e.clone());
-                }
-            }
+    #[must_use]
+    pub fn from_parts(
+        symbol_types: SymbolTypesJson,
+        debug_marks: Vec<DebugMark>,
+        marks_dict: DebugMarksDict,
+    ) -> Self {
+        SourceMap {
+            files: symbol_types.files,
+            declarations: symbol_types.declarations,
+            unique_types: symbol_types.unique_types,
+            struct_instantiations: symbol_types.struct_instantiations,
+            alias_instantiations: symbol_types.alias_instantiations,
+            functions: symbol_types.functions,
+            debug_marks,
+            marks_dict,
+            decl_index: OnceLock::new(),
         }
+    }
+
+    #[must_use]
+    pub fn without_debug_info() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn find_source_loc(&self, hash: &str, offset: u16) -> Option<SourceLocation> {
+        let marks = self.marks_dict.get(hash)?;
+        let target_offset = i32::from(offset);
+
+        let mut approx_loc = None;
+        let mut exact_loc = None;
+
+        for &(mark_offset, mark_id) in marks {
+            let Some(loc) = self.source_location_for_mark(mark_id as usize) else {
+                continue;
+            };
+
+            if mark_offset < target_offset {
+                approx_loc = Some(loc);
+                continue;
+            }
+
+            if mark_offset == target_offset {
+                exact_loc = Some(loc);
+                continue;
+            }
+
+            break;
+        }
+
+        exact_loc.or(approx_loc)
     }
 
     #[must_use]
@@ -92,29 +130,114 @@ impl SourceMap {
     }
 
     #[must_use]
+    pub fn files(&self) -> &[SrcFileInfo] {
+        &self.files
+    }
+
+    #[must_use]
     pub fn declarations(&self) -> &[Declaration] {
         &self.declarations
     }
 
     #[must_use]
+    pub fn find_message_name_by_opcode(&self, opcode: u32) -> Option<&str> {
+        self.declarations.iter().find_map(|declaration| {
+            let Declaration::Struct(struct_decl) = declaration else {
+                return None;
+            };
+
+            if struct_decl
+                .type_params
+                .as_ref()
+                .is_some_and(|params| !params.is_empty())
+            {
+                return None;
+            }
+
+            let matches_opcode = struct_decl.prefix.as_ref().is_some_and(|prefix| {
+                prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
+            });
+            matches_opcode.then_some(struct_decl.name.as_str())
+        })
+    }
+
+    #[must_use]
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
-        self.structs
+        let idx = *self
+            .declaration_index()
+            .structs
             .get(name)
-            .unwrap_or_else(|| panic!("struct `{name}` not found"))
+            .unwrap_or_else(|| panic!("struct `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Struct(s) => s,
+            _ => unreachable!("declaration index points to non-struct"),
+        }
     }
 
     #[must_use]
     pub fn get_alias(&self, name: &str) -> &AbiAlias {
-        self.aliases
+        let idx = *self
+            .declaration_index()
+            .aliases
             .get(name)
-            .unwrap_or_else(|| panic!("alias `{name}` not found"))
+            .unwrap_or_else(|| panic!("alias `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Alias(a) => a,
+            _ => unreachable!("declaration index points to non-alias"),
+        }
     }
 
     #[must_use]
     pub fn get_enum(&self, name: &str) -> &AbiEnum {
-        self.enums
+        let idx = *self
+            .declaration_index()
+            .enums
             .get(name)
-            .unwrap_or_else(|| panic!("enum `{name}` not found"))
+            .unwrap_or_else(|| panic!("enum `{name}` not found"));
+        match &self.declarations[idx] {
+            Declaration::Enum(e) => e,
+            _ => unreachable!("declaration index points to non-enum"),
+        }
+    }
+
+    #[must_use]
+    pub fn struct_fields_of(&self, ty_idx: TyIdx) -> Option<Vec<FieldInfo>> {
+        let Ty::StructRef { struct_name, .. } = self.ty_by_idx(ty_idx)? else {
+            return None;
+        };
+        if let Some(inst) = self
+            .struct_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+        {
+            let fields = &self.get_struct(struct_name).fields;
+            if fields.len() != inst.monomorphic_fields_ty_idx.len() {
+                return None;
+            }
+            return Some(
+                fields
+                    .iter()
+                    .zip(&inst.monomorphic_fields_ty_idx)
+                    .map(|(field, &field_ty_idx)| FieldInfo {
+                        ty_idx: field_ty_idx,
+                        ..field.clone()
+                    })
+                    .collect(),
+            );
+        }
+        Some(self.get_struct(struct_name).fields.clone())
+    }
+
+    #[must_use]
+    pub fn alias_target_of(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        let Ty::AliasRef { alias_name, .. } = self.ty_by_idx(ty_idx)? else {
+            return None;
+        };
+        self.alias_instantiations
+            .iter()
+            .find(|inst| inst.ty_idx == ty_idx)
+            .map(|inst| inst.monomorphic_target_ty_idx)
+            .or_else(|| Some(self.get_alias(alias_name).target_ty_idx))
     }
 
     #[must_use]
@@ -151,11 +274,8 @@ impl SourceMap {
     }
 
     #[must_use]
-    pub fn resolve_ty(&self, ty_idx: usize) -> Option<&Ty> {
-        self.unique_ty
-            .iter()
-            .find(|u| u.ty_idx == ty_idx)
-            .map(|u| &u.ty)
+    pub fn ty_by_idx(&self, ty_idx: TyIdx) -> Option<&Ty> {
+        self.unique_types.get(ty_idx)
     }
 
     /// Collect all source lines that have a stoppable debug mark (LOC,
@@ -187,6 +307,16 @@ impl SourceMap {
     #[must_use]
     pub const fn debug_marks_count(&self) -> usize {
         self.debug_marks.len()
+    }
+
+    #[must_use]
+    pub fn has_debug_marks(&self) -> bool {
+        !self.marks_dict.is_empty()
+    }
+
+    #[must_use]
+    pub const fn debug_marks_dict(&self) -> &DebugMarksDict {
+        &self.marks_dict
     }
 
     #[must_use]
@@ -222,36 +352,79 @@ impl SourceMap {
 
         normalized
     }
-}
 
-#[derive(Deserialize)]
-struct SourceMapDe {
-    files: Vec<SrcFileInfo>,
-    declarations: Vec<Declaration>,
-    unique_ty: Vec<UniqueTy>,
-    functions: Vec<FunctionInfo>,
-    debug_marks: Vec<DebugMark>,
-}
-
-impl<'de> Deserialize<'de> for SourceMap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = SourceMapDe::deserialize(deserializer)?;
-        let mut sm = SourceMap {
-            files: raw.files,
-            declarations: raw.declarations,
-            unique_ty: raw.unique_ty,
-            functions: raw.functions,
-            debug_marks: raw.debug_marks,
-            structs: HashMap::new(),
-            aliases: HashMap::new(),
-            enums: HashMap::new(),
-        };
-        sm.index_declarations();
-        Ok(sm)
+    fn declaration_index(&self) -> &DeclarationIndex {
+        self.decl_index.get_or_init(|| {
+            let mut index = DeclarationIndex::default();
+            for (idx, decl) in self.declarations.iter().enumerate() {
+                match decl {
+                    Declaration::Struct(s) => {
+                        index.structs.insert(s.name.clone(), idx);
+                    }
+                    Declaration::Alias(a) => {
+                        index.aliases.insert(a.name.clone(), idx);
+                    }
+                    Declaration::Enum(e) => {
+                        index.enums.insert(e.name.clone(), idx);
+                    }
+                }
+            }
+            index
+        })
     }
+
+    fn source_location_for_mark(&self, mark_id: usize) -> Option<SourceLocation> {
+        let (DebugMark::EnterFun {
+            is_inlined: true,
+            range,
+            ..
+        }
+        | DebugMark::Loc { range, .. }
+        | DebugMark::LeaveFun { range, .. }) = self.get_debug_mark(mark_id)
+        else {
+            return None;
+        };
+
+        let file_id = range.file_id();
+        let file = self
+            .resolve_file_full_path(file_id)
+            .unwrap_or_else(|| self.resolve_file_name(file_id))
+            .to_owned();
+        if file.is_empty() || file.starts_with("@stdlib/") {
+            return None;
+        }
+
+        Some(SourceLocation {
+            file,
+            line: range.start_line() as i64,
+            column: range.start_col() as i64,
+            end_line: range.end_line() as i64,
+            end_column: range.end_col() as i64,
+            length: 0,
+        })
+    }
+}
+
+impl TyResolver for SourceMap {
+    fn ty_by_idx(&self, ty_idx: TyIdx) -> Option<&Ty> {
+        SourceMap::ty_by_idx(self, ty_idx)
+    }
+
+    fn struct_field_ty_indices(&self, ty_idx: TyIdx) -> Option<Vec<TyIdx>> {
+        self.struct_fields_of(ty_idx)
+            .map(|fields| fields.into_iter().map(|field| field.ty_idx).collect())
+    }
+
+    fn alias_target_ty_idx(&self, ty_idx: TyIdx) -> Option<TyIdx> {
+        self.alias_target_of(ty_idx)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct DeclarationIndex {
+    structs: HashMap<String, usize>,
+    aliases: HashMap<String, usize>,
+    enums: HashMap<String, usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +435,11 @@ impl<'de> Deserialize<'de> for SourceMap {
 pub struct SrcRange(pub Vec<usize>);
 
 impl SrcRange {
+    #[must_use]
+    pub fn is_undefined(&self) -> bool {
+        self.start_line() == 0
+    }
+
     #[must_use]
     pub fn file_id(&self) -> usize {
         self.0[0]
@@ -306,6 +484,7 @@ pub struct SrcFileInfo {
     pub file_id: usize,
     pub file_name: String,
     pub size_chars: u64,
+    pub imports: Vec<usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -315,29 +494,38 @@ pub struct SrcFileInfo {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiStruct {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
     #[serde(default)]
     pub prefix: Option<PrefixInfo>,
     pub fields: Vec<FieldInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiAlias {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
-    pub target_ty: Ty,
+    pub target_ty_idx: TyIdx,
     #[serde(default)]
     pub type_params: Option<Vec<String>>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AbiEnum {
     pub name: String,
+    pub ty_idx: TyIdx,
     pub ident_loc: SrcRange,
-    pub encoded_as: Ty,
+    pub encoded_as_ty_idx: TyIdx,
     pub members: Vec<EnumMemberInfo>,
+    #[serde(default)]
+    pub custom_pack_unpack: Option<ABICustomPackUnpack>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -353,30 +541,20 @@ pub enum Declaration {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PrefixInfo {
-    pub prefix_str: String,
+    pub prefix_num: u64,
     pub prefix_len: i32,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FieldInfo {
     pub name: String,
-    pub ty: Ty,
+    pub ty_idx: TyIdx,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EnumMemberInfo {
     pub name: String,
     pub value: BigintAsString,
-}
-
-// ---------------------------------------------------------------------------
-// Unique type table (ty_idx -> Ty)
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct UniqueTy {
-    pub ty_idx: usize,
-    pub ty: Ty,
 }
 
 // ---------------------------------------------------------------------------
@@ -387,7 +565,7 @@ pub struct UniqueTy {
 pub struct FunctionInfo {
     pub f_idx: usize,
     pub name: String,
-    pub return_ty_idx: usize,
+    pub return_ty_idx: TyIdx,
     pub num_params: usize,
     pub ident_loc: SrcRange,
     pub end_loc: SrcRange,
@@ -429,7 +607,7 @@ pub enum DebugMark {
         mark_id: usize,
         var_name: String,
         is_parameter: bool,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
         #[serde(default)]
         ir_lazy_slice: Option<usize>,
@@ -442,14 +620,14 @@ pub enum DebugMark {
     SmartCast {
         mark_id: usize,
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     #[serde(rename = "set_glob")]
     SetGlob {
         mark_id: usize,
         glob_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
 }

@@ -85,6 +85,8 @@ impl<'a> LocalnetBuilder<'a> {
         cmd.args(&self.args)
             .current_dir(&self.current_dir)
             .env("NO_COLOR", "1")
+            .env("HOME", self.project.isolated_home())
+            .env("USERPROFILE", self.project.isolated_home())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 

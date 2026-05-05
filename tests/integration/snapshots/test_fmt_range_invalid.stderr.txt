@@ -1,0 +1,1 @@
+Error: Invalid range format. Expected: startLine:startChar-endLine:endChar (e.g., 1:5-3:10)

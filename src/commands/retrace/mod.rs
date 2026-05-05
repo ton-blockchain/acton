@@ -16,7 +16,7 @@ use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
 
 struct ContractTraceArtifacts {
     code_cell: Cell,
-    source_map: tolk_compiler::TolkSourceMap,
+    source_map: tolk_compiler::SourceMap,
 }
 
 #[allow(unsafe_code)]
@@ -164,10 +164,12 @@ fn print_retrace_result(
             "Success".green(),
             "(exit code: 0)".to_string().dimmed()
         )
+    } else if matches!(tx.compute_info, ComputeInfo::Skipped) {
+        "Compute phase skipped".bright_red().to_string()
     } else if !compute_success {
         let exit_code = match &tx.compute_info {
             ComputeInfo::Success { exit_code, .. } => *exit_code,
-            _ => 0,
+            ComputeInfo::Skipped => 0,
         };
         format!(
             "{} {}",
@@ -430,10 +432,10 @@ fn print_retrace_result(
     if let Some(opcode) = result.in_msg.opcode {
         println!("\n{}", "Message Data:".bold());
         println!("  {:<15} 0x{:08x}", "Opcode:".dimmed(), opcode);
-        println!();
     }
 
     if logs_dir.is_none() {
+        println!();
         println!("Help: Use --logs-dir <DIR> to save full VM and executor logs to files.");
     }
 }
@@ -469,25 +471,19 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
         tolk_compiler::CompilerResult::Success(res) => {
             let code_cell = Boc::decode_base64(res.code_boc64)
                 .with_context(|| "Failed to decode compiled contract code BoC".to_string())?;
-            let source_map = res.new_source_map.ok_or_else(|| {
+            let source_map = res.source_map.ok_or_else(|| {
                 anyhow!(
                     "Compiler did not return source maps for {}",
                     contract_path.display()
                 )
             })?;
 
-            let debug_mark_base64 = res.debug_mark_base64.ok_or_else(|| {
-                anyhow!(
+            if !source_map.has_debug_marks() {
+                anyhow::bail!(
                     "Compiler did not return debug marks for {}",
                     contract_path.display()
                 )
-            })?;
-
-            let source_map = tolk_compiler::TolkSourceMap::from_code_cell(
-                source_map,
-                &code_cell,
-                Some(&debug_mark_base64),
-            )?;
+            }
 
             Ok(ContractTraceArtifacts {
                 code_cell,

@@ -4,6 +4,7 @@ mod tests {
     use crate::resolve_index::Resolved;
     use expect_test::{Expect, expect};
     use std::collections::BTreeMap;
+    use std::fmt::Write as _;
     use std::path::PathBuf;
 
     #[test]
@@ -1113,10 +1114,10 @@ mod tests {
                 }
             ",
             expect![[r"
-                uint128 -> Global(uintN at common.tolk:3633-3638)
-                int32 -> Global(intN at common.tolk:3357-3361)
-                bits256 -> Global(bitsN at common.tolk:5235-5240)
-                bytes32 -> Global(bytesN at common.tolk:5325-5331)
+                uint128 -> Global(uintN at common.tolk:3511-3516)
+                int32 -> Global(intN at common.tolk:3235-3239)
+                bits256 -> Global(bitsN at common.tolk:5113-5118)
+                bytes32 -> Global(bytesN at common.tolk:5203-5209)
             "]],
         );
     }
@@ -1140,6 +1141,25 @@ mod tests {
             "#,
             expect![[r"
                 unknown_symbol at 280-294
+            "]],
+        );
+    }
+
+    #[test]
+    fn test_abi_client_type_annotation_resolves_struct_field_type_argument() {
+        check_definition(
+            r"
+                type ClientAddress = address;
+                type ClientPayload = cell;
+
+                struct Message {
+                    @abi.clientType(<caret>ClientAddress | <caret>ClientPayload)
+                    admin: address
+                }
+            ",
+            expect![[r"
+                ClientAddress -> Global(ClientAddress at test.tolk:22-35)
+                ClientPayload -> Global(ClientPayload at test.tolk:68-81)
             "]],
         );
     }
@@ -1657,7 +1677,7 @@ mod tests {
                                     }
                                     Resolved::Unresolved => "Unresolved".to_string(),
                                 };
-                                actual.push_str(&format!("{} -> {}\n", u.name, resolved_str));
+                                let _ = writeln!(actual, "{} -> {}", u.name, resolved_str);
                             }
                             None => {
                                 actual.push_str("Unresolved");
@@ -1675,10 +1695,8 @@ mod tests {
                                         resolved_uses.global_usages_of(*symbol_id).collect();
                                     usages.sort_by_key(|u| u.span.start);
                                     for usage in usages {
-                                        actual.push_str(&format!(
-                                            "{} at {}\n",
-                                            usage.name, usage.span
-                                        ));
+                                        let _ =
+                                            writeln!(actual, "{} at {}", usage.name, usage.span);
                                     }
                                 }
                                 Resolved::Local(local_id) => {
@@ -1686,10 +1704,8 @@ mod tests {
                                         resolved_uses.local_usages_of(*local_id).collect();
                                     usages.sort_by_key(|u| u.span.start);
                                     for usage in usages {
-                                        actual.push_str(&format!(
-                                            "{} at {}\n",
-                                            usage.name, usage.span
-                                        ));
+                                        let _ =
+                                            writeln!(actual, "{} at {}", usage.name, usage.span);
                                     }
                                 }
                                 Resolved::Unresolved => {
@@ -1709,7 +1725,7 @@ mod tests {
                         .collect();
                     unresolved.sort_by_key(|u| u.span.start);
                     for usage in unresolved {
-                        actual.push_str(&format!("{} at {}\n", usage.name, usage.span));
+                        let _ = writeln!(actual, "{} at {}", usage.name, usage.span);
                     }
                 }
             }

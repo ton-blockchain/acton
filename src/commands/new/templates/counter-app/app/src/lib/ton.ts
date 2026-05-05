@@ -1,12 +1,11 @@
 import { Address } from '@ton/core';
+import { TonClient } from '@ton/ton';
 import { QueryClient } from '@tanstack/react-query';
-import { AppKit, Network, TonConnectConnector } from '@ton/appkit-react';
+import { CHAIN } from '@tonconnect/ui-react';
 
 export type TonNetworkMode = 'mainnet' | 'testnet';
 
 const NETWORK_STORAGE_KEY = 'counter-network';
-const MAINNET = Network.mainnet();
-const TESTNET = Network.testnet();
 
 function isNetworkMode(value: string | null): value is TonNetworkMode {
   return value === 'mainnet' || value === 'testnet';
@@ -59,20 +58,24 @@ function toncenterBaseUrl(network: TonNetworkMode): string {
 }
 
 export const TON_NETWORK_MODE = readNetworkMode();
-export const TON_NETWORK = TON_NETWORK_MODE === 'mainnet' ? MAINNET : TESTNET;
-export const IS_TESTNET = TON_NETWORK.chainId === Network.testnet().chainId;
+export const TON_CHAIN: CHAIN =
+  TON_NETWORK_MODE === 'mainnet' ? CHAIN.MAINNET : CHAIN.TESTNET;
+export const IS_TESTNET = TON_CHAIN === CHAIN.TESTNET;
 export const TON_NETWORK_LABEL = IS_TESTNET ? 'Testnet' : 'Mainnet';
 export const TONCENTER_API_KEY = toncenterApiKey(TON_NETWORK_MODE);
 
 const selectedToncenterBaseUrl = toncenterBaseUrl(TON_NETWORK_MODE);
-const TON_CONNECT_MANIFEST_URL =
-  'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
 
 export const TONCENTER_BASE_URL = selectedToncenterBaseUrl;
 export const TONCENTER_RPC_URL = `${selectedToncenterBaseUrl}/api/v2/jsonRPC`;
 export const TONSCAN_ADDRESS_URL = IS_TESTNET
   ? 'https://testnet.tonscan.org/address'
   : 'https://tonscan.org/address';
+
+export const tonClient = new TonClient({
+  endpoint: TONCENTER_RPC_URL,
+  apiKey: TONCENTER_API_KEY,
+});
 
 export function setTonNetworkMode(network: TonNetworkMode) {
   try {
@@ -93,11 +96,11 @@ export function setTonNetworkMode(network: TonNetworkMode) {
 
 export function formatAddressForNetwork(
   address: string,
-  chainId: string | number = TON_NETWORK.chainId,
+  chain: CHAIN | string = TON_CHAIN,
 ): string {
   return Address.parse(address).toString({
     bounceable: false,
-    testOnly: chainId === Network.testnet().chainId,
+    testOnly: chain === CHAIN.TESTNET,
   });
 }
 
@@ -108,29 +111,4 @@ export const queryClient = new QueryClient({
       retry: 1,
     },
   },
-});
-
-export const appKit = new AppKit({
-  networks: {
-    [MAINNET.chainId]: {
-      apiClient: {
-        url: toncenterBaseUrl('mainnet'),
-        key: toncenterApiKey('mainnet'),
-      },
-    },
-    [TESTNET.chainId]: {
-      apiClient: {
-        url: toncenterBaseUrl('testnet'),
-        key: toncenterApiKey('testnet'),
-      },
-    },
-  },
-  defaultNetwork: TON_NETWORK,
-  connectors: [
-    new TonConnectConnector({
-      tonConnectOptions: {
-        manifestUrl: TON_CONNECT_MANIFEST_URL,
-      },
-    }),
-  ],
 });

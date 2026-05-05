@@ -61,7 +61,7 @@ clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 check-deps:
-    cargo shear # --deny-warnings
+    cargo shear --deny-warnings
 
 typos:
     typos .
@@ -71,6 +71,7 @@ check-docgen:
 
 check-schema:
     cargo run -p xtask -- schema --schema acton-toml --check
+    cargo run -p xtask -- schema --schema lint-report --check
     cargo run -p xtask -- schema --schema mutation-rules --check
 
 check-deny:
@@ -126,6 +127,9 @@ fmt-ui:
 
 play-tree-sitter:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter build --wasm && yarn tree-sitter playground
+
+update-template-wrappers:
+    cargo xtask update-template-wrappers
 
 precommit: fmt fmt-ui build build-ui check check-ui
 
