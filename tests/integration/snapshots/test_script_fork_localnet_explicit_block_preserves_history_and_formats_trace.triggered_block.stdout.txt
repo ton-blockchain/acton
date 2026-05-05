@@ -1,0 +1,8 @@
+FORK_RECEIVER_BEFORE=2
+FORK_TRACE_BEGIN
+N/A -> fork_sender A
+└── TriggerForward 0.4 TON -> forwarder B                                       gas=1701
+    └── empty 0.2 TON -> receiver C                                             gas=1776
+
+FORK_TRACE_END
+FORK_RECEIVER_AFTER=3

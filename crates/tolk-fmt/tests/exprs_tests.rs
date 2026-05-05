@@ -1,6 +1,6 @@
 mod common;
 
-use crate::common::{check, check_with_width, check_without_trees};
+use crate::common::{check, check_with_width};
 use expect_test::expect;
 
 #[test]
@@ -434,12 +434,15 @@ fn test_object_literal_two_fields_mixed_forces_multiline() {
 }
 
 #[test]
-fn test_object_literal_with_expr_and_field_with_same_name() {
-    check_without_trees(
+fn test_object_literal_preserves_explicit_fields_with_same_name() {
+    check(
         "fun test() { x = Point { x: x, y: y }; }",
         expect![[r"
                 fun test() {
-                    x = Point { x, y };
+                    x = Point {
+                        x: x,
+                        y: y,
+                    };
                 }"]],
     );
 }

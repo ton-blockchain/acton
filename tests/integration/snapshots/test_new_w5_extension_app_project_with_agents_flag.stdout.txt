@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+> Initialized empty Git repository in [ROOT]/foobar/.git/
+✓ Created new Acton project
+  Project name: W5 Extension App Project
+  Description: w5-extension app description
+  Template: w5-extension
+  TypeScript app: included
+  AGENTS.md: included
+  License: MIT
+
+Created Acton.toml with project configuration
+
+Next steps:
+
+  # Navigate to project
+  cd [ROOT]/foobar
+  # Build your contract
+  acton build
+  # Run tests
+  acton test
+  # Install app dependencies
+  npm ci
+  # Start the TypeScript app
+  npm run dev

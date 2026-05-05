@@ -10,7 +10,7 @@ use lsp_types::{
 pub(crate) fn uri_for_case(case_name: &str, extension: &str) -> Url {
     let mut file_name = case_name.replace(' ', "_");
     if file_name.is_empty() {
-        file_name = "unnamed".to_owned();
+        "unnamed".clone_into(&mut file_name);
     }
     let root = std::env::temp_dir()
         .join("ton-ls-self-contained-tests")

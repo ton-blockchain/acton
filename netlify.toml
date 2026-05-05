@@ -1,6 +1,6 @@
 [build]
 base = "docs"
-command = "bun ci && bun run generated-source && bun run lint:links && bun run build"
+command = "bun ci && bun run generated-source && bun run docs-lint && bun run build"
 publish = "out"
 ignore = "bash ./scripts/netlify-ignore-build.sh"
 

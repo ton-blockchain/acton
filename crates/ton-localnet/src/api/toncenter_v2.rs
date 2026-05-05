@@ -182,6 +182,14 @@ pub fn map_extended_account_state(s: &LocalnetAccountState) -> Value {
 }
 
 #[must_use]
+pub fn map_shard_account_cell(boc: &BocBytes) -> Value {
+    serde_json::json!({
+        "@type": "tvm.cell",
+        "bytes": boc.to_base64()
+    })
+}
+
+#[must_use]
 pub fn map_run_get_method(r: &LocalnetRunGetMethodResult, is_legacy: bool) -> Value {
     let stack_cell = Boc::decode(&r.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();

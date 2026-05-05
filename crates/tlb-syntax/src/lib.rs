@@ -80,7 +80,7 @@ mod tests {
                     "CommonMsgInfo"
                 );
             }
-            _ => panic!("expected declaration"),
+            TopLevel::Unmapped(_) => panic!("expected declaration"),
         }
 
         Ok(())

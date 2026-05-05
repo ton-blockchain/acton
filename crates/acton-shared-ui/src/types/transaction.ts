@@ -1,6 +1,7 @@
 import type {Address, Cell, OutAction, Transaction} from "@ton/core"
+import type {ContractABI} from "gen-typescript-from-tolk-dev"
 
-import type {Abi, BackendExecutorAction, CompilerAbi} from "./index"
+import type {BackendExecutorAction} from "./index"
 
 export interface ParsedTransactionBody {
   readonly name: string
@@ -76,8 +77,5 @@ export interface ContractData {
   readonly displayName: string
   readonly address: Address
   readonly letter: string
-  readonly abi?: Abi
-  readonly compilerAbi?: CompilerAbi
-  readonly incomingMessageNamesByOpcode?: ReadonlyMap<number, string>
-  readonly outgoingMessageNamesByOpcode?: ReadonlyMap<number, string>
+  readonly abi?: ContractABI
 }

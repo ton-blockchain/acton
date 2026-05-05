@@ -1,0 +1,9 @@
+Error: Acton CLI version mismatch for this project.
+
+Acton.toml expects [toolchain].acton = "0.0.0"
+Installed acton version is "[ACTON_VERSION]".
+
+Install the expected version:
+  acton up 0.0.0
+
+Or update [toolchain].acton if this project supports acton [ACTON_VERSION].

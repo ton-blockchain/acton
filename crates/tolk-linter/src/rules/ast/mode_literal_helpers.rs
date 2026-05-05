@@ -81,7 +81,8 @@ fn rewrite_bin(bin: &Bin, source: &str, flags: &[(u32, &str)]) -> RewrittenMode 
         };
     }
 
-    if bin.operator_name(source) != "+" {
+    let operator = bin.operator_name(source);
+    if operator != "+" && operator != "|" {
         return RewrittenMode {
             text: bin.text(source).to_string(),
             has_number_literal: true,
@@ -90,7 +91,7 @@ fn rewrite_bin(bin: &Bin, source: &str, flags: &[(u32, &str)]) -> RewrittenMode 
     }
 
     RewrittenMode {
-        text: format!("{} + {}", left_rewritten.text, right_rewritten.text),
+        text: format!("{} | {}", left_rewritten.text, right_rewritten.text),
         has_number_literal: true,
         fully_mapped: left_rewritten.fully_mapped && right_rewritten.fully_mapped,
     }
@@ -119,7 +120,7 @@ pub(super) fn mode_value_to_constants(mut value: u32, flags: &[(u32, &str)]) -> 
     }
 
     parts.reverse();
-    Some(parts.join(" + "))
+    Some(parts.join(" | "))
 }
 
 pub(super) fn resolve_call_symbol(

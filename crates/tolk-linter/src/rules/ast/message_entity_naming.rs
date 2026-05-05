@@ -19,7 +19,7 @@ use tolk_ty::InferenceResult;
 /// ### Example
 /// ```tolk twoslash
 /// val msg = createMessage({ ... });
-/// //  ^^^ E011: message should be properly named
+/// //  ^^^ S005: message should be properly named
 /// msg.send(SEND_MODE_REGULAR);
 /// ```
 ///
@@ -50,7 +50,7 @@ impl Violation for MessageShouldBeNamed {
 /// ### Example
 /// ```tolk twoslash
 /// createMessage({ ... }).send(SEND_MODE_REGULAR);
-/// //                    ^^^^^ E012: create named message before send
+/// //                    ^^^^^ S006: create named message before send
 /// ```
 ///
 /// Use instead:

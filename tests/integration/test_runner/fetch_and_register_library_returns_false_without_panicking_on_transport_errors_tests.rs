@@ -47,7 +47,6 @@ api = {{ v2 = "http://127.0.0.1:1/api/v2" }}
     project
         .acton()
         .test()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .fork_net("custom:bl-unreachable")
         .run()
         .success()

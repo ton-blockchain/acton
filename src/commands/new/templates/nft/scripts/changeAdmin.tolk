@@ -1,3 +1,4 @@
+import "@acton/io"
 import "@acton/emulation/network"
 import "@wrappers/NftCollection.gen"
 import "utils/common"
@@ -13,7 +14,7 @@ fun main() {
         newAdmin,
         { value: ton("0.05"), bounce: true },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     printNftCollectionInfo(collection, "NFT");
 }

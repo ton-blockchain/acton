@@ -2,6 +2,7 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ContractConfig, DependencyKind};
 use anyhow::anyhow;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
@@ -144,7 +145,7 @@ pub(super) fn generate_dependency_graph_dot(
             continue;
         };
         let label = format!("{}\\n({})", config.display_name(key), key);
-        dot_content.push_str(&format!("    \"{key}\" [label=\"{label}\"];\n"));
+        let _ = writeln!(dot_content, "    \"{key}\" [label=\"{label}\"];");
     }
 
     dot_content.push('\n');
@@ -163,9 +164,10 @@ pub(super) fn generate_dependency_graph_dot(
                     DependencyKind::LibraryRef => " library ref ",
                 };
 
-                dot_content.push_str(&format!(
-                    "    \"{key}\" -> \"{dep_name}\" [label=\"{label}\", labeldistance=3];\n"
-                ));
+                let _ = writeln!(
+                    dot_content,
+                    "    \"{key}\" -> \"{dep_name}\" [label=\"{label}\", labeldistance=3];"
+                );
             }
         }
     }

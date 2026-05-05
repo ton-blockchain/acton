@@ -1,0 +1,4 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]

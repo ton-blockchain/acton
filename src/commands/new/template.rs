@@ -29,6 +29,12 @@ static NFT_TEMPLATE_DIR: Dir<'static> =
 static NFT_APP_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft-app");
 
+static W5_EXTENSION_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension");
+
+static W5_EXTENSION_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension-app");
+
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
 const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
 
@@ -106,12 +112,20 @@ pub(super) struct ContractTemplate {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(super) struct ExtraScript {
+    pub alias: &'static str,
+    pub script: &'static str,
+    pub net: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(super) struct ProjectScaffold {
     base_dir: &'static Dir<'static>,
     app_overlay_dir: Option<&'static Dir<'static>>,
     layout: ProjectLayout,
     contracts: &'static [ContractTemplate],
     deploy_script: &'static str,
+    extra_scripts: &'static [ExtraScript],
 }
 
 impl ProjectScaffold {
@@ -133,6 +147,21 @@ impl ProjectScaffold {
     #[must_use]
     pub(super) fn contract_src(&self, contract: &ContractTemplate) -> String {
         self.layout.remap_path(contract.src)
+    }
+
+    #[must_use]
+    pub(super) fn extra_scripts(&self) -> Vec<(String, String)> {
+        self.extra_scripts
+            .iter()
+            .map(|script| {
+                let path = self.layout.remap_path(script.script);
+                let cmd = match script.net {
+                    Some(net) => format!("acton script {path} --net {net}"),
+                    None => format!("acton script {path}"),
+                };
+                (script.alias.to_owned(), cmd)
+            })
+            .collect()
     }
 }
 
@@ -214,12 +243,28 @@ const NFT_CONTRACTS: [ContractTemplate; 2] = [
     },
 ];
 
+const W5_EXTENSION_CONTRACTS: [ContractTemplate; 2] = [
+    ContractTemplate {
+        id: "SimpleExtension",
+        name: "SimpleExtension",
+        src: "contracts/SimpleExtension.tolk",
+        depends: &[],
+    },
+    ContractTemplate {
+        id: "WalletV5",
+        name: "WalletV5",
+        src: "contracts/walletv5/WalletV5.tolk",
+        depends: &[],
+    },
+];
+
 const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     base_dir: &EMPTY_TEMPLATE_DIR,
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -228,6 +273,7 @@ const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -236,6 +282,7 @@ const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -244,6 +291,7 @@ const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -252,6 +300,7 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -260,6 +309,7 @@ const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -268,6 +318,7 @@ const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deployCollection.tolk",
+    extra_scripts: &[],
 };
 
 const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -276,6 +327,38 @@ const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deployCollection.tolk",
+    extra_scripts: &[],
+};
+
+const W5_EXTENSION_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "install-extension",
+        script: "scripts/install-extension.tolk",
+        net: Some("testnet"),
+    },
+    ExtraScript {
+        alias: "delete-extension",
+        script: "scripts/delete-extension.tolk",
+        net: Some("testnet"),
+    },
+];
+
+const W5_EXTENSION_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    app_overlay_dir: None,
+    layout: ProjectLayout::Standard,
+    contracts: &W5_EXTENSION_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
+};
+
+const W5_EXTENSION_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    app_overlay_dir: Some(&W5_EXTENSION_APP_TEMPLATE_DIR),
+    layout: ProjectLayout::App,
+    contracts: &W5_EXTENSION_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -284,6 +367,8 @@ pub enum ProjectTemplate {
     Counter,
     Jetton,
     Nft,
+    #[value(alias = "w5-plugin")]
+    W5Extension,
 }
 
 impl ProjectTemplate {
@@ -294,6 +379,7 @@ impl ProjectTemplate {
             Self::Counter => "counter",
             Self::Jetton => "jetton",
             Self::Nft => "nft",
+            Self::W5Extension => "w5-extension",
         }
     }
 
@@ -304,6 +390,7 @@ impl ProjectTemplate {
             Self::Counter => "Simple counter contract",
             Self::Jetton => "Jetton minter and wallet contracts",
             Self::Nft => "NFT collection and item contracts",
+            Self::W5Extension => "Wallet V5 extension contract and subscription example",
         }
     }
 }
@@ -334,12 +421,18 @@ const NFT_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     app_scaffold: Some(NFT_APP_SCAFFOLD),
 };
 
+const W5_EXTENSION_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
+    default_scaffold: W5_EXTENSION_SCAFFOLD,
+    app_scaffold: Some(W5_EXTENSION_APP_SCAFFOLD),
+};
+
 const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefinition {
     match template {
         ProjectTemplate::Empty => &EMPTY_TEMPLATE_DEFINITION,
         ProjectTemplate::Counter => &COUNTER_TEMPLATE_DEFINITION,
         ProjectTemplate::Jetton => &JETTON_TEMPLATE_DEFINITION,
         ProjectTemplate::Nft => &NFT_TEMPLATE_DEFINITION,
+        ProjectTemplate::W5Extension => &W5_EXTENSION_TEMPLATE_DEFINITION,
     }
 }
 
@@ -349,6 +442,7 @@ pub(super) fn get_available_templates() -> Vec<ProjectTemplate> {
         ProjectTemplate::Counter,
         ProjectTemplate::Jetton,
         ProjectTemplate::Nft,
+        ProjectTemplate::W5Extension,
     ]
 }
 
@@ -410,7 +504,7 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
 }
 
 /// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
-/// without any contract files, for `acton init --create-app`.
+/// without any contract files, for `acton init --create-dapp`.
 pub fn extract_standalone_app_scaffold(
     target_dir: &Path,
     npm_package_name: &str,

@@ -6,6 +6,7 @@ use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::thread;
@@ -19,7 +20,8 @@ use ton_localnet::types::Hash256;
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
 use tycho_types::models::{
-    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, OwnedMessage, StdAddr,
+    AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo,
+    OwnedMessage, ShardAccount, StdAddr,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -107,6 +109,36 @@ fun main() {
 }
 "#;
 
+const DEPLOY_TRACKED_CONTRACT_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val trackedInit = ContractState {
+        code: build("tracked"),
+        data: createEmptyCell(),
+    };
+    val trackedAddress = AutoDeployAddress {
+        stateInit: trackedInit,
+    }.calculateAddress();
+
+    val deployTracked = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: trackedInit,
+        },
+    });
+    net.send(wallet.address, deployTracked);
+
+    println("TRACKED_CONTRACT={}", trackedAddress);
+}
+"#;
+
 const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
 kind = "v4r2"
 workchain = 0
@@ -150,6 +182,104 @@ fun main() {
     net.send(wallet.address, deployGetter);
 
     println("GETTER_CONTRACT={}", getterAddress);
+}
+"#;
+
+const LOCALNET_CACHE_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+";
+
+const LOCALNET_CACHE_COUNTER_CONTRACT: &str = r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounter(): int {
+    val storage = lazy Storage.load();
+    return storage.counter;
+}
+"#;
+
+const LOCALNET_CACHE_REFRESH_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/types"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val counterInit = ContractState {
+        code: build("counter"),
+        data: Storage {
+            id: 0,
+            counter: 7,
+        }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress {
+        stateInit: counterInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: counterInit,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val before: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("BEFORE={}", before);
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.05"),
+        dest: counterAddress,
+        body: IncreaseCounter {
+            increaseBy: 5,
+        },
+    })).waitForFirstTransaction(true, 30, 100) == null) {
+        println("INCREASE_NULL");
+        return;
+    }
+
+    val after: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("AFTER={}", after);
 }
 "#;
 
@@ -320,6 +450,120 @@ fn localnet_starts_and_serves_masterchain_info() {
         response["result"]["last"]["seqno"].as_u64().is_some(),
         "Expected getMasterchainInfo result.last.seqno to be present:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_empty_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
+    let node = project.localnet().start();
+    let address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let mut response = node.get_json(&format!("/api/v2/getShardAccountCell?address={address}"));
+    normalize_extra_for_snapshot(&mut response);
+
+    let _parsed = decode_shard_account_cell_response(&response);
+
+    let mut rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getShardAccountCell",
+            "params": {
+                "address": address
+            }
+        }),
+    );
+    normalize_extra_for_snapshot(&mut rpc_response);
+    let _rpc_parsed = decode_shard_account_cell_response(&rpc_response);
+
+    let mut invalid_response =
+        node.get_json("/api/v2/getShardAccountCell?address=not-a-ton-address");
+    normalize_extra_for_snapshot(&mut invalid_response);
+
+    let snapshot = json!({
+        "empty_http": response,
+        "empty_json_rpc": rpc_response,
+        "invalid_address": invalid_response,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("Failed to serialize JSON response")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_empty.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_active_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-active")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let stdout = output.get_stdout();
+    let tracked_address = extract_marker_value(&stdout, "TRACKED_CONTRACT=");
+
+    wait_until_address_state_active(&node, &tracked_address, Duration::from_secs(12));
+    let raw_address = unpack_address(&node, &tracked_address);
+
+    let http_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={tracked_address}"),
+        Duration::from_secs(12),
+    );
+    let rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "tracked",
+            "method": "getShardAccountCell",
+            "params": {
+                "address": tracked_address
+            }
+        }),
+    );
+
+    let http_boc = shard_account_cell_boc64(&http_response);
+    let rpc_boc = shard_account_cell_boc64(&rpc_response);
+    let snapshot = json!({
+        "http": summarize_shard_account_cell_response(&http_response, Some(&raw_address)),
+        "json_rpc": summarize_shard_account_cell_response(&rpc_response, Some(&raw_address)),
+        "same_cell_bytes": http_boc == rpc_boc,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot)
+            .expect("Failed to serialize active shard account summary")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_active.summary.json"),
     );
 
     node.stop();
@@ -544,6 +788,41 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_not_contains("compute phase skipped")
         .assert_snapshot_matches(
             "integration/snapshots/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+        );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_invalidates_remote_cache_after_broadcast_before_get_method() {
+    let project = ProjectBuilder::new("localnet-script-cache-refresh")
+        .file("contracts/types", LOCALNET_CACHE_COUNTER_TYPES)
+        .contract("counter", LOCALNET_CACHE_COUNTER_CONTRACT)
+        .script_file("cache_refresh", LOCALNET_CACHE_REFRESH_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/cache_refresh.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output
+        .assert_contains("BEFORE=7")
+        .assert_contains("AFTER=12")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_localnet_script_invalidates_remote_cache_after_broadcast_before_get_method.stdout.txt",
         );
 
     node.stop();
@@ -2449,25 +2728,23 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .expect("accountStates code_hash must be valid base64")
         .to_hex();
 
-    let compiler_abi_response = wait_for_ok_response(
+    let abi_response = wait_for_ok_response(
         &node,
         &format!("/admin/compiler-abi?code_hash={code_hash_hex}"),
         Duration::from_secs(12),
     );
-    let compiler_abi = response_payload(&compiler_abi_response);
+    let abi = response_payload(&abi_response);
 
-    assert_eq!(compiler_abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(compiler_abi["contract_name"].as_str(), Some("getter"));
+    assert_eq!(abi["compiler_name"].as_str(), Some("tolk"));
+    assert_eq!(abi["contract_name"].as_str(), Some("getter"));
     assert!(
-        compiler_abi["get_methods"]
-            .as_array()
-            .is_some_and(|methods| {
-                methods
-                    .iter()
-                    .any(|method| method["name"].as_str() == Some("addTen"))
-            }),
+        abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("addTen"))
+        }),
         "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(compiler_abi).unwrap_or_default()
+        serde_json::to_string_pretty(abi).unwrap_or_default()
     );
 
     let missing_response = node.get_json(
@@ -2559,16 +2836,19 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
 }
 
@@ -2680,28 +2960,104 @@ fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str
         &format!("/api/v2/unpackAddress?address={address}"),
         Duration::from_secs(12),
     );
-    response["result"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    response["result"].as_str().map_or_else(
+        || {
             panic!(
                 "Expected string result from unpackAddress for `{address}`:\n{}",
                 serde_json::to_string_pretty(&response).unwrap_or_default()
             )
-        })
+        },
+        ToOwned::to_owned,
+    )
+}
+
+fn shard_account_cell_boc64(response: &Value) -> &str {
+    response["result"]["bytes"].as_str().unwrap_or_else(|| {
+        panic!(
+            "getShardAccountCell result must contain cell bytes:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        )
+    })
+}
+
+fn decode_shard_account_cell_response(response: &Value) -> ShardAccount {
+    Boc::decode_base64(shard_account_cell_boc64(response))
+        .expect("getShardAccountCell bytes must be a valid BoC")
+        .parse::<ShardAccount>()
+        .expect("getShardAccountCell bytes must decode as ShardAccount")
+}
+
+fn summarize_shard_account_cell_response(
+    response: &Value,
+    expected_raw_address: Option<&str>,
+) -> Value {
+    let shard_account = decode_shard_account_cell_response(response);
+    let last_trans_lt = if shard_account.last_trans_lt == 0 {
+        "zero"
+    } else {
+        "nonzero"
+    };
+    let last_trans_hash_nonzero = shard_account.last_trans_hash != HashBytes::ZERO;
+
+    let optional_account = shard_account
+        .account
+        .load()
+        .expect("ShardAccount account reference must load");
+    let Some(account) = optional_account.0 else {
+        return json!({
+            "ok": response["ok"],
+            "cell_type": response["result"]["@type"],
+            "state": "nonexist",
+            "last_trans_lt": last_trans_lt,
+            "last_trans_hash_nonzero": last_trans_hash_nonzero,
+        });
+    };
+
+    let address_matches = expected_raw_address.map(|expected| match &account.address {
+        IntAddr::Std(std) => {
+            format!("{}:{}", std.workchain, hex::encode(std.address.0)) == expected
+        }
+        IntAddr::Var(_) => false,
+    });
+    let balance: u128 = account.balance.tokens.into();
+    let (state, code_present, data_present, frozen_hash_present) = match account.state {
+        AccountState::Active(state_init) => (
+            "active",
+            state_init.code.is_some(),
+            state_init.data.is_some(),
+            false,
+        ),
+        AccountState::Uninit => ("uninitialized", false, false, false),
+        AccountState::Frozen(hash) => ("frozen", false, false, hash != HashBytes::ZERO),
+    };
+
+    json!({
+        "ok": response["ok"],
+        "cell_type": response["result"]["@type"],
+        "state": state,
+        "balance_positive": balance > 0,
+        "address_matches": address_matches,
+        "code_present": code_present,
+        "data_present": data_present,
+        "frozen_hash_present": frozen_hash_present,
+        "last_trans_lt": last_trans_lt,
+        "last_trans_hash_nonzero": last_trans_hash_nonzero,
+    })
 }
 
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
     response_payload(response)
         .get("transactions")
         .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected `transactions` array in response payload:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
-        })
+        .map_or_else(
+            || {
+                panic!(
+                    "Expected `transactions` array in response payload:\n{}",
+                    serde_json::to_string_pretty(response).unwrap_or_default()
+                )
+            },
+            Vec::as_slice,
+        )
 }
 
 fn hashes_equivalent(left: &str, right: &str) -> bool {
@@ -2849,7 +3205,9 @@ fn encode_query_component(value: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(char::from(byte));
             }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
         }
     }
     encoded
@@ -2972,16 +3330,12 @@ fn extract_first_outgoing_message_locator(
 }
 
 fn normalize_transactions_std_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
     redact_dynamic_transaction_fields(response);
 }
 
 fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
 
     if let Some(shards) = response
         .pointer_mut("/result/shards")
@@ -3000,6 +3354,12 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 }
             }
         }
+    }
+}
+
+fn normalize_extra_for_snapshot(response: &mut Value) {
+    if let Some(extra) = response.get_mut("@extra") {
+        *extra = json!("[EXTRA]");
     }
 }
 

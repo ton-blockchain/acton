@@ -2,11 +2,6 @@
 
 @custom-variant dark (&:is([data-theme="dark"] *));
 
-/*
-  NFT Minter — shadcn/ui theme mapped to TON color palette
-  Using data-theme="dark" / data-theme="light" instead of .dark class
-*/
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -43,7 +38,6 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
-
   --color-success: var(--success);
   --color-warning: var(--warning);
 
@@ -58,7 +52,6 @@
   --animate-out: exit 0.15s ease-in;
 }
 
-/* ─── Light theme (default) ─── */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0 0);
@@ -97,7 +90,6 @@
   --sidebar-ring: #0098ea;
 }
 
-/* ─── Dark theme ─── */
 [data-theme='dark'] {
   --background: oklch(0.141 0.005 285.82);
   --foreground: oklch(0.925 0.006 264.53);
@@ -133,7 +125,6 @@
   --sidebar-ring: #0098ea;
 }
 
-/* ─── Base styles ─── */
 @layer base {
   *,
   ::after,
@@ -153,9 +144,16 @@
     font-family: var(--font-sans);
     background: var(--color-background);
     color: var(--color-foreground);
-    font-size: 14px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
   }
 }
 
@@ -173,7 +171,6 @@
   border-radius: 3px;
 }
 
-/* ─── Animations for shadcn ─── */
 @keyframes enter {
   from {
     opacity: 0;
@@ -202,17 +199,6 @@
   }
 }
 
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
-}
-
-/* ─── Spinner ─── */
 .spinner {
   width: 16px;
   height: 16px;
@@ -224,10 +210,11 @@
   opacity: 0.6;
 }
 
-/* ─── TonConnect overrides ─── */
 [data-tc-wallets-modal-container],
 [data-tc-dropdown-container],
 [data-tc-notification-container],
+[data-ta-overlay],
+[data-ta-modal],
 div[class*='tc-'] {
   z-index: 1000 !important;
 }

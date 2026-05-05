@@ -63,6 +63,15 @@
   color: var(--text-primary);
 }
 
+.sourceLocationLink {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+.sourceLocationLink:hover {
+  text-decoration: underline;
+}
+
 .ideTrigger {
   display: flex;
   align-items: center;

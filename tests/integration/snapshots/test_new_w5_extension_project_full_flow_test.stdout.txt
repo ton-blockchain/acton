@@ -1,0 +1,13 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]/foobar
+
+ > tests/simple-extension.test.tolk (4 tests)
+  ✓ extension: installs into wallet v5 [TIME]
+  ✓ extension: collects payment from installed wallet [TIME]
+  ✓ extension: enforces payment interval [TIME]
+  ✓ admin: cancels subscription and removes extension from wallet [TIME]
+
+ ✓ 4 passed in 1 file

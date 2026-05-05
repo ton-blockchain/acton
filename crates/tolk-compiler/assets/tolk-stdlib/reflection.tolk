@@ -28,6 +28,16 @@ fun reflect.typeNameOf<T>(): string
 fun reflect.typeNameOfObject<T>(anyVariable: T): string
     builtin
 
+/// Get unique ty_idx (from `out.symbolTypes.json`) of any type T.
+@pure
+fun reflect.typeUniqueIdxOf<T>(): int
+    builtin
+
+/// Get unique ty_idx (from `out.symbolTypes.json`) of any object.
+@pure
+fun reflect.typeUniqueIdxOfObject<T>(anyVariable: T): int
+    builtin
+
 /// Returns the number of stack slots a type T occupies.
 /// Example:
 /// ```

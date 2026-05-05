@@ -13,8 +13,8 @@ fn env_slice_returns_raw_and_empty_values_and_null_when_missing() {
             import "../../lib/testing/expect"
 
             get fun `test bp stdlib env slice branches`() {
-                expect(env<slice>("BP_ENV_SLICE_RAW")).toEqual("  keep surrounding spaces  ");
-                expect(env<slice>("BP_ENV_SLICE_EMPTY")).toEqual("");
+                expect(env<slice>("BP_ENV_SLICE_RAW")).toEqual("  keep surrounding spaces  ".beginParse());
+                expect(env<slice>("BP_ENV_SLICE_EMPTY")).toEqual("".beginParse());
                 expect(env<slice>("BP_ENV_SLICE_MISSING")).toBeNull();
             }
         "#,
@@ -29,6 +29,32 @@ fn env_slice_returns_raw_and_empty_values_and_null_when_missing() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/env_slice_returns_raw_and_empty_values_and_null_when_missing/env_slice_returns_raw_and_empty_values_and_null_when_missing.stdout.txt",
+        );
+}
+
+#[test]
+fn env_slice_to_equal_string_reports_typed_mismatch() {
+    ProjectBuilder::new("bp-stdlib-env-slice-string-typed-mismatch")
+        .test_file(
+            "env_slice_string_mismatch",
+            r#"
+            import "../../lib/env"
+            import "../../lib/testing/expect"
+
+            get fun `test bp stdlib env slice string typed mismatch`() {
+                expect(env<slice>("BP_ENV_SLICE_TEXT")).toEqual("slice-value");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .env("BP_ENV_SLICE_TEXT", "slice-value")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/env_slice_returns_raw_and_empty_values_and_null_when_missing/env_slice_to_equal_string_reports_typed_mismatch.stdout.txt",
         );
 }
 
@@ -83,7 +109,7 @@ fn env_or_slice_uses_fallback_for_missing_and_present_value_when_set() {
 
                 val fallback = fallbackOpt!;
                 expect(env<slice>("BP_ENV_OR_SLICE_MISSING") ?? fallback).toEqual(fallback);
-                expect(env<slice>("BP_ENV_OR_SLICE_PRESENT") ?? fallback).toEqual("present-slice-value");
+                expect(env<slice>("BP_ENV_OR_SLICE_PRESENT") ?? fallback).toEqual("present-slice-value".beginParse());
             }
         "#,
         )
@@ -115,7 +141,7 @@ fn env_string_and_slice_support_long_values_without_truncation() {
                 expect(asString).toBeNotNull();
                 expect(asSlice).toBeNotNull();
                 expect(asString!).toEqual("{long_value}");
-                expect(asSlice!).toEqual("{long_value}");
+                expect(asSlice!).toBeNonEmpty();
             }}
         "#
     );

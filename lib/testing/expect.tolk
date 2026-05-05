@@ -39,7 +39,7 @@ struct Expectation<T> {
     /// The value to be expected.
     private value: T
     /// The type of the value to be expected.
-    private valueType: string
+    private valueType: int
     /// The location of the expectation to be printed in the error message.
     /// This field is set by the test framework and should not be set manually.
     private location: string
@@ -53,7 +53,7 @@ struct Expectation<T> {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
-fun Expectation<T>.create(value: T, valueType: string, location: string): Expectation<T> {
+fun Expectation<T>.create(value: T, valueType: int, location: string): Expectation<T> {
     return Expectation<T> { value, valueType, location };
 }
 
@@ -642,7 +642,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
 fun expect<T>(value: T, loc: string = reflect.sourceLocationAsString()): Expectation<T> {
     return Expectation<T>.create(
         value,
-        reflect.typeNameOfObject(value),
+        reflect.typeUniqueIdxOfObject(value),
         loc,
     );
 }

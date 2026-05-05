@@ -10,6 +10,23 @@
  > tests/io_nested_formatter.test.tolk (1 test)
   ✓ ar stdlib println nested tuple and struct values [TIME]
     └─ Test output:
-       ([BOC_HEX], 7, 9, 11, 13, [17, 19, 23], [29, 31], 37, 41)
+       (
+           Frame {
+               name: "root",
+               point: Point {
+                   x: 7,
+                   y: 9,
+               },
+               pair: (11, 13),
+               numbers: [17, 19, 23],
+           },
+           (
+               [29, 31],
+               Point {
+                   x: 37,
+                   y: 41,
+               },
+           ),
+       )
 
  ✓ 1 passed in 1 file

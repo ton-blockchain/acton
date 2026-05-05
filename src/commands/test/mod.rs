@@ -1,4 +1,4 @@
-use crate::commands::build::build_cmd;
+use crate::commands::build::{BuildCommandOptions, build_cmd};
 use crate::commands::common::{
     error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
 };
@@ -48,10 +48,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
-use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
@@ -114,7 +113,6 @@ pub struct TestRunner<'a> {
     reporter_manager: &'a mut ReporterManager,
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
-    abi_parse_cache: ContractAbiParseCache,
     fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
@@ -193,7 +191,6 @@ impl<'a> TestRunner<'a> {
             mutation_overrides,
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
-            abi_parse_cache: ContractAbiParseCache::new(),
             fuzz_seed,
         })
     }
@@ -254,32 +251,15 @@ impl<'a> TestRunner<'a> {
         test: &TestDescriptor,
         code_cell: &Cell,
         dest_address: &str,
-        abi: Arc<ContractAbi>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        abi: Option<Arc<ContractABI>>,
+        source_map: Arc<SourceMap>,
     ) -> anyhow::Result<TestResult> {
         if let Some(fuzz) = test.fuzz {
-            return self.execute_fuzz_test(
-                test,
-                code_cell,
-                dest_address,
-                abi,
-                compiler_abi,
-                source_map,
-                fuzz,
-            );
+            return self.execute_fuzz_test(test, code_cell, dest_address, abi, source_map, fuzz);
         }
 
         let stack = &Tuple::empty();
-        self.execute_test_case(
-            test,
-            code_cell,
-            dest_address,
-            abi,
-            compiler_abi,
-            source_map,
-            stack,
-        )
+        self.execute_test_case(test, code_cell, dest_address, abi, source_map, stack)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -288,9 +268,8 @@ impl<'a> TestRunner<'a> {
         test: &TestDescriptor,
         code_cell: &Cell,
         dest_address: &str,
-        abi: Arc<ContractAbi>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
-        source_map: Arc<TolkSourceMap>,
+        abi: Option<Arc<ContractABI>>,
+        source_map: Arc<SourceMap>,
         stack: &Tuple,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.effective_log_verbosity();
@@ -339,11 +318,13 @@ impl<'a> TestRunner<'a> {
             env: Env {
                 config: &self.acton_config,
                 project_root: self.project_root.clone(),
-                abi,
+                abi: abi.clone(),
+                source_map: source_map.clone(),
                 show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
+                tonconnect: None,
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
                 fork_net: self.config.fork_net.clone(),
@@ -390,7 +371,7 @@ impl<'a> TestRunner<'a> {
                 executor.prepare(test.id, &stack)?;
                 let mut replayer =
                     TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-                replayer.set_compiler_abi(compiler_abi);
+                replayer.set_abi(abi);
                 let mut dbg_session =
                     ReplayerDebugSession::new(self.transport.clone(), replayer, test.name.clone());
                 ctx.debug = DebugCtx::new(&mut dbg_session);
@@ -549,7 +530,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
     if need_to_build() {
-        build_cmd(None, config.clear_cache, None, None, None, None, false)?;
+        build_cmd(BuildCommandOptions {
+            clear_cache: config.clear_cache,
+            ..BuildCommandOptions::default()
+        })?;
     }
     println!("     {} tests", "Running".green().bold());
 
@@ -761,18 +745,25 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     runner.reporter_manager.finalize()?;
 
     if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
-        match profiling::collect_profile(&runner) {
-            Ok(()) => {}
-            Err(err) => {
-                if config.fail_on_diff {
-                    return Err(err);
+        if total_failed == 0 {
+            match profiling::collect_profile(&runner) {
+                Ok(()) => {}
+                Err(err) => {
+                    if config.fail_on_diff {
+                        return Err(err);
+                    }
+                    eprintln!(
+                        "{}: Cannot collect profiling result: {}",
+                        "Error".red(),
+                        err
+                    );
                 }
-                eprintln!(
-                    "{}: Cannot collect profiling result: {}",
-                    "Error".red(),
-                    err
-                );
             }
+        } else {
+            println!(
+                "\n{} Gas profiling snapshot and comparison tables were skipped because tests failed.",
+                "Note:".yellow()
+            );
         }
     }
 
@@ -1001,8 +992,7 @@ fn compile_test_file(
                 fift_code: cache_entry.fift_code.unwrap_or_default(),
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
-                debug_mark_base64: cache_entry.debug_mark_base64,
-                new_source_map: cache_entry.new_source_map,
+                source_map: cache_entry.source_map,
                 abi: cache_entry.abi,
             },
         ));
@@ -1041,16 +1031,6 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let file = tolk_syntax::parse(&content);
     let tests = find_all_test(filepath, &file, &content);
 
-    let mappings = runner.acton_config.mappings();
-
-    let abi = contract_abi_with_file(
-        content.into(),
-        filepath,
-        &file,
-        &mappings,
-        Some(&mut runner.abi_parse_cache),
-    );
-
     let config = &runner.config;
     let need_debug_info =
         config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
@@ -1076,34 +1056,20 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     };
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
-    let source_map = Arc::new(TolkSourceMap::from_code_cell(
-        result.new_source_map.unwrap_or_default(),
-        &code_cell,
-        result.debug_mark_base64.as_deref(),
-    )?);
-    let compiler_abi = result.abi.map(Arc::new);
-    let tests = attach_test_parameter_metadata(tests, &abi, compiler_abi.as_deref());
-    let stats = run_file_tests(
-        runner,
-        filepath,
-        tests,
-        &code_cell,
-        Arc::new(abi),
-        compiler_abi,
-        source_map,
-    )?;
+    let source_map = Arc::new(result.source_map.unwrap_or_default());
+    let abi = result.abi.map(Arc::new);
+    let tests = attach_test_parameter_metadata(tests, abi.as_deref());
+    let stats = run_file_tests(runner, filepath, tests, &code_cell, abi, source_map)?;
     Ok(stats)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
     code: &Cell,
-    abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<tolk_compiler::abi::ContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
@@ -1133,7 +1099,6 @@ fn run_file_tests(
     let mut skipped = 0;
     let mut todo = 0;
     let mut stopped = false;
-    let mappings = runner.acton_config.mappings();
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
         let mut test_report = TestReport {
@@ -1152,7 +1117,6 @@ fn run_file_tests(
             details: None,
             location: None,
             abi: abi.clone(),
-            compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
             show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
@@ -1168,7 +1132,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
-            test_report.details = test.status_description.clone();
+            test_report.details.clone_from(&test.status_description);
             runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
@@ -1176,7 +1140,7 @@ fn run_file_tests(
 
         if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
-            test_report.details = test.status_description.clone();
+            test_report.details.clone_from(&test.status_description);
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
@@ -1195,14 +1159,8 @@ fn run_file_tests(
         }
 
         let start_time = Instant::now();
-        let result = runner.execute_test(
-            test,
-            code,
-            &dest_address,
-            abi.clone(),
-            compiler_abi.clone(),
-            source_map.clone(),
-        );
+        let result =
+            runner.execute_test(test, code, &dest_address, abi.clone(), source_map.clone());
         let result = match result {
             Ok(result) => result,
             Err(err) if is_debug_stop_requested(&err) => {
@@ -1305,7 +1263,6 @@ fn run_file_tests(
             test_report.status = TestStatus::Failed;
 
             let formatter = FormatterContext {
-                contract_abi: abi.clone(),
                 accounts: Cow::Borrowed(&accounts),
                 build_cache: Cow::Borrowed(&runner.build_cache),
                 emulations: Cow::Borrowed(&runner.emulations),
@@ -1336,7 +1293,7 @@ fn run_file_tests(
                 }
                 test_report.details = failure.location().map(|l| l.format_full());
                 test_report.location = failure.location();
-                let detailed = formatter.format_detailed_assert_failure(failure, abi.clone());
+                let detailed = formatter.format_detailed_assert_failure(failure);
                 test_report.detailed_message = Some(FormatterContext::strip_ansi_text(&detailed));
 
                 if let AssertFailure::TransactionNotFound(tx_failure)
@@ -1345,7 +1302,7 @@ fn run_file_tests(
                     test_report.failed_transactions =
                         Some(formatter.parse_failed_transactions(&tx_failure.txs));
                     test_report.failed_transaction_context =
-                        Some(formatter.get_failed_transaction_context(tx_failure, abi.clone()));
+                        Some(formatter.get_failed_transaction_context(tx_failure));
                 }
             } else if expected_exit_code != 0 {
                 test_report.message = Some(format!(
@@ -1377,7 +1334,6 @@ fn run_file_tests(
                 }
 
                 // TODO: remove this memoize somehow
-                let content: Arc<str> = fs::read_to_string(&file_path).unwrap_or_default().into();
                 let code_boc64 = Boc::encode_base64(code);
                 runner.build_cache.memoize(
                     &test.name,
@@ -1385,11 +1341,7 @@ fn run_file_tests(
                     &code_boc64,
                     *code.repr_hash(),
                     source_map.clone(),
-                    Some(
-                        contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
-                            .into(),
-                    ),
-                    None,
+                    abi.clone(),
                 );
             }
         }

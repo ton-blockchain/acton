@@ -9,10 +9,17 @@ pub enum Instruction {
     Plain(PlainInstruction),
     Ref(RefInstruction),
     ExoticCell(ExoticCellInstruction),
+    Slice(SliceInstruction),
 }
 
 #[derive(Debug, Clone)]
 pub struct ExoticCellInstruction {
+    pub source_cell: Option<Cell>,
+    pub cell: Cell,
+}
+
+#[derive(Debug, Clone)]
+pub struct SliceInstruction {
     pub source_cell: Option<Cell>,
     pub cell: Cell,
 }

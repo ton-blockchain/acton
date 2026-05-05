@@ -12,7 +12,7 @@
 //! *   [`TraceStep`]: Individual events in the trace, such as instruction
 //!     executions ([`TraceStep::Execute`]), exceptions ([`TraceStep::Exception`]),
 //!     or action register value ([`TraceStep::FinalC5`]).
-//! *   [`InstalledActions`]: Actions (messages and reservations) that the contract
+//! *   [`InstalledActions`]: Actions that the contract
 //!     *queued* during its execution.
 //! *   [`ExecutedActions`]: Actions that the sandbox actually *processed* during
 //!     the action phase.
@@ -86,13 +86,67 @@ pub enum TraceStep {
 }
 
 /// An action that was "installed" (queued) by the contract during execution.
-/// These are extracted from `SENDRAWMSG` and `RAWRESERVE` instructions.
+/// These are extracted from instructions that append to the action list.
 #[derive(Debug)]
 pub enum InstalledAction {
     /// A message was queued for sending via `SENDRAWMSG`.
     Message(InstalledSendMessageAction),
     /// A currency reservation was made via `RAWRESERVE`.
     Reserve(InstalledReserveAction),
+    /// Contract code update was queued via `SETCODE`.
+    SetCode(InstalledSetCodeAction),
+    /// Contract library collection update was queued via `SETLIBCODE` or `CHANGELIB`.
+    ChangeLibrary(InstalledChangeLibraryAction),
+}
+
+impl InstalledAction {
+    /// Hash of the code cell where the instruction was executed.
+    #[must_use]
+    pub fn loc_hash(&self) -> &str {
+        match self {
+            Self::Message(action) => &action.loc_hash,
+            Self::Reserve(action) => &action.loc_hash,
+            Self::SetCode(action) => &action.loc_hash,
+            Self::ChangeLibrary(action) => &action.loc_hash,
+        }
+    }
+
+    /// Offset within the code cell.
+    #[must_use]
+    pub const fn loc_offset(&self) -> u16 {
+        match self {
+            Self::Message(action) => action.loc_offset,
+            Self::Reserve(action) => action.loc_offset,
+            Self::SetCode(action) => action.loc_offset,
+            Self::ChangeLibrary(action) => action.loc_offset,
+        }
+    }
+
+    /// Returns whether an executor-log action describes the same action-list item.
+    #[must_use]
+    pub fn matches_executed_action(&self, action: &ExecutedAction) -> bool {
+        match (self, action) {
+            (Self::Message(installed), ExecutedAction::SendMessage { hash, .. }) => {
+                installed.msg_hash.eq_ignore_ascii_case(hash)
+            }
+            (Self::Reserve(installed), ExecutedAction::ReserveCurrency { mode, reserve, .. }) => {
+                installed.mode == *mode && installed.amount == *reserve
+            }
+            (Self::SetCode(installed), ExecutedAction::SetCode { new_code_hash, .. }) => {
+                cell_hash_matches(&installed.new_code, new_code_hash)
+            }
+            (
+                Self::ChangeLibrary(installed),
+                ExecutedAction::ChangeLibrary {
+                    mode,
+                    lib_hash,
+                    lib_ref,
+                    ..
+                },
+            ) => installed.mode == *mode && library_ref_matches(&installed.lib, lib_hash, lib_ref),
+            _ => false,
+        }
+    }
 }
 
 /// Details of a message queued via `SENDRAWMSG`.
@@ -131,6 +185,39 @@ pub struct InstalledReserveAction {
     pub mode: i32,
     /// Amount of nanoton to reserve.
     pub amount: BigInt,
+    /// Hash of the code cell where the instruction was executed.
+    pub loc_hash: String,
+    /// Offset within the code cell.
+    pub loc_offset: u16,
+}
+
+/// Details of a code update queued via `SETCODE`.
+#[derive(Debug)]
+pub struct InstalledSetCodeAction {
+    /// A cell with new code.
+    pub new_code: Cell,
+    /// Hash of the code cell where the instruction was executed.
+    pub loc_hash: String,
+    /// Offset within the code cell.
+    pub loc_offset: u16,
+}
+
+/// Library reference queued by `SETLIBCODE` or `CHANGELIB`.
+#[derive(Debug)]
+pub enum InstalledLibraryRef {
+    /// Hash of the root cell of the library code.
+    Hash(BigInt),
+    /// Library code itself.
+    Cell(Cell),
+}
+
+/// Details of a library collection update queued via `SETLIBCODE` or `CHANGELIB`.
+#[derive(Debug)]
+pub struct InstalledChangeLibraryAction {
+    /// Library change mode.
+    pub mode: i32,
+    /// Library reference.
+    pub lib: InstalledLibraryRef,
     /// Hash of the code cell where the instruction was executed.
     pub loc_hash: String,
     /// Offset within the code cell.
@@ -189,6 +276,24 @@ pub enum ExecutedAction {
         /// Optional action-phase error code for this action.
         failure_code: Option<i32>,
     },
+    /// Contract code update was successfully processed.
+    SetCode {
+        /// Hash of the new code cell.
+        new_code_hash: String,
+        /// Optional action-phase error code for this action.
+        failure_code: Option<i32>,
+    },
+    /// Contract library collection update was successfully processed.
+    ChangeLibrary {
+        /// Library change mode before executor normalization.
+        mode: i32,
+        /// Hash of the target library code.
+        lib_hash: String,
+        /// Whether executor saw the library reference as `cell` or `hash`.
+        lib_ref: String,
+        /// Optional action-phase error code for this action.
+        failure_code: Option<i32>,
+    },
 }
 
 /// Details of an `invalid action` entry from executor logs.
@@ -209,13 +314,16 @@ impl ExecutedAction {
             | ExecutedAction::ReserveCurrency { failure_reason, .. } => {
                 *failure_reason = Some(reason);
             }
+            ExecutedAction::SetCode { .. } | ExecutedAction::ChangeLibrary { .. } => {}
         }
     }
 
     const fn set_failure_code(&mut self, code: i32) {
         match self {
             ExecutedAction::SendMessage { failure_code, .. }
-            | ExecutedAction::ReserveCurrency { failure_code, .. } => {
+            | ExecutedAction::ReserveCurrency { failure_code, .. }
+            | ExecutedAction::SetCode { failure_code, .. }
+            | ExecutedAction::ChangeLibrary { failure_code, .. } => {
                 *failure_code = Some(code);
             }
         }
@@ -252,7 +360,7 @@ pub struct Trace {
     pub start_gas: usize,
     /// Sequential list of all execution steps.
     pub steps: Vec<TraceStep>,
-    /// Full BoC hex payloads registered by compact VM stack logs, keyed by cell hash.
+    /// Full `BoC` hex payloads registered by compact VM stack logs, keyed by cell hash.
     pub registered_cell_bocs: HashMap<String, String>,
 }
 
@@ -406,8 +514,7 @@ impl Trace {
 
     /// Extracts all [`InstalledAction`]s from the execution trace.
     ///
-    /// Scans the trace for instructions that modify the action list (c5),
-    /// specifically `SENDRAWMSG` and `RAWRESERVE`.
+    /// Scans the trace for instructions that modify the action list (c5).
     ///
     /// # Example
     ///
@@ -429,57 +536,133 @@ impl Trace {
                     ..
                 } = step
                 {
-                    if instr != "SENDRAWMSG" && instr != "RAWRESERVE" {
-                        return None;
-                    }
-
                     let parsed = VmStack::new(stack).parsed();
-                    if parsed.len() < 2 {
-                        return None;
-                    }
 
-                    if instr == "SENDRAWMSG" {
+                    match instr.as_str() {
                         // SENDRAWMSG takes (cell, mode) from the stack.
                         // We are interested in the cell (second from top).
-                        if let Some(VmStackValue::Cell(CellLike::Cell(msg_cell))) =
-                            parsed.get(parsed.len() - 2)
-                            && let Ok(cell) = Boc::decode_hex(
-                                self.registered_cell_bocs
-                                    .get(msg_cell.as_str())
-                                    .map_or(msg_cell.as_str(), String::as_str),
-                            )
-                        {
-                            return Some(InstalledAction::Message(InstalledSendMessageAction {
-                                msg_hash: cell.repr_hash().to_string().to_ascii_uppercase(),
-                                msg_cell: cell,
-                                loc_hash: hash.clone(),
-                                loc_offset: *offset,
-                            }));
+                        "SENDRAWMSG" if parsed.len() >= 2 => {
+                            if let Some(VmStackValue::Cell(cell_like)) =
+                                parsed.get(parsed.len() - 2)
+                                && let Some(cell) =
+                                    decode_stack_cell(cell_like, &self.registered_cell_bocs)
+                            {
+                                return Some(InstalledAction::Message(
+                                    InstalledSendMessageAction {
+                                        msg_hash: cell.repr_hash().to_string().to_ascii_uppercase(),
+                                        msg_cell: cell,
+                                        loc_hash: hash.clone(),
+                                        loc_offset: *offset,
+                                    },
+                                ));
+                            }
                         }
-                    }
-
-                    if instr == "RAWRESERVE" {
                         // RAWRESERVE takes (amount, mode) from the stack.
-                        if let (
-                            Some(VmStackValue::Integer(amount_str)),
-                            Some(VmStackValue::Integer(mode_str)),
-                        ) = (parsed.get(parsed.len() - 2), parsed.last())
-                        {
-                            let amount = amount_str.parse().unwrap_or_default();
-                            let mode = mode_str.parse().unwrap_or(0);
-                            return Some(InstalledAction::Reserve(InstalledReserveAction {
-                                mode,
-                                amount,
-                                loc_hash: hash.clone(),
-                                loc_offset: *offset,
-                            }));
+                        "RAWRESERVE" if parsed.len() >= 2 => {
+                            if let (
+                                Some(VmStackValue::Integer(amount_str)),
+                                Some(VmStackValue::Integer(mode_str)),
+                            ) = (parsed.get(parsed.len() - 2), parsed.last())
+                            {
+                                let amount = amount_str.parse().unwrap_or_default();
+                                let mode = mode_str.parse().unwrap_or(0);
+                                return Some(InstalledAction::Reserve(InstalledReserveAction {
+                                    mode,
+                                    amount,
+                                    loc_hash: hash.clone(),
+                                    loc_offset: *offset,
+                                }));
+                            }
                         }
+                        // SETCODE takes (code) from the stack.
+                        "SETCODE" if !parsed.is_empty() => {
+                            if let Some(VmStackValue::Cell(cell_like)) = parsed.last()
+                                && let Some(new_code) =
+                                    decode_stack_cell(cell_like, &self.registered_cell_bocs)
+                            {
+                                return Some(InstalledAction::SetCode(InstalledSetCodeAction {
+                                    new_code,
+                                    loc_hash: hash.clone(),
+                                    loc_offset: *offset,
+                                }));
+                            }
+                        }
+                        // SETLIBCODE takes (code, mode) from the stack.
+                        "SETLIBCODE" if parsed.len() >= 2 => {
+                            if let (
+                                Some(VmStackValue::Cell(cell_like)),
+                                Some(VmStackValue::Integer(mode_str)),
+                            ) = (parsed.get(parsed.len() - 2), parsed.last())
+                                && let Some(cell) =
+                                    decode_stack_cell(cell_like, &self.registered_cell_bocs)
+                            {
+                                let mode = mode_str.parse().unwrap_or(0);
+                                return Some(InstalledAction::ChangeLibrary(
+                                    InstalledChangeLibraryAction {
+                                        mode,
+                                        lib: InstalledLibraryRef::Cell(cell),
+                                        loc_hash: hash.clone(),
+                                        loc_offset: *offset,
+                                    },
+                                ));
+                            }
+                        }
+                        // CHANGELIB takes (hash, mode) from the stack.
+                        "CHANGELIB" if parsed.len() >= 2 => {
+                            if let (
+                                Some(VmStackValue::Integer(hash_str)),
+                                Some(VmStackValue::Integer(mode_str)),
+                            ) = (parsed.get(parsed.len() - 2), parsed.last())
+                            {
+                                let lib_hash = hash_str.parse().unwrap_or_default();
+                                let mode = mode_str.parse().unwrap_or(0);
+                                return Some(InstalledAction::ChangeLibrary(
+                                    InstalledChangeLibraryAction {
+                                        mode,
+                                        lib: InstalledLibraryRef::Hash(lib_hash),
+                                        loc_hash: hash.clone(),
+                                        loc_offset: *offset,
+                                    },
+                                ));
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 None
             })
             .collect();
         InstalledActions { actions }
+    }
+}
+
+fn decode_stack_cell(
+    cell_like: &CellLike,
+    registered_cell_bocs: &HashMap<String, String>,
+) -> Option<Cell> {
+    match cell_like {
+        CellLike::Cell(cell) => {
+            let boc = registered_cell_bocs
+                .get(cell.as_str())
+                .map_or(cell.as_str(), String::as_str);
+            Boc::decode_hex(boc).ok()
+        }
+        CellLike::Builder(_) => None,
+    }
+}
+
+fn cell_hash_matches(cell: &Cell, hash: &str) -> bool {
+    cell.repr_hash().to_string().eq_ignore_ascii_case(hash)
+}
+
+fn library_ref_matches(lib: &InstalledLibraryRef, hash: &str, ref_kind: &str) -> bool {
+    match (lib, ref_kind) {
+        (InstalledLibraryRef::Cell(cell), "cell") => cell_hash_matches(cell, hash),
+        (InstalledLibraryRef::Hash(installed_hash), "hash") => {
+            BigInt::parse_bytes(hash.as_bytes(), 16)
+                .is_some_and(|executed_hash| installed_hash == &executed_hash)
+        }
+        _ => false,
     }
 }
 
@@ -511,7 +694,7 @@ impl InstalledActions {
             .iter()
             .filter_map(|action| match action {
                 InstalledAction::Message(msg) => Some(msg),
-                InstalledAction::Reserve(_) => None,
+                _ => None,
             })
             .find(|msg| msg.msg_hash == *hash)
     }
@@ -531,7 +714,7 @@ impl InstalledActions {
             .iter()
             .filter_map(|action| match action {
                 InstalledAction::Reserve(reserve) => Some(reserve),
-                InstalledAction::Message(_) => None,
+                _ => None,
             })
             .find(|reserve| reserve.mode == mode && reserve.amount == *amount)
     }
@@ -578,6 +761,24 @@ impl ExecutedActions {
                         hash: message_hash.to_string(),
                         remaining_balance: BigInt::ZERO, // Will be updated by RemainingBalance
                         failure_reason: None,
+                        failure_code: None,
+                    });
+                }
+                Ok(ExecutorLine::ProcessSetCode { new_code_hash }) => {
+                    actions.push(ExecutedAction::SetCode {
+                        new_code_hash: new_code_hash.to_string(),
+                        failure_code: None,
+                    });
+                }
+                Ok(ExecutorLine::ProcessChangeLibrary {
+                    mode,
+                    lib_hash,
+                    lib_ref,
+                }) => {
+                    actions.push(ExecutedAction::ChangeLibrary {
+                        mode: mode.parse().unwrap_or(0),
+                        lib_hash: lib_hash.to_string(),
+                        lib_ref: lib_ref.to_string(),
                         failure_code: None,
                     });
                 }
@@ -742,6 +943,105 @@ gas remaining: 999
             .to_string()
             .to_ascii_uppercase();
         assert_eq!(action.msg_hash, expected_hash);
+    }
+
+    #[test]
+    fn actions_collect_code_and_library_updates() {
+        let boc = "B5EE9C72010101010002000000";
+        let logs = format!(
+            r"
+register new cell 0F: {boc}
+stack: [ C{{0F}} ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 10
+execute SETCODE
+gas remaining: 999
+stack: [ C{{0F}} 2 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 20
+execute SETLIBCODE
+gas remaining: 998
+stack: [ 12345 1 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 30
+execute CHANGELIB
+gas remaining: 997
+        "
+        );
+
+        let trace = Trace::new(&logs, None);
+        let actions = trace.actions();
+        assert_eq!(actions.actions.len(), 3);
+
+        let InstalledAction::SetCode(action) = &actions.actions[0] else {
+            panic!("Expected installed set-code action");
+        };
+        assert_eq!(action.loc_offset, 10);
+        assert_eq!(
+            action.new_code.repr_hash(),
+            Boc::decode_hex(boc)
+                .expect("test boc should decode")
+                .repr_hash()
+        );
+
+        let InstalledAction::ChangeLibrary(action) = &actions.actions[1] else {
+            panic!("Expected installed set-library action");
+        };
+        assert_eq!(action.mode, 2);
+        assert!(matches!(action.lib, InstalledLibraryRef::Cell(_)));
+        assert_eq!(action.loc_offset, 20);
+
+        let InstalledAction::ChangeLibrary(action) = &actions.actions[2] else {
+            panic!("Expected installed change-library action");
+        };
+        assert_eq!(action.mode, 1);
+        assert!(
+            matches!(&action.lib, InstalledLibraryRef::Hash(hash) if hash == &BigInt::from(12345))
+        );
+        assert_eq!(action.loc_offset, 30);
+    }
+
+    #[test]
+    fn installed_actions_match_set_code_and_change_library_executor_logs() {
+        let boc = "B5EE9C72010101010002000000";
+        let logs = format!(
+            r"
+register new cell 0F: {boc}
+stack: [ C{{0F}} ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 10
+execute SETCODE
+gas remaining: 999
+stack: [ C{{0F}} 18 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 20
+execute SETLIBCODE
+gas remaining: 998
+stack: [ 12345 1 ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 30
+execute CHANGELIB
+gas remaining: 997
+        "
+        );
+
+        let trace = Trace::new(&logs, None);
+        let actions = trace.actions();
+        let cell_hash = Boc::decode_hex(boc)
+            .expect("test boc should decode")
+            .repr_hash()
+            .to_string();
+        let executor_logs = format!(
+            "[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2269]\tprocess set code {cell_hash}
+[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={cell_hash}, lib_ref=cell
+[ 4][t 0][2026-03-03 13:38:24.650055][transaction.cpp:2312]\tprocess change library with mode 1, lib_hash=3039, lib_ref=hash"
+        );
+        let executed = ExecutedActions::from(&executor_logs);
+
+        assert_eq!(executed.actions.len(), 3);
+        assert!(actions.actions[0].matches_executed_action(&executed.actions[0]));
+        assert!(actions.actions[1].matches_executed_action(&executed.actions[1]));
+        assert!(actions.actions[2].matches_executed_action(&executed.actions[2]));
+
+        let mismatched_executor_logs = format!(
+            "[ 4][t 0][2026-03-03 13:38:24.650054][transaction.cpp:2312]\tprocess change library with mode 18, lib_hash={cell_hash}, lib_ref=hash"
+        );
+        let mismatched = ExecutedActions::from(&mismatched_executor_logs);
+        assert!(!actions.actions[1].matches_executed_action(&mismatched.actions[0]));
     }
 }
 

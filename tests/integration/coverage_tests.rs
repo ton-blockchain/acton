@@ -89,14 +89,24 @@ fn build_coverage_scope_project(name: &str) -> Project {
             }
         "#,
         )
+        .file(
+            "tests/support_helpers",
+            r"
+            @noinline
+            fun valueFromTestsHelper(): int {
+                return 5;
+            }
+        ",
+        )
         .test_file(
             "test",
             r#"
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
+            import "./support_helpers.tolk"
 
             get fun `test coverage scope`() {
-                expect(callThroughWrapper(5)).toEqual(6);
+                expect(callThroughWrapper(valueFromTestsHelper())).toEqual(6);
             }
         "#,
         )
@@ -1140,6 +1150,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
             "integration/snapshots/test_coverage_scope_with_tests.txt",
         )
         .assert_file_contains("with-tests.txt", "tests/test.test.tolk")
+        .assert_file_contains("with-tests.txt", "tests/support_helpers.tolk")
         .assert_file_contains("with-tests.txt", "test coverage scope");
 }
 
@@ -1165,14 +1176,24 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             }
         "#,
         )
+        .file(
+            "tests/config_support_helpers",
+            r"
+            @noinline
+            fun configValueFromTestsHelper(): int {
+                return 5;
+            }
+        ",
+        )
         .test_file(
             "test",
             r#"
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
+            import "./config_support_helpers.tolk"
 
             get fun `test config coverage scope`() {
-                expect(callThroughWrapper(5)).toEqual(6);
+                expect(callThroughWrapper(configValueFromTestsHelper())).toEqual(6);
             }
         "#,
         )
@@ -1199,7 +1220,8 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             "integration/snapshots/test_coverage_scope_from_config.txt",
         )
         .assert_file_contains("from-config.txt", "generated/abi/TestWrapper.tolk")
-        .assert_file_contains("from-config.txt", "tests/test.test.tolk");
+        .assert_file_contains("from-config.txt", "tests/test.test.tolk")
+        .assert_file_contains("from-config.txt", "tests/config_support_helpers.tolk");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use crate::backend::Backend;
 use crate::backend::utils::SpanExt;
-use lsp_types::*;
+use lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, InlayHintParams, Position};
 use std::sync::Arc;
 use tolk_resolver::file_db::FileInfo;
 use tolk_resolver::project_index::ProjectIndex;
@@ -19,7 +19,7 @@ impl Backend {
         crate::profile!(self, "inlay_hint");
         let now = std::time::Instant::now();
         let uri = params.text_document.uri;
-        log::info!("Request: inlay_hint for {}", uri);
+        log::info!("Request: inlay_hint for {uri}");
 
         let result = (|| {
             let analysis = self.analysis.get(&uri)?;

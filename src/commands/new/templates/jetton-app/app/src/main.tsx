@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { TonConnectUIProvider, THEME } from '@tonconnect/ui-react';
 
 const manifestUrl =
-  'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
+  'https://ton-blockchain.github.io/acton/tonconnect-manifest.json';
 
 const savedTheme = localStorage.getItem('jm-theme');
 const initialTheme = savedTheme === 'light' ? THEME.LIGHT : THEME.DARK;

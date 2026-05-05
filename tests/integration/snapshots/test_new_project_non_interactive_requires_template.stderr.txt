@@ -3,4 +3,4 @@ Error: Project template is required when running acton new non-interactively.
 Pass --template <TEMPLATE>, for example:
   acton new [ROOT]/foobar --template empty
 
-Available templates: empty, counter, jetton, nft
+Available templates: empty, counter, jetton, nft, w5-extension

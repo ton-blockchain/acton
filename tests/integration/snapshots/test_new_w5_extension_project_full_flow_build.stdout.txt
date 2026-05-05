@@ -1,0 +1,6 @@
+   Compiling contracts
+   Compiling SimpleExtension
+    Finished in [TIME]
+   Compiling WalletV5
+    Finished in [TIME]
+    Finished in [TIME]

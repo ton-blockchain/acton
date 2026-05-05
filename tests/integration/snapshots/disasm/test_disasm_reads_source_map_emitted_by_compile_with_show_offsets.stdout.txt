@@ -24,7 +24,7 @@ off │ instruction
     │         // .. | ... 13 lines omitted ...
     │         // 22 |     }
     │         //    |     ^
-56  │         SDBEGINSQ x{7e8764efa_}
+56  │         SDBEGINSQ x{7E8764EF}
 112 │         PUSHCONT {
     │             // contracts/counter[LINE]
     │             //  9 |         IncreaseCounter => {
@@ -77,7 +77,7 @@ off │ instruction
     │         // .. | ... 13 lines omitted ...
     │         // 22 |     }
     │         //    |     ^
-328 │         SDBEGINSQ x{3a752f06a_}
+328 │         SDBEGINSQ x{3A752F06}
 384 │         NIP
 392 │         PUSHCONT {
     │             // contracts/counter[LINE]
@@ -102,7 +102,7 @@ off │ instruction
     │             //    |                      ^^^^^^^^^^^^^
 464 │             NEWC
 472 │             STSLICE
-480 │             STSLICECONST x{}
+480 │             STSLICECONST x{00000000}
 528 │             ENDC
     │             // contracts/types[LINE]
     │             // 11 |     contract.setData(self.toCell());

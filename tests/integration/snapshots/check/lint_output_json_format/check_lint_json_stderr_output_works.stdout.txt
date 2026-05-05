@@ -5,7 +5,7 @@
       "file": "[ROOT]/contracts/main.tolk",
       "severity": "warning",
       "name": "unused-variable",
-      "code": "E002",
+      "code": "E001",
       "message": "variable is unused",
       "annotations": [
         {

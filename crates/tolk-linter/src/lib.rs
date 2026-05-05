@@ -153,6 +153,7 @@ impl<'a> Checker<'a> {
         self
     }
 
+    #[must_use]
     pub fn with_project_root(mut self, project_root: impl Into<PathBuf>) -> Self {
         self.project_root = Some(project_root.into());
         self

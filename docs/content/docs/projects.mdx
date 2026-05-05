@@ -33,7 +33,7 @@ Use `acton init` when the repository already exists and you want Acton to
 discover contracts, create or patch `Acton.toml`, install the bundled stdlib,
 and add the usual ignore/config glue without replacing your existing files. If
 you also want a frontend scaffold in that existing repository, run
-`acton init --create-app` as a separate step.
+`acton init --create-dapp` as a separate step.
 
 ## Usage
 
@@ -58,7 +58,7 @@ acton init
 To scaffold only the default TypeScript app in `app/`, run:
 
 ```bash
-acton init --create-app
+acton init --create-dapp
 ```
 
 `acton init` works in place. It does not create a new folder. When
@@ -67,7 +67,7 @@ patches `.gitignore`, refreshes `.acton/tolk-stdlib`, and attempts to create
 local symlinks to global wallet/library overlays when those global files
 already exist.
 
-When `--create-app` is passed, Acton does not patch the Acton project at all.
+When `--create-dapp` is passed, Acton does not patch the Acton project at all.
 It only creates a new Vite-based TypeScript app scaffold. The target app
 directory defaults to `app` and must not already exist.
 

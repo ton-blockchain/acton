@@ -8,7 +8,7 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
         .without_acton_toml()
         .build();
 
-    let output = project.acton().init().arg("--create-app").run().success();
+    let output = project.acton().init().arg("--create-dapp").run().success();
     output.assert_snapshot_matches(
         "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.stdout.txt",
     );
@@ -20,6 +20,8 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
     assert!(app_dir.join("vite.config.ts").is_file());
     assert!(app_dir.join("app/src/App.tsx").is_file());
     assert!(app_dir.join("app/src/providers/AppProviders.tsx").is_file());
+    assert!(app_dir.join("app/src/styles.css").is_file());
+    assert!(app_dir.join(".prettierignore").is_file());
     assert!(!app_dir.join("node_modules").exists());
     assert!(!app_dir.join("dist").exists());
     assert!(!app_dir.join(".idea").exists());
@@ -27,6 +29,14 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
     output.assert_file_snapshot_matches(
         "app/package.json",
         "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.package.json",
+    );
+    output.assert_file_snapshot_matches(
+        "app/README.md",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.readme.md",
+    );
+    output.assert_file_snapshot_matches(
+        "app/.github/workflows/ci.yml",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.ci.yml",
     );
 }
 
@@ -39,7 +49,7 @@ fn test_init_create_app_scaffolds_empty_ui_into_custom_directory() {
     let output = project
         .acton()
         .init()
-        .arg("--create-app=frontend")
+        .arg("--create-dapp=frontend")
         .run()
         .success();
     output.assert_snapshot_matches(
@@ -61,7 +71,7 @@ fn test_init_create_app_rejects_existing_app_directory() {
         .build();
     fs::create_dir(project.path().join("app")).expect("failed to create existing app dir");
 
-    let output = project.acton().init().arg("--create-app").run().failure();
+    let output = project.acton().init().arg("--create-dapp").run().failure();
     output.assert_stderr_snapshot_matches(
         "integration/snapshots/create_app/test_init_create_app_rejects_existing_app_directory.stderr.txt",
     );

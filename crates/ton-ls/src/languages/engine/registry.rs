@@ -97,34 +97,42 @@ impl SelfContainedLanguageRegistry {
         }
     }
 
+    #[must_use]
     pub fn find_tasm_file(&self, uri: &Url) -> Option<ParsedSnapshot<tasm_syntax::SourceFile>> {
         self.tasm_cache.snapshot(uri)
     }
 
+    #[must_use]
     pub fn find_tasm_text(&self, uri: &Url) -> Option<Arc<str>> {
         self.tasm_cache.text(uri)
     }
 
+    #[must_use]
     pub fn find_fift_file(&self, uri: &Url) -> Option<ParsedSnapshot<fift_syntax::SourceFile>> {
         self.fift_cache.snapshot(uri)
     }
 
+    #[must_use]
     pub fn find_fift_text(&self, uri: &Url) -> Option<Arc<str>> {
         self.fift_cache.text(uri)
     }
 
+    #[must_use]
     pub fn find_tlb_file(&self, uri: &Url) -> Option<ParsedSnapshot<tlb_syntax::SourceFile>> {
         self.tlb_cache.snapshot(uri)
     }
 
+    #[must_use]
     pub fn find_tlb_text(&self, uri: &Url) -> Option<Arc<str>> {
         self.tlb_cache.text(uri)
     }
 
+    #[must_use]
     pub fn find_toml_file(&self, uri: &Url) -> Option<ParsedSnapshot<toml_syntax::SourceFile>> {
         self.toml_cache.snapshot(uri)
     }
 
+    #[must_use]
     pub fn find_toml_text(&self, uri: &Url) -> Option<Arc<str>> {
         self.toml_cache.text(uri)
     }

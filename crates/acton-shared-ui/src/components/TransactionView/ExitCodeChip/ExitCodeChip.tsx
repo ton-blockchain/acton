@@ -1,4 +1,5 @@
-import type {Abi, CompilerAbi} from "@/types"
+import type {ContractABI} from "gen-typescript-from-tolk-dev"
+
 import {Tooltip} from "@/index"
 
 import styles from "./ExitCodeViewer.module.css"
@@ -6,8 +7,7 @@ import {EXIT_CODE_DESCRIPTIONS, getExitCodeDocsUrl, type ExitCodeDescription} fr
 
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined
-  readonly abi?: Abi | undefined
-  readonly compilerAbi?: CompilerAbi | undefined
+  readonly abi?: ContractABI | undefined
   readonly phase?: "compute" | "action"
 }
 
@@ -22,38 +22,12 @@ interface FallbackExitCodeInfo {
   readonly origin: string
 }
 
-const getCompilerAbiSymbolDescription = (
-  compilerAbi: CompilerAbi | undefined,
-  symbol: string,
-): string | undefined => {
-  const enumMatch = symbol.split(".")
-  if (enumMatch.length >= 2) {
-    const memberName = enumMatch.at(-1)
-    const enumName = enumMatch.at(-2)
-    const enumDeclaration = compilerAbi?.declarations?.find(
-      declaration => declaration.kind === "enum" && declaration.name === enumName,
-    )
-    const memberDescription = enumDeclaration?.members?.find(
-      member => member.name === memberName && member.description,
-    )?.description
-    if (memberDescription) {
-      return memberDescription
-    }
-  }
-
-  return compilerAbi?.constants?.find(constant => constant.name === symbol && constant.description)
-    ?.description
-}
-
 const getCustomExitCodeInfo = (
   exitCode: number,
-  abi: Abi | undefined,
-  compilerAbi: CompilerAbi | undefined,
+  abi: ContractABI | undefined,
 ): CustomExitCodeInfo | undefined => {
-  const thrownError = compilerAbi?.thrown_errors?.find(error => error.err_code === exitCode)
-  const symbolicName =
-    thrownError?.name ||
-    abi?.exitCodes?.find(candidate => candidate.value === exitCode)?.constantName
+  const thrownError = abi?.thrown_errors?.find(error => error.err_code === exitCode)
+  const symbolicName = thrownError?.name
 
   if (!symbolicName) {
     return
@@ -61,7 +35,7 @@ const getCustomExitCodeInfo = (
 
   return {
     symbolicName,
-    description: getCompilerAbiSymbolDescription(compilerAbi, symbolicName) ?? symbolicName,
+    description: thrownError.description ?? symbolicName,
   }
 }
 
@@ -74,7 +48,7 @@ const getFallbackExitCodeInfo = (
   origin: phase === "action" ? "Action phase" : "Compute phase",
 })
 
-export function ExitCodeChip({exitCode, abi, compilerAbi, phase = "compute"}: ExitCodeViewerProps) {
+export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeViewerProps) {
   if (exitCode === undefined) {
     return <span className={styles.exitCode}>—</span>
   }
@@ -82,7 +56,7 @@ export function ExitCodeChip({exitCode, abi, compilerAbi, phase = "compute"}: Ex
   const standardDescription = (EXIT_CODE_DESCRIPTIONS as Record<number, ExitCodeDescription>)[
     exitCode
   ]
-  const customExitCode = getCustomExitCodeInfo(exitCode, abi, compilerAbi)
+  const customExitCode = getCustomExitCodeInfo(exitCode, abi)
   const fallbackExitCode =
     standardDescription || customExitCode ? undefined : getFallbackExitCodeInfo(phase)
   const displayName =

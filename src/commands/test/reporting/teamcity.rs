@@ -48,12 +48,14 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_type,
+                                bin_failure.right_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_type,
+                                bin_failure.left_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                         }
@@ -63,12 +65,14 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_type,
+                                bin_failure.right_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_type,
+                                bin_failure.left_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                         }
@@ -120,7 +124,7 @@ impl TeamCityReporter {
         }
 
         if let Some(ref test_message) = test.message {
-            message = test_message.clone();
+            message.clone_from(test_message);
         }
 
         if let Some(exec) = &test.execution

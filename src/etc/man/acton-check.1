@@ -43,7 +43,7 @@ Write output to a file instead of standard output.
 .sp
 \fB\-\-enable\-only\fR \fIcode\fR[,\fIcode\fR\[u2026]]_
 .RS 4
-Enable only selected lint rules, for example \fBE001,S001\fR\&.
+Enable only selected lint rules, for example \fBS003,S001\fR\&.
 .RE
 .sp
 \fB\-\-explain\fR \fIcode\fR
@@ -133,7 +133,7 @@ lint roots
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'single\-file mode relaxes \fBE014 (acton\-import\-in\-contract)\fR
+\h'-04'\(bu\h'+03'single\-file mode relaxes \fBE010 (acton\-import\-in\-contract)\fR
 .RE
 .sp
 .RS 4
@@ -170,7 +170,7 @@ default severity, and every unselected rule is forced to \fBallow\fR
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-enable\-only\fR selectors must resolve to exactly one rule; in practice, use
-full rule codes such as \fBE003\fR for stability
+full rule codes such as \fBE002\fR for stability
 .RE
 .sp
 .RS 4
@@ -254,7 +254,7 @@ acton check \-\-output\-format sarif \-\-output\-file build/reports/lint.sarif
 .sp
 .RS 4
 .nf
-acton check \-\-enable\-only E001,S001
+acton check \-\-enable\-only S003,S001
 .fi
 .RE
 .RE
@@ -295,7 +295,7 @@ acton check \-\-fix
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fILinting guide\fR <https://ton\-blockchain.github.io/acton/docs/linting/overview>
+\h'-04'\(bu\h'+03'\fILinting guide\fR <https://ton\-blockchain.github.io/acton/docs/lint>
 .RE
 .sp
 .RS 4

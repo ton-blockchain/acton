@@ -1,0 +1,4 @@
+N/A -> remote_call_sender A
+└── ScriptRemotePing 0.1 TON -> script_remote_sink B                            gas=412 exit_code=73 aborted
+    └── Compute phase failed: Errors.NotOwner
+

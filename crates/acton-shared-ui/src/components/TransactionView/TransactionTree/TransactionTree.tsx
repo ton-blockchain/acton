@@ -10,7 +10,7 @@ import {
   type TreeLinkDatum,
 } from "react-d3-tree"
 
-import type {BackendContractInfo} from "@/types"
+import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {fmt} from "@/index"
 import {
@@ -61,6 +61,7 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
 function EdgeTransactionTooltipContent({
@@ -171,6 +172,7 @@ export function TransactionTree({
   contracts,
   allContracts,
   onContractClick,
+  renderSourceLocation,
 }: TransactionTreeProps): React.JSX.Element {
   const {
     tooltip,
@@ -734,6 +736,7 @@ export function TransactionTree({
             contracts={contracts}
             allContracts={allContracts}
             onContractClick={onContractClick}
+            renderSourceLocation={renderSourceLocation}
           />
         </div>
       )}

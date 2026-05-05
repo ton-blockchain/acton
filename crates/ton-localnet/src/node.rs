@@ -1413,6 +1413,28 @@ impl Node {
         Self::empty_shard_account_boc()
     }
 
+    pub fn get_shard_account_at_block(
+        &mut self,
+        addr: &Addr,
+        seqno: Option<Seqno>,
+    ) -> anyhow::Result<BocBytes> {
+        let Some(seqno) = seqno else {
+            return self.get_shard_account(addr);
+        };
+
+        if seqno == 0 || seqno >= self.globals.head_seqno {
+            return self.get_shard_account(addr);
+        }
+
+        if let Some(meta) = self.get_address_information_at_block(addr, seqno)
+            && let Some(boc) = self.cas.get(&meta.account_hash)
+        {
+            return Ok(boc);
+        }
+
+        Self::empty_shard_account_boc()
+    }
+
     pub fn emulate_trace_by_external_message(
         &mut self,
         boc: BocBytes,
@@ -1525,25 +1547,7 @@ impl Node {
         addr: &Addr,
         mc_block_seqno: Option<Seqno>,
     ) -> anyhow::Result<BocBytes> {
-        let Some(seqno) = mc_block_seqno else {
-            return self.get_shard_account(addr);
-        };
-
-        if seqno == 0 {
-            return self.get_shard_account(addr);
-        }
-
-        if seqno >= self.globals.head_seqno {
-            return self.get_shard_account(addr);
-        }
-
-        if let Some(meta) = self.get_address_information_at_block(addr, seqno)
-            && let Some(boc) = self.cas.get(&meta.account_hash)
-        {
-            return Ok(boc);
-        }
-
-        Self::empty_shard_account_boc()
+        self.get_shard_account_at_block(addr, mc_block_seqno)
     }
 
     fn emulation_context(&self, mc_block_seqno: Option<Seqno>) -> anyhow::Result<(Lt, u32, Seqno)> {
@@ -1939,6 +1943,50 @@ mod tests {
         }
     }
 
+    fn store_test_account_meta(
+        node: &mut Node,
+        boc: &BocBytes,
+        status: AccountStatus,
+    ) -> AccountMeta {
+        let account_hash = compute_boc_hash(boc).expect("must hash shard account");
+        node.cas.put(boc.clone(), account_hash);
+        let cached_balance = if status == AccountStatus::Nonexist {
+            0
+        } else {
+            1_000_000_000
+        };
+        AccountMeta {
+            account_hash,
+            status,
+            cached_balance: Some(cached_balance),
+            last_trans_lt: Some(0),
+            last_trans_hash: None,
+            code_hash: None,
+            data_hash: None,
+            frozen_hash: None,
+        }
+    }
+
+    fn shard_account_state_name(boc: &BocBytes) -> &'static str {
+        let cell = Boc::decode(boc).expect("shard account boc must decode");
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .expect("shard account boc must parse");
+        let optional_account = shard_account
+            .account
+            .load()
+            .expect("shard account lazy account must load");
+        let Some(account) = optional_account.0 else {
+            return "nonexist";
+        };
+
+        match account.state {
+            AccountState::Active(_) => "active",
+            AccountState::Uninit => "uninit",
+            AccountState::Frozen(_) => "frozen",
+        }
+    }
+
     fn make_lib_root(seed: u32) -> Cell {
         let mut builder = CellBuilder::new();
         builder.store_u32(seed).expect("must store seed");
@@ -2020,6 +2068,116 @@ mod tests {
 
     fn found_library_entry(node: &Node, hash: Hash256) -> Option<GlobalLibraryEntry> {
         single_library_lookup(node, hash).entry
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_latest_for_current_queries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x10);
+        let boc = make_active_shard_account_boc(account, Dict::new());
+        let meta = store_test_account_meta(&mut node, &boc, AccountStatus::Active);
+        node.latest.accounts.insert(account, meta);
+        node.globals.head_seqno = 3;
+
+        for seqno in [None, Some(0), Some(3), Some(4)] {
+            assert_eq!(
+                node.get_shard_account_at_block(&account, seqno)
+                    .expect("must get current shard account"),
+                boc,
+                "seqno {seqno:?} must resolve to latest account state"
+            );
+        }
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_historical_deltas() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x20);
+        let uninit_boc = make_uninit_shard_account_boc(account);
+        let active_boc = make_active_shard_account_boc(account, Dict::new());
+        let uninit_meta = store_test_account_meta(&mut node, &uninit_boc, AccountStatus::Uninit);
+        let active_meta = store_test_account_meta(&mut node, &active_boc, AccountStatus::Active);
+
+        node.latest.accounts.insert(account, active_meta.clone());
+        node.history.deltas_by_seqno = vec![
+            Vec::new(),
+            vec![AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(uninit_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(uninit_meta.clone()),
+            }],
+            vec![AccountDelta {
+                addr: account,
+                old_hash: Some(uninit_meta.account_hash),
+                new_hash: Some(active_meta.account_hash),
+                old_meta: Some(uninit_meta),
+                new_meta: Some(active_meta),
+            }],
+        ];
+        node.globals.head_seqno = 3;
+
+        let before_first_delta = node
+            .get_shard_account_at_block(&account, Some(1))
+            .expect("must return empty state before first account delta");
+        assert_eq!(shard_account_state_name(&before_first_delta), "nonexist");
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(2))
+                .expect("must return historical uninit state"),
+            uninit_boc
+        );
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(3))
+                .expect("must return latest active state"),
+            active_boc
+        );
+    }
+
+    #[test]
+    fn get_shard_account_at_block_preserves_account_state_variants() {
+        let cases = [
+            (
+                "active",
+                test_addr(0x31),
+                make_active_shard_account_boc(test_addr(0x31), Dict::new()),
+                AccountStatus::Active,
+            ),
+            (
+                "uninit",
+                test_addr(0x32),
+                make_uninit_shard_account_boc(test_addr(0x32)),
+                AccountStatus::Uninit,
+            ),
+            (
+                "frozen",
+                test_addr(0x33),
+                make_frozen_shard_account_boc(test_addr(0x33)),
+                AccountStatus::Frozen,
+            ),
+            (
+                "nonexist",
+                test_addr(0x34),
+                make_nonexist_shard_account_boc(),
+                AccountStatus::Nonexist,
+            ),
+        ];
+
+        for (expected_state, account, boc, status) in cases {
+            let mut node = make_test_node(Box::new(NoopExecutor));
+            let meta = store_test_account_meta(&mut node, &boc, status);
+            node.latest.accounts.insert(account, meta);
+
+            let actual = node
+                .get_shard_account_at_block(&account, None)
+                .expect("must return stored shard account");
+            assert_eq!(actual, boc, "{expected_state} BOC must be preserved");
+            assert_eq!(
+                shard_account_state_name(&actual),
+                expected_state,
+                "{expected_state} shard account state must round-trip"
+            );
+        }
     }
 
     #[test]
