@@ -43,6 +43,7 @@ The final `contracts/Poll.tolk` with all changes applied:
 
 ```tolk title="contracts/Poll.tolk"
 import "types"
+import "@gen/Voter.code"
 
 type AllowedPollMessage = Vote | ClosePoll
 
@@ -68,15 +69,16 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
 
             val voterInit = ContractState {
-                code: build("Voter"),
-                data: VoterStorage { poll: contract.getAddress(), hasVoted: false }.toCell(),
+                code: voterCompiledCode(),
+                data: VoterStorage { poll: contract.getAddress(), voter: in.senderAddress, hasVoted: false }.toCell(),
             };
-            createMessage({
+            val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
                 value:  ton("0.05"),
                 dest:   { stateInit: voterInit },
                 body:   msg,
-            }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+            });
+            outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
         }
         ClosePoll => {
             var storage = lazy PollStorage.load();
@@ -84,12 +86,13 @@ fun onInternalMessage(in: InMessage) {
             storage.isClosed = true;
             storage.save();
 
-            // Return remaining balance to the owner.
-            createMessage({
+            // Return remaining message value to the owner.
+            val returnMsg = createMessage({
                 bounce: false,
                 value:  0,
                 dest:   storage.owner,
-            }).send(SEND_MODE_CARRY_ALL_REMAINING_BALANCE | SEND_MODE_DESTROY_ACCOUNT_IF_ZERO);
+            });
+            returnMsg.send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_DESTROY);
         }
         else => {
             assert (in.body.isEmpty()) throw Errors.InvalidMessage;
@@ -112,8 +115,8 @@ fun onBouncedMessage(in: InMessageBounced) {
 
 get fun calcVoterAddress(voter: address): address {
     val init = ContractState {
-        code: build("Voter"),
-        data: VoterStorage { poll: contract.getAddress(), hasVoted: false }.toCell(),
+        code: voterCompiledCode(),
+        data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
     };
     return AutoDeployAddress { stateInit: init }.calculateAddress();
 }
@@ -139,6 +142,10 @@ Regenerate the wrapper to pick up `sendClosePoll` and `isClosed`:
 ```bash
 acton wrapper Poll
 ```
+
+<Callout type="info">
+  `PollStorage` now has an `isClosed` field. Update `setupTest()` to include `isClosed: false` in the `PollStorage` initializer.
+</Callout>
 
 ## Test the close logic
 

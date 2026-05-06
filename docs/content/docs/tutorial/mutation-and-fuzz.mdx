@@ -1,6 +1,6 @@
 ---
 title: "6. Harden with mutation and fuzz testing"
-description: "Use acton test --mutate to find untested mutations and @fuzzing to validate the Vote option boundary."
+description: "Use acton test --mutate to find untested mutations and @test.fuzz to validate the Vote option boundary."
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -61,9 +61,9 @@ get fun `test voter exits with AlreadyVoted on duplicate`() {
         dest:   voter.address,
         body:   Vote { option: 0 },
     });
-    val res2 = net.send(alice.address, directMsg);
+    val res2 = net.send(poll.address, directMsg);
     expect(res2).toHaveFailedTx({
-        from:     alice.address,
+        from:     poll.address,
         to:       voter.address,
         exitCode: Errors.AlreadyVoted as int,
     });
@@ -98,10 +98,14 @@ Address any survivors. Common ones:
 
 ## Add a fuzz test for the option boundary
 
+A fuzz test in Acton is a parameterized `get fun` annotated with `@test.fuzz`. The runner reads each parameter's type, generates inputs accordingly, and re-runs the test until the configured number of accepted runs pass or one fails. For integer types it always tries the boundary values first (`0`, `1`, max, mid) and then samples the remaining runs at random; types like `cell`, structs, and tuples are not supported yet. See the [fuzz testing docs](/docs/testing/fuzz-testing) for the full list and for the `fuzz.bound(...)` / `fuzz.assume(...)` helpers.
+
+Because `option: uint8` already constrains generated values to `0..255`, no extra bounds are needed:
+
 ```tolk title="tests/poll.test.tolk"
 import "@acton/testing/expect"
 
-@fuzzing(min: 0, max: 255)
+@test.fuzz
 get fun `fuzz vote option boundary`(option: uint8) {
     val (poll, _, alice, _) = setupTest();
 
@@ -137,13 +141,13 @@ $ acton test --fuzz-seed 42 -f "fuzz vote option"
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (1 fuzz test)
-  ✓ fuzz vote option boundary  (256 iterations, seed 42)  145ms
+ > ./tests/poll.test.tolk (1 test)
+  ✓ fuzz vote option boundary  145ms (256 runs, seed 42)
 
  ✓ 1 passed in 1 file
 ```
 
-The fuzz test exercises all 256 possible `uint8` values and confirms Poll accepts only `0` and `1`.
+The fuzz test runs 256 generated `uint8` cases — including the boundary values `0`, `1`, `128`, and `255` — and confirms Poll accepts only `0` and `1`. The runner samples the remaining cases at random, so a single run does not guarantee every distinct `uint8` value is hit; raise `runs` (e.g. `@test.fuzz(2048)`) for tighter coverage.
 
 <Callout type="info">
   For CI, run with a fixed seed for deterministic output. See the [fuzz testing docs](/docs/testing/fuzz-testing) for configuration.

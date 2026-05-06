@@ -118,6 +118,10 @@ get fun `test voter rejects direct vote`() {
     val (poll, _, alice, _) = setupTest();
     val intruder = testing.treasury("intruder");
 
+    // Deploy the Voter by having Alice vote normally first.
+    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(voteRes).toHaveAllSuccessfulTxs();
+
     val voterAddr = poll.calcVoterAddress(alice.address);
     val voter     = Voter.fromAddress(voterAddr);
 
@@ -142,8 +146,8 @@ get fun `test voter rejects direct vote`() {
   ```tolk
   get fun calcVoterAddress(voter: address): address {
       val init = ContractState {
-          code: build("Voter"),
-          data: VoterStorage { poll: contract.getAddress(), hasVoted: false }.toCell(),
+          code: voterCompiledCode(),
+          data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
       };
       return AutoDeployAddress { stateInit: init }.calculateAddress();
   }
