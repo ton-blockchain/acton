@@ -6,6 +6,12 @@ on:
       - master
     paths-ignore:
       - "docs/**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
   push:
     branches:
       - master
@@ -33,7 +39,7 @@ jobs:
             sys: linux
             abi: gnu
     runs-on: ${{ matrix.runner }}
-    if: true
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -151,7 +157,7 @@ jobs:
     name: Lint Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
-    if: true
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -200,7 +206,7 @@ jobs:
     name: UI (${{ matrix.sys }}-${{ matrix.arch }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
-    if: true
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     permissions:
       contents: read
@@ -254,7 +260,7 @@ jobs:
             vendor: apple
             sys: darwin
     runs-on: ${{ matrix.runner }}
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
@@ -361,7 +367,7 @@ jobs:
     name: Create Trunk Release
     needs: [ build-linux, build-macos, lint, ui ]
     runs-on: ubicloud-standard-2-ubuntu-2204
-    if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+    if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
 
     permissions:
       actions: write
