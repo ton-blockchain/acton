@@ -110,11 +110,7 @@ const renderExternalDestination = (
 
   if (contracts.has(destination)) {
     return (
-      <ContractChip
-        address={destination}
-        contracts={contracts}
-        onContractClick={onContractClick}
-      />
+      <ContractChip address={destination} contracts={contracts} onContractClick={onContractClick} />
     )
   }
 
@@ -307,11 +303,7 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
-                    {renderExternalDestination(
-                      info.dest?.toString(),
-                      contracts,
-                      onContractClick,
-                    )}
+                    {renderExternalDestination(info.dest?.toString(), contracts, onContractClick)}
                   </div>
                 </div>
               </>
@@ -356,11 +348,7 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
@@ -395,11 +383,7 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
@@ -439,11 +423,7 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
@@ -496,11 +476,7 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Exit Code:</span>
                 <span className={styles.detailValue}>
-                  <ExitCodeChip
-                    exitCode={execution.failureCode}
-                    abi={contractAbi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={execution.failureCode} abi={contractAbi} phase="action" />
                 </span>
               </div>
             )}
