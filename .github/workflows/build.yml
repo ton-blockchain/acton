@@ -81,6 +81,7 @@ jobs:
           tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Install LLVM and Clang
+        timeout-minutes: 5
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh

@@ -1125,7 +1125,7 @@ fn run_file_tests(
                 .config
                 .save_test_trace
                 .as_ref()
-                .map(|_| format!("{}_trace.json", test.name)),
+                .map(|_| trace::trace_file_name(&test.name)),
         };
 
         runner.reporter_manager.on_test_started(&test_report)?;
