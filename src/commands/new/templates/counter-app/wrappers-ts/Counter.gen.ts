@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a Counter contract in Tolk
+// It's a TypeScript wrapper for a Counter contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -115,15 +115,7 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
 type uint32 = bigint
-type uint256 = bigint
 
 /**
  > struct Storage {
@@ -320,9 +312,9 @@ export class Counter implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }
