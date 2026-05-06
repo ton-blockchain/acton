@@ -4,6 +4,9 @@ description = "empty app description"
 version = "0.1.0"
 license = "MIT"
 
+[toolchain]
+acton = "[ACTON_VERSION]"
+
 [contracts.Empty]
 display-name = "Empty"
 src = "contracts/src/Empty.tolk"

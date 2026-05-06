@@ -54,7 +54,9 @@ enum RepoFetchResult<T> {
 impl GitHubClient {
     pub(super) fn new(token: Option<String>) -> Self {
         Self {
-            client: Client::new(),
+            client: crate::http::blocking_client_builder()
+                .build()
+                .expect("failed to build GitHub HTTP client"),
             token,
         }
     }

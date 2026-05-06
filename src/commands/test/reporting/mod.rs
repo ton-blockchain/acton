@@ -10,9 +10,8 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use ton_abi::ContractAbi;
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
 use ton_executor::get::GetMethodResult;
 use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
@@ -111,11 +110,9 @@ pub struct TestReport {
     pub details: Option<String>,
     pub location: Option<SourceLocation>,
     #[serde(skip)]
-    pub abi: Arc<ContractAbi>,
+    pub abi: Option<Arc<ContractABI>>,
     #[serde(skip)]
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
-    #[serde(skip)]
-    pub source_map: Arc<TolkSourceMap>,
+    pub source_map: Arc<SourceMap>,
     #[serde(skip)]
     pub show_bodies: bool,
     #[serde(skip)]
@@ -297,11 +294,10 @@ pub(super) fn extract_suite_name(file_path: &Path) -> Arc<str> {
         .into()
 }
 
-pub(super) fn formatter_for_failed_test<'a>(test: &'a TestReport) -> Option<FormatterContext<'a>> {
+pub(super) fn formatter_for_failed_test(test: &TestReport) -> Option<FormatterContext<'_>> {
     let failure = test.execution.as_ref()?.failure.as_ref()?;
 
     Some(FormatterContext {
-        contract_abi: test.abi.clone(),
         accounts: Cow::Borrowed(&failure.accounts),
         build_cache: Cow::Borrowed(&failure.build_cache),
         emulations: Cow::Borrowed(&failure.emulations),

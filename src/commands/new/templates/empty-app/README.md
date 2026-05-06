@@ -2,7 +2,7 @@
 
 This project includes a Vite-based React app for TON dApp development. It can
 be generated as part of an Acton project with `acton new --template empty --app`
-or as a standalone frontend with `acton init --create-app`.
+or as a standalone frontend with `acton init --create-dapp`.
 
 ## Layout
 

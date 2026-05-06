@@ -113,11 +113,11 @@ fn ui_port_config_is_used_when_cli_port_is_absent() {
     append_acton_toml(
         &project,
         &format!(
-            r#"
+            r"
 [test]
 ui = true
 ui-port = {port}
-"#
+"
         ),
     );
 

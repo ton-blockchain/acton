@@ -1,7 +1,7 @@
 use crate::integration::check::run_rule_test;
 use function_name::named;
 
-const RULE_CODE: &str = "E031";
+const RULE_CODE: &str = "E025";
 
 #[test]
 #[named]

@@ -15,6 +15,22 @@ const FORMATTED_TOLK: &str = r"fun onInternalMessage(in: InMessage) {
 }
 ";
 
+const RANGE_UNFORMATTED_TOLK: &str = r"fun onInternalMessage(in: InMessage) {
+    val   x   =   1;
+    val   y   =   2;
+    val   z   =   3;
+}
+";
+
+const RANGE_WITH_HEADER_TOLK: &str = r"// file header
+// second header line
+
+fun onInternalMessage(in: InMessage) {
+    val   x   =   1;
+    val   y   =   2;
+}
+";
+
 const IMPORTS_UNFORMATTED_TOLK: &str = r#"import "./b"
 import "@acton/io"
 import "@stdlib/reflection"
@@ -101,6 +117,199 @@ fn test_fmt_specific_file() {
         fs::read_to_string(project.path().join("contracts/simple2.tolk")).unwrap(),
         UNFORMATTED_TOLK
     );
+}
+
+#[test]
+fn test_fmt_range_formats_only_selected_statement() {
+    let project = ProjectBuilder::new("fmt-range")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    let output = project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("2:4-2:24")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches("integration/snapshots/test_fmt_range.stdout.txt")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("contracts/ranged.tolk")
+                .to_str()
+                .unwrap(),
+            "integration/snapshots/test_fmt_range.result.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_check_failure_prints_range_diff() {
+    let project = ProjectBuilder::new("fmt-range-check")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("2:4-2:24")
+        .arg("--check")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_fmt_range_check_failure.stdout.txt");
+}
+
+#[test]
+fn test_fmt_range_end_boundary_does_not_format_next_statement() {
+    let project = ProjectBuilder::new("fmt-range-end-boundary")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    let output = project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("1:4-2:4")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches("integration/snapshots/test_fmt_range.stdout.txt")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("contracts/ranged.tolk")
+                .to_str()
+                .unwrap(),
+            "integration/snapshots/test_fmt_range_end_boundary.result.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_preserves_file_header_comment() {
+    let project = ProjectBuilder::new("fmt-range-header")
+        .contract("ranged", RANGE_WITH_HEADER_TOLK)
+        .build();
+
+    let output = project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("4:4-4:24")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches("integration/snapshots/test_fmt_range.stdout.txt")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("contracts/ranged.tolk")
+                .to_str()
+                .unwrap(),
+            "integration/snapshots/test_fmt_range_header.result.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_rejects_invalid_range() {
+    let project = ProjectBuilder::new("fmt-range-invalid")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("invalid-range")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches("integration/snapshots/test_fmt_range_invalid.stderr.txt");
+}
+
+#[test]
+fn test_fmt_range_requires_single_file_path() {
+    let project = ProjectBuilder::new("fmt-range-no-path")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("2:4-2:24")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_range_requires_file.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_rejects_directory_path() {
+    let project = ProjectBuilder::new("fmt-range-directory")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("2:4-2:24")
+        .arg("contracts")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_range_directory.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_rejects_multiple_files() {
+    let project = ProjectBuilder::new("fmt-range-multiple")
+        .contract("ranged1", RANGE_UNFORMATTED_TOLK)
+        .contract("ranged2", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("--range")
+        .arg("2:4-2:24")
+        .arg("contracts/ranged1.tolk")
+        .arg("contracts/ranged2.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_range_multiple_files.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_range_short_flag_is_not_supported() {
+    let project = ProjectBuilder::new("fmt-range-no-short-flag")
+        .contract("ranged", RANGE_UNFORMATTED_TOLK)
+        .build();
+
+    project
+        .acton()
+        .fmt()
+        .arg("-r")
+        .arg("2:4-2:24")
+        .arg("contracts/ranged.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_fmt_range_short_flag.stderr.txt",
+        );
 }
 
 #[test]

@@ -1,0 +1,37 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
+depends = []
+
+See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_to_equal_rendered_values.test.tolk (19 tests)
+  ✓ fk expect toEqual nullable struct equals plain struct [TIME]
+  ✓ fk expect toEqual plain struct equals nullable struct [TIME]
+  ✓ fk expect toEqual nullable struct field equals plain struct [TIME]
+  ✓ fk expect toEqual nested nullable struct wrappers match [TIME]
+  ✓ fk expect toEqual tuple with nullable struct matches plain struct tuple [TIME]
+  ✓ fk expect toEqual nullable struct null equals null literal [TIME]
+  ✓ fk expect toEqual scalar union int equals plain int [TIME]
+  ✓ fk expect toEqual plain int equals scalar union int [TIME]
+  ✓ fk expect toEqual scalar union bool equals plain bool [TIME]
+  ✓ fk expect toEqual bool does not collapse to raw tvm minus one [TIME]
+  ✓ fk expect toEqual scalar union bool does not collapse to raw tvm minus one [TIME]
+  ✓ fk expect toEqual struct union equals plain struct [TIME]
+  ✓ fk expect toEqual plain struct equals struct union [TIME]
+  ✓ fk expect toEqual complex union event equals plain event struct [TIME]
+  ✓ fk expect toEqual complex union event equals same union event [TIME]
+  ✓ fk expect toEqual unit union variant equals empty struct [TIME]
+  ✓ fk expect toEqual null union variant equals null literal [TIME]
+  ✓ fk expect toEqual struct with nested union and nullable fields matches [TIME]
+  ✓ fk expect toEqual nested union field equals plain event struct [TIME]
+
+ ✓ 19 passed in 1 file

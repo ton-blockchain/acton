@@ -1,7 +1,10 @@
 use super::utils::handle_result;
 use crate::localnet::Localnet;
 use crate::node;
-use crate::server::models::*;
+use crate::server::models::{
+    FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
+    SetAddressNameRequest,
+};
 use crate::types::Hash256;
 use axum::{Json, extract::State};
 use serde_json::Value;

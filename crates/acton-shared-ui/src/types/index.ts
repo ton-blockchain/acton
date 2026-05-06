@@ -1,3 +1,5 @@
+import type {ContractABI} from "gen-typescript-from-tolk-dev"
+
 export enum TestStatus {
   Passed = "Passed",
   Failed = "Failed",
@@ -31,6 +33,15 @@ export interface TestExecutionLogs {
   readonly stdout?: string
   readonly stderr?: string
   readonly vm_log?: string
+}
+
+export interface SourceLocation {
+  readonly file: string
+  readonly line: number
+  readonly column: number
+  readonly end_line: number
+  readonly end_column: number
+  readonly length: number
 }
 
 export interface BackendTransaction {
@@ -71,6 +82,7 @@ export type BackendExecutorAction =
       readonly type: "send_message"
       readonly hash: string
       readonly remaining_balance: string
+      readonly location?: SourceLocation
       readonly failure_reason?: BackendExecutorActionFailureReason
       readonly failure_code?: number
     }
@@ -82,7 +94,18 @@ export type BackendExecutorAction =
       readonly original_balance: string
       readonly changed_remaining_balance: string
       readonly changed_reserved_balance: string
+      readonly location?: SourceLocation
       readonly failure_reason?: BackendExecutorActionFailureReason
+      readonly failure_code?: number
+    }
+  | {
+      readonly type: "set_code"
+      readonly location?: SourceLocation
+      readonly failure_code?: number
+    }
+  | {
+      readonly type: "change_library"
+      readonly location?: SourceLocation
       readonly failure_code?: number
     }
 
@@ -99,60 +122,11 @@ export interface Trace {
   readonly wallets: Record<string, string>
 }
 
-export interface AbiMessage {
-  readonly name: string
-  readonly opcode: number | undefined
-}
-
-export interface AbiExitCode {
-  readonly constantName: string
-  readonly value: number
-}
-
-export interface Abi {
-  readonly messages: AbiMessage[]
-  readonly exitCodes?: readonly AbiExitCode[]
-}
-
-export interface CompilerAbiThrownError {
-  readonly name: string
-  readonly err_code: number
-}
-
-export interface CompilerAbiConstant {
-  readonly name: string
-  readonly description?: string
-}
-
-export interface CompilerAbiEnumMember {
-  readonly name: string
-  readonly description?: string
-}
-
-export type CompilerAbiDeclaration =
-  | {
-      readonly kind: "enum"
-      readonly name: string
-      readonly members: readonly CompilerAbiEnumMember[]
-    }
-  | {
-      readonly kind: string
-      readonly name?: string
-      readonly members?: readonly CompilerAbiEnumMember[]
-    }
-
-export interface CompilerAbi {
-  readonly thrown_errors?: readonly CompilerAbiThrownError[]
-  readonly constants?: readonly CompilerAbiConstant[]
-  readonly declarations?: readonly CompilerAbiDeclaration[]
-}
-
 export interface BackendContractInfo {
   readonly name: string
   readonly code_boc64: string
   readonly source_map: unknown
-  readonly abi?: Abi
-  readonly compiler_abi?: CompilerAbi
+  readonly abi?: ContractABI
 }
 
 export * from "./transaction"

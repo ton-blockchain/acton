@@ -19,10 +19,10 @@ crossbeam-channel = { workspace = true }
 dap = { workspace = true }
 log = { workspace = true }
 num-bigint = { workspace = true }
+owo-colors = { workspace = true }
 serde_json = { workspace = true }
 tolk-syntax = { workspace = true }
 tolk-compiler = { workspace = true }
-ton-abi = { workspace = true }
 ton-executor = { workspace = true }
 tvm-ffi = { workspace = true }
 tycho-types = { workspace = true }

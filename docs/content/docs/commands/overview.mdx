@@ -28,6 +28,24 @@ acton --project-root ../my-project test
 acton --manifest-path ../my-project/Acton.toml wallet new --local
 ```
 
+## Global Environment Overrides
+
+Acton normally refreshes the bundled standard library in `.acton/` before
+commands that need project support, such as `build`, `test`, `script`, `new`,
+and `init`.
+
+Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic `.acton/` refresh for
+the current process. Explicit standard-library commands, such as
+`acton init --stdlib-only`, still update `.acton/`.
+
+Acton disables HTTP proxy detection by default for its own HTTP clients. This
+means `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and system proxy settings are
+ignored unless you opt in. The default avoids macOS sandbox crashes caused by
+system proxy autodetection.
+
+Set `ACTON_USE_PROXY=1` or `ACTON_USE_PROXY=true` to let Acton use those proxy
+settings for the current process.
+
 ## Help And Manuals
 
 Use the CLI help surfaces intentionally:
@@ -115,14 +133,6 @@ command manuals.
     <Card href="/docs/commands/rpc" title="Inspecting Remote State">
         Query account information from a network endpoint and decode storage
         with local ABI metadata when available
-    </Card>
-    <Card href="/docs/commands/localnet" title="Local Development Node">
-        Learn how to start local node, fork remote state, and fund addresses
-        with built-in faucet
-    </Card>
-    <Card href="/docs/commands/ls" title="Language Server">
-        Start the Acton language server over stdio or TCP for editor
-        integrations
     </Card>
     <Card href="/docs/commands/up" title="Managing Acton Versions">
         List, inspect, and install stable or trunk Acton releases

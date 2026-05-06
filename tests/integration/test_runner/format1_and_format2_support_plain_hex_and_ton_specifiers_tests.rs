@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 const FMT_TEST_IMPORTS: &str = r#"
 import "../../lib/fmt"
+import "../../lib/io"
 import "../../lib/testing/expect"
 "#;
 
@@ -71,5 +72,37 @@ get fun `test y stdlib format5 placeholder order bug`() {
 }
 "#,
         "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug.stdout.txt",
+    );
+}
+
+#[test]
+fn format_supports_cell_tree_for_cells_slices_and_typed_cells() {
+    run_fmt_success(
+        "y-stdlib-format-cell-tree",
+        r#"
+struct TreePayload {
+    value: uint16,
+    child: Cell<uint8>,
+}
+
+get fun `test y stdlib format cell tree`() {
+    val child = beginCell().storeUint(0xAB, 8).endCell();
+    val typedChild = child as Cell<uint8>;
+    val root = beginCell()
+        .storeUint(0xCAFE, 16)
+        .storeRef(child)
+        .endCell();
+    val typedRoot: Cell<TreePayload> = TreePayload {
+        value: 0xCAFE,
+        child: typedChild,
+    }.toCell();
+
+    println(format("cell:\n{:cell-tree}", root));
+    println(format("slice:\n{:cell-tree}", root.beginParse()));
+    println(format("typed:\n{:cell-tree}", typedRoot));
+    expect(format("fallback={:cell-tree}", 42)).toEqual("fallback=42");
+}
+"#,
+        "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format_supports_cell_tree_for_cells_slices_and_typed_cells.stdout.txt",
     );
 }

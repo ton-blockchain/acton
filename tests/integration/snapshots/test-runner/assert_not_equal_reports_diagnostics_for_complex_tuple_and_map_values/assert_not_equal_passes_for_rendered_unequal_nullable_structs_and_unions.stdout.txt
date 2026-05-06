@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.MyContract]
+display-name = "MyContract"
+src = "contracts/MyContract.tolk"
+depends = []
+
+See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/assert_not_equal_rendered_unequal.test.tolk (4 tests)
+  ✓ ej stdlib assert not equal pass nullable struct value differs [TIME]
+  ✓ ej stdlib assert not equal pass nullable struct differs from null [TIME]
+  ✓ ej stdlib assert not equal pass same union variant payload differs [TIME]
+  ✓ ej stdlib assert not equal pass different union variants [TIME]
+
+ ✓ 4 passed in 1 file

@@ -4,6 +4,8 @@ use reqwest::blocking::Response;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::env;
+use std::ffi::OsStr;
 use std::fmt;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
@@ -18,12 +20,34 @@ const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
 const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
 const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
+const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
 
 const fn user_agent() -> &'static str {
     concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
+fn http_client_builder() -> reqwest::blocking::ClientBuilder {
+    let builder = reqwest::blocking::Client::builder();
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn proxy_enabled() -> bool {
+    proxy_enabled_from_value(env::var_os(USE_PROXY_ENV).as_deref())
+}
+
+fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|value| {
+        let value = value.to_string_lossy();
+        let value = value.trim();
+        value == "1" || value == "true"
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,12 +102,9 @@ impl TonApiClient {
         network: Network,
         custom_networks: HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<TonApiClient> {
-        let mut client_builder = reqwest::blocking::ClientBuilder::new()
+        let client_builder = http_client_builder()
             .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
             .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS));
-        if should_disable_system_proxy() {
-            client_builder = client_builder.no_proxy();
-        }
 
         Ok(TonApiClient {
             client: client_builder
@@ -458,6 +479,61 @@ impl TonApiClient {
         Ok(data.result)
     }
 
+    pub fn get_shard_account_cell(
+        &self,
+        seqno: Option<u64>,
+        address: &str,
+    ) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getShardAccountCell?address={}{}",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
+            urlencoding::encode(address),
+            seqno
+                .map(|seqno| format!("&seqno={seqno}"))
+                .unwrap_or_default(),
+        );
+
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send getShardAccountCell request to TonCenter",
+        )?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterShardAccountCellResponse {
+            ok: bool,
+            result: Option<TonCenterTvmCell>,
+            error: Option<String>,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterTvmCell {
+            bytes: String,
+        }
+
+        let data: TonCenterShardAccountCellResponse = response
+            .json()
+            .context("Failed to parse getShardAccountCell response")?;
+
+        if !data.ok {
+            anyhow::bail!(
+                "{}",
+                data.error
+                    .unwrap_or_else(|| "TonCenter returned ok=false for getShardAccountCell".into())
+            );
+        }
+
+        let cell_boc = data
+            .result
+            .ok_or_else(|| anyhow!("TonCenter getShardAccountCell response has no result"))?
+            .bytes;
+
+        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
+    }
+
     pub fn get_library_by_hash(&self, hash: &HashBytes) -> anyhow::Result<Cell> {
         let url = format!(
             "{}/getLibraries",
@@ -822,10 +898,10 @@ struct TonCenterErrorResponse {
     error: String,
 }
 
-/// TonCenter v3 transaction summary returned by `/api/v3/transactionsByMessage` and
+/// `TonCenter` v3 transaction summary returned by `/api/v3/transactionsByMessage` and
 /// embedded inside `/api/v3/traces` responses.
 ///
-/// `/traces` does not ship the raw Transaction BoC — callers reconstruct a synthetic
+/// `/traces` does not ship the raw Transaction `BoC` — callers reconstruct a synthetic
 /// `Transaction` cell from the structured fields below.
 #[derive(Deserialize, Debug, Clone)]
 pub struct V3TransactionSummary {
@@ -987,7 +1063,7 @@ pub struct V3StoragePhase {
 }
 
 /// v3 message summary (embedded in `in_msg` / `out_msgs` of each transaction). Contains
-/// enough to reconstruct a full `Message` cell without querying raw BoCs.
+/// enough to reconstruct a full `Message` cell without querying raw `BoCs`.
 #[derive(Deserialize, Debug, Clone)]
 pub struct V3MessageSummary {
     #[serde(default)]
@@ -1030,7 +1106,7 @@ pub struct V3MessageContent {
     pub body: Option<String>,
 }
 
-/// TonCenter v3 trace envelope returned by `/api/v3/traces`.
+/// `TonCenter` v3 trace envelope returned by `/api/v3/traces`.
 ///
 /// Only the fields actually used by acton are deserialized. `transactions_order` lists
 /// transactions in their natural parent-first order; each entry keys into `transactions`.
@@ -1102,15 +1178,29 @@ impl TonApiClient {
     }
 }
 
-fn should_disable_system_proxy() -> bool {
-    std::env::var("ACTON_DISABLE_SYSTEM_PROXY")
-        .map(|value| value.trim() == "1")
-        .unwrap_or(false)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::normalize_toncenter_error_message;
+    use super::{normalize_toncenter_error_message, proxy_enabled_from_value};
+    use std::ffi::OsStr;
+
+    #[test]
+    fn acton_use_proxy_is_disabled_by_default() {
+        assert!(!proxy_enabled_from_value(None));
+    }
+
+    #[test]
+    fn acton_use_proxy_accepts_1_or_true() {
+        for value in ["1", "true"] {
+            assert!(proxy_enabled_from_value(Some(OsStr::new(value))));
+        }
+    }
+
+    #[test]
+    fn acton_use_proxy_rejects_other_values() {
+        for value in ["", "0", "false", "TRUE", "yes"] {
+            assert!(!proxy_enabled_from_value(Some(OsStr::new(value))));
+        }
+    }
 
     #[test]
     fn normalize_toncenter_error_message_maps_missing_account_state() {

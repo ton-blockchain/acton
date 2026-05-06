@@ -1,4 +1,4 @@
-warning[E021]: send with dangerous mode requires safety comment
+warning[E016]: send with dangerous mode requires safety comment
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 outMsg.send(SEND_MODE_CARRY_ALL_BALANCE);
@@ -8,4 +8,4 @@ warning[E021]: send with dangerous mode requires safety comment
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E021
+For example: acton check --explain E016

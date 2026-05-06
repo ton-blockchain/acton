@@ -1,4 +1,5 @@
 import "@acton/fmt"
+import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
 import "@acton/testing/assert"
@@ -15,7 +16,7 @@ fun main() {
     }
 
     val res = deployNftBatch(collection, deployer, batchOwner, batchCount);
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     printNftCollectionInfo(collection, "NFT");
 }

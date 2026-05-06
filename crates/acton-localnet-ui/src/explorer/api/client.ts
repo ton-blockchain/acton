@@ -1,4 +1,4 @@
-import type {ContractABI} from "gen-typescript-from-tolk-dev/src/abi"
+import type {ContractABI} from "gen-typescript-from-tolk-dev"
 
 import type {
   AccountStatesResponse,

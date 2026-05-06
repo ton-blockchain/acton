@@ -20,9 +20,9 @@
   ✓ admin: admin should be able to upgrade minter code and data [TIME]
   ✓ shard: wallet address should keep owner shard prefix in get/discovery/transfer [TIME]
  > tests/bounce-handling.test.tolk (3 tests)
-  ✓ minter restores supply on internal_transfer bounce [TIME]
-  ✓ wallet restores balance on internal_transfer bounce [TIME]
-  ✓ wallet restores balance on burn_notification bounce [TIME]
+  ✓ bounce: minter restores supply on internal_transfer bounce [TIME]
+  ✓ bounce: wallet restores balance on internal_transfer bounce [TIME]
+  ✓ bounce: wallet restores balance on burn_notification bounce [TIME]
  > tests/gas.test.tolk (13 tests)
   ✓ gas: transfer minimal value edge [TIME]
   ✓ gas: transfer minimal value is message-size aware [TIME]

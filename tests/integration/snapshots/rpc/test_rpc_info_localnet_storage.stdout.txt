@@ -12,7 +12,6 @@ Remote Account
 
 Local Match
   Contract:          counter (counter)
-  ABI:               counter
 
 Decoded Storage
   counter: 42

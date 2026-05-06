@@ -37,7 +37,7 @@ struct VeryNested1 {
 
 get fun `test format struct with single field`() {
     expect(format("{}", SingleInt { a: 100 })).toEqual("""SingleInt {
-    a: 100
+    a: 100,
 }""");
 }
 
@@ -52,7 +52,7 @@ get fun `test format struct with two fields`() {
         ),
     ).toEqual("""DoubleInt {
     a: 100,
-    b: 200
+    b: 200,
 }""");
 }
 
@@ -70,8 +70,8 @@ get fun `test format struct with nested single int`() {
     a: 100,
     b: 200,
     nested: SingleInt {
-        a: 300
-    }
+        a: 300,
+    },
 }""");
 }
 
@@ -83,8 +83,8 @@ get fun `test format struct with nested double int`() {
     b: 4,
     nested: DoubleInt {
         a: 0,
-        b: 1
-    }
+        b: 1,
+    },
 }""");
 }
 
@@ -98,9 +98,9 @@ get fun `test format struct with very nested`() {
         a: 4,
         nested: DoubleInt {
             a: 0,
-            b: 1
-        }
-    }
+            b: 1,
+        },
+    },
 }""");
 }
 
@@ -128,19 +128,19 @@ get fun `test format message`() {
         ihrDisabled: true,
         bounce: false,
         bounced: false,
-        src: kQC5PHBsPEHzypAUMCGXCD5pNDAA2DozF5CZxqKiB1_dtgb3,
+        src: kQC5PHBsPEHzypAUMCGXCD5pNDAA2DozF5CZxqKiB1_dtgb3 (src),
         dest: kQC0663BO7-gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
         value: TlbCurrencyCollection {
             grams: 1999900000,
-            other: map<int32, varuint32> {}
+            other: map<int32, varuint32> {},
         },
         extraFlags: 0,
         fwdFee: 266669,
         createdLt: 0,
-        createdAt: 0
+        createdAt: 0,
     },
-    init: null,
-    body: null
+    init: TlbNone,
+    body: slice{4_},
 }""");
     }
 }

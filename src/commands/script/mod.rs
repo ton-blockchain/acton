@@ -8,6 +8,7 @@ use crate::context::{
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use crate::retrace;
+use crate::tonconnect::{TonConnectContext, TonConnectSession};
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
@@ -28,10 +29,10 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::{ABIFunctionParameter, ContractABI as CompilerContractABI, Ty};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
+use tolk_compiler::types_kernel::TyIdx;
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
-use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -61,7 +62,10 @@ fn resolve_script_networks(
         && net != fork_net
     {
         anyhow::bail!(
-            "`--net` ({net}) and `--fork-net` ({fork_net}) cannot differ when broadcasting; use one network or omit `--fork-net`"
+            "{} ({net}) and {} ({fork_net}) cannot differ when broadcasting; use one network or omit {}",
+            "--net".yellow(),
+            "--fork-net".yellow(),
+            "--fork-net".yellow()
         );
     }
 
@@ -88,6 +92,8 @@ pub fn script_cmd(
     net: Option<String>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
+    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
@@ -118,10 +124,18 @@ pub fn script_cmd(
         anyhow::bail!("Script file must end with {}", ".tolk".yellow());
     }
 
-    let content = fs::read_to_string(path)
-        .map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
-
     let (network, fork_net) = resolve_script_networks(net.as_deref(), fork_net.as_deref())?;
+    if tonconnect && network.is_none() {
+        anyhow::bail!(
+            "{} requires {} or {}",
+            "--tonconnect".yellow(),
+            "--net mainnet".yellow(),
+            "--net testnet".yellow()
+        );
+    }
+    if tonconnect && let Some(network) = &network {
+        crate::tonconnect::ensure_supported_network(network)?;
+    }
     let debug_listener = if debug {
         Some(reserve_dap_listener(debug_port)?)
     } else {
@@ -130,8 +144,7 @@ pub fn script_cmd(
 
     run_script_file(
         path,
-        &content,
-        &mappings,
+        mappings.as_ref(),
         args,
         verbose,
         debug,
@@ -142,6 +155,8 @@ pub fn script_cmd(
         network,
         explorer,
         show_bodies,
+        tonconnect,
+        tonconnect_port,
     )
 }
 
@@ -153,8 +168,7 @@ pub fn script_cmd(
 #[allow(clippy::too_many_arguments)]
 fn run_script_file(
     file_path: &str,
-    content: &str,
-    mappings: &Option<BTreeMap<String, String>>,
+    mappings: Option<&BTreeMap<String, String>>,
     args: Vec<String>,
     verbose: u8,
     debug: bool,
@@ -165,10 +179,12 @@ fn run_script_file(
     net: Option<Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
+    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
-    let abi = contract_abi(content.into(), file_path, mappings);
+    let mappings = mappings.cloned();
 
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(mappings);
+    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
     let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
     let mut verbosity = executor_verbosity_for_cli_level(verbose);
 
@@ -181,16 +197,11 @@ fn run_script_file(
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
             let stack = parse_script_stack_args(result.abi.as_ref(), &args)?;
-            let source_map = Arc::new(TolkSourceMap::from_code_cell(
-                result.new_source_map.unwrap_or_default(),
-                &code_cell,
-                result.debug_mark_base64.as_deref(),
-            )?);
+            let source_map = Arc::new(result.source_map.unwrap_or_default());
             execute_script(
                 &code_cell,
                 &data_cell,
                 stack,
-                Arc::new(abi),
                 result.abi.map(Arc::new),
                 source_map,
                 debug,
@@ -202,6 +213,8 @@ fn run_script_file(
                 net.as_ref(),
                 explorer,
                 show_bodies,
+                tonconnect,
+                tonconnect_port,
             )?;
             Ok(())
         }
@@ -213,8 +226,8 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    source_map: Arc<TolkSourceMap>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    source_map: Arc<SourceMap>,
+    abi: Option<Arc<ContractABI>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -222,9 +235,8 @@ fn execute_script(
     code_cell: &Cell,
     data_cell: &Cell,
     stack: Tuple,
-    abi: Arc<ContractAbi>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
-    source_map: Arc<TolkSourceMap>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Arc<SourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -234,6 +246,8 @@ fn execute_script(
     net: Option<&Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
+    tonconnect: bool,
+    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let broadcast = net.is_some();
     let dest_address = contract_address(code_cell)?;
@@ -280,17 +294,33 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let open_wallets = wallets::open_wallets(&config, net, broadcast)?;
+    let current_project_root = project_root().to_path_buf();
+    let tonconnect = if tonconnect {
+        let network = net.expect("`--tonconnect` must be validated before script execution");
+        let storage_path = crate::tonconnect::session_storage_path(&current_project_root, network)?;
+        let session = Arc::new(TonConnectSession::start(tonconnect_port, storage_path)?);
+        let wallet = session.connect(network)?;
+        Some(TonConnectContext { session, wallet })
+    } else {
+        None
+    };
+    let open_wallets = if tonconnect.is_some() {
+        BTreeMap::new()
+    } else {
+        wallets::open_wallets(&config, net, broadcast)?
+    };
 
     let mut ctx = Context {
         env: Env {
             config: &config,
-            project_root: project_root().to_path_buf(),
-            abi,
+            project_root: current_project_root,
+            abi: abi.clone(),
+            source_map: source_map.clone(),
             show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets,
+            tonconnect,
             build_override: BTreeMap::new(),
             explorer,
             fork_net,
@@ -340,7 +370,7 @@ fn execute_script(
         let transport = start_dap_server_with_listener(listener)?;
         executor.prepare(0, &stack_b64)?;
         let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
-        replayer.set_compiler_abi(compiler_abi.clone());
+        replayer.set_abi(abi.clone());
 
         let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
         ctx.debug = DebugCtx::new(&mut dbg_session);
@@ -354,7 +384,7 @@ fn execute_script(
             ScriptResult {
                 result,
                 source_map,
-                compiler_abi,
+                abi,
             },
         );
         return Ok(());
@@ -369,7 +399,7 @@ fn execute_script(
         ScriptResult {
             result,
             source_map,
-            compiler_abi,
+            abi,
         },
     );
     Ok(())
@@ -396,8 +426,8 @@ fn print_script_result<'a>(ctx: &'a Context<'a>, result: ScriptResult) {
                             println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                         }
                     } else {
-                        let detailed_message = formatter
-                            .format_detailed_assert_failure(assert_failure, ctx.env.abi.clone());
+                        let detailed_message =
+                            formatter.format_detailed_assert_failure(assert_failure);
 
                         if detailed_message.is_empty() {
                             println!("{}", "└─".dimmed());
@@ -455,11 +485,7 @@ fn format_nonzero_script_exit_code_details<'a>(
     let custom_exit_code_info = if FormatterContext::is_special_get_method_exit_code(exit_code) {
         None
     } else {
-        FormatterContext::find_custom_exit_code_info(
-            exit_code,
-            Some(ctx.env.abi.as_ref()),
-            script_result.compiler_abi.as_deref(),
-        )
+        FormatterContext::find_custom_exit_code_info(exit_code, script_result.abi.as_deref())
     };
 
     if let Some(info) = &exit_code_info {
@@ -553,17 +579,14 @@ fn format_std_address(address: &StdAddr, network: Option<&Network>) -> String {
     .to_string()
 }
 
-fn parse_script_stack_args(
-    compiler_abi: Option<&CompilerContractABI>,
-    args: &[String],
-) -> anyhow::Result<Tuple> {
-    let Some(compiler_abi) = compiler_abi else {
+fn parse_script_stack_args(abi: Option<&ContractABI>, args: &[String]) -> anyhow::Result<Tuple> {
+    let Some(abi) = abi else {
         if args.is_empty() {
             return Ok(Tuple::empty());
         }
         anyhow::bail!("Cannot parse script arguments: missing ABI");
     };
-    let Some(main) = compiler_abi
+    let Some(main) = abi
         .get_methods
         .iter()
         .find(|method| method.tvm_method_id == 0)
@@ -585,21 +608,25 @@ fn parse_script_stack_args(
 
     let mut items = Vec::with_capacity(args.len());
     for (param, arg) in main.parameters.iter().zip(args) {
-        items.push(parse_script_parameter(param, arg)?);
+        items.push(parse_script_parameter(abi, param, arg)?);
     }
 
     Ok(Tuple(items))
 }
 
-fn parse_script_parameter(param: &ABIFunctionParameter, raw: &str) -> anyhow::Result<TupleItem> {
-    validate_script_arg_ty(&param.ty)
-        .and_then(|()| parse_script_value(&param.ty, raw))
+fn parse_script_parameter(
+    abi: &ContractABI,
+    param: &ABIFunctionParameter,
+    raw: &str,
+) -> anyhow::Result<TupleItem> {
+    validate_script_arg_ty(abi, param.ty_idx)
+        .and_then(|()| parse_script_value(abi, param.ty_idx, raw))
         .map_err(|err| match err {
             ScriptArgParseError::Invalid => {
                 anyhow!(
                     "Cannot parse argument {} as {}: {}",
                     param.name.yellow(),
-                    param.ty.to_string().yellow(),
+                    abi.render_type(param.ty_idx).yellow(),
                     format_arg_value(raw).yellow()
                 )
             }
@@ -629,9 +656,17 @@ enum ScriptArgParseError {
     Unsupported { kind: &'static str, ty: String },
 }
 
-fn validate_script_arg_ty(ty: &Ty) -> Result<(), ScriptArgParseError> {
+fn validate_script_arg_ty(abi: &ContractABI, ty_idx: TyIdx) -> Result<(), ScriptArgParseError> {
+    let Some(ty) = abi.ty_by_idx(ty_idx) else {
+        return Err(ScriptArgParseError::Unsupported {
+            kind: "argument",
+            ty: format!("ty#{ty_idx}"),
+        });
+    };
     match ty {
-        Ty::Nullable { inner, .. } | Ty::ArrayOf { inner } => validate_script_arg_ty(inner),
+        Ty::Nullable { inner_ty_idx, .. } | Ty::ArrayOf { inner_ty_idx } => {
+            validate_script_arg_ty(abi, *inner_ty_idx)
+        }
         Ty::Int
         | Ty::IntN { .. }
         | Ty::UintN { .. }
@@ -648,19 +683,29 @@ fn validate_script_arg_ty(ty: &Ty) -> Result<(), ScriptArgParseError> {
         | Ty::AddressExt
         | Ty::AddressOpt
         | Ty::NullLiteral => Ok(()),
-        _ => Err(unsupported_ty(ty)),
+        _ => Err(unsupported_ty(abi, ty_idx)),
     }
 }
 
-fn parse_script_value(ty: &Ty, raw: &str) -> Result<TupleItem, ScriptArgParseError> {
+fn parse_script_value(
+    abi: &ContractABI,
+    ty_idx: TyIdx,
+    raw: &str,
+) -> Result<TupleItem, ScriptArgParseError> {
+    let Some(ty) = abi.ty_by_idx(ty_idx) else {
+        return Err(ScriptArgParseError::Unsupported {
+            kind: "argument",
+            ty: format!("ty#{ty_idx}"),
+        });
+    };
     let trimmed = raw.trim();
     match ty {
         Ty::String if !trimmed.starts_with('"') => string_tuple_item(raw),
         Ty::Nullable { .. } if trimmed == "null" => Ok(TupleItem::Null),
-        Ty::Nullable { inner, .. } => parse_script_value(inner, raw),
+        Ty::Nullable { inner_ty_idx, .. } => parse_script_value(abi, *inner_ty_idx, raw),
         _ => {
-            let mut parser = ScriptArgParser::new(raw);
-            let item = parser.parse_value(ty)?;
+            let mut parser = ScriptArgParser::new(abi, raw);
+            let item = parser.parse_value(ty_idx)?;
             parser.skip_ws();
             if parser.is_eof() {
                 Ok(item)
@@ -672,13 +717,14 @@ fn parse_script_value(ty: &Ty, raw: &str) -> Result<TupleItem, ScriptArgParseErr
 }
 
 struct ScriptArgParser<'a> {
+    abi: &'a ContractABI,
     input: &'a str,
     pos: usize,
 }
 
 impl<'a> ScriptArgParser<'a> {
-    const fn new(input: &'a str) -> Self {
-        Self { input, pos: 0 }
+    const fn new(abi: &'a ContractABI, input: &'a str) -> Self {
+        Self { abi, input, pos: 0 }
     }
 
     const fn is_eof(&self) -> bool {
@@ -706,8 +752,14 @@ impl<'a> ScriptArgParser<'a> {
         }
     }
 
-    fn parse_value(&mut self, ty: &Ty) -> Result<TupleItem, ScriptArgParseError> {
+    fn parse_value(&mut self, ty_idx: TyIdx) -> Result<TupleItem, ScriptArgParseError> {
         self.skip_ws();
+        let Some(ty) = self.abi.ty_by_idx(ty_idx) else {
+            return Err(ScriptArgParseError::Unsupported {
+                kind: "argument",
+                ty: format!("ty#{ty_idx}"),
+            });
+        };
         match ty {
             Ty::Int
             | Ty::IntN { .. }
@@ -734,8 +786,8 @@ impl<'a> ScriptArgParser<'a> {
                     Err(ScriptArgParseError::Invalid)
                 }
             }
-            Ty::ArrayOf { inner } => self.parse_array(inner),
-            _ => Err(unsupported_ty(ty)),
+            Ty::ArrayOf { inner_ty_idx } => self.parse_array(*inner_ty_idx),
+            _ => Err(unsupported_ty(self.abi, ty_idx)),
         }
     }
 
@@ -777,7 +829,7 @@ impl<'a> ScriptArgParser<'a> {
         address_tuple_item(token)
     }
 
-    fn parse_array(&mut self, inner: &Ty) -> Result<TupleItem, ScriptArgParseError> {
+    fn parse_array(&mut self, inner_ty_idx: TyIdx) -> Result<TupleItem, ScriptArgParseError> {
         if !self.consume_byte(b'[') {
             return Err(ScriptArgParseError::Invalid);
         }
@@ -792,7 +844,7 @@ impl<'a> ScriptArgParser<'a> {
                 return Err(ScriptArgParseError::Invalid);
             }
 
-            items.push(self.parse_value(inner)?);
+            items.push(self.parse_value(inner_ty_idx)?);
 
             self.skip_ws();
             self.consume_byte(b',');
@@ -896,10 +948,12 @@ fn address_tuple_item(value: &str) -> Result<TupleItem, ScriptArgParseError> {
         .map_err(|_| ScriptArgParseError::Invalid)
 }
 
-fn unsupported_ty(ty: &Ty) -> ScriptArgParseError {
+fn unsupported_ty(abi: &ContractABI, ty_idx: TyIdx) -> ScriptArgParseError {
     ScriptArgParseError::Unsupported {
-        kind: unsupported_ty_kind(ty),
-        ty: ty.to_string(),
+        kind: abi
+            .ty_by_idx(ty_idx)
+            .map_or("argument", unsupported_ty_kind),
+        ty: abi.render_type(ty_idx),
     }
 }
 

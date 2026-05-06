@@ -11,6 +11,6 @@
   → Sending sources to backend for verification
   → Using backend: [LOCALHOST_URL]/source
 
-  Warning: Contract with the hash 5n[TIME]O9SBx5EMh6Bh5gylCegu3Wh6DhyL8bQ35t4+aXM= has already been verified previously, no further action is required
+  Warning: Contract with the hash 5n7sO9SBx5EMh6Bh5gylCegu3Wh6DhyL8bQ35t4+aXM= has already been verified previously, no further action is required
 
 View at: https://verifier.ton.org/[WALLET_ADDRESS_BASE]?testnet

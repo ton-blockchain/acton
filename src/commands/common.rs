@@ -98,15 +98,16 @@ pub mod error_fmt {
         if contracts.is_none() || contracts.as_ref().is_some_and(|c| c.is_empty()) {
             return "no contracts defined yet".to_string();
         }
-        contracts
-            .map(|contracts| {
+        contracts.map_or_else(
+            || "none".to_string(),
+            |contracts| {
                 contracts
                     .keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string())
+            },
+        )
     }
 
     #[must_use]
@@ -115,15 +116,16 @@ pub mod error_fmt {
         if wallets.is_none() || wallets.as_ref().is_some_and(|c| c.is_empty()) {
             return format!("Wallet {} not found. {}", name.yellow(), no_wallets_found());
         }
-        let available = wallets
-            .map(|contracts| {
+        let available = wallets.map_or_else(
+            || "none".to_string(),
+            |contracts| {
                 contracts
                     .keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string());
+            },
+        );
         format!(
             "Wallet {} not found in wallets.toml and global.wallets.toml\nAvailable wallets:\n{}",
             name.yellow(),
@@ -141,14 +143,15 @@ pub mod error_fmt {
                 no_libraries_found()
             );
         }
-        let available = libraries
-            .map(|libs| {
+        let available = libraries.map_or_else(
+            || "none".to_string(),
+            |libs| {
                 libs.keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string());
+            },
+        );
         format!(
             "Library {} not found in libraries.toml and global.libraries.toml\nAvailable libraries:\n{}",
             name.yellow(),

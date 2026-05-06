@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tolk_compiler::abi::ContractABI;
 use ton_emulator::emulator::SendMessageResultSuccess;
 use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
@@ -101,17 +102,22 @@ fn resolve_opcode_name(
     opcode: u32,
 ) -> String {
     if let Some((_, build_info)) = runner.build_cache.result_for_code(&result.code)
-        && let Some(abi) = &build_info.abi
-        && let Some(message) = abi.find_type_by_opcode(opcode)
+        && let Some(message_name) = ContractABI::find_message_name_by_opcode_with_symbols(
+            build_info.source_map.as_ref(),
+            build_info.abi.as_deref(),
+            opcode,
+        )
     {
-        return message.name;
+        return message_name.to_owned();
     }
 
     for build_info in runner.build_cache.built.values() {
-        if let Some(abi) = &build_info.abi
-            && let Some(message) = abi.find_type_by_opcode(opcode)
-        {
-            return message.name;
+        if let Some(message_name) = ContractABI::find_message_name_by_opcode_with_symbols(
+            build_info.source_map.as_ref(),
+            build_info.abi.as_deref(),
+            opcode,
+        ) {
+            return message_name.to_owned();
         }
     }
 

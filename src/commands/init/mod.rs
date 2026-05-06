@@ -1,5 +1,4 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
-use crate::commands::create_app::create_app_cmd;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
@@ -8,6 +7,10 @@ use std::fs;
 use std::path::Path;
 use tree_sitter::Node;
 use walkdir::WalkDir;
+
+mod create_app;
+
+pub use create_app::DEFAULT_APP_DIR;
 
 const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
     (
@@ -29,7 +32,7 @@ const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
 
 pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Result<()> {
     if create_app_path.is_some() {
-        return create_app_cmd(create_app_path);
+        return create_app::create_app_cmd(create_app_path);
     }
 
     if stdlib_only {

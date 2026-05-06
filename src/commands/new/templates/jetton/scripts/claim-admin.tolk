@@ -13,7 +13,7 @@ fun main() {
         0,
         { bounce: false, value: ton("0.05") },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     println("JETTON CLAIM_SENDER={}", claimer.address);
     printJettonMinterInfo(minter, "JETTON");

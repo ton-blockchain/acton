@@ -1,4 +1,4 @@
-warning[E025]: division before multiplication may cause precision loss
+warning[E019]: division before multiplication may cause precision loss
   --> [ROOT]/contracts/main[LINE]
   |
 5 |                     t = a / b;
@@ -12,4 +12,4 @@ warning[E025]: division before multiplication may cause precision loss
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E025
+For example: acton check --explain E019

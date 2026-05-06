@@ -53,6 +53,44 @@ fn test_up_list_aggregates_unique_versions_across_repositories() {
 }
 
 #[test]
+// Verifies that `acton up` remains available when [toolchain].acton does not match.
+fn test_up_list_ignores_project_toolchain_acton_mismatch() {
+    let project = ProjectBuilder::new("up-list-toolchain-mismatch").build();
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "0.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![
+            expected_json_response(
+                "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+                json!([{ "tag_name": "v0.4.0", "assets": [] }]).to_string(),
+            ),
+            expected_json_response(
+                "/repos/i582/acton-public/releases?per_page=100&page=1",
+                json!([{ "tag_name": "v0.3.0", "assets": [] }]).to_string(),
+            ),
+        ]
+    });
+
+    let output = up_command(&project)
+        .arg("--list")
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/up/test_up_list_ignores_project_toolchain_acton_mismatch.stdout.txt",
+    );
+}
+
+#[test]
 // Verifies that `acton up --check` returns machine-readable JSON when a newer stable release exists.
 fn test_up_check_reports_update_available_as_json() {
     let project = ProjectBuilder::new("up-check-update").build();

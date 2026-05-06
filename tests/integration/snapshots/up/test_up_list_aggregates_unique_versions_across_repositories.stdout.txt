@@ -1,4 +1,4 @@
 Available versions:
-  v0.4.0
+  [ACTON_VERSION]
   v0.3.0
   trunk

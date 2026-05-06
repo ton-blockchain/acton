@@ -17,12 +17,12 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use ton_api::{
     AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
     V3TransactionSummary,
 };
-use tvm_ffi::stack::{Tuple, TupleItem};
+use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{HashBytes, Lazy};
 use tycho_types::models::{
@@ -63,16 +63,11 @@ pub(super) fn rpc_trace_cmd(
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
     print_section("Trace Tree");
-    let send_result_list = TupleItem::TypedTuple {
-        type_name: "SendResultList".to_owned(),
-        inner: Tuple(
-            trace_txs
-                .iter()
-                .map(V3TraceTransaction::to_send_result_tuple)
-                .collect(),
-        ),
-    };
-    let formatted_tree = formatter.format(&send_result_list);
+    let send_result_list: Vec<TupleItem> = trace_txs
+        .iter()
+        .map(V3TraceTransaction::to_send_result_tuple)
+        .collect();
+    let formatted_tree = formatter.format_transaction_list(&send_result_list);
     println!("{}", formatted_tree.trim_end());
 
     if verbose {
@@ -121,8 +116,7 @@ fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
         trace
             .transactions_order
             .first()
-            .map(String::as_str)
-            .unwrap_or("<none>"),
+            .map_or("<none>", String::as_str),
     );
     print_kv("Trace Complete", (!trace.is_incomplete).to_string());
     print_kv("Total Txs", trace.transactions_order.len().to_string());
@@ -177,11 +171,11 @@ fn print_rpc_trace_details(
                 .and_then(|formatter| formatter.transaction_inbound_message_name(&tx.transaction));
             println!(
                 "    from: {}",
-                format_optional_address(&message.source, network)
+                format_optional_address(message.source.as_deref(), network)
             );
             println!(
                 "    to: {}",
-                format_optional_address(&message.destination, network)
+                format_optional_address(message.destination.as_deref(), network)
             );
             println!("    value: {}", format_message_value(message));
             println!(
@@ -329,8 +323,8 @@ fn format_message_value(message: &V3MessageSummary) -> String {
     }
 }
 
-fn format_optional_address(address: &Option<String>, network: &Network) -> String {
-    address.as_deref().map_or_else(
+fn format_optional_address(address: Option<&str>, network: &Network) -> String {
+    address.map_or_else(
         || "<none>".to_owned(),
         |address| format_trace_address(address, network),
     )
@@ -443,9 +437,10 @@ fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
             &candidate.contract_path,
             &candidate.code_boc64,
             candidate.code_hash,
-            Arc::new(TolkSourceMap::without_debug_info()),
+            candidate
+                .source_map
+                .unwrap_or_else(|| Arc::new(SourceMap::without_debug_info())),
             candidate.abi,
-            candidate.compiler_abi,
         );
     }
     Ok(build_cache)

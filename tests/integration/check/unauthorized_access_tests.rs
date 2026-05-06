@@ -14,7 +14,7 @@ fn run_unauthorized_access_test(content: &str, name: &str) {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E017")
+        .arg("E013")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

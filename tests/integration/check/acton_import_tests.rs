@@ -70,7 +70,7 @@ fn test_check_acton_import_with_mappings_direct() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E014")
+        .arg("E010")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
@@ -112,7 +112,7 @@ fn test_check_acton_import_with_mappings_transitive_dependency() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E014")
+        .arg("E010")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
@@ -148,8 +148,8 @@ fn test_check_acton_import_rule_is_disabled_for_test_files() {
         .success();
 
     assert!(
-        !output.get_normalized_stderr().contains("E014"),
-        "E014 should not be emitted for explicit .test.tolk checks:\n{}",
+        !output.get_normalized_stderr().contains("E010"),
+        "E010 should not be emitted for explicit .test.tolk checks:\n{}",
         output.get_normalized_stderr()
     );
 }
@@ -167,7 +167,7 @@ fn run_check(group: &str, main_content: &str, files: &[(&str, &str)], name: &str
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E014")
+        .arg("E010")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!("integration/snapshots/check/{group}/{name}.txt"));

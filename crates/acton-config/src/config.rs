@@ -140,6 +140,8 @@ pub struct CustomNetworkConfig {
 pub struct ActonConfig {
     /// Package metadata for the Acton project
     pub package: PackageConfig,
+    /// Required versions for project-level tooling
+    pub toolchain: Option<ToolchainConfig>,
     /// Definition of contracts in the project
     pub contracts: Option<ContractsConfig>,
     /// Default settings for the test runner
@@ -228,6 +230,14 @@ pub struct PackageConfig {
     pub repository: Option<String>,
     /// The project's license identifier
     pub license: Option<String>,
+}
+
+/// Required versions for project-level tooling
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct ToolchainConfig {
+    /// Acton CLI version required by this project
+    pub acton: Option<String>,
 }
 
 /// Coverage settings for the test runner
@@ -431,6 +441,8 @@ pub struct BuildSettings {
     pub out_dir: Option<String>,
     /// Directory where generated dependency files are saved
     pub gen_dir: Option<String>,
+    /// Directory where per-contract ABI JSON files are saved
+    pub output_abi: Option<String>,
     /// Directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
 }
@@ -607,6 +619,7 @@ impl Default for ActonConfig {
                 repository: None,
                 license: Some("MIT".to_string()),
             },
+            toolchain: None,
             test: None,
             lint: None,
             contracts: None,
@@ -704,7 +717,7 @@ impl ContractConfig {
 }
 
 impl ActonConfig {
-    pub fn load() -> Result<Self> {
+    pub fn load_manifest() -> Result<Self> {
         let config_path = manifest_path();
         if !config_path.exists() {
             return Err(anyhow!(
@@ -713,8 +726,10 @@ impl ActonConfig {
         }
 
         let content = fs::read_to_string(config_path)?;
-        let mut config: ActonConfig = toml::from_str(&content)?;
+        Ok(toml::from_str(&content)?)
+    }
 
+    pub fn load_wallets() -> Result<WalletsConfig> {
         // Merge wallets from different sources
         // Order of importance (later overrides earlier):
         // 1. Global ~/.config/acton/wallets/global.wallets.toml
@@ -747,9 +762,14 @@ impl ActonConfig {
             }
         }
 
-        config.wallets = Some(WalletsConfig {
+        Ok(WalletsConfig {
             wallets: merged_wallets,
-        });
+        })
+    }
+
+    pub fn load() -> Result<Self> {
+        let mut config = Self::load_manifest()?;
+        config.wallets = Some(Self::load_wallets()?);
 
         // Merge libraries from different sources
         let mut merged_libraries = BTreeMap::new();
@@ -1362,6 +1382,7 @@ mod tests {
         clear_cache_override: Option<bool>,
         junit_path_override: Option<&str>,
         fork_net_override: Option<Network>,
+        fork_block_number_override: Option<u64>,
         fail_fast_override: Option<bool>,
         ui_port_override: Option<u16>,
     ) -> TestConfig {
@@ -1386,7 +1407,7 @@ mod tests {
             None,
             None,
             fork_net_override,
-            None,
+            fork_block_number_override,
             None,
             false,
             None,
@@ -1411,13 +1432,15 @@ mod tests {
             fork_net: Some("custom:devnet".to_owned()),
             fail_fast: Some(true),
             ui_port: Some(23_456),
+            fork_block_number: Some(111_111),
             ..TestSettings::default()
         };
 
-        let config = test_settings_to_config(&settings, None, None, None, None, None);
+        let config = test_settings_to_config(&settings, None, None, None, None, None, None);
         assert!(!config.clear_cache);
         assert_eq!(config.junit_path.as_deref(), Some("configured-reports"));
         assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
+        assert_eq!(config.fork_block_number, Some(111_111));
         assert!(config.fail_fast);
         assert_eq!(config.ui_port, 23_456);
 
@@ -1426,12 +1449,14 @@ mod tests {
             Some(true),
             Some("cli-reports"),
             Some(Network::Testnet),
+            Some(222_222),
             Some(false),
             Some(34_567),
         );
         assert!(config.clear_cache);
         assert_eq!(config.junit_path.as_deref(), Some("cli-reports"));
         assert_eq!(config.fork_net, Some(Network::Testnet));
+        assert_eq!(config.fork_block_number, Some(222_222));
         assert!(!config.fail_fast);
         assert_eq!(config.ui_port, 34_567);
     }
@@ -1439,11 +1464,12 @@ mod tests {
     #[test]
     fn test_settings_merge_uses_test_defaults_without_config_or_cli() {
         let config =
-            test_settings_to_config(&TestSettings::default(), None, None, None, None, None);
+            test_settings_to_config(&TestSettings::default(), None, None, None, None, None, None);
 
         assert!(!config.clear_cache);
         assert_eq!(config.junit_path, None);
         assert_eq!(config.fork_net, None);
+        assert_eq!(config.fork_block_number, None);
         assert!(!config.fail_fast);
         assert_eq!(config.ui_port, 12_344);
     }
@@ -1616,6 +1642,7 @@ rules-file = "mutation-rules.json"
                 repository: None,
                 license: None,
             },
+            toolchain: None,
             contracts: Some(ContractsConfig {
                 contracts: BTreeMap::from([(
                     "counter".to_string(),
@@ -1656,6 +1683,7 @@ rules-file = "mutation-rules.json"
                 repository: None,
                 license: None,
             },
+            toolchain: None,
             contracts: None,
             test: None,
             lint: None,
@@ -1824,7 +1852,7 @@ unused-variable = "allow"
 
         match lint.entries.get("unused-variable").unwrap() {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Deny),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint
@@ -1833,14 +1861,14 @@ unused-variable = "allow"
             .unwrap()
         {
             LintEntry::Level(level) => assert_eq!(*level, LintLevel::Warn),
-            _ => panic!("Expected level"),
+            LintEntry::Config(_) => panic!("Expected level"),
         }
 
         match lint.entries.get("counter").unwrap() {
             LintEntry::Config(config) => {
                 assert_eq!(*config.get("unused-variable").unwrap(), LintLevel::Allow);
             }
-            _ => panic!("Expected config"),
+            LintEntry::Level(_) => panic!("Expected config"),
         }
     }
 
@@ -2069,6 +2097,7 @@ version = "0.1.0"
 [build]
 out-dir = "artifacts/build"
 gen-dir = "artifacts/gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
 "#;
 
@@ -2076,6 +2105,7 @@ output-fift = "build/fift"
         let build = config.build.as_ref().unwrap();
         assert_eq!(build.out_dir.as_deref(), Some("artifacts/build"));
         assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
+        assert_eq!(build.output_abi.as_deref(), Some("build/abi"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
     }
 

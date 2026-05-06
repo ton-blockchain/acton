@@ -7,14 +7,16 @@
 /// - `{}`: default formatting
 /// - `{:x}`: integer formatted as hexadecimal without `0x`
 /// - `{:ton}`: integer nanotons formatted as `<value> TON`
+/// - `{:cell-tree}`: cell/slice/builder/Cell<T> formatted as a tree of cell references
 ///
 /// Format rules and edge cases:
 /// - Escape literal braces with `{{` and `}}`.
 /// - Extra arguments are ignored.
-/// - Missing arguments leave placeholders unchanged in output (`{}`, `{:x}`, `{:ton}`).
+/// - Missing arguments leave placeholders unchanged in output (`{}`, `{:x}`, `{:ton}`, `{:cell-tree}`).
 /// - Invalid format strings (unknown modifier, unsupported placeholder, unmatched braces)
 ///   fail at runtime with a parser error that includes a byte offset.
 /// - For non-int arguments, `{:x}` and `{:ton}` fall back to default formatting.
+/// - For non-cell/slice/builder/Cell<T> arguments, `{:cell-tree}` falls back to default formatting.
 /// - `{:ton}` uses `f64` internally, so very large values can lose precision.
 ///
 /// Examples:
@@ -27,6 +29,9 @@
 ///
 /// // Formatting TON amounts
 /// val balance = format("Balance: {:ton}", 500_000_000); // "Balance: 0.5 TON"
+///
+/// // Formatting cell references as a tree
+/// val tree = format("{:cell-tree}", bodyCell);
 ///
 /// // Escaping braces
 /// val escaped = format("Use {{}} to print braces", 0); // "Use {} to print braces"
@@ -71,15 +76,15 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 ): string {
     return ffi.format(
         fmt,
-        reflect.typeNameOfObject(arg1),
+        reflect.typeUniqueIdxOfObject(arg1),
         arg1.toTuple(),
-        reflect.typeNameOfObject(arg2),
+        reflect.typeUniqueIdxOfObject(arg2),
         arg2.toTuple(),
-        reflect.typeNameOfObject(arg3),
+        reflect.typeUniqueIdxOfObject(arg3),
         arg3.toTuple(),
-        reflect.typeNameOfObject(arg4),
+        reflect.typeUniqueIdxOfObject(arg4),
         arg4.toTuple(),
-        reflect.typeNameOfObject(arg5),
+        reflect.typeUniqueIdxOfObject(arg5),
         arg5.toTuple(),
     );
 }
@@ -132,15 +137,15 @@ fun parseCellFromHex(cellHex: string): cell {
 
 fun ffi.format(
     fmt: string,
-    type1: string,
+    type1: int,
     arg1: tuple,
-    type2: string,
+    type2: int,
     arg2: tuple,
-    type3: string,
+    type3: int,
     arg3: tuple,
-    type4: string,
+    type4: int,
     arg4: tuple,
-    type5: string,
+    type5: int,
     arg5: tuple,
 ): string
     asm "200 EXTCALL"

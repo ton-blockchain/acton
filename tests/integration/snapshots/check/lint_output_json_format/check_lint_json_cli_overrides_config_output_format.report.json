@@ -20,7 +20,7 @@
           ]
         }
       ],
-      "code": "E002",
+      "code": "E001",
       "file": "[ROOT]/contracts/main.tolk",
       "fixes": [
         {

@@ -45,7 +45,7 @@ OPTIONS
        --template template
            Project template to use.
 
-           Possible values: empty, counter, jetton, nft
+           Possible values: empty, counter, jetton, nft, w5-extension
 
            If not provided, interactive mode prompts for the template.
 
@@ -61,8 +61,8 @@ OPTIONS
            Include the template’s TypeScript app scaffold when available.
 
            All built-in templates currently support the app layout: empty,
-           counter, jetton, and nft. If you pass --app for a template that does
-           not support it, acton new fails.
+           counter, jetton, nft, and w5-extension. If you pass --app for a
+           template that does not support it, acton new fails.
 
            If the selected template supports the app layout and --app is not
            provided, interactive mode prompts for this choice. Non-interactive
@@ -158,8 +158,25 @@ TEMPLATES
 
        o  optional AGENTS.md
 
+   w5-extension
+       Wallet V5 extension contract and subscription example template with:
+
+       o  the extension contract and shared types
+
+       o  vendored Wallet V5 sources for end-to-end testing
+
+       o  extension and Wallet V5 wrappers
+
+       o  integration tests for install, payment, and cancellation flows
+
+       o  deploy, install, and delete scripts
+
+       o  CI workflow
+
+       o  optional AGENTS.md
+
        All built-in templates support the optional TypeScript app layout with
-       --app: empty, counter, jetton, and nft.
+       --app: empty, counter, jetton, nft, and w5-extension.
 
        With --app, Acton also creates a Vite-based React app and top-level npm
        metadata files. App templates with frontend contract flows also include
@@ -278,7 +295,8 @@ SIDE EFFECTS
        ., that means the current directory itself, and existing files with the
        same paths as template files can be overwritten.
 
-       It also installs .acton/tolk-stdlib there, may create .githooks/ plus an
+       It also installs .acton/tolk-stdlib there unless
+       ACTON_DISABLE_AUTO_STDLIB=1 is set, may create .githooks/ plus an
        AGENTS.md file when requested, and, when git is available, initializes
        the project repository and runs git add ., which stages all
        current-directory contents.

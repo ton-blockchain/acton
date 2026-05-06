@@ -17,7 +17,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
   ✗ ba-stdlib-raw-sign-positive-negative-private-keys [TIME]
     └─ Error: expect(actual).toNotEqual(expected)
        Values are equal but expected to be different:
-         [BOC_HEX]
+         slice{[HEX]}
       └─ at tests/crypto_signing_edges.test[LINE]
 
  ✗ 1 failed in 1 file

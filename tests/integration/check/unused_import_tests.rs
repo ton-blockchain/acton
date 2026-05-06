@@ -3,7 +3,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const RULE_CODE: &str = "E006";
+const RULE_CODE: &str = "E005";
 
 fn run_check_test_with_files(group: &str, main_content: &str, files: &[(&str, &str)], name: &str) {
     run_rule_check_test_with_files(group, RULE_CODE, main_content, files, name);

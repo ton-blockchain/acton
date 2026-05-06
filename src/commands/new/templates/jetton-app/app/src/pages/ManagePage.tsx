@@ -1,7 +1,11 @@
 import { useState, useCallback, useEffect, type FormEvent } from 'react';
-import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
+import {
+  useTonConnectUI,
+  useTonWallet,
+  type TonConnectUI,
+} from '@tonconnect/ui-react';
 import { Address, toNano } from '@ton/core';
-import { Search, AlertCircle, Wallet, Lock, Check } from 'lucide-react';
+import { Search, AlertCircle, Wallet, Lock } from 'lucide-react';
 import { getTonClient, getWalletAddress, fetchJettonMaster } from '../lib/ton';
 import type { JettonMetadata } from '../lib/jettonContent';
 import {
@@ -12,6 +16,7 @@ import {
   buildTransferBody,
   parseUnits,
 } from '../lib/deploy';
+import { getErrorMessage, isCancelledTransactionError } from '../lib/errors';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -113,8 +118,8 @@ export function ManagePage({
         adminAddress: data.adminAddress,
         metadata: data.metadata,
       });
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
+      const msg = getErrorMessage(err);
       if (
         msg.includes('exit_code') ||
         msg.includes('-13') ||
@@ -133,7 +138,7 @@ export function ManagePage({
       }
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }, [contractAddr, network]);
 
@@ -142,6 +147,8 @@ export function ManagePage({
       onAddressChange(contractAddr.trim());
       loadJettonInfo();
     }
+    // Reload only when the network changes; address changes are handled via the input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [network]);
 
   const isAdmin =
@@ -520,7 +527,7 @@ function EmptyState({
   );
 }
 
-function WalletRequired({ tonConnectUI }: { tonConnectUI: any }) {
+function WalletRequired({ tonConnectUI }: { tonConnectUI: TonConnectUI }) {
   return (
     <EmptyState
       icon={<Wallet className="size-8" />}
@@ -563,7 +570,7 @@ function MintTab({
   isAdmin: boolean;
   isConnected: boolean;
   network: 'mainnet' | 'testnet';
-  tonConnectUI: any;
+  tonConnectUI: TonConnectUI;
   ownerAddress: Address | null;
   onSuccess: () => void;
 }) {
@@ -621,17 +628,16 @@ function MintTab({
       setStatus({ type: 'success', message: 'Mint transaction sent!' });
       setAmount('');
       setTimeout(onSuccess, 5000);
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
       setStatus({
         type: 'error',
-        message: msg.match(/cancel|reject|closed|Interrupt/i)
+        message: isCancelledTransactionError(err)
           ? 'Transaction cancelled'
-          : msg || 'Mint failed',
+          : getErrorMessage(err) || 'Mint failed',
       });
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }
 
@@ -690,7 +696,7 @@ function TransferTab({
   decimals: number;
   isConnected: boolean;
   network: 'mainnet' | 'testnet';
-  tonConnectUI: any;
+  tonConnectUI: TonConnectUI;
   ownerAddress: Address | null;
 }) {
   const [toAddr, setToAddr] = useState('');
@@ -752,17 +758,16 @@ function TransferTab({
       setStatus({ type: 'success', message: 'Transfer transaction sent!' });
       setAmount('');
       setToAddr('');
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
       setStatus({
         type: 'error',
-        message: msg.match(/cancel|reject|closed|Interrupt/i)
+        message: isCancelledTransactionError(err)
           ? 'Transaction cancelled'
-          : msg || 'Transfer failed',
+          : getErrorMessage(err) || 'Transfer failed',
       });
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }
 
@@ -822,7 +827,7 @@ function BurnTab({
   decimals: number;
   isConnected: boolean;
   network: 'mainnet' | 'testnet';
-  tonConnectUI: any;
+  tonConnectUI: TonConnectUI;
   ownerAddress: Address | null;
   onSuccess: () => void;
 }) {
@@ -874,17 +879,16 @@ function BurnTab({
       setStatus({ type: 'success', message: 'Burn transaction sent!' });
       setAmount('');
       setTimeout(onSuccess, 5000);
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
       setStatus({
         type: 'error',
-        message: msg.match(/cancel|reject|closed|Interrupt/i)
+        message: isCancelledTransactionError(err)
           ? 'Transaction cancelled'
-          : msg || 'Burn failed',
+          : getErrorMessage(err) || 'Burn failed',
       });
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }
 
@@ -937,7 +941,7 @@ function AdminTab({
   isAdmin: boolean;
   isConnected: boolean;
   network: 'mainnet' | 'testnet';
-  tonConnectUI: any;
+  tonConnectUI: TonConnectUI;
   onSuccess: () => void;
 }) {
   const [newAdmin, setNewAdmin] = useState(ZERO_ADDRESS);
@@ -949,7 +953,7 @@ function AdminTab({
 
   const [newName, setNewName] = useState(info.metadata.name || '');
   const [newSymbol, setNewSymbol] = useState(info.metadata.symbol || '');
-  const [newDecimals, setNewDecimals] = useState(info.metadata.decimals || '9');
+  const newDecimals = info.metadata.decimals || '9';
   const [newDescription, setNewDescription] = useState(
     info.metadata.description || '',
   );
@@ -984,17 +988,16 @@ function AdminTab({
       });
       setStatus({ type: 'success', message: 'Admin change transaction sent!' });
       setTimeout(onSuccess, 5000);
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
       setStatus({
         type: 'error',
-        message: msg.match(/cancel|reject|closed|Interrupt/i)
+        message: isCancelledTransactionError(err)
           ? 'Transaction cancelled'
-          : msg || 'Failed',
+          : getErrorMessage(err) || 'Failed',
       });
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }
 
@@ -1027,17 +1030,16 @@ function AdminTab({
         message: 'Content update transaction sent!',
       });
       setTimeout(onSuccess, 5000);
-    } catch (err: any) {
-      const msg = err?.message || '';
+    } catch (err) {
       setStatus({
         type: 'error',
-        message: msg.match(/cancel|reject|closed|Interrupt/i)
+        message: isCancelledTransactionError(err)
           ? 'Transaction cancelled'
-          : msg || 'Failed',
+          : getErrorMessage(err) || 'Failed',
       });
     } finally {
       setLoading(false);
-      setStatus((prev: any) => (prev?.type === 'info' ? null : prev));
+      setStatus((prev) => (prev?.type === 'info' ? null : prev));
     }
   }
 

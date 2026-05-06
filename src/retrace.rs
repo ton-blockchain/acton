@@ -2,7 +2,7 @@ pub use ::ton_retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
 use acton_debug::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 use ton_source_map::SourceLocation;
 use tvm_logs::parser::VmLine;
 
@@ -27,12 +27,10 @@ pub struct TolkExceptionInfo {
 }
 
 #[must_use]
-pub fn find_exception_info(vm_logs: &str, source_map: &TolkSourceMap) -> Option<TolkExceptionInfo> {
+pub fn find_exception_info(vm_logs: &str, source_map: &SourceMap) -> Option<TolkExceptionInfo> {
     let description = exception_description(vm_logs);
     let mut replayer = TolkReplayer::new(source_map, vm_logs).ok()?;
     replayer.set_exception_breakpoints(ExceptionBreakMode::Uncaught);
-
-    let source_map = &source_map.source_map;
 
     while !replayer.is_finished() {
         replayer.step(StepMode::StepInto);
@@ -63,7 +61,7 @@ pub fn find_exception_info(vm_logs: &str, source_map: &TolkSourceMap) -> Option<
 }
 
 #[must_use]
-pub fn find_execution_trace(vm_logs: &str, source_map: &TolkSourceMap) -> Option<TolkTraceInfo> {
+pub fn find_execution_trace(vm_logs: &str, source_map: &SourceMap) -> Option<TolkTraceInfo> {
     let mut replayer = TolkReplayer::new(source_map, vm_logs).ok()?;
 
     while !replayer.is_finished() {
@@ -71,7 +69,7 @@ pub fn find_execution_trace(vm_logs: &str, source_map: &TolkSourceMap) -> Option
     }
 
     let loc = to_source_location(
-        &source_map.source_map,
+        source_map,
         replayer.current_file_id(),
         replayer.current_line(),
         replayer.current_column(),
@@ -81,7 +79,7 @@ pub fn find_execution_trace(vm_logs: &str, source_map: &TolkSourceMap) -> Option
     }
 
     Some(TolkTraceInfo {
-        backtrace: find_backtrace(&source_map.source_map, &replayer.call_stack(), &loc),
+        backtrace: find_backtrace(source_map, &replayer.call_stack(), &loc),
         loc,
     })
 }
@@ -98,7 +96,7 @@ fn exception_description(vm_logs: &str) -> String {
 }
 
 fn find_backtrace(
-    source_map: &tolk_compiler::SourceMap,
+    source_map: &SourceMap,
     call_stack: &[CallFrameInfo],
     current_loc: &SourceLocation,
 ) -> Vec<TolkBacktraceFrame> {
@@ -127,7 +125,7 @@ fn find_backtrace(
 }
 
 fn src_range_to_source_location(
-    source_map: &tolk_compiler::SourceMap,
+    source_map: &SourceMap,
     range: &tolk_compiler::source_map::SrcRange,
 ) -> SourceLocation {
     to_source_location(
@@ -139,7 +137,7 @@ fn src_range_to_source_location(
 }
 
 fn to_source_location(
-    source_map: &tolk_compiler::SourceMap,
+    source_map: &SourceMap,
     file_id: usize,
     line: usize,
     column: usize,
@@ -160,12 +158,8 @@ fn to_source_location(
 }
 
 #[must_use]
-pub fn find_source_loc(
-    source_map: &TolkSourceMap,
-    hash: &str,
-    offset: u16,
-) -> Option<SourceLocation> {
-    if source_map.source_map.is_empty() {
+pub fn find_source_loc(source_map: &SourceMap, hash: &str, offset: u16) -> Option<SourceLocation> {
+    if source_map.is_empty() {
         return None;
     }
 

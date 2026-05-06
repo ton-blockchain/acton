@@ -20,7 +20,7 @@
           ]
         }
       ],
-      "code": "E004",
+      "code": "E003",
       "file": "[ROOT]/contracts/main.tolk",
       "fixes": [],
       "help": "deprecated symbols may be removed in future versions",

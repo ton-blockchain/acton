@@ -69,7 +69,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             Expr::Lambda(v) => self.infer_lambda_fun(v, flow, as_cond, hint),
             Expr::Instantiation(v) => self.infer_instantiation(v, flow, as_cond),
             Expr::Underscore(v) => self.infer_underscore(v, flow, as_cond, hint),
-            _ => ExprFlow::create(flow, as_cond),
+            Expr::Unmapped(_) => ExprFlow::create(flow, as_cond),
         }
     }
 

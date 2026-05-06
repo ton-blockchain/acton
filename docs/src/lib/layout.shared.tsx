@@ -1,19 +1,17 @@
-import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { ThemeLogo } from '@/components/ThemeLogo';
+import type {BaseLayoutProps} from "fumadocs-ui/layouts/shared"
+import {ThemeLogo} from "@/components/ThemeLogo"
 
-export const logo = (
-    <ThemeLogo />
-);
+export const logo = <ThemeLogo />
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
-          <>
-            {logo}
-            <span className="text-lg font-bold leading-none in-[.uwu]:hidden">Acton</span>
-          </>
+        <>
+          {logo}
+          <span className="text-lg font-semibold tracking-tight in-[.uwu]:hidden">Docs</span>
+        </>
       ),
     },
-  };
+  }
 }

@@ -4,7 +4,7 @@ use crate::support::project::{Project, ProjectBuilder};
 use serde_json::Value as JsonValue;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 #[cfg(unix)]
@@ -28,24 +28,21 @@ fn make_executable(path: &Path) {
 }
 
 #[cfg(unix)]
-fn setup_real_npm_toolchain(project_root: &Path) -> (String, PathBuf) {
+fn setup_real_npm_toolchain(project_root: &Path, cache_dir: &Path) -> String {
     let bin_dir = project_root.join("bin");
-    let cache_dir = project_root.join(".npm-cache");
     fs::create_dir_all(&bin_dir).unwrap();
-    fs::create_dir_all(&cache_dir).unwrap();
+    fs::create_dir_all(cache_dir).unwrap();
 
     let acton_path = bin_dir.join("acton");
 
     fs::write(&acton_path, ACTON_SHIM).unwrap();
     make_executable(&acton_path);
 
-    let path_env = format!(
+    format!(
         "{}:{}",
         bin_dir.display(),
         env::var("PATH").unwrap_or_default()
-    );
-
-    (path_env, cache_dir)
+    )
 }
 
 #[cfg(unix)]
@@ -183,8 +180,10 @@ fn run_npm_command(
         .env("NPM_CONFIG_CACHE", cache_dir)
         .env("NPM_CONFIG_AUDIT", "false")
         .env("NPM_CONFIG_FUND", "false")
-        .env("NPM_CONFIG_FETCH_RETRIES", "0")
-        .env("NPM_CONFIG_FETCH_TIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRIES", "3")
+        .env("NPM_CONFIG_FETCH_RETRY_MINTIMEOUT", "5000")
+        .env("NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT", "30000")
+        .env("NPM_CONFIG_FETCH_TIMEOUT", "60000")
         .env("NPM_CONFIG_PROGRESS", "false")
         .env("NPM_CONFIG_UPDATE_NOTIFIER", "false")
         .env("NPM_CONFIG_PREFER_OFFLINE", "true")
@@ -213,9 +212,20 @@ fn npm_failure_looks_environment_specific(output: &std::process::Output) -> bool
         "ECONNREFUSED",
         "ECONNRESET",
         "ETIMEDOUT",
+        "EPIPE",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "ENETDOWN",
         "fetch failed",
         "getaddrinfo",
         "network request",
+        "network timeout",
+        "socket hang up",
+        "Bad response from registry",
+        "503 Service Unavailable",
+        "502 Bad Gateway",
+        "504 Gateway",
+        "429 Too Many Requests",
         "Failed to execute `npx",
         "Exit handler never called!",
         "cb() never called!",
@@ -251,16 +261,19 @@ keys = {{ mnemonic = "{LOCALNET_TEST_MNEMONIC}" }}
 }
 
 fn append_localnet_network(project_dir: &Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_dir.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
 }
 
@@ -362,6 +375,11 @@ fn test_new_empty_project_non_interactive() {
     assert!(content.contains(r#"name = "test-project""#));
     assert!(content.contains(r#"description = "test description""#));
     assert!(content.contains(r#"license = "MIT""#));
+    assert!(content.contains(&format!(
+        "[toolchain]\nacton = \"{}\"",
+        acton::build_info::PACKAGE_VERSION
+    )));
+    assert!(!content.contains("-trunk"));
     assert!(content.contains("Check full Acton.toml reference and all available keys"));
     assert!(content.contains("https://ton-blockchain.github.io/acton/docs/acton-toml"));
 
@@ -486,6 +504,139 @@ fn test_new_nft_project_non_interactive() {
     assert!(project_dir.join("tests/nft-item.test.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
+}
+
+#[test]
+fn test_new_w5_extension_project_non_interactive() {
+    let project = ProjectBuilder::new("new-w5-extension")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-extension-project")
+        .arg("--description")
+        .arg("w5-extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: w5-extension");
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "w5-extension-project""#));
+    assert!(content.contains(r"[contracts.SimpleExtension]"));
+    assert!(content.contains(r"[contracts.WalletV5]"));
+    assert!(content.contains(r#"src = "contracts/walletv5/WalletV5.tolk""#));
+    assert!(content.contains("acton script scripts/deploy.tolk"));
+    assert!(content.contains("install-extension = \"acton script scripts/install-extension.tolk"));
+    assert!(content.contains("delete-extension = \"acton script scripts/delete-extension.tolk"));
+
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(project_dir.join("contracts/types.tolk").exists());
+    assert!(project_dir.join("contracts/errors.tolk").exists());
+    assert!(project_dir.join("contracts/w5-types.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/walletv5/messages.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("contracts/walletv5/storage.tolk").exists());
+    assert!(
+        project_dir
+            .join("wrappers/SimpleExtension.gen.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers/WalletV5.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/utils.tolk").exists());
+    assert!(
+        project_dir
+            .join("tests/simple-extension.test.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("scripts/deploy.tolk").exists());
+    assert!(project_dir.join("scripts/install-extension.tolk").exists());
+    assert!(project_dir.join("scripts/delete-extension.tolk").exists());
+    assert!(project_dir.join("scripts/utils/common.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+}
+
+#[test]
+fn test_new_w5_plugin_template_alias_still_works() {
+    let project = ProjectBuilder::new("new-w5-plugin-alias")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-extension-project")
+        .arg("--description")
+        .arg("w5 extension description")
+        .arg("--template")
+        .arg("w5-plugin")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: w5-extension");
+    assert!(
+        project
+            .path()
+            .join("foobar/contracts/SimpleExtension.tolk")
+            .exists()
+    );
+}
+
+#[test]
+fn test_new_w5_extension_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("w5-extension-project")
+        .arg("--description")
+        .arg("w5-extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_contains("Template: w5-extension")
+        .assert_contains("AGENTS.md: included")
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_w5_extension_project_with_agents_flag.agents.md.gen",
+        );
+
+    assert!(project.path().join("foobar/AGENTS.md").exists());
 }
 
 #[test]
@@ -616,6 +767,128 @@ fn test_new_counter_project_with_app_flag() {
             .exists()
     );
     assert!(project_dir.join(".prettierrc").exists());
+}
+
+#[test]
+fn test_new_w5_extension_project_with_app_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-app")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("W5 Extension App Project")
+        .arg("--description")
+        .arg("w5-extension app description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/Acton.toml",
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.acton.toml.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_w5_extension_project_with_app_flag.package.json.gen",
+        );
+
+    let project_dir = project.path().join("foobar");
+    let package_lock = fs::read_to_string(project_dir.join("package-lock.json")).unwrap();
+    assert!(package_lock.contains(r#""name": "w5-extension-app-project""#));
+    assert!(!package_lock.contains(r#""name": "simple-extension""#));
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(
+        project_dir
+            .join("wrappers-ts/SimpleExtension.gen.ts")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers-ts/WalletV5.gen.ts").exists());
+    assert!(
+        project_dir
+            .join("contracts/src/SimpleExtension.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/src/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/tests/simple-extension.test.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/SimpleExtension.gen.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/wrappers/WalletV5.gen.tolk")
+            .exists()
+    );
+    assert!(project_dir.join("contracts/wrappers/utils.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/scripts/install-extension.tolk")
+            .exists()
+    );
+    assert!(
+        project_dir
+            .join("contracts/scripts/utils/common.tolk")
+            .exists()
+    );
+    assert!(project_dir.join(".prettierrc").exists());
+}
+
+#[test]
+fn test_new_w5_extension_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-w5-extension-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("W5 Extension App Project")
+        .arg("--description")
+        .arg("w5-extension app description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/package.json",
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.package.json.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.agents.md.gen",
+        );
 }
 
 #[test]
@@ -1060,6 +1333,45 @@ fn test_new_templates_returns_machine_readable_json() {
                             ]
                         }
                     ]
+                },
+                {
+                    "id": "w5-extension",
+                    "description": "Wallet V5 extension contract and subscription example",
+                    "supports_app": true,
+                    "scaffolds": [
+                        {
+                            "kind": "standard",
+                            "includes_typescript_app": false,
+                            "contracts": [
+                                {
+                                    "id": "SimpleExtension",
+                                    "name": "SimpleExtension",
+                                    "src": "contracts/SimpleExtension.tolk"
+                                },
+                                {
+                                    "id": "WalletV5",
+                                    "name": "WalletV5",
+                                    "src": "contracts/walletv5/WalletV5.tolk"
+                                }
+                            ]
+                        },
+                        {
+                            "kind": "app",
+                            "includes_typescript_app": true,
+                            "contracts": [
+                                {
+                                    "id": "SimpleExtension",
+                                    "name": "SimpleExtension",
+                                    "src": "contracts/src/SimpleExtension.tolk"
+                                },
+                                {
+                                    "id": "WalletV5",
+                                    "name": "WalletV5",
+                                    "src": "contracts/src/walletv5/WalletV5.tolk"
+                                }
+                            ]
+                        }
+                    ]
                 }
             ]
         })
@@ -1262,6 +1574,62 @@ fn test_new_counter_project_can_be_selected_interactively() {
 
 #[cfg(unix)]
 #[test]
+fn test_new_w5_extension_project_can_be_selected_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-template-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-selected-w5-extension")
+        .arg("--description")
+        .arg("interactive selected w5 extension description")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Template:");
+    for _ in 0..4 {
+        session
+            .send("\u{1b}[B")
+            .expect("failed to navigate to w5-extension template");
+    }
+    session.send_line("", "failed to select w5-extension template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-selected-w5-extension");
+    session.expect("Description: interactive selected w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("License: MIT");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_can_be_selected_interactively.acton.toml.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn test_new_counter_project_prompts_for_app_when_supported() {
     use expectrl::Eof;
 
@@ -1315,6 +1683,66 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
 
 #[cfg(unix)]
 #[test]
+fn test_new_w5_extension_project_prompts_for_app_when_supported() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-app-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-w5-extension")
+        .arg("--description")
+        .arg("interactive w5 extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("y", "failed to confirm TypeScript app scaffold");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-w5-extension");
+    session.expect("Description: interactive w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("TypeScript app: included");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
+    session.expect("npm ci");
+    session.expect("npm run dev");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.acton.toml.gen",
+    );
+    session.assert_file_snapshot_matches(
+        "foobar/package.json",
+        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.package.json.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("package.json").exists());
+    assert!(project_dir.join("app/src/App.tsx").exists());
+    assert!(
+        project_dir
+            .join("wrappers-ts/SimpleExtension.gen.ts")
+            .exists()
+    );
+    assert!(project_dir.join("wrappers-ts/WalletV5.gen.ts").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     use expectrl::Eof;
 
@@ -1357,6 +1785,60 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
 
     let project_dir = project.path().join("foobar");
     assert!(project_dir.join("contracts/Counter.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_w5_extension_project_interactive_decline_keeps_standard_layout() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-w5-extension-app-interactive-decline")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-w5-extension")
+        .arg("--description")
+        .arg("interactive w5 extension description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-w5-extension");
+    session.expect("Description: interactive w5 extension description");
+    session.expect("Template: w5-extension");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
+    session.expect("acton test");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_w5_extension_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("contracts/SimpleExtension.tolk").exists());
+    assert!(
+        project_dir
+            .join("contracts/walletv5/WalletV5.tolk")
+            .exists()
+    );
     assert!(!project_dir.join("package.json").exists());
     assert!(!project_dir.join("app").exists());
     assert!(!project_dir.join("AGENTS.md").exists());
@@ -1515,9 +1997,11 @@ fn test_new_counter_app_project_supports_npm_scripts() {
             .contains_key("app")
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
+    let cache_path = project_dir.join(".npm-cache");
+    let cache_dir = cache_path.as_path();
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
 
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping real npm integration test due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1533,7 +2017,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&install_output.stderr)
     );
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1541,7 +2025,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+    let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
     assert!(
         test_output.status.success(),
         "npm run test failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1550,7 +2034,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
     );
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1558,7 +2042,7 @@ fn test_new_counter_app_project_supports_npm_scripts() {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed:\nstdout:\n{}\nstderr:\n{}",
@@ -1639,7 +2123,7 @@ fn package_uses_eslint(package_json: &JsonValue) -> bool {
 }
 
 #[cfg(unix)]
-fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
+fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache_dir: &Path) {
     if !is_npm_available() {
         eprintln!("Skipping npm app template checks: npm is not available in PATH");
         return;
@@ -1658,8 +2142,8 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         "{template} app template must expose npm run fmt:check"
     );
 
-    let (path_env, cache_dir) = setup_real_npm_toolchain(&project_dir);
-    let install_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["ci"]);
+    let path_env = setup_real_npm_toolchain(&project_dir, cache_dir);
+    let install_output = run_npm_command(&project_dir, &path_env, cache_dir, &["ci"]);
     if !install_output.status.success() && npm_failure_looks_environment_specific(&install_output) {
         eprintln!(
             "Skipping npm app template checks for {template} due to environment-specific npm failure:\nstdout:\n{}\nstderr:\n{}",
@@ -1675,22 +2159,23 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&install_output.stderr)
     );
 
-    if scripts.contains_key("lint") {
-        let lint_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "lint"]);
-        assert!(
-            lint_output.status.success(),
-            "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&lint_output.stdout),
-            String::from_utf8_lossy(&lint_output.stderr)
-        );
-    } else {
-        assert!(
-            !package_uses_eslint(&package_json),
-            "{template} app template uses ESLint but does not expose npm run lint"
-        );
-    }
+    assert!(
+        scripts.contains_key("lint"),
+        "{template} app template must expose npm run lint"
+    );
+    assert!(
+        package_uses_eslint(&package_json),
+        "{template} app template must depend on ESLint"
+    );
+    let lint_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "lint"]);
+    assert!(
+        lint_output.status.success(),
+        "npm run lint failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&lint_output.stdout),
+        String::from_utf8_lossy(&lint_output.stderr)
+    );
 
-    let build_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "build"]);
+    let build_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "build"]);
     assert!(
         build_output.status.success(),
         "npm run build failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1701,14 +2186,14 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
     if template == "empty" {
         assert!(
             !scripts.contains_key("test"),
-            "empty app template is also used by acton init --create-app and must not require an Acton project"
+            "empty app template is also used by acton init --create-dapp and must not require an Acton project"
         );
     } else {
         assert!(
             scripts.contains_key("test"),
             "{template} app template must expose npm run test"
         );
-        let test_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "test"]);
+        let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
         assert!(
             test_output.status.success(),
             "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1718,7 +2203,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
     }
 
     let typecheck_output =
-        run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "typecheck"]);
+        run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
     assert!(
         typecheck_output.status.success(),
         "npm run typecheck failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1726,7 +2211,7 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
         String::from_utf8_lossy(&typecheck_output.stderr)
     );
 
-    let fmt_output = run_npm_command(&project_dir, &path_env, &cache_dir, &["run", "fmt:check"]);
+    let fmt_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "fmt:check"]);
     assert!(
         fmt_output.status.success(),
         "npm run fmt:check failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
@@ -1738,12 +2223,143 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str) {
 #[cfg(unix)]
 #[test]
 fn test_new_app_templates_npm_quality_checks() {
-    for template in ["empty", "counter", "jetton", "nft"] {
+    let cache_workspace = ProjectBuilder::new("new-app-templates-npm-cache")
+        .without_acton_toml()
+        .build();
+    let cache_dir = cache_workspace.path().join("npm-cache");
+
+    for template in ["empty", "counter", "jetton", "nft", "w5-extension"] {
         assert_app_template_npm_quality_checks(
             &format!("new-{template}-app-npm-quality-checks"),
             template,
+            &cache_dir,
         );
     }
+}
+
+fn read_new_template_file(template: &str, relative_path: &str) -> String {
+    fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/commands/new/templates")
+            .join(template)
+            .join(relative_path),
+    )
+    .unwrap_or_else(|e| panic!("Failed to read {template}/{relative_path}: {e}"))
+}
+
+fn read_new_template_package_json(template: &str) -> JsonValue {
+    serde_json::from_str(&read_new_template_file(template, "package.json"))
+        .unwrap_or_else(|e| panic!("Failed to parse {template}/package.json: {e}"))
+}
+
+fn assert_new_template_files_match_baseline(
+    baseline_template: &str,
+    candidate_templates: &[&str],
+    relative_paths: &[&str],
+    reason: &str,
+) {
+    let mut mismatches = Vec::new();
+
+    for candidate_template in candidate_templates {
+        for relative_path in relative_paths {
+            if read_new_template_file(candidate_template, relative_path)
+                != read_new_template_file(baseline_template, relative_path)
+            {
+                mismatches.push(format!(
+                    "- {candidate_template}/{relative_path} differs from {baseline_template}/{relative_path}\n  inspect: diff -u src/commands/new/templates/{baseline_template}/{relative_path} src/commands/new/templates/{candidate_template}/{relative_path}"
+                ));
+            }
+        }
+    }
+
+    if !mismatches.is_empty() {
+        panic!(
+            "App template shared file parity regression.\n\n{}\n\n{reason}",
+            mismatches.join("\n")
+        );
+    }
+}
+
+#[test]
+fn test_new_w5_extension_app_template_matches_contract_app_package_sections() {
+    let baseline = read_new_template_package_json("counter-app");
+    let w5_package = read_new_template_package_json("w5-extension-app");
+
+    for section in ["scripts", "dependencies", "devDependencies"] {
+        assert_eq!(
+            w5_package[section], baseline[section],
+            "w5-extension app template package.json `{section}` must match the common contract app template shape"
+        );
+    }
+}
+
+#[test]
+fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
+    for relative_path in [
+        ".github/workflows/ci.yml",
+        ".prettierignore",
+        ".prettierrc",
+        "components.json",
+        "eslint.config.js",
+        "tsconfig.json",
+        "vite.config.ts",
+    ] {
+        assert_eq!(
+            read_new_template_file("w5-extension-app", relative_path),
+            read_new_template_file("counter-app", relative_path),
+            "w5-extension app template `{relative_path}` must match the common contract app template tooling file"
+        );
+    }
+}
+
+#[test]
+fn test_new_app_template_common_styles_match_shared_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["empty-app", "jetton-app", "w5-extension-app"],
+        &["app/src/styles.css"],
+        "Keep the shared app CSS baseline byte-for-byte identical across empty, counter, jetton, and w5-extension app templates. If a style change is common, apply it to every shared stylesheet. If a divergence is intentional, document the exception in this test.",
+    );
+}
+
+#[test]
+fn test_new_nft_app_template_styles_only_extend_shared_baseline() {
+    let baseline = read_new_template_file("counter-app", "app/src/styles.css");
+    let nft_styles = read_new_template_file("nft-app", "app/src/styles.css");
+
+    let domain_tail = nft_styles
+        .strip_prefix(&baseline)
+        .unwrap_or_else(|| {
+            panic!(
+                "nft-app/app/src/styles.css no longer starts with the shared app CSS baseline from counter-app/app/src/styles.css.\n\nKeep common theme tokens, base styles, scrollbars, animations, and overlay z-index rules identical, then append NFT-only classes after the shared block.\n\ninspect: diff -u src/commands/new/templates/counter-app/app/src/styles.css src/commands/new/templates/nft-app/app/src/styles.css"
+            )
+        });
+
+    assert!(
+        domain_tail.starts_with("\n/* ─── Domain-specific styles ─── */\n"),
+        "nft-app/app/src/styles.css may only differ from the shared baseline by appending the documented NFT domain-specific block. Found unexpected tail after the shared baseline:\n{domain_tail}"
+    );
+}
+
+#[test]
+fn test_new_contract_app_template_shared_ui_components_match_baseline() {
+    assert_new_template_files_match_baseline(
+        "counter-app",
+        &["jetton-app", "nft-app", "w5-extension-app"],
+        &[
+            "app/src/components/ui/alert.tsx",
+            "app/src/components/ui/badge.tsx",
+            "app/src/components/ui/button.tsx",
+            "app/src/components/ui/card.tsx",
+            "app/src/components/ui/dropdown-menu.tsx",
+            "app/src/components/ui/input.tsx",
+            "app/src/components/ui/label.tsx",
+            "app/src/components/ui/separator.tsx",
+            "app/src/components/ui/tabs.tsx",
+            "app/src/components/ui/textarea.tsx",
+        ],
+        "These shadcn-style primitives are shared by all contract app templates. Keep them byte-for-byte identical unless a template-specific component is deliberately split into a separate file.",
+    );
 }
 
 #[test]
@@ -1803,6 +2419,30 @@ fn test_new_nft_project_localnet_deploy_snapshot() {
         "deployer",
         "scripts/deployCollection.tolk",
         "integration/snapshots/test_new_nft_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
+fn test_new_w5_extension_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-w5-extension-localnet-deploy",
+        "w5-extension",
+        false,
+        "deployer",
+        "scripts/deploy.tolk",
+        "integration/snapshots/test_new_w5_extension_project_localnet_deploy.stdout.txt",
+    );
+}
+
+#[test]
+fn test_new_w5_extension_app_project_localnet_deploy_snapshot() {
+    assert_new_project_localnet_deploy_snapshot(
+        "new-w5-extension-app-localnet-deploy",
+        "w5-extension",
+        true,
+        "deployer",
+        "contracts/scripts/deploy.tolk",
+        "integration/snapshots/test_new_w5_extension_app_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2553,6 +3193,92 @@ fn test_new_nft_project_full_flow() {
 }
 
 #[test]
+fn test_new_w5_extension_project_full_flow() {
+    let project = ProjectBuilder::new("new-w5-extension-full")
+        .without_acton_toml()
+        .build();
+
+    let dir = project.path();
+    let project_dir = project.path().join("foobar");
+
+    // 1. Create project
+    project
+        .acton()
+        .arg("new")
+        .arg(&dir.join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("w5-extension")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_new.stdout.txt",
+        );
+
+    // 2. Build project
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("build")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_build.stdout.txt",
+        );
+
+    // 3. Run tests
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("test")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_test.stdout.txt",
+        );
+
+    // 4. Run deploy script in emulation mode
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/deploy.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_script.stdout.txt",
+        );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_w5_extension_project_full_flow_fmt.stdout.txt",
+        );
+}
+
+#[test]
 fn test_new_empty_project_with_env_example() {
     let project = ProjectBuilder::new("new-dot-env")
         .without_acton_toml()
@@ -2694,10 +3420,7 @@ fn create_project_and_check_wrappers_inner(
 
         let generated_wrapper = fs::read_to_string(project_dir.join(template_wrapper_path))
             .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to read generated wrapper {}: {e}",
-                    template_wrapper_path
-                )
+                panic!("Failed to read generated wrapper {template_wrapper_path}: {e}")
             });
 
         assert_eq!(
@@ -2809,6 +3532,19 @@ fn test_new_nft_app_template_typescript_wrappers_match_autogenerated() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn test_new_w5_extension_app_template_typescript_wrappers_match_autogenerated() {
+    create_app_project_and_check_typescript_wrappers(
+        "new-w5-extension-app-ts-wrapper-check",
+        "w5-extension",
+        &[
+            ("SimpleExtension", "wrappers-ts/SimpleExtension.gen.ts"),
+            ("WalletV5", "wrappers-ts/WalletV5.gen.ts"),
+        ],
+    );
+}
+
 #[test]
 fn test_new_empty_template_wrappers_match_autogenerated() {
     create_project_and_check_wrappers(
@@ -2880,6 +3616,33 @@ fn test_new_nft_app_template_wrappers_match_autogenerated() {
         &[
             ("NftCollection", "contracts/wrappers/NftCollection.gen.tolk"),
             ("NftItem", "contracts/wrappers/NftItem.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_w5_extension_template_wrappers_match_autogenerated() {
+    create_project_and_check_wrappers(
+        "new-w5-extension-wrapper-check",
+        "w5-extension",
+        &[
+            ("SimpleExtension", "wrappers/SimpleExtension.gen.tolk"),
+            ("WalletV5", "wrappers/WalletV5.gen.tolk"),
+        ],
+    );
+}
+
+#[test]
+fn test_new_w5_extension_app_template_wrappers_match_autogenerated() {
+    create_app_project_and_check_wrappers(
+        "new-w5-extension-app-wrapper-check",
+        "w5-extension",
+        &[
+            (
+                "SimpleExtension",
+                "contracts/wrappers/SimpleExtension.gen.tolk",
+            ),
+            ("WalletV5", "contracts/wrappers/WalletV5.gen.tolk"),
         ],
     );
 }

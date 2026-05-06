@@ -1,10 +1,12 @@
 use crate::build_info;
 use acton_config::color::OwoColorize;
 use include_dir::{Dir, include_dir};
+use std::env;
 use std::fs;
 use std::path::Path;
 
 pub static LIB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
+pub const DISABLE_AUTO_STDLIB_ENV: &str = "ACTON_DISABLE_AUTO_STDLIB";
 
 pub(crate) fn current_stdlib_version() -> String {
     let package_version = build_info::PACKAGE_VERSION;
@@ -19,6 +21,10 @@ pub(crate) fn current_stdlib_version() -> String {
 }
 
 pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
+    if auto_install_disabled() {
+        return Ok(());
+    }
+
     // Only run if we are in an Acton project
     if !project_root.join("Acton.toml").exists() {
         return Ok(());
@@ -29,6 +35,14 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
 
 pub fn update_latest(project_root: &Path) -> anyhow::Result<()> {
     install_latest(project_root, true)
+}
+
+#[must_use]
+fn auto_install_disabled() -> bool {
+    env::var_os(DISABLE_AUTO_STDLIB_ENV).is_some_and(|value| {
+        let value = value.to_string_lossy().trim().to_ascii_lowercase();
+        !value.is_empty() && value != "0" && value != "false"
+    })
 }
 
 fn install_latest(project_root: &Path, force: bool) -> anyhow::Result<()> {

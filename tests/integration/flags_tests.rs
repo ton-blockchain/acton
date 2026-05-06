@@ -101,6 +101,41 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const PROFILED_TEST_WITH_FAILURE: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-transaction`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployer = testing.treasury("deployer");
+    val deployMessage = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    val deployResult = net.send(deployer.address, deployMessage);
+    expect(deployResult.size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    });
+    val pingResult = net.send(deployer.address, ping);
+    expect(pingResult.size()).toEqual(2);
+}
+"#;
+
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build"
 import "../../lib/testing/expect"
@@ -1401,6 +1436,30 @@ fn test_fail_on_diff_succeeds_when_profile_matches_baseline() {
         !stderr.contains("Profiling drift detected"),
         "unexpected drift error in stderr:\n{stderr}"
     );
+}
+
+#[test]
+fn test_profiling_tables_are_hidden_when_tests_fail() {
+    let project = ProjectBuilder::new("profiling-hidden-on-test-failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST_WITH_FAILURE)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("missing-baseline.json")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stderr.txt",
+        );
 }
 
 #[test]

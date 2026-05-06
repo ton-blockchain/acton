@@ -16,7 +16,7 @@ use tolk_syntax::{AstNode, TryFromNode};
 /// ### Example
 /// ```tolk twoslash
 /// val x = foo!!;
-/// //         ^^ E019: several not-null assertions in a row
+/// //         ^^ E014: several not-null assertions in a row
 /// ```
 ///
 /// Use instead:

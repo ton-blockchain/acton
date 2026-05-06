@@ -9,16 +9,15 @@ use super::debug_executor_handle::DebugExecutorHandle;
 use super::debug_executor_handle::RuntimeDebugSnapshot;
 use super::types_render::{
     RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack, render_runtime_in_message,
-    render_runtime_out_actions, render_runtime_storage_with_compiler_abi, render_runtime_vm_value,
+    render_runtime_out_actions, render_runtime_storage_with_abi, render_runtime_vm_value,
 };
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, OnceLock};
-use tolk_compiler::TolkSourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::debug_marks_dict::DebugMarksDict;
 use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
-use tolk_compiler::types_kernel::Ty;
+use tolk_compiler::types_kernel::{Ty, TyIdx, render_ty};
 use tvm_logs::parser::{VmLine, VmStack, VmStackValue};
 
 // ---------------------------------------------------------------------------
@@ -47,7 +46,7 @@ pub enum ExceptionBreakMode {
     All,
 }
 
-const IGNORED_UNCAUGHT_EXCEPTION_ERRNO: &str = "65536"; // invalid message
+const IGNORED_UNCAUGHT_EXCEPTION_ERRNO: &str = "65535"; // invalid message
 
 #[derive(Debug, Clone)]
 pub struct ExceptionInfo {
@@ -129,7 +128,7 @@ pub trait RuntimeEventSource {
 #[derive(Debug, Clone)]
 struct LocalVarInScope {
     name: String,
-    ty_idx: usize,
+    ty_idx: TyIdx,
     ir_slots: Vec<usize>,
     // None = not lazy; Some((ir_slot, slice)) = lazy, with the original CellSlice for field preview
     lazy_info: Option<(usize, VmStackValue)>,
@@ -482,19 +481,19 @@ pub enum Tick {
     },
     LocalVar {
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
         is_parameter: bool,
         ir_lazy_slice: Option<usize>,
     },
     SmartCast {
         var_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     SetGlob {
         glob_name: String,
-        ty_idx: usize,
+        ty_idx: TyIdx,
         ir_slots: Vec<usize>,
     },
     ScopeStart {
@@ -545,7 +544,7 @@ pub struct TolkReplayer {
     // glob_name → (ty_idx, captured TVM values) for globals that have been SET
     global_var_values: HashMap<String, (usize, Vec<VmStackValue>)>,
 
-    compiler_abi: Option<Arc<ContractABI>>,
+    abi: Option<Arc<ContractABI>>,
 
     // TVM stack from runtime events.
     // global (not per-context) because TvmStackValues tick arrives before PushFrame
@@ -584,35 +583,37 @@ pub struct TolkReplayer {
 }
 
 impl TolkReplayer {
-    pub fn new(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+    pub fn new(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(VmLogRuntimeEventSource::from_vm_logs(vm_logs)),
         ))
     }
 
-    pub fn new_for_coverage(source_map: &TolkSourceMap, vm_logs: &str) -> anyhow::Result<Self> {
+    pub fn new_for_coverage(source_map: &SourceMap, vm_logs: &str) -> anyhow::Result<Self> {
         let mut replayer = Self::new(source_map, vm_logs)?;
         replayer.coverage_mode = true;
         Ok(replayer)
     }
 
     pub fn new_live_vm(
-        source_map: &TolkSourceMap,
+        source_map: &SourceMap,
         executor: DebugExecutorHandle,
     ) -> anyhow::Result<Self> {
-        let marks_dict = source_map
-            .marks_dict
-            .as_deref()
-            .ok_or_else(|| anyhow!("Compiler did not return debug info for Tolk debug session"))?;
+        if !source_map.has_debug_marks() {
+            return Err(anyhow!(
+                "Compiler did not return debug info for Tolk debug session"
+            ));
+        }
         Ok(Self::new_with_boxed_runtime_source(
-            source_map.source_map.clone(),
-            marks_dict,
+            source_map.clone(),
+            source_map.debug_marks_dict(),
             Box::new(LiveVmRuntimeEventSource::new(executor)),
         ))
     }
@@ -643,7 +644,7 @@ impl TolkReplayer {
             current_vm_position: None,
             exec_stack: vec![NoinlineExecState::new()],
             global_var_values: HashMap::new(),
-            compiler_abi: None,
+            abi: None,
             tvm_stack_values: RuntimeStack::default(),
             coverage_mode: false,
             breakpoints: HashSet::new(),
@@ -717,8 +718,8 @@ impl TolkReplayer {
         }
     }
 
-    pub fn set_compiler_abi(&mut self, compiler_abi: Option<Arc<ContractABI>>) {
-        self.compiler_abi = compiler_abi;
+    pub fn set_abi(&mut self, abi: Option<Arc<ContractABI>>) {
+        self.abi = abi;
     }
 
     /// Set breakpoints for a file. Each requested line is resolved to the nearest
@@ -761,7 +762,7 @@ impl TolkReplayer {
 
     fn resolve_exception_symbolic_name(&self, errno: &str) -> Option<String> {
         let code = errno.parse::<i32>().ok()?;
-        self.compiler_abi
+        self.abi
             .as_deref()
             .and_then(|abi| abi.thrown_errors.iter().find(|err| err.err_code == code))
             .and_then(|err| (!err.name.is_empty()).then(|| err.name.clone()))
@@ -783,16 +784,16 @@ impl TolkReplayer {
             values.push(LocalVarRendered {
                 var_name: "c4 (storage)".to_owned(),
                 value: self
-                    .compiler_abi
+                    .abi
                     .as_deref()
-                    .and_then(|abi| render_runtime_storage_with_compiler_abi(c4, abi))
+                    .and_then(|abi| render_runtime_storage_with_abi(c4, &self.source_map, abi))
                     .unwrap_or_else(|| render_runtime_vm_value(c4)),
             });
         }
         if let Some(c5) = snapshot.c5.as_ref() {
             values.push(LocalVarRendered {
                 var_name: "c5 (output actions)".to_owned(),
-                value: render_runtime_out_actions(c5, self.compiler_abi.as_deref())
+                value: render_runtime_out_actions(c5, &self.source_map, self.abi.as_deref())
                     .unwrap_or_else(|| render_runtime_vm_value(c5)),
             });
         }
@@ -867,7 +868,7 @@ impl TolkReplayer {
                 definition_loc: self
                     .source_map
                     .get_function_by_idx(f.f_idx)
-                    .map(|fun| fun.ident_loc.clone()),
+                    .and_then(|fun| (!fun.ident_loc.is_undefined()).then(|| fun.ident_loc.clone())),
                 call_site_loc: f.call_site_loc.clone(),
             })
             .collect()
@@ -1151,7 +1152,7 @@ impl TolkReplayer {
                 let is_void = self
                     .source_map
                     .get_function_by_idx(f_idx)
-                    .and_then(|f| self.source_map.resolve_ty(f.return_ty_idx))
+                    .and_then(|f| self.source_map.ty_by_idx(f.return_ty_idx))
                     .is_some_and(|ty| matches!(ty, Ty::Void));
                 if let Some(frame) = self.call_stack.last_mut() {
                     frame.pending_ir_return = Some(ir_return);
@@ -1293,7 +1294,7 @@ impl TolkReplayer {
                     // last_exception may be None if mode=All (we already stopped, and step() cleared it)
                     exc.is_uncaught = true;
                 }
-                // The executor can report 65536 for "invalid message" for example for Jettons.
+                // The executor can report 65535 for "invalid message" for example for Jettons.
                 // This is unnecessary noise for the user so we just skip it completely
                 // and do not pause on it in the source-level uncaught-exception flow.
                 if errno == IGNORED_UNCAUGHT_EXCEPTION_ERRNO {
@@ -1424,14 +1425,12 @@ impl TolkReplayer {
             })
             .collect();
 
-        let return_ty = self
-            .source_map
-            .get_function_by_idx(f_idx)
-            .and_then(|f| self.source_map.resolve_ty(f.return_ty_idx));
-
-        match return_ty {
-            Some(ty) => debug_print_from_stack(&self.source_map, &values, ty),
-            None => RenderedValue::leaf("return type not found"),
+        let leaving_f = self.source_map.get_function_by_idx(f_idx);
+        match leaving_f {
+            Some(leaving_f) => {
+                debug_print_from_stack(&self.source_map, &values, leaving_f.return_ty_idx)
+            }
+            None => RenderedValue::leaf("leaving_f not found"),
         }
     }
 
@@ -1479,22 +1478,16 @@ impl TolkReplayer {
                 .collect();
 
             let debug_val = if let Some((_, ref slice)) = var.lazy_info {
-                match self.source_map.resolve_ty(var.ty_idx) {
-                    Some(ty) => debug_format_lazy(
-                        &self.source_map,
-                        &slot_values,
-                        &var.ir_slots,
-                        ty,
-                        last_seen,
-                        slice,
-                    ),
-                    None => RenderedValue::leaf("var.ty_idx not found"),
-                }
+                debug_format_lazy(
+                    &self.source_map,
+                    &slot_values,
+                    &var.ir_slots,
+                    var.ty_idx,
+                    last_seen,
+                    slice,
+                )
             } else {
-                match self.source_map.resolve_ty(var.ty_idx) {
-                    Some(ty) => debug_print_from_stack(&self.source_map, &slot_values, ty),
-                    None => RenderedValue::leaf("var.ty_idx not found"),
-                }
+                debug_print_from_stack(&self.source_map, &slot_values, var.ty_idx)
             };
             result.push(LocalVarRendered {
                 var_name: var.name.clone(),
@@ -1526,13 +1519,10 @@ impl TolkReplayer {
 
         for (name, (ty_idx, values)) in &self.global_var_values {
             let slot_values: Vec<SlotValue> = values.iter().map(SlotValue::Live).collect();
-            let debug_val = match self.source_map.resolve_ty(*ty_idx) {
-                Some(ty) => debug_print_from_stack(&self.source_map, &slot_values, ty),
-                None => RenderedValue::leaf("var.ty_idx not found"),
-            };
+            let rendered_g = debug_print_from_stack(&self.source_map, &slot_values, *ty_idx);
             result.push(LocalVarRendered {
                 var_name: format!("global {name}"),
-                value: debug_val,
+                value: rendered_g,
             });
         }
 
@@ -1651,8 +1641,10 @@ impl TolkReplayer {
     }
 
     #[must_use]
-    pub fn type_name(&self, ty_idx: usize) -> Option<String> {
-        self.source_map.resolve_ty(ty_idx).map(ToString::to_string)
+    pub fn type_name(&self, ty_idx: TyIdx) -> Option<String> {
+        self.source_map
+            .ty_by_idx(ty_idx)
+            .map(|_| render_ty(&self.source_map, ty_idx))
     }
 
     #[must_use]

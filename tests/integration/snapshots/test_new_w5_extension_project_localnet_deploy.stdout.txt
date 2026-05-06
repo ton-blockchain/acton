@@ -1,0 +1,5 @@
+Awaiting transaction... [Attempt 1/20]
+Transaction successfully applied!
+You can view it at [EXPLORER_TX_URL]
+Deployed simple extension to [WALLET_ADDRESS_BASE]
+Configured wallet address [WALLET_ADDRESS_BASE]

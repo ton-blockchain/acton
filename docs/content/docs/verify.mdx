@@ -1,7 +1,125 @@
 ---
 title: "Verification"
-description: "How to verify Tolk smart contracts with Acton"
+description: "Verify deployed Tolk contract source code with Acton on testnet or mainnet"
 icon: "Lock"
 ---
 
-Stub.
+Source code verification proves that the code deployed at a contract address matches the local Tolk source in the current Acton project. Acton handles the full verifier flow: it compiles the contract, uploads the sources to the TON Verifier backend, collects signatures, and can send the final verification transaction.
+
+This guide covers verification for deployed contracts on `testnet` and `mainnet`.
+
+## Before verification
+
+Prepare these inputs before running `acton verify`:
+
+- a [wallet configured in Acton](/docs/wallets)
+- a deployed `.tolk` contract that is defined in `Acton.toml`
+- [at least 1 Toncoin on the wallet](/docs/wallets#fund-a-wallet-on-testnet) to cover the final verification transaction when not using `--dry-run`
+
+Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
+
+Verification fails if the current local sources do not compile to the same bytecode as the deployed contract. Run verification from the same source revision and compiler configuration used for deployment.
+
+## Verify on testnet
+
+Run `acton verify` with the contract name from `Acton.toml` and the deployed address:
+
+```bash
+acton verify Counter --address EQDt7LL...
+```
+
+`testnet` is the default network, so `--net testnet` is optional.
+
+If the project defines only one contract, the contract name can be omitted. If multiple contracts are available, Acton prompts for the selection. If `--address` is omitted, Acton prompts for the address.
+
+On success, Acton prints a verifier link for the contract:
+
+```text
+✓ Contract verification completed!
+View at: https://verifier.ton.org/EQBUSJ...?testnet
+```
+
+## Verify on mainnet
+
+Pass `--net mainnet` to target a mainnet deployment:
+
+```bash
+acton verify Counter --address UQDt7LL... --net mainnet
+```
+
+## Choose the wallet for the verification transaction
+
+When more than one wallet is configured, use `--wallet` to pick the sender for the final verification transaction:
+
+```bash
+acton verify Counter --address EQDt7LL... --wallet deployer
+```
+
+If exactly one wallet is configured, Acton selects it automatically. If multiple wallets are available and `--wallet` is omitted, Acton prompts for the selection.
+
+When `--dry-run` is not used, the final verification transaction sends `0.1 TON`. If the verifier backend reports that the same code hash is already verified, Acton exits successfully without sending another transaction.
+
+## Check the verifier flow without sending the transaction
+
+Use `--dry-run` to run the verifier flow without publishing the final transaction on-chain:
+
+```bash
+acton verify Counter --address EQDt7LL... --dry-run
+```
+
+`--dry-run` still compiles the contract, uploads the sources, and collects the required verifier signatures. It skips only the final blockchain transaction.
+
+Use this mode to confirm that the verifier backend accepts the source package before spending TON from the wallet.
+
+## Pin the compiler version
+
+If the deployed contract was built with a specific Tolk compiler version, pass that version explicitly:
+
+```bash
+acton verify Counter --address EQDt7LL... --compiler-version <TOLK_VERSION>
+```
+
+Verification compares the deployed code with the bytecode produced from the submitted sources and compiler settings. A different compiler version can produce a different result even when the source files are unchanged.
+
+## Troubleshoot verification failures
+
+A bytecode mismatch usually means that the local sources, imports, or compiler settings differ from the deployment inputs.
+
+Common causes include:
+
+- a different Git revision than the one used for deployment
+- a different Tolk compiler version
+- changed generated or imported source files
+- verifying the wrong contract name or address
+
+For backend diagnostics, rerun the command with `ACTON_VERIFY_DEBUG=1`:
+
+```bash
+ACTON_VERIFY_DEBUG=1 \
+acton verify Counter --address EQDt7LL... --dry-run
+```
+
+With debug mode enabled, Acton prints the compiler version, the collected source files, and any backend overrides.
+
+To test a specific verifier backend, set `ACTON_VERIFY_BACKEND`:
+
+```bash
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
+ACTON_VERIFY_DEBUG=1 \
+acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+```
+
+To replace the signer backend list, set `ACTON_VERIFY_BACKENDS`:
+
+```bash
+ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
+ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
+acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+```
+
+If the backend returns a transient `5xx` error, retry the command. Acton automatically retries source upload failures before exiting.
+
+## See also
+
+- [`acton verify` command reference](/docs/commands/verify).
+- [Wallet management](/docs/tutorial/setup-wallets).
