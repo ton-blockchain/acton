@@ -28,7 +28,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
       [wallets.deployer.expected]
       [WALLET_ADDRESS_TESTNET]
 
-      See [ACTON_DOCS_URL]/tutorial/setup-wallets for more information
+      See [ACTON_DOCS_URL]/wallets for more information
 
  ✗ 1 failed in 1 file
 
