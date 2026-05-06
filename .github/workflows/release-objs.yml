@@ -86,6 +86,7 @@ jobs:
 
       - name: Install LLVM and Clang
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 10
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -95,6 +96,7 @@ jobs:
 
       - name: Install system dependencies
         if: steps.archive-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 10
         # language=Bash
         run: |
           sudo apt-get update
@@ -325,6 +327,7 @@ jobs:
           persist-credentials: false
 
       - name: Install LLVM and Clang
+        timeout-minutes: 10
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -333,6 +336,7 @@ jobs:
           rm llvm.sh
 
       - name: Install system dependencies
+        timeout-minutes: 10
         # language=Bash
         run: |
           sudo apt-get update
