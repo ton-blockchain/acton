@@ -1,0 +1,160 @@
+---
+title: "FunC to Tolk migration"
+description: "Use the func2tolk skill to migrate a FunC and TypeScript project to Tolk and Acton"
+icon: ArrowRightLeft
+---
+
+import {Callout} from "fumadocs-ui/components/callout";
+import {Func2TolkPrompt} from "@/components/Func2TolkPrompt";
+
+The `func2tolk` skill helps a coding agent migrate an existing FunC project to
+idiomatic Tolk with Acton as the build, test, wrapper, script, and deployment
+toolchain.
+
+Use it when a repository already has `.fc` or `.func` contracts, TypeScript
+wrappers, TypeScript tests, deployment scripts, or fixture-based checks, and you
+want the final project to use Tolk contracts plus Acton-native tests and
+wrappers.
+
+<Callout type="warning">
+    `acton func2tolk` is a converter, not a full migration by itself. Treat the
+    converted code as a draft, then preserve the old TL-B layouts, opcodes,
+    error codes, getter shapes, send modes, and bounce behavior during the
+    Tolk refactor.
+</Callout>
+
+## Install the skill
+
+Install the skill globally with `npx skills`:
+
+```bash
+npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/func2tolk
+```
+
+After installation, mention `$func2tolk` in the prompt when asking the agent to
+port a repository.
+
+## Example prompt
+
+<Func2TolkPrompt />
+
+## What the skill does
+
+The skill tells the agent to:
+
+- inspect the existing FunC entrypoints, TypeScript wrappers, tests, scripts,
+  fixtures, and package commands before editing;
+- run [`acton func2tolk`](/docs/commands/func2tolk) when it is useful for a
+  first-pass conversion;
+- split the result into Tolk modules such as `messages.tolk`, `storage.tolk`,
+  `errors.tolk`, and contract entrypoint files;
+- replace manual opcode and slice parsing with tagged message structs, union
+  dispatch, typed storage, typed maps, and `createMessage(...)` where possible;
+- migrate important TypeScript tests into `tests/*.test.tolk`;
+- generate Acton wrappers for tests, scripts, and optional TypeScript app code;
+- run Acton build and test commands, then report any remaining compatibility
+  exceptions.
+
+## Migration workflow
+
+Start from a clean branch and capture the old behavior before changing the
+contract code:
+
+```bash
+git checkout -b migrate-to-tolk-acton
+npm test
+```
+
+If the repository does not already use Acton, initialize it:
+
+```bash
+acton init
+```
+
+Convert the FunC sources into a draft Tolk output:
+
+```bash
+acton func2tolk contracts --output contracts-tolk --warnings-as-comments
+```
+
+Then ask the agent to refactor the draft into the Acton project layout. A
+typical `Acton.toml` entry looks like this:
+
+```toml
+[contracts.MainContract]
+display-name = "Main Contract"
+src = "contracts/MainContract.tolk"
+```
+
+Once the contract is registered, iterate with Acton:
+
+```bash
+acton build
+acton wrapper MainContract --test
+acton test
+acton check
+acton fmt --check
+```
+
+For a TypeScript frontend or existing TypeScript integration tests, generate
+TypeScript wrappers from the migrated Tolk ABI:
+
+```bash
+acton wrapper --all --ts --output-dir wrappers-ts
+```
+
+## What to expect
+
+A good migration should produce:
+
+- an `Acton.toml` with each migrated contract registered under `[contracts]`;
+- Tolk contract files with explicit storage, message, and error schemas;
+- native tests in `tests/*.test.tolk` that cover the behavior previously
+  checked by TypeScript tests;
+- generated Tolk wrappers for tests and scripts;
+- generated TypeScript wrappers when the project still has TypeScript app or
+  integration code;
+- a report of build and test results plus any compatibility exceptions.
+
+Do not expect the migrated contract to have the same bytecode hash as the FunC
+contract. The target is TL-B compatibility and observable behavior parity, not
+identical compiler output.
+
+## Debugging
+
+If conversion fails, check that Node.js, npm, and `npx` are available. Try a
+single file first and keep converter warnings inline:
+
+```bash
+acton func2tolk contracts/main.fc --output contracts-tolk/main.tolk --warnings-as-comments
+```
+
+If `acton build` fails, inspect `Acton.toml`, import mappings, generated
+dependency files, and duplicated entrypoints. Re-run with a clean cache:
+
+```bash
+acton build --clear-cache
+```
+
+If behavior differs from the TypeScript test suite, port the failing case into a
+Tolk test and compare message bodies, state layout, opcodes, send modes, bounce
+handling, and unknown-message policy:
+
+```bash
+acton test --show-bodies --verbose
+acton test --save-test-trace
+```
+
+If wrapper generation fails, build first and confirm the contract ABI has the
+storage, incoming message, and getter declarations expected by the generator:
+
+```bash
+acton build
+acton wrapper MainContract
+acton wrapper MainContract --ts --output-dir wrappers-ts
+```
+
+If a compatibility rule forces low-level Tolk code, keep it localized and leave
+a short comment explaining the FunC layout or behavior being preserved. Common
+examples include inline body quirks, broad address encodings, remainder payloads,
+and raw dictionary boundaries.
