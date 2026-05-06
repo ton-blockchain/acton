@@ -3,55 +3,55 @@ title: "Overview"
 description: "Learn how to write and run tests for Tolk smart contracts"
 ---
 
-This section contains guides and reference documentation for Acton's test runner.
+This section contains guides and reference documentation for the Acton test runner.
 
 <Cards>
-  <Card href="/docs/testing/generating-wrappers" title="Generating Wrappers">
-    Learn how to automatically generate wrappers for Tolk contracts
+  <Card href="/docs/testing/generating-wrappers" title="Generating wrappers">
+    Generate wrappers for Tolk smart contracts
   </Card>
-  <Card href="/docs/testing/test-attributes" title="Test Attributes">
-    Learn how to use test attributes to control test behavior, skip tests, and set expectations
+  <Card href="/docs/testing/test-attributes" title="Test attributes">
+    Control test behavior, skip tests, and set expectations with `@test.*` attributes
   </Card>
-  <Card href="/docs/testing/fuzz-testing" title="Fuzz Testing">
-    Learn how to run parameterized tests with generated inputs, assumptions, and bounds
+  <Card href="/docs/testing/fuzz-testing" title="Fuzz testing">
+    Run parameterized tests with generated inputs, assumptions, and bounds
   </Card>
-  <Card href="/docs/testing/test-configuration" title="Test Configuration">
-    Learn how to configure test runner behavior through project settings and command line options
+  <Card href="/docs/testing/test-configuration" title="Test configuration">
+    Configure the test runner in `Acton.toml` and with CLI flags
   </Card>
-  <Card href="/docs/testing/world-state-snapshots" title="World State Snapshots">
-    Learn how to save and restore local emulation state as JSON fixtures inside tests
+  <Card href="/docs/testing/world-state-snapshots" title="World state snapshots">
+    Save and restore local emulation state as JSON fixtures inside tests
   </Card>
-  <Card href="/docs/testing/step-by-step-execution" title="Step-by-step Execution">
-    Learn how to use `testing.createTraceIterationCursor()` and `TxCursor` to execute transaction chains in parts
+  <Card href="/docs/testing/step-by-step-execution" title="Step-by-step execution">
+    Use `testing.createTraceIterationCursor()` and `TxCursor` to run transaction chains in parts
   </Card>
   <Card href="/docs/testing/test-ui/overview" title="Test UI">
-    Learn how to inspect traces, transaction trees, logs, and failures in the browser UI
+    Inspect traces, transaction trees, logs, and failures in the browser UI
   </Card>
-  <Card href="/docs/testing/saved-trace-bundles" title="Saved Trace Bundles">
-    Reference for the JSON artifacts written by `acton test --save-test-trace` and reused by the Test UI
+  <Card href="/docs/testing/saved-trace-bundles" title="Saved trace bundles">
+    Reference for JSON artifacts from `acton test --save-test-trace`, reused by the Test UI
   </Card>
-  <Card href="/docs/testing/built-in-matchers-and-helpers" title="Built-in Matchers and Helpers">
-    Find transaction predicates, map expectations, and out-action helpers before writing your own matchers
+  <Card href="/docs/testing/built-in-matchers-and-helpers" title="Built-in matchers and helpers">
+    Reference for transaction predicates, map expectations, and out-action helpers
   </Card>
-  <Card href="/docs/testing/reading-transaction-chains" title="Reading Transaction Chains">
-    Learn how to read the text trace format printed by `println(txs)` and matcher failures
+  <Card href="/docs/testing/reading-transaction-chains" title="Reading transaction chains">
+    Read the text trace format from `println(txs)` and matcher failures
   </Card>
-  <Card href="/docs/testing/gas-profiling-with-snapshots" title="Gas Profiling with Snapshots">
-    Learn how to profile opcode and transaction-chain gas/fee metrics, save snapshots, and compare with baselines
+  <Card href="/docs/testing/gas-profiling-with-snapshots" title="Gas profiling with snapshots">
+    Profile opcode and chain gas and fees, save snapshots, and compare baselines
   </Card>
-  <Card href="/docs/testing/fork-testing" title="Fork Testing">
-    Learn how to test contracts against real blockchain state by forking testnet or mainnet
+  <Card href="/docs/testing/fork-testing" title="Fork testing">
+    Test contracts against real chain state by forking testnet or mainnet
   </Card>
-  <Card href="/docs/testing/code-coverage" title="Code Coverage">
-    Learn how to measure and analyze code coverage in your Tolk smart contract tests
+  <Card href="/docs/testing/code-coverage" title="Code coverage">
+    Measure and inspect code coverage in Tolk smart contract tests
   </Card>
-  <Card href="/docs/testing/mutation-testing/overview" title="Mutation Testing">
-    Learn how to use mutation testing to assess the quality of your test suite
+  <Card href="/docs/testing/mutation-testing/overview" title="Mutation testing">
+    Run mutation testing to assess the test suite quality and find hidden gaps in the coverage
   </Card>
   <Card href="/docs/testing/cookbook" title="Cookbook">
-    Practical examples and code snippets for common testing scenarios in Tolk smart contracts
+    Short examples for common assertions, helpers, and scenarios in tests
   </Card>
-  <Card href="/docs/testing/writing-your-own-matchers" title="Custom Matchers">
-    Learn how to add custom matchers for expect() calls
+  <Card href="/docs/testing/writing-your-own-matchers" title="Custom matchers">
+    Extend `expect()` with domain-specific matchers
   </Card>
 </Cards>

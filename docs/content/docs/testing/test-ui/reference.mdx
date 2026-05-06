@@ -3,9 +3,7 @@ title: "Reference"
 description: "Complete reference for all Test UI features and interface sections"
 ---
 
-Test UI is a browser interface for reviewing completed `acton test` runs with
-traces, transaction trees, logs, source links, and coverage data when the run
-includes `--coverage`.
+Test UI is a browser interface for reviewing completed `acton test` runs with traces, transaction trees, logs, source links, and coverage data when the run includes `--coverage`.
 
 ## 1. Start Test UI
 
@@ -39,15 +37,16 @@ acton test --coverage --ui
   `--coverage` and `--ui`.
 </Callout>
 
-## 2. Sidebar Features
+## 2. Sidebar features
 
-### Test Search and Status Filters
+### Test search and status filters
 
 - Text filter (`Filter tests...`) matches test names
 - Status toggles for all statuses: `Passed`, `Failed`, `Skipped`, `Todo`
-- You can combine text + status filters
 
-### Suite/Test Navigation
+Both can be used simultaneously.
+
+### Suite and test navigation
 
 - Tests are grouped by files
 - Each suite can be collapsed/expanded
@@ -57,14 +56,14 @@ acton test --coverage --ui
 
 ![Sidebar filters with text search and status toggles](../imgs/test-ui-filters.png)
 
-### Sidebar Controls
+### Sidebar controls
 
 - Theme toggle (`light`/`dark`)
 - Collapse sidebar button
 
 ![Sidebar controls with theme toggle and collapse button](../imgs/test-ui-sidebar-controls.png)
 
-## 3. Test Header and IDE Integration
+## 3. Test header and IDE integration
 
 The selected test header contains:
 
@@ -82,7 +81,7 @@ Supported IDE deep links include Cursor, VS Code-family, and JetBrains IDEs.
 
 ![IDE selector dropdown in test header with quick-open action](../imgs/test-ui-ide-selector.png)
 
-## 4. Info Tab
+## 4. Info tab
 
 The `Info` tab includes:
 
@@ -91,20 +90,19 @@ The `Info` tab includes:
 - file location (`file:line:column`)
 - duration and total transaction count
 
-### Failure Diagnostics
+### Failure diagnostics
 
 For failed tests, Info tab also shows:
 
 - error message block
 - detailed matcher/exit-code message
-- structured mismatch context for transaction assertions
-  (`from`, `to`, and matcher params)
+- structured mismatch context for transaction assertions (`from`, `to`, and matcher params)
 - failed transaction tree (if available)
 - highlighted source snippet around failure location
 
 ![Failed test details with error block, mismatch context, and highlighted source snippet](../imgs/test-ui-failed-test.png)
 
-### Fee Summary
+### Fee summary
 
 If traces are available, Info tab also shows `Fee Summary` table per trace:
 
@@ -115,34 +113,31 @@ If traces are available, Info tab also shows `Fee Summary` table per trace:
 
 Clicking a trace row opens that trace in `Transactions` tab.
 
-For baseline and regression-oriented fee analysis, see
-[Gas Profiling with Snapshots](/docs/testing/gas-profiling-with-snapshots).
+For baseline and regression-oriented fee analysis, see the [gas profiling with snapshots](/docs/testing/gas-profiling-with-snapshots) page.
 
 <Callout type="tip">
-Name trace chains in tests with
-[`txs.giveName(...)`](/docs/standard_library/emulation/network#sendresultlistgivename) to make trace
-tabs and fee summaries easier to read.
+  Name trace chains in tests with [`txs.giveName(...)`](/docs/standard_library/emulation/network#sendresultlistgivename) to make trace tabs and fee summaries easier to read.
 </Callout>
 
 ![Fee Summary table with per-trace gas, forward fee, and total fee columns](../imgs/test-ui-fees.png)
 
-## 5. Transactions Tab
+## 5. Transactions tab
 
 If a test has trace data, Transactions tab provides full tree visualization.
 
-### Trace Switcher
+### Trace switcher
 
 - When a test has multiple traces, tabs appear above content
 - Selecting a trace updates tree and details
 
-### Transaction Tree
+### Transaction tree
 
 - Horizontal transaction tree with root blockchain node
 - Node color indicates success/failure
 - Dashed edges indicate bounced messages
 - Hover tooltip shows route, state transition, and gas/exit-code details
 
-### Transaction Details Panel
+### Transaction details panel
 
 Clicking a node opens detailed transaction view below tree:
 
@@ -153,7 +148,7 @@ Clicking a node opens detailed transaction view below tree:
 
 ![Transactions tab with trace tree and selected transaction details](../imgs/test-ui-transactions-tree.png)
 
-### Actions Details
+### Actions details
 
 When action phase has out actions:
 
@@ -163,23 +158,20 @@ When action phase has out actions:
 
 ![Actions panel showing out actions and expanded action details](../imgs/test-ui-actions.png)
 
-## 6. Logs Tab
+## 6. Logs tab
 
 Logs tab shows `Executor Log` and `VM Log` grouped by transaction for the selected trace. If a transaction has no logs, it is skipped; if all VM logs are missing for the selected trace, UI shows a hint to rerun with `acton test --ui --verbose`.
 
 ![Logs tab with Executor Log and VM Log grouped by transaction](../imgs/test-ui-logs.png)
 
-## 7. Coverage Tab
+## 7. Coverage tab
 
 When the run includes `acton test --coverage --ui`, Test UI adds a dedicated
-`Coverage` tab.
-
-The Coverage view includes:
+`Coverage` tab with:
 
 - summary cards for overall coverage
 - file list sorted by coverage score
 - source viewer with annotated covered and uncovered lines
 - search field for filtering files
 
-Use this tab when you want a fast visual pass over untested areas without
-leaving the browser UI.
+The `Coverage` tab supports a quick visual scan of uncovered lines without leaving the browser UI.

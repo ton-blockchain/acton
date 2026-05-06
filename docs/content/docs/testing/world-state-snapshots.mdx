@@ -1,18 +1,18 @@
 ---
-title: "World State Snapshots"
+title: "World state snapshots"
 description: "Save and restore test runner world state as JSON fixtures with testing.saveSnapshot() and testing.loadSnapshot()"
 ---
 
-World state snapshots let you capture the current emulation state during a test and restore it later from a JSON file.
+World state snapshots capture the current emulation state during a test and restore it later from a JSON file.
 
-This is useful when you want to:
+This is useful to:
 
-- reuse a complex setup across multiple test runs
-- freeze a real regression scenario as a fixture
-- checkpoint state mid-test and return to it later
-- debug stateful flows without repeating the full bootstrap sequence every time
+- reuse a complex setup across multiple test runs;
+- freeze a real regression scenario as a fixture;
+- checkpoint state mid-test and return to it later;
+- debug stateful flows without repeating the full bootstrap sequence every time.
 
-## Quick Start
+## Quick start
 
 Save the current emulation state:
 
@@ -47,7 +47,7 @@ get fun `test load snapshot`() {
 }
 ```
 
-## What snapshot stores
+## Snapshot contents
 
 The snapshot file stores the local emulation state needed for deterministic replay:
 
@@ -58,7 +58,7 @@ The snapshot file stores the local emulation state needed for deterministic repl
 - materialized account state
 
 <Callout type="info" title="Snapshots store state, not cache noise">
-Read-only cache misses such as checking balance on an unknown address are not persisted into the snapshot file.
+    Read-only cache misses such as checking balance on an unknown address are not persisted into the snapshot file.
 </Callout>
 
 ## Cross-run workflow
@@ -81,7 +81,7 @@ This works well for expensive setup flows, multi-contract fixtures, and regressi
 
 ## Same-run restore
 
-You can also use snapshots as checkpoints inside a single test:
+Snapshots can also checkpoint state inside one test:
 
 ```tolk
 import "@acton/emulation/network"
@@ -102,7 +102,7 @@ get fun `test checkpoint and restore`() {
 }
 ```
 
-`testing.loadSnapshot(...)` replaces the current local emulation state instead of merging into it.
+There, `testing.loadSnapshot(...)` replaces the current local emulation state instead of merging into it.
 
 ## Failure handling
 
@@ -122,13 +122,12 @@ If loading fails, the current world state is left unchanged.
 
 ## Limitations
 
-- snapshots restore the local emulation state only
-- loading a snapshot switches execution to local state, not fork mode
-- snapshot file paths are regular host file paths relative to the project working directory
-- if you intentionally change storage layout or config assumptions, an old snapshot may stop being compatible
+- Snapshots restore the local emulation state only.
+- Loading a snapshot switches execution to local state, not fork mode.
+- Snapshot file paths are regular host file paths relative to the project working directory.
+- If storage layout or config assumptions change on purpose, an older snapshot may stop loading.
 
-## Learn more
+## Related topics
 
-- [Fork Testing](/docs/testing/fork-testing)
-- [Gas Profiling with Snapshots](/docs/testing/gas-profiling-with-snapshots)
-- [Persistence and Snapshots for localnet](/docs/localnet/persistence-and-snapshots)
+- [Fork testing](/docs/testing/fork-testing)
+- [Gas profiling with snapshots](/docs/testing/gas-profiling-with-snapshots)
