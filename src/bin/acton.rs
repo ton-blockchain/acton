@@ -943,6 +943,8 @@ enum Commands {
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
+        #[arg(long, hide = true)]
+        yes: bool,
     },
     #[command(
         name = "func2tolk",
@@ -2124,6 +2126,7 @@ fn main() {
             force,
             list,
             check,
+            yes: _,
         } => {
             let result = up_cmd(version, trunk, stable, force, list, check);
             if check {
