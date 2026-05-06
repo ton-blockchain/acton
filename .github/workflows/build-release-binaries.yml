@@ -59,6 +59,7 @@ jobs:
           fallback: none
 
       - name: Install LLVM and Clang (don't cache)
+        timeout-minutes: 10
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh

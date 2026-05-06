@@ -107,6 +107,7 @@ jobs:
           echo "${PWD}/acton-bin" >> "$GITHUB_PATH"
 
       - name: Install QEMU user emulation
+        timeout-minutes: 10
         shell: bash
         # language=Bash
         run: |
