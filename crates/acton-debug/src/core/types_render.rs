@@ -3796,11 +3796,12 @@ mod tests {
                     fields: vec![ABIStructField {
                         name: "count".to_owned(),
                         ty_idx: count_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
-                    overrides_client_type: false,
+                    description: String::new(),
                 },
                 ABIDeclaration::Struct {
                     name: "DeploymentStorage".to_owned(),
@@ -3810,17 +3811,17 @@ mod tests {
                     fields: vec![ABIStructField {
                         name: "ready".to_owned(),
                         ty_idx: ready_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
-                    overrides_client_type: false,
+                    description: String::new(),
                 },
             ],
             storage: ABIStorage {
                 storage_ty_idx: Some(storage_ty_idx),
                 storage_at_deployment_ty_idx: Some(deployment_ty_idx),
-                description: String::new(),
             },
             ..Default::default()
         };
@@ -4388,11 +4389,10 @@ mod tests {
                 }),
                 fields: vec![],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             }],
             outgoing_messages: vec![ABIOutgoingMessage {
                 body_ty_idx: transfer_ty_idx,
-                description: String::new(),
             }],
             ..Default::default()
         };

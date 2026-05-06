@@ -777,7 +777,6 @@ mod tests {
             storage: ABIStorage {
                 storage_ty_idx: None,
                 storage_at_deployment_ty_idx: None,
-                description: String::new(),
             },
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
@@ -861,23 +860,22 @@ mod tests {
                 ABIStructField {
                     name: "queryId".to_owned(),
                     ty_idx: query_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 },
                 ABIStructField {
                     name: "flag".to_owned(),
                     ty_idx: flag_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 },
             ],
             custom_pack_unpack: None,
-            overrides_client_type: false,
-        }];
-        abi.incoming_messages = vec![ABIInternalMessage {
-            body_ty_idx,
             description: String::new(),
         }];
+        abi.incoming_messages = vec![ABIInternalMessage { body_ty_idx }];
 
         let mut builder = CellBuilder::new();
         builder.store_uint(0x12345678, 32).unwrap();
@@ -923,18 +921,20 @@ mod tests {
                 ABIStructField {
                     name: "owner".to_owned(),
                     ty_idx: owner_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 },
                 ABIStructField {
                     name: "items".to_owned(),
                     ty_idx: map_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 },
             ],
             custom_pack_unpack: None,
-            overrides_client_type: false,
+            description: String::new(),
         }];
 
         let owner = ExtAddr::new(8, vec![0xaa]).unwrap();
@@ -1038,11 +1038,12 @@ mod tests {
             fields: vec![ABIStructField {
                 name: "value".to_owned(),
                 ty_idx: generic_ty_idx,
+                client_ty_idx: None,
                 default_value: None,
                 description: String::new(),
             }],
             custom_pack_unpack: None,
-            overrides_client_type: false,
+            description: String::new(),
         }];
 
         let mut builder = CellBuilder::new();
@@ -1083,6 +1084,7 @@ mod tests {
                 },
             ],
             custom_pack_unpack: None,
+            description: String::new(),
         }];
 
         let mut builder = CellBuilder::new();
@@ -1123,6 +1125,7 @@ mod tests {
                 },
             ],
             custom_pack_unpack: None,
+            description: String::new(),
         }];
 
         let mut builder = CellBuilder::new();
