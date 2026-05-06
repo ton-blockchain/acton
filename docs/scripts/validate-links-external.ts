@@ -24,6 +24,10 @@ async function validateExternalLinks() {
 }
 
 function whitelist(url: string): boolean {
+  if (url.startsWith("http://localhost")) {
+    return true
+  }
+
   if (url.startsWith("https://github.com/ton-blockchain/acton")) {
     return true
   }
