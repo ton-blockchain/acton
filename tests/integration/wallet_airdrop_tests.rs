@@ -1251,7 +1251,7 @@ fn test_wallet_airdrop_rate_limit_uses_friendly_error_message() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_wallet_airdrop_claim_request_contains_challenge_nonce_and_address() {
+fn test_wallet_airdrop_claim_request_contains_challenge_nonce_address_and_ton_type() {
     let project = ProjectBuilder::new("wallet-airdrop-claim-payload").build();
 
     project
@@ -1310,6 +1310,7 @@ fn test_wallet_airdrop_claim_request_contains_challenge_nonce_and_address() {
 
     assert_eq!(claim_body["challenge"], "payload-check");
     assert!(claim_body["nonce"].as_u64().is_some(), "nonce must be u64");
+    assert_eq!(claim_body["type"], 1);
     assert!(
         claim_body["address"]
             .as_str()

@@ -104,6 +104,7 @@ const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
+const AIRDROP_TYPE_TON: u16 = 1;
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -482,6 +483,7 @@ fn perform_testnet_airdrop(
         "address": address,
         "challenge": challenge_data.challenge,
         "nonce": nonce,
+        "type": AIRDROP_TYPE_TON,
     });
     let response = send_with_retry(
         || client.post(claim_url.clone()).json(&claim_payload).send(),
