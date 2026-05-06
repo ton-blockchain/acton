@@ -68,6 +68,21 @@ pub struct FailedMessageInfo {
     pub missing_libraries: Vec<String>,
 }
 
+pub(super) fn trace_file_name(test_name: &str) -> String {
+    let mut stem = String::with_capacity(test_name.len());
+    for ch in test_name.chars() {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+            stem.push(ch);
+        } else {
+            stem.push('_');
+        }
+    }
+
+    let stem = stem.trim_matches('_');
+    let stem = if stem.is_empty() { "test" } else { stem };
+    format!("{stem}_trace.json")
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExecutorActionFailureReasonInfo {
@@ -330,7 +345,7 @@ pub(super) fn dump_test_transactions(
         fs::write(contract_file, info_json)?;
     }
 
-    let filename = format!("{}_trace.json", test.name);
+    let filename = trace_file_name(&test.name);
     let file_path = output_path.join(filename);
     fs::write(file_path, str)?;
 

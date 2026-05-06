@@ -282,6 +282,38 @@ fn save_test_trace_without_path_uses_default_directory() {
 }
 
 #[test]
+fn save_test_trace_sanitizes_test_names_for_trace_file_paths() {
+    let project = trace_project(
+        "h-save-trace-name-with-slash",
+        r"
+        get fun `test trace/name with slash`() {
+            deployCounter();
+        }
+        ",
+    );
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--save-test-trace")
+        .run()
+        .success();
+
+    output
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_sanitizes_test_names_for_trace_file_paths.stdout.txt",
+        )
+        .assert_file_exists("build/traces/test_trace_name_with_slash_trace.json");
+
+    assert_trace_json_contract(
+        &project,
+        "build/traces/test_trace_name_with_slash_trace.json",
+        "test trace/name with slash",
+    );
+}
+
+#[test]
 fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
     let project = trace_project(
         "h-save-trace-custom-dir",
