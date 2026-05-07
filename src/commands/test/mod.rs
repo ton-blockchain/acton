@@ -1303,6 +1303,9 @@ fn run_file_tests(
                         Some(formatter.parse_failed_transactions(&tx_failure.txs));
                     test_report.failed_transaction_context =
                         Some(formatter.get_failed_transaction_context(tx_failure));
+                } else if let AssertFailure::ExternalMessageNotFound(external_failure) = failure {
+                    test_report.failed_transactions =
+                        Some(formatter.parse_failed_transactions(&external_failure.txs));
                 }
             } else if expected_exit_code != 0 {
                 test_report.message = Some(format!(

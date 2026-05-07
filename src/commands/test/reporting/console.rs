@@ -533,6 +533,21 @@ fn process_assert_failure(failure: &AssertFailure, _test: &TestReport, fmt: &For
         }
     }
 
+    if let AssertFailure::ExternalMessageNotFound(failure) = &failure {
+        let params = fmt.format_external_message_search_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
+        let diff_output = format!(
+            "{tx_tree}\nCannot find external message {}\n{}{}",
+            failure.message_name.purple().bold(),
+            if params.is_empty() { "" } else { "with:\n" },
+            params.join("\n"),
+        );
+
+        for line in diff_output.lines() {
+            println!("        {line}");
+        }
+    }
+
     if let Some(location) = &failure.location() {
         println!("      {} at {}", "└─".dimmed(), location.format().dimmed());
     }

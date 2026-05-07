@@ -2,8 +2,9 @@ use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
 use crate::context;
 use crate::context::{
-    AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
-    KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, DisplayParam, EmulationsState, ExternalMessageNotFoundFailure,
+    GetMethodAssertFailure, KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure,
+    to_cell,
 };
 use crate::ffi::assert::{rendered_values_equal, union_case_payload};
 use crate::retrace::{
@@ -2880,6 +2881,22 @@ impl FormatterContext<'_> {
     }
 
     #[must_use]
+    pub fn format_external_message_search_parameters(
+        &self,
+        failure: &ExternalMessageNotFoundFailure,
+    ) -> Vec<String> {
+        let Some(opcode) = failure.opcode else {
+            return Vec::new();
+        };
+
+        vec![format!(
+            "  opcode={} {}",
+            format!("0x{opcode:x}").green(),
+            failure.message_name.purple().bold()
+        )]
+    }
+
+    #[must_use]
     pub fn highlight_actual_expected(message: &str) -> String {
         message
             .replace("<actual>", &"actual".red().to_string())
@@ -3233,6 +3250,23 @@ impl FormatterContext<'_> {
                     format!(" from {from_s} to {to_s}")
                 };
                 writeln!(result, "Unexpected transaction{from_to}").ok();
+                if !params.is_empty() {
+                    writeln!(result, "with:").ok();
+                    for param in params {
+                        writeln!(result, "  {param}").ok();
+                    }
+                }
+            }
+            AssertFailure::ExternalMessageNotFound(external_failure) => {
+                let params = self.format_external_message_search_parameters(external_failure);
+                let tx_tree = self.format_transaction_list(&external_failure.txs);
+                writeln!(result, "{tx_tree}").ok();
+                writeln!(
+                    result,
+                    "Cannot find external message {}",
+                    external_failure.message_name.purple().bold()
+                )
+                .ok();
                 if !params.is_empty() {
                     writeln!(result, "with:").ok();
                     for param in params {
