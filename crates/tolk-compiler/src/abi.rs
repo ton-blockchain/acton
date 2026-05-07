@@ -70,11 +70,21 @@ pub struct ABIStructField {
     pub name: String,
     pub ty_idx: TyIdx,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_ty_idx: Option<TyIdx>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<ABIConstValue>,
 
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+}
+
+impl ABIStructField {
+    #[must_use]
+    pub fn client_or_declared_ty_idx(&self) -> TyIdx {
+        self.client_ty_idx.unwrap_or(self.ty_idx)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,8 +115,8 @@ pub enum ABIDeclaration {
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
 
-        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-        overrides_client_type: bool,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        description: String,
     },
 
     #[serde(rename = "alias")]
@@ -122,6 +132,9 @@ pub enum ABIDeclaration {
 
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
+
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        description: String,
     },
 
     #[serde(rename = "enum")]
@@ -133,6 +146,9 @@ pub enum ABIDeclaration {
 
         #[serde(skip_serializing_if = "Option::is_none")]
         custom_pack_unpack: Option<ABICustomPackUnpack>,
+
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        description: String,
     },
 }
 
@@ -162,23 +178,16 @@ pub struct ABIGetMethod {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIInternalMessage {
     pub body_ty_idx: TyIdx,
-
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIExternalMessage {
     pub body_ty_idx: TyIdx,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ABIOutgoingMessage {
     pub body_ty_idx: TyIdx,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -188,9 +197,6 @@ pub struct ABIStorage {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_at_deployment_ty_idx: Option<TyIdx>,
-
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -248,7 +254,6 @@ pub struct ABIResolvedStruct {
     pub name: String,
     pub prefix: Option<ABIOpcode>,
     pub fields: Vec<ABIStructField>,
-    pub overrides_client_type: bool,
 }
 
 impl ContractABI {
@@ -306,7 +311,7 @@ impl ContractABI {
             .iter()
             .find(|inst| inst.ty_idx == ty_idx)
         {
-            let (_, fields, _) = find_struct_decl(self, struct_name)
+            let (_, fields) = find_struct_decl(self, struct_name)
                 .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
             if fields.len() != inst.monomorphic_fields_ty_idx.len() {
                 anyhow::bail!(
@@ -326,7 +331,7 @@ impl ContractABI {
                 .collect());
         }
 
-        let (_, fields, _) = find_struct_decl(self, struct_name)
+        let (_, fields) = find_struct_decl(self, struct_name)
             .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
         Ok(fields.to_vec())
     }
@@ -494,16 +499,11 @@ fn collect_structs_from_type(
         .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     match ty {
         Ty::StructRef { struct_name, .. } => {
-            let (prefix, _, overrides_client_type) = find_struct_decl(abi, struct_name)
+            let (prefix, _) = find_struct_decl(abi, struct_name)
                 .ok_or_else(|| anyhow!("Struct {struct_name} referenced by ABI was not found"))?;
             let fields = abi.struct_fields_of(ty_idx)?;
             if seen_structs.insert(struct_name.clone()) {
-                resolved.push(to_resolved_struct(
-                    struct_name,
-                    prefix,
-                    &fields,
-                    overrides_client_type,
-                ));
+                resolved.push(to_resolved_struct(struct_name, prefix, &fields));
             }
             Ok(())
         }
@@ -552,17 +552,14 @@ fn collect_structs_from_type(
 fn find_struct_decl<'a>(
     abi: &'a ContractABI,
     target_name: &str,
-) -> Option<(Option<&'a ABIOpcode>, &'a [ABIStructField], bool)> {
+) -> Option<(Option<&'a ABIOpcode>, &'a [ABIStructField])> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Struct {
             name,
             prefix,
             fields,
-            overrides_client_type,
             ..
-        } if name == target_name => {
-            Some((prefix.as_ref(), fields.as_slice(), *overrides_client_type))
-        }
+        } if name == target_name => Some((prefix.as_ref(), fields.as_slice())),
         _ => None,
     })
 }
@@ -582,13 +579,11 @@ fn to_resolved_struct(
     name: &str,
     prefix: Option<&ABIOpcode>,
     fields: &[ABIStructField],
-    overrides_client_type: bool,
 ) -> ABIResolvedStruct {
     ABIResolvedStruct {
         name: name.to_owned(),
         prefix: prefix.cloned(),
         fields: fields.to_vec(),
-        overrides_client_type,
     }
 }
 
@@ -867,7 +862,7 @@ fn render_const_object_value(
     struct_name: &str,
     fields: &[ABIConstValue],
 ) -> String {
-    let Some((_, struct_fields, _)) = find_struct_decl(abi, struct_name) else {
+    let Some((_, struct_fields)) = find_struct_decl(abi, struct_name) else {
         return format!("{struct_name} {{}}");
     };
 
@@ -910,7 +905,6 @@ mod tests {
             storage: ABIStorage {
                 storage_ty_idx: None,
                 storage_at_deployment_ty_idx: None,
-                description: String::new(),
             },
             get_methods: Vec::new(),
             thrown_errors: Vec::new(),
@@ -1046,11 +1040,12 @@ mod tests {
                 fields: vec![ABIStructField {
                     name: "value".to_owned(),
                     ty_idx: value_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 }],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
             ABIDeclaration::Struct {
                 name: "MsgB".to_owned(),
@@ -1062,7 +1057,7 @@ mod tests {
                 }),
                 fields: vec![],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
             ABIDeclaration::Alias {
                 name: "Incoming".to_owned(),
@@ -1070,11 +1065,11 @@ mod tests {
                 target_ty_idx: incoming_union_ty_idx,
                 type_params: None,
                 custom_pack_unpack: None,
+                description: String::new(),
             },
         ];
         abi.incoming_messages = vec![ABIInternalMessage {
             body_ty_idx: incoming_alias_ty_idx,
-            description: String::new(),
         }];
 
         let resolved = abi
@@ -1099,7 +1094,7 @@ mod tests {
                 prefix: None,
                 fields: vec![],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
             ABIDeclaration::Struct {
                 name: "DeploymentStorage".to_owned(),
@@ -1108,13 +1103,12 @@ mod tests {
                 prefix: None,
                 fields: vec![],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
         ];
         abi.storage = ABIStorage {
             storage_ty_idx: Some(storage_ty_idx),
             storage_at_deployment_ty_idx: Some(deployment_ty_idx),
-            description: String::new(),
         };
 
         let resolved = abi
@@ -1135,10 +1129,10 @@ mod tests {
             target_ty_idx: incoming_alias_ty_idx,
             type_params: None,
             custom_pack_unpack: None,
+            description: String::new(),
         }];
         abi.incoming_messages = vec![ABIInternalMessage {
             body_ty_idx: incoming_alias_ty_idx,
-            description: String::new(),
         }];
 
         let error = abi
@@ -1338,6 +1332,7 @@ mod tests {
                     },
                 ],
                 custom_pack_unpack: None,
+                description: String::new(),
             },
             ABIDeclaration::Struct {
                 name: "Boxed".to_owned(),
@@ -1347,11 +1342,12 @@ mod tests {
                 fields: vec![ABIStructField {
                     name: "item".to_owned(),
                     ty_idx: generic_ty_idx,
+                    client_ty_idx: None,
                     default_value: None,
                     description: String::new(),
                 }],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
             ABIDeclaration::Alias {
                 name: "UserId".to_owned(),
@@ -1359,6 +1355,7 @@ mod tests {
                 target_ty_idx: int32_ty_idx,
                 type_params: None,
                 custom_pack_unpack: None,
+                description: String::new(),
             },
             ABIDeclaration::Alias {
                 name: "MaybeBoxed".to_owned(),
@@ -1366,6 +1363,7 @@ mod tests {
                 target_ty_idx: boxed_nullable_generic_ty_idx,
                 type_params: Some(vec!["T".to_owned()]),
                 custom_pack_unpack: None,
+                description: String::new(),
             },
             ABIDeclaration::Struct {
                 name: "Storage".to_owned(),
@@ -1376,24 +1374,28 @@ mod tests {
                     ABIStructField {
                         name: "owner".to_owned(),
                         ty_idx: user_id_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     },
                     ABIStructField {
                         name: "color".to_owned(),
                         ty_idx: color_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     },
                     ABIStructField {
                         name: "maybeItem".to_owned(),
                         ty_idx: maybe_boxed_bool_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     },
                     ABIStructField {
                         name: "nested".to_owned(),
                         ty_idx: boxed_plain_ty_idx,
+                        client_ty_idx: None,
                         default_value: Some(ABIConstValue::Object {
                             struct_name: "Boxed".to_owned(),
                             fields: vec![ABIConstValue::Null],
@@ -1403,6 +1405,7 @@ mod tests {
                     ABIStructField {
                         name: "opcode".to_owned(),
                         ty_idx: uint32_ty_idx,
+                        client_ty_idx: None,
                         default_value: Some(ABIConstValue::CastTo {
                             inner: Box::new(ABIConstValue::Int { v: "7".to_owned() }),
                             cast_to_ty_idx: uint32_ty_idx,
@@ -1411,7 +1414,7 @@ mod tests {
                     },
                 ],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             },
         ];
 
@@ -1433,6 +1436,7 @@ mod tests {
             target_ty_idx: loop_ty_idx,
             type_params: None,
             custom_pack_unpack: None,
+            description: String::new(),
         }];
 
         let value = abi.default_value(loop_ty_idx);

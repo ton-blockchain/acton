@@ -2,7 +2,7 @@ use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, CompilationResult, Context, DebugStopRequested, GetMethodAssertFailure,
     KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep, SearchField, Wallet,
-    to_cell,
+    code_lookup_hash, to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
@@ -267,7 +267,8 @@ pub(crate) fn compilation_result_for_code(
     code: Option<&Cell>,
     need_project_contract_lookup: bool,
 ) -> Option<(PathBuf, CompilationResult)> {
-    let code = code?;
+    let code = code.cloned()?;
+
     // Fast path: wrappers created via `fromStorage()` call `build(...)`, so the
     // matching code hash is already present in the per-run build cache.
     if let Some(result) = ctx.build.build_cache.result_for_code(&Some(code.clone())) {
@@ -282,7 +283,7 @@ pub(crate) fn compilation_result_for_code(
     // as a code cell from account state. When a caller asks for a slow lookup,
     // match that cell against local project contracts so debug/backtrace and
     // formatter paths can still use their source maps or ABI.
-    let target_hash = *code.repr_hash();
+    let target_hash = code_lookup_hash(&code);
 
     let contracts = &ctx.env.config.contracts.as_ref()?.contracts;
     for (contract_id, contract) in contracts {

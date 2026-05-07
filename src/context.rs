@@ -244,12 +244,28 @@ impl BuildCache {
     #[must_use]
     pub fn result_for_code(&self, code: &Option<Cell>) -> Option<(PathBuf, CompilationResult)> {
         let Some(code) = code else { return None };
-        let code_hash = code.repr_hash();
+        let code_hash = code_lookup_hash(code);
         self.built
             .iter()
-            .find(|(_, result)| &result.code_hash == code_hash)
+            .find(|(_, result)| result.code_hash == code_hash)
             .map(|(name, result)| ((*name).clone(), (*result).clone()))
     }
+}
+
+pub(crate) fn code_lookup_hash(code: &Cell) -> HashBytes {
+    if code.is_exotic() {
+        let mut code_slice = code.as_slice_allow_exotic();
+        // Fift's `hash>libref` stores tag 2 followed by the real code hash. Accounts
+        // deployed through that library reference still need to resolve to the source
+        // map and ABI of the compiled ordinary code.
+        if code_slice.load_uint(8) == Ok(2)
+            && let Ok(hash) = code_slice.load_u256()
+        {
+            return hash;
+        }
+    }
+
+    *code.repr_hash()
 }
 
 #[derive(Debug, Clone)]
@@ -961,6 +977,33 @@ mod tests {
 
     fn dummy_hash(byte: u8) -> HashBytes {
         HashBytes([byte; 32])
+    }
+
+    #[test]
+    fn build_cache_matches_library_reference_to_real_code_hash() {
+        let mut code_builder = CellBuilder::new();
+        code_builder.store_uint(0xcafe, 16).unwrap();
+        let code = code_builder.build().unwrap();
+        let library_reference = CellBuilder::build_library(code.repr_hash());
+
+        let mut cache = BuildCache::new();
+        let path = PathBuf::from("w5/contracts/WalletV5.tolk");
+        cache.built.insert(
+            path.clone(),
+            CompilationResult {
+                name: "WalletV5".to_owned(),
+                code_boc64: String::new(),
+                code_hash: *code.repr_hash(),
+                source_map: Arc::new(SourceMap::default()),
+                abi: None,
+            },
+        );
+
+        let resolved = cache
+            .result_for_code(&Some(library_reference))
+            .expect("library reference should resolve to compiled code");
+
+        assert_eq!(resolved.0, path);
     }
 
     #[test]
