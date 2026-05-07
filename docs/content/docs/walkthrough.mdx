@@ -311,7 +311,7 @@ See the [testing guides](/docs/testing/overview) for more.
 
 ### Collect coverage
 
-`--coverage` collects line and branch coverage and prints a summary after the run:
+Pass `--coverage` to collect line and branch coverage and prints a summary after the run:
 
 ```bash
 acton test --coverage
@@ -325,13 +325,19 @@ acton test --coverage --coverage-minimum-percent 80
 
 ### Inspect results in the browser UI
 
-`--ui` opens an interactive browser interface while tests run. Combine it with `--coverage` to browse annotated source files in the Coverage tab:
+Pass `--ui` to open an interactive browser interface called [Test UI](/docs/testing/test-ui/overview). Combine it with `--coverage` to browse annotated source files in the Coverage tab:
 
 ```bash
 acton test --ui --coverage
 ```
 
-TODO: add screenshots.
+Filter tests and inspect the traces:
+
+![](ide-support/imgs/test-ui/trace.png)
+
+Inspect the coverage:
+
+![](ide-support/imgs/test-ui/coverage.png)
 
 ### Run mutation testing
 
