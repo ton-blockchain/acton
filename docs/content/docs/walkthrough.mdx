@@ -525,11 +525,11 @@ fun explicitCounterAddress(): address? {
     return env("COUNTER_ADDRESS");
 }
 
-fun targetCounter(): Counter {
+fun targetCounter(ownerAddress: address): Counter {
     val expected = Counter.fromStorage(Storage {
         id: 0,
         counter: 0,
-        owner: deployer.address,
+        owner: ownerAddress,
     });
     val counterAddress = explicitCounterAddress();
     if (counterAddress == null) {
@@ -546,7 +546,7 @@ fun main() {
     val deployer = scripts.wallet("deployer");
     val deployValue = counterDeployValue();
     val counterAddress = explicitCounterAddress();
-    val counter = targetCounter();
+    val counter = targetCounter(deployer.address);
     println("Deploy value: {}", deployValue);
     if (!scripts.isContractDeployed(counter.address)) {
         if (counterAddress != null) {
