@@ -4,21 +4,23 @@
 // them from the bytecode but records each mark's position into a separate dictionary:
 //
 //   RawDict<256>  (key = cell hash)
-//     value = 1 bit (is_normal) + HashmapE<u32, ...>  (key = mark_id)
+//     value = 1 bit (is_not_top_level) + HashmapE<u32, ...>  (key = mark_id)
 //       value = ref -> RawDict<10>  (key = 10-bit offset within cell)
 //
-// The cell hashes recorded by the assembler may differ from what TVM sees at runtime,
-// because TVM code is stored as a method dictionary (RawDict<19>) where each leaf cell
-// contains both the hashmap label (trie key prefix) and the method bytecode. The assembler
-// only sees the bytecode part, so its hash and offsets need adjustment.
+// The cell hashes recorded by the assembler may differ from what TVM sees at runtime.
+// Top-level procedure bodies are later stored in a method dictionary (RawDict<19>) where
+// each leaf cell contains both the hashmap label (trie key prefix) and the method bytecode.
+// The assembler only sees the bytecode part, so its hash and offsets need adjustment.
 //
 // We reconcile this using the code BOC: for each method, we find the actual leaf cell
-// in the trie and compute the offset adjustment (leaf_bits - value_bits).
+// in the trie and compute the offset adjustment (leaf_bits - value_bits). A missing
+// remap is not always a compiler error: Fift may keep stale debug entries for unused
+// or inlined procedures even after removing them from the final method dictionary.
 //
 // The result is: HashMap<cell_hash, Vec<(offset, mark_id)>> in TVM-visible coordinates.
 
 use anyhow::anyhow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use tycho_types::boc::Boc;
@@ -49,6 +51,11 @@ pub fn parse_debug_marks(
 
     let hash_remap = build_hash_remap(&code_cell)?;
 
+    // `hash_remap` only covers method-dict values. Long or split procedures can also
+    // leave a real cell with the raw hash somewhere under the final code root, so keep
+    // a cheap reachability index before deciding that a missing remap is stale.
+    let reachable_cell_hashes = collect_reachable_cell_hashes(&code_cell);
+
     let outer_dict = RawDict::<256>::from(Some(marks_cell));
     let mut result = DebugMarksDict::new();
 
@@ -57,15 +64,21 @@ pub fn parse_debug_marks(
 
         let raw_hash = hash_from_key_slice(kv.0.as_data_slice());
         let mut slice = kv.1;
-        let is_normal = slice.load_bit()?;
 
-        let (final_hash, offset_adj) = if is_normal {
-            (raw_hash.clone(), 0)
-        } else if let Some((leaf_hash, adj)) = hash_remap.get(&raw_hash) {
-            (leaf_hash.clone(), *adj)
-        } else {
-            eprintln!("WARNING: is_normal=false but hash {raw_hash} not in code dict");
-            (raw_hash, 0)
+        // Fift names this flag `isnottoplevel`. `true` means the recorded hash already
+        // points at a TVM-visible cell. `false` means a top-level proc body hash that
+        // usually needs remapping through the final RawDict<19> method dictionary.
+        let is_not_top_level = slice.load_bit()?;
+
+        let Some((final_hash, offset_adj)) = resolve_debug_mark_hash(
+            &raw_hash,
+            is_not_top_level,
+            &hash_remap,
+            &reachable_cell_hashes,
+        ) else {
+            // Stale top-level proc debug data. Useful inline marks are copied to the
+            // caller by Fift, so there is no runtime cell we can attach this entry to.
+            continue;
         };
 
         let inner_dict = Dict::<u32, CellSlice>::load_from(&mut slice)?;
@@ -118,13 +131,13 @@ fn build_hash_remap(code_cell: &Cell) -> anyhow::Result<HashMap<String, (String,
 
     let mut remap = HashMap::new();
     for kv in method_dict.iter() {
-        let Ok(kv) = kv else { continue };
+        let kv = kv?;
 
         // value_hash = hash of just the bytecode (what the assembler recorded)
         let value_bits = kv.1.size_bits();
         let mut builder = CellBuilder::new();
-        let _ = builder.store_slice(kv.1);
-        let value_cell = builder.build().expect("failed to build cell");
+        builder.store_slice(kv.1)?;
+        let value_cell = builder.build()?;
         let value_hash = cell_hash_string(&value_cell);
 
         // leaf_hash = hash of the full trie leaf cell (what TVM sees)
@@ -137,6 +150,57 @@ fn build_hash_remap(code_cell: &Cell) -> anyhow::Result<HashMap<String, (String,
         remap.insert(value_hash, (leaf_hash, adjustment));
     }
     Ok(remap)
+}
+
+fn collect_reachable_cell_hashes(root: &Cell) -> HashSet<String> {
+    let mut hashes = HashSet::new();
+    let mut stack = vec![root.clone()];
+
+    while let Some(cell) = stack.pop() {
+        // Cells form a DAG. Hash-based deduplication avoids walking shared tails twice
+        // and also gives the final membership set used by `resolve_debug_mark_hash`.
+        if !hashes.insert(cell_hash_string(&cell)) {
+            continue;
+        }
+
+        for index in 0..cell.reference_count() {
+            if let Some(child) = cell.reference_cloned(index) {
+                stack.push(child);
+            }
+        }
+    }
+
+    hashes
+}
+
+fn resolve_debug_mark_hash(
+    raw_hash: &str,
+    is_not_top_level: bool,
+    hash_remap: &HashMap<String, (String, i32)>,
+    reachable_cell_hashes: &HashSet<String>,
+) -> Option<(String, i32)> {
+    if is_not_top_level {
+        return Some((raw_hash.to_owned(), 0));
+    }
+
+    // Top-level procedure debug marks are recorded against the assembler-side method
+    // body hash. Runtime sees the whole hashmap leaf instead, so prefer this remap
+    // whenever the body is present as a direct value in the final method dictionary.
+    if let Some((leaf_hash, adj)) = hash_remap.get(raw_hash) {
+        return Some((leaf_hash.clone(), *adj));
+    }
+
+    // If the raw hash is still reachable as an actual cell, keep it. This protects long
+    // or split procedure bodies where the hash is not present as a direct dict value but
+    // can still appear in VM traces.
+    if reachable_cell_hashes.contains(raw_hash) {
+        return Some((raw_hash.to_owned(), 0));
+    }
+
+    // Fift can leave debug mark entries for unused or inlined top-level procs after
+    // removing those procs from the final method dictionary. They have no TVM-visible
+    // cell to attach to, while useful inline marks are re-added at the caller site.
+    None
 }
 
 // ---------------------------------------------------------------------------
