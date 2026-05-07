@@ -24,6 +24,7 @@ permissions: { }
 jobs:
   build:
     name: Build docs
+    if: github.event.pull_request.draft != true
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
