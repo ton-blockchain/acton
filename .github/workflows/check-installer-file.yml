@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+  PUBLIC_ACTON_REPOSITORY: ton-blockchain/acton
 
 permissions: { }
 
