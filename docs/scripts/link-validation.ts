@@ -37,7 +37,6 @@ export function createLinkValidationConfig(
         Card: {attributes: ["href"]},
         Cards: {attributes: ["href"]},
         Link: {attributes: ["href"]},
-        SourceCodeLink: {attributes: ["href"]},
         LandingVideo: {attributes: ["src"]},
       },
     },
