@@ -4946,6 +4946,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "dunce",
+ "expect-test",
  "include_dir",
  "num-bigint",
  "rustc-hash 2.1.1",

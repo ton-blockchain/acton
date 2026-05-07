@@ -1,4 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
+use crate::context::Wallet;
+use crate::tonconnect::TonConnectSession;
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
@@ -9,15 +11,19 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton_api::{GetMethodResult, Network, TonApiClient};
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::{Cell, CellSlice, CellSliceParts, HashBytes, Load};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, CellSliceParts, HashBytes, Load};
 use tycho_types::dict::{Dict, RawDict};
-use tycho_types::models::{CurrencyCollection, IntAddr, MsgInfo, OwnedMessage, StdAddr};
+use tycho_types::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
+    StdAddr,
+};
 
 const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
 const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
@@ -35,6 +41,8 @@ pub fn verify_cmd(
     wallet_name: Option<String>,
     compiler_version: Option<String>,
     dry_run: bool,
+    tonconnect: bool,
+    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
@@ -45,6 +53,16 @@ pub fn verify_cmd(
     let contract_path = contract.absolute_source_path(configured_project_root());
 
     let network = Network::from_str(&network)?;
+    if tonconnect {
+        crate::tonconnect::ensure_supported_network(&network)?;
+        if wallet_name.is_some() {
+            anyhow::bail!(
+                "{} cannot be used with {}; TON Connect uses the wallet selected in the browser",
+                "--wallet".yellow(),
+                "--tonconnect".yellow()
+            );
+        }
+    }
     if !matches!(network, Network::Mainnet | Network::Testnet) {
         anyhow::bail!(
             "Unsupported verification network {network}. Verification backends are available only for mainnet and testnet"
@@ -110,19 +128,47 @@ pub fn verify_cmd(
         format_ton_address(&contract_address, network == Network::Testnet).dimmed()
     );
 
-    let wallet_name = select_wallet(wallet_name, &config)?;
+    let local_wallet: Option<Wallet>;
+    let tonconnect_session: Option<Arc<TonConnectSession>>;
+    let sender_std_addr: StdAddr;
+    let sender_address: String;
 
-    let mut wallets = open_wallets(&config, Some(&network), true)?;
-    let wallet = wallets
-        .remove(&wallet_name)
-        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
+    if tonconnect {
+        let storage_path =
+            crate::tonconnect::session_storage_path(configured_project_root(), &network)?;
+        let session = Arc::new(TonConnectSession::start(tonconnect_port, storage_path)?);
+        let connected_wallet = session.connect(&network)?;
+        sender_std_addr = connected_wallet.address;
+        sender_address = format_std_address(&sender_std_addr, &network, false);
 
-    println!(
-        "  {} Using wallet: {} {}",
-        "→".blue().bold(),
-        wallet_name.cyan(),
-        format_ton_address(&wallet.wallet.address, network == Network::Testnet).dimmed()
-    );
+        println!(
+            "  {} Using TON Connect wallet: {}",
+            "→".blue().bold(),
+            sender_address.dimmed()
+        );
+
+        local_wallet = None;
+        tonconnect_session = Some(session);
+    } else {
+        let wallet_name = select_wallet(wallet_name, &config)?;
+
+        let mut wallets = open_wallets(&config, Some(&network), true)?;
+        let wallet = wallets
+            .remove(&wallet_name)
+            .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
+        sender_std_addr = wallet.address();
+        sender_address = format_ton_address(&wallet.wallet.address, network == Network::Testnet);
+
+        println!(
+            "  {} Using wallet: {} {}",
+            "→".blue().bold(),
+            wallet_name.cyan(),
+            sender_address.dimmed()
+        );
+
+        local_wallet = Some(wallet);
+        tonconnect_session = None;
+    }
 
     println!("  {} Using built-in verifier backends", "→".blue().bold());
     let backends_config = get_backends()?;
@@ -204,7 +250,7 @@ pub fn verify_cmd(
     let sources_object = SourcesObject {
         known_contract_hash: contract_hash.clone(),
         known_contract_address: format_ton_address(&contract_address, network == Network::Testnet),
-        sender_address: format_ton_address(&wallet.wallet.address, network == Network::Testnet),
+        sender_address,
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
@@ -490,22 +536,11 @@ pub fn verify_cmd(
     let cell_data = &msg_cell.data;
     let body_cell = Boc::decode(cell_data)?;
 
-    wait_for_rate_limit(api_client.has_api_key());
-
-    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    wait_for_rate_limit(api_client.has_api_key());
-
-    let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
-    let expire_at = expired_at_time
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs() as u32;
-
     let message_info = tycho_types::models::IntMsgInfo {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: IntAddr::Std(wallet.address()),
+        src: IntAddr::Std(sender_std_addr),
         dst: IntAddr::Std(ton_address_to_std_addr(&registry_address)),
         value: CurrencyCollection::new(100_000_000u128), // 0.1 TON
         ihr_fee: Default::default(),
@@ -521,7 +556,28 @@ pub fn verify_cmd(
         layout: None,
     };
 
-    let message_cell_boc = BocRepr::encode(message)?;
+    let message_cell = CellBuilder::build_from(message)?;
+
+    if let Some(tonconnect) = tonconnect_session {
+        let transaction = crate::tonconnect::transaction_from_message(&message_cell, &network)?;
+        tonconnect.send_transaction(transaction)?;
+        println!("  {} Transaction sent successfully", "✓".green().bold());
+        println!();
+        println!("{}", "✓ Contract verification completed!".green().bold());
+        show_verifier_link(&network, contract_address);
+        return Ok(());
+    }
+
+    let wallet = local_wallet.expect("local wallet must be available without --tonconnect");
+    wait_for_rate_limit(api_client.has_api_key());
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
+    wait_for_rate_limit(api_client.has_api_key());
+
+    let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
+    let expire_at = expired_at_time
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as u32;
+    let message_cell_boc = Boc::encode(message_cell);
     let message_cell = TonCell::from_boc(message_cell_boc)?;
 
     let external =
@@ -800,6 +856,18 @@ fn source_retry_delay(attempt: usize) -> std::time::Duration {
 
 fn format_ton_address(address: &TonAddress, is_testnet: bool) -> String {
     address.to_base64(!is_testnet, false, true)
+}
+
+fn format_std_address(address: &StdAddr, network: &Network, bounceable: bool) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet: network.uses_testnet_address_format(),
+            base64_url: true,
+            bounceable,
+        },
+    }
+    .to_string()
 }
 
 fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {

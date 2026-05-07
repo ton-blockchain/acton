@@ -42,6 +42,18 @@ If omitted, Acton auto-selects the only configured wallet or prompts when
 multiple wallets are available.
 {{/option}}
 
+{{#option "`--tonconnect`" }}
+Use TON Connect wallet approval for the verification transaction.
+
+This uses the wallet selected in the browser and conflicts with `--wallet`.
+{{/option}}
+
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port.
+
+Defaults to `52258`.
+{{/option}}
+
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
@@ -103,7 +115,7 @@ on-chain code-hash comparison against the target address before upload.
 - a `.tolk` contract source in the current project
 - a supported verifier network: `testnet` or `mainnet`
 - verifier backend availability for the selected network
-- a configured wallet, funded when not using `--dry-run`
+- a configured wallet or TON Connect wallet, funded when not using `--dry-run`
 - reproducible compiler settings that match the deployed contract
 
 ## Contract And Wallet Selection
@@ -114,13 +126,16 @@ on-chain code-hash comparison against the target address before upload.
 - if `--wallet` is omitted and exactly one wallet is configured, Acton selects
   it automatically
 - if multiple wallets are configured, Acton prompts for the wallet
+- if `--tonconnect` is used, Acton skips local wallet selection and uses the
+  wallet selected in the TON Connect page
 
 ## Requirements And Limitations
 
 - only `.tolk` sources can be verified
 - precompiled `.boc` contracts cannot be verified
 - `localnet` and `custom:<name>` are not supported by verifier backends
-- verification requires a funded wallet when not using `--dry-run`
+- verification requires a funded local or TON Connect wallet when not using
+  `--dry-run`
 - if a contract with the same code hash is already verified, the backend may
   skip the final transaction
 
@@ -173,6 +188,18 @@ acton verify Counter --address EQDt7LL... --net mainnet --dry-run
 `--dry-run` still compiles the contract, uploads sources to the verifier
 backend, and collects the required signatures. It skips only the final
 blockchain transaction.
+
+## TON Connect
+
+Use `--tonconnect` to approve the final verification transaction through a TON
+Connect wallet instead of a wallet configured in `wallets.toml`:
+
+```bash
+acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+```
+
+Acton starts a local TON Connect page and opens it in the browser. Use
+`--tonconnect-port` when the default page port is already busy.
 
 ## Retries And Failure Hints
 

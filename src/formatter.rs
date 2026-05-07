@@ -1369,6 +1369,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Null => "null".to_owned(),
+            UnpackedValue::Void => "(void)".to_owned(),
             UnpackedValue::Number(value) => value.to_string(),
             UnpackedValue::Bool(value) => value.to_string(),
             UnpackedValue::String(value) => format!("{value:?}"),

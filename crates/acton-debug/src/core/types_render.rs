@@ -315,6 +315,28 @@ impl RenderedValue {
             RenderedValue::CellOf {
                 type_name,
                 value,
+                fields,
+                ..
+            } if cell_of_has_decoded(fields) => {
+                writeln!(
+                    out,
+                    "{} {} {}",
+                    pretty_magenta(type_name, options),
+                    pretty_dimmed(value, options),
+                    pretty_dimmed("{", options)
+                )?;
+                for (name, value) in fields {
+                    write_indent(out, indent + 4)?;
+                    write!(out, "{name}: ")?;
+                    value.write_pretty(out, indent + 4, options)?;
+                    writeln!(out, ",")?;
+                }
+                write_indent(out, indent)?;
+                write!(out, "{}", pretty_dimmed("}", options))
+            }
+            RenderedValue::CellOf {
+                type_name,
+                value,
                 raw,
                 ..
             } => write!(
@@ -394,6 +416,7 @@ impl RenderedValue {
     fn wants_multiline_pretty(&self) -> bool {
         match self {
             RenderedValue::Struct { fields, .. } => !fields.is_empty(),
+            RenderedValue::CellOf { fields, .. } => cell_of_has_decoded(fields),
             RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
                 items.iter().any(Self::wants_multiline_pretty)
             }
@@ -402,6 +425,10 @@ impl RenderedValue {
             _ => false,
         }
     }
+}
+
+fn cell_of_has_decoded(fields: &[(String, RenderedValue)]) -> bool {
+    fields.iter().any(|(name, _)| name == "decoded")
 }
 
 fn pretty_field_name<'a>(
@@ -1565,22 +1592,12 @@ pub(crate) fn render_runtime_storage_with_abi(
 
 fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> RenderedValue {
     let type_name = render_ty(symbols, ty_idx);
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
+    if abi_object_is_enum(symbols, shape_ty_idx) {
+        return render_abi_enum_data(symbols, data, type_name, shape_ty_idx);
+    }
+
     match data {
-        UnpackedValue::Object { name, fields } if abi_object_is_enum(symbols, ty_idx) => {
-            let mut fields = fields.into_iter();
-            match fields.next() {
-                Some((_, value)) => {
-                    let enum_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
-                    let raw_ty_idx = enum_raw_value_ty(symbols, enum_ty_idx).unwrap_or(ty_idx);
-                    render_enum_value_name(
-                        type_name,
-                        name,
-                        render_abi_data(symbols, value, raw_ty_idx),
-                    )
-                }
-                None => typed_leaf(type_name, name),
-            }
-        }
         UnpackedValue::Object { name, fields } => {
             let object_ty_idx = abi_object_context_ty(symbols, &name, ty_idx).unwrap_or(ty_idx);
             RenderedValue::Struct {
@@ -1613,10 +1630,28 @@ fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> R
             typed_leaf(type_name, format_abi_bits(&bytes, bit_len))
         }
         UnpackedValue::Null => typed_leaf(type_name, "null"),
+        UnpackedValue::Void => typed_leaf(type_name, "(void)"),
         UnpackedValue::Number(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::Bool(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::String(value) => typed_leaf(type_name, format!("\"{value}\"")),
     }
+}
+
+fn render_abi_enum_data(
+    symbols: &SourceMap,
+    data: UnpackedValue,
+    type_name: String,
+    enum_ty_idx: TyIdx,
+) -> RenderedValue {
+    let raw_ty_idx = enum_raw_value_ty(symbols, enum_ty_idx).unwrap_or(enum_ty_idx);
+    let value_name = abi_enum_value_name(symbols, enum_ty_idx, &data)
+        .unwrap_or_else(|| abi_enum_fallback_value(symbols, enum_ty_idx, &data));
+
+    render_enum_value_name(
+        type_name,
+        value_name,
+        render_abi_data(symbols, data, raw_ty_idx),
+    )
 }
 
 fn render_abi_array_items(
@@ -1675,8 +1710,15 @@ fn render_abi_map(
 }
 
 fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty_idx: TyIdx) -> String {
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, key_ty_idx).unwrap_or(key_ty_idx);
+    if abi_object_is_enum(symbols, shape_ty_idx) {
+        return abi_enum_value_name(symbols, shape_ty_idx, data)
+            .unwrap_or_else(|| abi_enum_fallback_value(symbols, shape_ty_idx, data));
+    }
+
     match data {
         UnpackedValue::Null => "null".to_owned(),
+        UnpackedValue::Void => "(void)".to_owned(),
         UnpackedValue::Number(value) => value.to_string(),
         UnpackedValue::Bool(value) => value.to_string(),
         UnpackedValue::String(value) => format!("\"{value}\""),
@@ -1709,6 +1751,34 @@ fn enum_raw_value_ty(symbols: &SourceMap, ty_idx: TyIdx) -> Option<TyIdx> {
         Ty::EnumRef { enum_name } => Some(symbols.get_enum(enum_name).encoded_as_ty_idx),
         Ty::AliasRef { .. } => enum_raw_value_ty(symbols, symbols.alias_target_of(ty_idx)?),
         _ => None,
+    }
+}
+
+fn abi_enum_value_name(symbols: &SourceMap, ty_idx: TyIdx, data: &UnpackedValue) -> Option<String> {
+    let Ty::EnumRef { enum_name } = symbols.ty_by_idx(ty_idx)? else {
+        return None;
+    };
+    let enum_ref = symbols.get_enum(enum_name);
+    enum_ref
+        .members
+        .iter()
+        .find(|member| match data {
+            UnpackedValue::Number(value) => member.value == value.to_string(),
+            UnpackedValue::Bool(value) => member.value == value.to_string(),
+            _ => false,
+        })
+        .map(|member| format!("{}.{}", enum_ref.name, member.name))
+}
+
+fn abi_enum_fallback_value(symbols: &SourceMap, ty_idx: TyIdx, data: &UnpackedValue) -> String {
+    let enum_name = match symbols.ty_by_idx(ty_idx) {
+        Some(Ty::EnumRef { enum_name }) => enum_name.as_str(),
+        _ => return format!("{data:?}"),
+    };
+    match data {
+        UnpackedValue::Number(value) => format!("{enum_name}({value})"),
+        UnpackedValue::Bool(value) => format!("{enum_name}({value})"),
+        other => format!("{enum_name}({other:?})"),
     }
 }
 
@@ -3466,10 +3536,11 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
 mod tests {
     use super::*;
     use tolk_compiler::abi::{
-        ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField,
+        ABICustomPackUnpack, ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage,
+        ABIStructField,
     };
     use tolk_compiler::source_map::{
-        AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
+        AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
     use tolk_compiler::types_kernel::UnionVariant;
     use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
@@ -3609,14 +3680,7 @@ mod tests {
             })],
             unique_types,
         );
-        let rendered = render_abi_data(
-            &symbols,
-            UnpackedValue::Object {
-                name: "Color.Blue".to_owned(),
-                fields: vec![("value".to_owned(), UnpackedValue::Number(2.into()))],
-            },
-            color_ty_idx,
-        );
+        let rendered = render_abi_data(&symbols, UnpackedValue::Number(2.into()), color_ty_idx);
 
         let RenderedValue::EnumValue {
             type_name,
@@ -3871,6 +3935,114 @@ mod tests {
         assert_eq!(decoded_fields[0].0, "count");
         assert_eq!(decoded_fields[0].1.dap_parts().0, "7");
         assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_typed_cell_decodes_builtin_tlb_varuint_custom_aliases() {
+        let mut unique_types = Vec::new();
+        let int_ty_idx = add_ty(&mut unique_types, Ty::Int);
+        let varuint7_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::AliasRef {
+                alias_name: "TlbVarUint7".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let varuint3_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::AliasRef {
+                alias_name: "TlbVarUint3".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let gas_record_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::StructRef {
+                struct_name: "GasRecord".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let custom_pack_unpack = Some(ABICustomPackUnpack {
+            pack_to_builder: Some(true),
+            unpack_from_slice: Some(true),
+        });
+        let symbols = source_map_with_declarations_and_types(
+            vec![
+                Declaration::Alias(AbiAlias {
+                    name: "TlbVarUint7".to_owned(),
+                    ty_idx: varuint7_ty_idx,
+                    ident_loc: loc(),
+                    target_ty_idx: int_ty_idx,
+                    type_params: None,
+                    custom_pack_unpack: custom_pack_unpack.clone(),
+                }),
+                Declaration::Alias(AbiAlias {
+                    name: "TlbVarUint3".to_owned(),
+                    ty_idx: varuint3_ty_idx,
+                    ident_loc: loc(),
+                    target_ty_idx: int_ty_idx,
+                    type_params: None,
+                    custom_pack_unpack,
+                }),
+                Declaration::Struct(AbiStruct {
+                    name: "GasRecord".to_owned(),
+                    ty_idx: gas_record_ty_idx,
+                    ident_loc: loc(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![
+                        FieldInfo {
+                            name: "gasUsed".to_owned(),
+                            ty_idx: varuint7_ty_idx,
+                        },
+                        FieldInfo {
+                            name: "gasCredit".to_owned(),
+                            ty_idx: varuint3_ty_idx,
+                        },
+                    ],
+                    custom_pack_unpack: None,
+                }),
+            ],
+            unique_types,
+        );
+        let mut builder = CellBuilder::new();
+        builder.store_uint(1, 3).unwrap();
+        builder.store_uint(118, 8).unwrap();
+        builder.store_uint(2, 2).unwrap();
+        builder.store_uint(1024, 16).unwrap();
+        let cell = builder.build().unwrap();
+
+        let rendered = render_typed_cell(
+            &symbols,
+            "Cell<GasRecord>".to_owned(),
+            gas_record_ty_idx,
+            &CellLike::Cell(Boc::encode_hex(&cell)),
+        );
+
+        let RenderedValue::CellOf { fields, .. } = rendered else {
+            panic!("expected CellOf");
+        };
+        assert_eq!(fields[0].0, "decoded");
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded cell");
+        };
+        assert_eq!(type_name, "GasRecord");
+        assert_eq!(decoded_fields[0].0, "gasUsed");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "118");
+        assert_eq!(
+            decoded_fields[0].1.dap_parts().1.as_deref(),
+            Some("TlbVarUint7")
+        );
+        assert_eq!(decoded_fields[1].0, "gasCredit");
+        assert_eq!(decoded_fields[1].1.dap_parts().0, "1024");
+        assert_eq!(
+            decoded_fields[1].1.dap_parts().1.as_deref(),
+            Some("TlbVarUint3")
+        );
     }
 
     #[test]
