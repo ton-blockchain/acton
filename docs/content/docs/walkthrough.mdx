@@ -529,6 +529,7 @@ fun targetCounter(): Counter {
     val expected = Counter.fromStorage(Storage {
         id: 0,
         counter: 0,
+        owner: deployer.address,
     });
     val counterAddress = explicitCounterAddress();
     if (counterAddress == null) {
