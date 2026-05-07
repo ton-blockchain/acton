@@ -26,23 +26,50 @@ acton test --mutate --mutate-contract Voter
 
 ```acton-cli
 $ acton test --mutate --mutate-contract Voter
-   Compiling contracts
-    Finished in 620.11µs
-     Running tests (mutation mode)
 
- Mutating: Voter (12 mutations)
+Mutation Testing
+────────────────────────────────────────────────────────────
+Session:  20260507-103452-7d8c
+Contract: Voter
+Source:   contracts/voter.tolk
+Files:    1
+Mutants:  8
 
-  ✓ Mutation 1: replaced `== storage.poll` with `!= storage.poll`  killed in 3ms
-  ✓ Mutation 2: replaced `!storage.hasVoted` with `storage.hasVoted`  killed in 4ms
-  ✓ Mutation 3: removed `storage.hasVoted = true`  killed in 3ms
-  ...
-  ✗ Mutation 7: replaced `Errors.AlreadyVoted` with `Errors.NotFromPoll`  survived
+  ◉ Mutation 1/8 contracts/voter.tolk:23 Replace == with != KILLED
+  ◉ Mutation 2/8 contracts/voter.tolk:23 Remove assert statements KILLED
+  ◉ Mutation 3/8 contracts/voter.tolk:23 Remove throw keyword KILLED
+  ◉ Mutation 4/8 contracts/voter.tolk:24 Remove logical NOT (`!`) KILLED
+  ◉ Mutation 5/8 contracts/voter.tolk:24 Remove assert statements SURVIVED
+  ◉ Mutation 6/8 contracts/voter.tolk:24 Remove throw keyword KILLED
+  ◉ Mutation 7/8 contracts/voter.tolk:25 Replace `true` with `false` KILLED
+  ◉ Mutation 8/8 contracts/voter.tolk:26 Remove save() method calls KILLED
 
- Mutation score: 11/12 (91.7%)
- 1 survivor found.
+    Total mutants        8
+  ✓ Killed               7
+  ✗ Survived             1
+  ! Compile errors       0
+
+  ◆ Mutation Score       87.5%
+
+Survived Mutants
+────────────────────────────────────────────────────────────
+
+  ✗ Mutation #5
+  Rule:  Remove assert statements [remove_assert]
+  Level: critical
+  Group: assertion
+  at contracts/voter.tolk:24
+    23 │     assert (in.senderAddress == storage.poll) throw Errors.NotFromPoll;
+    24 │     assert (!storage.hasVoted) throw Errors.AlreadyVoted;
+    25 │     storage.hasVoted = true;
+
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
+────────────────────────────────────────────────────────────
+These mutants were not caught by your tests!
+Consider adding more test cases to improve mutation coverage.
 ```
 
-One mutation survived: changing `Errors.AlreadyVoted` to `Errors.NotFromPoll` in Voter's assert. Tests checked that a duplicate vote is rejected — but none checked the specific exit code. Add one:
+One mutation survived: removing `assert (!storage.hasVoted) throw Errors.AlreadyVoted` from Voter (rule `remove_assert`). The earlier test suite never sends a duplicate vote, so deleting the duplicate-vote check goes unnoticed. Add a test that exercises that path:
 
 ```tolk title="tests/poll.test.tolk"
 get fun `test voter exits with AlreadyVoted on duplicate`() {
@@ -53,18 +80,18 @@ get fun `test voter exits with AlreadyVoted on duplicate`() {
     expect(res1).toHaveAllSuccessfulTxs();
 
     val voterAddr = poll.calcVoterAddress(alice.address);
-    val voter     = Voter.fromAddress(voterAddr);
+    val voter = Voter.fromAddress(voterAddr);
 
     val directMsg = createMessage({
         bounce: false,
-        value:  ton("0.05"),
-        dest:   voter.address,
-        body:   Vote { option: 0 },
+        value: ton("0.05"),
+        dest: voter.address,
+        body: Vote { option: 0 },
     });
     val res2 = net.send(poll.address, directMsg);
     expect(res2).toHaveFailedTx({
-        from:     poll.address,
-        to:       voter.address,
+        from: poll.address,
+        to: voter.address,
         exitCode: Errors.AlreadyVoted as int,
     });
 }
@@ -77,8 +104,14 @@ acton test --mutate --mutate-contract Voter
 ```
 
 ```acton-cli
- Mutation score: 12/12 (100%)
- No survivors.
+    Total mutants        8
+  ✓ Killed               8
+  ✗ Survived             0
+  ! Compile errors       0
+
+  ◆ Mutation Score       100.0%
+
+✓ Excellent! All mutants were killed!
 ```
 
 ## Run mutation testing on Poll
@@ -93,7 +126,7 @@ Address any survivors. Common ones:
 - Off-by-one in increment or decrement operations
 
 <Callout type="tip">
-  Use `--mutation-diff` to test only mutations in lines changed since the main branch — useful in CI to skip re-testing stable code.
+  Use `--mutation-diff branch` to test only mutations on lines changed on the current branch since its merge base — useful in CI to skip re-testing stable code. Other modes are `worktree` (vs. `HEAD`) and `ref` (vs. an explicit `--mutation-diff-ref *REF*`). See the [mutation testing docs](/docs/testing/mutation-testing/overview) for details.
 </Callout>
 
 ## Add a fuzz test for the option boundary
@@ -111,9 +144,9 @@ get fun `fuzz vote option boundary`(option: uint8) {
 
     val msg = createMessage({
         bounce: false,
-        value:  ton("0.1"),
-        dest:   poll.address,
-        body:   Vote { option },
+        value: ton("0.1"),
+        dest: poll.address,
+        body: Vote { option },
     });
     val res = net.send(alice.address, msg);
 
@@ -121,8 +154,8 @@ get fun `fuzz vote option boundary`(option: uint8) {
         expect(res).toHaveSuccessfulTx({ from: alice.address, to: poll.address });
     } else {
         expect(res).toHaveFailedTx({
-            from:     alice.address,
-            to:       poll.address,
+            from: alice.address,
+            to: poll.address,
             exitCode: Errors.InvalidOption as int,
         });
     }
