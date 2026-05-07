@@ -19,18 +19,19 @@ import {InlineInstallationCommand} from "@/components/InstallationCodeBlock"
 import {LandingVideo} from "@/components/LandingVideo"
 import logoDark from "@/public/logo-dark.svg"
 
-const landingOgImage = "/og/home/image.png"
+const landingUrl = "https://ton-blockchain.github.io/acton"
+const landingOgImage = `${landingUrl}/og/home/image.png`
 
 export const metadata: Metadata = {
   title: "Acton — TON Development Toolkit",
   description:
     "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
-  metadataBase: new URL("https://ton-blockchain.github.io/acton"),
+  metadataBase: new URL(landingUrl),
   openGraph: {
     title: "Acton — TON Development Toolkit",
     description:
       "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
-    url: "https://ton-blockchain.github.io/acton",
+    url: landingUrl,
     images: landingOgImage,
     locale: "en_US",
     type: "website",

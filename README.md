@@ -29,7 +29,7 @@ Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 The recommended way to get Acton today is to run the latest public installer:
 
 ```bash
-curl -LsSf https://ton.org/acton/install.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh
 ```
 
 If you prefer a manual download, use the latest public release:

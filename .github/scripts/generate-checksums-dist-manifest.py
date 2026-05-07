@@ -103,22 +103,25 @@ def archive_checksum_artifacts(manifest: Manifest) -> ArchiveChecksumFileMapping
 
     checksums_by_archive: ArchiveChecksumFileMapping = {}
     for archive_name, artifact in artifacts.items():
-        if not archive_name.endswith(".tar.gz"):
+        if not archive_name.startswith("acton-") or not archive_name.endswith(".tar.gz"):
             continue
 
         checksum_name = artifact.get("checksum")
-        if not checksum_name.endswith(".tar.gz.sha256"):
-            raise ValueError(f"expected artifact `{archive_name}` to reference a .tar.gz.sha256 checksum")
+        expected_checksum_name = f"{archive_name}.sha256"
+        if checksum_name != expected_checksum_name:
+            raise ValueError(f"expected artifact `{archive_name}` to reference checksum `{expected_checksum_name}`")
+
+        checksum_artifact = artifacts.get(checksum_name)
+        if checksum_artifact is None:
+            raise ValueError(f"expected cargo-dist manifest artifacts to contain `{checksum_name}`")
+
+        if checksum_artifact.get("kind") != "checksum":
+            raise ValueError(f"expected cargo-dist manifest artifact `{checksum_name}` to be a checksum")
 
         checksums_by_archive[archive_name] = checksum_name
 
     if len(checksums_by_archive) == 0:
         raise ValueError("cargo-dist manifest did not define any .tar.gz archives with checksums")
-
-    if len(checksums_by_archive) * 2 != len(artifacts):
-        raise ValueError(
-            "expected cargo-dist manifest artifacts to contain one checksum artifact for each .tar.gz archive"
-        )
 
     return checksums_by_archive
 
